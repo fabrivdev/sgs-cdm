@@ -33,7 +33,7 @@ export default function Auth() {
             <Wrench className="h-6 w-6" />
           </div>
           <CardTitle className="text-2xl">Servicios Técnicos</CardTitle>
-          <CardDescription>CLAAS · HORSCH — Acceso interno</CardDescription>
+          <CardDescription>Acceso interno</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
