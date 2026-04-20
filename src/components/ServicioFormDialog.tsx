@@ -94,6 +94,9 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
       trabajo_descripcion: trabajo,
       observaciones: observaciones || null,
       creado_por: user?.id,
+      // dia_semana and semana are auto-computed by DB trigger
+      dia_semana: "",
+      semana: 0,
     };
 
     const { error } = servicio
