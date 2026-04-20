@@ -90,24 +90,32 @@ export default function Historial() {
             <p className="text-sm text-muted-foreground">Sin servicios registrados.</p>
           ) : (
             <ul className="space-y-2">
-              {historial.map((s) => (
-                <li key={s.id}>
-                  <button onClick={() => setDetalle(s)} className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium tabular-nums">{format(parseISO(s.fecha_programada), "dd/MM/yyyy")}</span>
-                      <div className="flex items-center gap-2">
-                        <MarcaBadge marca={s.marca} />
-                        <EstadoBadge estado={s.estado} />
+              {historial.map((s) => {
+                const tipo = s.tipo_trabajo ?? "Visita de campo";
+                const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
+                return (
+                  <li key={s.id}>
+                    <button onClick={() => setDetalle(s)} className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium tabular-nums">{format(parseISO(s.fecha_programada), "dd/MM/yyyy")}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="gap-0.5 px-1.5 py-0 text-[10px]">
+                            <TipoIcon className="h-2.5 w-2.5" />
+                            {tipo === "Máquina en taller" ? "Taller" : "Visita"}
+                          </Badge>
+                          <MarcaBadge marca={s.marca} />
+                          <EstadoBadge estado={s.estado} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-1 text-sm">{s.trabajo_descripcion}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] : "—"}
-                      {s.horas_trabajadas != null && ` · ${s.horas_trabajadas} hs`}
-                    </div>
-                  </button>
-                </li>
-              ))}
+                      <div className="mt-1 text-sm">{s.trabajo_descripcion}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] : "—"}
+                        {s.horas_trabajadas != null && ` · ${s.horas_trabajadas} hs`}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
