@@ -27,6 +27,7 @@ const COLORS_MARCA: Record<Marca, string> = {
 export default function Dashboard() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
 
@@ -34,9 +35,11 @@ export default function Dashboard() {
     Promise.all([
       supabase.from("servicios").select("id, fecha_programada, tecnico_responsable_id, sucursal, marca, estado, horas_trabajadas"),
       supabase.from("profiles").select("id, nombre"),
-    ]).then(([s, p]) => {
+      supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
+    ]).then(([s, p, r]) => {
       setServicios((s.data ?? []) as Servicio[]);
       setProfiles((p.data ?? []) as Profile[]);
+      setAdminIds(new Set((r.data ?? []).map((x: { user_id: string }) => x.user_id)));
     });
   }, []);
 
