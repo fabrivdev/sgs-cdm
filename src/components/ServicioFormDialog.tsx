@@ -142,12 +142,12 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-          <DialogTitle>{servicio ? "Editar servicio" : "Nuevo servicio"}</DialogTitle>
+      <DialogContent className="max-w-xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 rounded-lg">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 shrink-0">
+          <DialogTitle className="text-base sm:text-lg pr-6">{servicio ? "Editar servicio" : "Nuevo servicio"}</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto px-6">
-          <div className="space-y-4 py-2">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+          <div className="space-y-3 sm:space-y-4 py-2">
             {/* Fecha + Tipo */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -328,9 +328,9 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
             </Collapsible>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 border-t shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? "Guardando…" : "Guardar"}</Button>
+        <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 border-t shrink-0 flex-row gap-2 sm:gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none">Cancelar</Button>
+          <Button onClick={submit} disabled={busy} className="flex-1 sm:flex-none">{busy ? "Guardando…" : "Guardar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
