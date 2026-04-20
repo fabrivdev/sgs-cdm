@@ -1,52 +1,98 @@
 
-# Ajustes al modelo antes de la carga masiva
+# Optimización UX: tabla, calendario, formulario y campos de servicio
 
-## Cambios solicitados
-1. **Clientes sin sucursal fija**: un cliente puede recibir servicios en cualquier sucursal.
-2. **Técnicos pueden trabajar en cualquier sucursal**: la `sucursal` del perfil es sólo su base, no una restricción. Equipo HORSCH Brasil y cualquier técnico puede ser asignado a servicios de otras sucursales.
+## 1. Nuevo campo: tipo de trabajo (Visita / Taller)
 
-## Cambios de schema (migración)
+**Schema (migración):**
+- Agregar enum `tipo_trabajo` con valores: `'Visita de campo'`, `'Máquina en taller'`.
+- Agregar columna `tipo_trabajo` a `servicios` (NOT NULL, default `'Visita de campo'`).
 
-### Tabla `clientes`
-- `sucursal` pasa de `NOT NULL` a **nullable** (o se elimina). Decisión: la dejo **nullable** para no romper datos existentes y permitir guardar opcionalmente la sucursal "principal" del cliente si se desea, pero ya no se usa para filtrar ni para validar.
-- Actualizar las RLS de `clientes`:
-  - **SELECT**: cualquier usuario autenticado ve todos los clientes (necesario para que un técnico de Santa Rita pueda asignar un servicio a un cliente "de" Campo 9).
-  - **INSERT/UPDATE**: admin y cabecilla (sin filtro de sucursal del cliente).
-  - **DELETE**: sólo admin.
+Se mostrará como badge junto al estado en la tabla y como ícono (📍 visita / 🔧 taller) en el calendario.
 
-### Tabla `profiles`
-- No cambia el schema (`sucursal` ya es nullable). La sucursal queda como informativa = "base" del técnico.
-- No se aplica ninguna restricción adicional: un técnico puede ser `tecnico_responsable_id` o estar en `auxiliares` de un servicio de cualquier sucursal.
+## 2. Cliente como texto libre + auto-creación
 
-### Tabla `servicios`
-- No cambia. La columna `sucursal` del servicio sigue indicando dónde se ejecuta el trabajo, independiente de la base del técnico.
-- Las RLS actuales ya permiten que el técnico vea el servicio si es responsable o auxiliar (sin importar la sucursal del servicio vs. su base) ✓.
+En vez de un `<Select>` con lookup, usamos un `Input` con autocompletado simple (datalist) que muestra los clientes existentes. Al guardar:
+- Si el texto coincide con un cliente existente (case-insensitive) → uso ese `cliente_id`.
+- Si es un nombre nuevo → lo creo automáticamente en `clientes` y uso el id resultante.
 
-## Ajustes en el frontend
+Elimina el doble campo "cliente existente / nuevo cliente" actual y simplifica todo en un solo input.
 
-### `ServicioFormDialog`
-- Selector de **cliente**: mostrar todos los clientes (sin filtrar por sucursal del servicio).
-- Selector de **técnico responsable** y **auxiliares**: mostrar todos los técnicos activos (sin filtrar por sucursal). Mostrar la sucursal base entre paréntesis para referencia visual: `Juan Pérez (Santa Rita)`.
+## 3. Formulario de servicio simplificado
 
-### `Admin` (gestión de clientes)
-- Hacer el campo "sucursal" del cliente **opcional** en el formulario (etiqueta: "Sucursal principal (opcional)").
-- En la lista de clientes mostrar "—" cuando no haya sucursal.
+Reorganizo `ServicioFormDialog` para reducir fricción visual:
 
-### `Historial`
-- El buscador de clientes ya no filtra por sucursal del usuario; muestra el listado completo.
+```text
+┌─────────────────────────────────────────┐
+│ Fecha          │ Tipo (Visita/Taller)   │
+├─────────────────────────────────────────┤
+│ Cliente (input con autocomplete)        │
+├─────────────────────────────────────────┤
+│ Trabajo o problema a resolver           │
+│ [textarea grande, prominente]           │
+├─────────────────────────────────────────┤
+│ Sucursal       │ Marca                  │
+├─────────────────────────────────────────┤
+│ Responsable    │ Auxiliares (chips)     │
+├─────────────────────────────────────────┤
+│ ▸ Observaciones (colapsable, opcional)  │
+└─────────────────────────────────────────┘
+```
 
-## Carga masiva del Excel (después de aplicar lo anterior)
+Cambios concretos:
+- Renombro la etiqueta "Descripción del trabajo" → **"Trabajo o problema a resolver"**.
+- Auxiliares pasa de lista de checkboxes a **chips clickeables** compactos (técnico activo = chip relleno).
+- "Observaciones" queda en un `Collapsible` cerrado por defecto.
+- Quito el campo "Cliente existente" + "Nuevo cliente"; queda un solo input con `<datalist>`.
 
-Una sola transacción SQL que hace:
+## 4. Tabla del Planificador más compacta
 
-1. **Insert de 27 perfiles** con uuids generados. Cada uno con su sucursal base del Excel (`EQUIPO TÉCNICO HORSCH BRASIL` con sucursal = `Campo 9` como base, pero podrá ser asignado a servicios de cualquier sucursal).
-2. **Insert de ~22 clientes** con uuids generados, **sin sucursal** (NULL), `ON CONFLICT (nombre) DO NOTHING` para evitar duplicados.
-3. **Insert de 27 servicios** resolviendo `tecnico_responsable_id` y `cliente_id` por nombre vía subqueries. La columna `sucursal` del servicio se toma de la columna "SUCURSAL" del Excel (la sucursal donde se ejecuta el trabajo).
+Problema actual: 12 columnas para 1071px de viewport → todo muy apretado y mal alineado.
 
-Para que el `ON CONFLICT` funcione en clientes agrego un **índice único en `clientes.nombre`** dentro de la misma migración.
+Reduzco a **8 columnas** densas:
 
-## Resultado esperado
-- Vas a poder asignar cualquier técnico a cualquier servicio sin importar su sucursal base.
-- El Equipo HORSCH Brasil aparece como técnico disponible en todas las sucursales.
-- Los clientes son globales: cualquier sucursal puede crear servicios para cualquier cliente.
-- Los 27 servicios del Excel quedan cargados con sus técnicos, auxiliares y clientes correctamente vinculados.
+| Fecha | Cliente | Trabajo | Marca/Tipo | Responsable | Suc. | Estado | Hs |
+
+- Fusiono `Día` + `Sem` dentro de `Fecha` (segunda línea pequeña: "Lun · S16").
+- Fusiono `Marca` + `Tipo` en una sola celda con dos badges chicos.
+- Muevo `Auxiliares` y `Observaciones` al diálogo de detalle (no se ven en tabla).
+- Bajo padding global de la tabla a `py-2 px-3` (override) en vez del `p-4` por defecto.
+- Reduzco tamaño de fuente a `text-[13px]` y uso `text-xs` para metadatos.
+- `Trabajo` toma el ancho restante con `truncate` + tooltip.
+- Estado: badge clickeable que abre un popover con las 3 opciones (en vez del Select grande actual).
+
+Resultado: la tabla cabe sin scroll horizontal en pantallas medianas.
+
+## 5. Calendario con vista de día expandible
+
+Cuando el usuario hace click en un día del calendario:
+- Se abre un **Sheet lateral** (drawer derecho) con el listado completo de servicios de ese día.
+- Cada item del sheet muestra: hora/tipo, cliente, técnico, marca y estado clickeable.
+- Click en un item → abre el `ServicioDetalleDialog` existente.
+- Botón "+ Nuevo servicio" en el header del sheet (preselecciona la fecha) si el usuario puede crear.
+
+Cambio adicional en la grilla del calendario:
+- Cada celda muestra hasta 3 servicios (en vez de 4) para que se vean mejor.
+- El "+N más" se reemplaza por el click al día completo (toda la celda es clickeable).
+- Click en un evento individual sigue abriendo el detalle directo (con `stopPropagation`).
+
+## 6. Detalles técnicos
+
+**Migración SQL:**
+```sql
+CREATE TYPE public.tipo_trabajo AS ENUM ('Visita de campo','Máquina en taller');
+ALTER TABLE public.servicios
+  ADD COLUMN tipo_trabajo public.tipo_trabajo NOT NULL DEFAULT 'Visita de campo';
+```
+
+**Archivos a modificar:**
+- `supabase/migrations/...` — nuevo enum y columna.
+- `src/lib/constants.ts` — exportar `TIPOS_TRABAJO` y tipo `TipoTrabajo`.
+- `src/components/ServicioFormDialog.tsx` — rediseño completo (cliente input, layout, observaciones colapsable, campo tipo).
+- `src/components/ServicioDetalleDialog.tsx` — mostrar tipo y auxiliares.
+- `src/pages/Planificador.tsx` — tabla compacta de 8 columnas, popover de estado, exportar incluye `Tipo`.
+- `src/pages/Calendario.tsx` — Sheet lateral al click en día, ícono de tipo en eventos.
+- `src/pages/Historial.tsx` — agregar columna Tipo.
+
+**Sin cambios destructivos:** los servicios existentes reciben `Visita de campo` por default; podés cambiarlos manualmente luego desde el detalle.
+
+**Elementos nuevos shadcn ya disponibles:** `Sheet`, `Popover`, `Collapsible` — todos ya están en el proyecto.
