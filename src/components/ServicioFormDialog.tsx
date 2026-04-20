@@ -241,32 +241,73 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
               </Select>
             </div>
 
-            {/* Auxiliares como chips */}
+            {/* Auxiliares — combobox multi-select */}
             <div className="space-y-1.5">
               <Label>Auxiliares <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
               {auxDisponibles.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No hay técnicos disponibles.</p>
               ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {auxDisponibles.map((p) => {
-                    const active = auxiliares.includes(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => toggleAux(p.id)}
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-input bg-background hover:bg-accent"
-                        )}
-                      >
-                        {p.nombre}
-                      </button>
-                    );
-                  })}
-                </div>
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                        <span className="truncate">
+                          {auxiliares.length === 0
+                            ? "Seleccionar auxiliares"
+                            : `${auxiliares.length} seleccionado${auxiliares.length === 1 ? "" : "s"}`}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar técnico…" className="h-9" />
+                        <CommandList>
+                          <CommandEmpty>Sin resultados.</CommandEmpty>
+                          <CommandGroup>
+                            {auxDisponibles.map((p) => {
+                              const active = auxiliares.includes(p.id);
+                              return (
+                                <CommandItem
+                                  key={p.id}
+                                  value={`${p.nombre} ${p.sucursal ?? ""}`}
+                                  onSelect={() => toggleAux(p.id)}
+                                  className="cursor-pointer"
+                                >
+                                  <Checkbox checked={active} className="mr-2 pointer-events-none" />
+                                  <span className="flex-1 truncate">{p.nombre}</span>
+                                  {p.sucursal && (
+                                    <span className="ml-2 text-[10px] text-muted-foreground">{p.sucursal}</span>
+                                  )}
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {auxiliares.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {auxiliares.map((id) => {
+                        const p = profiles.find((x) => x.id === id);
+                        if (!p) return null;
+                        return (
+                          <Badge key={id} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px] font-normal">
+                            {p.nombre}
+                            <button
+                              type="button"
+                              onClick={() => toggleAux(id)}
+                              className="rounded-sm hover:bg-background/60 p-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
