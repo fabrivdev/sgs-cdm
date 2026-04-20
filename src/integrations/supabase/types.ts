@@ -16,24 +16,248 @@ export type Database = {
     Tables: {
       clientes: {
         Row: {
+          activo: boolean
+          correo_principal: string | null
           creado_en: string
+          direccion: string | null
           id: string
+          localidad: string | null
           nombre: string
+          region: string | null
+          ruc: string | null
           sucursal: Database["public"]["Enums"]["sucursal"] | null
         }
         Insert: {
+          activo?: boolean
+          correo_principal?: string | null
           creado_en?: string
+          direccion?: string | null
           id?: string
+          localidad?: string | null
           nombre: string
+          region?: string | null
+          ruc?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
         Update: {
+          activo?: boolean
+          correo_principal?: string | null
           creado_en?: string
+          direccion?: string | null
           id?: string
+          localidad?: string | null
           nombre?: string
+          region?: string | null
+          ruc?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
         Relationships: []
+      }
+      contactos_cliente: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          cargo: string | null
+          cliente_id: string
+          correo: string | null
+          creado_en: string
+          es_principal: boolean
+          es_whatsapp: boolean
+          id: string
+          nombre: string
+          notas: string | null
+          telefono: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          cargo?: string | null
+          cliente_id: string
+          correo?: string | null
+          creado_en?: string
+          es_principal?: boolean
+          es_whatsapp?: boolean
+          id?: string
+          nombre: string
+          notas?: string | null
+          telefono?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          cargo?: string | null
+          cliente_id?: string
+          correo?: string | null
+          creado_en?: string
+          es_principal?: boolean
+          es_whatsapp?: boolean
+          id?: string
+          nombre?: string
+          notas?: string | null
+          telefono?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contactos_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturacion: {
+        Row: {
+          cliente_id: string | null
+          cod_entidad: string | null
+          cod_factura: string
+          entidad_nombre: string
+          fecha: string
+          grupo: string | null
+          id: string
+          importado_en: string
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo: Database["public"]["Enums"]["tipo_facturacion"]
+          total_venta: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          cod_entidad?: string | null
+          cod_factura: string
+          entidad_nombre: string
+          fecha: string
+          grupo?: string | null
+          id?: string
+          importado_en?: string
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          tipo: Database["public"]["Enums"]["tipo_facturacion"]
+          total_venta?: number
+        }
+        Update: {
+          cliente_id?: string | null
+          cod_entidad?: string | null
+          cod_factura?: string
+          entidad_nombre?: string
+          fecha?: string
+          grupo?: string | null
+          id?: string
+          importado_en?: string
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          tipo?: Database["public"]["Enums"]["tipo_facturacion"]
+          total_venta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importaciones: {
+        Row: {
+          archivo_nombre: string | null
+          creado_en: string
+          duplicados: number
+          id: string
+          insertados: number
+          tipo: Database["public"]["Enums"]["tipo_importacion"]
+          total_filas: number
+          usuario_id: string | null
+        }
+        Insert: {
+          archivo_nombre?: string | null
+          creado_en?: string
+          duplicados?: number
+          id?: string
+          insertados?: number
+          tipo: Database["public"]["Enums"]["tipo_importacion"]
+          total_filas?: number
+          usuario_id?: string | null
+        }
+        Update: {
+          archivo_nombre?: string | null
+          creado_en?: string
+          duplicados?: number
+          id?: string
+          insertados?: number
+          tipo?: Database["public"]["Enums"]["tipo_importacion"]
+          total_filas?: number
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importaciones_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parque_maquinas: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          agregado_manualmente: boolean
+          anio: number | null
+          cliente_id: string | null
+          creado_en: string
+          id: string
+          localidad: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_tipo: string | null
+          notas: string | null
+          serie: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          vendedor: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          agregado_manualmente?: boolean
+          anio?: number | null
+          cliente_id?: string | null
+          creado_en?: string
+          id?: string
+          localidad?: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_tipo?: string | null
+          notas?: string | null
+          serie: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          vendedor?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          agregado_manualmente?: boolean
+          anio?: number | null
+          cliente_id?: string | null
+          creado_en?: string
+          id?: string
+          localidad?: string | null
+          marca?: Database["public"]["Enums"]["marca"]
+          modelo_tipo?: string | null
+          notas?: string | null
+          serie?: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          vendedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -61,6 +285,51 @@ export type Database = {
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
         Relationships: []
+      }
+      seguimiento_comercial: {
+        Row: {
+          cliente_id: string
+          creado_en: string
+          fecha: string
+          id: string
+          observaciones: string | null
+          resultado: Database["public"]["Enums"]["resultado_seguimiento"]
+          usuario_id: string | null
+        }
+        Insert: {
+          cliente_id: string
+          creado_en?: string
+          fecha?: string
+          id?: string
+          observaciones?: string | null
+          resultado: Database["public"]["Enums"]["resultado_seguimiento"]
+          usuario_id?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          creado_en?: string
+          fecha?: string
+          id?: string
+          observaciones?: string | null
+          resultado?: Database["public"]["Enums"]["resultado_seguimiento"]
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seguimiento_comercial_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seguimiento_comercial_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       servicios: {
         Row: {
@@ -182,6 +451,20 @@ export type Database = {
       app_role: "admin" | "cabecilla" | "tecnico"
       estado_servicio: "Pendiente" | "Iniciado" | "Completado"
       marca: "CLAAS" | "HORSCH"
+      resultado_seguimiento:
+        | "Contactado"
+        | "No contesta"
+        | "Rechazó"
+        | "Agendó servicio"
+        | "Pendiente llamar"
+      subgrupo_maquina:
+        | "COSECHADORAS"
+        | "SEMBRADORAS"
+        | "PICADORAS"
+        | "PLATAFORMAS"
+        | "PULVERIZADORAS"
+        | "TRACTORES"
+        | "OTRO"
       sucursal:
         | "Santa Rita"
         | "Santa Rosa"
@@ -189,6 +472,8 @@ export type Database = {
         | "Misiones"
         | "Loma Plata"
         | "Katuete"
+      tipo_facturacion: "Repuesto" | "Servicio"
+      tipo_importacion: "parque" | "facturacion"
       tipo_trabajo: "Visita de campo" | "Máquina en taller"
     }
     CompositeTypes: {
@@ -320,6 +605,22 @@ export const Constants = {
       app_role: ["admin", "cabecilla", "tecnico"],
       estado_servicio: ["Pendiente", "Iniciado", "Completado"],
       marca: ["CLAAS", "HORSCH"],
+      resultado_seguimiento: [
+        "Contactado",
+        "No contesta",
+        "Rechazó",
+        "Agendó servicio",
+        "Pendiente llamar",
+      ],
+      subgrupo_maquina: [
+        "COSECHADORAS",
+        "SEMBRADORAS",
+        "PICADORAS",
+        "PLATAFORMAS",
+        "PULVERIZADORAS",
+        "TRACTORES",
+        "OTRO",
+      ],
       sucursal: [
         "Santa Rita",
         "Santa Rosa",
@@ -328,6 +629,8 @@ export const Constants = {
         "Loma Plata",
         "Katuete",
       ],
+      tipo_facturacion: ["Repuesto", "Servicio"],
+      tipo_importacion: ["parque", "facturacion"],
       tipo_trabajo: ["Visita de campo", "Máquina en taller"],
     },
   },
