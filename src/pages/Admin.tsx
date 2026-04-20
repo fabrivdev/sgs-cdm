@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { UserPlus, Building2, Users } from "lucide-react";
+import { UserPlus, Building2, Users, KeyRound } from "lucide-react";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
@@ -20,6 +21,7 @@ export default function Admin() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [emails, setEmails] = useState<Record<string, string>>({});
 
   // Form: nuevo usuario
   const [email, setEmail] = useState("");
@@ -29,9 +31,15 @@ export default function Admin() {
   const [nuRol, setNuRol] = useState<Role>("tecnico");
   const [busy, setBusy] = useState(false);
 
-  // Cliente (sucursal opcional)
+  // Cliente
   const [cliNombre, setCliNombre] = useState("");
   const [cliSucursal, setCliSucursal] = useState<Sucursal | "">("");
+
+  // Credenciales dialog
+  const [credUser, setCredUser] = useState<Profile | null>(null);
+  const [credEmail, setCredEmail] = useState("");
+  const [credPassword, setCredPassword] = useState("");
+  const [credBusy, setCredBusy] = useState(false);
 
   const load = async () => {
     const [{ data: prof }, { data: rls }, { data: cli }] = await Promise.all([
@@ -42,6 +50,16 @@ export default function Admin() {
     setProfiles((prof ?? []) as Profile[]);
     setRoles((rls ?? []) as UserRole[]);
     setClientes((cli ?? []) as Cliente[]);
+
+    // Cargar emails vía edge function
+    const { data: emailData, error: emailErr } = await supabase.functions.invoke("admin-list-users");
+    if (!emailErr && emailData?.users) {
+      const map: Record<string, string> = {};
+      for (const u of emailData.users as { user_id: string; email: string }[]) {
+        map[u.user_id] = u.email;
+      }
+      setEmails(map);
+    }
   };
   useEffect(() => { load(); }, []);
 
@@ -85,8 +103,30 @@ export default function Admin() {
     else { toast.success("Cliente creado"); setCliNombre(""); setCliSucursal(""); load(); }
   };
 
+  const openCred = (p: Profile) => {
+    setCredUser(p);
+    setCredEmail(emails[p.id] ?? "");
+    setCredPassword("");
+  };
+
+  const guardarCred = async () => {
+    if (!credUser) return;
+    const original = emails[credUser.id] ?? "";
+    const payload: { user_id: string; email?: string; password?: string } = { user_id: credUser.id };
+    if (credEmail.trim() && credEmail.trim() !== original) payload.email = credEmail.trim();
+    if (credPassword) payload.password = credPassword;
+    if (!payload.email && !payload.password) { toast.info("No hay cambios"); return; }
+    setCredBusy(true);
+    const { data, error } = await supabase.functions.invoke("admin-update-user", { body: payload });
+    setCredBusy(false);
+    if (error || data?.error) { toast.error(error?.message || data?.error); return; }
+    toast.success("Credenciales actualizadas");
+    setCredUser(null);
+    load();
+  };
+
   return (
-    <div className="container max-w-6xl py-4 space-y-4">
+    <div className="container max-w-6xl py-3 px-3 sm:py-4 space-y-4">
       <h1 className="text-2xl font-bold">Administración</h1>
 
       <Tabs defaultValue="usuarios">
@@ -96,7 +136,7 @@ export default function Admin() {
         </TabsList>
 
         <TabsContent value="usuarios" className="space-y-4">
-          <Card className="p-4">
+          <Card className="p-3 sm:p-4">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><UserPlus className="h-4 w-4" /> Crear nuevo usuario</h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <div><Label className="text-xs">Nombre</Label><Input value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>
@@ -120,20 +160,24 @@ export default function Admin() {
             <Button className="mt-3" onClick={crearUsuario} disabled={busy}>{busy ? "Creando…" : "Crear usuario"}</Button>
           </Card>
 
-          <Card>
+          {/* Desktop table */}
+          <Card className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Sucursal</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Activo</TableHead>
+                  <TableHead className="w-[100px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {profiles.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.nombre}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{emails[p.id] ?? "—"}</TableCell>
                     <TableCell>
                       <Select value={p.sucursal ?? ""} onValueChange={(v) => cambiarSucursal(p.id, v as Sucursal)}>
                         <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
@@ -151,15 +195,63 @@ export default function Admin() {
                         {p.activo ? "Activo" : "Inactivo"}
                       </Button>
                     </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
+                        <KeyRound className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </Card>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {profiles.map((p) => (
+              <Card key={p.id} className="p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold truncate">{p.nombre}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{emails[p.id] ?? "—"}</div>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => openCred(p)} className="h-7 px-2">
+                      <KeyRound className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant={p.activo ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleActivo(p)}
+                      className="h-7 px-2 text-[10px]"
+                    >
+                      {p.activo ? "Activo" : "Inactivo"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
+                    <Select value={p.sucursal ?? ""} onValueChange={(v) => cambiarSucursal(p.id, v as Sucursal)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Rol</Label>
+                    <Select value={rolesByUser[p.id]?.[0] ?? ""} onValueChange={(v) => cambiarRol(p.id, v as Role)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
 
         <TabsContent value="clientes" className="space-y-4">
-          <Card className="p-4">
+          <Card className="p-3 sm:p-4">
             <h3 className="mb-3 text-sm font-semibold">Crear cliente</h3>
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label className="text-xs">Nombre</Label><Input value={cliNombre} onChange={(e) => setCliNombre(e.target.value)} /></div>
@@ -192,6 +284,35 @@ export default function Admin() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Credenciales dialog */}
+      <Dialog open={!!credUser} onOpenChange={(o) => !o && setCredUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Credenciales — {credUser?.nombre}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email</Label>
+              <Input type="email" value={credEmail} onChange={(e) => setCredEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nueva contraseña</Label>
+              <Input
+                type="text"
+                value={credPassword}
+                onChange={(e) => setCredPassword(e.target.value)}
+                placeholder="Dejar vacío para no cambiar"
+              />
+              <p className="text-[11px] text-muted-foreground">Mínimo 6 caracteres si la cambiás.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCredUser(null)}>Cancelar</Button>
+            <Button onClick={guardarCred} disabled={credBusy}>{credBusy ? "Guardando…" : "Guardar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
