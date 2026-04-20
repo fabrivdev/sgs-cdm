@@ -1,98 +1,69 @@
 
-# Optimización UX: tabla, calendario, formulario y campos de servicio
+# Gestión de credenciales en Admin + UX móvil + filtros y selectores
 
-## 1. Nuevo campo: tipo de trabajo (Visita / Taller)
+## 1. Admin: editar email y contraseña de usuarios
 
-**Schema (migración):**
-- Agregar enum `tipo_trabajo` con valores: `'Visita de campo'`, `'Máquina en taller'`.
-- Agregar columna `tipo_trabajo` a `servicios` (NOT NULL, default `'Visita de campo'`).
+### Backend — nuevo edge function `admin-update-user`
+Recibe `{ user_id, email?, password? }`, valida que el caller sea admin (mismo patrón que `admin-create-user`) y llama a `admin.auth.admin.updateUserById(user_id, { email, password })`. Devuelve `{ ok: true }` o error.
 
-Se mostrará como badge junto al estado en la tabla y como ícono (📍 visita / 🔧 taller) en el calendario.
+### Frontend — fila de usuario expandible
+En `Admin.tsx`, agrego un botón de acción "Credenciales" por fila (ícono llave) que abre un pequeño popover/dialog con:
+- Input **Email** (precargado, opcional cambiarlo)
+- Input **Nueva contraseña** (vacío, opcional)
+- Botón **Guardar** (sólo manda los campos que cambiaron)
 
-## 2. Cliente como texto libre + auto-creación
+Para mostrar el email actual en la tabla agrego una columna nueva "Email", que viene del edge function `admin-list-users` (ver más abajo) — los emails viven en `auth.users` y no son accesibles vía RLS desde el cliente.
 
-En vez de un `<Select>` con lookup, usamos un `Input` con autocompletado simple (datalist) que muestra los clientes existentes. Al guardar:
-- Si el texto coincide con un cliente existente (case-insensitive) → uso ese `cliente_id`.
-- Si es un nombre nuevo → lo creo automáticamente en `clientes` y uso el id resultante.
+### Backend — nuevo edge function `admin-list-users`
+Devuelve `[{ user_id, email }]` para que la tabla de Admin muestre los emails. Sólo accesible para admin. Se llama una vez al cargar la página y se mergea con `profiles`.
 
-Elimina el doble campo "cliente existente / nuevo cliente" actual y simplifica todo en un solo input.
+## 2. Optimización vista móvil (Planificador y Admin)
 
-## 3. Formulario de servicio simplificado
+### Planificador móvil
+- El `container` global queda en `px-3` en mobile (hoy `px-4` por default → muy ajustado). Ajusto a `container max-w-[1600px] py-3 px-3 sm:py-4 space-y-3`.
+- Tarjeta resumen más compacta:
+  - Línea 1: `dd/MM` · día abreviado · ícono tipo · Estado (a la derecha como ahora).
+  - Línea 2: **Cliente** en negrita, una sola línea con `truncate`.
+  - Línea 3: **Trabajo** truncado a 2 líneas con `line-clamp-2`.
+  - Línea 4 (meta): técnico responsable + sucursal abreviada — tamaño `text-[10px]`.
+  - Quito el badge de marca redundante en mobile (la marca queda visible al abrir el detalle).
+- Padding interior baja a `p-2.5` para que respiren los bordes.
 
-Reorganizo `ServicioFormDialog` para reducir fricción visual:
+### Admin móvil
+La tabla actual de usuarios desborda en mobile. Agrego una vista de **tarjetas** debajo de `md`:
+- Card por usuario con: nombre, email (texto pequeño), badges de rol y sucursal, switch de activo, y los dos botones (Credenciales / Cambiar rol-sucursal).
+- La tabla original queda visible sólo en `md:`.
 
-```text
-┌─────────────────────────────────────────┐
-│ Fecha          │ Tipo (Visita/Taller)   │
-├─────────────────────────────────────────┤
-│ Cliente (input con autocomplete)        │
-├─────────────────────────────────────────┤
-│ Trabajo o problema a resolver           │
-│ [textarea grande, prominente]           │
-├─────────────────────────────────────────┤
-│ Sucursal       │ Marca                  │
-├─────────────────────────────────────────┤
-│ Responsable    │ Auxiliares (chips)     │
-├─────────────────────────────────────────┤
-│ ▸ Observaciones (colapsable, opcional)  │
-└─────────────────────────────────────────┘
-```
+## 3. Filtros del Planificador en botón colapsable
 
-Cambios concretos:
-- Renombro la etiqueta "Descripción del trabajo" → **"Trabajo o problema a resolver"**.
-- Auxiliares pasa de lista de checkboxes a **chips clickeables** compactos (técnico activo = chip relleno).
-- "Observaciones" queda en un `Collapsible` cerrado por defecto.
-- Quito el campo "Cliente existente" + "Nuevo cliente"; queda un solo input con `<datalist>`.
+- Reemplazo la `Card` de filtros visible por un botón **"Filtros"** con `Sheet` (drawer) que abre desde la derecha.
+- Junto al botón muestro chips compactos con los filtros activos (ej: `Semana 17 ✕`, `Sucursal: Campo 9 ✕`) para que el usuario sepa qué está filtrado sin abrir el drawer.
+- **Defaults al cargar**:
+  - `fSemana` = semana ISO actual (calculada con `date-fns/getISOWeek(new Date())`).
+  - `fSucursal` = `profile.sucursal` si existe; si el usuario es admin sin sucursal asignada → `"all"`.
+  - Resto = `"all"`.
+- Botón **"Limpiar filtros"** dentro del drawer para volver a `"all"` en todo.
 
-## 4. Tabla del Planificador más compacta
+## 4. Formulario de servicio: auxiliares como dropdown multi-select
 
-Problema actual: 12 columnas para 1071px de viewport → todo muy apretado y mal alineado.
+- **Técnico responsable**: ya es dropdown `<Select>` simple, lo dejo igual.
+- **Auxiliares**: reemplazo los chips por un componente desplegable estilo combobox multi-select:
+  - Trigger: botón con texto "Seleccionar auxiliares" o "3 seleccionados", igual aspecto que un `SelectTrigger`.
+  - Contenido: `Popover` con `Command` (cmdk) que lista todos los técnicos con un `Checkbox` + nombre + sucursal entre paréntesis. Click toggle. Búsqueda incluida en el header del popover.
+  - Debajo del trigger, fila de chips pequeños removibles con los seleccionados (✕ para sacar uno rápido).
+- Esto reduce drásticamente el alto del formulario cuando hay muchos técnicos.
 
-Reduzco a **8 columnas** densas:
+## 5. Detalles técnicos
 
-| Fecha | Cliente | Trabajo | Marca/Tipo | Responsable | Suc. | Estado | Hs |
-
-- Fusiono `Día` + `Sem` dentro de `Fecha` (segunda línea pequeña: "Lun · S16").
-- Fusiono `Marca` + `Tipo` en una sola celda con dos badges chicos.
-- Muevo `Auxiliares` y `Observaciones` al diálogo de detalle (no se ven en tabla).
-- Bajo padding global de la tabla a `py-2 px-3` (override) en vez del `p-4` por defecto.
-- Reduzco tamaño de fuente a `text-[13px]` y uso `text-xs` para metadatos.
-- `Trabajo` toma el ancho restante con `truncate` + tooltip.
-- Estado: badge clickeable que abre un popover con las 3 opciones (en vez del Select grande actual).
-
-Resultado: la tabla cabe sin scroll horizontal en pantallas medianas.
-
-## 5. Calendario con vista de día expandible
-
-Cuando el usuario hace click en un día del calendario:
-- Se abre un **Sheet lateral** (drawer derecho) con el listado completo de servicios de ese día.
-- Cada item del sheet muestra: hora/tipo, cliente, técnico, marca y estado clickeable.
-- Click en un item → abre el `ServicioDetalleDialog` existente.
-- Botón "+ Nuevo servicio" en el header del sheet (preselecciona la fecha) si el usuario puede crear.
-
-Cambio adicional en la grilla del calendario:
-- Cada celda muestra hasta 3 servicios (en vez de 4) para que se vean mejor.
-- El "+N más" se reemplaza por el click al día completo (toda la celda es clickeable).
-- Click en un evento individual sigue abriendo el detalle directo (con `stopPropagation`).
-
-## 6. Detalles técnicos
-
-**Migración SQL:**
-```sql
-CREATE TYPE public.tipo_trabajo AS ENUM ('Visita de campo','Máquina en taller');
-ALTER TABLE public.servicios
-  ADD COLUMN tipo_trabajo public.tipo_trabajo NOT NULL DEFAULT 'Visita de campo';
-```
+**Archivos a crear:**
+- `supabase/functions/admin-list-users/index.ts` (lista emails de auth.users, sólo admin).
+- `supabase/functions/admin-update-user/index.ts` (actualiza email/password de un user, sólo admin).
 
 **Archivos a modificar:**
-- `supabase/migrations/...` — nuevo enum y columna.
-- `src/lib/constants.ts` — exportar `TIPOS_TRABAJO` y tipo `TipoTrabajo`.
-- `src/components/ServicioFormDialog.tsx` — rediseño completo (cliente input, layout, observaciones colapsable, campo tipo).
-- `src/components/ServicioDetalleDialog.tsx` — mostrar tipo y auxiliares.
-- `src/pages/Planificador.tsx` — tabla compacta de 8 columnas, popover de estado, exportar incluye `Tipo`.
-- `src/pages/Calendario.tsx` — Sheet lateral al click en día, ícono de tipo en eventos.
-- `src/pages/Historial.tsx` — agregar columna Tipo.
+- `src/pages/Admin.tsx` — columna Email, botón Credenciales con dialog, vista mobile en cards.
+- `src/pages/Planificador.tsx` — drawer de filtros, defaults a semana actual + sucursal del user, chips de filtros activos, padding mobile, tarjetas más compactas.
+- `src/components/ServicioFormDialog.tsx` — multi-select de auxiliares con `Popover + Command + Checkbox`.
 
-**Sin cambios destructivos:** los servicios existentes reciben `Visita de campo` por default; podés cambiarlos manualmente luego desde el detalle.
+**Sin cambios de schema.** Las funciones admin ya tienen el patrón de validación existente.
 
-**Elementos nuevos shadcn ya disponibles:** `Sheet`, `Popover`, `Collapsible` — todos ya están en el proyecto.
+**Componentes shadcn ya disponibles:** `Sheet`, `Popover`, `Command`, `Checkbox`, `Dialog` — todos están en el proyecto.
