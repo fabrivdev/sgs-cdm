@@ -328,9 +328,9 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
             </Collapsible>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 border-t shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? "Guardando…" : "Guardar"}</Button>
+        <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 border-t shrink-0 flex-row gap-2 sm:gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none">Cancelar</Button>
+          <Button onClick={submit} disabled={busy} className="flex-1 sm:flex-none">{busy ? "Guardando…" : "Guardar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
