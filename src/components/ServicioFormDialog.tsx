@@ -13,7 +13,7 @@ import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
-interface Cliente { id: string; nombre: string; sucursal: Sucursal }
+interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Servicio {
   id: string;
   fecha_programada: string;
@@ -71,15 +71,17 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
     }
   }, [servicio, open, isAdmin, profile]);
 
-  const profilesSucursal = profiles.filter((p) => p.sucursal === sucursal);
-  const clientesSucursal = clientes.filter((c) => c.sucursal === sucursal);
+  // Técnicos y clientes son globales: cualquiera puede asignarse a servicios de cualquier sucursal
+  const tecnicosDisponibles = profiles;
+  const clientesDisponibles = clientes;
+  const labelTecnico = (p: Profile) => p.sucursal ? `${p.nombre} (${p.sucursal})` : p.nombre;
 
   const submit = async () => {
     if (!fecha || !trabajo) { toast.error("Completá fecha y descripción del trabajo"); return; }
     setBusy(true);
     let cli = clienteId;
     if (nuevoCliente.trim()) {
-      const { data, error } = await supabase.from("clientes").insert({ nombre: nuevoCliente.trim(), sucursal }).select("id").single();
+      const { data, error } = await supabase.from("clientes").insert({ nombre: nuevoCliente.trim(), sucursal: null }).select("id").single();
       if (error) { toast.error(error.message); setBusy(false); return; }
       cli = data.id;
     }
@@ -141,7 +143,7 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">— Sin asignar —</SelectItem>
-                    {profilesSucursal.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
+                    {tecnicosDisponibles.map((p) => <SelectItem key={p.id} value={p.id}>{labelTecnico(p)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -150,8 +152,8 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
             <div className="space-y-1.5">
               <Label>Auxiliares</Label>
               <div className="rounded-md border p-2 max-h-32 overflow-y-auto space-y-1">
-                {profilesSucursal.length === 0 && <p className="text-xs text-muted-foreground">Sin técnicos en esta sucursal.</p>}
-                {profilesSucursal.filter((p) => p.id !== responsableId).map((p) => (
+                {tecnicosDisponibles.length === 0 && <p className="text-xs text-muted-foreground">No hay técnicos cargados.</p>}
+                {tecnicosDisponibles.filter((p) => p.id !== responsableId).map((p) => (
                   <label key={p.id} className="flex items-center gap-2 text-sm">
                     <Checkbox
                       checked={auxiliares.includes(p.id)}
@@ -159,7 +161,7 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
                         setAuxiliares((prev) => c ? [...prev, p.id] : prev.filter((x) => x !== p.id))
                       }
                     />
-                    {p.nombre}
+                    {labelTecnico(p)}
                   </label>
                 ))}
               </div>
@@ -172,7 +174,7 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">— Ninguno —</SelectItem>
-                    {clientesSucursal.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
+                    {clientesDisponibles.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

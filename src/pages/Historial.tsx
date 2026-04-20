@@ -16,7 +16,7 @@ interface Servicio {
   visto_por: string[];
 }
 interface Profile { id: string; nombre: string }
-interface Cliente { id: string; nombre: string; sucursal: Sucursal }
+interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 
 export default function Historial() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -68,7 +68,7 @@ export default function Historial() {
               <li key={c.id}>
                 <button className="w-full px-3 py-2 text-left hover:bg-accent" onClick={() => { setSelected(c); setQ(c.nombre); }}>
                   <span className="font-medium">{c.nombre}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{c.sucursal}</span>
+                  {c.sucursal && <span className="ml-2 text-xs text-muted-foreground">{c.sucursal}</span>}
                 </button>
               </li>
             ))}
@@ -81,7 +81,7 @@ export default function Historial() {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <div className="text-lg font-semibold">{selected.nombre}</div>
-              <div className="text-xs text-muted-foreground">{selected.sucursal} · {historial.length} servicio(s)</div>
+              <div className="text-xs text-muted-foreground">{selected.sucursal ? `${selected.sucursal} · ` : ""}{historial.length} servicio(s)</div>
             </div>
           </div>
           {historial.length === 0 ? (
