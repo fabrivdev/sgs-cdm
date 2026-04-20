@@ -5,12 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
-import { ESTADOS, type Estado, type Marca, type Sucursal } from "@/lib/constants";
+import { ESTADOS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
+import { MapPin, Wrench } from "lucide-react";
 
 interface Servicio {
   id: string;
@@ -22,6 +24,7 @@ interface Servicio {
   sucursal: Sucursal;
   cliente_id: string | null;
   marca: Marca;
+  tipo_trabajo: TipoTrabajo;
   trabajo_descripcion: string;
   estado: Estado;
   observaciones: string | null;
@@ -59,6 +62,7 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
   const cliById = Object.fromEntries(clientes.map((c) => [c.id, c.nombre]));
   const isAssigned = user && (servicio.tecnico_responsable_id === user.id || servicio.auxiliares.includes(user.id));
   const canEdit = isAdmin || isCabecilla || isAssigned;
+  const tipo = servicio.tipo_trabajo ?? "Visita de campo";
 
   const save = async () => {
     if (estado === "Completado" && !horas) { toast.error("Cargá las horas trabajadas para completar."); return; }
@@ -77,8 +81,13 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
     <Dialog open={!!servicio} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Detalle del servicio <MarcaBadge marca={servicio.marca} />
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            Detalle del servicio
+            <MarcaBadge marca={servicio.marca} />
+            <Badge variant="outline" className="gap-1 text-[10px]">
+              {tipo === "Máquina en taller" ? <Wrench className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
+              {tipo}
+            </Badge>
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
@@ -88,7 +97,7 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
           <Row k="Responsable" v={servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] : "—"} />
           <Row k="Auxiliares" v={servicio.auxiliares.map((a) => profById[a]).filter(Boolean).join(", ") || "—"} />
           <div>
-            <div className="text-xs text-muted-foreground">Trabajo</div>
+            <div className="text-xs text-muted-foreground">Trabajo o problema a resolver</div>
             <div className="rounded-md bg-muted/40 p-2 text-sm">{servicio.trabajo_descripcion}</div>
           </div>
 

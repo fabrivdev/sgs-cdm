@@ -2,16 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
-import { Search } from "lucide-react";
+import { Search, MapPin, Wrench } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
-import type { Estado, Marca, Sucursal } from "@/lib/constants";
+import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 
 interface Servicio {
   id: string; fecha_programada: string; dia_semana: string; semana: number;
   tecnico_responsable_id: string | null; auxiliares: string[];
   sucursal: Sucursal; cliente_id: string | null; marca: Marca;
+  tipo_trabajo: TipoTrabajo;
   trabajo_descripcion: string; estado: Estado; observaciones: string | null; horas_trabajadas: number | null;
   visto_por: string[];
 }
@@ -88,24 +90,32 @@ export default function Historial() {
             <p className="text-sm text-muted-foreground">Sin servicios registrados.</p>
           ) : (
             <ul className="space-y-2">
-              {historial.map((s) => (
-                <li key={s.id}>
-                  <button onClick={() => setDetalle(s)} className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium tabular-nums">{format(parseISO(s.fecha_programada), "dd/MM/yyyy")}</span>
-                      <div className="flex items-center gap-2">
-                        <MarcaBadge marca={s.marca} />
-                        <EstadoBadge estado={s.estado} />
+              {historial.map((s) => {
+                const tipo = s.tipo_trabajo ?? "Visita de campo";
+                const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
+                return (
+                  <li key={s.id}>
+                    <button onClick={() => setDetalle(s)} className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium tabular-nums">{format(parseISO(s.fecha_programada), "dd/MM/yyyy")}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="gap-0.5 px-1.5 py-0 text-[10px]">
+                            <TipoIcon className="h-2.5 w-2.5" />
+                            {tipo === "Máquina en taller" ? "Taller" : "Visita"}
+                          </Badge>
+                          <MarcaBadge marca={s.marca} />
+                          <EstadoBadge estado={s.estado} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-1 text-sm">{s.trabajo_descripcion}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] : "—"}
-                      {s.horas_trabajadas != null && ` · ${s.horas_trabajadas} hs`}
-                    </div>
-                  </button>
-                </li>
-              ))}
+                      <div className="mt-1 text-sm">{s.trabajo_descripcion}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] : "—"}
+                        {s.horas_trabajadas != null && ` · ${s.horas_trabajadas} hs`}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>

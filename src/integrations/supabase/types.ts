@@ -79,6 +79,7 @@ export type Database = {
           semana: number
           sucursal: Database["public"]["Enums"]["sucursal"]
           tecnico_responsable_id: string | null
+          tipo_trabajo: Database["public"]["Enums"]["tipo_trabajo"]
           trabajo_descripcion: string
           visto_por: string[]
         }
@@ -98,6 +99,7 @@ export type Database = {
           semana: number
           sucursal: Database["public"]["Enums"]["sucursal"]
           tecnico_responsable_id?: string | null
+          tipo_trabajo?: Database["public"]["Enums"]["tipo_trabajo"]
           trabajo_descripcion: string
           visto_por?: string[]
         }
@@ -117,6 +119,7 @@ export type Database = {
           semana?: number
           sucursal?: Database["public"]["Enums"]["sucursal"]
           tecnico_responsable_id?: string | null
+          tipo_trabajo?: Database["public"]["Enums"]["tipo_trabajo"]
           trabajo_descripcion?: string
           visto_por?: string[]
         }
@@ -186,6 +189,7 @@ export type Database = {
         | "Misiones"
         | "Loma Plata"
         | "Katuete"
+      tipo_trabajo: "Visita de campo" | "Máquina en taller"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -324,6 +328,7 @@ export const Constants = {
         "Loma Plata",
         "Katuete",
       ],
+      tipo_trabajo: ["Visita de campo", "Máquina en taller"],
     },
   },
 } as const
