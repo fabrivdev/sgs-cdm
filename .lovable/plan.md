@@ -1,93 +1,52 @@
 
-# App de Planificación de Servicios Técnicos — CLAAS / HORSCH
+# Ajustes al modelo antes de la carga masiva
 
-## Stack y backend
-- **Lovable Cloud** (Supabase) para auth, base de datos y RLS.
-- Login con **email + contraseña** (sólo el Admin crea usuarios desde un panel interno).
-- Mobile-first con Tailwind + shadcn/ui.
+## Cambios solicitados
+1. **Clientes sin sucursal fija**: un cliente puede recibir servicios en cualquier sucursal.
+2. **Técnicos pueden trabajar en cualquier sucursal**: la `sucursal` del perfil es sólo su base, no una restricción. Equipo HORSCH Brasil y cualquier técnico puede ser asignado a servicios de otras sucursales.
 
-## Modelo de datos
+## Cambios de schema (migración)
 
-**profiles** (perfil del usuario, vinculado a `auth.users`)
-- `id` (uuid, FK auth.users), `nombre`, `sucursal`, `activo`, `creado_en`
+### Tabla `clientes`
+- `sucursal` pasa de `NOT NULL` a **nullable** (o se elimina). Decisión: la dejo **nullable** para no romper datos existentes y permitir guardar opcionalmente la sucursal "principal" del cliente si se desea, pero ya no se usa para filtrar ni para validar.
+- Actualizar las RLS de `clientes`:
+  - **SELECT**: cualquier usuario autenticado ve todos los clientes (necesario para que un técnico de Santa Rita pueda asignar un servicio a un cliente "de" Campo 9).
+  - **INSERT/UPDATE**: admin y cabecilla (sin filtro de sucursal del cliente).
+  - **DELETE**: sólo admin.
 
-**user_roles** (separada para evitar escalada de privilegios)
-- `id`, `user_id`, `role` (enum: `admin`, `cabecilla`, `tecnico`)
+### Tabla `profiles`
+- No cambia el schema (`sucursal` ya es nullable). La sucursal queda como informativa = "base" del técnico.
+- No se aplica ninguna restricción adicional: un técnico puede ser `tecnico_responsable_id` o estar en `auxiliares` de un servicio de cualquier sucursal.
 
-**sucursales** (catálogo fijo): Santa Rita, Santa Rosa, Campo 9, Misiones, Loma Plata, Katuete
+### Tabla `servicios`
+- No cambia. La columna `sucursal` del servicio sigue indicando dónde se ejecuta el trabajo, independiente de la base del técnico.
+- Las RLS actuales ya permiten que el técnico vea el servicio si es responsable o auxiliar (sin importar la sucursal del servicio vs. su base) ✓.
 
-**clientes**: `id`, `nombre`, `sucursal`, `creado_en`
+## Ajustes en el frontend
 
-**servicios**:
-- `id`, `fecha_programada`, `dia_semana`, `semana`
-- `tecnico_responsable_id` (FK profiles), `auxiliares` (uuid[])
-- `sucursal`, `cliente_id`, `marca` (CLAAS/HORSCH)
-- `trabajo_descripcion`, `estado` (Pendiente/Iniciado/Completado)
-- `observaciones`, `horas_trabajadas`
-- `creado_por`, `creado_en`, `actualizado_en`
-- `visto_por` (uuid[]) — para el badge de notificaciones in-app
+### `ServicioFormDialog`
+- Selector de **cliente**: mostrar todos los clientes (sin filtrar por sucursal del servicio).
+- Selector de **técnico responsable** y **auxiliares**: mostrar todos los técnicos activos (sin filtrar por sucursal). Mostrar la sucursal base entre paréntesis para referencia visual: `Juan Pérez (Santa Rita)`.
 
-**RLS por rol** (con función `has_role` security definer):
-- Admin: todo.
-- Cabecilla: ve/edita servicios de su sucursal.
-- Técnico: ve sólo donde es responsable o auxiliar; puede actualizar `estado`, `horas_trabajadas`, `observaciones`.
+### `Admin` (gestión de clientes)
+- Hacer el campo "sucursal" del cliente **opcional** en el formulario (etiqueta: "Sucursal principal (opcional)").
+- En la lista de clientes mostrar "—" cuando no haya sucursal.
 
-## Vistas principales
+### `Historial`
+- El buscador de clientes ya no filtra por sucursal del usuario; muestra el listado completo.
 
-### 1. Planificador (estilo Excel)
-- Tabla densa con columnas: Fecha · Día · Semana · Técnico · Auxiliares · Sucursal · Cliente · Marca · Trabajo · Estado · Observaciones · Horas.
-- **Color de fila por estado**: amarillo (Pendiente), azul (Iniciado), verde (Completado).
-- **Etiqueta de marca**: chip verde CLAAS / chip rojo-naranja HORSCH.
-- Filtros superiores: semana, sucursal, técnico, marca, estado.
-- Edición inline para campos permitidos según rol.
-- Botón **"Nuevo servicio"** (Admin y Cabecilla) con formulario modal validado con zod.
-- Botón **"Exportar Excel"** que descarga la vista filtrada como `.xlsx` (xlsx/SheetJS).
+## Carga masiva del Excel (después de aplicar lo anterior)
 
-### 2. Calendario visual
-- Vistas mensual y semanal (react-day-picker + grilla custom).
-- Eventos coloreados por estado, etiqueta = "Técnico · Cliente".
-- Filtro por técnico para agenda individual.
-- Click en evento → modal con detalle completo y acciones según rol.
+Una sola transacción SQL que hace:
 
-### 3. Dashboard
-- Tarjetas resumen: total semana, % completados, pendientes, horas totales.
-- Gráficos (recharts):
-  - Barras: servicios por sucursal y por técnico.
-  - Torta: distribución por marca y por estado.
-  - Barras horizontales: horas trabajadas por técnico.
-- Filtro de rango de fechas.
+1. **Insert de 27 perfiles** con uuids generados. Cada uno con su sucursal base del Excel (`EQUIPO TÉCNICO HORSCH BRASIL` con sucursal = `Campo 9` como base, pero podrá ser asignado a servicios de cualquier sucursal).
+2. **Insert de ~22 clientes** con uuids generados, **sin sucursal** (NULL), `ON CONFLICT (nombre) DO NOTHING` para evitar duplicados.
+3. **Insert de 27 servicios** resolviendo `tecnico_responsable_id` y `cliente_id` por nombre vía subqueries. La columna `sucursal` del servicio se toma de la columna "SUCURSAL" del Excel (la sucursal donde se ejecuta el trabajo).
 
-### 4. Historial por cliente
-- Buscador con autocomplete de clientes.
-- Lista cronológica de servicios del cliente con marca, técnico, estado y horas.
-- Acceso al detalle de cada servicio.
+Para que el `ON CONFLICT` funcione en clientes agrego un **índice único en `clientes.nombre`** dentro de la misma migración.
 
-## Funciones clave
-- **Notificaciones in-app**: badge en el header con cantidad de servicios asignados no vistos. Al abrir el servicio se marca como visto. Toast al entrar si hay nuevos.
-- **Cambio de estado rápido**: en móvil, swipe en cada tarjeta de la lista (Pendiente → Iniciado → Completado). En desktop, dropdown en la celda Estado.
-- **Carga de horas**: campo numérico que se habilita al pasar a "Completado"; obligatorio para cerrar.
-- **Auto-cálculo** de `dia_semana` y `semana` a partir de `fecha_programada`.
-- **Exportar a Excel** la vista actual del planificador con todos los filtros aplicados.
-
-## Roles visuales y navegación
-- Sidebar (desktop) / bottom-nav (móvil) con: Planificador, Calendario, Dashboard, Historial, Admin (sólo admin).
-- **Panel Admin**: gestión de usuarios (crear técnicos/cabecillas con email+password, asignar rol y sucursal), gestión de clientes y técnicos.
-- Header con: sucursal activa (admin puede cambiar), badge de notificaciones, menú de usuario.
-
-## Diseño
-- Mobile-first, denso y funcional tipo planilla operativa.
-- Paleta de estado consistente: amarillo `#F59E0B`, azul `#3B82F6`, verde `#10B981`.
-- Marcas: CLAAS verde `#0E8B3A`, HORSCH naranja `#E85D1A`.
-- Tipografía Inter, tablas compactas con filas zebra, hover claro.
-- En móvil, el Planificador colapsa a tarjetas-lista compactas con swipe.
-
-## Entregable inicial (primera implementación)
-1. Schema + RLS + enum de roles + función `has_role`.
-2. Auth (login email/password) + ruta protegida + ProtectedRoute por rol.
-3. Layout principal con navegación responsive y badge de notificaciones.
-4. Planificador con filtros, colores por estado, edición inline, alta de servicios, export a Excel.
-5. Calendario mensual/semanal con filtro por técnico.
-6. Dashboard con KPIs y gráficos básicos.
-7. Historial por cliente.
-8. Panel Admin de usuarios/técnicos/clientes.
-9. Seed inicial de sucursales y un usuario admin.
+## Resultado esperado
+- Vas a poder asignar cualquier técnico a cualquier servicio sin importar su sucursal base.
+- El Equipo HORSCH Brasil aparece como técnico disponible en todas las sucursales.
+- Los clientes son globales: cualquier sucursal puede crear servicios para cualquier cliente.
+- Los 27 servicios del Excel quedan cargados con sus técnicos, auxiliares y clientes correctamente vinculados.
