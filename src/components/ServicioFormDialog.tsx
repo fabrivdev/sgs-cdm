@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// ScrollArea removed: interfered with Radix Select popovers inside Dialog
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, MapPin, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,11 +138,11 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{servicio ? "Editar servicio" : "Nuevo servicio"}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 pr-3">
+        <div className="flex-1 overflow-y-auto px-6">
           <div className="space-y-4 py-2">
             {/* Fecha + Tipo */}
             <div className="grid grid-cols-2 gap-3">
