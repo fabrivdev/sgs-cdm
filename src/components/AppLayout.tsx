@@ -79,8 +79,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       <main className="pb-20 md:pb-6">{children}</main>
 
-      {/* Bottom nav (mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 border-t bg-card md:hidden">
+      {/* Bottom nav (mobile) — se centra y se adapta a la cantidad de items */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t bg-card md:hidden">
         {navItems.slice(0, 5).map((it) => {
           const active =
             it.end ? location.pathname === it.to : location.pathname.startsWith(it.to);
@@ -89,7 +89,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               key={it.to}
               to={it.to}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
+                "flex flex-1 max-w-[96px] flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
                 active ? "text-primary" : "text-muted-foreground",
               )}
             >
