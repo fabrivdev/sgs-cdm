@@ -143,30 +143,28 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </Card>
 
-        <Card className="p-4">
-          <h3 className="text-sm font-semibold mb-3">Servicios y horas por técnico</h3>
-          <div className="max-h-[260px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Técnico</TableHead>
-                  <TableHead className="text-xs text-right">Servicios</TableHead>
-                  <TableHead className="text-xs text-right">Horas</TableHead>
+        <Card className="p-3 sm:p-4">
+          <h3 className="text-sm font-semibold mb-2">Servicios y horas por técnico</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="h-8 text-[11px]">Técnico</TableHead>
+                <TableHead className="h-8 text-[11px] text-right">Serv.</TableHead>
+                <TableHead className="h-8 text-[11px] text-right">Horas</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {porTecnico.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">Sin datos en el período</TableCell></TableRow>
+              ) : porTecnico.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="py-1.5 text-xs font-medium">{t.name}</TableCell>
+                  <TableCell className="py-1.5 text-xs text-right tabular-nums">{t.total}</TableCell>
+                  <TableCell className="py-1.5 text-xs text-right tabular-nums">{t.horas.toFixed(1)}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {porTecnico.length === 0 ? (
-                  <TableRow><TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">Sin datos en el período</TableCell></TableRow>
-                ) : porTecnico.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="text-sm font-medium">{t.name}</TableCell>
-                    <TableCell className="text-sm text-right tabular-nums">{t.total}</TableCell>
-                    <TableCell className="text-sm text-right tabular-nums">{t.horas.toFixed(1)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       </div>
     </div>
