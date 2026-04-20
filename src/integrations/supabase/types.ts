@@ -19,19 +19,19 @@ export type Database = {
           creado_en: string
           id: string
           nombre: string
-          sucursal: Database["public"]["Enums"]["sucursal"]
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
         }
         Insert: {
           creado_en?: string
           id?: string
           nombre: string
-          sucursal: Database["public"]["Enums"]["sucursal"]
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
         Update: {
           creado_en?: string
           id?: string
           nombre?: string
-          sucursal?: Database["public"]["Enums"]["sucursal"]
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
         Relationships: []
       }

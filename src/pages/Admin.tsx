@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { UserPlus, Building2, Users } from "lucide-react";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean }
-interface Cliente { id: string; nombre: string; sucursal: Sucursal }
+interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface UserRole { user_id: string; role: Role }
 
 export default function Admin() {
@@ -29,9 +29,9 @@ export default function Admin() {
   const [nuRol, setNuRol] = useState<Role>("tecnico");
   const [busy, setBusy] = useState(false);
 
-  // Cliente
+  // Cliente (sucursal opcional)
   const [cliNombre, setCliNombre] = useState("");
-  const [cliSucursal, setCliSucursal] = useState<Sucursal>(SUCURSALES[0]);
+  const [cliSucursal, setCliSucursal] = useState<Sucursal | "">("");
 
   const load = async () => {
     const [{ data: prof }, { data: rls }, { data: cli }] = await Promise.all([
@@ -80,9 +80,9 @@ export default function Admin() {
 
   const crearCliente = async () => {
     if (!cliNombre.trim()) return;
-    const { error } = await supabase.from("clientes").insert({ nombre: cliNombre.trim(), sucursal: cliSucursal });
+    const { error } = await supabase.from("clientes").insert({ nombre: cliNombre.trim(), sucursal: cliSucursal || null });
     if (error) toast.error(error.message);
-    else { toast.success("Cliente creado"); setCliNombre(""); load(); }
+    else { toast.success("Cliente creado"); setCliNombre(""); setCliSucursal(""); load(); }
   };
 
   return (
@@ -164,10 +164,13 @@ export default function Admin() {
             <div className="grid gap-3 sm:grid-cols-3">
               <div><Label className="text-xs">Nombre</Label><Input value={cliNombre} onChange={(e) => setCliNombre(e.target.value)} /></div>
               <div>
-                <Label className="text-xs">Sucursal</Label>
-                <Select value={cliSucursal} onValueChange={(v) => setCliSucursal(v as Sucursal)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <Label className="text-xs">Sucursal principal (opcional)</Label>
+                <Select value={cliSucursal || "none"} onValueChange={(v) => setCliSucursal(v === "none" ? "" : (v as Sucursal))}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Ninguna —</SelectItem>
+                    {SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="flex items-end"><Button onClick={crearCliente}>Agregar</Button></div>
@@ -176,12 +179,12 @@ export default function Admin() {
 
           <Card>
             <Table>
-              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Sucursal</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Sucursal principal</TableHead></TableRow></TableHeader>
               <TableBody>
                 {clientes.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.nombre}</TableCell>
-                    <TableCell><Badge variant="outline">{c.sucursal}</Badge></TableCell>
+                    <TableCell>{c.sucursal ? <Badge variant="outline">{c.sucursal}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
