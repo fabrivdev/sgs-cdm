@@ -7,12 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
 import { ESTADOS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
-import { Plus, FileSpreadsheet, Filter, MapPin, Wrench } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X } from "lucide-react";
+import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,7 @@ const SUCURSAL_ABBR: Record<Sucursal, string> = {
 };
 
 export default function Planificador() {
-  const { user, isAdmin, isCabecilla } = useAuth();
+  const { user, profile, isAdmin, isCabecilla } = useAuth();
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -56,12 +57,24 @@ export default function Planificador() {
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Servicio | null>(null);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
 
-  const [fSemana, setFSemana] = useState<string>("all");
+  const currentWeek = useMemo(() => String(getISOWeek(new Date())), []);
+  const [fSemana, setFSemana] = useState<string>(currentWeek);
   const [fSucursal, setFSucursal] = useState<string>("all");
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [fMarca, setFMarca] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
+
+  // Default sucursal por perfil al primer load
+  useEffect(() => {
+    if (!defaultsApplied && profile) {
+      if (profile.sucursal && !isAdmin) setFSucursal(profile.sucursal);
+      else if (profile.sucursal) setFSucursal(profile.sucursal);
+      setDefaultsApplied(true);
+    }
+  }, [profile, isAdmin, defaultsApplied]);
 
   const load = async () => {
     setLoading(true);
@@ -142,53 +155,95 @@ export default function Planificador() {
     }
   };
 
+  const limpiarFiltros = () => {
+    setFSemana("all"); setFSucursal("all"); setFTecnico("all"); setFMarca("all"); setFEstado("all");
+  };
+
+  const activeChips: { label: string; clear: () => void }[] = [];
+  if (fSemana !== "all") activeChips.push({ label: `Semana ${fSemana}`, clear: () => setFSemana("all") });
+  if (fSucursal !== "all") activeChips.push({ label: fSucursal, clear: () => setFSucursal("all") });
+  if (fTecnico !== "all") activeChips.push({ label: profById[fTecnico]?.nombre ?? "Técnico", clear: () => setFTecnico("all") });
+  if (fMarca !== "all") activeChips.push({ label: fMarca, clear: () => setFMarca("all") });
+  if (fEstado !== "all") activeChips.push({ label: fEstado, clear: () => setFEstado("all") });
+
   return (
-    <div className="container max-w-[1600px] py-4 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="container max-w-[1600px] py-3 px-3 sm:py-4 space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Planificador</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
           <p className="text-xs text-muted-foreground">{filtered.length} servicios visibles</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" /> Filtros
+                {activeChips.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">{activeChips.length}</Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>Filtros</SheetTitle>
+              </SheetHeader>
+              <div className="mt-6 space-y-4">
+                <FilterField label="Semana" value={fSemana} onChange={setFSemana} options={[
+                  { v: "all", l: "Todas" },
+                  ...semanasDisponibles.map((s) => ({ v: String(s), l: `Semana ${s}` })),
+                ]} />
+                <FilterField label="Sucursal" value={fSucursal} onChange={setFSucursal} options={[
+                  { v: "all", l: "Todas" },
+                  ...SUCURSALES.map((s) => ({ v: s, l: s })),
+                ]} />
+                <FilterField label="Técnico" value={fTecnico} onChange={setFTecnico} options={[
+                  { v: "all", l: "Todos" },
+                  ...profiles.map((p) => ({ v: p.id, l: p.nombre })),
+                ]} />
+                <FilterField label="Marca" value={fMarca} onChange={setFMarca} options={[
+                  { v: "all", l: "Todas" },
+                  ...MARCAS.map((m) => ({ v: m, l: m })),
+                ]} />
+                <FilterField label="Estado" value={fEstado} onChange={setFEstado} options={[
+                  { v: "all", l: "Todos" },
+                  ...ESTADOS.map((e) => ({ v: e, l: e })),
+                ]} />
+                <div className="pt-2 flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={limpiarFiltros}>Limpiar</Button>
+                  <Button className="flex-1" onClick={() => setFiltersOpen(false)}>Aplicar</Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
           <Button variant="outline" size="sm" onClick={exportExcel}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
           </Button>
           {canCreate && (
             <Button size="sm" onClick={() => { setEditing(null); setOpenForm(true); }}>
-              <Plus className="mr-2 h-4 w-4" /> Nuevo servicio
+              <Plus className="mr-2 h-4 w-4" /> Nuevo
             </Button>
           )}
         </div>
       </div>
 
-      {/* Filtros */}
-      <Card className="p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <FilterSelect label="Semana" value={fSemana} onChange={setFSemana} options={[
-            { v: "all", l: "Todas" },
-            ...semanasDisponibles.map((s) => ({ v: String(s), l: `Semana ${s}` })),
-          ]} />
-          <FilterSelect label="Sucursal" value={fSucursal} onChange={setFSucursal} options={[
-            { v: "all", l: "Todas" },
-            ...SUCURSALES.map((s) => ({ v: s, l: s })),
-          ]} />
-          <FilterSelect label="Técnico" value={fTecnico} onChange={setFTecnico} options={[
-            { v: "all", l: "Todos" },
-            ...profiles.map((p) => ({ v: p.id, l: p.nombre })),
-          ]} />
-          <FilterSelect label="Marca" value={fMarca} onChange={setFMarca} options={[
-            { v: "all", l: "Todas" },
-            ...MARCAS.map((m) => ({ v: m, l: m })),
-          ]} />
-          <FilterSelect label="Estado" value={fEstado} onChange={setFEstado} options={[
-            { v: "all", l: "Todos" },
-            ...ESTADOS.map((e) => ({ v: e, l: e })),
-          ]} />
+      {/* Chips de filtros activos */}
+      {activeChips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {activeChips.map((c, i) => (
+            <Badge key={i} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px] font-normal">
+              {c.label}
+              <button onClick={c.clear} className="rounded-sm hover:bg-background/60 p-0.5">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          <button onClick={limpiarFiltros} className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2">
+            Limpiar todo
+          </button>
         </div>
-      </Card>
+      )}
 
-      {/* Desktop table — compacta, 8 columnas */}
+      {/* Desktop table */}
       <Card className="hidden md:block overflow-hidden">
         <div className="overflow-x-auto">
           <Table className="text-[13px]">
@@ -278,26 +333,32 @@ export default function Planificador() {
 
       {/* Mobile list */}
       <div className="md:hidden space-y-2">
+        {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
+        {!loading && filtered.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin servicios.</p>}
         {filtered.map((s) => {
           const tipo = s.tipo_trabajo ?? "Visita de campo";
           const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
+          const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
           return (
-            <Card key={s.id} className={cn("p-3", rowClassByEstado(s.estado))} onClick={() => openDetalle(s)}>
+            <Card
+              key={s.id}
+              className={cn("p-2.5 cursor-pointer", rowClassByEstado(s.estado), unseen && "ring-2 ring-primary/40")}
+              onClick={() => openDetalle(s)}
+            >
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold tabular-nums">{format(parseISO(s.fecha_programada), "dd/MM")}</span>
-                    <span className="text-[10px] text-muted-foreground">{s.dia_semana}</span>
-                    <MarcaBadge marca={s.marca} className="text-[10px]" />
-                    <Badge variant="outline" className="gap-0.5 px-1.5 py-0 text-[10px]">
-                      <TipoIcon className="h-2.5 w-2.5" />
-                      {tipo === "Máquina en taller" ? "Taller" : "Visita"}
-                    </Badge>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="font-semibold tabular-nums text-foreground">{format(parseISO(s.fecha_programada), "dd/MM")}</span>
+                    <span>·</span>
+                    <span>{s.dia_semana.slice(0,3)}</span>
+                    <TipoIcon className="h-3 w-3" />
                   </div>
-                  <div className="text-sm font-medium truncate">{s.cliente_id ? cliById[s.cliente_id]?.nombre : "—"}</div>
-                  <div className="text-xs text-muted-foreground truncate">{s.trabajo_descripcion}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "—"} · {s.sucursal}
+                  <div className="text-sm font-semibold truncate">{s.cliente_id ? cliById[s.cliente_id]?.nombre : "—"}</div>
+                  <div className="text-xs text-muted-foreground line-clamp-2 leading-snug">{s.trabajo_descripcion}</div>
+                  <div className="text-[10px] text-muted-foreground pt-0.5">
+                    {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "Sin asignar"}
+                    <span className="mx-1">·</span>
+                    {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                   </div>
                 </div>
                 <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
@@ -326,14 +387,14 @@ export default function Planificador() {
   );
 }
 
-function FilterSelect({
+function FilterField({
   label, value, onChange, options,
 }: { label: string; value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs text-muted-foreground">{label}:</span>
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 min-w-[120px] text-xs"><SelectValue /></SelectTrigger>
+        <SelectTrigger><SelectValue /></SelectTrigger>
         <SelectContent>{options.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}</SelectContent>
       </Select>
     </div>
