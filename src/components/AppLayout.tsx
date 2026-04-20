@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { CalendarDays, LayoutDashboard, ListChecks, History, Users, LogOut, Wrench, Bell } from "lucide-react";
+import { CalendarDays, LayoutDashboard, ListChecks, History, Users, LogOut, Wrench, Bell, Tractor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useUnseen } from "@/hooks/useUnseen";
@@ -14,11 +14,17 @@ const items = [
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, signOut, roles } = useAuth();
+  const { profile, isAdmin, isCabecilla, signOut, roles } = useAuth();
   const unseen = useUnseen();
   const location = useLocation();
 
-  const navItems = [...items, ...(isAdmin ? [{ to: "/admin", label: "Admin", icon: Users, end: false }] : [])];
+  const navItems = [
+    ...items,
+    ...((isAdmin || isCabecilla)
+      ? [{ to: "/parque-clientes", label: "Parque & Clientes", icon: Tractor, end: false }]
+      : []),
+    ...(isAdmin ? [{ to: "/admin", label: "Admin", icon: Users, end: false }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-background">
