@@ -53,11 +53,15 @@ export default function Dashboard() {
   const totalHoras = filtered.reduce((acc, s) => acc + (s.horas_trabajadas ?? 0), 0);
 
   const porSucursal = SUCURSALES.map((s) => ({ name: s, total: filtered.filter((x) => x.sucursal === s).length }));
+  // Solo nombre + apellido (primeras 2 palabras)
+  const shortName = (n: string) => n.trim().split(/\s+/).slice(0, 2).join(" ");
   const porTecnico = profiles.map((p) => ({
-    name: p.nombre.length > 14 ? p.nombre.slice(0, 14) + "…" : p.nombre,
+    id: p.id,
+    name: shortName(p.nombre),
     total: filtered.filter((x) => x.tecnico_responsable_id === p.id).length,
     horas: filtered.filter((x) => x.tecnico_responsable_id === p.id).reduce((a, x) => a + (x.horas_trabajadas ?? 0), 0),
-  })).filter((x) => x.total > 0 || x.horas > 0);
+  })).sort((a, b) => b.total - a.total || b.horas - a.horas);
+
 
   const porMarca = MARCAS.map((m) => ({ name: m, value: filtered.filter((x) => x.marca === m).length }));
   const porEstado = ESTADOS.map((e) => ({ name: e, value: filtered.filter((x) => x.estado === e).length }));
