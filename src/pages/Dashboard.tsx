@@ -90,12 +90,13 @@ export default function Dashboard() {
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-3">Servicios por sucursal</h3>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={porSucursal}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <BarChart data={porSucursal} margin={{ top: 20, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" fontSize={11} />
-              <YAxis fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-              <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} cursor={{ fill: "hsl(var(--accent))", opacity: 0.3 }} />
+              <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                <LabelList dataKey="total" position="top" fontSize={11} fill="hsl(var(--foreground))" formatter={(v: number) => v > 0 ? v : ""} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -104,7 +105,15 @@ export default function Dashboard() {
           <h3 className="text-sm font-semibold mb-3">Distribución por estado</h3>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={porEstado} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} label>
+              <Pie
+                data={porEstado}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={50}
+                outerRadius={80}
+                label={({ value, percent }) => value > 0 ? `${value} (${Math.round((percent ?? 0) * 100)}%)` : ""}
+                labelLine={false}
+              >
                 {porEstado.map((e) => <Cell key={e.name} fill={COLORS_ESTADO[e.name as Estado]} />)}
               </Pie>
               <Legend />
@@ -115,9 +124,17 @@ export default function Dashboard() {
 
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-3">Distribución por marca</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={porMarca} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} label>
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart margin={{ top: 16, right: 16, bottom: 16, left: 16 }}>
+              <Pie
+                data={porMarca}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={45}
+                outerRadius={75}
+                label={({ name, value, percent }) => value > 0 ? `${name}: ${value} (${Math.round((percent ?? 0) * 100)}%)` : ""}
+                labelLine={true}
+              >
                 {porMarca.map((e) => <Cell key={e.name} fill={COLORS_MARCA[e.name as Marca]} />)}
               </Pie>
               <Legend />
@@ -128,17 +145,28 @@ export default function Dashboard() {
 
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-3">Servicios y horas por técnico</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={porTecnico} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis type="number" fontSize={11} />
-              <YAxis dataKey="name" type="category" fontSize={11} width={100} />
-              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-              <Legend />
-              <Bar dataKey="total" name="Servicios" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-              <Bar dataKey="horas" name="Horas" fill="hsl(var(--marca-horsch))" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="max-h-[260px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Técnico</TableHead>
+                  <TableHead className="text-xs text-right">Servicios</TableHead>
+                  <TableHead className="text-xs text-right">Horas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {porTecnico.length === 0 ? (
+                  <TableRow><TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">Sin datos en el período</TableCell></TableRow>
+                ) : porTecnico.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="text-sm font-medium">{t.name}</TableCell>
+                    <TableCell className="text-sm text-right tabular-nums">{t.total}</TableCell>
+                    <TableCell className="text-sm text-right tabular-nums">{t.horas.toFixed(1)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </div>
     </div>
