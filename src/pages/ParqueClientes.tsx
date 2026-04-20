@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ParqueTab } from "@/components/parque/ParqueTab";
+import { AgendaTab } from "@/components/parque/AgendaTab";
+import { ImportarTab } from "@/components/parque/ImportarTab";
+import { ClientePanel } from "@/components/parque/ClientePanel";
 import { Tractor, CheckCircle2, PhoneCall, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +23,9 @@ export default function ParqueClientes() {
     pctContactadosEsteMes: 0,
     sinContacto60d: 0,
   });
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const cargarMetricas = async () => {
     const hoy = new Date();
@@ -49,7 +55,6 @@ export default function ParqueClientes() {
     const pctConServicioUltimoAnio =
       totalClientes > 0 ? Math.round((clientesConServicio.size / totalClientes) * 100) : 0;
 
-    // último seguimiento por cliente
     const ultimoSegPorCliente = new Map<string, Date>();
     for (const s of seguimientosRes.data ?? []) {
       const f = new Date(s.fecha);
@@ -73,7 +78,14 @@ export default function ParqueClientes() {
 
   useEffect(() => {
     cargarMetricas();
-  }, []);
+  }, [refreshKey]);
+
+  const handleChanged = () => setRefreshKey((k) => k + 1);
+
+  const handleOpenCliente = (id: string) => {
+    setClienteAbierto(id);
+    setPanelOpen(true);
+  };
 
   const cards = useMemo(
     () => [
@@ -143,18 +155,27 @@ export default function ParqueClientes() {
       <Tabs defaultValue="parque">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="parque">Parque de máquinas</TabsTrigger>
-          <TabsTrigger value="agenda" disabled>
-            Agenda comercial
-          </TabsTrigger>
-          <TabsTrigger value="importar" disabled>
-            Importar datos
-          </TabsTrigger>
+          <TabsTrigger value="agenda">Agenda comercial</TabsTrigger>
+          <TabsTrigger value="importar">Importar datos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="parque" className="mt-4">
-          <ParqueTab onChanged={cargarMetricas} />
+          <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} />
+        </TabsContent>
+        <TabsContent value="agenda" className="mt-4">
+          <AgendaTab key={`a-${refreshKey}`} onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
+        </TabsContent>
+        <TabsContent value="importar" className="mt-4">
+          <ImportarTab onChanged={handleChanged} />
         </TabsContent>
       </Tabs>
+
+      <ClientePanel
+        clienteId={clienteAbierto}
+        open={panelOpen}
+        onOpenChange={setPanelOpen}
+        onChanged={handleChanged}
+      />
     </div>
   );
 }

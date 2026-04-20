@@ -121,7 +121,7 @@ const resultadoColor = (r: string | undefined) => {
   }
 };
 
-export function ParqueTab({ onChanged: _onChanged }: { onChanged?: () => void }) {
+export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?: () => void; onOpenCliente?: (id: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -448,7 +448,11 @@ export function ParqueTab({ onChanged: _onChanged }: { onChanged?: () => void })
             )}
             {!loading &&
               ordenadas.map((r) => (
-                <TableRow key={r.cliente.id} className={cn(filaColor(r.diasUltServicio))}>
+                <TableRow
+                  key={r.cliente.id}
+                  className={cn(filaColor(r.diasUltServicio), onOpenCliente && "cursor-pointer")}
+                  onClick={() => onOpenCliente?.(r.cliente.id)}
+                >
                   <TableCell>
                     <div className="font-medium">{r.cliente.nombre}</div>
                     {r.cliente.sucursal && (
