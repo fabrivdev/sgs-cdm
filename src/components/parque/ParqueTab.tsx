@@ -258,6 +258,7 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
     return rows.filter((r) => {
+      if (r.cantTotal === 0) return false;
       if (ql && !r.cliente.nombre.toLowerCase().includes(ql)) return false;
       if (fSucursal !== "all" && r.cliente.sucursal !== fSucursal) return false;
       if (fMarca !== "all") {
