@@ -1,88 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 15% 15%;
+    /* Core colors - Clean iOS whites */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 0 0% 10%;
 
-    --primary: 142 70% 30%;
+    /* Primary - Olive Green */
+    --primary: 75 46% 44%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 15% 15%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 20%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 220 14% 94%;
-    --accent-foreground: 220 15% 15%;
+    --accent: 75 40% 95%;
+    --accent-foreground: 75 46% 35%;
 
-    --destructive: 0 84% 55%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 88%;
-    --input: 220 13% 88%;
-    --ring: 142 70% 30%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 75 46% 44%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     /* Estado colors */
     --estado-pendiente: 38 92% 50%;
     --estado-pendiente-bg: 48 100% 92%;
     --estado-iniciado: 217 91% 55%;
     --estado-iniciado-bg: 213 100% 94%;
-    --estado-completado: 142 71% 40%;
-    --estado-completado-bg: 142 70% 92%;
+    --estado-completado: 75 46% 44%;
+    --estado-completado-bg: 75 50% 92%;
 
     /* Marca colors */
-    --marca-claas: 142 75% 28%;
-    --marca-claas-bg: 142 60% 92%;
+    --marca-claas: 75 46% 38%;
+    --marca-claas-bg: 75 50% 92%;
     --marca-horsch: 18 85% 50%;
     --marca-horsch-bg: 18 85% 94%;
 
-    --sidebar-background: 220 15% 12%;
-    --sidebar-foreground: 220 10% 85%;
-    --sidebar-primary: 142 70% 40%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 75 46% 44%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 18%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 142 70% 40%;
+    --sidebar-accent: 75 40% 95%;
+    --sidebar-accent-foreground: 75 46% 35%;
+    --sidebar-border: 0 0% 92%;
+    --sidebar-ring: 75 46% 44%;
   }
 
   .dark {
-    --background: 220 18% 10%;
-    --foreground: 220 10% 95%;
-    --card: 220 18% 12%;
-    --card-foreground: 220 10% 95%;
-    --popover: 220 18% 12%;
-    --popover-foreground: 220 10% 95%;
-    --primary: 142 70% 45%;
-    --primary-foreground: 220 18% 10%;
-    --secondary: 220 15% 18%;
-    --secondary-foreground: 220 10% 95%;
-    --muted: 220 15% 18%;
-    --muted-foreground: 220 10% 65%;
-    --accent: 220 15% 20%;
-    --accent-foreground: 220 10% 95%;
-    --destructive: 0 70% 50%;
+    --background: 0 0% 5%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 75 46% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 75 40% 15%;
+    --accent-foreground: 75 46% 65%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 22%;
-    --input: 220 15% 22%;
-    --ring: 142 70% 45%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 75 46% 50%;
+
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 75 46% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 75 40% 15%;
+    --sidebar-accent-foreground: 75 46% 65%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 75 46% 50%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   body { @apply bg-background text-foreground font-sans antialiased; }
 }
 
