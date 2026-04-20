@@ -17,7 +17,7 @@ interface Servicio {
   trabajo_descripcion: string; estado: Estado; observaciones: string | null; horas_trabajadas: number | null;
   visto_por: string[];
 }
-interface Profile { id: string; nombre: string }
+interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 
 export default function Historial() {
@@ -31,7 +31,7 @@ export default function Historial() {
   const load = async () => {
     const [{ data: srv }, { data: prof }, { data: cli }] = await Promise.all([
       supabase.from("servicios").select("*").order("fecha_programada", { ascending: false }),
-      supabase.from("profiles").select("id, nombre"),
+      supabase.from("profiles").select("id, nombre, sucursal"),
       supabase.from("clientes").select("id, nombre, sucursal").order("nombre"),
     ]);
     setServicios((srv ?? []) as Servicio[]);
