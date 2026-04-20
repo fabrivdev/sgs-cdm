@@ -10,11 +10,13 @@ export const SUCURSALES = [
 export const MARCAS = ["CLAAS", "HORSCH"] as const;
 export const ESTADOS = ["Pendiente", "Iniciado", "Completado"] as const;
 export const ROLES = ["admin", "cabecilla", "tecnico"] as const;
+export const TIPOS_TRABAJO = ["Visita de campo", "Máquina en taller"] as const;
 
 export type Sucursal = (typeof SUCURSALES)[number];
 export type Marca = (typeof MARCAS)[number];
 export type Estado = (typeof ESTADOS)[number];
 export type Role = (typeof ROLES)[number];
+export type TipoTrabajo = (typeof TIPOS_TRABAJO)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrador",

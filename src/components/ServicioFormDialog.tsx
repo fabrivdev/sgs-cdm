@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, MapPin, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
+import { MARCAS, SUCURSALES, TIPOS_TRABAJO, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
@@ -22,6 +24,7 @@ interface Servicio {
   sucursal: Sucursal;
   cliente_id: string | null;
   marca: Marca;
+  tipo_trabajo: TipoTrabajo;
   trabajo_descripcion: string;
   observaciones: string | null;
 }
@@ -33,70 +36,93 @@ interface Props {
   profiles: Profile[];
   clientes: Cliente[];
   onSaved: () => void;
+  defaultDate?: string;
 }
 
-export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, clientes, onSaved }: Props) {
+export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, clientes, onSaved, defaultDate }: Props) {
   const { user, profile, isAdmin } = useAuth();
   const [fecha, setFecha] = useState("");
+  const [tipo, setTipo] = useState<TipoTrabajo>("Visita de campo");
   const [sucursal, setSucursal] = useState<Sucursal>(SUCURSALES[0]);
   const [marca, setMarca] = useState<Marca>("CLAAS");
   const [responsableId, setResponsableId] = useState<string>("");
   const [auxiliares, setAuxiliares] = useState<string[]>([]);
-  const [clienteId, setClienteId] = useState<string>("");
-  const [nuevoCliente, setNuevoCliente] = useState("");
+  const [clienteText, setClienteText] = useState("");
   const [trabajo, setTrabajo] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [busy, setBusy] = useState(false);
+  const [obsOpen, setObsOpen] = useState(false);
+
+  const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c.nombre])), [clientes]);
 
   useEffect(() => {
+    if (!open) return;
     if (servicio) {
       setFecha(servicio.fecha_programada);
+      setTipo(servicio.tipo_trabajo ?? "Visita de campo");
       setSucursal(servicio.sucursal);
       setMarca(servicio.marca);
       setResponsableId(servicio.tecnico_responsable_id ?? "");
       setAuxiliares(servicio.auxiliares);
-      setClienteId(servicio.cliente_id ?? "");
+      setClienteText(servicio.cliente_id ? (cliById[servicio.cliente_id] ?? "") : "");
       setTrabajo(servicio.trabajo_descripcion);
       setObservaciones(servicio.observaciones ?? "");
+      setObsOpen(!!servicio.observaciones);
     } else {
-      setFecha(new Date().toISOString().slice(0, 10));
+      setFecha(defaultDate ?? new Date().toISOString().slice(0, 10));
+      setTipo("Visita de campo");
       setSucursal(isAdmin ? SUCURSALES[0] : (profile?.sucursal ?? SUCURSALES[0]));
       setMarca("CLAAS");
       setResponsableId("");
       setAuxiliares([]);
-      setClienteId("");
-      setNuevoCliente("");
+      setClienteText("");
       setTrabajo("");
       setObservaciones("");
+      setObsOpen(false);
     }
-  }, [servicio, open, isAdmin, profile]);
+  }, [servicio, open, isAdmin, profile, defaultDate, cliById]);
 
-  // Técnicos y clientes son globales: cualquiera puede asignarse a servicios de cualquier sucursal
-  const tecnicosDisponibles = profiles;
-  const clientesDisponibles = clientes;
+  const tecnicos = profiles;
   const labelTecnico = (p: Profile) => p.sucursal ? `${p.nombre} (${p.sucursal})` : p.nombre;
+  const auxDisponibles = tecnicos.filter((p) => p.id !== responsableId);
+
+  const toggleAux = (id: string) => {
+    setAuxiliares((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
 
   const submit = async () => {
-    if (!fecha || !trabajo) { toast.error("Completá fecha y descripción del trabajo"); return; }
+    if (!fecha || !trabajo.trim()) { toast.error("Completá fecha y trabajo a resolver"); return; }
     setBusy(true);
-    let cli = clienteId;
-    if (nuevoCliente.trim()) {
-      const { data, error } = await supabase.from("clientes").insert({ nombre: nuevoCliente.trim(), sucursal: null }).select("id").single();
-      if (error) { toast.error(error.message); setBusy(false); return; }
-      cli = data.id;
+
+    // Resolver cliente: si está vacío -> null; si coincide con uno existente -> ese id; si es nuevo -> crearlo
+    let cli: string | null = null;
+    const nombreCli = clienteText.trim();
+    if (nombreCli) {
+      const existente = clientes.find((c) => c.nombre.toLowerCase() === nombreCli.toLowerCase());
+      if (existente) {
+        cli = existente.id;
+      } else {
+        const { data, error } = await supabase
+          .from("clientes")
+          .insert({ nombre: nombreCli, sucursal: null })
+          .select("id")
+          .single();
+        if (error) { toast.error(error.message); setBusy(false); return; }
+        cli = data.id;
+      }
     }
 
     const payload = {
       fecha_programada: fecha,
       sucursal,
       marca,
+      tipo_trabajo: tipo,
       tecnico_responsable_id: responsableId || null,
       auxiliares,
-      cliente_id: cli || null,
-      trabajo_descripcion: trabajo,
-      observaciones: observaciones || null,
+      cliente_id: cli,
+      trabajo_descripcion: trabajo.trim(),
+      observaciones: observaciones.trim() || null,
       creado_por: user?.id,
-      // dia_semana and semana are auto-computed by DB trigger
       dia_semana: "",
       semana: 0,
     };
@@ -112,17 +138,77 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{servicio ? "Editar servicio" : "Nuevo servicio"}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1 pr-3">
           <div className="space-y-4 py-2">
+            {/* Fecha + Tipo */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Fecha programada</Label>
+                <Label>Fecha</Label>
                 <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
               </div>
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setTipo("Visita de campo")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-medium transition-colors",
+                      tipo === "Visita de campo" ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-accent"
+                    )}
+                  >
+                    <MapPin className="h-3.5 w-3.5" /> Visita
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipo("Máquina en taller")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-medium transition-colors",
+                      tipo === "Máquina en taller" ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-accent"
+                    )}
+                  >
+                    <Wrench className="h-3.5 w-3.5" /> Taller
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Cliente */}
+            <div className="space-y-1.5">
+              <Label htmlFor="cliente-input">Cliente</Label>
+              <Input
+                id="cliente-input"
+                list="clientes-list"
+                value={clienteText}
+                onChange={(e) => setClienteText(e.target.value)}
+                placeholder="Escribí el nombre del cliente"
+                autoComplete="off"
+              />
+              <datalist id="clientes-list">
+                {clientes.map((c) => <option key={c.id} value={c.nombre} />)}
+              </datalist>
+              <p className="text-[11px] text-muted-foreground">Si no existe, se crea automáticamente al guardar.</p>
+            </div>
+
+            {/* Trabajo destacado */}
+            <div className="space-y-1.5">
+              <Label htmlFor="trabajo-input" className="text-sm font-semibold">Trabajo o problema a resolver</Label>
+              <Textarea
+                id="trabajo-input"
+                value={trabajo}
+                onChange={(e) => setTrabajo(e.target.value)}
+                rows={3}
+                placeholder="Ej: Cambio de aceite hidráulico, revisar pérdida en bomba…"
+                className="text-sm"
+              />
+            </div>
+
+            {/* Sucursal + Marca */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Sucursal</Label>
                 <Select value={sucursal} onValueChange={(v) => setSucursal(v as Sucursal)} disabled={!isAdmin}>
@@ -137,61 +223,64 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
                   <SelectContent>{MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Técnico responsable</Label>
-                <Select value={responsableId || "none"} onValueChange={(v) => setResponsableId(v === "none" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Sin asignar —</SelectItem>
-                    {tecnicosDisponibles.map((p) => <SelectItem key={p.id} value={p.id}>{labelTecnico(p)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
+            {/* Responsable */}
             <div className="space-y-1.5">
-              <Label>Auxiliares</Label>
-              <div className="rounded-md border p-2 max-h-32 overflow-y-auto space-y-1">
-                {tecnicosDisponibles.length === 0 && <p className="text-xs text-muted-foreground">No hay técnicos cargados.</p>}
-                {tecnicosDisponibles.filter((p) => p.id !== responsableId).map((p) => (
-                  <label key={p.id} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={auxiliares.includes(p.id)}
-                      onCheckedChange={(c) =>
-                        setAuxiliares((prev) => c ? [...prev, p.id] : prev.filter((x) => x !== p.id))
-                      }
-                    />
-                    {labelTecnico(p)}
-                  </label>
-                ))}
-              </div>
+              <Label>Técnico responsable</Label>
+              <Select value={responsableId || "none"} onValueChange={(v) => setResponsableId(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Sin asignar —</SelectItem>
+                  {tecnicos.map((p) => <SelectItem key={p.id} value={p.id}>{labelTecnico(p)}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Cliente existente</Label>
-                <Select value={clienteId || "none"} onValueChange={(v) => setClienteId(v === "none" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Ninguno —</SelectItem>
-                    {clientesDisponibles.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>O cargar nuevo cliente</Label>
-                <Input value={nuevoCliente} onChange={(e) => setNuevoCliente(e.target.value)} placeholder="Nombre del cliente" />
-              </div>
+            {/* Auxiliares como chips */}
+            <div className="space-y-1.5">
+              <Label>Auxiliares <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+              {auxDisponibles.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No hay técnicos disponibles.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {auxDisponibles.map((p) => {
+                    const active = auxiliares.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => toggleAux(p.id)}
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                          active
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-accent"
+                        )}
+                      >
+                        {p.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Descripción del trabajo</Label>
-              <Textarea value={trabajo} onChange={(e) => setTrabajo(e.target.value)} rows={3} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Observaciones</Label>
-              <Textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} />
-            </div>
+            {/* Observaciones colapsable */}
+            <Collapsible open={obsOpen} onOpenChange={setObsOpen}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent">
+                <span>Observaciones {observaciones && <span className="ml-1 text-foreground">({observaciones.length} car.)</span>}</span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", obsOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <Textarea
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  rows={2}
+                  placeholder="Notas internas, recordatorios…"
+                />
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </ScrollArea>
         <DialogFooter>
