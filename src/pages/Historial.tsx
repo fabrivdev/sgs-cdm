@@ -2,16 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
-import { Search } from "lucide-react";
+import { Search, MapPin, Wrench } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
-import type { Estado, Marca, Sucursal } from "@/lib/constants";
+import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 
 interface Servicio {
   id: string; fecha_programada: string; dia_semana: string; semana: number;
   tecnico_responsable_id: string | null; auxiliares: string[];
   sucursal: Sucursal; cliente_id: string | null; marca: Marca;
+  tipo_trabajo: TipoTrabajo;
   trabajo_descripcion: string; estado: Estado; observaciones: string | null; horas_trabajadas: number | null;
   visto_por: string[];
 }
