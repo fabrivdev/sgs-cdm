@@ -121,7 +121,7 @@ const resultadoColor = (r: string | undefined) => {
   }
 };
 
-export function ParqueTab({ onChanged: _onChanged }: { onChanged?: () => void }) {
+export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?: () => void; onOpenCliente?: (id: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
