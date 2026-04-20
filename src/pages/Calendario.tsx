@@ -71,38 +71,45 @@ export default function Calendario() {
   const canCreate = isAdmin || isCabecilla;
   const eventosDia = diaSel ? eventsForDay(diaSel) : [];
 
+  // Para mobile: color dominante del día (prioridad: pendiente > iniciado > completado)
+  const dominantColor = (evs: Servicio[]) => {
+    if (evs.some((s) => s.estado === "Pendiente")) return "bg-estado-pendiente";
+    if (evs.some((s) => s.estado === "Iniciado")) return "bg-estado-iniciado";
+    return "bg-estado-completado";
+  };
+
   return (
-    <div className="container max-w-[1400px] py-4 space-y-4">
+    <div className="container max-w-[1400px] py-3 sm:py-4 px-3 sm:px-4 space-y-3 sm:space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Calendario</h1>
-          <p className="text-xs text-muted-foreground">{format(cursor, "MMMM yyyy", { locale: es })}</p>
+          <h1 className="text-xl sm:text-2xl font-bold">Calendario</h1>
+          <p className="text-xs text-muted-foreground capitalize">{format(cursor, "MMMM yyyy", { locale: es })}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={vista} onValueChange={(v) => setVista(v as "mes" | "semana")}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28 sm:w-32 h-9"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="mes">Mes</SelectItem><SelectItem value="semana">Semana</SelectItem></SelectContent>
           </Select>
           <Select value={fTecnico} onValueChange={setFTecnico}>
-            <SelectTrigger className="w-48"><SelectValue placeholder="Técnico" /></SelectTrigger>
+            <SelectTrigger className="w-40 sm:w-48 h-9"><SelectValue placeholder="Técnico" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los técnicos</SelectItem>
               {profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={() => setCursor(vista === "mes" ? addMonths(cursor, -1) : addWeeks(cursor, -1))}>
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setCursor(vista === "mes" ? addMonths(cursor, -1) : addWeeks(cursor, -1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCursor(new Date())}>Hoy</Button>
-          <Button variant="outline" size="icon" onClick={() => setCursor(vista === "mes" ? addMonths(cursor, 1) : addWeeks(cursor, 1))}>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => setCursor(new Date())}>Hoy</Button>
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setCursor(vista === "mes" ? addMonths(cursor, 1) : addWeeks(cursor, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-xs font-semibold uppercase">
-          {["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"].map((d) => <div key={d} className="py-2">{d}</div>)}
+        <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
+          {["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"].map((d) => <div key={d} className="py-1.5 sm:py-2">{d}</div>)}
         </div>
         <div className="grid grid-cols-7">
           {days.map((d) => {
@@ -114,15 +121,31 @@ export default function Calendario() {
                 key={d.toISOString()}
                 onClick={() => setDiaSel(d)}
                 className={cn(
-                  "min-h-[110px] border-b border-r p-1.5 text-xs text-left transition-colors hover:bg-accent/50",
+                  "min-h-[56px] sm:min-h-[110px] border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
                   isToday && "bg-primary/5"
                 )}
               >
-                <div className={cn("mb-1 text-right text-[11px] font-semibold tabular-nums", isToday && "text-primary")}>
+                <div className={cn("text-right text-[11px] font-semibold tabular-nums sm:mb-1", isToday && "text-primary")}>
                   {format(d, "d")}
                 </div>
-                <div className="space-y-1">
+
+                {/* Mobile: solo contador con color */}
+                <div className="flex flex-1 items-center justify-center sm:hidden">
+                  {evs.length > 0 && (
+                    <span
+                      className={cn(
+                        "inline-flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white",
+                        dominantColor(evs)
+                      )}
+                    >
+                      {evs.length}
+                    </span>
+                  )}
+                </div>
+
+                {/* Desktop: tarjetitas */}
+                <div className="hidden sm:block space-y-1">
                   {evs.slice(0, 3).map((s) => {
                     const TipoIcon = (s.tipo_trabajo ?? "Visita de campo") === "Máquina en taller" ? Wrench : MapPin;
                     return (
