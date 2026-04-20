@@ -11,6 +11,7 @@ import Planificador from "./pages/Planificador";
 import Calendario from "./pages/Calendario";
 import Dashboard from "./pages/Dashboard";
 import Historial from "./pages/Historial";
+import ParqueClientes from "./pages/ParqueClientes";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -54,6 +55,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout><Historial /></AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/parque-clientes"
+              element={
+                <ProtectedRoute requireRoles={["admin", "cabecilla"]}>
+                  <AppLayout><ParqueClientes /></AppLayout>
                 </ProtectedRoute>
               }
             />
