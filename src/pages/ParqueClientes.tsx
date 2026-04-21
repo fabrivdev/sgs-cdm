@@ -47,13 +47,20 @@ export default function ParqueClientes() {
     ]);
 
     const totalMaquinas = maquinasRes.count ?? 0;
-    const clientesIds = new Set((clientesRes.data ?? []).map((c) => c.id));
+
+    // Clientes CON máquinas (universo para métricas comerciales)
+    const clientesConMaquinas = new Set<string>();
+    for (const m of maquinasRes.data ?? []) {
+      if (m.cliente_id) clientesConMaquinas.add(m.cliente_id);
+    }
+
     const clientesConServicio = new Set(
       (facturacionRes.data ?? []).map((f) => f.cliente_id).filter(Boolean) as string[],
     );
-    const totalClientes = clientesIds.size;
+    const totalClientes = clientesConMaquinas.size;
+    const conServicio = [...clientesConServicio].filter((c) => clientesConMaquinas.has(c)).length;
     const pctConServicioUltimoAnio =
-      totalClientes > 0 ? Math.round((clientesConServicio.size / totalClientes) * 100) : 0;
+      totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0;
 
     const ultimoSegPorCliente = new Map<string, Date>();
     for (const s of seguimientosRes.data ?? []) {
@@ -64,7 +71,7 @@ export default function ParqueClientes() {
 
     let contactadosEsteMes = 0;
     let sinContacto60d = 0;
-    for (const cid of clientesIds) {
+    for (const cid of clientesConMaquinas) {
       const ult = ultimoSegPorCliente.get(cid);
       if (ult && ult >= inicioMes) contactadosEsteMes++;
       if (!ult || ult < hace60d) sinContacto60d++;
