@@ -81,6 +81,7 @@ export function AgendaTab({ onOpenCliente, onChanged }: { onOpenCliente: (id: st
           ultResultado: ult?.resultado ?? null,
         };
       })
+      .filter((f) => f.cantMaquinas > 0)
       .sort((a, b) => {
         const da = a.dias ?? Number.MAX_SAFE_INTEGER;
         const db = b.dias ?? Number.MAX_SAFE_INTEGER;
