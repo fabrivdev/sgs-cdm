@@ -10,11 +10,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Phone, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  CalendarIcon,
+  Check,
+  Download,
+  Flag,
+  Phone,
+  Search,
+  X,
+} from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { format } from "date-fns";
 
 const SUBGRUPOS = [
   "COSECHADORAS",
@@ -80,6 +94,8 @@ interface Row {
   antiguedadProm: number | null;
   diasUltRepuesto: number | null;
   diasUltServicio: number | null;
+  tieneRepEnRango: boolean;
+  tieneSrvEnRango: boolean;
   factYTD: number;
   factPrev: number;
   varPct: number | null;
@@ -93,8 +109,10 @@ type SortKey =
   | "diasUltRepuesto"
   | "diasUltServicio"
   | "factYTD"
-  | "varPct"
-  | "ultSeg";
+  | "factPrev"
+  | "varPct";
+
+type RangoPreset = "30d" | "90d" | "180d" | "365d" | "ytd" | "custom";
 
 const dias = (d: string | null | undefined) => {
   if (!d) return null;
@@ -104,24 +122,23 @@ const dias = (d: string | null | undefined) => {
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(n);
 
-const resultadoColor = (r: string | undefined) => {
-  switch (r) {
-    case "Agendó servicio":
-      return "bg-emerald-500 text-white";
-    case "Contactado":
-      return "bg-blue-500 text-white";
-    case "Pendiente llamar":
-      return "bg-amber-500 text-white";
-    case "No contesta":
-      return "bg-muted text-foreground";
-    case "Rechazó":
-      return "bg-destructive text-destructive-foreground";
-    default:
-      return "bg-muted text-foreground";
-  }
+// Heatmap antigüedad: 0 verde -> 15+ rojo
+const antiguedadColor = (a: number | null) => {
+  if (a == null) return "bg-muted text-muted-foreground";
+  if (a <= 3) return "bg-emerald-500 text-white";
+  if (a <= 6) return "bg-lime-500 text-white";
+  if (a <= 9) return "bg-amber-500 text-white";
+  if (a <= 12) return "bg-orange-500 text-white";
+  return "bg-destructive text-destructive-foreground";
 };
 
-export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?: () => void; onOpenCliente?: (id: string) => void }) {
+export function ParqueTab({
+  onChanged: _onChanged,
+  onOpenCliente,
+}: {
+  onChanged?: () => void;
+  onOpenCliente?: (id: string) => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -136,13 +153,18 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
   const [fSubgrupo, setFSubgrupo] = useState<string>("all");
   const [fSeguimiento, setFSeguimiento] = useState<string>("all");
 
+  // rango fechas
+  const [rango, setRango] = useState<RangoPreset>("365d");
+  const [customDesde, setCustomDesde] = useState<Date | undefined>();
+  const [customHasta, setCustomHasta] = useState<Date | undefined>();
+
   // orden
   const [sortKey, setSortKey] = useState<SortKey>("cliente");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const cargar = async () => {
     setLoading(true);
-    const [c, ct, m, f, s] = await Promise.all([
+    const [c, ct, m, s] = await Promise.all([
       supabase.from("clientes").select("id, nombre, sucursal, activo").eq("activo", true),
       supabase
         .from("contactos_cliente")
@@ -152,16 +174,31 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
         .from("parque_maquinas")
         .select("id, cliente_id, anio, marca, subgrupo, activo")
         .eq("activo", true),
-      supabase.from("facturacion").select("cliente_id, fecha, tipo, total_venta"),
       supabase
         .from("seguimiento_comercial")
         .select("cliente_id, fecha, resultado")
         .order("fecha", { ascending: false }),
     ]);
+
+    // Facturación: paginar para superar límite 1000
+    const facts: Factura[] = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from("facturacion")
+        .select("cliente_id, fecha, tipo, total_venta")
+        .range(from, from + PAGE - 1);
+      if (error || !data || data.length === 0) break;
+      facts.push(...(data as Factura[]).map((x) => ({ ...x, total_venta: Number(x.total_venta) })));
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+
     setClientes((c.data ?? []) as Cliente[]);
     setContactos((ct.data ?? []) as Contacto[]);
     setMaquinas((m.data ?? []) as Maquina[]);
-    setFacturas(((f.data ?? []) as Factura[]).map((x) => ({ ...x, total_venta: Number(x.total_venta) })));
+    setFacturas(facts);
     setSeguimientos((s.data ?? []) as Seguimiento[]);
     setLoading(false);
   };
@@ -170,13 +207,47 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
     cargar();
   }, []);
 
+  // calcular rango efectivo
+  const { desdeDate, hastaDate, prevDesdeDate, prevHastaDate } = useMemo(() => {
+    const hoy = new Date();
+    let desde: Date;
+    let hasta: Date = hoy;
+    switch (rango) {
+      case "30d":
+        desde = new Date(hoy.getTime() - 30 * 86400000);
+        break;
+      case "90d":
+        desde = new Date(hoy.getTime() - 90 * 86400000);
+        break;
+      case "180d":
+        desde = new Date(hoy.getTime() - 180 * 86400000);
+        break;
+      case "365d":
+        desde = new Date(hoy.getTime() - 365 * 86400000);
+        break;
+      case "ytd":
+        desde = new Date(hoy.getFullYear(), 0, 1);
+        break;
+      case "custom":
+        desde = customDesde ?? new Date(hoy.getFullYear(), 0, 1);
+        hasta = customHasta ?? hoy;
+        break;
+    }
+    // mismo periodo año anterior
+    const prevDesde = new Date(desde);
+    prevDesde.setFullYear(prevDesde.getFullYear() - 1);
+    const prevHasta = new Date(hasta);
+    prevHasta.setFullYear(prevHasta.getFullYear() - 1);
+    return { desdeDate: desde, hastaDate: hasta, prevDesdeDate: prevDesde, prevHastaDate: prevHasta };
+  }, [rango, customDesde, customHasta]);
+
   const rows: Row[] = useMemo(() => {
     const hoy = new Date();
-    const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
-    const inicioAnioPrev = new Date(hoy.getFullYear() - 1, 0, 1);
-    const finAnioPrev = new Date(hoy.getFullYear(), 0, 1);
+    const desdeT = desdeDate.getTime();
+    const hastaT = hastaDate.getTime();
+    const prevDT = prevDesdeDate.getTime();
+    const prevHT = prevHastaDate.getTime();
 
-    // indexar
     const contactosByCliente = new Map<string, Contacto[]>();
     for (const ct of contactos) {
       const arr = contactosByCliente.get(ct.cliente_id) ?? [];
@@ -195,19 +266,25 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
     const ultSrvByCliente = new Map<string, string>();
     const factYTDByCliente = new Map<string, number>();
     const factPrevByCliente = new Map<string, number>();
+    const tieneRepRango = new Set<string>();
+    const tieneSrvRango = new Set<string>();
+
     for (const fc of facturas) {
       if (!fc.cliente_id) continue;
-      const fd = new Date(fc.fecha);
+      const ft = new Date(fc.fecha).getTime();
       if (fc.tipo === "Repuesto") {
         const cur = ultRepByCliente.get(fc.cliente_id);
-        if (!cur || new Date(cur) < fd) ultRepByCliente.set(fc.cliente_id, fc.fecha);
+        if (!cur || new Date(cur).getTime() < ft) ultRepByCliente.set(fc.cliente_id, fc.fecha);
+        if (ft >= desdeT && ft <= hastaT) tieneRepRango.add(fc.cliente_id);
       } else {
         const cur = ultSrvByCliente.get(fc.cliente_id);
-        if (!cur || new Date(cur) < fd) ultSrvByCliente.set(fc.cliente_id, fc.fecha);
+        if (!cur || new Date(cur).getTime() < ft) ultSrvByCliente.set(fc.cliente_id, fc.fecha);
+        if (ft >= desdeT && ft <= hastaT) tieneSrvRango.add(fc.cliente_id);
       }
-      if (fd >= inicioAnio) {
+      if (ft >= desdeT && ft <= hastaT) {
         factYTDByCliente.set(fc.cliente_id, (factYTDByCliente.get(fc.cliente_id) ?? 0) + fc.total_venta);
-      } else if (fd >= inicioAnioPrev && fd < finAnioPrev) {
+      }
+      if (ft >= prevDT && ft <= prevHT) {
         factPrevByCliente.set(fc.cliente_id, (factPrevByCliente.get(fc.cliente_id) ?? 0) + fc.total_venta);
       }
     }
@@ -220,8 +297,7 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
 
     return clientes.map((cli) => {
       const cts = contactosByCliente.get(cli.id) ?? [];
-      const principal =
-        cts.find((x) => x.es_principal) ?? cts[0] ?? null;
+      const principal = cts.find((x) => x.es_principal) ?? cts[0] ?? null;
       const mqs = maquinasByCliente.get(cli.id) ?? [];
       const cantClaas = mqs.filter((m) => m.marca === "CLAAS").length;
       const cantHorsch = mqs.filter((m) => m.marca === "HORSCH").length;
@@ -247,13 +323,15 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
         antiguedadProm,
         diasUltRepuesto: dias(ultRepByCliente.get(cli.id) ?? null),
         diasUltServicio: dias(ultSrvByCliente.get(cli.id) ?? null),
+        tieneRepEnRango: tieneRepRango.has(cli.id),
+        tieneSrvEnRango: tieneSrvRango.has(cli.id),
         factYTD: ytd,
         factPrev: prev,
         varPct,
         ultSeg: ultSegByCliente.get(cli.id) ?? null,
       };
     });
-  }, [clientes, contactos, maquinas, facturas, seguimientos]);
+  }, [clientes, contactos, maquinas, facturas, seguimientos, desdeDate, hastaDate, prevDesdeDate, prevHastaDate]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -291,14 +369,10 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
           return (safe(a.diasUltServicio) - safe(b.diasUltServicio)) * dir;
         case "factYTD":
           return (a.factYTD - b.factYTD) * dir;
+        case "factPrev":
+          return (a.factPrev - b.factPrev) * dir;
         case "varPct":
           return (safe(a.varPct) - safe(b.varPct)) * dir;
-        case "ultSeg":
-          return (
-            ((a.ultSeg ? new Date(a.ultSeg.fecha).getTime() : 0) -
-              (b.ultSeg ? new Date(b.ultSeg.fecha).getTime() : 0)) *
-            dir
-          );
       }
     });
   }, [filtradas, sortKey, sortDir]);
@@ -320,20 +394,18 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
     const data = ordenadas.map((r) => ({
       Cliente: r.cliente.nombre,
       Sucursal: r.cliente.sucursal ?? "",
-      "Contacto principal": r.contactoPrincipal?.nombre ?? "",
       Teléfono: r.contactoPrincipal?.telefono ?? "",
-      "Cant. contactos": r.contactosCount,
-      "Máq. CLAAS": r.cantClaas,
-      "Máq. HORSCH": r.cantHorsch,
-      "Total máq.": r.cantTotal,
-      Subgrupos: r.subgrupos.join(", "),
+      Maquinarias: r.cantTotal,
       "Antig. prom (años)": r.antiguedadProm ?? "",
+      "% CLAAS": r.cantTotal ? Math.round((r.cantClaas / r.cantTotal) * 100) : 0,
+      "% HORSCH": r.cantTotal ? Math.round((r.cantHorsch / r.cantTotal) * 100) : 0,
       "Días últ. repuesto": r.diasUltRepuesto ?? "",
       "Días últ. servicio": r.diasUltServicio ?? "",
+      Repuesto: r.tieneRepEnRango ? "Sí" : "No",
+      Servicio: r.tieneSrvEnRango ? "Sí" : "No",
       "Fact. YTD": r.factYTD,
-      "Var % vs año ant.": r.varPct ?? "",
-      "Últ. seguimiento": r.ultSeg ? new Date(r.ultSeg.fecha).toLocaleDateString("es-PY") : "",
-      "Resultado seguimiento": r.ultSeg?.resultado ?? "",
+      "Fact. LY": r.factPrev,
+      "%VAR": r.varPct ?? "",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -390,13 +462,65 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
             {RESULTADOS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
           </SelectContent>
         </Select>
+
+        {/* Rango fechas */}
+        <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
+          <SelectTrigger className="w-[160px]">
+            <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="30d">Últimos 30 días</SelectItem>
+            <SelectItem value="90d">Últimos 90 días</SelectItem>
+            <SelectItem value="180d">Últimos 6 meses</SelectItem>
+            <SelectItem value="365d">Últimos 12 meses</SelectItem>
+            <SelectItem value="ytd">Año en curso (YTD)</SelectItem>
+            <SelectItem value="custom">Personalizado…</SelectItem>
+          </SelectContent>
+        </Select>
+        {rango === "custom" && (
+          <>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9">
+                  {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={customDesde}
+                  onSelect={setCustomDesde}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9">
+                  {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={customHasta}
+                  onSelect={setCustomHasta}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
+
         <Button variant="outline" size="sm" onClick={exportar} className="ml-auto">
           <Download className="mr-1 h-4 w-4" /> Exportar Excel
         </Button>
       </div>
 
       <div className="text-xs text-muted-foreground">
-        {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"}
+        {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
+        {format(desdeDate, "dd/MM/yy")} – {format(hastaDate, "dd/MM/yy")}
       </div>
 
       {/* Tabla */}
@@ -404,148 +528,168 @@ export function ParqueTab({ onChanged: _onChanged, onOpenCliente }: { onChanged?
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="cursor-pointer whitespace-nowrap" onClick={() => toggleSort("cliente")}>
+              <TableHead className="cursor-pointer whitespace-nowrap min-w-[200px]" onClick={() => toggleSort("cliente")}>
                 <div className="flex items-center gap-1">Cliente {sortIcon("cliente")}</div>
               </TableHead>
-              <TableHead className="whitespace-nowrap">Contacto</TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap" onClick={() => toggleSort("cantTotal")}>
-                <div className="flex items-center gap-1">Máquinas {sortIcon("cantTotal")}</div>
+              <TableHead className="whitespace-nowrap">Teléfono</TableHead>
+              <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("cantTotal")}>
+                <div className="flex items-center justify-center gap-1">Maq. {sortIcon("cantTotal")}</div>
               </TableHead>
-              <TableHead className="whitespace-nowrap">Subgrupos</TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("antiguedadProm")}>
-                <div className="flex items-center justify-end gap-1">Antig. {sortIcon("antiguedadProm")}</div>
+              <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("antiguedadProm")}>
+                <div className="flex items-center justify-center gap-1">Antig. {sortIcon("antiguedadProm")}</div>
               </TableHead>
+              <TableHead className="whitespace-nowrap min-w-[140px]">% Marcas</TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("diasUltRepuesto")}>
                 <div className="flex items-center justify-end gap-1">Últ. Rep. {sortIcon("diasUltRepuesto")}</div>
               </TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("diasUltServicio")}>
                 <div className="flex items-center justify-end gap-1">Últ. Serv. {sortIcon("diasUltServicio")}</div>
               </TableHead>
+              <TableHead className="whitespace-nowrap text-center">Rep.</TableHead>
+              <TableHead className="whitespace-nowrap text-center">Serv.</TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("factYTD")}>
-                <div className="flex items-center justify-end gap-1">Fact. YTD {sortIcon("factYTD")}</div>
+                <div className="flex items-center justify-end gap-1">Fact. Período {sortIcon("factYTD")}</div>
+              </TableHead>
+              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("factPrev")}>
+                <div className="flex items-center justify-end gap-1">Fact. LY {sortIcon("factPrev")}</div>
               </TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("varPct")}>
                 <div className="flex items-center justify-end gap-1">%VAR {sortIcon("varPct")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap" onClick={() => toggleSort("ultSeg")}>
-                <div className="flex items-center gap-1">Últ. Seguimiento {sortIcon("ultSeg")}</div>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={10} className="h-20 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
                   Cargando...
                 </TableCell>
               </TableRow>
             )}
             {!loading && ordenadas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="h-20 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
                   Sin clientes que coincidan con los filtros.
                 </TableCell>
               </TableRow>
             )}
             {!loading &&
-              ordenadas.map((r) => (
-                <TableRow
-                  key={r.cliente.id}
-                  className={cn(filaColor(r.diasUltServicio), onOpenCliente && "cursor-pointer")}
-                  onClick={() => onOpenCliente?.(r.cliente.id)}
-                >
-                  <TableCell>
-                    <div className="font-medium">{r.cliente.nombre}</div>
-                    {r.cliente.sucursal && (
-                      <div className="text-[11px] text-muted-foreground">{r.cliente.sucursal}</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {r.contactoPrincipal ? (
-                      <div className="flex items-center gap-1.5">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm">{r.contactoPrincipal.nombre}</div>
-                          {r.contactoPrincipal.telefono && (
-                            <a
-                              href={`tel:${r.contactoPrincipal.telefono}`}
-                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
-                            >
-                              <Phone className="h-3 w-3" /> {r.contactoPrincipal.telefono}
-                            </a>
-                          )}
-                        </div>
-                        {r.contactosCount > 1 && (
-                          <Badge variant="secondary" className="ml-auto text-[10px]">
-                            +{r.contactosCount - 1}
-                          </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {r.cantClaas > 0 && (
-                        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90">
-                          CLAAS {r.cantClaas}
-                        </Badge>
-                      )}
-                      {r.cantHorsch > 0 && (
-                        <Badge className="bg-orange-500 text-white hover:bg-orange-500/90">
-                          HORSCH {r.cantHorsch}
-                        </Badge>
-                      )}
-                      {r.cantTotal === 0 && <span className="text-xs text-muted-foreground">—</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {r.subgrupos.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
-                      {r.subgrupos.map((s) => (
-                        <Badge key={s} variant="outline" className="text-[10px]">
-                          {s.slice(0, 4)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.antiguedadProm ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.diasUltRepuesto != null ? `${r.diasUltRepuesto}d` : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.diasUltServicio != null ? `${r.diasUltServicio}d` : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {r.factYTD > 0 ? fmtMoney(r.factYTD) : "—"}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tabular-nums font-medium",
-                      r.varPct != null && r.varPct >= 0 && "text-emerald-600",
-                      r.varPct != null && r.varPct < 0 && "text-destructive",
-                    )}
+              ordenadas.map((r) => {
+                const pctClaas = r.cantTotal ? (r.cantClaas / r.cantTotal) * 100 : 0;
+                const pctHorsch = r.cantTotal ? (r.cantHorsch / r.cantTotal) * 100 : 0;
+                const ultMin = Math.min(
+                  r.diasUltRepuesto ?? Infinity,
+                  r.diasUltServicio ?? Infinity,
+                );
+                const flag = ultMin === Infinity || ultMin > 365;
+                return (
+                  <TableRow
+                    key={r.cliente.id}
+                    className={cn(filaColor(r.diasUltServicio), onOpenCliente && "cursor-pointer")}
+                    onClick={() => onOpenCliente?.(r.cliente.id)}
                   >
-                    {r.varPct != null ? `${r.varPct > 0 ? "+" : ""}${r.varPct}%` : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {r.ultSeg ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[11px] text-muted-foreground">
-                          {new Date(r.ultSeg.fecha).toLocaleDateString("es-PY")}
-                        </span>
-                        <Badge className={cn("w-fit text-[10px]", resultadoColor(r.ultSeg.resultado))}>
-                          {r.ultSeg.resultado}
+                    <TableCell>
+                      <div className="font-medium">{r.cliente.nombre}</div>
+                      {r.cliente.sucursal && (
+                        <div className="text-[11px] text-muted-foreground">{r.cliente.sucursal}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.contactoPrincipal?.telefono ? (
+                        <a
+                          href={`tel:${r.contactoPrincipal.telefono}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1 text-sm hover:text-primary"
+                        >
+                          <Phone className="h-3 w-3" /> {r.contactoPrincipal.telefono}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums font-medium">
+                      {r.cantTotal}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {r.antiguedadProm != null ? (
+                        <Badge className={cn("min-w-[36px] justify-center tabular-nums", antiguedadColor(r.antiguedadProm))}>
+                          {r.antiguedadProm}
                         </Badge>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.cantTotal > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                            {pctClaas > 0 && (
+                              <div className="bg-emerald-600" style={{ width: `${pctClaas}%` }} title={`CLAAS ${r.cantClaas}`} />
+                            )}
+                            {pctHorsch > 0 && (
+                              <div className="bg-orange-500" style={{ width: `${pctHorsch}%` }} title={`HORSCH ${r.cantHorsch}`} />
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                            {r.cantClaas}/{r.cantHorsch}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.diasUltRepuesto != null ? (
+                        <span className="inline-flex items-center gap-1">
+                          {r.diasUltRepuesto > 365 && <Flag className="h-3 w-3 text-destructive" />}
+                          {r.diasUltRepuesto}d
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.diasUltServicio != null ? (
+                        <span className="inline-flex items-center gap-1">
+                          {r.diasUltServicio > 365 && <Flag className="h-3 w-3 text-destructive" />}
+                          {r.diasUltServicio}d
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {r.tieneRepEnRango ? (
+                        <Check className="mx-auto h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <X className="mx-auto h-4 w-4 text-destructive" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {r.tieneSrvEnRango ? (
+                        <Check className="mx-auto h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <X className="mx-auto h-4 w-4 text-destructive" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.factYTD > 0 ? `₲${fmtMoney(r.factYTD)}` : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {r.factPrev > 0 ? `₲${fmtMoney(r.factPrev)}` : "—"}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "text-right tabular-nums font-medium",
+                        r.varPct != null && r.varPct >= 0 && "text-emerald-600",
+                        r.varPct != null && r.varPct < 0 && "text-destructive",
+                      )}
+                    >
+                      {r.varPct != null ? `${r.varPct > 0 ? "+" : ""}${r.varPct}%` : "—"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
       </div>
