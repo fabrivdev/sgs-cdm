@@ -453,19 +453,12 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
-  // ===== Procesar Clientes =====
+  // ===== Procesar Clientes (fusiona TODAS las hojas, BD CLIENTES sobreescribe) =====
   const procesarClientes = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      // Usar la primera hoja, o "BD CLIENTES" si existe
-      const sheetName =
-        wb.SheetNames.find((n) => n.toLowerCase().includes("bd clientes")) ?? wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
 
-      // Cargar existentes (por nombre normalizado y RUC normalizado)
       const { data: existentes } = await supabase.from("clientes").select("id, nombre, ruc");
       const porNombre = new Map<string, string>();
       const porRuc = new Map<string, string>();
@@ -474,40 +467,80 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
       }
 
-      const rows: ClienteRow[] = [];
-      const vistos = new Set<string>();
-      for (const r of json) {
-        const nombre = norm(pick(r, ["NOMBRE", "Nombre", "Cliente", "Razón Social", "Razon Social", "Entidad"]));
-        if (!nombre) continue;
-        const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
-        const region = norm(pick(r, ["REGION", "Región", "Region"])) || null;
-        const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
-        const localidad = norm(pick(r, ["LOCALIDAD", "Localidad", "Ciudad"])) || null;
-        const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
-        const sucursal =
-          matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
+      // Acumulador por clave (RUC normalizado o nombre lowercase si no hay RUC).
+      // Procesa Cadastro primero (base), luego BD CLIENTES (curada, sobreescribe).
+      type Acc = ClienteRow & { _key: string };
+      const acc = new Map<string, Acc>();
+      const orderedSheets = [...wb.SheetNames].sort((a, b) => {
+        const aBd = a.toLowerCase().includes("bd clientes") ? 1 : 0;
+        const bBd = b.toLowerCase().includes("bd clientes") ? 1 : 0;
+        return aBd - bBd;
+      });
 
-        // Dedupe en el propio Excel (por RUC o por nombre)
-        const key = ruc ? `r:${normRuc(ruc)}` : `n:${nombre.toLowerCase()}`;
-        if (vistos.has(key)) continue;
-        vistos.add(key);
+      for (const sheetName of orderedSheets) {
+        const isBdClientes = sheetName.toLowerCase().includes("bd clientes");
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (json.length === 0) continue;
 
-        // Match contra base
-        const matchedId =
-          (ruc && porRuc.get(normRuc(ruc))) ?? porNombre.get(nombre.toLowerCase()) ?? null;
+        for (const r of json) {
+          const nombre = norm(
+            pick(r, [
+              "NOMBRE", "Nombre", "Cliente", "CLIENTE",
+              "Razón Social", "Razon Social", "Entidad",
+              "Nombre Entidad",
+            ]),
+          );
+          if (!nombre) continue;
+          const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
+          const region = norm(pick(r, ["REGION", "REGIONES", "Región", "Region", "Sucursal"])) || null;
+          const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
+          const localidad = norm(pick(r, ["LOCALIDAD", "Localidad", "Ciudad", "Municipio"])) || null;
+          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+          const sucursal =
+            matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
 
-        rows.push({
-          nombre,
-          ruc,
-          region,
-          direccion,
-          localidad,
-          correo_principal: correo,
-          sucursal,
-          _isNew: !matchedId,
-          _matchedId: matchedId,
-        });
+          const key = ruc ? `r:${normRuc(ruc)}` : `n:${nombre.toLowerCase()}`;
+          const prev = acc.get(key);
+          if (!prev) {
+            const matchedId =
+              (ruc && porRuc.get(normRuc(ruc))) ?? porNombre.get(nombre.toLowerCase()) ?? null;
+            acc.set(key, {
+              _key: key,
+              nombre,
+              ruc,
+              region,
+              direccion,
+              localidad,
+              correo_principal: correo,
+              sucursal,
+              _isNew: !matchedId,
+              _matchedId: matchedId,
+            });
+          } else {
+            // BD CLIENTES sobreescribe; otras hojas solo rellenan vacíos
+            if (isBdClientes) {
+              prev.nombre = nombre;
+              if (ruc) prev.ruc = ruc;
+              if (region) prev.region = region;
+              if (direccion) prev.direccion = direccion;
+              if (localidad) prev.localidad = localidad;
+              if (correo) prev.correo_principal = correo;
+              if (sucursal) prev.sucursal = sucursal;
+            } else {
+              prev.ruc = prev.ruc ?? ruc;
+              prev.region = prev.region ?? region;
+              prev.direccion = prev.direccion ?? direccion;
+              prev.localidad = prev.localidad ?? localidad;
+              prev.correo_principal = prev.correo_principal ?? correo;
+              prev.sucursal = prev.sucursal ?? sucursal;
+            }
+          }
+        }
       }
+
+      const rows: ClienteRow[] = [...acc.values()].map(({ _key, ...r }) => r);
+      if (rows.length === 0) return toast.error("Excel sin filas válidas");
       setCliRows(rows);
       setCliFile(file.name);
     } catch (e) {
