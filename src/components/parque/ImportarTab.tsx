@@ -743,17 +743,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         />
         <DropZone
           title="Importar facturación"
-          help="Columnas: Fecha Factura, Sucursal (CENTRAL=Santa Rita, etc.), Entidad, Cod. Entidad, Total Venta, Grupo, Código Factura, Tipo, Tp. Movimento (solo S)"
+          help="FACTURACIÓN_HISTORICA.xlsx — lee ambas hojas (Fact. Repuestos + Fact. Servicios). Filtra Tp. Movimento = S, mapea CENTRAL→Santa Rita."
           onFile={procesarFact}
         />
         <DropZone
           title="Importar clientes"
-          help="Columnas: NOMBRE, RUC, REGION, DIRECCION, LOCALIDAD, CORREO. Match por RUC o nombre. Hoja 'BD CLIENTES' o la primera disponible."
+          help="MATRIZ_CLIENTES.xlsx — fusiona ambas hojas (Cadastro + BD CLIENTES). Match por RUC con fallback a nombre. BD CLIENTES tiene prioridad."
           onFile={procesarClientes}
         />
         <DropZone
           title="Importar contactos"
-          help="Columnas: RUC (o CLIENTE), CONTACTO, CARGO, TELEFONO, CORREO, WHATSAPP, PRINCIPAL, NOTAS. Match por RUC + fallback nombre."
+          help="MATRIZ_CLIENTES.xlsx (hoja BD CLIENTES) — extrae fila por fila CONTACTO + TELEFONO + CORREO. Vincula al cliente por RUC."
           onFile={procesarContactos}
         />
       </div>
