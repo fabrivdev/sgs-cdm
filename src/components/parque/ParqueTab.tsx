@@ -159,50 +159,99 @@ export function ParqueTab({
   const [customHasta, setCustomHasta] = useState<Date | undefined>();
 
   // orden
-  const [sortKey, setSortKey] = useState<SortKey>("cliente");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+ const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
+const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const cargar = async () => {
-    setLoading(true);
-    const [c, ct, m, s] = await Promise.all([
-      supabase.from("clientes").select("id, nombre, sucursal, activo").eq("activo", true),
+const cargar = async () => {
+  setLoading(true);
+
+  try {
+    // 1) Primero traemos solo máquinas activas
+    const { data: maquinasData, error: maquinasError } = await supabase
+      .from("parque_maquinas")
+      .select("id, cliente_id, anio, marca, subgrupo, activo")
+      .eq("activo", true);
+
+    if (maquinasError) throw maquinasError;
+
+    const maquinasRows = (maquinasData ?? []) as Maquina[];
+    const clienteIds = Array.from(
+      new Set(maquinasRows.map((m) => m.cliente_id).filter(Boolean) as string[])
+    );
+
+    if (clienteIds.length === 0) {
+      setClientes([]);
+      setContactos([]);
+      setMaquinas(maquinasRows);
+      setFacturas([]);
+      setSeguimientos([]);
+      setLoading(false);
+      return;
+    }
+
+    // 2) Después solo traemos clientes/contactos/seguimientos/facturación
+    //    de esos clientes que realmente tienen máquinas
+    const [c, ct, s] = await Promise.all([
+      supabase
+        .from("clientes")
+        .select("id, nombre, sucursal, activo")
+        .in("id", clienteIds)
+        .eq("activo", true),
+
       supabase
         .from("contactos_cliente")
         .select("id, cliente_id, nombre, telefono, es_principal, activo")
+        .in("cliente_id", clienteIds)
         .eq("activo", true),
-      supabase
-        .from("parque_maquinas")
-        .select("id, cliente_id, anio, marca, subgrupo, activo")
-        .eq("activo", true),
+
       supabase
         .from("seguimiento_comercial")
         .select("cliente_id, fecha, resultado")
+        .in("cliente_id", clienteIds)
         .order("fecha", { ascending: false }),
     ]);
 
-    // Facturación: paginar para superar límite 1000
+    if (c.error) throw c.error;
+    if (ct.error) throw ct.error;
+    if (s.error) throw s.error;
+
+    // 3) Facturación paginada, pero solo para clientes del parque
     const facts: Factura[] = [];
     let from = 0;
     const PAGE = 1000;
+
     while (true) {
       const { data, error } = await supabase
         .from("facturacion")
         .select("cliente_id, fecha, tipo, total_venta")
+        .in("cliente_id", clienteIds)
         .range(from, from + PAGE - 1);
-      if (error || !data || data.length === 0) break;
-      facts.push(...(data as Factura[]).map((x) => ({ ...x, total_venta: Number(x.total_venta) })));
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      facts.push(
+        ...(data as Factura[]).map((x) => ({
+          ...x,
+          total_venta: Number(x.total_venta),
+        }))
+      );
+
       if (data.length < PAGE) break;
       from += PAGE;
     }
 
     setClientes((c.data ?? []) as Cliente[]);
     setContactos((ct.data ?? []) as Contacto[]);
-    setMaquinas((m.data ?? []) as Maquina[]);
+    setMaquinas(maquinasRows);
     setFacturas(facts);
     setSeguimientos((s.data ?? []) as Seguimiento[]);
+  } catch (e) {
+    console.error(e);
+  } finally {
     setLoading(false);
-  };
-
+  }
+};
   useEffect(() => {
     cargar();
   }, []);
