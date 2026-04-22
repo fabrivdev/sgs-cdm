@@ -786,10 +786,11 @@ if (!nombre) continue;
       const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
 
       const clienteId =
-        (cliente_cod_entidad && porCodigo.get(normCode(cliente_cod_entidad))) ??
-        (ruc && porRuc.get(normRuc(ruc))) ??
-        (cliente_nombre && porNombre.get(normText(cliente_nombre))) ??
-        null;
+        const clienteId =
+  (cliente_cod_entidad && porCodigo.get(cliente_cod_entidad)) ??
+  (ruc && porRuc.get(normRuc(ruc))) ??
+  (cliente_nombre && porNombre.get(normText(cliente_nombre))) ??
+  null;
 
       const excelKey = [
         clienteId ?? normCode(cliente_cod_entidad) ?? normText(cliente_nombre),
