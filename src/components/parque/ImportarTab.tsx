@@ -764,7 +764,9 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
 if (!nombre) continue;
 
-      const cliente_cod_entidad = norm(pick(r, ["NRO ENTIDAD", "Nro Entidad", "NRO_ENTIDAD"])) || null;
+      const cliente_cod_entidad = normCode(
+  pick(r, ["NRO ENTIDAD", "Nro Entidad", "NRO_ENTIDAD"]),
+) || null;
       const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
       const cliente_nombre = norm(
         pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
