@@ -286,63 +286,101 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
 
-      // Cargar TODOS los cod_factura existentes con paginación (Supabase limita a 1000)
-      const codsExistentes = new Set<string>();
+      // Procesar TODAS las hojas. El tipo se infiere del nombre de la hoja:
+      //   "Fact. Repuestos" / contiene "repuesto" → Repuesto
+      //   "Fact. Servicios" / contiene "servicio" → Servicio
+      // Si no se puede inferir, se usa la columna "Tipo" o se asume Repuesto.
+      const inferTipoFromSheet = (name: string): "Repuesto" | "Servicio" | null => {
+        const n = name.toLowerCase();
+        if (n.includes("servic")) return "Servicio";
+        if (n.includes("repuest")) return "Repuesto";
+        return null;
+      };
+
+      // Cargar TODOS los cod_factura+tipo existentes con paginación (Supabase limita a 1000)
+      // Clave: `${cod}|${tipo}` para permitir repuesto y servicio del mismo cod_factura
+      const existentesKey = new Set<string>();
       let from = 0;
       const PAGE = 1000;
       while (true) {
         const { data, error } = await supabase
           .from("facturacion")
-          .select("cod_factura")
+          .select("cod_factura, tipo")
           .range(from, from + PAGE - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
-        for (const e of data) codsExistentes.add(e.cod_factura.toLowerCase());
+        for (const e of data) existentesKey.add(`${e.cod_factura.toLowerCase()}|${e.tipo}`);
         if (data.length < PAGE) break;
         from += PAGE;
       }
 
       const rows: FactRow[] = [];
-      for (const r of json) {
-        const cod = norm(
-          pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
-        );
-        if (!cod) continue;
-        const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
-        if (!fecha) continue;
-        // Solo ventas (S). Ignorar entradas (E)
-        const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
-        if (tpMov && tpMov !== "S") continue;
+      // Para agrupar por (cod_factura, tipo) dentro del propio Excel
+      const agg = new Map<string, FactRow & { _seen: number }>();
 
-        const tipoRaw = norm(pick(r, ["Tipo", "tipo", "Tipo Item"]));
-        const tipo: "Repuesto" | "Servicio" =
-          tipoRaw.toLowerCase().startsWith("serv") ? "Servicio" : "Repuesto";
-        const totalRaw = pick(r, ["Total Venta", "total_venta", "Vlr. Total", "Valor Total"]) ?? 0;
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (json.length === 0) continue;
+        const tipoSheet = inferTipoFromSheet(sheetName);
 
-        // Mapeo sucursal: CENTRAL→Santa Rita, SANTA ROSA DEL AGUARAY→Santa Rosa, resto literal
-        const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
-        const sucursal =
-          matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
+        for (const r of json) {
+          const cod = norm(
+            pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
+          );
+          if (!cod) continue;
+          const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
+          if (!fecha) continue;
+          // Solo ventas (S). Ignorar entradas (E)
+          const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
+          if (tpMov && tpMov !== "S") continue;
 
-        rows.push({
-          fecha,
-          sucursal,
-          entidad_nombre: norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"])),
-          cod_entidad: norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null,
-          total_venta:
+          let tipo: "Repuesto" | "Servicio";
+          if (tipoSheet) {
+            tipo = tipoSheet;
+          } else {
+            const tipoRaw = norm(pick(r, ["Tipo", "tipo", "Tipo Item", "Tipo Mercaderia"]));
+            tipo = tipoRaw.toLowerCase().startsWith("serv") ? "Servicio" : "Repuesto";
+          }
+
+          const totalRaw = pick(r, ["Total Venta", "total_venta", "Vlr. Total", "Valor Total"]) ?? 0;
+          const total =
             typeof totalRaw === "number"
               ? totalRaw
-              : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0,
-          grupo: norm(pick(r, ["Grupo", "grupo"])) || null,
-          cod_factura: cod,
-          tipo,
-          _isNew: !codsExistentes.has(cod.toLowerCase()),
-        });
+              : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0;
+
+          const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
+          const sucursal = matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
+
+          const key = `${cod.toLowerCase()}|${tipo}`;
+          const prev = agg.get(key);
+          if (prev) {
+            // Misma factura+tipo: sumar total y mantener primer encabezado
+            prev.total_venta += total;
+            prev._seen += 1;
+          } else {
+            agg.set(key, {
+              fecha,
+              sucursal,
+              entidad_nombre: norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"])),
+              cod_entidad: norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null,
+              total_venta: total,
+              grupo: norm(pick(r, ["Grupo", "grupo"])) || null,
+              cod_factura: cod,
+              tipo,
+              _isNew: !existentesKey.has(key),
+              _seen: 1,
+            });
+          }
+        }
       }
+
+      for (const v of agg.values()) {
+        const { _seen, ...row } = v;
+        rows.push(row);
+      }
+      if (rows.length === 0) return toast.error("Excel vacío o sin filas válidas");
       setFactRows(rows);
       setFactFile(file.name);
     } catch (e) {
@@ -415,19 +453,12 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
-  // ===== Procesar Clientes =====
+  // ===== Procesar Clientes (fusiona TODAS las hojas, BD CLIENTES sobreescribe) =====
   const procesarClientes = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      // Usar la primera hoja, o "BD CLIENTES" si existe
-      const sheetName =
-        wb.SheetNames.find((n) => n.toLowerCase().includes("bd clientes")) ?? wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
 
-      // Cargar existentes (por nombre normalizado y RUC normalizado)
       const { data: existentes } = await supabase.from("clientes").select("id, nombre, ruc");
       const porNombre = new Map<string, string>();
       const porRuc = new Map<string, string>();
@@ -436,40 +467,80 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
       }
 
-      const rows: ClienteRow[] = [];
-      const vistos = new Set<string>();
-      for (const r of json) {
-        const nombre = norm(pick(r, ["NOMBRE", "Nombre", "Cliente", "Razón Social", "Razon Social", "Entidad"]));
-        if (!nombre) continue;
-        const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
-        const region = norm(pick(r, ["REGION", "Región", "Region"])) || null;
-        const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
-        const localidad = norm(pick(r, ["LOCALIDAD", "Localidad", "Ciudad"])) || null;
-        const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
-        const sucursal =
-          matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
+      // Acumulador por clave (RUC normalizado o nombre lowercase si no hay RUC).
+      // Procesa Cadastro primero (base), luego BD CLIENTES (curada, sobreescribe).
+      type Acc = ClienteRow & { _key: string };
+      const acc = new Map<string, Acc>();
+      const orderedSheets = [...wb.SheetNames].sort((a, b) => {
+        const aBd = a.toLowerCase().includes("bd clientes") ? 1 : 0;
+        const bBd = b.toLowerCase().includes("bd clientes") ? 1 : 0;
+        return aBd - bBd;
+      });
 
-        // Dedupe en el propio Excel (por RUC o por nombre)
-        const key = ruc ? `r:${normRuc(ruc)}` : `n:${nombre.toLowerCase()}`;
-        if (vistos.has(key)) continue;
-        vistos.add(key);
+      for (const sheetName of orderedSheets) {
+        const isBdClientes = sheetName.toLowerCase().includes("bd clientes");
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (json.length === 0) continue;
 
-        // Match contra base
-        const matchedId =
-          (ruc && porRuc.get(normRuc(ruc))) ?? porNombre.get(nombre.toLowerCase()) ?? null;
+        for (const r of json) {
+          const nombre = norm(
+            pick(r, [
+              "NOMBRE", "Nombre", "Cliente", "CLIENTE",
+              "Razón Social", "Razon Social", "Entidad",
+              "Nombre Entidad",
+            ]),
+          );
+          if (!nombre) continue;
+          const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
+          const region = norm(pick(r, ["REGION", "REGIONES", "Región", "Region", "Sucursal"])) || null;
+          const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
+          const localidad = norm(pick(r, ["LOCALIDAD", "Localidad", "Ciudad", "Municipio"])) || null;
+          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+          const sucursal =
+            matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
 
-        rows.push({
-          nombre,
-          ruc,
-          region,
-          direccion,
-          localidad,
-          correo_principal: correo,
-          sucursal,
-          _isNew: !matchedId,
-          _matchedId: matchedId,
-        });
+          const key = ruc ? `r:${normRuc(ruc)}` : `n:${nombre.toLowerCase()}`;
+          const prev = acc.get(key);
+          if (!prev) {
+            const matchedId =
+              (ruc && porRuc.get(normRuc(ruc))) ?? porNombre.get(nombre.toLowerCase()) ?? null;
+            acc.set(key, {
+              _key: key,
+              nombre,
+              ruc,
+              region,
+              direccion,
+              localidad,
+              correo_principal: correo,
+              sucursal,
+              _isNew: !matchedId,
+              _matchedId: matchedId,
+            });
+          } else {
+            // BD CLIENTES sobreescribe; otras hojas solo rellenan vacíos
+            if (isBdClientes) {
+              prev.nombre = nombre;
+              if (ruc) prev.ruc = ruc;
+              if (region) prev.region = region;
+              if (direccion) prev.direccion = direccion;
+              if (localidad) prev.localidad = localidad;
+              if (correo) prev.correo_principal = correo;
+              if (sucursal) prev.sucursal = sucursal;
+            } else {
+              prev.ruc = prev.ruc ?? ruc;
+              prev.region = prev.region ?? region;
+              prev.direccion = prev.direccion ?? direccion;
+              prev.localidad = prev.localidad ?? localidad;
+              prev.correo_principal = prev.correo_principal ?? correo;
+              prev.sucursal = prev.sucursal ?? sucursal;
+            }
+          }
+        }
       }
+
+      const rows: ClienteRow[] = [...acc.values()].map(({ _key, ...r }) => r);
+      if (rows.length === 0) return toast.error("Excel sin filas válidas");
       setCliRows(rows);
       setCliFile(file.name);
     } catch (e) {
@@ -518,14 +589,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
-  // ===== Procesar Contactos =====
+  // ===== Procesar Contactos (recorre TODAS las hojas) =====
   const procesarContactos = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
 
       const { data: clientes } = await supabase.from("clientes").select("id, nombre, ruc");
       const porNombre = new Map<string, string>();
@@ -535,7 +603,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
       }
 
-      // Cargar contactos existentes para detectar duplicados (mismo cliente + tel/nombre)
       const { data: contactosEx } = await supabase
         .from("contactos_cliente")
         .select("cliente_id, nombre, telefono");
@@ -546,49 +613,78 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       }
 
       const rows: ContactoRow[] = [];
-      for (const r of json) {
-        const nombre = norm(pick(r, ["CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto", "NOMBRE", "Nombre"]));
-        if (!nombre) continue;
-        const ruc = norm(pick(r, ["RUC", "Ruc", "RUC CLIENTE", "ruc"])) || null;
-        const cliente_nombre = norm(pick(r, ["CLIENTE", "Cliente", "Razón Social", "Entidad"])) || null;
-        const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
-        const telefono = norm(pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"])) || null;
-        const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
-        const ws = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
-        const es_whatsapp = ws === "si" || ws === "sí" || ws === "true" || ws === "1" || ws === "x";
-        const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
-        const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
-        const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
+      // Dedupe dentro del propio Excel
+      const vistosExcel = new Set<string>();
 
-        const clienteId =
-          (ruc && porRuc.get(normRuc(ruc))) ??
-          (cliente_nombre && porNombre.get(cliente_nombre.toLowerCase())) ??
-          null;
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (json.length === 0) continue;
 
-        let status: ContactoRow["_status"] = "ok";
-        if (!clienteId) status = "sin-cliente";
-        else if (
-          (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
-          dupKeys.has(`${clienteId}|n:${nombre.toLowerCase()}`)
-        ) {
-          status = "duplicado";
+        for (const r of json) {
+          const nombre = norm(
+            pick(r, [
+              "CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto",
+            ]),
+          );
+          // Si la fila NO tiene un campo CONTACTO, no es una fila de contacto válida
+          // (evita interpretar filas de la hoja "Cadastro de Entidad v2" como contactos sin nombre).
+          if (!nombre) continue;
+
+          const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
+          const cliente_nombre = norm(
+            pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
+          ) || null;
+          const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
+          const telefono = norm(
+            pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"]),
+          ) || null;
+          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+          const wa = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
+          const es_whatsapp = wa === "si" || wa === "sí" || wa === "true" || wa === "1" || wa === "x";
+          const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
+          const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
+          const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
+
+          const clienteId =
+            (ruc && porRuc.get(normRuc(ruc))) ??
+            (cliente_nombre && porNombre.get(cliente_nombre.toLowerCase())) ??
+            null;
+
+          // Dedupe del propio Excel (mismo cliente + nombre o teléfono)
+          const excelKey = clienteId
+            ? `${clienteId}|${normPhone(telefono ?? "")}|${nombre.toLowerCase()}`
+            : `noid|${ruc ?? cliente_nombre ?? ""}|${nombre.toLowerCase()}`;
+          if (vistosExcel.has(excelKey)) continue;
+          vistosExcel.add(excelKey);
+
+          let status: ContactoRow["_status"] = "ok";
+          if (!clienteId) status = "sin-cliente";
+          else if (
+            (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
+            dupKeys.has(`${clienteId}|n:${nombre.toLowerCase()}`)
+          ) {
+            status = "duplicado";
+          }
+
+          rows.push({
+            cliente_ruc: ruc,
+            cliente_nombre,
+            nombre,
+            cargo,
+            telefono,
+            correo,
+            es_whatsapp,
+            es_principal,
+            notas,
+            _isNew: status === "ok",
+            _clienteId: clienteId,
+            _status: status,
+          });
         }
-
-        rows.push({
-          cliente_ruc: ruc,
-          cliente_nombre,
-          nombre,
-          cargo,
-          telefono,
-          correo,
-          es_whatsapp,
-          es_principal,
-          notas,
-          _isNew: status === "ok",
-          _clienteId: clienteId,
-          _status: status,
-        });
       }
+
+      if (rows.length === 0) return toast.error("No se encontraron filas con columna CONTACTO");
       setConRows(rows);
       setConFile(file.name);
     } catch (e) {
@@ -647,17 +743,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         />
         <DropZone
           title="Importar facturación"
-          help="Columnas: Fecha Factura, Sucursal (CENTRAL=Santa Rita, etc.), Entidad, Cod. Entidad, Total Venta, Grupo, Código Factura, Tipo, Tp. Movimento (solo S)"
+          help="FACTURACIÓN_HISTORICA.xlsx — lee ambas hojas (Fact. Repuestos + Fact. Servicios). Filtra Tp. Movimento = S, mapea CENTRAL→Santa Rita."
           onFile={procesarFact}
         />
         <DropZone
           title="Importar clientes"
-          help="Columnas: NOMBRE, RUC, REGION, DIRECCION, LOCALIDAD, CORREO. Match por RUC o nombre. Hoja 'BD CLIENTES' o la primera disponible."
+          help="MATRIZ_CLIENTES.xlsx — fusiona ambas hojas (Cadastro + BD CLIENTES). Match por RUC con fallback a nombre. BD CLIENTES tiene prioridad."
           onFile={procesarClientes}
         />
         <DropZone
           title="Importar contactos"
-          help="Columnas: RUC (o CLIENTE), CONTACTO, CARGO, TELEFONO, CORREO, WHATSAPP, PRINCIPAL, NOTAS. Match por RUC + fallback nombre."
+          help="MATRIZ_CLIENTES.xlsx (hoja BD CLIENTES) — extrae fila por fila CONTACTO + TELEFONO + CORREO. Vincula al cliente por RUC."
           onFile={procesarContactos}
         />
       </div>
