@@ -219,6 +219,30 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     cargarHistorial();
   }, []);
 
+  const cargarTodosLosClientes = async () => {
+    const PAGE = 1000;
+    let from = 0;
+    const all: any[] = [];
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("*")
+        .range(from, from + PAGE - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      all.push(...data);
+
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+
+    return all;
+  };
+
+
   const procesarParque = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
@@ -279,8 +303,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
     setBusy(true);
     try {
-      const { data: cliExistentes, error: cliErr } = await supabase.from("clientes").select("id, nombre");
-      if (cliErr) throw cliErr;
+      const cliExistentes = await cargarTodosLosClientes();
 
       const cliMap = new Map<string, string>();
       for (const c of cliExistentes ?? []) {
@@ -468,8 +491,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
     setBusy(true);
     try {
-      const { data: cliExistentes, error: cliErr } = await supabase.from("clientes").select("*");
-      if (cliErr) throw cliErr;
+      const cliExistentes = await cargarTodosLosClientes();
 
       const cliByCod = new Map<string, string>();
       const cliByNombre = new Map<string, string>();
@@ -533,8 +555,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         return toast.error("El archivo debe contener las hojas 'Cadastro de Entidad v2' y 'BD CLIENTES'");
       }
 
-      const { data: existentesRaw, error: exErr } = await supabase.from("clientes").select("*");
-      if (exErr) throw exErr;
+      const existentesRaw = await cargarTodosLosClientes();
 
       const porCodigo = new Map<string, string>();
       const porNombre = new Map<string, string>();
@@ -704,8 +725,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         return toast.error("No se encontró la hoja BD CLIENTES");
       }
 
-      const { data: clientesRaw, error: cliErr } = await supabase.from("clientes").select("*");
-      if (cliErr) throw cliErr;
+      const clientesRaw = await cargarTodosLosClientes();
 
       const porCodigo = new Map<string, string>();
       const porNombre = new Map<string, string>();
