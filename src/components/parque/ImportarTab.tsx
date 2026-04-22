@@ -85,6 +85,14 @@ const norm = (s: unknown) => String(s ?? "").trim();
 const lower = (s: unknown) => norm(s).toLowerCase();
 const normRuc = (s: unknown) => norm(s).replace(/[.\s-]/g, "").toLowerCase();
 const normPhone = (s: unknown) => norm(s).replace(/[^\d]/g, "");
+// Normaliza nombre para comparación: mayúsculas, sin puntos/comas/S.A./S.R.L. al final, trim
+const normName = (s: unknown) =>
+  norm(s)
+    .toUpperCase()
+    .replace(/\s+(S\.?A\.?|S\.R\.L\.?|LTDA\.?|INC\.?)\s*$/i, "")
+    .replace(/[.,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 // Mapeo de regiones a sucursales (igual al usado en la importación inicial)
 const REGION_TO_SUCURSAL: Record<string, Sucursal> = {
@@ -218,14 +226,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     setBusy(true);
     try {
       const nombresUnicos = Array.from(new Set(nuevos.map((r) => r.cliente_nombre).filter(Boolean)));
-      const { data: cliExistentes } = await supabase
-        .from("clientes")
-        .select("id, nombre")
-        .in("nombre", nombresUnicos);
-      const cliMap = new Map<string, string>();
-      for (const c of cliExistentes ?? []) cliMap.set(c.nombre.toLowerCase(), c.id);
+      const { data: todosClientes } = await supabase.from("clientes").select("id, nombre");
+      const cliMap = new Map<string, string>(); // normName → id
+      const cliMapRaw = new Map<string, string>(); // lower exact → id
+      for (const c of todosClientes ?? []) {
+        cliMap.set(normName(c.nombre), c.id);
+        cliMapRaw.set(c.nombre.toLowerCase(), c.id);
+      }
+      const resolveId = (n: string) =>
+        cliMapRaw.get(n.toLowerCase()) ?? cliMap.get(normName(n)) ?? null;
 
-      const aCrear = nombresUnicos.filter((n) => !cliMap.has(n.toLowerCase()));
+      const aCrear = nombresUnicos.filter((n) => !resolveId(n));
       if (aCrear.length > 0) {
         const sucPorCliente = new Map<string, Sucursal | null>();
         for (const r of nuevos) {
@@ -242,11 +253,14 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           .insert(insertCli)
           .select("id, nombre");
         if (errCli) throw errCli;
-        for (const c of creados ?? []) cliMap.set(c.nombre.toLowerCase(), c.id);
+        for (const c of creados ?? []) {
+          cliMap.set(normName(c.nombre), c.id);
+          cliMapRaw.set(c.nombre.toLowerCase(), c.id);
+        }
       }
 
       const insertMaq = nuevos.map((r) => ({
-        cliente_id: r.cliente_nombre ? cliMap.get(r.cliente_nombre.toLowerCase()) ?? null : null,
+        cliente_id: r.cliente_nombre ? resolveId(r.cliente_nombre) : null,
         anio: r.anio,
         sucursal: r.sucursal,
         localidad: r.localidad,
@@ -395,13 +409,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     setBusy(true);
     try {
       const nombresUnicos = Array.from(new Set(nuevos.map((r) => r.entidad_nombre).filter(Boolean)));
-      const { data: cliExistentes } = await supabase
-        .from("clientes")
-        .select("id, nombre")
-        .in("nombre", nombresUnicos);
-      const cliMap = new Map<string, string>();
-      for (const c of cliExistentes ?? []) cliMap.set(c.nombre.toLowerCase(), c.id);
-      const aCrear = nombresUnicos.filter((n) => !cliMap.has(n.toLowerCase()));
+      // Traer TODOS los clientes para hacer match por normName (evita duplicados por S.A. / puntuación)
+      const { data: todosClientes } = await supabase.from("clientes").select("id, nombre, ruc");
+      const cliMap = new Map<string, string>(); // normName → id
+      const cliMapRaw = new Map<string, string>(); // nombre exacto → id
+      for (const c of todosClientes ?? []) {
+        cliMap.set(normName(c.nombre), c.id);
+        cliMapRaw.set(c.nombre.toLowerCase(), c.id);
+      }
+      const aCrear = nombresUnicos.filter(
+        (n) => !cliMap.has(normName(n)) && !cliMapRaw.has(n.toLowerCase()),
+      );
       if (aCrear.length > 0) {
         const insertCli = aCrear.map((n) => {
           const r = nuevos.find((x) => x.entidad_nombre === n);
@@ -412,14 +430,20 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           .insert(insertCli)
           .select("id, nombre");
         if (errCli) throw errCli;
-        for (const c of creados ?? []) cliMap.set(c.nombre.toLowerCase(), c.id);
+        for (const c of creados ?? []) {
+          cliMap.set(normName(c.nombre), c.id);
+          cliMapRaw.set(c.nombre.toLowerCase(), c.id);
+        }
       }
+      // Remap insertF usando normName como fallback
+      const resolveClienteId = (nombre: string) =>
+        cliMapRaw.get(nombre.toLowerCase()) ?? cliMap.get(normName(nombre)) ?? null;
 
       const insertF = nuevos.map((r) => ({
         fecha: r.fecha,
         sucursal: r.sucursal,
         tipo: r.tipo as never,
-        cliente_id: r.entidad_nombre ? cliMap.get(r.entidad_nombre.toLowerCase()) ?? null : null,
+        cliente_id: r.entidad_nombre ? resolveClienteId(r.entidad_nombre) : null,
         entidad_nombre: r.entidad_nombre,
         cod_entidad: r.cod_entidad,
         total_venta: r.total_venta,
@@ -597,9 +621,13 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
       const { data: clientes } = await supabase.from("clientes").select("id, nombre, ruc");
       const porNombre = new Map<string, string>();
+      const porNombreNorm = new Map<string, string>();
       const porRuc = new Map<string, string>();
       for (const c of clientes ?? []) {
-        if (c.nombre) porNombre.set(c.nombre.toLowerCase(), c.id);
+        if (c.nombre) {
+          porNombre.set(c.nombre.toLowerCase(), c.id);
+          porNombreNorm.set(normName(c.nombre), c.id);
+        }
         if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
       }
 
@@ -625,36 +653,38 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           const nombre = norm(
             pick(r, [
               "CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto",
+              "NOMBRE_CONTACTO", "nombre_contacto",
             ]),
           );
-          // Si la fila NO tiene un campo CONTACTO, no es una fila de contacto válida
-          // (evita interpretar filas de la hoja "Cadastro de Entidad v2" como contactos sin nombre).
-          if (!nombre) continue;
+          // Si no hay nombre de contacto, usar el nombre del cliente como contacto principal
+          const clienteNombreFallback = norm(
+            pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
+          );
+          const nombreFinal = nombre || clienteNombreFallback;
+          if (!nombreFinal) continue;
 
           const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
-          const cliente_nombre = norm(
-            pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
-          ) || null;
+          const cliente_nombre = clienteNombreFallback || null;
           const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
           const telefono = norm(
-            pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"]),
+            pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil", "telefono"]),
           ) || null;
-          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
-          const wa = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
-          const es_whatsapp = wa === "si" || wa === "sí" || wa === "true" || wa === "1" || wa === "x";
-          const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
-          const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
+          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL", "CORREO"])) || null;
+          const wa = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp", "TIENE_WHATSAPP"]));
+          const es_whatsapp = wa === "si" || wa === "sí" || wa === "true" || wa === "1" || wa === "x" || !!telefono;
+          const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal", "ES_PRINCIPAL"]));
+          const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x" || !nombre;
           const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
 
           const clienteId =
             (ruc && porRuc.get(normRuc(ruc))) ??
-            (cliente_nombre && porNombre.get(cliente_nombre.toLowerCase())) ??
+            (cliente_nombre && (porNombre.get(cliente_nombre.toLowerCase()) ?? porNombreNorm.get(normName(cliente_nombre)))) ??
             null;
 
           // Dedupe del propio Excel (mismo cliente + nombre o teléfono)
           const excelKey = clienteId
-            ? `${clienteId}|${normPhone(telefono ?? "")}|${nombre.toLowerCase()}`
-            : `noid|${ruc ?? cliente_nombre ?? ""}|${nombre.toLowerCase()}`;
+            ? `${clienteId}|${normPhone(telefono ?? "")}|${nombreFinal.toLowerCase()}`
+            : `noid|${ruc ?? cliente_nombre ?? ""}|${nombreFinal.toLowerCase()}`;
           if (vistosExcel.has(excelKey)) continue;
           vistosExcel.add(excelKey);
 
@@ -662,7 +692,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           if (!clienteId) status = "sin-cliente";
           else if (
             (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
-            dupKeys.has(`${clienteId}|n:${nombre.toLowerCase()}`)
+            dupKeys.has(`${clienteId}|n:${nombreFinal.toLowerCase()}`)
           ) {
             status = "duplicado";
           }
@@ -670,7 +700,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           rows.push({
             cliente_ruc: ruc,
             cliente_nombre,
-            nombre,
+            nombre: nombreFinal,
             cargo,
             telefono,
             correo,
