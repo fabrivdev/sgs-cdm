@@ -589,14 +589,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
-  // ===== Procesar Contactos =====
+  // ===== Procesar Contactos (recorre TODAS las hojas) =====
   const procesarContactos = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
 
       const { data: clientes } = await supabase.from("clientes").select("id, nombre, ruc");
       const porNombre = new Map<string, string>();
@@ -606,7 +603,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
       }
 
-      // Cargar contactos existentes para detectar duplicados (mismo cliente + tel/nombre)
       const { data: contactosEx } = await supabase
         .from("contactos_cliente")
         .select("cliente_id, nombre, telefono");
@@ -617,49 +613,78 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       }
 
       const rows: ContactoRow[] = [];
-      for (const r of json) {
-        const nombre = norm(pick(r, ["CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto", "NOMBRE", "Nombre"]));
-        if (!nombre) continue;
-        const ruc = norm(pick(r, ["RUC", "Ruc", "RUC CLIENTE", "ruc"])) || null;
-        const cliente_nombre = norm(pick(r, ["CLIENTE", "Cliente", "Razón Social", "Entidad"])) || null;
-        const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
-        const telefono = norm(pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"])) || null;
-        const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
-        const ws = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
-        const es_whatsapp = ws === "si" || ws === "sí" || ws === "true" || ws === "1" || ws === "x";
-        const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
-        const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
-        const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
+      // Dedupe dentro del propio Excel
+      const vistosExcel = new Set<string>();
 
-        const clienteId =
-          (ruc && porRuc.get(normRuc(ruc))) ??
-          (cliente_nombre && porNombre.get(cliente_nombre.toLowerCase())) ??
-          null;
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (json.length === 0) continue;
 
-        let status: ContactoRow["_status"] = "ok";
-        if (!clienteId) status = "sin-cliente";
-        else if (
-          (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
-          dupKeys.has(`${clienteId}|n:${nombre.toLowerCase()}`)
-        ) {
-          status = "duplicado";
+        for (const r of json) {
+          const nombre = norm(
+            pick(r, [
+              "CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto",
+            ]),
+          );
+          // Si la fila NO tiene un campo CONTACTO, no es una fila de contacto válida
+          // (evita interpretar filas de la hoja "Cadastro de Entidad v2" como contactos sin nombre).
+          if (!nombre) continue;
+
+          const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
+          const cliente_nombre = norm(
+            pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
+          ) || null;
+          const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
+          const telefono = norm(
+            pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"]),
+          ) || null;
+          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+          const wa = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
+          const es_whatsapp = wa === "si" || wa === "sí" || wa === "true" || wa === "1" || wa === "x";
+          const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
+          const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
+          const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
+
+          const clienteId =
+            (ruc && porRuc.get(normRuc(ruc))) ??
+            (cliente_nombre && porNombre.get(cliente_nombre.toLowerCase())) ??
+            null;
+
+          // Dedupe del propio Excel (mismo cliente + nombre o teléfono)
+          const excelKey = clienteId
+            ? `${clienteId}|${normPhone(telefono ?? "")}|${nombre.toLowerCase()}`
+            : `noid|${ruc ?? cliente_nombre ?? ""}|${nombre.toLowerCase()}`;
+          if (vistosExcel.has(excelKey)) continue;
+          vistosExcel.add(excelKey);
+
+          let status: ContactoRow["_status"] = "ok";
+          if (!clienteId) status = "sin-cliente";
+          else if (
+            (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
+            dupKeys.has(`${clienteId}|n:${nombre.toLowerCase()}`)
+          ) {
+            status = "duplicado";
+          }
+
+          rows.push({
+            cliente_ruc: ruc,
+            cliente_nombre,
+            nombre,
+            cargo,
+            telefono,
+            correo,
+            es_whatsapp,
+            es_principal,
+            notas,
+            _isNew: status === "ok",
+            _clienteId: clienteId,
+            _status: status,
+          });
         }
-
-        rows.push({
-          cliente_ruc: ruc,
-          cliente_nombre,
-          nombre,
-          cargo,
-          telefono,
-          correo,
-          es_whatsapp,
-          es_principal,
-          notas,
-          _isNew: status === "ok",
-          _clienteId: clienteId,
-          _status: status,
-        });
       }
+
+      if (rows.length === 0) return toast.error("No se encontraron filas con columna CONTACTO");
       setConRows(rows);
       setConFile(file.name);
     } catch (e) {
