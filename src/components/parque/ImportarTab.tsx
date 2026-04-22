@@ -44,6 +44,31 @@ interface FactRow {
   tipo: "Repuesto" | "Servicio";
   _isNew: boolean;
 }
+interface ClienteRow {
+  nombre: string;
+  ruc: string | null;
+  region: string | null;
+  direccion: string | null;
+  localidad: string | null;
+  correo_principal: string | null;
+  sucursal: Sucursal | null;
+  _isNew: boolean;
+  _matchedId?: string | null;
+}
+interface ContactoRow {
+  cliente_ruc: string | null;
+  cliente_nombre: string | null;
+  nombre: string;
+  cargo: string | null;
+  telefono: string | null;
+  correo: string | null;
+  es_whatsapp: boolean;
+  es_principal: boolean;
+  notas: string | null;
+  _isNew: boolean;
+  _clienteId: string | null;
+  _status: "ok" | "sin-cliente" | "duplicado";
+}
 
 interface Imp {
   id: string;
@@ -58,6 +83,26 @@ interface Imp {
 
 const norm = (s: unknown) => String(s ?? "").trim();
 const lower = (s: unknown) => norm(s).toLowerCase();
+const normRuc = (s: unknown) => norm(s).replace(/[.\s-]/g, "").toLowerCase();
+const normPhone = (s: unknown) => norm(s).replace(/[^\d]/g, "");
+
+// Mapeo de regiones a sucursales (igual al usado en la importación inicial)
+const REGION_TO_SUCURSAL: Record<string, Sucursal> = {
+  "central": "Santa Rita",
+  "santa rita": "Santa Rita",
+  "santa rosa del aguaray": "Santa Rosa",
+  "santa rosa": "Santa Rosa",
+  "campo 9": "Campo 9",
+  "campo nueve": "Campo 9",
+  "misiones": "Misiones",
+  "loma plata": "Loma Plata",
+  "katuete": "Katuete",
+  "katueté": "Katuete",
+};
+const matchSucursalFromRegion = (region: unknown): Sucursal | null => {
+  const v = lower(region).replace(/\s*\(\d+\)\s*$/, ""); // quita "(9)" final
+  return REGION_TO_SUCURSAL[v] ?? null;
+};
 
 const parseExcelDate = (v: unknown): string | null => {
   if (v == null || v === "") return null;
@@ -67,7 +112,6 @@ const parseExcelDate = (v: unknown): string | null => {
     return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
   }
   const s = String(v).trim();
-  // dd/mm/yyyy o dd-mm-yyyy
   const m = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$/);
   if (m) {
     let [, d, mo, y] = m;
@@ -88,12 +132,26 @@ const matchMarca = (s: unknown): Marca | null => {
   return (MARCAS.find((x) => x.toLowerCase() === v) ?? null) as Marca | null;
 };
 
+// Busca el primer valor que matchee algún alias (case-insensitive)
+const pick = (row: Record<string, unknown>, aliases: string[]): unknown => {
+  const keys = Object.keys(row);
+  for (const a of aliases) {
+    const k = keys.find((x) => x.trim().toLowerCase() === a.toLowerCase());
+    if (k != null && row[k] != null && String(row[k]).trim() !== "") return row[k];
+  }
+  return null;
+};
+
 export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const { user } = useAuth();
   const [parqueRows, setParqueRows] = useState<ParqueRow[] | null>(null);
   const [parqueFile, setParqueFile] = useState<string>("");
   const [factRows, setFactRows] = useState<FactRow[] | null>(null);
   const [factFile, setFactFile] = useState<string>("");
+  const [cliRows, setCliRows] = useState<ClienteRow[] | null>(null);
+  const [cliFile, setCliFile] = useState<string>("");
+  const [conRows, setConRows] = useState<ContactoRow[] | null>(null);
+  const [conFile, setConFile] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [historial, setHistorial] = useState<Imp[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
@@ -120,7 +178,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
       if (json.length === 0) return toast.error("Excel vacío");
 
-      // Match series existentes
       const seriesExistentes = new Set<string>();
       const { data: existentes } = await supabase.from("parque_maquinas").select("serie");
       for (const e of existentes ?? []) seriesExistentes.add(e.serie.toLowerCase());
@@ -160,7 +217,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     if (nuevos.length === 0) return toast.info("No hay registros nuevos");
     setBusy(true);
     try {
-      // Resolver clientes: crear los que no existen
       const nombresUnicos = Array.from(new Set(nuevos.map((r) => r.cliente_nombre).filter(Boolean)));
       const { data: cliExistentes } = await supabase
         .from("clientes")
@@ -171,7 +227,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
       const aCrear = nombresUnicos.filter((n) => !cliMap.has(n.toLowerCase()));
       if (aCrear.length > 0) {
-        // Buscar sucursal predominante por cliente
         const sucPorCliente = new Map<string, Sucursal | null>();
         for (const r of nuevos) {
           if (r.cliente_nombre && !sucPorCliente.has(r.cliente_nombre.toLowerCase())) {
@@ -235,27 +290,54 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
       if (json.length === 0) return toast.error("Excel vacío");
 
+      // Cargar TODOS los cod_factura existentes con paginación (Supabase limita a 1000)
       const codsExistentes = new Set<string>();
-      const { data: existentes } = await supabase.from("facturacion").select("cod_factura");
-      for (const e of existentes ?? []) codsExistentes.add(e.cod_factura.toLowerCase());
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from("facturacion")
+          .select("cod_factura")
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const e of data) codsExistentes.add(e.cod_factura.toLowerCase());
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
 
       const rows: FactRow[] = [];
       for (const r of json) {
-        const cod = norm(r["Código Factura"] ?? r["Codigo Factura"] ?? r["cod_factura"]);
+        const cod = norm(
+          pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
+        );
         if (!cod) continue;
-        const fecha = parseExcelDate(r["Fecha Factura"] ?? r["Fecha"] ?? r["fecha"]);
+        const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
         if (!fecha) continue;
-        const tipoRaw = norm(r["Tipo"] ?? r["tipo"]);
+        // Solo ventas (S). Ignorar entradas (E)
+        const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
+        if (tpMov && tpMov !== "S") continue;
+
+        const tipoRaw = norm(pick(r, ["Tipo", "tipo", "Tipo Item"]));
         const tipo: "Repuesto" | "Servicio" =
           tipoRaw.toLowerCase().startsWith("serv") ? "Servicio" : "Repuesto";
-        const totalRaw = r["Total Venta"] ?? r["total_venta"] ?? 0;
+        const totalRaw = pick(r, ["Total Venta", "total_venta", "Vlr. Total", "Valor Total"]) ?? 0;
+
+        // Mapeo sucursal: CENTRAL→Santa Rita, SANTA ROSA DEL AGUARAY→Santa Rosa, resto literal
+        const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
+        const sucursal =
+          matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
+
         rows.push({
           fecha,
-          sucursal: matchSucursal(r["Sucursal"] ?? r["sucursal"]),
-          entidad_nombre: norm(r["Entidad"] ?? r["entidad"]),
-          cod_entidad: norm(r["Cod. Entidad"] ?? r["Cod Entidad"] ?? r["cod_entidad"]) || null,
-          total_venta: typeof totalRaw === "number" ? totalRaw : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0,
-          grupo: norm(r["Grupo"] ?? r["grupo"]) || null,
+          sucursal,
+          entidad_nombre: norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"])),
+          cod_entidad: norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null,
+          total_venta:
+            typeof totalRaw === "number"
+              ? totalRaw
+              : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0,
+          grupo: norm(pick(r, ["Grupo", "grupo"])) || null,
           cod_factura: cod,
           tipo,
           _isNew: !codsExistentes.has(cod.toLowerCase()),
@@ -274,7 +356,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     if (nuevos.length === 0) return toast.info("No hay registros nuevos");
     setBusy(true);
     try {
-      // Match clientes por nombre
       const nombresUnicos = Array.from(new Set(nuevos.map((r) => r.entidad_nombre).filter(Boolean)));
       const { data: cliExistentes } = await supabase
         .from("clientes")
@@ -307,7 +388,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         grupo: r.grupo,
         cod_factura: r.cod_factura,
       }));
-      // Insertar en chunks de 500
       for (let i = 0; i < insertF.length; i += 500) {
         const chunk = insertF.slice(i, i + 500);
         const { error } = await supabase.from("facturacion").insert(chunk);
@@ -335,18 +415,250 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
+  // ===== Procesar Clientes =====
+  const procesarClientes = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      // Usar la primera hoja, o "BD CLIENTES" si existe
+      const sheetName =
+        wb.SheetNames.find((n) => n.toLowerCase().includes("bd clientes")) ?? wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+      if (json.length === 0) return toast.error("Excel vacío");
+
+      // Cargar existentes (por nombre normalizado y RUC normalizado)
+      const { data: existentes } = await supabase.from("clientes").select("id, nombre, ruc");
+      const porNombre = new Map<string, string>();
+      const porRuc = new Map<string, string>();
+      for (const c of existentes ?? []) {
+        if (c.nombre) porNombre.set(c.nombre.toLowerCase(), c.id);
+        if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
+      }
+
+      const rows: ClienteRow[] = [];
+      const vistos = new Set<string>();
+      for (const r of json) {
+        const nombre = norm(pick(r, ["NOMBRE", "Nombre", "Cliente", "Razón Social", "Razon Social", "Entidad"]));
+        if (!nombre) continue;
+        const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
+        const region = norm(pick(r, ["REGION", "Región", "Region"])) || null;
+        const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
+        const localidad = norm(pick(r, ["LOCALIDAD", "Localidad", "Ciudad"])) || null;
+        const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+        const sucursal =
+          matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
+
+        // Dedupe en el propio Excel (por RUC o por nombre)
+        const key = ruc ? `r:${normRuc(ruc)}` : `n:${nombre.toLowerCase()}`;
+        if (vistos.has(key)) continue;
+        vistos.add(key);
+
+        // Match contra base
+        const matchedId =
+          (ruc && porRuc.get(normRuc(ruc))) ?? porNombre.get(nombre.toLowerCase()) ?? null;
+
+        rows.push({
+          nombre,
+          ruc,
+          region,
+          direccion,
+          localidad,
+          correo_principal: correo,
+          sucursal,
+          _isNew: !matchedId,
+          _matchedId: matchedId,
+        });
+      }
+      setCliRows(rows);
+      setCliFile(file.name);
+    } catch (e) {
+      toast.error("Error leyendo archivo: " + (e as Error).message);
+    }
+  };
+
+  const confirmarClientes = async () => {
+    if (!cliRows || !user) return;
+    const nuevos = cliRows.filter((r) => r._isNew);
+    if (nuevos.length === 0) return toast.info("No hay clientes nuevos");
+    setBusy(true);
+    try {
+      const insertCli = nuevos.map((r) => ({
+        nombre: r.nombre,
+        ruc: r.ruc,
+        region: r.region,
+        direccion: r.direccion,
+        localidad: r.localidad,
+        correo_principal: r.correo_principal,
+        sucursal: r.sucursal,
+      }));
+      for (let i = 0; i < insertCli.length; i += 500) {
+        const chunk = insertCli.slice(i, i + 500);
+        const { error } = await supabase.from("clientes").insert(chunk);
+        if (error) throw error;
+      }
+      await supabase.from("importaciones").insert({
+        usuario_id: user.id,
+        // reusamos "parque" como tipo lógico (enum solo permite parque|facturacion)
+        tipo: "parque",
+        total_filas: cliRows.length,
+        insertados: nuevos.length,
+        duplicados: cliRows.length - nuevos.length,
+        archivo_nombre: `clientes:${cliFile}`,
+      });
+      toast.success(`Importados ${nuevos.length} clientes`);
+      setCliRows(null);
+      setCliFile("");
+      await cargarHistorial();
+      onChanged();
+    } catch (e) {
+      toast.error("Error: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ===== Procesar Contactos =====
+  const procesarContactos = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+      if (json.length === 0) return toast.error("Excel vacío");
+
+      const { data: clientes } = await supabase.from("clientes").select("id, nombre, ruc");
+      const porNombre = new Map<string, string>();
+      const porRuc = new Map<string, string>();
+      for (const c of clientes ?? []) {
+        if (c.nombre) porNombre.set(c.nombre.toLowerCase(), c.id);
+        if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
+      }
+
+      // Cargar contactos existentes para detectar duplicados (mismo cliente + tel/nombre)
+      const { data: contactosEx } = await supabase
+        .from("contactos_cliente")
+        .select("cliente_id, nombre, telefono");
+      const dupKeys = new Set<string>();
+      for (const c of contactosEx ?? []) {
+        if (c.telefono) dupKeys.add(`${c.cliente_id}|t:${normPhone(c.telefono)}`);
+        if (c.nombre) dupKeys.add(`${c.cliente_id}|n:${c.nombre.toLowerCase()}`);
+      }
+
+      const rows: ContactoRow[] = [];
+      for (const r of json) {
+        const nombre = norm(pick(r, ["CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto", "NOMBRE", "Nombre"]));
+        if (!nombre) continue;
+        const ruc = norm(pick(r, ["RUC", "Ruc", "RUC CLIENTE", "ruc"])) || null;
+        const cliente_nombre = norm(pick(r, ["CLIENTE", "Cliente", "Razón Social", "Entidad"])) || null;
+        const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
+        const telefono = norm(pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"])) || null;
+        const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+        const ws = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
+        const es_whatsapp = ws === "si" || ws === "sí" || ws === "true" || ws === "1" || ws === "x";
+        const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
+        const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
+        const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
+
+        const clienteId =
+          (ruc && porRuc.get(normRuc(ruc))) ??
+          (cliente_nombre && porNombre.get(cliente_nombre.toLowerCase())) ??
+          null;
+
+        let status: ContactoRow["_status"] = "ok";
+        if (!clienteId) status = "sin-cliente";
+        else if (
+          (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
+          dupKeys.has(`${clienteId}|n:${nombre.toLowerCase()}`)
+        ) {
+          status = "duplicado";
+        }
+
+        rows.push({
+          cliente_ruc: ruc,
+          cliente_nombre,
+          nombre,
+          cargo,
+          telefono,
+          correo,
+          es_whatsapp,
+          es_principal,
+          notas,
+          _isNew: status === "ok",
+          _clienteId: clienteId,
+          _status: status,
+        });
+      }
+      setConRows(rows);
+      setConFile(file.name);
+    } catch (e) {
+      toast.error("Error leyendo archivo: " + (e as Error).message);
+    }
+  };
+
+  const confirmarContactos = async () => {
+    if (!conRows || !user) return;
+    const nuevos = conRows.filter((r) => r._isNew && r._clienteId);
+    if (nuevos.length === 0) return toast.info("No hay contactos nuevos");
+    setBusy(true);
+    try {
+      const insertCon = nuevos.map((r) => ({
+        cliente_id: r._clienteId!,
+        nombre: r.nombre,
+        cargo: r.cargo,
+        telefono: r.telefono,
+        correo: r.correo,
+        es_whatsapp: r.es_whatsapp,
+        es_principal: r.es_principal,
+        notas: r.notas,
+      }));
+      for (let i = 0; i < insertCon.length; i += 500) {
+        const chunk = insertCon.slice(i, i + 500);
+        const { error } = await supabase.from("contactos_cliente").insert(chunk);
+        if (error) throw error;
+      }
+      await supabase.from("importaciones").insert({
+        usuario_id: user.id,
+        tipo: "parque",
+        total_filas: conRows.length,
+        insertados: nuevos.length,
+        duplicados: conRows.length - nuevos.length,
+        archivo_nombre: `contactos:${conFile}`,
+      });
+      toast.success(`Importados ${nuevos.length} contactos`);
+      setConRows(null);
+      setConFile("");
+      await cargarHistorial();
+      onChanged();
+    } catch (e) {
+      toast.error("Error: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <DropZone
           title="Importar parque de máquinas"
-          help="Columnas esperadas: AÑO, SUCURSAL, SUBGRUPO, MODELO_TIPO, SERIE, CLIENTE, MARCA, VENDEDOR, LOCALIDAD"
+          help="Columnas: AÑO, SUCURSAL, SUBGRUPO, MODELO_TIPO, SERIE, CLIENTE, MARCA, VENDEDOR, LOCALIDAD"
           onFile={procesarParque}
         />
         <DropZone
           title="Importar facturación"
-          help="Columnas esperadas: Fecha Factura, Sucursal, Entidad, Cod. Entidad, Total Venta, Grupo, Código Factura, Tipo"
+          help="Columnas: Fecha Factura, Sucursal (CENTRAL=Santa Rita, etc.), Entidad, Cod. Entidad, Total Venta, Grupo, Código Factura, Tipo, Tp. Movimento (solo S)"
           onFile={procesarFact}
+        />
+        <DropZone
+          title="Importar clientes"
+          help="Columnas: NOMBRE, RUC, REGION, DIRECCION, LOCALIDAD, CORREO. Match por RUC o nombre. Hoja 'BD CLIENTES' o la primera disponible."
+          onFile={procesarClientes}
+        />
+        <DropZone
+          title="Importar contactos"
+          help="Columnas: RUC (o CLIENTE), CONTACTO, CARGO, TELEFONO, CORREO, WHATSAPP, PRINCIPAL, NOTAS. Match por RUC + fallback nombre."
+          onFile={procesarContactos}
         />
       </div>
 
@@ -368,6 +680,27 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           columns={["fecha", "sucursal", "entidad_nombre", "cod_factura", "tipo", "total_venta"]}
           onConfirm={confirmarFact}
           onCancel={() => setFactRows(null)}
+          busy={busy}
+        />
+      )}
+
+      {cliRows && (
+        <Preview
+          title={`Clientes — ${cliFile}`}
+          rows={cliRows}
+          columns={["nombre", "ruc", "region", "localidad", "direccion", "correo_principal", "sucursal"]}
+          onConfirm={confirmarClientes}
+          onCancel={() => setCliRows(null)}
+          busy={busy}
+        />
+      )}
+
+      {conRows && (
+        <ContactosPreview
+          title={`Contactos — ${conFile}`}
+          rows={conRows}
+          onConfirm={confirmarContactos}
+          onCancel={() => setConRows(null)}
           busy={busy}
         />
       )}
@@ -521,6 +854,99 @@ function Preview<T extends { _isNew: boolean }>({
           <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>Cancelar</Button>
           <Button size="sm" onClick={onConfirm} disabled={busy || nuevos === 0}>
             {busy ? "Importando..." : `Confirmar (${nuevos})`}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ContactosPreview({
+  title,
+  rows,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  title: string;
+  rows: ContactoRow[];
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  const ok = rows.filter((r) => r._status === "ok").length;
+  const sinCliente = rows.filter((r) => r._status === "sin-cliente").length;
+  const dup = rows.filter((r) => r._status === "duplicado").length;
+  const preview = rows.slice(0, 15);
+  return (
+    <Card>
+      <CardContent className="p-3 sm:p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="font-semibold text-sm">{title}</div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{rows.length} filas</Badge>
+            <Badge className="bg-emerald-600 text-white">
+              <CheckCircle2 className="mr-1 h-3 w-3" /> {ok} a importar
+            </Badge>
+            <Badge variant="secondary">
+              <AlertCircle className="mr-1 h-3 w-3" /> {dup} duplicados
+            </Badge>
+            {sinCliente > 0 && (
+              <Badge variant="destructive">
+                <AlertCircle className="mr-1 h-3 w-3" /> {sinCliente} sin cliente
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-20">Estado</TableHead>
+                <TableHead className="text-[11px]">Cliente (RUC / Nombre)</TableHead>
+                <TableHead className="text-[11px]">Contacto</TableHead>
+                <TableHead className="text-[11px]">Cargo</TableHead>
+                <TableHead className="text-[11px]">Teléfono</TableHead>
+                <TableHead className="text-[11px]">Correo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {preview.map((r, i) => (
+                <TableRow
+                  key={i}
+                  className={cn(
+                    r._status === "duplicado" && "opacity-50",
+                    r._status === "sin-cliente" && "bg-destructive/5",
+                  )}
+                >
+                  <TableCell>
+                    {r._status === "ok" && (
+                      <Badge className="bg-emerald-600 text-white text-[9px]">Nuevo</Badge>
+                    )}
+                    {r._status === "duplicado" && (
+                      <Badge variant="secondary" className="text-[9px]">Dup.</Badge>
+                    )}
+                    {r._status === "sin-cliente" && (
+                      <Badge variant="destructive" className="text-[9px]">Sin cliente</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <div className="font-mono text-[10px] text-muted-foreground">{r.cliente_ruc ?? "—"}</div>
+                    <div className="truncate max-w-[200px]">{r.cliente_nombre ?? "—"}</div>
+                  </TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{r.nombre}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{r.cargo ?? "—"}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{r.telefono ?? "—"}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{r.correo ?? "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>Cancelar</Button>
+          <Button size="sm" onClick={onConfirm} disabled={busy || ok === 0}>
+            {busy ? "Importando..." : `Confirmar (${ok})`}
           </Button>
         </div>
       </CardContent>
