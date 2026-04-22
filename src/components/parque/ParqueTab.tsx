@@ -54,6 +54,7 @@ type Cliente = {
   sucursal: Sucursal | null;
   activo: boolean;
 };
+
 type Contacto = {
   id: string;
   cliente_id: string;
@@ -62,6 +63,7 @@ type Contacto = {
   es_principal: boolean;
   activo: boolean;
 };
+
 type Maquina = {
   id: string;
   cliente_id: string | null;
@@ -70,12 +72,15 @@ type Maquina = {
   subgrupo: string;
   activo: boolean;
 };
+
 type Factura = {
   cliente_id: string | null;
   fecha: string;
   tipo: "Repuesto" | "Servicio";
+  grupo: string | null;
   total_venta: number;
 };
+
 type Seguimiento = {
   cliente_id: string;
   fecha: string;
@@ -122,7 +127,19 @@ const dias = (d: string | null | undefined) => {
 const fmtMoney = (n: number) =>
   new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(n);
 
-// Heatmap antigüedad: 0 verde -> 15+ rojo
+const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const esServicioValido = (grupo: string | null | undefined) => {
+  const g = normText(grupo);
+  return g.includes("mano de obra") || g.includes("kilometraje");
+};
+
+const esFacturaComercialValida = (fc: Factura) => {
+  if (fc.tipo === "Repuesto") return true;
+  if (fc.tipo === "Servicio") return esServicioValido(fc.grupo);
+  return false;
+};
+
 const antiguedadColor = (a: number | null) => {
   if (a == null) return "bg-muted text-muted-foreground";
   if (a <= 3) return "bg-emerald-500 text-white";
@@ -146,121 +163,116 @@ export function ParqueTab({
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
 
-  // filtros
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState<string>("all");
   const [fMarca, setFMarca] = useState<string>("all");
   const [fSubgrupo, setFSubgrupo] = useState<string>("all");
   const [fSeguimiento, setFSeguimiento] = useState<string>("all");
 
-  // rango fechas
   const [rango, setRango] = useState<RangoPreset>("365d");
   const [customDesde, setCustomDesde] = useState<Date | undefined>();
   const [customHasta, setCustomHasta] = useState<Date | undefined>();
 
-  // orden
- const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
-const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-const cargar = async () => {
-  setLoading(true);
+  const cargar = async () => {
+    setLoading(true);
 
-  try {
-    // 1) Primero traemos solo máquinas activas
-    const { data: maquinasData, error: maquinasError } = await supabase
-      .from("parque_maquinas")
-      .select("id, cliente_id, anio, marca, subgrupo, activo")
-      .eq("activo", true);
+    try {
+      const { data: maquinasData, error: maquinasError } = await supabase
+        .from("parque_maquinas")
+        .select("id, cliente_id, anio, marca, subgrupo, activo")
+        .eq("activo", true);
 
-    if (maquinasError) throw maquinasError;
+      if (maquinasError) throw maquinasError;
 
-    const maquinasRows = (maquinasData ?? []) as Maquina[];
-    const clienteIds = Array.from(
-      new Set(maquinasRows.map((m) => m.cliente_id).filter(Boolean) as string[])
-    );
-
-    if (clienteIds.length === 0) {
-      setClientes([]);
-      setContactos([]);
-      setMaquinas(maquinasRows);
-      setFacturas([]);
-      setSeguimientos([]);
-      setLoading(false);
-      return;
-    }
-
-    // 2) Después solo traemos clientes/contactos/seguimientos/facturación
-    //    de esos clientes que realmente tienen máquinas
-    const [c, ct, s] = await Promise.all([
-      supabase
-        .from("clientes")
-        .select("id, nombre, sucursal, activo")
-        .in("id", clienteIds)
-        .eq("activo", true),
-
-      supabase
-        .from("contactos_cliente")
-        .select("id, cliente_id, nombre, telefono, es_principal, activo")
-        .in("cliente_id", clienteIds)
-        .eq("activo", true),
-
-      supabase
-        .from("seguimiento_comercial")
-        .select("cliente_id, fecha, resultado")
-        .in("cliente_id", clienteIds)
-        .order("fecha", { ascending: false }),
-    ]);
-
-    if (c.error) throw c.error;
-    if (ct.error) throw ct.error;
-    if (s.error) throw s.error;
-
-    // 3) Facturación paginada, pero solo para clientes del parque
-    const facts: Factura[] = [];
-    let from = 0;
-    const PAGE = 1000;
-
-    while (true) {
-      const { data, error } = await supabase
-        .from("facturacion")
-        .select("cliente_id, fecha, tipo, total_venta")
-        .in("cliente_id", clienteIds)
-        .range(from, from + PAGE - 1);
-
-      if (error) throw error;
-      if (!data || data.length === 0) break;
-
-      facts.push(
-        ...(data as Factura[]).map((x) => ({
-          ...x,
-          total_venta: Number(x.total_venta),
-        }))
+      const maquinasRows = (maquinasData ?? []) as Maquina[];
+      const clienteIds = Array.from(
+        new Set(maquinasRows.map((m) => m.cliente_id).filter(Boolean) as string[])
       );
 
-      if (data.length < PAGE) break;
-      from += PAGE;
-    }
+      if (clienteIds.length === 0) {
+        setClientes([]);
+        setContactos([]);
+        setMaquinas(maquinasRows);
+        setFacturas([]);
+        setSeguimientos([]);
+        setLoading(false);
+        return;
+      }
 
-    setClientes((c.data ?? []) as Cliente[]);
-    setContactos((ct.data ?? []) as Contacto[]);
-    setMaquinas(maquinasRows);
-    setFacturas(facts);
-    setSeguimientos((s.data ?? []) as Seguimiento[]);
-  } catch (e) {
-    console.error(e);
-  } finally {
-    setLoading(false);
-  }
-};
+      const [c, ct, s] = await Promise.all([
+        supabase
+          .from("clientes")
+          .select("id, nombre, sucursal, activo")
+          .in("id", clienteIds)
+          .eq("activo", true),
+
+        supabase
+          .from("contactos_cliente")
+          .select("id, cliente_id, nombre, telefono, es_principal, activo")
+          .in("cliente_id", clienteIds)
+          .eq("activo", true),
+
+        supabase
+          .from("seguimiento_comercial")
+          .select("cliente_id, fecha, resultado")
+          .in("cliente_id", clienteIds)
+          .order("fecha", { ascending: false }),
+      ]);
+
+      if (c.error) throw c.error;
+      if (ct.error) throw ct.error;
+      if (s.error) throw s.error;
+
+      const facts: Factura[] = [];
+      let from = 0;
+      const PAGE = 1000;
+
+      while (true) {
+        const { data, error } = await supabase
+          .from("facturacion")
+          .select("cliente_id, fecha, tipo, grupo, total_venta")
+          .in("cliente_id", clienteIds)
+          .range(from, from + PAGE - 1);
+
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        facts.push(
+          ...(data as Factura[]).map((x) => ({
+            ...x,
+            grupo: x.grupo ?? null,
+            total_venta: Number(x.total_venta) || 0,
+          }))
+        );
+
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      setClientes((c.data ?? []) as Cliente[]);
+      setContactos((ct.data ?? []) as Contacto[]);
+      setMaquinas(maquinasRows);
+      setFacturas(facts);
+      setSeguimientos((s.data ?? []) as Seguimiento[]);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     cargar();
   }, []);
 
-  // calcular rango efectivo
   const { desdeDate, hastaDate, prevDesdeDate, prevHastaDate } = useMemo(() => {
     const hoy = new Date();
     let desde: Date;
     let hasta: Date = hoy;
+
     switch (rango) {
       case "30d":
         desde = new Date(hoy.getTime() - 30 * 86400000);
@@ -282,12 +294,18 @@ const cargar = async () => {
         hasta = customHasta ?? hoy;
         break;
     }
-    // mismo periodo año anterior
+
     const prevDesde = new Date(desde);
     prevDesde.setFullYear(prevDesde.getFullYear() - 1);
     const prevHasta = new Date(hasta);
     prevHasta.setFullYear(prevHasta.getFullYear() - 1);
-    return { desdeDate: desde, hastaDate: hasta, prevDesdeDate: prevDesde, prevHastaDate: prevHasta };
+
+    return {
+      desdeDate: desde,
+      hastaDate: hasta,
+      prevDesdeDate: prevDesde,
+      prevHastaDate: prevHasta,
+    };
   }, [rango, customDesde, customHasta]);
 
   const rows: Row[] = useMemo(() => {
@@ -303,6 +321,7 @@ const cargar = async () => {
       arr.push(ct);
       contactosByCliente.set(ct.cliente_id, arr);
     }
+
     const maquinasByCliente = new Map<string, Maquina[]>();
     for (const mq of maquinas) {
       if (!mq.cliente_id) continue;
@@ -320,19 +339,24 @@ const cargar = async () => {
 
     for (const fc of facturas) {
       if (!fc.cliente_id) continue;
+      if (!esFacturaComercialValida(fc)) continue;
+
       const ft = new Date(fc.fecha).getTime();
+
       if (fc.tipo === "Repuesto") {
         const cur = ultRepByCliente.get(fc.cliente_id);
         if (!cur || new Date(cur).getTime() < ft) ultRepByCliente.set(fc.cliente_id, fc.fecha);
         if (ft >= desdeT && ft <= hastaT) tieneRepRango.add(fc.cliente_id);
-      } else {
+      } else if (fc.tipo === "Servicio") {
         const cur = ultSrvByCliente.get(fc.cliente_id);
         if (!cur || new Date(cur).getTime() < ft) ultSrvByCliente.set(fc.cliente_id, fc.fecha);
         if (ft >= desdeT && ft <= hastaT) tieneSrvRango.add(fc.cliente_id);
       }
+
       if (ft >= desdeT && ft <= hastaT) {
         factYTDByCliente.set(fc.cliente_id, (factYTDByCliente.get(fc.cliente_id) ?? 0) + fc.total_venta);
       }
+
       if (ft >= prevDT && ft <= prevHT) {
         factPrevByCliente.set(fc.cliente_id, (factPrevByCliente.get(fc.cliente_id) ?? 0) + fc.total_venta);
       }
@@ -356,6 +380,7 @@ const cargar = async () => {
         anios.length > 0
           ? Math.round((anios.reduce((s, a) => s + (hoy.getFullYear() - a), 0) / anios.length) * 10) / 10
           : null;
+
       const ytd = factYTDByCliente.get(cli.id) ?? 0;
       const prev = factPrevByCliente.get(cli.id) ?? 0;
       const varPct = prev > 0 ? Math.round(((ytd - prev) / prev) * 100) : ytd > 0 ? 100 : null;
@@ -388,15 +413,19 @@ const cargar = async () => {
       if (r.cantTotal === 0) return false;
       if (ql && !r.cliente.nombre.toLowerCase().includes(ql)) return false;
       if (fSucursal !== "all" && r.cliente.sucursal !== fSucursal) return false;
+
       if (fMarca !== "all") {
         if (fMarca === "CLAAS" && r.cantClaas === 0) return false;
         if (fMarca === "HORSCH" && r.cantHorsch === 0) return false;
       }
+
       if (fSubgrupo !== "all" && !r.subgrupos.includes(fSubgrupo)) return false;
+
       if (fSeguimiento !== "all") {
         if (fSeguimiento === "sin_seguimiento" && r.ultSeg) return false;
         if (fSeguimiento !== "sin_seguimiento" && r.ultSeg?.resultado !== fSeguimiento) return false;
       }
+
       return true;
     });
   }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento]);
@@ -404,6 +433,7 @@ const cargar = async () => {
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
     const safe = (n: number | null | undefined) => (n == null ? Number.POSITIVE_INFINITY : n);
+
     return [...filtradas].sort((a, b) => {
       switch (sortKey) {
         case "cliente":
@@ -456,6 +486,7 @@ const cargar = async () => {
       "Fact. LY": r.factPrev,
       "%VAR": r.varPct ?? "",
     }));
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Parque");
@@ -471,7 +502,6 @@ const cargar = async () => {
 
   return (
     <div className="space-y-3">
-      {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[180px] flex-1">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -482,37 +512,64 @@ const cargar = async () => {
             className="pl-8"
           />
         </div>
+
         <Select value={fSucursal} onValueChange={setFSucursal}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Sucursal" /></SelectTrigger>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Sucursal" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las sucursales</SelectItem>
-            {SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={fMarca} onValueChange={setFMarca}>
-          <SelectTrigger className="w-[120px]"><SelectValue placeholder="Marca" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las marcas</SelectItem>
-            {MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Subgrupo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los subgrupos</SelectItem>
-            {SUBGRUPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
-          <SelectTrigger className="w-[170px]"><SelectValue placeholder="Seguimiento" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Cualquier seguimiento</SelectItem>
-            <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
-            {RESULTADOS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+            {SUCURSALES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
-        {/* Rango fechas */}
+        <Select value={fMarca} onValueChange={setFMarca}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Marca" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las marcas</SelectItem>
+            {MARCAS.map((m) => (
+              <SelectItem key={m} value={m}>
+                {m}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Subgrupo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los subgrupos</SelectItem>
+            {SUBGRUPOS.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
+          <SelectTrigger className="w-[170px]">
+            <SelectValue placeholder="Seguimiento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Cualquier seguimiento</SelectItem>
+            <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
+            {RESULTADOS.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
           <SelectTrigger className="w-[160px]">
             <CalendarIcon className="mr-1 h-3.5 w-3.5" />
@@ -527,6 +584,7 @@ const cargar = async () => {
             <SelectItem value="custom">Personalizado…</SelectItem>
           </SelectContent>
         </Select>
+
         {rango === "custom" && (
           <>
             <Popover>
@@ -544,6 +602,7 @@ const cargar = async () => {
                 />
               </PopoverContent>
             </Popover>
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-9">
@@ -572,7 +631,6 @@ const cargar = async () => {
         {format(desdeDate, "dd/MM/yy")} – {format(hastaDate, "dd/MM/yy")}
       </div>
 
-      {/* Tabla */}
       <div className="rounded-md border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
@@ -607,6 +665,7 @@ const cargar = async () => {
               </TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {loading && (
               <TableRow>
@@ -615,6 +674,7 @@ const cargar = async () => {
                 </TableCell>
               </TableRow>
             )}
+
             {!loading && ordenadas.length === 0 && (
               <TableRow>
                 <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
@@ -622,15 +682,12 @@ const cargar = async () => {
                 </TableCell>
               </TableRow>
             )}
+
             {!loading &&
               ordenadas.map((r) => {
                 const pctClaas = r.cantTotal ? (r.cantClaas / r.cantTotal) * 100 : 0;
                 const pctHorsch = r.cantTotal ? (r.cantHorsch / r.cantTotal) * 100 : 0;
-                const ultMin = Math.min(
-                  r.diasUltRepuesto ?? Infinity,
-                  r.diasUltServicio ?? Infinity,
-                );
-                const flag = ultMin === Infinity || ultMin > 365;
+
                 return (
                   <TableRow
                     key={r.cliente.id}
@@ -643,6 +700,7 @@ const cargar = async () => {
                         <div className="text-[11px] text-muted-foreground">{r.cliente.sucursal}</div>
                       )}
                     </TableCell>
+
                     <TableCell>
                       {r.contactoPrincipal?.telefono ? (
                         <a
@@ -656,9 +714,9 @@ const cargar = async () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-center tabular-nums font-medium">
-                      {r.cantTotal}
-                    </TableCell>
+
+                    <TableCell className="text-center tabular-nums font-medium">{r.cantTotal}</TableCell>
+
                     <TableCell className="text-center">
                       {r.antiguedadProm != null ? (
                         <Badge className={cn("min-w-[36px] justify-center tabular-nums", antiguedadColor(r.antiguedadProm))}>
@@ -668,6 +726,7 @@ const cargar = async () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
+
                     <TableCell>
                       {r.cantTotal > 0 ? (
                         <div className="flex items-center gap-1">
@@ -687,6 +746,7 @@ const cargar = async () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
+
                     <TableCell className="text-right tabular-nums">
                       {r.diasUltRepuesto != null ? (
                         <span className="inline-flex items-center gap-1">
@@ -697,6 +757,7 @@ const cargar = async () => {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
+
                     <TableCell className="text-right tabular-nums">
                       {r.diasUltServicio != null ? (
                         <span className="inline-flex items-center gap-1">
@@ -707,6 +768,7 @@ const cargar = async () => {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
+
                     <TableCell className="text-center">
                       {r.tieneRepEnRango ? (
                         <Check className="mx-auto h-4 w-4 text-emerald-600" />
@@ -714,6 +776,7 @@ const cargar = async () => {
                         <X className="mx-auto h-4 w-4 text-destructive" />
                       )}
                     </TableCell>
+
                     <TableCell className="text-center">
                       {r.tieneSrvEnRango ? (
                         <Check className="mx-auto h-4 w-4 text-emerald-600" />
@@ -721,12 +784,15 @@ const cargar = async () => {
                         <X className="mx-auto h-4 w-4 text-destructive" />
                       )}
                     </TableCell>
+
                     <TableCell className="text-right tabular-nums">
                       {r.factYTD > 0 ? `₲${fmtMoney(r.factYTD)}` : <span className="text-muted-foreground">—</span>}
                     </TableCell>
+
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {r.factPrev > 0 ? `₲${fmtMoney(r.factPrev)}` : "—"}
                     </TableCell>
+
                     <TableCell
                       className={cn(
                         "text-right tabular-nums font-medium",
