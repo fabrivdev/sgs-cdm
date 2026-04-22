@@ -286,63 +286,101 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
 
-      // Cargar TODOS los cod_factura existentes con paginación (Supabase limita a 1000)
-      const codsExistentes = new Set<string>();
+      // Procesar TODAS las hojas. El tipo se infiere del nombre de la hoja:
+      //   "Fact. Repuestos" / contiene "repuesto" → Repuesto
+      //   "Fact. Servicios" / contiene "servicio" → Servicio
+      // Si no se puede inferir, se usa la columna "Tipo" o se asume Repuesto.
+      const inferTipoFromSheet = (name: string): "Repuesto" | "Servicio" | null => {
+        const n = name.toLowerCase();
+        if (n.includes("servic")) return "Servicio";
+        if (n.includes("repuest")) return "Repuesto";
+        return null;
+      };
+
+      // Cargar TODOS los cod_factura+tipo existentes con paginación (Supabase limita a 1000)
+      // Clave: `${cod}|${tipo}` para permitir repuesto y servicio del mismo cod_factura
+      const existentesKey = new Set<string>();
       let from = 0;
       const PAGE = 1000;
       while (true) {
         const { data, error } = await supabase
           .from("facturacion")
-          .select("cod_factura")
+          .select("cod_factura, tipo")
           .range(from, from + PAGE - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
-        for (const e of data) codsExistentes.add(e.cod_factura.toLowerCase());
+        for (const e of data) existentesKey.add(`${e.cod_factura.toLowerCase()}|${e.tipo}`);
         if (data.length < PAGE) break;
         from += PAGE;
       }
 
       const rows: FactRow[] = [];
-      for (const r of json) {
-        const cod = norm(
-          pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
-        );
-        if (!cod) continue;
-        const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
-        if (!fecha) continue;
-        // Solo ventas (S). Ignorar entradas (E)
-        const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
-        if (tpMov && tpMov !== "S") continue;
+      // Para agrupar por (cod_factura, tipo) dentro del propio Excel
+      const agg = new Map<string, FactRow & { _seen: number }>();
 
-        const tipoRaw = norm(pick(r, ["Tipo", "tipo", "Tipo Item"]));
-        const tipo: "Repuesto" | "Servicio" =
-          tipoRaw.toLowerCase().startsWith("serv") ? "Servicio" : "Repuesto";
-        const totalRaw = pick(r, ["Total Venta", "total_venta", "Vlr. Total", "Valor Total"]) ?? 0;
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        if (json.length === 0) continue;
+        const tipoSheet = inferTipoFromSheet(sheetName);
 
-        // Mapeo sucursal: CENTRAL→Santa Rita, SANTA ROSA DEL AGUARAY→Santa Rosa, resto literal
-        const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
-        const sucursal =
-          matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
+        for (const r of json) {
+          const cod = norm(
+            pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
+          );
+          if (!cod) continue;
+          const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
+          if (!fecha) continue;
+          // Solo ventas (S). Ignorar entradas (E)
+          const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
+          if (tpMov && tpMov !== "S") continue;
 
-        rows.push({
-          fecha,
-          sucursal,
-          entidad_nombre: norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"])),
-          cod_entidad: norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null,
-          total_venta:
+          let tipo: "Repuesto" | "Servicio";
+          if (tipoSheet) {
+            tipo = tipoSheet;
+          } else {
+            const tipoRaw = norm(pick(r, ["Tipo", "tipo", "Tipo Item", "Tipo Mercaderia"]));
+            tipo = tipoRaw.toLowerCase().startsWith("serv") ? "Servicio" : "Repuesto";
+          }
+
+          const totalRaw = pick(r, ["Total Venta", "total_venta", "Vlr. Total", "Valor Total"]) ?? 0;
+          const total =
             typeof totalRaw === "number"
               ? totalRaw
-              : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0,
-          grupo: norm(pick(r, ["Grupo", "grupo"])) || null,
-          cod_factura: cod,
-          tipo,
-          _isNew: !codsExistentes.has(cod.toLowerCase()),
-        });
+              : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0;
+
+          const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
+          const sucursal = matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
+
+          const key = `${cod.toLowerCase()}|${tipo}`;
+          const prev = agg.get(key);
+          if (prev) {
+            // Misma factura+tipo: sumar total y mantener primer encabezado
+            prev.total_venta += total;
+            prev._seen += 1;
+          } else {
+            agg.set(key, {
+              fecha,
+              sucursal,
+              entidad_nombre: norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"])),
+              cod_entidad: norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null,
+              total_venta: total,
+              grupo: norm(pick(r, ["Grupo", "grupo"])) || null,
+              cod_factura: cod,
+              tipo,
+              _isNew: !existentesKey.has(key),
+              _seen: 1,
+            });
+          }
+        }
       }
+
+      for (const v of agg.values()) {
+        const { _seen, ...row } = v;
+        rows.push(row);
+      }
+      if (rows.length === 0) return toast.error("Excel vacío o sin filas válidas");
       setFactRows(rows);
       setFactFile(file.name);
     } catch (e) {
