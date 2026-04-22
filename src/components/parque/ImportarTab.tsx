@@ -33,6 +33,7 @@ interface ParqueRow {
   localidad: string | null;
   _isNew: boolean;
 }
+
 interface FactRow {
   fecha: string;
   sucursal: Sucursal | null;
@@ -44,7 +45,9 @@ interface FactRow {
   tipo: "Repuesto" | "Servicio";
   _isNew: boolean;
 }
+
 interface ClienteRow {
+  cod_entidad: string | null;
   nombre: string;
   ruc: string | null;
   region: string | null;
@@ -55,7 +58,9 @@ interface ClienteRow {
   _isNew: boolean;
   _matchedId?: string | null;
 }
+
 interface ContactoRow {
+  cliente_cod_entidad: string | null;
   cliente_ruc: string | null;
   cliente_nombre: string | null;
   nombre: string;
@@ -83,16 +88,52 @@ interface Imp {
 
 const norm = (s: unknown) => String(s ?? "").trim();
 const lower = (s: unknown) => norm(s).toLowerCase();
+const normText = (s: unknown) => lower(s).replace(/\s+/g, " ");
 const normRuc = (s: unknown) => norm(s).replace(/[.\s-]/g, "").toLowerCase();
 const normPhone = (s: unknown) => norm(s).replace(/[^\d]/g, "");
-// Normaliza nombre para comparación: mayúsculas, sin puntos/comas/S.A./S.R.L. al final, trim
-const normName = (s: unknown) =>
-  norm(s)
-    .toUpperCase()
-    .replace(/\s+(S\.?A\.?|S\.R\.L\.?|LTDA\.?|INC\.?)\s*$/i, "")
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+const normCode = (s: unknown) => norm(s).replace(/\s+/g, "").toLowerCase();
+
+const parseMoney = (v: unknown): number => {
+  if (v == null || v === "") return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+
+  const raw = String(v).trim();
+  if (!raw) return 0;
+
+  const cleaned = raw.replace(/[^\d,.-]/g, "");
+  if (!cleaned) return 0;
+
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+
+  if (lastComma > lastDot) {
+    const normalized = cleaned.replace(/\./g, "").replace(",", ".");
+    return Number(normalized) || 0;
+  }
+
+  const normalized = cleaned.replace(/,/g, "");
+  return Number(normalized) || 0;
+};
+
+const factKey = (row: {
+  cod_factura: string;
+  tipo: "Repuesto" | "Servicio";
+  fecha: string;
+  cod_entidad: string | null;
+  entidad_nombre: string;
+  sucursal: Sucursal | null;
+  grupo: string | null;
+}) =>
+  [
+    normCode(row.cod_factura),
+    row.tipo,
+    row.fecha,
+    normCode(row.cod_entidad),
+    normText(row.entidad_nombre),
+    normText(row.sucursal),
+    normText(row.grupo),
+  ].join("|");
+
 
 // Mapeo de regiones a sucursales (igual al usado en la importación inicial)
 const REGION_TO_SUCURSAL: Record<string, Sucursal> = {
@@ -179,549 +220,603 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
   // ===== Procesar Parque =====
   const procesarParque = async (file: File) => {
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-      if (json.length === 0) return toast.error("Excel vacío");
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
 
-      const seriesExistentes = new Set<string>();
-      const { data: existentes } = await supabase.from("parque_maquinas").select("serie");
-      for (const e of existentes ?? []) seriesExistentes.add(e.serie.toLowerCase());
-
-      const rows: ParqueRow[] = [];
-      for (const r of json) {
-        const serie = norm(r["SERIE"] ?? r["serie"]);
-        if (!serie) continue;
-        const marca = matchMarca(r["MARCA"] ?? r["marca"]) ?? "CLAAS";
-        const subRaw = norm(r["SUBGRUPO"] ?? r["subgrupo"]).toUpperCase();
-        const subgrupo = SUBGRUPOS_VALIDOS.has(subRaw) ? subRaw : "OTRO";
-        const anioVal = r["AÑO"] ?? r["ANO"] ?? r["ANIO"] ?? r["año"];
-        const anio = anioVal ? Number(anioVal) || null : null;
-        rows.push({
-          anio,
-          sucursal: matchSucursal(r["SUCURSAL"] ?? r["sucursal"]),
-          subgrupo,
-          modelo_tipo: norm(r["MODELO_TIPO"] ?? r["MODELO"] ?? r["modelo_tipo"]) || null,
-          serie,
-          cliente_nombre: norm(r["CLIENTE"] ?? r["cliente"]),
-          marca,
-          vendedor: norm(r["VENDEDOR"] ?? r["vendedor"]) || null,
-          localidad: norm(r["LOCALIDAD"] ?? r["localidad"]) || null,
-          _isNew: !seriesExistentes.has(serie.toLowerCase()),
-        });
-      }
-      setParqueRows(rows);
-      setParqueFile(file.name);
-    } catch (e) {
-      toast.error("Error leyendo archivo: " + (e as Error).message);
+    const sheetName = wb.SheetNames.find((x) => x.trim().toLowerCase() === "bd_claas_horsch");
+    if (!sheetName) {
+      return toast.error("No se encontró la hoja BD_CLAAS_HORSCH");
     }
-  };
+
+    const ws = wb.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+    if (json.length === 0) return toast.error("Excel vacío");
+
+    const seriesExistentes = new Set<string>();
+    const { data: existentes } = await supabase.from("parque_maquinas").select("serie");
+    for (const e of existentes ?? []) {
+      if (e.serie) seriesExistentes.add(normText(e.serie));
+    }
+
+    const rows: ParqueRow[] = [];
+    for (const r of json) {
+      const serie = norm(r["SERIE"] ?? r["serie"]);
+      if (!serie) continue;
+
+      const marca = matchMarca(r["MARCA"] ?? r["marca"]) ?? "CLAAS";
+      const subRaw = norm(r["SUBGRUPO"] ?? r["subgrupo"]).toUpperCase();
+      const subgrupo = SUBGRUPOS_VALIDOS.has(subRaw) ? subRaw : "OTRO";
+      const anioVal = r["AÑO"] ?? r["ANO"] ?? r["ANIO"] ?? r["año"];
+      const anio = anioVal ? Number(anioVal) || null : null;
+
+      rows.push({
+        anio,
+        sucursal: matchSucursal(r["SUCURSAL"] ?? r["sucursal"]),
+        subgrupo,
+        modelo_tipo: norm(r["MODELO_TIPO"] ?? r["MODELO"] ?? r["modelo_tipo"]) || null,
+        serie,
+        cliente_nombre: norm(r["CLIENTE"] ?? r["cliente"]),
+        marca,
+        vendedor: norm(r["VENDEDOR"] ?? r["vendedor"]) || null,
+        localidad: norm(r["LOCALIDAD"] ?? r["localidad"]) || null,
+        _isNew: !seriesExistentes.has(normText(serie)),
+      });
+    }
+
+    setParqueRows(rows);
+    setParqueFile(file.name);
+  } catch (e) {
+    toast.error("Error leyendo archivo: " + (e as Error).message);
+  }
+};
 
   const confirmarParque = async () => {
-    if (!parqueRows || !user) return;
-    const nuevos = parqueRows.filter((r) => r._isNew);
-    if (nuevos.length === 0) return toast.info("No hay registros nuevos");
-    setBusy(true);
-    try {
-      const nombresUnicos = Array.from(new Set(nuevos.map((r) => r.cliente_nombre).filter(Boolean)));
-      const { data: todosClientes } = await supabase.from("clientes").select("id, nombre");
-      const cliMap = new Map<string, string>(); // normName → id
-      const cliMapRaw = new Map<string, string>(); // lower exact → id
-      for (const c of todosClientes ?? []) {
-        cliMap.set(normName(c.nombre), c.id);
-        cliMapRaw.set(c.nombre.toLowerCase(), c.id);
-      }
-      const resolveId = (n: string) =>
-        cliMapRaw.get(n.toLowerCase()) ?? cliMap.get(normName(n)) ?? null;
+  if (!parqueRows || !user) return;
 
-      const aCrear = nombresUnicos.filter((n) => !resolveId(n));
-      if (aCrear.length > 0) {
-        const sucPorCliente = new Map<string, Sucursal | null>();
-        for (const r of nuevos) {
-          if (r.cliente_nombre && !sucPorCliente.has(r.cliente_nombre.toLowerCase())) {
-            sucPorCliente.set(r.cliente_nombre.toLowerCase(), r.sucursal);
-          }
-        }
-        const insertCli = aCrear.map((n) => ({
-          nombre: n,
-          sucursal: sucPorCliente.get(n.toLowerCase()) ?? null,
-        }));
-        const { data: creados, error: errCli } = await supabase
-          .from("clientes")
-          .insert(insertCli)
-          .select("id, nombre");
-        if (errCli) throw errCli;
-        for (const c of creados ?? []) {
-          cliMap.set(normName(c.nombre), c.id);
-          cliMapRaw.set(c.nombre.toLowerCase(), c.id);
-        }
-      }
+  const nuevos = parqueRows.filter((r) => r._isNew);
+  if (nuevos.length === 0) return toast.info("No hay registros nuevos");
 
-      const insertMaq = nuevos.map((r) => ({
-        cliente_id: r.cliente_nombre ? resolveId(r.cliente_nombre) : null,
-        anio: r.anio,
-        sucursal: r.sucursal,
-        localidad: r.localidad,
-        subgrupo: r.subgrupo as never,
-        modelo_tipo: r.modelo_tipo,
-        serie: r.serie,
-        vendedor: r.vendedor,
-        marca: r.marca,
-        agregado_manualmente: false,
-      }));
-      const { error } = await supabase.from("parque_maquinas").insert(insertMaq);
-      if (error) throw error;
+  setBusy(true);
+  try {
+    const { data: cliExistentes, error: cliErr } = await supabase
+      .from("clientes")
+      .select("id, nombre");
+    if (cliErr) throw cliErr;
 
-      await supabase.from("importaciones").insert({
-        usuario_id: user.id,
-        tipo: "parque",
-        total_filas: parqueRows.length,
-        insertados: nuevos.length,
-        duplicados: parqueRows.length - nuevos.length,
-        archivo_nombre: parqueFile,
-      });
-
-      toast.success(`Importadas ${nuevos.length} máquinas`);
-      setParqueRows(null);
-      setParqueFile("");
-      await cargarHistorial();
-      onChanged();
-    } catch (e) {
-      toast.error("Error: " + (e as Error).message);
-    } finally {
-      setBusy(false);
+    const cliMap = new Map<string, string>();
+    for (const c of cliExistentes ?? []) {
+      if (c.nombre) cliMap.set(normText(c.nombre), c.id);
     }
-  };
 
+    const validos = nuevos.filter((r) => cliMap.has(normText(r.cliente_nombre)));
+    const omitidos = nuevos.length - validos.length;
+
+    if (validos.length === 0) {
+      return toast.error("Ninguna máquina coincide exactamente con un cliente existente");
+    }
+
+    const insertMaq = validos.map((r) => ({
+      cliente_id: cliMap.get(normText(r.cliente_nombre)) ?? null,
+      anio: r.anio,
+      sucursal: r.sucursal,
+      localidad: r.localidad,
+      subgrupo: r.subgrupo as never,
+      modelo_tipo: r.modelo_tipo,
+      serie: r.serie,
+      vendedor: r.vendedor,
+      marca: r.marca,
+      agregado_manualmente: false,
+    }));
+
+    const { error } = await supabase.from("parque_maquinas").insert(insertMaq);
+    if (error) throw error;
+
+    await supabase.from("importaciones").insert({
+      usuario_id: user.id,
+      tipo: "parque",
+      total_filas: parqueRows.length,
+      insertados: validos.length,
+      duplicados: parqueRows.length - validos.length,
+      archivo_nombre: parqueFile,
+    });
+
+    if (omitidos > 0) {
+      toast.success(`Importadas ${validos.length} máquinas. ${omitidos} fueron omitidas por no coincidir exactamente con un cliente.`);
+    } else {
+      toast.success(`Importadas ${validos.length} máquinas`);
+    }
+
+    setParqueRows(null);
+    setParqueFile("");
+    await cargarHistorial();
+    onChanged();
+  } catch (e) {
+    toast.error("Error: " + (e as Error).message);
+  } finally {
+    setBusy(false);
+  }
+};
+
+      
   // ===== Procesar Facturación =====
   const procesarFact = async (file: File) => {
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
 
-      // Procesar TODAS las hojas. El tipo se infiere del nombre de la hoja:
-      //   "Fact. Repuestos" / contiene "repuesto" → Repuesto
-      //   "Fact. Servicios" / contiene "servicio" → Servicio
-      // Si no se puede inferir, se usa la columna "Tipo" o se asume Repuesto.
-      const inferTipoFromSheet = (name: string): "Repuesto" | "Servicio" | null => {
-        const n = name.toLowerCase();
-        if (n.includes("servic")) return "Servicio";
-        if (n.includes("repuest")) return "Repuesto";
-        return null;
-      };
+    const hojasValidas = wb.SheetNames.filter((name) => {
+      const n = name.toLowerCase();
+      return n.includes("repuest") || n.includes("servic");
+    });
 
-      // Cargar TODOS los cod_factura+tipo existentes con paginación (Supabase limita a 1000)
-      // Clave: `${cod}|${tipo}` para permitir repuesto y servicio del mismo cod_factura
-      const existentesKey = new Set<string>();
-      let from = 0;
-      const PAGE = 1000;
-      while (true) {
-        const { data, error } = await supabase
-          .from("facturacion")
-          .select("cod_factura, tipo")
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        for (const e of data) existentesKey.add(`${e.cod_factura.toLowerCase()}|${e.tipo}`);
-        if (data.length < PAGE) break;
-        from += PAGE;
-      }
-
-      const rows: FactRow[] = [];
-      // Para agrupar por (cod_factura, tipo) dentro del propio Excel
-      const agg = new Map<string, FactRow & { _seen: number }>();
-
-      for (const sheetName of wb.SheetNames) {
-        const ws = wb.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-        if (json.length === 0) continue;
-        const tipoSheet = inferTipoFromSheet(sheetName);
-
-        for (const r of json) {
-          const cod = norm(
-            pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
-          );
-          if (!cod) continue;
-          const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
-          if (!fecha) continue;
-          // Solo ventas (S). Ignorar entradas (E)
-          const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
-          if (tpMov && tpMov !== "S") continue;
-
-          let tipo: "Repuesto" | "Servicio";
-          if (tipoSheet) {
-            tipo = tipoSheet;
-          } else {
-            const tipoRaw = norm(pick(r, ["Tipo", "tipo", "Tipo Item", "Tipo Mercaderia"]));
-            tipo = tipoRaw.toLowerCase().startsWith("serv") ? "Servicio" : "Repuesto";
-          }
-
-          const totalRaw = pick(r, ["Total Venta", "total_venta", "Vlr. Total", "Valor Total"]) ?? 0;
-          const total =
-            typeof totalRaw === "number"
-              ? totalRaw
-              : Number(String(totalRaw).replace(/[^0-9.-]/g, "")) || 0;
-
-          const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
-          const sucursal = matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
-
-          const key = `${cod.toLowerCase()}|${tipo}`;
-          const prev = agg.get(key);
-          if (prev) {
-            // Misma factura+tipo: sumar total y mantener primer encabezado
-            prev.total_venta += total;
-            prev._seen += 1;
-          } else {
-            agg.set(key, {
-              fecha,
-              sucursal,
-              entidad_nombre: norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"])),
-              cod_entidad: norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null,
-              total_venta: total,
-              grupo: norm(pick(r, ["Grupo", "grupo"])) || null,
-              cod_factura: cod,
-              tipo,
-              _isNew: !existentesKey.has(key),
-              _seen: 1,
-            });
-          }
-        }
-      }
-
-      for (const v of agg.values()) {
-        const { _seen, ...row } = v;
-        rows.push(row);
-      }
-      if (rows.length === 0) return toast.error("Excel vacío o sin filas válidas");
-      setFactRows(rows);
-      setFactFile(file.name);
-    } catch (e) {
-      toast.error("Error leyendo archivo: " + (e as Error).message);
+    if (hojasValidas.length === 0) {
+      return toast.error("No se encontraron hojas válidas de facturación");
     }
-  };
 
-  const confirmarFact = async () => {
-    if (!factRows || !user) return;
-    const nuevos = factRows.filter((r) => r._isNew);
-    if (nuevos.length === 0) return toast.info("No hay registros nuevos");
-    setBusy(true);
-    try {
-      const nombresUnicos = Array.from(new Set(nuevos.map((r) => r.entidad_nombre).filter(Boolean)));
-      // Traer TODOS los clientes para hacer match por normName (evita duplicados por S.A. / puntuación)
-      const { data: todosClientes } = await supabase.from("clientes").select("id, nombre, ruc");
-      const cliMap = new Map<string, string>(); // normName → id
-      const cliMapRaw = new Map<string, string>(); // nombre exacto → id
-      for (const c of todosClientes ?? []) {
-        cliMap.set(normName(c.nombre), c.id);
-        cliMapRaw.set(c.nombre.toLowerCase(), c.id);
+    const existentesKey = new Set<string>();
+    let from = 0;
+    const PAGE = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("facturacion")
+        .select("cod_factura, tipo, fecha, cod_entidad, entidad_nombre, sucursal, grupo")
+        .range(from, from + PAGE - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      for (const e of data) {
+        existentesKey.add(
+          factKey({
+            cod_factura: e.cod_factura,
+            tipo: e.tipo,
+            fecha: e.fecha,
+            cod_entidad: e.cod_entidad,
+            entidad_nombre: e.entidad_nombre,
+            sucursal: e.sucursal,
+            grupo: e.grupo,
+          }),
+        );
       }
-      const aCrear = nombresUnicos.filter(
-        (n) => !cliMap.has(normName(n)) && !cliMapRaw.has(n.toLowerCase()),
-      );
-      if (aCrear.length > 0) {
-        const insertCli = aCrear.map((n) => {
-          const r = nuevos.find((x) => x.entidad_nombre === n);
-          return { nombre: n, sucursal: r?.sucursal ?? null };
+
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+
+    const agg = new Map<string, FactRow>();
+
+    for (const sheetName of hojasValidas) {
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+      if (json.length === 0) continue;
+
+      const tipo: "Repuesto" | "Servicio" =
+        sheetName.toLowerCase().includes("servic") ? "Servicio" : "Repuesto";
+
+      for (const r of json) {
+        const codFactura = norm(
+          pick(r, ["Código Factura", "Codigo Factura", "cod_factura", "Nro. Factura", "Nro Factura"]),
+        );
+        if (!codFactura) continue;
+
+        const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
+        if (!fecha) continue;
+
+        const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
+        if (tpMov && tpMov !== "S") continue;
+
+        const grupoFx = normText(pick(r, ["GRUPO FX", "Grupo FX", "grupo fx"]));
+        if (tipo === "Servicio" && grupoFx !== "kilometraje" && grupoFx !== "mano de obra") {
+          continue;
+        }
+
+        const codEntidad = norm(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null;
+        const entidadNombre = norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"]));
+        if (!codEntidad && !entidadNombre) continue;
+
+        const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
+        const sucursal = matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
+
+        const grupo = norm(pick(r, ["Grupo", "grupo"])) || null;
+        const valorMedio = parseMoney(pick(r, ["Valor Medio", "valor medio", "Valor medio"]));
+
+        const key = factKey({
+          cod_factura: codFactura,
+          tipo,
+          fecha,
+          cod_entidad: codEntidad,
+          entidad_nombre: entidadNombre,
+          sucursal,
+          grupo,
         });
-        const { data: creados, error: errCli } = await supabase
-          .from("clientes")
-          .insert(insertCli)
-          .select("id, nombre");
-        if (errCli) throw errCli;
-        for (const c of creados ?? []) {
-          cliMap.set(normName(c.nombre), c.id);
-          cliMapRaw.set(c.nombre.toLowerCase(), c.id);
-        }
-      }
-      // Remap insertF usando normName como fallback
-      const resolveClienteId = (nombre: string) =>
-        cliMapRaw.get(nombre.toLowerCase()) ?? cliMap.get(normName(nombre)) ?? null;
 
-      const insertF = nuevos.map((r) => ({
-        fecha: r.fecha,
-        sucursal: r.sucursal,
-        tipo: r.tipo as never,
-        cliente_id: r.entidad_nombre ? resolveClienteId(r.entidad_nombre) : null,
-        entidad_nombre: r.entidad_nombre,
-        cod_entidad: r.cod_entidad,
-        total_venta: r.total_venta,
-        grupo: r.grupo,
-        cod_factura: r.cod_factura,
-      }));
-      for (let i = 0; i < insertF.length; i += 500) {
-        const chunk = insertF.slice(i, i + 500);
-        const { error } = await supabase.from("facturacion").insert(chunk);
-        if (error) throw error;
-      }
-
-      await supabase.from("importaciones").insert({
-        usuario_id: user.id,
-        tipo: "facturacion",
-        total_filas: factRows.length,
-        insertados: nuevos.length,
-        duplicados: factRows.length - nuevos.length,
-        archivo_nombre: factFile,
-      });
-
-      toast.success(`Importadas ${nuevos.length} facturas`);
-      setFactRows(null);
-      setFactFile("");
-      await cargarHistorial();
-      onChanged();
-    } catch (e) {
-      toast.error("Error: " + (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // ===== Procesar Clientes (fusiona TODAS las hojas, BD CLIENTES sobreescribe) =====
-  const procesarClientes = async (file: File) => {
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-
-      const { data: existentes } = await supabase.from("clientes").select("id, nombre, ruc");
-      const porNombre = new Map<string, string>();
-      const porRuc = new Map<string, string>();
-      for (const c of existentes ?? []) {
-        if (c.nombre) porNombre.set(c.nombre.toLowerCase(), c.id);
-        if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
-      }
-
-      // Acumulador por clave (RUC normalizado o nombre lowercase si no hay RUC).
-      // Procesa Cadastro primero (base), luego BD CLIENTES (curada, sobreescribe).
-      type Acc = ClienteRow & { _key: string };
-      const acc = new Map<string, Acc>();
-      const orderedSheets = [...wb.SheetNames].sort((a, b) => {
-        const aBd = a.toLowerCase().includes("bd clientes") ? 1 : 0;
-        const bBd = b.toLowerCase().includes("bd clientes") ? 1 : 0;
-        return aBd - bBd;
-      });
-
-      for (const sheetName of orderedSheets) {
-        const isBdClientes = sheetName.toLowerCase().includes("bd clientes");
-        const ws = wb.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-        if (json.length === 0) continue;
-
-        for (const r of json) {
-          const nombre = norm(
-            pick(r, [
-              "NOMBRE", "Nombre", "Cliente", "CLIENTE",
-              "Razón Social", "Razon Social", "Entidad",
-              "Nombre Entidad",
-            ]),
-          );
-          if (!nombre) continue;
-          const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
-          const region = norm(pick(r, ["REGION", "REGIONES", "Región", "Region", "Sucursal"])) || null;
-          const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
-          const localidad = norm(pick(r, ["LOCALIDAD", "Localidad", "Ciudad", "Municipio"])) || null;
-          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
-          const sucursal =
-            matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
-
-          const key = ruc ? `r:${normRuc(ruc)}` : `n:${nombre.toLowerCase()}`;
-          const prev = acc.get(key);
-          if (!prev) {
-            const matchedId =
-              (ruc && porRuc.get(normRuc(ruc))) ?? porNombre.get(nombre.toLowerCase()) ?? null;
-            acc.set(key, {
-              _key: key,
-              nombre,
-              ruc,
-              region,
-              direccion,
-              localidad,
-              correo_principal: correo,
-              sucursal,
-              _isNew: !matchedId,
-              _matchedId: matchedId,
-            });
-          } else {
-            // BD CLIENTES sobreescribe; otras hojas solo rellenan vacíos
-            if (isBdClientes) {
-              prev.nombre = nombre;
-              if (ruc) prev.ruc = ruc;
-              if (region) prev.region = region;
-              if (direccion) prev.direccion = direccion;
-              if (localidad) prev.localidad = localidad;
-              if (correo) prev.correo_principal = correo;
-              if (sucursal) prev.sucursal = sucursal;
-            } else {
-              prev.ruc = prev.ruc ?? ruc;
-              prev.region = prev.region ?? region;
-              prev.direccion = prev.direccion ?? direccion;
-              prev.localidad = prev.localidad ?? localidad;
-              prev.correo_principal = prev.correo_principal ?? correo;
-              prev.sucursal = prev.sucursal ?? sucursal;
-            }
-          }
-        }
-      }
-
-      const rows: ClienteRow[] = [...acc.values()].map(({ _key, ...r }) => r);
-      if (rows.length === 0) return toast.error("Excel sin filas válidas");
-      setCliRows(rows);
-      setCliFile(file.name);
-    } catch (e) {
-      toast.error("Error leyendo archivo: " + (e as Error).message);
-    }
-  };
-
-  const confirmarClientes = async () => {
-    if (!cliRows || !user) return;
-    const nuevos = cliRows.filter((r) => r._isNew);
-    if (nuevos.length === 0) return toast.info("No hay clientes nuevos");
-    setBusy(true);
-    try {
-      const insertCli = nuevos.map((r) => ({
-        nombre: r.nombre,
-        ruc: r.ruc,
-        region: r.region,
-        direccion: r.direccion,
-        localidad: r.localidad,
-        correo_principal: r.correo_principal,
-        sucursal: r.sucursal,
-      }));
-      for (let i = 0; i < insertCli.length; i += 500) {
-        const chunk = insertCli.slice(i, i + 500);
-        const { error } = await supabase.from("clientes").insert(chunk);
-        if (error) throw error;
-      }
-      await supabase.from("importaciones").insert({
-        usuario_id: user.id,
-        // reusamos "parque" como tipo lógico (enum solo permite parque|facturacion)
-        tipo: "parque",
-        total_filas: cliRows.length,
-        insertados: nuevos.length,
-        duplicados: cliRows.length - nuevos.length,
-        archivo_nombre: `clientes:${cliFile}`,
-      });
-      toast.success(`Importados ${nuevos.length} clientes`);
-      setCliRows(null);
-      setCliFile("");
-      await cargarHistorial();
-      onChanged();
-    } catch (e) {
-      toast.error("Error: " + (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // ===== Procesar Contactos (recorre TODAS las hojas) =====
-  const procesarContactos = async (file: File) => {
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-
-      const { data: clientes } = await supabase.from("clientes").select("id, nombre, ruc");
-      const porNombre = new Map<string, string>();
-      const porNombreNorm = new Map<string, string>();
-      const porRuc = new Map<string, string>();
-      for (const c of clientes ?? []) {
-        if (c.nombre) {
-          porNombre.set(c.nombre.toLowerCase(), c.id);
-          porNombreNorm.set(normName(c.nombre), c.id);
-        }
-        if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
-      }
-
-      const { data: contactosEx } = await supabase
-        .from("contactos_cliente")
-        .select("cliente_id, nombre, telefono");
-      const dupKeys = new Set<string>();
-      for (const c of contactosEx ?? []) {
-        if (c.telefono) dupKeys.add(`${c.cliente_id}|t:${normPhone(c.telefono)}`);
-        if (c.nombre) dupKeys.add(`${c.cliente_id}|n:${c.nombre.toLowerCase()}`);
-      }
-
-      const rows: ContactoRow[] = [];
-      // Dedupe dentro del propio Excel
-      const vistosExcel = new Set<string>();
-
-      for (const sheetName of wb.SheetNames) {
-        const ws = wb.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-        if (json.length === 0) continue;
-
-        for (const r of json) {
-          const nombre = norm(
-            pick(r, [
-              "CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto",
-              "NOMBRE_CONTACTO", "nombre_contacto",
-            ]),
-          );
-          // Si no hay nombre de contacto, usar el nombre del cliente como contacto principal
-          const clienteNombreFallback = norm(
-            pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
-          );
-          const nombreFinal = nombre || clienteNombreFallback;
-          if (!nombreFinal) continue;
-
-          const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
-          const cliente_nombre = clienteNombreFallback || null;
-          const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
-          const telefono = norm(
-            pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil", "telefono"]),
-          ) || null;
-          const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL", "CORREO"])) || null;
-          const wa = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp", "TIENE_WHATSAPP"]));
-          const es_whatsapp = wa === "si" || wa === "sí" || wa === "true" || wa === "1" || wa === "x" || !!telefono;
-          const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal", "ES_PRINCIPAL"]));
-          const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x" || !nombre;
-          const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
-
-          const clienteId =
-            (ruc && porRuc.get(normRuc(ruc))) ??
-            (cliente_nombre && (porNombre.get(cliente_nombre.toLowerCase()) ?? porNombreNorm.get(normName(cliente_nombre)))) ??
-            null;
-
-          // Dedupe del propio Excel (mismo cliente + nombre o teléfono)
-          const excelKey = clienteId
-            ? `${clienteId}|${normPhone(telefono ?? "")}|${nombreFinal.toLowerCase()}`
-            : `noid|${ruc ?? cliente_nombre ?? ""}|${nombreFinal.toLowerCase()}`;
-          if (vistosExcel.has(excelKey)) continue;
-          vistosExcel.add(excelKey);
-
-          let status: ContactoRow["_status"] = "ok";
-          if (!clienteId) status = "sin-cliente";
-          else if (
-            (telefono && dupKeys.has(`${clienteId}|t:${normPhone(telefono)}`)) ||
-            dupKeys.has(`${clienteId}|n:${nombreFinal.toLowerCase()}`)
-          ) {
-            status = "duplicado";
-          }
-
-          rows.push({
-            cliente_ruc: ruc,
-            cliente_nombre,
-            nombre: nombreFinal,
-            cargo,
-            telefono,
-            correo,
-            es_whatsapp,
-            es_principal,
-            notas,
-            _isNew: status === "ok",
-            _clienteId: clienteId,
-            _status: status,
+        const prev = agg.get(key);
+        if (prev) {
+          prev.total_venta += valorMedio;
+        } else {
+          agg.set(key, {
+            fecha,
+            sucursal,
+            entidad_nombre: entidadNombre,
+            cod_entidad: codEntidad,
+            total_venta: valorMedio,
+            grupo,
+            cod_factura: codFactura,
+            tipo,
+            _isNew: !existentesKey.has(key),
           });
         }
       }
-
-      if (rows.length === 0) return toast.error("No se encontraron filas con columna CONTACTO");
-      setConRows(rows);
-      setConFile(file.name);
-    } catch (e) {
-      toast.error("Error leyendo archivo: " + (e as Error).message);
     }
-  };
 
+    const rows = Array.from(agg.values());
+    if (rows.length === 0) return toast.error("Excel vacío o sin filas válidas");
+
+    setFactRows(rows);
+    setFactFile(file.name);
+  } catch (e) {
+    toast.error("Error leyendo archivo: " + (e as Error).message);
+  }
+};
+
+ const confirmarFact = async () => {
+  if (!factRows || !user) return;
+
+  const nuevos = factRows.filter((r) => r._isNew);
+  if (nuevos.length === 0) return toast.info("No hay registros nuevos");
+
+  setBusy(true);
+  try {
+    const { data: cliExistentes, error: cliErr } = await supabase
+      .from("clientes")
+      .select("*");
+    if (cliErr) throw cliErr;
+
+    const cliByCod = new Map<string, string>();
+    const cliByNombre = new Map<string, string>();
+
+    for (const c of (cliExistentes ?? []) as any[]) {
+      if (c.cod_entidad) cliByCod.set(normCode(c.cod_entidad), c.id);
+      if (c.nombre) cliByNombre.set(normText(c.nombre), c.id);
+    }
+
+    const insertF = nuevos.map((r) => ({
+      fecha: r.fecha,
+      sucursal: r.sucursal,
+      tipo: r.tipo as never,
+      cliente_id:
+        (r.cod_entidad && cliByCod.get(normCode(r.cod_entidad))) ??
+        cliByNombre.get(normText(r.entidad_nombre)) ??
+        null,
+      entidad_nombre: r.entidad_nombre,
+      cod_entidad: r.cod_entidad,
+      total_venta: r.total_venta,
+      grupo: r.grupo,
+      cod_factura: r.cod_factura,
+    }));
+
+    for (let i = 0; i < insertF.length; i += 500) {
+      const chunk = insertF.slice(i, i + 500);
+      const { error } = await supabase.from("facturacion").insert(chunk);
+      if (error) throw error;
+    }
+
+    await supabase.from("importaciones").insert({
+      usuario_id: user.id,
+      tipo: "facturacion",
+      total_filas: factRows.length,
+      insertados: nuevos.length,
+      duplicados: factRows.length - nuevos.length,
+      archivo_nombre: factFile,
+    });
+
+    toast.success(`Importadas ${nuevos.length} facturas`);
+    setFactRows(null);
+    setFactFile("");
+    await cargarHistorial();
+    onChanged();
+  } catch (e) {
+    toast.error("Error: " + (e as Error).message);
+  } finally {
+    setBusy(false);
+  }
+};
+  // ===== Procesar Clientes (fusiona TODAS las hojas, BD CLIENTES sobreescribe) =====
+  const procesarClientes = async (file: File) => {
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+
+    const sheetCadastro = wb.SheetNames.find((x) => x.trim().toLowerCase() === "cadastro de entidad v2");
+    const sheetBd = wb.SheetNames.find((x) => x.trim().toLowerCase() === "bd clientes");
+
+    if (!sheetCadastro || !sheetBd) {
+      return toast.error("El archivo debe contener las hojas 'Cadastro de Entidad v2' y 'BD CLIENTES'");
+    }
+
+    const { data: existentesRaw, error: exErr } = await supabase
+      .from("clientes")
+      .select("*");
+    if (exErr) throw exErr;
+
+    const porCodigo = new Map<string, string>();
+    const porNombre = new Map<string, string>();
+    const porRuc = new Map<string, string>();
+
+    for (const c of (existentesRaw ?? []) as any[]) {
+      if (c.cod_entidad) porCodigo.set(normCode(c.cod_entidad), c.id);
+      if (c.nombre) porNombre.set(normText(c.nombre), c.id);
+      if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
+    }
+
+    type Acc = ClienteRow & { _key: string };
+
+    const acc = new Map<string, Acc>();
+
+    const cadastroRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetCadastro], { defval: null });
+    const bdRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetBd], { defval: null });
+
+    for (const r of cadastroRows) {
+      const cod_entidad = norm(pick(r, ["Cód. Interno", "Cod. Interno", "Cod Interno", "Codigo Interno"])) || null;
+      const nombre = norm(pick(r, ["Nombre Entidad", "Entidad", "Cliente", "Nombre"]));
+      if (!cod_entidad || !nombre) continue;
+
+      const ruc = norm(pick(r, ["RUC", "Ruc", "ruc"])) || null;
+      const region = norm(pick(r, ["Sucursal", "REGION", "REGIONES", "Región", "Region"])) || null;
+      const direccion = norm(pick(r, ["Dirección", "Direccion", "DIRECCION"])) || null;
+      const localidad = norm(pick(r, ["Localidad", "LOCALIDAD", "Municipio"])) || null;
+      const correo = norm(pick(r, ["Correo", "CORREO", "Email", "EMAIL"])) || null;
+      const sucursal =
+        matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
+
+      const matchedId =
+        porCodigo.get(normCode(cod_entidad)) ??
+        (ruc ? porRuc.get(normRuc(ruc)) : null) ??
+        porNombre.get(normText(nombre)) ??
+        null;
+
+      acc.set(normCode(cod_entidad), {
+        _key: normCode(cod_entidad),
+        cod_entidad,
+        nombre,
+        ruc,
+        region,
+        direccion,
+        localidad,
+        correo_principal: correo,
+        sucursal,
+        _isNew: !matchedId,
+        _matchedId: matchedId,
+      });
+    }
+
+    for (const r of bdRows) {
+      const cod_entidad = norm(pick(r, ["NRO ENTIDAD", "Nro Entidad", "NRO_ENTIDAD"])) || null;
+      if (!cod_entidad) continue;
+
+      const nombre = norm(pick(r, ["CLIENTE", "Cliente", "Nombre Entidad", "Entidad"])) || null;
+      const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC"])) || null;
+      const region = norm(pick(r, ["REGIONES", "REGION", "Region", "Región"])) || null;
+      const direccion = norm(pick(r, ["DIRECCION", "Dirección", "Direccion"])) || null;
+      const localidad = norm(pick(r, ["LOCALIDAD", "Localidad"])) || null;
+      const correo = norm(pick(r, ["CORREO", "Correo", "EMAIL", "Email"])) || null;
+      const sucursal =
+        matchSucursalFromRegion(region) ?? matchSucursal(region) ?? matchSucursal(localidad);
+
+      const key = normCode(cod_entidad);
+      const prev = acc.get(key);
+
+      if (!prev) {
+        const matchedId =
+          porCodigo.get(key) ??
+          (ruc ? porRuc.get(normRuc(ruc)) : null) ??
+          (nombre ? porNombre.get(normText(nombre)) : null) ??
+          null;
+
+        acc.set(key, {
+          _key: key,
+          cod_entidad,
+          nombre: nombre ?? "",
+          ruc,
+          region,
+          direccion,
+          localidad,
+          correo_principal: correo,
+          sucursal,
+          _isNew: !matchedId,
+          _matchedId: matchedId,
+        });
+      } else {
+        if (nombre) prev.nombre = nombre;
+        if (ruc) prev.ruc = ruc;
+        if (region) prev.region = region;
+        if (direccion) prev.direccion = direccion;
+        if (localidad) prev.localidad = localidad;
+        if (correo) prev.correo_principal = correo;
+        if (sucursal) prev.sucursal = sucursal;
+      }
+    }
+
+    const rows: ClienteRow[] = [...acc.values()]
+      .map(({ _key, ...r }) => r)
+      .filter((r) => !!r.cod_entidad && !!r.nombre);
+
+    if (rows.length === 0) return toast.error("Excel sin filas válidas");
+
+    setCliRows(rows);
+    setCliFile(file.name);
+  } catch (e) {
+    toast.error("Error leyendo archivo: " + (e as Error).message);
+  }
+};
+  const confirmarClientes = async () => {
+  if (!cliRows || !user) return;
+
+  const nuevos = cliRows.filter((r) => r._isNew);
+  if (nuevos.length === 0) return toast.info("No hay clientes nuevos");
+
+  setBusy(true);
+  try {
+    const insertCli = nuevos.map((r) => ({
+      cod_entidad: r.cod_entidad,
+      nombre: r.nombre,
+      ruc: r.ruc,
+      region: r.region,
+      direccion: r.direccion,
+      localidad: r.localidad,
+      correo_principal: r.correo_principal,
+      sucursal: r.sucursal,
+    }));
+
+    for (let i = 0; i < insertCli.length; i += 500) {
+      const chunk = insertCli.slice(i, i + 500);
+      const { error } = await supabase.from("clientes").insert(chunk as any);
+      if (error) throw error;
+    }
+
+    await supabase.from("importaciones").insert({
+      usuario_id: user.id,
+      tipo: "parque",
+      total_filas: cliRows.length,
+      insertados: nuevos.length,
+      duplicados: cliRows.length - nuevos.length,
+      archivo_nombre: `clientes:${cliFile}`,
+    });
+
+    toast.success(`Importados ${nuevos.length} clientes`);
+    setCliRows(null);
+    setCliFile("");
+    await cargarHistorial();
+    onChanged();
+  } catch (e) {
+    toast.error("Error: " + (e as Error).message);
+  } finally {
+    setBusy(false);
+  }
+};
+  // ===== Procesar Contactos (recorre TODAS las hojas) =====
+ const procesarContactos = async (file: File) => {
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+
+    const sheetBd = wb.SheetNames.find((x) => x.trim().toLowerCase() === "bd clientes");
+    if (!sheetBd) {
+      return toast.error("No se encontró la hoja BD CLIENTES");
+    }
+
+    const { data: clientesRaw, error: cliErr } = await supabase.from("clientes").select("*");
+    if (cliErr) throw cliErr;
+
+    const porCodigo = new Map<string, string>();
+    const porNombre = new Map<string, string>();
+    const porRuc = new Map<string, string>();
+
+    for (const c of (clientesRaw ?? []) as any[]) {
+      if (c.cod_entidad) porCodigo.set(normCode(c.cod_entidad), c.id);
+      if (c.nombre) porNombre.set(normText(c.nombre), c.id);
+      if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
+    }
+
+    const { data: contactosEx } = await supabase
+      .from("contactos_cliente")
+      .select("cliente_id, nombre, telefono, correo");
+
+    const dupKeys = new Set<string>();
+    for (const c of contactosEx ?? []) {
+      dupKeys.add(
+        [
+          c.cliente_id,
+          normText(c.nombre),
+          normPhone(c.telefono),
+          normText(c.correo),
+        ].join("|"),
+      );
+    }
+
+    const ws = wb.Sheets[sheetBd];
+    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+    if (json.length === 0) return toast.error("La hoja BD CLIENTES está vacía");
+
+    const rows: ContactoRow[] = [];
+    const vistosExcel = new Set<string>();
+
+    for (const r of json) {
+      const nombre = norm(pick(r, ["CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto"]));
+      if (!nombre) continue;
+
+      const cliente_cod_entidad = norm(pick(r, ["NRO ENTIDAD", "Nro Entidad", "NRO_ENTIDAD"])) || null;
+      const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
+      const cliente_nombre = norm(
+        pick(r, ["CLIENTE", "Cliente", "Razón Social", "Razon Social", "Entidad", "Nombre Entidad"]),
+      ) || null;
+      const cargo = norm(pick(r, ["CARGO", "Cargo", "Puesto"])) || null;
+      const telefono = norm(
+        pick(r, ["TELEFONO", "Teléfono", "Telefono", "CELULAR", "Celular", "Móvil", "Movil"]),
+      ) || null;
+      const correo = norm(pick(r, ["CORREO", "Correo", "Email", "E-mail", "EMAIL"])) || null;
+
+      const wa = lower(pick(r, ["WHATSAPP", "WhatsApp", "Whatsapp", "Es Whatsapp"]));
+      const es_whatsapp = wa === "si" || wa === "sí" || wa === "true" || wa === "1" || wa === "x";
+
+      const pr = lower(pick(r, ["PRINCIPAL", "Principal", "Es Principal"]));
+      const es_principal = pr === "si" || pr === "sí" || pr === "true" || pr === "1" || pr === "x";
+
+      const notas = norm(pick(r, ["NOTAS", "Notas", "Observaciones", "OBSERVACIONES"])) || null;
+
+      const clienteId =
+        (cliente_cod_entidad && porCodigo.get(normCode(cliente_cod_entidad))) ??
+        (ruc && porRuc.get(normRuc(ruc))) ??
+        (cliente_nombre && porNombre.get(normText(cliente_nombre))) ??
+        null;
+
+      const excelKey = [
+        clienteId ?? normCode(cliente_cod_entidad) ?? normText(cliente_nombre),
+        normText(nombre),
+        normPhone(telefono),
+        normText(correo),
+      ].join("|");
+
+      if (vistosExcel.has(excelKey)) continue;
+      vistosExcel.add(excelKey);
+
+      let status: ContactoRow["_status"] = "ok";
+      const dbKey = [
+        clienteId,
+        normText(nombre),
+        normPhone(telefono),
+        normText(correo),
+      ].join("|");
+
+      if (!clienteId) status = "sin-cliente";
+      else if (dupKeys.has(dbKey)) status = "duplicado";
+
+      rows.push({
+        cliente_cod_entidad,
+        cliente_ruc: ruc,
+        cliente_nombre,
+        nombre,
+        cargo,
+        telefono,
+        correo,
+        es_whatsapp,
+        es_principal,
+        notas,
+        _isNew: status === "ok",
+        _clienteId: clienteId,
+        _status: status,
+      });
+    }
+
+    if (rows.length === 0) return toast.error("No se encontraron contactos válidos");
+    setConRows(rows);
+    setConFile(file.name);
+  } catch (e) {
+    toast.error("Error leyendo archivo: " + (e as Error).message);
+  }
+};
   const confirmarContactos = async () => {
     if (!conRows || !user) return;
     const nuevos = conRows.filter((r) => r._isNew && r._clienteId);
@@ -767,25 +862,25 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <DropZone
-          title="Importar parque de máquinas"
-          help="Columnas: AÑO, SUCURSAL, SUBGRUPO, MODELO_TIPO, SERIE, CLIENTE, MARCA, VENDEDOR, LOCALIDAD"
-          onFile={procesarParque}
-        />
-        <DropZone
-          title="Importar facturación"
-          help="FACTURACIÓN_HISTORICA.xlsx — lee ambas hojas (Fact. Repuestos + Fact. Servicios). Filtra Tp. Movimento = S, mapea CENTRAL→Santa Rita."
-          onFile={procesarFact}
-        />
-        <DropZone
-          title="Importar clientes"
-          help="MATRIZ_CLIENTES.xlsx — fusiona ambas hojas (Cadastro + BD CLIENTES). Match por RUC con fallback a nombre. BD CLIENTES tiene prioridad."
-          onFile={procesarClientes}
-        />
-        <DropZone
-          title="Importar contactos"
-          help="MATRIZ_CLIENTES.xlsx (hoja BD CLIENTES) — extrae fila por fila CONTACTO + TELEFONO + CORREO. Vincula al cliente por RUC."
-          onFile={procesarContactos}
-        />
+  title="Importar parque de máquinas"
+  help="COBERTURA PARQUE DE MAQUINAS.xlsx — usa solo la hoja BD_CLAAS_HORSCH y exige coincidencia exacta del CLIENTE con la matriz ya importada."
+  onFile={procesarParque}
+/>
+<DropZone
+  title="Importar facturación"
+  help="FACTURACIÓN HISTORICA.xlsx — usa Fact. Repuestos + Fact. Servicios, filtra Tp. Movimento = S, en servicios solo GRUPO FX = KILOMETRAJE o MANO DE OBRA, y toma Valor Medio."
+  onFile={procesarFact}
+/>
+<DropZone
+  title="Importar clientes"
+  help="MATRIZ CLIENTES.xlsx — une Cadastro de Entidad v2 + BD CLIENTES por código de entidad. BD CLIENTES complementa y sobreescribe datos."
+  onFile={procesarClientes}
+/>
+<DropZone
+  title="Importar contactos"
+  help="MATRIZ CLIENTES.xlsx — toma contactos solo desde BD CLIENTES y los vincula por NRO ENTIDAD."
+  onFile={procesarContactos}
+/>  
       </div>
 
       {parqueRows && (
@@ -814,7 +909,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         <Preview
           title={`Clientes — ${cliFile}`}
           rows={cliRows}
-          columns={["nombre", "ruc", "region", "localidad", "direccion", "correo_principal", "sucursal"]}
+          columns={["cod_entidad", "nombre", "ruc", "region", "localidad", "direccion", "correo_principal", "sucursal"]}
           onConfirm={confirmarClientes}
           onCancel={() => setCliRows(null)}
           busy={busy}
