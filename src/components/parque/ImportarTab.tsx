@@ -744,8 +744,25 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     const vistosExcel = new Set<string>();
 
     for (const r of json) {
-      const nombre = norm(pick(r, ["CONTACTO", "Contacto", "NOMBRE CONTACTO", "Nombre Contacto"]));
-      if (!nombre) continue;
+      const nombre =
+  norm(
+    pick(r, [
+      "CONTACTO",
+      "Contacto",
+      "NOMBRE CONTACTO",
+      "Nombre Contacto",
+    ]),
+  ) ||
+  norm(
+    pick(r, [
+      "CLIENTE",
+      "Cliente",
+      "Nombre Entidad",
+      "Entidad",
+    ]),
+  );
+
+if (!nombre) continue;
 
       const cliente_cod_entidad = norm(pick(r, ["NRO ENTIDAD", "Nro Entidad", "NRO_ENTIDAD"])) || null;
       const ruc = norm(pick(r, ["RUC", "Ruc", "ruc", "CI/RUC", "RUC CLIENTE"])) || null;
