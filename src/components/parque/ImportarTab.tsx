@@ -41,6 +41,7 @@ interface FactRow {
   cod_entidad: string | null;
   total_venta: number;
   grupo: string | null;
+  grupo_fx: string | null;
   cod_factura: string;
   tipo: "Repuesto" | "Servicio";
   _isNew: boolean;
@@ -123,6 +124,7 @@ const factKey = (row: {
   entidad_nombre: string;
   sucursal: Sucursal | null;
   grupo: string | null;
+  grupo_fx: string | null;
 }) =>
   [
     normCode(row.cod_factura),
@@ -132,6 +134,7 @@ const factKey = (row: {
     normText(row.entidad_nombre),
     normText(row.sucursal),
     normText(row.grupo),
+    normText(row.grupo_fx),
   ].join("|");
 
 const REGION_TO_SUCURSAL: Record<string, Sucursal> = {
@@ -241,7 +244,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
     return all;
   };
-
 
   const procesarParque = async (file: File) => {
     try {
@@ -382,7 +384,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       while (true) {
         const { data, error } = await supabase
           .from("facturacion")
-          .select("cod_factura, tipo, fecha, cod_entidad, entidad_nombre, sucursal, grupo")
+          .select("cod_factura, tipo, fecha, cod_entidad, entidad_nombre, sucursal, grupo, grupo_fx")
           .range(from, from + PAGE - 1);
 
         if (error) throw error;
@@ -398,6 +400,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
               entidad_nombre: e.entidad_nombre,
               sucursal: e.sucursal,
               grupo: e.grupo,
+              grupo_fx: (e as any).grupo_fx ?? null,
             }),
           );
         }
@@ -428,9 +431,13 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
           if (tpMov && tpMov !== "S") continue;
 
-          const grupoFx = normText(pick(r, ["GRUPO FX", "Grupo FX", "grupo fx"]));
-          if (tipo === "Servicio" && grupoFx !== "kilometraje" && grupoFx !== "mano de obra") {
-            continue;
+          const grupoFx = norm(
+            pick(r, ["GRUPO FX", "Grupo FX", "grupo fx", "Grupo_FX", "grupo_fx"]),
+          ) || null;
+
+          if (tipo === "Servicio") {
+            const g = normText(grupoFx);
+            if (!(g.includes("mano de obra") || g.includes("kilometraje"))) continue;
           }
 
           const codEntidad =
@@ -442,7 +449,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           const sucursal = matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
 
           const grupo = norm(pick(r, ["Grupo", "grupo"])) || null;
-          const valorMedio = parseMoney(pick(r, ["Valor Medio", "valor medio", "Valor medio"]));
+          const totalVenta = parseMoney(pick(r, ["Total Venta", "total venta", "Total venta"]));
 
           const key = factKey({
             cod_factura: codFactura,
@@ -452,19 +459,21 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
             entidad_nombre: entidadNombre,
             sucursal,
             grupo,
+            grupo_fx: grupoFx,
           });
 
           const prev = agg.get(key);
           if (prev) {
-            prev.total_venta += valorMedio;
+            prev.total_venta += totalVenta;
           } else {
             agg.set(key, {
               fecha,
               sucursal,
               entidad_nombre: entidadNombre,
               cod_entidad: codEntidad,
-              total_venta: valorMedio,
+              total_venta: totalVenta,
               grupo,
+              grupo_fx: grupoFx,
               cod_factura: codFactura,
               tipo,
               _isNew: !existentesKey.has(key),
@@ -513,12 +522,13 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         cod_entidad: r.cod_entidad,
         total_venta: r.total_venta,
         grupo: r.grupo,
+        grupo_fx: r.grupo_fx,
         cod_factura: r.cod_factura,
       }));
 
       for (let i = 0; i < insertF.length; i += 500) {
         const chunk = insertF.slice(i, i + 500);
-        const { error } = await supabase.from("facturacion").insert(chunk);
+        const { error } = await supabase.from("facturacion").insert(chunk as any);
         if (error) throw error;
       }
 
@@ -737,9 +747,10 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.ruc) porRuc.set(normRuc(c.ruc), c.id);
       }
 
-      const { data: contactosEx } = await supabase
+      const { data: contactosEx, error: contErr } = await supabase
         .from("contactos_cliente")
         .select("cliente_id, nombre, telefono, correo");
+      if (contErr) throw contErr;
 
       const dupKeys = new Set<string>();
       for (const c of contactosEx ?? []) {
@@ -821,7 +832,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       setConRows(rows);
       setConFile(file.name);
     } catch (e) {
-      toast.error("Error: " + (e as Error).message);
+      toast.error("Error leyendo archivo: " + (e as Error).message);
     }
   };
 
@@ -880,7 +891,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         />
         <DropZone
           title="Importar facturación"
-          help="FACTURACIÓN HISTORICA.xlsx — usa Fact. Repuestos + Fact. Servicios, filtra Tp. Movimento = S, en servicios solo GRUPO FX = KILOMETRAJE o MANO DE OBRA, y toma Valor Medio."
+          help="FACTURACIÓN HISTORICA.xlsx — usa Fact. Repuestos + Fact. Servicios, filtra Tp. Movimento = S, usa Total Venta y guarda GRUPO FX. En servicios solo MANO DE OBRA o KILOMETRAJE."
           onFile={procesarFact}
         />
         <DropZone
@@ -910,7 +921,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         <Preview
           title={`Facturación — ${factFile}`}
           rows={factRows}
-          columns={["fecha", "sucursal", "entidad_nombre", "cod_factura", "tipo", "total_venta"]}
+          columns={["fecha", "sucursal", "entidad_nombre", "cod_factura", "tipo", "grupo_fx", "total_venta"]}
           onConfirm={confirmarFact}
           onCancel={() => setFactRows(null)}
           busy={busy}
