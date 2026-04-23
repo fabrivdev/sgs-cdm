@@ -35,14 +35,18 @@ export default function ParqueClientes() {
     const hace60d = new Date(hoy);
     hace60d.setDate(hoy.getDate() - 60);
 
-    const [maquinasRes, clientesRes, facturacionRes, seguimientosRes] = await Promise.all([
+    const [maquinasRes, facturacionRes, facturacion60Res, seguimientosRes] = await Promise.all([
       supabase.from("parque_maquinas").select("id, cliente_id", { count: "exact" }).eq("activo", true),
-      supabase.from("clientes").select("id").eq("activo", true),
       supabase
         .from("facturacion")
         .select("cliente_id, fecha, tipo")
         .eq("tipo", "Servicio")
         .gte("fecha", haceUnAnio.toISOString().slice(0, 10)),
+      supabase
+        .from("facturacion")
+        .select("cliente_id")
+        .eq("tipo", "Servicio")
+        .gte("fecha", hace60d.toISOString().slice(0, 10)),
       supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
     ]);
 
@@ -62,6 +66,11 @@ export default function ParqueClientes() {
     const pctConServicioUltimoAnio =
       totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0;
 
+    // Clientes con servicio en últimos 60 días
+    const clientesConServicio60d = new Set(
+      (facturacion60Res.data ?? []).map((f) => f.cliente_id).filter(Boolean) as string[],
+    );
+
     const ultimoSegPorCliente = new Map<string, Date>();
     for (const s of seguimientosRes.data ?? []) {
       const f = new Date(s.fecha);
@@ -74,7 +83,10 @@ export default function ParqueClientes() {
     for (const cid of clientesConMaquinas) {
       const ult = ultimoSegPorCliente.get(cid);
       if (ult && ult >= inicioMes) contactadosEsteMes++;
-      if (!ult || ult < hace60d) sinContacto60d++;
+      // Sin contacto +60d: no consume servicio hace 60d Y no fue contactado hace 60d
+      const sinServicio60d = !clientesConServicio60d.has(cid);
+      const sinSeguimiento60d = !ult || ult < hace60d;
+      if (sinServicio60d && sinSeguimiento60d) sinContacto60d++;
     }
 
     const pctContactadosEsteMes =

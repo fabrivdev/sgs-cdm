@@ -701,14 +701,15 @@ export function ParqueTab({
                       )}
                     </TableCell>
 
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {r.contactoPrincipal?.telefono ? (
                         <a
                           href={`tel:${r.contactoPrincipal.telefono}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-sm hover:text-primary"
+                          className="inline-flex items-center gap-1 whitespace-nowrap text-sm hover:text-primary"
                         >
-                          <Phone className="h-3 w-3" /> {r.contactoPrincipal.telefono}
+                          <Phone className="h-3 w-3 shrink-0" />
+                          <span className="whitespace-nowrap">{r.contactoPrincipal.telefono}</span>
                         </a>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>

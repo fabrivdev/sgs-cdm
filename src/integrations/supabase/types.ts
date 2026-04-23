@@ -17,6 +17,7 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean
+          cod_entidad: string | null
           correo_principal: string | null
           creado_en: string
           direccion: string | null
@@ -29,6 +30,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          cod_entidad?: string | null
           correo_principal?: string | null
           creado_en?: string
           direccion?: string | null
@@ -41,6 +43,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          cod_entidad?: string | null
           correo_principal?: string | null
           creado_en?: string
           direccion?: string | null
@@ -104,6 +107,13 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contactos_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
         ]
       }
       facturacion: {
@@ -114,6 +124,7 @@ export type Database = {
           entidad_nombre: string
           fecha: string
           grupo: string | null
+          grupo_fx: string | null
           id: string
           importado_en: string
           sucursal: Database["public"]["Enums"]["sucursal"] | null
@@ -127,6 +138,7 @@ export type Database = {
           entidad_nombre: string
           fecha: string
           grupo?: string | null
+          grupo_fx?: string | null
           id?: string
           importado_en?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
@@ -140,6 +152,7 @@ export type Database = {
           entidad_nombre?: string
           fecha?: string
           grupo?: string | null
+          grupo_fx?: string | null
           id?: string
           importado_en?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
@@ -152,6 +165,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
             referencedColumns: ["id"]
           },
         ]
@@ -257,6 +277,13 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -320,6 +347,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seguimiento_comercial_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
             referencedColumns: ["id"]
           },
           {
@@ -401,6 +435,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "servicios_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "servicios_tecnico_responsable_id_fkey"
             columns: ["tecnico_responsable_id"]
             isOneToOne: false
@@ -432,7 +473,18 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_clientes_resumen: {
+        Row: {
+          antiguedad: number | null
+          fact_total: number | null
+          id: string | null
+          maquinas: number | null
+          nombre: string | null
+          ult_rep: string | null
+          ult_serv: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_user_sucursal: {
