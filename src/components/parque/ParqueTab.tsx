@@ -78,6 +78,7 @@ type Factura = {
   fecha: string;
   tipo: "Repuesto" | "Servicio";
   grupo: string | null;
+  grupo_fx: string | null;
   total_venta: number;
 };
 
@@ -129,14 +130,13 @@ const fmtMoney = (n: number) =>
 
 const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
-const esServicioValido = (grupo: string | null | undefined) => {
-  const g = normText(grupo);
-  return g.includes("mano de obra") || g.includes("kilometraje");
-};
-
 const esFacturaComercialValida = (fc: Factura) => {
-  if (fc.tipo === "Repuesto") return true;
-  if (fc.tipo === "Servicio") return esServicioValido(fc.grupo);
+  const gx = normText(fc.grupo_fx);
+
+  if (gx === "repuestos") return true;
+  if (gx === "mano de obra") return true;
+  if (gx === "kilometraje") return true;
+
   return false;
 };
 
@@ -233,7 +233,7 @@ export function ParqueTab({
       while (true) {
         const { data, error } = await supabase
           .from("facturacion")
-          .select("cliente_id, fecha, tipo, grupo, total_venta")
+          .select("cliente_id, fecha, tipo, grupo, grupo_fx, total_venta")
           .in("cliente_id", clienteIds)
           .range(from, from + PAGE - 1);
 
@@ -244,6 +244,7 @@ export function ParqueTab({
           ...(data as Factura[]).map((x) => ({
             ...x,
             grupo: x.grupo ?? null,
+            grupo_fx: (x as any).grupo_fx ?? null,
             total_venta: Number(x.total_venta) || 0,
           }))
         );
@@ -342,12 +343,13 @@ export function ParqueTab({
       if (!esFacturaComercialValida(fc)) continue;
 
       const ft = new Date(fc.fecha).getTime();
+      const gx = normText(fc.grupo_fx);
 
-      if (fc.tipo === "Repuesto") {
+      if (gx === "repuestos") {
         const cur = ultRepByCliente.get(fc.cliente_id);
         if (!cur || new Date(cur).getTime() < ft) ultRepByCliente.set(fc.cliente_id, fc.fecha);
         if (ft >= desdeT && ft <= hastaT) tieneRepRango.add(fc.cliente_id);
-      } else if (fc.tipo === "Servicio") {
+      } else if (gx === "mano de obra" || gx === "kilometraje") {
         const cur = ultSrvByCliente.get(fc.cliente_id);
         if (!cur || new Date(cur).getTime() < ft) ultSrvByCliente.set(fc.cliente_id, fc.fecha);
         if (ft >= desdeT && ft <= hastaT) tieneSrvRango.add(fc.cliente_id);
@@ -701,15 +703,14 @@ export function ParqueTab({
                       )}
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell>
                       {r.contactoPrincipal?.telefono ? (
                         <a
                           href={`tel:${r.contactoPrincipal.telefono}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 whitespace-nowrap text-sm hover:text-primary"
+                          className="flex items-center gap-1 text-sm hover:text-primary"
                         >
-                          <Phone className="h-3 w-3 shrink-0" />
-                          <span className="whitespace-nowrap">{r.contactoPrincipal.telefono}</span>
+                          <Phone className="h-3 w-3" /> {r.contactoPrincipal.telefono}
                         </a>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
