@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -48,8 +48,18 @@ interface Servicio {
   observaciones: string | null;
   horas_trabajadas: number | null;
 }
-interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
-interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
+
+interface Profile {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+}
 
 interface Props {
   servicio: Servicio | null;
@@ -59,14 +69,63 @@ interface Props {
   onChanged: () => void;
 }
 
-export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, clientes, onChanged }: Props) {
+export function ServicioDetalleDialog({
+  servicio,
+  onOpenChange,
+  profiles,
+  clientes,
+  onChanged,
+}: Props) {
   const { user, isAdmin, isCabecilla } = useAuth();
+
   const [estado, setEstado] = useState<Estado>("Pendiente");
   const [horas, setHoras] = useState<string>("");
   const [obs, setObs] = useState("");
   const [busy, setBusy] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  /*
+    Este componente antes dependía solo del array "clientes" recibido por props.
+    Ese array puede venir filtrado y no incluir clientes que no están en parque.
+    Por eso cargamos TODOS los clientes desde la tabla clientes y usamos eso como fuente principal.
+  */
+  const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
+
+  useEffect(() => {
+    if (!servicio) return;
+
+    const loadClientes = async () => {
+      const PAGE = 1000;
+      let from = 0;
+      const all: Cliente[] = [];
+
+      while (true) {
+        const { data, error } = await supabase
+          .from("clientes")
+          .select("id, nombre, sucursal")
+          .order("nombre", { ascending: true })
+          .range(from, from + PAGE - 1);
+
+        if (error) {
+          console.error(error);
+          toast.error("No se pudo cargar el nombre del cliente");
+          return;
+        }
+
+        if (!data || data.length === 0) break;
+
+        all.push(...((data ?? []) as Cliente[]));
+
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      setClientesAll(all);
+    };
+
+    loadClientes();
+  }, [servicio?.id]);
 
   useEffect(() => {
     if (servicio) {
@@ -76,35 +135,72 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
     }
   }, [servicio]);
 
+  const profById = useMemo(() => {
+    return Object.fromEntries(profiles.map((p) => [p.id, p.nombre]));
+  }, [profiles]);
+
+  const cliById = useMemo(() => {
+    const fuente = clientesAll.length > 0 ? clientesAll : clientes;
+    return Object.fromEntries(fuente.map((c) => [c.id, c.nombre]));
+  }, [clientesAll, clientes]);
+
   if (!servicio) return null;
 
-  const profById = Object.fromEntries(profiles.map((p) => [p.id, p.nombre]));
-  const cliById = Object.fromEntries(clientes.map((c) => [c.id, c.nombre]));
-  const isAssigned = user && (servicio.tecnico_responsable_id === user.id || servicio.auxiliares.includes(user.id));
+  const isAssigned =
+    user &&
+    (servicio.tecnico_responsable_id === user.id || servicio.auxiliares.includes(user.id));
+
   const canEdit = isAdmin || isCabecilla || isAssigned;
   const canManage = isAdmin || isCabecilla;
   const tipo = servicio.tipo_trabajo ?? "Visita de campo";
 
+  const clienteNombre = servicio.cliente_id
+    ? cliById[servicio.cliente_id] ?? "Cliente no encontrado"
+    : "—";
+
   const save = async () => {
-    if (estado === "Completado" && !horas) { toast.error("Cargá las horas trabajadas para completar."); return; }
+    if (estado === "Completado" && !horas) {
+      toast.error("Cargá las horas trabajadas para completar.");
+      return;
+    }
+
     setBusy(true);
-    const { error } = await supabase.from("servicios").update({
-      estado,
-      horas_trabajadas: horas ? Number(horas) : null,
-      observaciones: obs || null,
-    }).eq("id", servicio.id);
+
+    const { error } = await supabase
+      .from("servicios")
+      .update({
+        estado,
+        horas_trabajadas: horas ? Number(horas) : null,
+        observaciones: obs || null,
+      })
+      .eq("id", servicio.id);
+
     setBusy(false);
-    if (error) toast.error(error.message);
-    else { toast.success("Actualizado"); onChanged(); onOpenChange(false); }
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Actualizado");
+      onChanged();
+      onOpenChange(false);
+    }
   };
 
   const handleDelete = async () => {
     setBusy(true);
+
     const { error } = await supabase.from("servicios").delete().eq("id", servicio.id);
+
     setBusy(false);
     setConfirmDelete(false);
-    if (error) toast.error(error.message);
-    else { toast.success("Servicio eliminado"); onChanged(); onOpenChange(false); }
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Servicio eliminado");
+      onChanged();
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -117,10 +213,15 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
                 Detalle del servicio
                 <MarcaBadge marca={servicio.marca} />
                 <Badge variant="outline" className="gap-1 text-[10px]">
-                  {tipo === "Máquina en taller" ? <Wrench className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
+                  {tipo === "Máquina en taller" ? (
+                    <Wrench className="h-3 w-3" />
+                  ) : (
+                    <MapPin className="h-3 w-3" />
+                  )}
                   {tipo}
                 </Badge>
               </DialogTitle>
+
               {canManage && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -144,22 +245,28 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
               )}
             </div>
           </DialogHeader>
+
           <div className="space-y-3 text-sm">
-            <Row k="Fecha" v={`${format(parseISO(servicio.fecha_programada), "dd/MM/yyyy")} (${servicio.dia_semana}, sem ${servicio.semana})`} />
-            <Row k="Sucursal" v={servicio.sucursal} />
             <Row
-  k="Cliente"
-  v={
-    servicio.cliente_id
-      ? cliById[servicio.cliente_id] ?? servicio.cliente_id
-      : "—"
-  }
-/>
-            <Row k="Responsable" v={servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] : "—"} />
-            <Row k="Auxiliares" v={servicio.auxiliares.map((a) => profById[a]).filter(Boolean).join(", ") || "—"} />
+              k="Fecha"
+              v={`${format(parseISO(servicio.fecha_programada), "dd/MM/yyyy")} (${servicio.dia_semana}, sem ${servicio.semana})`}
+            />
+            <Row k="Sucursal" v={servicio.sucursal} />
+            <Row k="Cliente" v={clienteNombre} />
+            <Row
+              k="Responsable"
+              v={servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] ?? "—" : "—"}
+            />
+            <Row
+              k="Auxiliares"
+              v={servicio.auxiliares.map((a) => profById[a]).filter(Boolean).join(", ") || "—"}
+            />
+
             <div>
               <div className="text-xs text-muted-foreground">Trabajo o problema a resolver</div>
-              <div className="rounded-md bg-muted/40 p-2 text-sm">{servicio.trabajo_descripcion}</div>
+              <div className="rounded-md bg-muted/40 p-2 text-sm">
+                {servicio.trabajo_descripcion}
+              </div>
             </div>
 
             {canEdit ? (
@@ -167,14 +274,33 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
                 <div className="space-y-1.5">
                   <Label>Estado</Label>
                   <Select value={estado} onValueChange={(v) => setEstado(v as Estado)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTADOS.map((e) => (
+                        <SelectItem key={e} value={e}>
+                          {e}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-1.5">
-                  <Label>Horas trabajadas {estado === "Completado" && <span className="text-destructive">*</span>}</Label>
-                  <Input type="number" step="0.5" min="0" value={horas} onChange={(e) => setHoras(e.target.value)} />
+                  <Label>
+                    Horas trabajadas{" "}
+                    {estado === "Completado" && <span className="text-destructive">*</span>}
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={horas}
+                    onChange={(e) => setHoras(e.target.value)}
+                  />
                 </div>
+
                 <div className="space-y-1.5">
                   <Label>Observaciones</Label>
                   <Textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} />
@@ -188,10 +314,15 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
               </>
             )}
           </div>
+
           {canEdit && (
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-              <Button onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar"}</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cerrar
+              </Button>
+              <Button onClick={save} disabled={busy}>
+                {busy ? "Guardando…" : "Guardar"}
+              </Button>
             </DialogFooter>
           )}
         </DialogContent>
@@ -206,8 +337,10 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
           }}
           servicio={servicio}
           profiles={profiles}
-          clientes={clientes}
-          onSaved={() => { onChanged(); }}
+          clientes={clientesAll.length > 0 ? clientesAll : clientes}
+          onSaved={() => {
+            onChanged();
+          }}
         />
       )}
 
