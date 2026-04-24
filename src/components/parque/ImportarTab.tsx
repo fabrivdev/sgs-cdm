@@ -584,10 +584,18 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         cod_factura: r.cod_factura,
       }));
 
+      let insertadosReal = 0;
       for (let i = 0; i < insertF.length; i += 500) {
         const chunk = insertF.slice(i, i + 500);
-        const { error } = await supabase.from("facturacion").insert(chunk as any);
+        const { error, count } = await supabase
+          .from("facturacion")
+          .upsert(chunk as any, {
+            onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo",
+            ignoreDuplicates: true,
+            count: "exact",
+          });
         if (error) throw error;
+        insertadosReal += count ?? 0;
       }
 
       await supabase.from("importaciones").insert({
