@@ -18,7 +18,12 @@ import { MARCAS, SUCURSALES, TIPOS_TRABAJO, type Marca, type Sucursal, type Tipo
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
+interface Profile {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+  rol: string | null;
+}
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Servicio {
   id: string;
@@ -87,7 +92,7 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
   }, [servicio, open, isAdmin, profile, defaultDate, cliById]);
 
   const tecnicos = profiles.filter(
-  (p) => p.rol === "tecnico"
+  (p) => p.rol !== "Administrador"
 );
   const labelTecnico = (p: Profile) => p.sucursal ? `${p.nombre} (${p.sucursal})` : p.nombre;
   const auxDisponibles = tecnicos.filter((p) => p.id !== responsableId);
