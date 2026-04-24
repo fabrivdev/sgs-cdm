@@ -602,6 +602,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       toast.success(`Importadas ${nuevos.length} facturas`);
       setFactRows(null);
       setFactFile("");
+      setFactDiag(null);
       await cargarHistorial();
       onChanged();
     } catch (e) {
