@@ -86,7 +86,9 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
     }
   }, [servicio, open, isAdmin, profile, defaultDate, cliById]);
 
-  const tecnicos = profiles;
+  const tecnicos = profiles.filter(
+  (p) => p.rol === "tecnico"
+);
   const labelTecnico = (p: Profile) => p.sucursal ? `${p.nombre} (${p.sucursal})` : p.nombre;
   const auxDisponibles = tecnicos.filter((p) => p.id !== responsableId);
 
