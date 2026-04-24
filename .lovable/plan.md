@@ -1,69 +1,58 @@
+## Diagnóstico
 
-# Gestión de credenciales en Admin + UX móvil + filtros y selectores
+Revisé la base de datos y encontré la causa real:
 
-## 1. Admin: editar email y contraseña de usuarios
+| Tipo | Cantidad | Min fecha | Max fecha |
+|------|----------|-----------|-----------|
+| Repuesto | 53.029 | 2010-02-10 | **2026-03-31** |
+| Servicio | 4.471 | 2010-03-11 | **2025-01-25** |
 
-### Backend — nuevo edge function `admin-update-user`
-Recibe `{ user_id, email?, password? }`, valida que el caller sea admin (mismo patrón que `admin-create-user`) y llama a `admin.auth.admin.updateUserById(user_id, { email, password })`. Devuelve `{ ok: true }` o error.
+Los datos **sí están cargados** (4.471 facturas de Servicio, todas con `grupo_fx = MANO DE OBRA`), pero la última factura de Servicio en la base es de **enero 2025**. Como el filtro por defecto del Parque es "últimos 365 días" (desde abril 2025), **0 clientes** tienen servicio en ese rango → la columna Servicio aparece toda en ✗ y los días desde último servicio salen >365.
 
-### Frontend — fila de usuario expandible
-En `Admin.tsx`, agrego un botón de acción "Credenciales" por fila (ícono llave) que abre un pequeño popover/dialog con:
-- Input **Email** (precargado, opcional cambiarlo)
-- Input **Nueva contraseña** (vacío, opcional)
-- Botón **Guardar** (sólo manda los campos que cambiaron)
+Hay dos problemas reales:
 
-Para mostrar el email actual en la tabla agrego una columna nueva "Email", que viene del edge function `admin-list-users` (ver más abajo) — los emails viven en `auth.users` y no son accesibles vía RLS desde el cliente.
+1. **El Excel `FACTURACIÓN_HISTORICA.xlsx` que importaste no contiene las facturas de Servicio recientes (2025-2026)**. Los repuestos llegan a marzo 2026 pero los servicios se cortan en enero 2025.
+2. **El importador filtra Servicios sólo por `grupo_fx` con "MANO DE OBRA" o "KILOMETRAJE"** (líneas 438-441 de `ImportarTab.tsx`). Si las facturas de servicio del Excel tienen otros valores en GRUPO FX, se descartan silenciosamente sin avisar.
 
-### Backend — nuevo edge function `admin-list-users`
-Devuelve `[{ user_id, email }]` para que la tabla de Admin muestre los emails. Sólo accesible para admin. Se llama una vez al cargar la página y se mergea con `profiles`.
+## Plan
 
-## 2. Optimización vista móvil (Planificador y Admin)
+### 1. Agregar diagnóstico al importador de Facturación
+En `ImportarTab.tsx` (función `procesarFact`), separar contadores por hoja y mostrar resumen previo:
+- Filas leídas por hoja (Repuestos / Servicios)
+- Filas descartadas por filtro `Tp. Movimento ≠ S`
+- Filas de Servicio descartadas por `grupo_fx` no reconocido (con lista de los grupos descartados y conteo)
+- Filas sin fecha o sin entidad
 
-### Planificador móvil
-- El `container` global queda en `px-3` en mobile (hoy `px-4` por default → muy ajustado). Ajusto a `container max-w-[1600px] py-3 px-3 sm:py-4 space-y-3`.
-- Tarjeta resumen más compacta:
-  - Línea 1: `dd/MM` · día abreviado · ícono tipo · Estado (a la derecha como ahora).
-  - Línea 2: **Cliente** en negrita, una sola línea con `truncate`.
-  - Línea 3: **Trabajo** truncado a 2 líneas con `line-clamp-2`.
-  - Línea 4 (meta): técnico responsable + sucursal abreviada — tamaño `text-[10px]`.
-  - Quito el badge de marca redundante en mobile (la marca queda visible al abrir el detalle).
-- Padding interior baja a `p-2.5` para que respiren los bordes.
+Mostrar este resumen como toast + sección colapsable arriba del preview.
 
-### Admin móvil
-La tabla actual de usuarios desborda en mobile. Agrego una vista de **tarjetas** debajo de `md`:
-- Card por usuario con: nombre, email (texto pequeño), badges de rol y sucursal, switch de activo, y los dos botones (Credenciales / Cambiar rol-sucursal).
-- La tabla original queda visible sólo en `md:`.
+### 2. Relajar el filtro de Servicios en la importación
+Actualmente sólo se acepta Servicio si `grupo_fx` contiene "mano de obra" o "kilometraje". Cambios:
+- **Importar TODAS las filas de la hoja Servicios** que pasen el filtro `Tp. Movimento = S` (no filtrar por grupo_fx).
+- Mantener `grupo_fx` y `grupo` en la base (ya existen las columnas).
+- El filtro "sólo mano de obra/kilometraje" sigue rigiendo en `ParqueTab` (`esServicioValido`) para "días desde último servicio" y la columna Servicio.
 
-## 3. Filtros del Planificador en botón colapsable
+Así no se pierden datos en la importación; el filtrado comercial se hace al visualizar.
 
-- Reemplazo la `Card` de filtros visible por un botón **"Filtros"** con `Sheet` (drawer) que abre desde la derecha.
-- Junto al botón muestro chips compactos con los filtros activos (ej: `Semana 17 ✕`, `Sucursal: Campo 9 ✕`) para que el usuario sepa qué está filtrado sin abrir el drawer.
-- **Defaults al cargar**:
-  - `fSemana` = semana ISO actual (calculada con `date-fns/getISOWeek(new Date())`).
-  - `fSucursal` = `profile.sucursal` si existe; si el usuario es admin sin sucursal asignada → `"all"`.
-  - Resto = `"all"`.
-- Botón **"Limpiar filtros"** dentro del drawer para volver a `"all"` en todo.
+### 3. Agregar contador de tipos en la previsualización del importador
+En la tabla preview de Facturación, mostrar arriba:
+- `X facturas Repuesto (Y nuevas)`
+- `Z facturas Servicio (W nuevas)`
 
-## 4. Formulario de servicio: auxiliares como dropdown multi-select
+Para ver de un vistazo si el archivo trae servicios antes de confirmar.
 
-- **Técnico responsable**: ya es dropdown `<Select>` simple, lo dejo igual.
-- **Auxiliares**: reemplazo los chips por un componente desplegable estilo combobox multi-select:
-  - Trigger: botón con texto "Seleccionar auxiliares" o "3 seleccionados", igual aspecto que un `SelectTrigger`.
-  - Contenido: `Popover` con `Command` (cmdk) que lista todos los técnicos con un `Checkbox` + nombre + sucursal entre paréntesis. Click toggle. Búsqueda incluida en el header del popover.
-  - Debajo del trigger, fila de chips pequeños removibles con los seleccionados (✕ para sacar uno rápido).
-- Esto reduce drásticamente el alto del formulario cuando hay muchos técnicos.
+### 4. Mejorar mensaje cuando 0 servicios en rango
+En `ParqueTab`, si el rango activo no contiene ninguna factura de Servicio, mostrar un aviso arriba: *"No hay servicios facturados en el período seleccionado. Última factura de servicio en la base: DD/MM/YYYY"*. Eso explica por qué la columna sale toda en ✗.
 
-## 5. Detalles técnicos
+## Detalles técnicos
 
-**Archivos a crear:**
-- `supabase/functions/admin-list-users/index.ts` (lista emails de auth.users, sólo admin).
-- `supabase/functions/admin-update-user/index.ts` (actualiza email/password de un user, sólo admin).
+- Archivos a modificar:
+  - `src/components/parque/ImportarTab.tsx`: quitar filtro por `grupo_fx` (líneas 438-441), agregar contadores diagnósticos por hoja, exponer resumen.
+  - `src/components/parque/ParqueTab.tsx`: agregar aviso cuando no hay servicios en rango.
+- No se modifica la base de datos ni los esquemas.
+- Después del fix vas a tener que volver a subir `FACTURACIÓN_HISTORICA.xlsx` para recuperar los servicios que estaban siendo descartados (si el archivo los trae).
 
-**Archivos a modificar:**
-- `src/pages/Admin.tsx` — columna Email, botón Credenciales con dialog, vista mobile en cards.
-- `src/pages/Planificador.tsx` — drawer de filtros, defaults a semana actual + sucursal del user, chips de filtros activos, padding mobile, tarjetas más compactas.
-- `src/components/ServicioFormDialog.tsx` — multi-select de auxiliares con `Popover + Command + Checkbox`.
+## Acción recomendada después del fix
 
-**Sin cambios de schema.** Las funciones admin ya tienen el patrón de validación existente.
-
-**Componentes shadcn ya disponibles:** `Sheet`, `Popover`, `Command`, `Checkbox`, `Dialog` — todos están en el proyecto.
+1. Confirmar el plan.
+2. Subir nuevamente `FACTURACIÓN_HISTORICA.xlsx` con el importador corregido.
+3. Revisar el resumen diagnóstico: ahí veremos si el Excel realmente trae servicios 2025-2026 o si el corte está en el archivo fuente.
