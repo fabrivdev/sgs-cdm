@@ -950,7 +950,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         />
         <DropZone
           title="Importar facturación"
-          help="FACTURACIÓN HISTORICA.xlsx — usa Fact. Repuestos + Fact. Servicios, filtra Tp. Movimento = S, usa Total Venta y guarda GRUPO FX. En servicios solo MANO DE OBRA o KILOMETRAJE."
+          help="FACTURACIÓN HISTORICA.xlsx — usa Fact. Repuestos + Fact. Servicios, filtra Tp. Movimento = S y guarda GRUPO FX. Se importan TODAS las líneas; el filtro 'Mano de Obra/Kilometraje' aplica sólo al cálculo del Parque."
           onFile={procesarFact}
         />
         <DropZone
