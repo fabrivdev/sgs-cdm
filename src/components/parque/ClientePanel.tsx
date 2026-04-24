@@ -104,6 +104,7 @@ type Factura = {
   tipo: "Repuesto" | "Servicio";
   total_venta: number;
   grupo: string | null;
+  grupo_fx: string | null;
   cod_factura: string;
 };
 
@@ -363,10 +364,12 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   for (const f of facturas) {
     if (f.tipo !== tipo) continue;
 
-    // 🔴 FILTRO CLAVE SOLO PARA SERVICIOS
+    const grupoFx = (f.grupo_fx ?? "").trim().toUpperCase();
+
     if (
       tipo === "Servicio" &&
-      !["MANO DE OBRA", "KILOMETRAJE"].includes((f.grupo ?? "").toUpperCase())
+      grupoFx !== "MANO DE OBRA" &&
+      grupoFx !== "KILOMETRAJE"
     ) {
       continue;
     }
@@ -379,13 +382,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     lista.push(f);
   }
 
-  const varPct =
-    prev > 0
-      ? Math.round(((ytd - prev) / prev) * 100)
-      : ytd > 0
-      ? 100
-      : null;
-
+  const varPct = prev > 0 ? Math.round(((ytd - prev) / prev) * 100) : ytd > 0 ? 100 : null;
   return { ytd, prev, varPct, lista: lista.slice(0, 10) };
 };
     return { Repuesto: calc("Repuesto"), Servicio: calc("Servicio") };
