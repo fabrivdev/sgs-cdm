@@ -584,22 +584,35 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         cod_factura: r.cod_factura,
       }));
 
+      let insertadosReal = 0;
       for (let i = 0; i < insertF.length; i += 500) {
         const chunk = insertF.slice(i, i + 500);
-        const { error } = await supabase.from("facturacion").insert(chunk as any);
+        const { error, count } = await supabase
+          .from("facturacion")
+          .upsert(chunk as any, {
+            onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo",
+            ignoreDuplicates: true,
+            count: "exact",
+          });
         if (error) throw error;
+        insertadosReal += count ?? 0;
       }
+
+      const dupBd = nuevos.length - insertadosReal;
 
       await supabase.from("importaciones").insert({
         usuario_id: user.id,
         tipo: "facturacion",
         total_filas: factRows.length,
-        insertados: nuevos.length,
-        duplicados: factRows.length - nuevos.length,
+        insertados: insertadosReal,
+        duplicados: factRows.length - insertadosReal,
         archivo_nombre: factFile,
       });
 
-      toast.success(`Importadas ${nuevos.length} facturas`);
+      toast.success(
+        `Importadas ${insertadosReal} facturas` +
+          (dupBd > 0 ? ` (${dupBd} duplicadas ignoradas en BD)` : ""),
+      );
       setFactRows(null);
       setFactFile("");
       setFactDiag(null);

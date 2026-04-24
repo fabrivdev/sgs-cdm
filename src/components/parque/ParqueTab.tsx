@@ -464,7 +464,9 @@ export function ParqueTab({
     const desdeT = desdeDate.getTime();
     const hastaT = hastaDate.getTime();
     for (const fc of facturas) {
-      if (fc.tipo !== "Servicio" || !esServicioValido(fc.grupo)) continue;
+      if (fc.tipo !== "Servicio") continue;
+      const gx = normText(fc.grupo_fx);
+      if (gx !== "mano de obra" && gx !== "kilometraje") continue;
       const t = new Date(fc.fecha).getTime();
       if (!maxServ || t > maxServ.getTime()) maxServ = new Date(fc.fecha);
       if (t >= desdeT && t <= hastaT) hayEnRango = true;
