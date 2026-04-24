@@ -62,6 +62,33 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
   const [busy, setBusy] = useState(false);
   const [obsOpen, setObsOpen] = useState(false);
 
+  // Fallback: si Planificador/Calendario no pasan profiles, este modal los carga solo.
+  const [profilesInternos, setProfilesInternos] = useState<Profile[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (profiles.length > 0) return;
+
+    const cargarProfiles = async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, nombre, sucursal, rol")
+        .order("nombre", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        toast.error("No se pudieron cargar los técnicos");
+        return;
+      }
+
+      setProfilesInternos((data ?? []) as Profile[]);
+    };
+
+    cargarProfiles();
+  }, [open, profiles.length]);
+
+  const profilesDisponibles = profiles.length > 0 ? profiles : profilesInternos;
+
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c.nombre])), [clientes]);
 
   useEffect(() => {
@@ -91,7 +118,10 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
     }
   }, [servicio, open, isAdmin, profile, defaultDate, cliById]);
 
-  const tecnicos = profiles;
+  const tecnicos = profilesDisponibles.filter((p) => {
+    const rol = (p.rol ?? "").trim().toLowerCase();
+    return rol !== "administrador" && rol !== "admin";
+  });
   const labelTecnico = (p: Profile) => p.sucursal ? `${p.nombre} (${p.sucursal})` : p.nombre;
   const auxDisponibles = tecnicos.filter((p) => p.id !== responsableId);
 
@@ -295,7 +325,7 @@ export function ServicioFormDialog({ open, onOpenChange, servicio, profiles, cli
                   {auxiliares.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-1">
                       {auxiliares.map((id) => {
-                        const p = profiles.find((x) => x.id === id);
+                        const p = profilesDisponibles.find((x) => x.id === id);
                         if (!p) return null;
                         return (
                           <Badge key={id} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px] font-normal">
