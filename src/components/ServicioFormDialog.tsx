@@ -192,6 +192,12 @@ export function ServicioFormDialog({
     [clientesDisponibles],
   );
 
+  /*
+    IMPORTANTE:
+    Este efecto inicializa el formulario SOLO cuando se abre o cambia el servicio.
+    No depende de clientesDisponibles / cliById porque esos datos cargan segundos después
+    y antes estaban reseteando lo que el usuario ya estaba escribiendo.
+  */
   useEffect(() => {
     if (!open) return;
 
@@ -202,7 +208,7 @@ export function ServicioFormDialog({
       setMarca(servicio.marca);
       setResponsableId(servicio.tecnico_responsable_id ?? "");
       setAuxiliares(servicio.auxiliares);
-      setClienteText(servicio.cliente_id ? cliById[servicio.cliente_id] ?? "" : "");
+      setClienteText("");
       setTrabajo(servicio.trabajo_descripcion);
       setObservaciones(servicio.observaciones ?? "");
       setObsOpen(!!servicio.observaciones);
@@ -218,7 +224,17 @@ export function ServicioFormDialog({
       setObservaciones("");
       setObsOpen(false);
     }
-  }, [servicio, open, isAdmin, profile, defaultDate, cliById]);
+  }, [servicio?.id, open, isAdmin, profile?.sucursal, defaultDate]);
+
+  /*
+    Solo para edición: cuando ya cargó el listado completo de clientes,
+    completa el nombre del cliente del servicio. Para servicio nuevo NO toca nada.
+  */
+  useEffect(() => {
+    if (!open || !servicio?.cliente_id) return;
+    const nombre = cliById[servicio.cliente_id];
+    if (nombre) setClienteText(nombre);
+  }, [open, servicio?.cliente_id, cliById]);
 
   const labelTecnico = (p: Profile) => (p.sucursal ? `${p.nombre} (${p.sucursal})` : p.nombre);
   const auxDisponibles = tecnicos.filter((p) => p.id !== responsableId);
