@@ -977,14 +977,78 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       )}
 
       {factRows && (
-        <Preview
-          title={`Facturación — ${factFile}`}
-          rows={factRows}
-          columns={["fecha", "sucursal", "entidad_nombre", "cod_factura", "tipo", "grupo_fx", "total_venta"]}
-          onConfirm={confirmarFact}
-          onCancel={() => setFactRows(null)}
-          busy={busy}
-        />
+        <>
+          {factDiag && (
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardContent className="p-3 sm:p-4 space-y-2">
+                <div className="text-sm font-semibold">Resumen de lectura</div>
+                <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                  <div>
+                    <div className="text-muted-foreground">Repuesto (total)</div>
+                    <div className="font-semibold">{factDiag.repuestoTotal.toLocaleString()}</div>
+                    <div className="text-[10px] text-emerald-600">{factDiag.repuestoNuevos.toLocaleString()} nuevos</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Servicio (total)</div>
+                    <div className="font-semibold">{factDiag.servicioTotal.toLocaleString()}</div>
+                    <div className="text-[10px] text-emerald-600">{factDiag.servicioNuevos.toLocaleString()} nuevos</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Sin fecha</div>
+                    <div className="font-semibold">{factDiag.sinFecha.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Sin entidad</div>
+                    <div className="font-semibold">{factDiag.sinEntidad.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Tp. Mov. ≠ S</div>
+                    <div className="font-semibold">{factDiag.descTpMov.toLocaleString()}</div>
+                  </div>
+                  {Object.entries(factDiag.porHoja).map(([h, n]) => (
+                    <div key={h}>
+                      <div className="text-muted-foreground truncate" title={h}>Hoja "{h}"</div>
+                      <div className="font-semibold">{n.toLocaleString()} filas</div>
+                    </div>
+                  ))}
+                </div>
+                {factDiag.grupoFxNoComercial.length > 0 && (
+                  <div className="pt-2 border-t border-blue-500/20">
+                    <div className="text-xs font-semibold mb-1">
+                      Servicios con GRUPO FX no comercial ({factDiag.grupoFxNoComercial.reduce((s, x) => s + x.count, 0).toLocaleString()} filas):
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Se importan igual, pero <strong>no</strong> cuentan como "servicio" en el Parque (sólo Mano de Obra y Kilometraje cuentan).
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {factDiag.grupoFxNoComercial.slice(0, 20).map((g) => (
+                        <Badge key={g.grupo} variant="outline" className="text-[10px]">
+                          {g.grupo} · {g.count}
+                        </Badge>
+                      ))}
+                      {factDiag.grupoFxNoComercial.length > 20 && (
+                        <Badge variant="outline" className="text-[10px]">
+                          +{factDiag.grupoFxNoComercial.length - 20} más
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          <Preview
+            title={`Facturación — ${factFile}`}
+            rows={factRows}
+            columns={["fecha", "sucursal", "entidad_nombre", "cod_factura", "tipo", "grupo_fx", "total_venta"]}
+            onConfirm={confirmarFact}
+            onCancel={() => {
+              setFactRows(null);
+              setFactDiag(null);
+            }}
+            busy={busy}
+          />
+        </>
       )}
 
       {cliRows && (
