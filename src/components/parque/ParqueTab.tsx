@@ -232,10 +232,11 @@ export function ParqueTab({
 
       while (true) {
         const { data, error } = await supabase
-          .from("facturacion")
-          .select("cliente_id, fecha, tipo, grupo, grupo_fx, total_venta")
-          .in("cliente_id", clienteIds)
-          .range(from, from + PAGE - 1);
+  .from("facturacion")
+  .select("id, cliente_id, fecha, tipo, grupo, grupo_fx, total_venta")
+  .in("cliente_id", clienteIds)
+  .order("id", { ascending: true })
+  .range(from, from + PAGE - 1);
 
         if (error) throw error;
         if (!data || data.length === 0) break;
