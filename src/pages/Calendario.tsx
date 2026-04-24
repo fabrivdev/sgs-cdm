@@ -57,8 +57,15 @@ export default function Calendario() {
     fTecnico === "all" || s.tecnico_responsable_id === fTecnico || s.auxiliares.includes(fTecnico)
   ), [servicios, fTecnico]);
 
-  const start = vista === "mes" ? startOfWeek(startOfMonth(cursor), { locale: es }) : startOfWeek(cursor, { locale: es });
-  const end = vista === "mes" ? endOfWeek(endOfMonth(cursor), { locale: es }) : endOfWeek(cursor, { locale: es });
+  const start =
+  vista === "mes"
+    ? startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 })
+    : startOfWeek(cursor, { weekStartsOn: 0 });
+
+const end =
+  vista === "mes"
+    ? endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 })
+    : endOfWeek(cursor, { weekStartsOn: 0 });
   const days = eachDayOfInterval({ start, end });
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
