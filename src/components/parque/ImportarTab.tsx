@@ -206,6 +206,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [historial, setHistorial] = useState<Imp[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [factDiag, setFactDiag] = useState<{
+    porHoja: Record<string, number>;
+    sinFecha: number;
+    sinEntidad: number;
+    descTpMov: number;
+    grupoFxNoComercial: { grupo: string; count: number }[];
+    repuestoTotal: number;
+    servicioTotal: number;
+    repuestoNuevos: number;
+    servicioNuevos: number;
+  } | null>(null);
 
   const cargarHistorial = async () => {
     const [imp, prof] = await Promise.all([
