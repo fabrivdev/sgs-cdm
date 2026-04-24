@@ -81,14 +81,38 @@ export function ServicioFormDialog({
   const [obsOpen, setObsOpen] = useState(false);
 
   /*
-    IMPORTANTE:
-    - La tabla profiles NO tiene columna rol.
-    - Los roles reales están en user_roles: user_id + role.
-    - Por eso este modal carga user_roles y excluye a quienes tengan role = admin.
-    - Si el archivo padre no manda profiles, también carga profiles por su cuenta.
+    Este modal ahora carga por su cuenta:
+    - profiles, si el padre no los pasa.
+    - user_roles, para ocultar admins.
+    - TODOS los clientes de la tabla clientes, no solo los que vienen del parque.
   */
   const [profilesInternos, setProfilesInternos] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [clientesInternos, setClientesInternos] = useState<Cliente[]>([]);
+
+  const cargarTodosLosClientes = async () => {
+    const PAGE = 1000;
+    let from = 0;
+    const all: Cliente[] = [];
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nombre, sucursal")
+        .order("nombre", { ascending: true })
+        .range(from, from + PAGE - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      all.push(...((data ?? []) as Cliente[]));
+
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+
+    return all;
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -107,31 +131,49 @@ export function ServicioFormDialog({
         );
       }
 
-      const resultados = await Promise.all(consultas);
+      try {
+        const [rolesRes, profilesRes] = await Promise.all(consultas);
 
-      const rolesRes = resultados[0];
-      if (rolesRes.error) {
-        console.error(rolesRes.error);
-        toast.error("No se pudieron cargar los roles de usuarios");
-      } else {
-        setRoles((rolesRes.data ?? []) as UserRole[]);
-      }
-
-      if (profiles.length === 0) {
-        const profilesRes = resultados[1];
-        if (profilesRes.error) {
-          console.error(profilesRes.error);
-          toast.error("No se pudieron cargar los técnicos");
+        if (rolesRes.error) {
+          console.error(rolesRes.error);
+          toast.error("No se pudieron cargar los roles de usuarios");
         } else {
-          setProfilesInternos((profilesRes.data ?? []) as Profile[]);
+          setRoles((rolesRes.data ?? []) as UserRole[]);
         }
+
+        if (profiles.length === 0) {
+          if (profilesRes?.error) {
+            console.error(profilesRes.error);
+            toast.error("No se pudieron cargar los técnicos");
+          } else {
+            setProfilesInternos((profilesRes?.data ?? []) as Profile[]);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        toast.error("No se pudieron cargar los técnicos");
+      }
+    };
+
+    const cargarClientes = async () => {
+      try {
+        const all = await cargarTodosLosClientes();
+        setClientesInternos(all);
+      } catch (e) {
+        console.error(e);
+        toast.error("No se pudieron cargar todos los clientes");
       }
     };
 
     cargarDatosAsignacion();
+    cargarClientes();
   }, [open, profiles.length]);
 
   const profilesDisponibles = profiles.length > 0 ? profiles : profilesInternos;
+
+  // Siempre usamos clientesInternos cuando ya cargaron, porque ahí están TODOS los clientes importados.
+  // Si todavía no cargaron, usamos los clientes recibidos por props como fallback temporal.
+  const clientesDisponibles = clientesInternos.length > 0 ? clientesInternos : clientes;
 
   const adminIds = useMemo(() => {
     return new Set(
@@ -146,8 +188,8 @@ export function ServicioFormDialog({
   }, [profilesDisponibles, adminIds]);
 
   const cliById = useMemo(
-    () => Object.fromEntries(clientes.map((c) => [c.id, c.nombre])),
-    [clientes],
+    () => Object.fromEntries(clientesDisponibles.map((c) => [c.id, c.nombre])),
+    [clientesDisponibles],
   );
 
   useEffect(() => {
@@ -197,7 +239,7 @@ export function ServicioFormDialog({
     const nombreCli = clienteText.trim();
 
     if (nombreCli) {
-      const existente = clientes.find((c) => c.nombre.toLowerCase() === nombreCli.toLowerCase());
+      const existente = clientesDisponibles.find((c) => c.nombre.toLowerCase() === nombreCli.toLowerCase());
 
       if (existente) {
         cli = existente.id;
@@ -310,7 +352,7 @@ export function ServicioFormDialog({
                 autoComplete="off"
               />
               <datalist id="clientes-list">
-                {clientes.map((c) => (
+                {clientesDisponibles.map((c) => (
                   <option key={c.id} value={c.nombre} />
                 ))}
               </datalist>
