@@ -147,7 +147,14 @@ export function ServicioDetalleDialog({ servicio, onOpenChange, profiles, client
           <div className="space-y-3 text-sm">
             <Row k="Fecha" v={`${format(parseISO(servicio.fecha_programada), "dd/MM/yyyy")} (${servicio.dia_semana}, sem ${servicio.semana})`} />
             <Row k="Sucursal" v={servicio.sucursal} />
-            <Row k="Cliente" v={servicio.cliente_id ? cliById[servicio.cliente_id] : "—"} />
+            <Row
+  k="Cliente"
+  v={
+    servicio.cliente_id
+      ? cliById[servicio.cliente_id] ?? servicio.cliente_id
+      : "—"
+  }
+/>
             <Row k="Responsable" v={servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] : "—"} />
             <Row k="Auxiliares" v={servicio.auxiliares.map((a) => profById[a]).filter(Boolean).join(", ") || "—"} />
             <div>
