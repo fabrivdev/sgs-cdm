@@ -36,8 +36,17 @@ interface Servicio {
   visto_por: string[];
 }
 
-interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
-interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
+interface Profile {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+}
 
 const SUCURSAL_ABBR: Record<Sucursal, string> = {
   "Santa Rita": "S.Rita",
@@ -47,6 +56,31 @@ const SUCURSAL_ABBR: Record<Sucursal, string> = {
   "Loma Plata": "L.Plata",
   "Katuete": "Katuete",
 };
+
+const PAGE = 1000;
+
+async function cargarTodosLosClientes() {
+  let from = 0;
+  const all: Cliente[] = [];
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("id, nombre, sucursal")
+      .order("nombre", { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    all.push(...((data ?? []) as Cliente[]));
+
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
 
 export default function Planificador() {
   const { user, profile, isAdmin, isCabecilla } = useAuth();
@@ -78,15 +112,23 @@ export default function Planificador() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: srv }, { data: prof }, { data: cli }] = await Promise.all([
-      supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
-      supabase.from("profiles").select("id, nombre, sucursal"),
-      supabase.from("clientes").select("id, nombre, sucursal"),
-    ]);
-    setServicios((srv ?? []) as Servicio[]);
-    setProfiles((prof ?? []) as Profile[]);
-    setClientes((cli ?? []) as Cliente[]);
-    setLoading(false);
+
+    try {
+      const [{ data: srv }, { data: prof }, cli] = await Promise.all([
+        supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
+        supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        cargarTodosLosClientes(),
+      ]);
+
+      setServicios((srv ?? []) as Servicio[]);
+      setProfiles((prof ?? []) as Profile[]);
+      setClientes(cli);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "No se pudieron cargar los datos del planificador");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -118,9 +160,12 @@ export default function Planificador() {
       toast.warning("Cargá las horas trabajadas para completar el servicio.");
       return;
     }
+
     const { error } = await supabase.from("servicios").update({ estado }).eq("id", s.id);
-    if (error) toast.error(error.message);
-    else {
+
+    if (error) {
+      toast.error(error.message);
+    } else {
       toast.success(`Estado: ${estado}`);
       load();
     }
@@ -135,13 +180,14 @@ export default function Planificador() {
       "Técnico Responsable": s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "",
       Auxiliares: s.auxiliares.map((a) => profById[a]?.nombre).filter(Boolean).join(", "),
       Sucursal: s.sucursal,
-      Cliente: s.cliente_id ? cliById[s.cliente_id]?.nombre : "",
+      Cliente: s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "",
       Marca: s.marca,
       Trabajo: s.trabajo_descripcion,
       Estado: s.estado,
       Observaciones: s.observaciones ?? "",
       Horas: s.horas_trabajadas ?? "",
     }));
+
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Servicios");
@@ -150,13 +196,18 @@ export default function Planificador() {
 
   const openDetalle = async (s: Servicio) => {
     setDetalle(s);
+
     if (user && !s.visto_por.includes(user.id)) {
       await supabase.from("servicios").update({ visto_por: [...s.visto_por, user.id] }).eq("id", s.id);
     }
   };
 
   const limpiarFiltros = () => {
-    setFSemana("all"); setFSucursal("all"); setFTecnico("all"); setFMarca("all"); setFEstado("all");
+    setFSemana("all");
+    setFSucursal("all");
+    setFTecnico("all");
+    setFMarca("all");
+    setFEstado("all");
   };
 
   const activeChips: { label: string; clear: () => void }[] = [];
@@ -173,6 +224,7 @@ export default function Planificador() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
           <p className="text-xs text-muted-foreground">{filtered.length} servicios visibles</p>
         </div>
+
         <div className="flex flex-wrap gap-2">
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
@@ -183,31 +235,63 @@ export default function Planificador() {
                 )}
               </Button>
             </SheetTrigger>
+
             <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
               <SheetHeader>
                 <SheetTitle>Filtros</SheetTitle>
               </SheetHeader>
+
               <div className="mt-6 space-y-4">
-                <FilterField label="Semana" value={fSemana} onChange={setFSemana} options={[
-                  { v: "all", l: "Todas" },
-                  ...semanasDisponibles.map((s) => ({ v: String(s), l: `Semana ${s}` })),
-                ]} />
-                <FilterField label="Sucursal" value={fSucursal} onChange={setFSucursal} options={[
-                  { v: "all", l: "Todas" },
-                  ...SUCURSALES.map((s) => ({ v: s, l: s })),
-                ]} />
-                <FilterField label="Técnico" value={fTecnico} onChange={setFTecnico} options={[
-                  { v: "all", l: "Todos" },
-                  ...profiles.map((p) => ({ v: p.id, l: p.nombre })),
-                ]} />
-                <FilterField label="Marca" value={fMarca} onChange={setFMarca} options={[
-                  { v: "all", l: "Todas" },
-                  ...MARCAS.map((m) => ({ v: m, l: m })),
-                ]} />
-                <FilterField label="Estado" value={fEstado} onChange={setFEstado} options={[
-                  { v: "all", l: "Todos" },
-                  ...ESTADOS.map((e) => ({ v: e, l: e })),
-                ]} />
+                <FilterField
+                  label="Semana"
+                  value={fSemana}
+                  onChange={setFSemana}
+                  options={[
+                    { v: "all", l: "Todas" },
+                    ...semanasDisponibles.map((s) => ({ v: String(s), l: `Semana ${s}` })),
+                  ]}
+                />
+
+                <FilterField
+                  label="Sucursal"
+                  value={fSucursal}
+                  onChange={setFSucursal}
+                  options={[
+                    { v: "all", l: "Todas" },
+                    ...SUCURSALES.map((s) => ({ v: s, l: s })),
+                  ]}
+                />
+
+                <FilterField
+                  label="Técnico"
+                  value={fTecnico}
+                  onChange={setFTecnico}
+                  options={[
+                    { v: "all", l: "Todos" },
+                    ...profiles.map((p) => ({ v: p.id, l: p.nombre })),
+                  ]}
+                />
+
+                <FilterField
+                  label="Marca"
+                  value={fMarca}
+                  onChange={setFMarca}
+                  options={[
+                    { v: "all", l: "Todas" },
+                    ...MARCAS.map((m) => ({ v: m, l: m })),
+                  ]}
+                />
+
+                <FilterField
+                  label="Estado"
+                  value={fEstado}
+                  onChange={setFEstado}
+                  options={[
+                    { v: "all", l: "Todos" },
+                    ...ESTADOS.map((e) => ({ v: e, l: e })),
+                  ]}
+                />
+
                 <div className="pt-2 flex gap-2">
                   <Button variant="outline" className="flex-1" onClick={limpiarFiltros}>Limpiar</Button>
                   <Button className="flex-1" onClick={() => setFiltersOpen(false)}>Aplicar</Button>
@@ -215,9 +299,11 @@ export default function Planificador() {
               </div>
             </SheetContent>
           </Sheet>
+
           <Button variant="outline" size="sm" onClick={exportExcel}>
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
           </Button>
+
           {canCreate && (
             <Button size="sm" onClick={() => { setEditing(null); setOpenForm(true); }}>
               <Plus className="mr-2 h-4 w-4" /> Nuevo
@@ -237,6 +323,7 @@ export default function Planificador() {
               </button>
             </Badge>
           ))}
+
           <button onClick={limpiarFiltros} className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2">
             Limpiar todo
           </button>
@@ -259,17 +346,27 @@ export default function Planificador() {
                 <TableHead className="h-9 px-3 py-2 w-[50px] text-right">Hs</TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {loading && (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando…</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando…</TableCell>
+                </TableRow>
               )}
+
               {!loading && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Sin servicios.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Sin servicios.</TableCell>
+                </TableRow>
               )}
+
               {filtered.map((s) => {
                 const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
                 const tipo = s.tipo_trabajo ?? "Visita de campo";
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
+                const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
+                const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
+
                 return (
                   <TableRow
                     key={s.id}
@@ -278,14 +375,17 @@ export default function Planificador() {
                   >
                     <TableCell className="px-3 py-2 align-top">
                       <div className="font-medium tabular-nums leading-tight">{format(parseISO(s.fecha_programada), "dd/MM/yy")}</div>
-                      <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0,3)} · S{s.semana}</div>
+                      <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
-                    <TableCell className="px-3 py-2 align-top font-medium truncate max-w-[180px]" title={s.cliente_id ? cliById[s.cliente_id]?.nombre : ""}>
-                      {s.cliente_id ? cliById[s.cliente_id]?.nombre : "—"}
+
+                    <TableCell className="px-3 py-2 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
+                      {clienteNombre}
                     </TableCell>
+
                     <TableCell className="px-3 py-2 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
                       {s.trabajo_descripcion}
                     </TableCell>
+
                     <TableCell className="px-3 py-2 align-top">
                       <div className="flex flex-col gap-1">
                         <MarcaBadge marca={s.marca} className="self-start text-[10px]" />
@@ -295,10 +395,15 @@ export default function Planificador() {
                         </Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="px-3 py-2 align-top truncate" title={s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : ""}>
-                      {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "—"}
+
+                    <TableCell className="px-3 py-2 align-top truncate" title={responsableNombre}>
+                      {responsableNombre}
                     </TableCell>
-                    <TableCell className="px-3 py-2 align-top text-xs text-muted-foreground">{SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}</TableCell>
+
+                    <TableCell className="px-3 py-2 align-top text-xs text-muted-foreground">
+                      {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
+                    </TableCell>
+
                     <TableCell className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
                       <Popover>
                         <PopoverTrigger asChild>
@@ -306,6 +411,7 @@ export default function Planificador() {
                             <EstadoBadge estado={s.estado} className="cursor-pointer" />
                           </button>
                         </PopoverTrigger>
+
                         <PopoverContent className="w-40 p-1" align="start">
                           {ESTADOS.map((e) => (
                             <button
@@ -313,7 +419,7 @@ export default function Planificador() {
                               onClick={() => onChangeEstado(s, e)}
                               className={cn(
                                 "block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent",
-                                s.estado === e && "bg-accent font-semibold"
+                                s.estado === e && "bg-accent font-semibold",
                               )}
                             >
                               {e}
@@ -322,7 +428,10 @@ export default function Planificador() {
                         </PopoverContent>
                       </Popover>
                     </TableCell>
-                    <TableCell className="px-3 py-2 align-top text-right tabular-nums">{s.horas_trabajadas ?? "—"}</TableCell>
+
+                    <TableCell className="px-3 py-2 align-top text-right tabular-nums">
+                      {s.horas_trabajadas ?? "—"}
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -335,10 +444,14 @@ export default function Planificador() {
       <div className="md:hidden space-y-2">
         {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
         {!loading && filtered.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin servicios.</p>}
+
         {filtered.map((s) => {
           const tipo = s.tipo_trabajo ?? "Visita de campo";
           const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
           const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
+          const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
+          const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
+
           return (
             <Card
               key={s.id}
@@ -350,17 +463,20 @@ export default function Planificador() {
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span className="font-semibold tabular-nums text-foreground">{format(parseISO(s.fecha_programada), "dd/MM")}</span>
                     <span>·</span>
-                    <span>{s.dia_semana.slice(0,3)}</span>
+                    <span>{s.dia_semana.slice(0, 3)}</span>
                     <TipoIcon className="h-3 w-3" />
                   </div>
-                  <div className="text-sm font-semibold truncate">{s.cliente_id ? cliById[s.cliente_id]?.nombre : "—"}</div>
+
+                  <div className="text-sm font-semibold truncate">{clienteNombre}</div>
                   <div className="text-xs text-muted-foreground line-clamp-2 leading-snug">{s.trabajo_descripcion}</div>
+
                   <div className="text-[10px] text-muted-foreground pt-0.5">
-                    {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "Sin asignar"}
+                    {responsableNombre}
                     <span className="mx-1">·</span>
                     {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                   </div>
                 </div>
+
                 <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
               </div>
             </Card>
@@ -376,6 +492,7 @@ export default function Planificador() {
         clientes={clientes}
         onSaved={load}
       />
+
       <ServicioDetalleDialog
         servicio={detalle}
         onOpenChange={(o) => !o && setDetalle(null)}
@@ -388,14 +505,30 @@ export default function Planificador() {
 }
 
 function FilterField({
-  label, value, onChange, options,
-}: { label: string; value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { v: string; l: string }[];
+}) {
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>{options.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}</SelectContent>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((o) => (
+            <SelectItem key={o.v} value={o.v}>
+              {o.l}
+            </SelectItem>
+          ))}
+        </SelectContent>
       </Select>
     </div>
   );
