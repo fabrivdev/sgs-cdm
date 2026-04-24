@@ -357,18 +357,37 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     const inicioPrev = new Date(hoy.getFullYear() - 1, 0, 1);
     const finPrev = new Date(hoy.getFullYear(), 0, 1);
     const calc = (tipo: "Repuesto" | "Servicio") => {
-      let ytd = 0, prev = 0;
-      const lista: Factura[] = [];
-      for (const f of facturas) {
-        if (f.tipo !== tipo) continue;
-        const d = new Date(f.fecha);
-        if (d >= inicioAnio) ytd += f.total_venta;
-        else if (d >= inicioPrev && d < finPrev) prev += f.total_venta;
-        lista.push(f);
-      }
-      const varPct = prev > 0 ? Math.round(((ytd - prev) / prev) * 100) : ytd > 0 ? 100 : null;
-      return { ytd, prev, varPct, lista: lista.slice(0, 10) };
-    };
+  let ytd = 0, prev = 0;
+  const lista: Factura[] = [];
+
+  for (const f of facturas) {
+    if (f.tipo !== tipo) continue;
+
+    // 🔴 FILTRO CLAVE SOLO PARA SERVICIOS
+    if (
+      tipo === "Servicio" &&
+      !["MANO DE OBRA", "KILOMETRAJE"].includes((f.grupo ?? "").toUpperCase())
+    ) {
+      continue;
+    }
+
+    const d = new Date(f.fecha);
+
+    if (d >= inicioAnio) ytd += f.total_venta;
+    else if (d >= inicioPrev && d < finPrev) prev += f.total_venta;
+
+    lista.push(f);
+  }
+
+  const varPct =
+    prev > 0
+      ? Math.round(((ytd - prev) / prev) * 100)
+      : ytd > 0
+      ? 100
+      : null;
+
+  return { ytd, prev, varPct, lista: lista.slice(0, 10) };
+};
     return { Repuesto: calc("Repuesto"), Servicio: calc("Servicio") };
   }, [facturas]);
 
