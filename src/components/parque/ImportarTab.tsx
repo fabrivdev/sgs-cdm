@@ -422,9 +422,24 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
       const agg = new Map<string, FactRow>();
 
+      // Diagnóstico
+      const diag = {
+        porHoja: {} as Record<string, number>,
+        sinFecha: 0,
+        sinEntidad: 0,
+        descTpMov: 0,
+        grupoFxNoComercial: [] as { grupo: string; count: number }[],
+        repuestoTotal: 0,
+        servicioTotal: 0,
+        repuestoNuevos: 0,
+        servicioNuevos: 0,
+      };
+      const grupoFxOtros = new Map<string, number>();
+
       for (const sheetName of hojasValidas) {
         const ws = wb.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        diag.porHoja[sheetName] = json.length;
         if (json.length === 0) continue;
 
         const tipo: "Repuesto" | "Servicio" =
@@ -437,24 +452,37 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           if (!codFactura) continue;
 
           const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha", "fecha", "Dt. Emissão"]));
-          if (!fecha) continue;
+          if (!fecha) {
+            diag.sinFecha++;
+            continue;
+          }
 
           const tpMov = norm(pick(r, ["Tp. Movimento", "Tipo Movimiento", "tp_movimento"])).toUpperCase();
-          if (tpMov && tpMov !== "S") continue;
+          if (tpMov && tpMov !== "S") {
+            diag.descTpMov++;
+            continue;
+          }
 
           const grupoFx = norm(
             pick(r, ["GRUPO FX", "Grupo FX", "grupo fx", "Grupo_FX", "grupo_fx"]),
           ) || null;
 
+          // Diagnóstico: registrar grupos no comerciales en Servicios (sin descartar)
           if (tipo === "Servicio") {
             const g = normText(grupoFx);
-            if (!(g.includes("mano de obra") || g.includes("kilometraje"))) continue;
+            if (!(g.includes("mano de obra") || g.includes("kilometraje"))) {
+              const label = grupoFx || "(sin grupo)";
+              grupoFxOtros.set(label, (grupoFxOtros.get(label) ?? 0) + 1);
+            }
           }
 
           const codEntidad =
             normCode(pick(r, ["Cod. Entidad", "Cod Entidad", "cod_entidad", "Cod. Cliente"])) || null;
           const entidadNombre = norm(pick(r, ["Entidad", "entidad", "Cliente", "Razão Social"]));
-          if (!codEntidad && !entidadNombre) continue;
+          if (!codEntidad && !entidadNombre) {
+            diag.sinEntidad++;
+            continue;
+          }
 
           const sucRaw = norm(pick(r, ["Sucursal", "sucursal", "Filial"]));
           const sucursal = matchSucursalFromRegion(sucRaw) ?? matchSucursal(sucRaw);
@@ -496,8 +524,27 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       const rows = Array.from(agg.values());
       if (rows.length === 0) return toast.error("Excel vacío o sin filas válidas");
 
+      // Contadores finales por tipo
+      for (const r of rows) {
+        if (r.tipo === "Repuesto") {
+          diag.repuestoTotal++;
+          if (r._isNew) diag.repuestoNuevos++;
+        } else {
+          diag.servicioTotal++;
+          if (r._isNew) diag.servicioNuevos++;
+        }
+      }
+      diag.grupoFxNoComercial = [...grupoFxOtros.entries()]
+        .map(([grupo, count]) => ({ grupo, count }))
+        .sort((a, b) => b.count - a.count);
+
+      setFactDiag(diag);
       setFactRows(rows);
       setFactFile(file.name);
+
+      toast.success(
+        `Leídas ${diag.repuestoTotal} Repuesto + ${diag.servicioTotal} Servicio`,
+      );
     } catch (e) {
       toast.error("Error leyendo archivo: " + (e as Error).message);
     }
