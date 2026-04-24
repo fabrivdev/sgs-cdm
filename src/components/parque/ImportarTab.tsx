@@ -598,16 +598,21 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         insertadosReal += count ?? 0;
       }
 
+      const dupBd = nuevos.length - insertadosReal;
+
       await supabase.from("importaciones").insert({
         usuario_id: user.id,
         tipo: "facturacion",
         total_filas: factRows.length,
-        insertados: nuevos.length,
-        duplicados: factRows.length - nuevos.length,
+        insertados: insertadosReal,
+        duplicados: factRows.length - insertadosReal,
         archivo_nombre: factFile,
       });
 
-      toast.success(`Importadas ${nuevos.length} facturas`);
+      toast.success(
+        `Importadas ${insertadosReal} facturas` +
+          (dupBd > 0 ? ` (${dupBd} duplicadas ignoradas en BD)` : ""),
+      );
       setFactRows(null);
       setFactFile("");
       setFactDiag(null);
