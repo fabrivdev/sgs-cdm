@@ -666,7 +666,7 @@ export function ParqueTab({
               <TableHead className="cursor-pointer whitespace-nowrap min-w-[200px]" onClick={() => toggleSort("cliente")}>
                 <div className="flex items-center gap-1">Cliente {sortIcon("cliente")}</div>
               </TableHead>
-              <TableHead className="whitespace-nowrap">Teléfono</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[170px]">Teléfono</TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("cantTotal")}>
                 <div className="flex items-center justify-center gap-1">Maq. {sortIcon("cantTotal")}</div>
               </TableHead>
@@ -729,15 +729,16 @@ export function ParqueTab({
                       )}
                     </TableCell>
 
-                    <TableCell>
+                    <TableCell className="min-w-[170px]">
                       {r.contactoPrincipal?.telefono ? (
                         <a
-                          href={`tel:${r.contactoPrincipal.telefono}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 text-sm hover:text-primary"
-                        >
-                          <Phone className="h-3 w-3" /> {r.contactoPrincipal.telefono}
-                        </a>
+  href={`tel:${r.contactoPrincipal.telefono}`}
+  onClick={(e) => e.stopPropagation()}
+  className="flex items-center gap-1 text-sm hover:text-primary whitespace-nowrap"
+>
+  <Phone className="h-3 w-3 shrink-0" />
+  <span className="whitespace-nowrap">{r.contactoPrincipal.telefono}</span>
+</a>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
@@ -760,11 +761,17 @@ export function ParqueTab({
                         <div className="flex items-center gap-1">
                           <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
                             {pctClaas > 0 && (
-                              <div className="bg-emerald-600" style={{ width: `${pctClaas}%` }} title={`CLAAS ${r.cantClaas}`} />
-                            )}
-                            {pctHorsch > 0 && (
-                              <div className="bg-orange-500" style={{ width: `${pctHorsch}%` }} title={`HORSCH ${r.cantHorsch}`} />
-                            )}
+  <div
+    style={{ width: `${pctClaas}%`, backgroundColor: "#9DBB00" }}
+    title={`CLAAS ${r.cantClaas}`}
+  />
+)}
+{pctHorsch > 0 && (
+  <div
+    style={{ width: `${pctHorsch}%`, backgroundColor: "#C8102E" }}
+    title={`HORSCH ${r.cantHorsch}`}
+  />
+)}
                           </div>
                           <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
                             {r.cantClaas}/{r.cantHorsch}
