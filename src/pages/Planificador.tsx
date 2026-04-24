@@ -80,7 +80,7 @@ export default function Planificador() {
     setLoading(true);
     const [{ data: srv }, { data: prof }, { data: cli }] = await Promise.all([
       supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
-      supabase.from("profiles").select("id, nombre, sucursal"),
+      supabase.from("profiles").select("id, nombre, sucursal, rol"),
       supabase.from("clientes").select("id, nombre, sucursal"),
     ]);
     setServicios((srv ?? []) as Servicio[]);
