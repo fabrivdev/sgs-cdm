@@ -590,7 +590,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         const { error, count } = await supabase
           .from("facturacion")
           .upsert(chunk as any, {
-            onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo",
+            onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx",
             ignoreDuplicates: true,
             count: "exact",
           });
