@@ -813,11 +813,11 @@ export function ParqueTab({
                     </TableCell>
 
                     <TableCell className="text-right tabular-nums">
-                      {r.factYTD > 0 ? `₲${fmtMoney(r.factYTD)}` : <span className="text-muted-foreground">—</span>}
+                      {r.factYTD > 0 ? `$${fmtMoney(r.factYTD)}` : <span className="text-muted-foreground">—</span>}
                     </TableCell>
 
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {r.factPrev > 0 ? `₲${fmtMoney(r.factPrev)}` : "—"}
+                      {r.factPrev > 0 ? `$${fmtMoney(r.factPrev)}` : "—"}
                     </TableCell>
 
                     <TableCell
