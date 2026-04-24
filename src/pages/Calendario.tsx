@@ -46,7 +46,7 @@ export default function Calendario() {
   const load = async () => {
     const [{ data: srv }, { data: prof }, { data: cli }] = await Promise.all([
       supabase.from("servicios").select("*"),
-      supabase.from("profiles").select("id, nombre, sucursal, rol"),
+      supabase.from("profiles").select("id, nombre, sucursal"),
       supabase.from("clientes").select("id, nombre, sucursal"),
     ]);
     setServicios((srv ?? []) as Servicio[]);
