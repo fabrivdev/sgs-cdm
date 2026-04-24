@@ -23,7 +23,12 @@ interface Servicio {
   trabajo_descripcion: string; estado: Estado; observaciones: string | null; horas_trabajadas: number | null;
   visto_por: string[];
 }
-interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
+interface Profile {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+  rol: string | null;
+}
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 
 export default function Calendario() {
@@ -41,7 +46,7 @@ export default function Calendario() {
   const load = async () => {
     const [{ data: srv }, { data: prof }, { data: cli }] = await Promise.all([
       supabase.from("servicios").select("*"),
-      supabase.from("profiles").select("id, nombre, sucursal"),
+      supabase.from("profiles").select("id, nombre, sucursal, rol"),
       supabase.from("clientes").select("id, nombre, sucursal"),
     ]);
     setServicios((srv ?? []) as Servicio[]);
