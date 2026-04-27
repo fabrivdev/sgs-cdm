@@ -118,7 +118,7 @@ export function ServicioFormDialog({
     if (!open) return;
 
     const cargarDatosAsignacion = async () => {
-      const consultas = [
+      const consultas: Promise<any>[] = [
         supabase.from("user_roles").select("user_id, role"),
       ];
 
@@ -130,7 +130,9 @@ export function ServicioFormDialog({
             .order("nombre", { ascending: true }),
         );
       }
-      const [rolesRes, profilesRes] = await Promise.all(consultas);
+
+      try {
+        const [rolesRes, profilesRes] = await Promise.all(consultas);
 
       try {
         const [rolesRes, profilesRes] = await Promise.all(consultas);
