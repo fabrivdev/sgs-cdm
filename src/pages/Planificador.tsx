@@ -105,7 +105,7 @@ export default function Planificador() {
   useEffect(() => {
     if (!defaultsApplied && profile) {
       if (profile.sucursal && !isAdmin) setFSucursal(profile.sucursal);
-      else if (profile.sucursal) setFSucursal(profile.sucursal);
+      // Para admins no filtrar por sucursal (dejar "all" para ver todas)
       setDefaultsApplied(true);
     }
   }, [profile, isAdmin, defaultsApplied]);

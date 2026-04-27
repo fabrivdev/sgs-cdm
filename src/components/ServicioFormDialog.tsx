@@ -118,7 +118,7 @@ export function ServicioFormDialog({
     if (!open) return;
 
     const cargarDatosAsignacion = async () => {
-      const consultas: Promise<any>[] = [
+      const consultas: any[] = [
         supabase.from("user_roles").select("user_id, role"),
       ];
 
