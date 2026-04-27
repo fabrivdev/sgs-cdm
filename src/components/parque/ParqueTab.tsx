@@ -357,6 +357,7 @@ export function ParqueTab({
     const maquinasByCliente = new Map<string, Maquina[]>();
     for (const mq of maquinas) {
       if (!mq.cliente_id) continue;
+      if (!incluirPlataformas && mq.subgrupo === "PLATAFORMAS") continue;
       const arr = maquinasByCliente.get(mq.cliente_id) ?? [];
       arr.push(mq);
       maquinasByCliente.set(mq.cliente_id, arr);
