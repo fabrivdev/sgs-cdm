@@ -14,12 +14,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   CalendarIcon,
   Check,
   Download,
+  Filter,
   Flag,
   Phone,
   Search,
@@ -175,6 +183,25 @@ export function ParqueTab({
 
   const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const [filtrosOpen, setFiltrosOpen] = useState(false);
+
+  const filtrosActivos =
+    (fSucursal !== "all" ? 1 : 0) +
+    (fMarca !== "all" ? 1 : 0) +
+    (fSubgrupo !== "all" ? 1 : 0) +
+    (fSeguimiento !== "all" ? 1 : 0) +
+    (rango !== "365d" ? 1 : 0);
+
+  const limpiarFiltros = () => {
+    setFSucursal("all");
+    setFMarca("all");
+    setFSubgrupo("all");
+    setFSeguimiento("all");
+    setRango("365d");
+    setCustomDesde(undefined);
+    setCustomHasta(undefined);
+  };
 
   const cargar = async () => {
     setLoading(true);
@@ -519,9 +546,186 @@ export function ParqueTab({
     return "hover:bg-accent/40";
   };
 
+  const filtrosSelects = (
+    <>
+      <Select value={fSucursal} onValueChange={setFSucursal}>
+        <SelectTrigger className="w-full md:w-[140px]">
+          <SelectValue placeholder="Sucursal" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas las sucursales</SelectItem>
+          {SUCURSALES.map((s) => (
+            <SelectItem key={s} value={s}>
+              {s}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={fMarca} onValueChange={setFMarca}>
+        <SelectTrigger className="w-full md:w-[120px]">
+          <SelectValue placeholder="Marca" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas las marcas</SelectItem>
+          {MARCAS.map((m) => (
+            <SelectItem key={m} value={m}>
+              {m}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
+        <SelectTrigger className="w-full md:w-[150px]">
+          <SelectValue placeholder="Subgrupo" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los subgrupos</SelectItem>
+          {SUBGRUPOS.map((s) => (
+            <SelectItem key={s} value={s}>
+              {s}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
+        <SelectTrigger className="w-full md:w-[170px]">
+          <SelectValue placeholder="Seguimiento" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Cualquier seguimiento</SelectItem>
+          <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
+          {RESULTADOS.map((r) => (
+            <SelectItem key={r} value={r}>
+              {r}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
+        <SelectTrigger className="w-full md:w-[160px]">
+          <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="30d">Últimos 30 días</SelectItem>
+          <SelectItem value="90d">Últimos 90 días</SelectItem>
+          <SelectItem value="180d">Últimos 6 meses</SelectItem>
+          <SelectItem value="365d">Últimos 12 meses</SelectItem>
+          <SelectItem value="ytd">Año en curso (YTD)</SelectItem>
+          <SelectItem value="custom">Personalizado…</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {rango === "custom" && (
+        <>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
+                {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={customDesde}
+                onSelect={setCustomDesde}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
+                {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={customHasta}
+                onSelect={setCustomHasta}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Móvil: buscador + botón filtros + exportar (icono) */}
+      <div className="flex items-center gap-2 md:hidden">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar cliente..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+
+        <Sheet open={filtrosOpen} onOpenChange={setFiltrosOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9 relative shrink-0">
+              <Filter className="h-4 w-4" />
+              {filtrosActivos > 0 && (
+                <Badge
+                  className="ml-1 h-5 min-w-5 px-1 text-[10px] tabular-nums"
+                  variant="secondary"
+                >
+                  {filtrosActivos}
+                </Badge>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[85vw] sm:max-w-sm overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Filtros</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 flex flex-col gap-3">
+              {filtrosSelects}
+              {filtrosActivos > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={limpiarFiltros}
+                  className="mt-2"
+                >
+                  <X className="mr-1 h-4 w-4" /> Limpiar filtros
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => setFiltrosOpen(false)}
+                className="mt-1"
+              >
+                Aplicar
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportar}
+          className="h-9 shrink-0"
+          aria-label="Exportar Excel"
+        >
+          <Download className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Desktop: barra horizontal completa */}
+      <div className="hidden md:flex flex-wrap items-center gap-2">
         <div className="relative min-w-[180px] flex-1">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -532,113 +736,7 @@ export function ParqueTab({
           />
         </div>
 
-        <Select value={fSucursal} onValueChange={setFSucursal}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Sucursal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las sucursales</SelectItem>
-            {SUCURSALES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={fMarca} onValueChange={setFMarca}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="Marca" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las marcas</SelectItem>
-            {MARCAS.map((m) => (
-              <SelectItem key={m} value={m}>
-                {m}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Subgrupo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los subgrupos</SelectItem>
-            {SUBGRUPOS.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
-          <SelectTrigger className="w-[170px]">
-            <SelectValue placeholder="Seguimiento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Cualquier seguimiento</SelectItem>
-            <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
-            {RESULTADOS.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
-          <SelectTrigger className="w-[160px]">
-            <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="30d">Últimos 30 días</SelectItem>
-            <SelectItem value="90d">Últimos 90 días</SelectItem>
-            <SelectItem value="180d">Últimos 6 meses</SelectItem>
-            <SelectItem value="365d">Últimos 12 meses</SelectItem>
-            <SelectItem value="ytd">Año en curso (YTD)</SelectItem>
-            <SelectItem value="custom">Personalizado…</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {rango === "custom" && (
-          <>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9">
-                  {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={customDesde}
-                  onSelect={setCustomDesde}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9">
-                  {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={customHasta}
-                  onSelect={setCustomHasta}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </>
-        )}
+        {filtrosSelects}
 
         <Button variant="outline" size="sm" onClick={exportar} className="ml-auto">
           <Download className="mr-1 h-4 w-4" /> Exportar Excel
