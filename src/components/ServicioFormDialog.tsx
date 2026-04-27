@@ -118,8 +118,8 @@ export function ServicioFormDialog({
     if (!open) return;
 
     const cargarDatosAsignacion = async () => {
-      const consultas: Promise<any>[] = [
-        supabase.from("user_roles").select("user_id, role") as Promise<any>,
+      const consultas = [
+        supabase.from("user_roles").select("user_id, role"),
       ];
 
       if (profiles.length === 0) {
@@ -127,9 +127,10 @@ export function ServicioFormDialog({
           supabase
             .from("profiles")
             .select("id, nombre, sucursal")
-            .order("nombre", { ascending: true }) as Promise<any>,
+            .order("nombre", { ascending: true }),
         );
       }
+      const [rolesRes, profilesRes] = await Promise.all(consultas);
 
       try {
         const [rolesRes, profilesRes] = await Promise.all(consultas);
