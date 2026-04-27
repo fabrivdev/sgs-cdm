@@ -134,9 +134,6 @@ export function ServicioFormDialog({
       try {
         const [rolesRes, profilesRes] = await Promise.all(consultas);
 
-      try {
-        const [rolesRes, profilesRes] = await Promise.all(consultas);
-
         if (rolesRes.error) {
           console.error(rolesRes.error);
           toast.error("No se pudieron cargar los roles de usuarios");
