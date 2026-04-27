@@ -16,10 +16,36 @@ const SUBGRUPOS_VALIDOS = new Set([
   "SEMBRADORAS",
   "PICADORAS",
   "PLATAFORMAS",
+  "PLATAFORMAS/CABEZALES",
   "PULVERIZADORAS",
   "TRACTORES",
+  "SUELO",
   "OTRO",
 ]);
+
+const normalizarSubgrupoParque = (value: unknown): string => {
+  const raw = norm(value).toUpperCase().replace(/\s+/g, " ");
+
+  if (!raw) return "OTRO";
+
+  if (raw.includes("COSECH")) return "COSECHADORAS";
+  if (raw.includes("SEMBR")) return "SEMBRADORAS";
+  if (raw.includes("PICAD")) return "PICADORAS";
+  if (raw.includes("PULVER")) return "PULVERIZADORAS";
+  if (raw.includes("TRACT")) return "TRACTORES";
+  if (raw.includes("SUELO")) return "SUELO";
+
+  if (
+    raw.includes("PLATAFORMA") ||
+    raw.includes("CABEZAL") ||
+    raw.includes("CABEZALES") ||
+    raw.includes("HEADER")
+  ) {
+    return "PLATAFORMAS/CABEZALES";
+  }
+
+  return SUBGRUPOS_VALIDOS.has(raw) ? raw : "OTRO";
+};
 
 interface ParqueRow {
   anio: number | null;
@@ -282,8 +308,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (!serie) continue;
 
         const marca = matchMarca(r["MARCA"] ?? r["marca"]) ?? "CLAAS";
-        const subRaw = norm(r["SUBGRUPO"] ?? r["subgrupo"]).toUpperCase();
-        const subgrupo = SUBGRUPOS_VALIDOS.has(subRaw) ? subRaw : "OTRO";
+        const subgrupo = normalizarSubgrupoParque(r["SUBGRUPO"] ?? r["subgrupo"]);
         const anioVal = r["AÑO"] ?? r["ANO"] ?? r["ANIO"] ?? r["año"];
         const anio = anioVal ? Number(anioVal) || null : null;
 
