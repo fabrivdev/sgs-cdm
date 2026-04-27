@@ -185,13 +185,15 @@ export function ParqueTab({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [filtrosOpen, setFiltrosOpen] = useState(false);
+  const [incluirPlataformas, setIncluirPlataformas] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
     (fMarca !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) +
     (fSeguimiento !== "all" ? 1 : 0) +
-    (rango !== "365d" ? 1 : 0);
+    (rango !== "365d" ? 1 : 0) +
+    (incluirPlataformas ? 1 : 0);
 
   const limpiarFiltros = () => {
     setFSucursal("all");
@@ -201,6 +203,7 @@ export function ParqueTab({
     setRango("365d");
     setCustomDesde(undefined);
     setCustomHasta(undefined);
+    setIncluirPlataformas(false);
   };
 
   const cargar = async () => {
