@@ -140,6 +140,17 @@ const fmtMoney = (n: number) =>
 
 const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
+const esPlataformaOCabezal = (subgrupo: string | null | undefined) => {
+  const s = normText(subgrupo);
+
+  return (
+    s.includes("plataforma") ||
+    s.includes("cabezal") ||
+    s.includes("cabecal") ||
+    s.includes("header")
+  );
+};
+
 const esFacturaComercialValida = (fc: Factura) => {
   const gx = normText(fc.grupo_fx);
 
@@ -359,7 +370,7 @@ export function ParqueTab({
     const maquinasByCliente = new Map<string, Maquina[]>();
     for (const mq of maquinas) {
       if (!mq.cliente_id) continue;
-      if (!incluirPlataformas && mq.subgrupo === "PLATAFORMAS") continue;
+      if (!incluirPlataformas && esPlataformaOCabezal(mq.subgrupo)) continue;
       const arr = maquinasByCliente.get(mq.cliente_id) ?? [];
       arr.push(mq);
       maquinasByCliente.set(mq.cliente_id, arr);
