@@ -184,6 +184,25 @@ export function ParqueTab({
   const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const [filtrosOpen, setFiltrosOpen] = useState(false);
+
+  const filtrosActivos =
+    (fSucursal !== "all" ? 1 : 0) +
+    (fMarca !== "all" ? 1 : 0) +
+    (fSubgrupo !== "all" ? 1 : 0) +
+    (fSeguimiento !== "all" ? 1 : 0) +
+    (rango !== "365d" ? 1 : 0);
+
+  const limpiarFiltros = () => {
+    setFSucursal("all");
+    setFMarca("all");
+    setFSubgrupo("all");
+    setFSeguimiento("all");
+    setRango("365d");
+    setCustomDesde(undefined);
+    setCustomHasta(undefined);
+  };
+
   const cargar = async () => {
     setLoading(true);
 
