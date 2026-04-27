@@ -1,58 +1,42 @@
-## Diagnóstico
+## Problema
 
-Revisé la base de datos y encontré la causa real:
+En la pestaña **Parque de máquinas**, la fila de filtros (Sucursal, Marca, Subgrupo, Seguimiento, Rango de fechas, Exportar) se muestra siempre en una grilla horizontal con `flex-wrap`. En vista móvil esto ocupa varias filas y se siente colapsado/desordenado, mientras que el buscador queda perdido entre los selects.
 
-| Tipo | Cantidad | Min fecha | Max fecha |
-|------|----------|-----------|-----------|
-| Repuesto | 53.029 | 2010-02-10 | **2026-03-31** |
-| Servicio | 4.471 | 2010-03-11 | **2025-01-25** |
+## Solución
 
-Los datos **sí están cargados** (4.471 facturas de Servicio, todas con `grupo_fx = MANO DE OBRA`), pero la última factura de Servicio en la base es de **enero 2025**. Como el filtro por defecto del Parque es "últimos 365 días" (desde abril 2025), **0 clientes** tienen servicio en ese rango → la columna Servicio aparece toda en ✗ y los días desde último servicio salen >365.
+Replicar el patrón usado en otras pestañas: en móvil dejar visible solo el **buscador de cliente**, y mover el resto de filtros a un panel lateral (`Sheet`) que se abre con un botón "Filtros". En desktop (≥ `md`) mantener la barra horizontal actual sin cambios.
 
-Hay dos problemas reales:
+### Comportamiento
 
-1. **El Excel `FACTURACIÓN_HISTORICA.xlsx` que importaste no contiene las facturas de Servicio recientes (2025-2026)**. Los repuestos llegan a marzo 2026 pero los servicios se cortan en enero 2025.
-2. **El importador filtra Servicios sólo por `grupo_fx` con "MANO DE OBRA" o "KILOMETRAJE"** (líneas 438-441 de `ImportarTab.tsx`). Si las facturas de servicio del Excel tienen otros valores en GRUPO FX, se descartan silenciosamente sin avisar.
+- **Móvil (< md)**:
+  - Fila visible: `[ Buscador (flex-1) ] [ Botón Filtros ] [ Botón Exportar (icono) ]`
+  - El botón "Filtros" muestra un badge con la cantidad de filtros activos (≠ "all" o rango ≠ default).
+  - Al tocar "Filtros" se abre un `Sheet` desde la derecha con: Sucursal, Marca, Subgrupo, Seguimiento, Rango (+ pickers personalizados si aplica), y un botón "Limpiar filtros".
+  - Cada select dentro del `Sheet` ocupa el ancho completo (`w-full`) en lugar de los anchos fijos actuales (`w-[140px]`, etc.).
+- **Desktop (≥ md)**: la barra horizontal queda igual a como está hoy (sin botón Filtros, todos los selects inline).
 
-## Plan
+### Archivos a modificar
 
-### 1. Agregar diagnóstico al importador de Facturación
-En `ImportarTab.tsx` (función `procesarFact`), separar contadores por hoja y mostrar resumen previo:
-- Filas leídas por hoja (Repuestos / Servicios)
-- Filas descartadas por filtro `Tp. Movimento ≠ S`
-- Filas de Servicio descartadas por `grupo_fx` no reconocido (con lista de los grupos descartados y conteo)
-- Filas sin fecha o sin entidad
+- `src/components/parque/ParqueTab.tsx` — reorganizar el bloque de filtros (líneas ~522–646) en dos vistas (móvil/desktop) usando clases responsive de Tailwind (`md:hidden` / `hidden md:flex`) y un `Sheet` (`@/components/ui/sheet`) para el panel móvil.
 
-Mostrar este resumen como toast + sección colapsable arriba del preview.
+### Detalles técnicos
 
-### 2. Relajar el filtro de Servicios en la importación
-Actualmente sólo se acepta Servicio si `grupo_fx` contiene "mano de obra" o "kilometraje". Cambios:
-- **Importar TODAS las filas de la hoja Servicios** que pasen el filtro `Tp. Movimento = S` (no filtrar por grupo_fx).
-- Mantener `grupo_fx` y `grupo` en la base (ya existen las columnas).
-- El filtro "sólo mano de obra/kilometraje" sigue rigiendo en `ParqueTab` (`esServicioValido`) para "días desde último servicio" y la columna Servicio.
+- Estado de apertura del Sheet: `const [filtrosOpen, setFiltrosOpen] = useState(false)`.
+- Contador de filtros activos: derivar de `fSucursal/fMarca/fSubgrupo/fSeguimiento !== "all"` + `rango !== "365d"` y mostrar como `Badge` sobre el botón "Filtros".
+- Extraer el contenido de los selects en una variable `filtrosContent` (JSX) para reutilizar en desktop (inline) y móvil (dentro del Sheet), evitando duplicación. En el Sheet, envolver con clases que fuercen `w-full` en los `SelectTrigger`.
+- El botón **Exportar Excel** en móvil se reduce a icono (`<Download />`) sin texto; en desktop mantiene texto + icono.
+- El banner de advertencia de servicios y el contador de resultados (líneas 648–660) no cambian.
+- La tabla principal sigue con `overflow-x-auto` igual que ahora.
 
-Así no se pierden datos en la importación; el filtrado comercial se hace al visualizar.
+### Resultado visual esperado
 
-### 3. Agregar contador de tipos en la previsualización del importador
-En la tabla preview de Facturación, mostrar arriba:
-- `X facturas Repuesto (Y nuevas)`
-- `Z facturas Servicio (W nuevas)`
+```text
+Móvil:
+┌──────────────────────────────────────────┐
+│ 🔍 Buscar cliente...   [Filtros·3] [⬇]  │
+└──────────────────────────────────────────┘
+   12 clientes · Período: ...
 
-Para ver de un vistazo si el archivo trae servicios antes de confirmar.
-
-### 4. Mejorar mensaje cuando 0 servicios en rango
-En `ParqueTab`, si el rango activo no contiene ninguna factura de Servicio, mostrar un aviso arriba: *"No hay servicios facturados en el período seleccionado. Última factura de servicio en la base: DD/MM/YYYY"*. Eso explica por qué la columna sale toda en ✗.
-
-## Detalles técnicos
-
-- Archivos a modificar:
-  - `src/components/parque/ImportarTab.tsx`: quitar filtro por `grupo_fx` (líneas 438-441), agregar contadores diagnósticos por hoja, exponer resumen.
-  - `src/components/parque/ParqueTab.tsx`: agregar aviso cuando no hay servicios en rango.
-- No se modifica la base de datos ni los esquemas.
-- Después del fix vas a tener que volver a subir `FACTURACIÓN_HISTORICA.xlsx` para recuperar los servicios que estaban siendo descartados (si el archivo los trae).
-
-## Acción recomendada después del fix
-
-1. Confirmar el plan.
-2. Subir nuevamente `FACTURACIÓN_HISTORICA.xlsx` con el importador corregido.
-3. Revisar el resumen diagnóstico: ahí veremos si el Excel realmente trae servicios 2025-2026 o si el corte está en el archivo fuente.
+Desktop (sin cambios):
+[🔍 Buscar] [Sucursal] [Marca] [Subgrupo] [Seguim.] [Rango] ... [⬇ Exportar Excel]
+```
