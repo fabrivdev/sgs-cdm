@@ -636,11 +636,11 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-md border p-2">
                       <div className="text-[10px] uppercase text-muted-foreground">YTD</div>
-                      <div className="text-sm font-bold">{fmtMoney(st.ytd)}</div>
+                      <div className="text-sm font-bold">$ {fmtMoney(st.ytd)}</div>
                     </div>
                     <div className="rounded-md border p-2">
                       <div className="text-[10px] uppercase text-muted-foreground">Año ant.</div>
-                      <div className="text-sm font-bold">{fmtMoney(st.prev)}</div>
+                      <div className="text-sm font-bold">$ {fmtMoney(st.prev)}</div>
                     </div>
                     <div className="rounded-md border p-2">
                       <div className="text-[10px] uppercase text-muted-foreground">Var %</div>
@@ -666,7 +666,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                               </div>
                               <div className="truncate">{f.grupo ?? "—"}</div>
                             </div>
-                            <div className="font-semibold tabular-nums">{fmtMoney(f.total_venta)}</div>
+                            <div className="font-semibold tabular-nums">$ {fmtMoney(f.total_venta)}</div>
                           </div>
                         ))}
                       </div>
