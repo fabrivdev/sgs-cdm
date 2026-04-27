@@ -13,6 +13,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -185,13 +187,15 @@ export function ParqueTab({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [filtrosOpen, setFiltrosOpen] = useState(false);
+  const [incluirPlataformas, setIncluirPlataformas] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
     (fMarca !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) +
     (fSeguimiento !== "all" ? 1 : 0) +
-    (rango !== "365d" ? 1 : 0);
+    (rango !== "365d" ? 1 : 0) +
+    (incluirPlataformas ? 1 : 0);
 
   const limpiarFiltros = () => {
     setFSucursal("all");
@@ -201,6 +205,7 @@ export function ParqueTab({
     setRango("365d");
     setCustomDesde(undefined);
     setCustomHasta(undefined);
+    setIncluirPlataformas(false);
   };
 
   const cargar = async () => {
@@ -354,6 +359,7 @@ export function ParqueTab({
     const maquinasByCliente = new Map<string, Maquina[]>();
     for (const mq of maquinas) {
       if (!mq.cliente_id) continue;
+      if (!incluirPlataformas && mq.subgrupo === "PLATAFORMAS") continue;
       const arr = maquinasByCliente.get(mq.cliente_id) ?? [];
       arr.push(mq);
       maquinasByCliente.set(mq.cliente_id, arr);
@@ -435,7 +441,7 @@ export function ParqueTab({
         ultSeg: ultSegByCliente.get(cli.id) ?? null,
       };
     });
-  }, [clientes, contactos, maquinas, facturas, seguimientos, desdeDate, hastaDate, prevDesdeDate, prevHastaDate]);
+  }, [clientes, contactos, maquinas, facturas, seguimientos, desdeDate, hastaDate, prevDesdeDate, prevHastaDate, incluirPlataformas]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -655,6 +661,17 @@ export function ParqueTab({
           </Popover>
         </>
       )}
+
+      <div className="flex items-center gap-2 rounded-md border px-3 h-9 w-full md:w-auto">
+        <Switch
+          id="incluir-plataformas"
+          checked={incluirPlataformas}
+          onCheckedChange={setIncluirPlataformas}
+        />
+        <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
+          Incluir plataformas/cabezales
+        </Label>
+      </div>
     </>
   );
 
