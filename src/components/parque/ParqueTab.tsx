@@ -661,6 +661,17 @@ export function ParqueTab({
           </Popover>
         </>
       )}
+
+      <div className="flex items-center gap-2 rounded-md border px-3 h-9 w-full md:w-auto">
+        <Switch
+          id="incluir-plataformas"
+          checked={incluirPlataformas}
+          onCheckedChange={setIncluirPlataformas}
+        />
+        <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
+          Incluir plataformas/cabezales
+        </Label>
+      </div>
     </>
   );
 
