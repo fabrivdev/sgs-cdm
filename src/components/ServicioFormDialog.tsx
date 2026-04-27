@@ -119,7 +119,7 @@ export function ServicioFormDialog({
 
     const cargarDatosAsignacion = async () => {
       const consultas: Promise<any>[] = [
-        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("user_roles").select("user_id, role") as Promise<any>,
       ];
 
       if (profiles.length === 0) {
@@ -127,7 +127,7 @@ export function ServicioFormDialog({
           supabase
             .from("profiles")
             .select("id, nombre, sucursal")
-            .order("nombre", { ascending: true }),
+            .order("nombre", { ascending: true }) as Promise<any>,
         );
       }
 
