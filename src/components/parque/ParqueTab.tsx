@@ -439,7 +439,7 @@ export function ParqueTab({
         ultSeg: ultSegByCliente.get(cli.id) ?? null,
       };
     });
-  }, [clientes, contactos, maquinas, facturas, seguimientos, desdeDate, hastaDate, prevDesdeDate, prevHastaDate]);
+  }, [clientes, contactos, maquinas, facturas, seguimientos, desdeDate, hastaDate, prevDesdeDate, prevHastaDate, incluirPlataformas]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
