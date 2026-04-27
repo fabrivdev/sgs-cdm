@@ -172,10 +172,10 @@ export default function ParqueClientes() {
 
       {/* Tabs */}
       <Tabs defaultValue="parque">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="parque">Parque de máquinas</TabsTrigger>
-          <TabsTrigger value="agenda">Agenda comercial</TabsTrigger>
-          <TabsTrigger value="importar">Importar datos</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-auto">
+          <TabsTrigger value="parque" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Parque<span className="hidden sm:inline">&nbsp;de máquinas</span></TabsTrigger>
+          <TabsTrigger value="agenda" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Agenda<span className="hidden sm:inline">&nbsp;comercial</span></TabsTrigger>
+          <TabsTrigger value="importar" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Importar<span className="hidden sm:inline">&nbsp;datos</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="parque" className="mt-4">
