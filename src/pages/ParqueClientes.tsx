@@ -26,6 +26,8 @@ export default function ParqueClientes() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [tab, setTab] = useState("parque");
+  const [parqueMetricas, setParqueMetricas] = useState<ParqueMetricas | null>(null);
 
   const cargarMetricas = async () => {
     const hoy = new Date();
