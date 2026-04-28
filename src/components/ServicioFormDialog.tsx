@@ -291,16 +291,70 @@ export function ServicioFormDialog({
       semana: 0,
     };
 
-    const { error } = servicio
-      ? await supabase.from("servicios").update(payload).eq("id", servicio.id)
-      : await supabase.from("servicios").insert(payload);
+    if (servicio) {
+      const fechaPrev = servicio.fecha_programada;
+      const { error } = await supabase.from("servicios").update(payload).eq("id", servicio.id);
 
-    setBusy(false);
+      if (error) {
+        setBusy(false);
+        toast.error(error.message);
+        return;
+      }
 
-    if (error) {
-      toast.error(error.message);
+      // Si cambió la fecha programada, mover la jornada original a la nueva fecha
+      // (solo si todavía existe una jornada con la fecha anterior y no choca con otra).
+      if (fechaPrev !== fecha) {
+        const { data: jornadaPrev } = await supabase
+          .from("servicio_jornadas")
+          .select("id")
+          .eq("servicio_id", servicio.id)
+          .eq("fecha", fechaPrev)
+          .maybeSingle();
+
+        const { data: choca } = await supabase
+          .from("servicio_jornadas")
+          .select("id")
+          .eq("servicio_id", servicio.id)
+          .eq("fecha", fecha)
+          .maybeSingle();
+
+        if (jornadaPrev?.id && !choca) {
+          await supabase
+            .from("servicio_jornadas")
+            .update({ fecha })
+            .eq("id", jornadaPrev.id);
+        }
+      }
+
+      setBusy(false);
+      toast.success("Servicio actualizado");
+      onOpenChange(false);
+      onSaved();
     } else {
-      toast.success(servicio ? "Servicio actualizado" : "Servicio creado");
+      const { data: nuevo, error } = await supabase
+        .from("servicios")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (error) {
+        setBusy(false);
+        toast.error(error.message);
+        return;
+      }
+
+      // Crear jornada inicial
+      if (nuevo?.id) {
+        const { error: errJornada } = await supabase.from("servicio_jornadas").insert({
+          servicio_id: nuevo.id,
+          fecha,
+          estado: "Pendiente",
+        });
+        if (errJornada) console.error(errJornada);
+      }
+
+      setBusy(false);
+      toast.success("Servicio creado");
       onOpenChange(false);
       onSaved();
     }
