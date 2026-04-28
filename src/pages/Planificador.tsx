@@ -423,7 +423,7 @@ export default function Planificador() {
 
                 return (
                   <TableRow
-                    key={s.id}
+                    key={`${s.id}-${s.fecha_programada}`}
                     className={cn(rowClassByEstado(s.estado), "cursor-pointer", unseen && "ring-2 ring-inset ring-primary/40")}
                     onClick={() => openDetalle(s)}
                   >
