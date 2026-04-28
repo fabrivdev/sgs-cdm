@@ -316,7 +316,7 @@ export default function Calendario() {
 
                     return (
                       <div
-                        key={s.id}
+                        key={`${s.id}-${s.fecha_programada}`}
                         role="button"
                         tabIndex={0}
                         onClick={(e) => {
