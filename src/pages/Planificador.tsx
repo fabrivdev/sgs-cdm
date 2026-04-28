@@ -508,7 +508,7 @@ export default function Planificador() {
 
           return (
             <Card
-              key={s.id}
+              key={`${s.id}-${s.fecha_programada}`}
               className={cn("p-2.5 cursor-pointer", rowClassByEstado(s.estado), unseen && "ring-2 ring-primary/40")}
               onClick={() => openDetalle(s)}
             >
