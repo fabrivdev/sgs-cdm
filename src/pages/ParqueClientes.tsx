@@ -108,35 +108,39 @@ export default function ParqueClientes() {
     setPanelOpen(true);
   };
 
+  // En la pestaña Parque mostramos métricas que reflejan los filtros aplicados
+  const metricasMostradas =
+    tab === "parque" && parqueMetricas ? parqueMetricas : metricas;
+
   const cards = useMemo(
     () => [
       {
         label: "Máquinas activas",
-        value: metricas.totalMaquinas.toLocaleString(),
+        value: metricasMostradas.totalMaquinas.toLocaleString(),
         icon: Tractor,
         accent: "text-primary",
       },
       {
         label: "% con servicio último año",
-        value: `${metricas.pctConServicioUltimoAnio}%`,
+        value: `${metricasMostradas.pctConServicioUltimoAnio}%`,
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
       {
         label: "% contactados este mes",
-        value: `${metricas.pctContactadosEsteMes}%`,
+        value: `${metricasMostradas.pctContactadosEsteMes}%`,
         icon: PhoneCall,
         accent: "text-blue-600",
       },
       {
         label: "Sin contacto +60 días",
-        value: metricas.sinContacto60d.toLocaleString(),
+        value: metricasMostradas.sinContacto60d.toLocaleString(),
         icon: AlertTriangle,
-        accent: metricas.sinContacto60d > 0 ? "text-destructive" : "text-muted-foreground",
-        critical: metricas.sinContacto60d > 0,
+        accent: metricasMostradas.sinContacto60d > 0 ? "text-destructive" : "text-muted-foreground",
+        critical: metricasMostradas.sinContacto60d > 0,
       },
     ],
-    [metricas],
+    [metricasMostradas],
   );
 
   return (
