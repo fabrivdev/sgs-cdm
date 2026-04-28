@@ -365,6 +365,47 @@ export type Database = {
           },
         ]
       }
+      servicio_jornadas: {
+        Row: {
+          actualizado_en: string
+          creado_en: string
+          estado: Database["public"]["Enums"]["estado_servicio"]
+          fecha: string
+          horas_trabajadas: number | null
+          id: string
+          observaciones: string | null
+          servicio_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          creado_en?: string
+          estado?: Database["public"]["Enums"]["estado_servicio"]
+          fecha: string
+          horas_trabajadas?: number | null
+          id?: string
+          observaciones?: string | null
+          servicio_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          creado_en?: string
+          estado?: Database["public"]["Enums"]["estado_servicio"]
+          fecha?: string
+          horas_trabajadas?: number | null
+          id?: string
+          observaciones?: string | null
+          servicio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicio_jornadas_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicios: {
         Row: {
           actualizado_en: string
