@@ -205,7 +205,17 @@ export default function Planificador() {
       return;
     }
 
-    const { error } = await supabase.from("servicios").update({ estado }).eq("id", s.id);
+    // Actualizar la jornada de esa fecha (si existe), no el servicio padre
+    const { data: j } = await supabase
+      .from("servicio_jornadas")
+      .select("id")
+      .eq("servicio_id", s.id)
+      .eq("fecha", s.fecha_programada)
+      .maybeSingle();
+
+    const error = j?.id
+      ? (await supabase.from("servicio_jornadas").update({ estado }).eq("id", j.id)).error
+      : (await supabase.from("servicios").update({ estado }).eq("id", s.id)).error;
 
     if (error) {
       toast.error(error.message);
