@@ -170,12 +170,21 @@ const antiguedadColor = (a: number | null) => {
   return "bg-destructive text-destructive-foreground";
 };
 
+export interface ParqueMetricas {
+  totalMaquinas: number;
+  pctConServicioUltimoAnio: number;
+  pctContactadosEsteMes: number;
+  sinContacto60d: number;
+}
+
 export function ParqueTab({
   onChanged: _onChanged,
   onOpenCliente,
+  onMetricasChange,
 }: {
   onChanged?: () => void;
   onOpenCliente?: (id: string) => void;
+  onMetricasChange?: (m: ParqueMetricas) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -476,6 +485,36 @@ export function ParqueTab({
       return true;
     });
   }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento]);
+
+  // Métricas calculadas a partir de los clientes filtrados (para las cards superiores)
+  useEffect(() => {
+    if (!onMetricasChange) return;
+    const hoy = new Date();
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getTime();
+    const totalClientes = filtradas.length;
+    let totalMaquinas = 0;
+    let conServicio = 0;
+    let contactadosMes = 0;
+    let sinContacto = 0;
+    for (const r of filtradas) {
+      totalMaquinas += r.cantTotal;
+      if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
+      if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= inicioMes) contactadosMes++;
+      const sinServ60 = r.diasUltServicio == null || r.diasUltServicio > 60;
+      const sinSeg60 =
+        !r.ultSeg ||
+        (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
+      if (sinServ60 && sinSeg60) sinContacto++;
+    }
+    onMetricasChange({
+      totalMaquinas,
+      pctConServicioUltimoAnio:
+        totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0,
+      pctContactadosEsteMes:
+        totalClientes > 0 ? Math.round((contactadosMes / totalClientes) * 100) : 0,
+      sinContacto60d: sinContacto,
+    });
+  }, [filtradas, onMetricasChange]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;

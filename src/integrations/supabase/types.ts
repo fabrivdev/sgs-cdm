@@ -517,6 +517,8 @@ export type Database = {
         | "PULVERIZADORAS"
         | "TRACTORES"
         | "OTRO"
+        | "PLATAFORMAS/CABEZALES"
+        | "SUELO"
       sucursal:
         | "Santa Rita"
         | "Santa Rosa"
@@ -672,6 +674,8 @@ export const Constants = {
         "PULVERIZADORAS",
         "TRACTORES",
         "OTRO",
+        "PLATAFORMAS/CABEZALES",
+        "SUELO",
       ],
       sucursal: [
         "Santa Rita",

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ParqueTab } from "@/components/parque/ParqueTab";
+import { ParqueTab, type ParqueMetricas } from "@/components/parque/ParqueTab";
 import { AgendaTab } from "@/components/parque/AgendaTab";
 import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
@@ -26,6 +26,8 @@ export default function ParqueClientes() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [tab, setTab] = useState("parque");
+  const [parqueMetricas, setParqueMetricas] = useState<ParqueMetricas | null>(null);
 
   const cargarMetricas = async () => {
     const hoy = new Date();
@@ -106,35 +108,39 @@ export default function ParqueClientes() {
     setPanelOpen(true);
   };
 
+  // En la pestaña Parque mostramos métricas que reflejan los filtros aplicados
+  const metricasMostradas =
+    tab === "parque" && parqueMetricas ? parqueMetricas : metricas;
+
   const cards = useMemo(
     () => [
       {
         label: "Máquinas activas",
-        value: metricas.totalMaquinas.toLocaleString(),
+        value: metricasMostradas.totalMaquinas.toLocaleString(),
         icon: Tractor,
         accent: "text-primary",
       },
       {
         label: "% con servicio último año",
-        value: `${metricas.pctConServicioUltimoAnio}%`,
+        value: `${metricasMostradas.pctConServicioUltimoAnio}%`,
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
       {
         label: "% contactados este mes",
-        value: `${metricas.pctContactadosEsteMes}%`,
+        value: `${metricasMostradas.pctContactadosEsteMes}%`,
         icon: PhoneCall,
         accent: "text-blue-600",
       },
       {
         label: "Sin contacto +60 días",
-        value: metricas.sinContacto60d.toLocaleString(),
+        value: metricasMostradas.sinContacto60d.toLocaleString(),
         icon: AlertTriangle,
-        accent: metricas.sinContacto60d > 0 ? "text-destructive" : "text-muted-foreground",
-        critical: metricas.sinContacto60d > 0,
+        accent: metricasMostradas.sinContacto60d > 0 ? "text-destructive" : "text-muted-foreground",
+        critical: metricasMostradas.sinContacto60d > 0,
       },
     ],
-    [metricas],
+    [metricasMostradas],
   );
 
   return (
@@ -171,7 +177,7 @@ export default function ParqueClientes() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="parque">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="parque" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Parque<span className="hidden sm:inline">&nbsp;de máquinas</span></TabsTrigger>
           <TabsTrigger value="agenda" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Agenda<span className="hidden sm:inline">&nbsp;comercial</span></TabsTrigger>
@@ -179,7 +185,7 @@ export default function ParqueClientes() {
         </TabsList>
 
         <TabsContent value="parque" className="mt-4">
-          <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} />
+          <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
         </TabsContent>
         <TabsContent value="agenda" className="mt-4">
           <AgendaTab key={`a-${refreshKey}`} onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
