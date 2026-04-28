@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ParqueTab } from "@/components/parque/ParqueTab";
+import { ParqueTab, type ParqueMetricas } from "@/components/parque/ParqueTab";
 import { AgendaTab } from "@/components/parque/AgendaTab";
 import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
