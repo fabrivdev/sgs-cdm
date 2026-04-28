@@ -170,12 +170,21 @@ const antiguedadColor = (a: number | null) => {
   return "bg-destructive text-destructive-foreground";
 };
 
+export interface ParqueMetricas {
+  totalMaquinas: number;
+  pctConServicioUltimoAnio: number;
+  pctContactadosEsteMes: number;
+  sinContacto60d: number;
+}
+
 export function ParqueTab({
   onChanged: _onChanged,
   onOpenCliente,
+  onMetricasChange,
 }: {
   onChanged?: () => void;
   onOpenCliente?: (id: string) => void;
+  onMetricasChange?: (m: ParqueMetricas) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
