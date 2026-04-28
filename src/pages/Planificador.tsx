@@ -553,6 +553,7 @@ export default function Planificador() {
         profiles={profiles}
         clientes={clientes}
         onChanged={load}
+        fechaContexto={detalle?.fecha_programada}
       />
     </div>
   );
