@@ -387,7 +387,7 @@ export default function Calendario() {
 
                 return (
                   <button
-                    key={s.id}
+                    key={`${s.id}-${s.fecha_programada}`}
                     onClick={() => {
                       setDiaSel(null);
                       setDetalle(s);
