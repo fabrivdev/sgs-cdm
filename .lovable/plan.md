@@ -1,42 +1,71 @@
-## Problema
+# Servicios continuables en varias fechas
 
-En la pestaña **Parque de máquinas**, la fila de filtros (Sucursal, Marca, Subgrupo, Seguimiento, Rango de fechas, Exportar) se muestra siempre en una grilla horizontal con `flex-wrap`. En vista móvil esto ocupa varias filas y se siente colapsado/desordenado, mientras que el buscador queda perdido entre los selects.
+Hoy cada servicio vive en una sola `fecha_programada`. Vamos a permitir que un mismo servicio aparezca en varias fechas (ej: empezó el lunes, sigue el martes) sin duplicar el trabajo, registrando las horas trabajadas por cada jornada.
 
-## Solución
+## Qué cambia para el usuario
 
-Replicar el patrón usado en otras pestañas: en móvil dejar visible solo el **buscador de cliente**, y mover el resto de filtros a un panel lateral (`Sheet`) que se abre con un botón "Filtros". En desktop (≥ `md`) mantener la barra horizontal actual sin cambios.
+- En el **detalle del servicio**, nuevo botón **"Continuar en otra fecha"** que abre un mini calendario para elegir el próximo día. El servicio queda visible también en esa fecha en el Planificador y Calendario.
+- Nueva sección **"Jornadas"** en el detalle: lista de fechas donde aparece el servicio, con horas trabajadas y estado por cada una. Se pueden agregar y quitar fechas.
+- Las **horas trabajadas se cargan por jornada** (no más un único campo total). El detalle muestra el total acumulado.
+- En el Planificador / Calendario, un servicio multi-fecha muestra un pequeño indicador (ícono de cadena 🔗 o badge "día 2 de 3") para que se vea que es continuación.
 
-### Comportamiento
+## Cambios técnicos
 
-- **Móvil (< md)**:
-  - Fila visible: `[ Buscador (flex-1) ] [ Botón Filtros ] [ Botón Exportar (icono) ]`
-  - El botón "Filtros" muestra un badge con la cantidad de filtros activos (≠ "all" o rango ≠ default).
-  - Al tocar "Filtros" se abre un `Sheet` desde la derecha con: Sucursal, Marca, Subgrupo, Seguimiento, Rango (+ pickers personalizados si aplica), y un botón "Limpiar filtros".
-  - Cada select dentro del `Sheet` ocupa el ancho completo (`w-full`) en lugar de los anchos fijos actuales (`w-[140px]`, etc.).
-- **Desktop (≥ md)**: la barra horizontal queda igual a como está hoy (sin botón Filtros, todos los selects inline).
+### Base de datos
 
-### Archivos a modificar
+Nueva tabla `servicio_jornadas` (una fila por (servicio, fecha)):
 
-- `src/components/parque/ParqueTab.tsx` — reorganizar el bloque de filtros (líneas ~522–646) en dos vistas (móvil/desktop) usando clases responsive de Tailwind (`md:hidden` / `hidden md:flex`) y un `Sheet` (`@/components/ui/sheet`) para el panel móvil.
-
-### Detalles técnicos
-
-- Estado de apertura del Sheet: `const [filtrosOpen, setFiltrosOpen] = useState(false)`.
-- Contador de filtros activos: derivar de `fSucursal/fMarca/fSubgrupo/fSeguimiento !== "all"` + `rango !== "365d"` y mostrar como `Badge` sobre el botón "Filtros".
-- Extraer el contenido de los selects en una variable `filtrosContent` (JSX) para reutilizar en desktop (inline) y móvil (dentro del Sheet), evitando duplicación. En el Sheet, envolver con clases que fuercen `w-full` en los `SelectTrigger`.
-- El botón **Exportar Excel** en móvil se reduce a icono (`<Download />`) sin texto; en desktop mantiene texto + icono.
-- El banner de advertencia de servicios y el contador de resultados (líneas 648–660) no cambian.
-- La tabla principal sigue con `overflow-x-auto` igual que ahora.
-
-### Resultado visual esperado
-
-```text
-Móvil:
-┌──────────────────────────────────────────┐
-│ 🔍 Buscar cliente...   [Filtros·3] [⬇]  │
-└──────────────────────────────────────────┘
-   12 clientes · Período: ...
-
-Desktop (sin cambios):
-[🔍 Buscar] [Sucursal] [Marca] [Subgrupo] [Seguim.] [Rango] ... [⬇ Exportar Excel]
 ```
+- id uuid PK
+- servicio_id uuid (referencia lógica a servicios.id, ON DELETE CASCADE vía trigger)
+- fecha date NOT NULL
+- horas_trabajadas numeric NULL
+- estado estado_servicio NOT NULL DEFAULT 'Pendiente'
+- observaciones text NULL
+- creado_en, actualizado_en timestamptz
+- UNIQUE (servicio_id, fecha)
+```
+
+RLS heredando de `servicios`: SELECT/UPDATE si el usuario puede ver/editar el servicio padre (admin, cabecilla de la misma sucursal, responsable o auxiliar). DELETE/INSERT para admin y cabecilla.
+
+**Migración de datos**: para cada servicio existente, crear una jornada inicial con su `fecha_programada`, `estado`, `horas_trabajadas` y `observaciones` actuales. La columna `fecha_programada` queda como "fecha inicial" (no se borra para no romper nada).
+
+### Lectura en el Planificador / Calendario / Historial
+
+Las consultas que hoy filtran por `servicios.fecha_programada` pasan a hacer un JOIN/`in` contra `servicio_jornadas`:
+
+- Planificador: `select ... from servicio_jornadas join servicios ...` filtrando por rango de fechas en `servicio_jornadas.fecha`. Cada jornada se renderiza como un slot, con el mismo servicio detrás.
+- Calendario: idem, una entrada por jornada.
+- Métricas (% completados, etc.): se calculan sobre jornadas, no sobre servicios.
+
+### UI
+
+- **`ServicioDetalleDialog.tsx`**:
+  - Nuevo bloque "Jornadas" arriba de Estado/Horas/Observaciones, listando las jornadas del servicio con sus campos editables inline.
+  - Botón "+ Continuar en otra fecha" → abre Popover con `<Calendar>` (shadcn) y crea una nueva fila en `servicio_jornadas`.
+  - Quitar los inputs sueltos de `estado` / `horas` / `observaciones` del servicio: ahora viven dentro de cada jornada. El `Servicio` mantiene `trabajo_descripcion`, cliente, técnicos, marca, tipo y sucursal (datos del trabajo, no de la jornada).
+
+- **`ServicioFormDialog.tsx`** (crear nuevo): al guardar un servicio nuevo, también insertar la jornada inicial con `fecha = fecha_programada`.
+
+- **Planificador / Calendario**: indicador visual cuando una jornada pertenece a un servicio con varias jornadas (badge "día N/M").
+
+### Limpieza
+
+- El campo `servicios.estado`, `servicios.horas_trabajadas` y `servicios.observaciones` quedan como "snapshot" del último estado por compatibilidad pero ya no se editan directamente. Opcionalmente, en una iteración futura se pueden eliminar.
+
+## Riesgos y consideraciones
+
+- **Historial / reportes existentes**: cualquier query que cuente "servicios completados" debe cambiar a "jornadas completadas" o decidir explícitamente qué cuenta. Voy a revisar `Historial.tsx`, `Dashboard.tsx` y `ParqueTab.tsx` para adaptar.
+- **Permisos**: si un técnico es responsable solo de la jornada del día siguiente (no de la original), igual debe poder verla. La RLS por servicio padre cubre este caso.
+- **Eliminar una jornada** ≠ eliminar el servicio. Si se borra la última jornada, se mantiene el servicio (queda "sin programar") o se borra el servicio entero — voy con la primera opción para evitar pérdidas accidentales.
+
+## Archivos a tocar
+
+- `supabase/migrations/...` (nueva tabla + RLS + backfill)
+- `src/components/ServicioDetalleDialog.tsx` (sección Jornadas + botón continuar)
+- `src/components/ServicioFormDialog.tsx` (crear jornada inicial al insertar)
+- `src/pages/Planificador.tsx` (consulta y render por jornada)
+- `src/pages/Calendario.tsx` (idem)
+- `src/pages/Historial.tsx` (consulta basada en jornadas)
+- `src/pages/Dashboard.tsx` (métricas basadas en jornadas)
+- `src/components/parque/ParqueTab.tsx` (si usa fechas de servicios para "último servicio")

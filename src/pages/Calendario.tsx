@@ -96,13 +96,52 @@ export default function Calendario() {
 
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
         cargarTodosLosClientes(),
       ]);
 
-      setServicios((srv ?? []) as Servicio[]);
+      const serviciosBase = (srv ?? []) as Servicio[];
+      const jornadas = (jor ?? []) as Array<{
+        servicio_id: string;
+        fecha: string;
+        estado: Estado;
+        horas_trabajadas: number | null;
+        observaciones: string | null;
+      }>;
+
+      const porServicio = new Map<string, typeof jornadas>();
+      for (const j of jornadas) {
+        const list = porServicio.get(j.servicio_id) ?? [];
+        list.push(j);
+        porServicio.set(j.servicio_id, list);
+      }
+
+      const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const expandidos: Servicio[] = [];
+
+      for (const s of serviciosBase) {
+        const lista = porServicio.get(s.id);
+        if (!lista || lista.length === 0) {
+          expandidos.push(s);
+          continue;
+        }
+        for (const j of lista) {
+          const d = parseISO(j.fecha);
+          expandidos.push({
+            ...s,
+            fecha_programada: j.fecha,
+            dia_semana: dias[d.getDay()],
+            estado: j.estado,
+            horas_trabajadas: j.horas_trabajadas,
+            observaciones: j.observaciones,
+          });
+        }
+      }
+
+      setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
       setClientes(cli);
     } catch (e) {
@@ -277,7 +316,7 @@ export default function Calendario() {
 
                     return (
                       <div
-                        key={s.id}
+                        key={`${s.id}-${s.fecha_programada}`}
                         role="button"
                         tabIndex={0}
                         onClick={(e) => {
@@ -348,7 +387,7 @@ export default function Calendario() {
 
                 return (
                   <button
-                    key={s.id}
+                    key={`${s.id}-${s.fecha_programada}`}
                     onClick={() => {
                       setDiaSel(null);
                       setDetalle(s);
@@ -386,6 +425,7 @@ export default function Calendario() {
         profiles={profiles}
         clientes={clientes}
         onChanged={load}
+        fechaContexto={detalle?.fecha_programada}
       />
 
       <ServicioFormDialog

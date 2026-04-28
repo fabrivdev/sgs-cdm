@@ -114,13 +114,57 @@ export default function Planificador() {
     setLoading(true);
 
     try {
-      const [{ data: srv }, { data: prof }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
         cargarTodosLosClientes(),
       ]);
 
-      setServicios((srv ?? []) as Servicio[]);
+      const serviciosBase = (srv ?? []) as Servicio[];
+      const jornadas = (jor ?? []) as Array<{
+        servicio_id: string;
+        fecha: string;
+        estado: Estado;
+        horas_trabajadas: number | null;
+        observaciones: string | null;
+      }>;
+
+      // Expandir: una entrada por jornada. Si un servicio no tiene jornadas (legado), usar su fecha.
+      const porServicio = new Map<string, typeof jornadas>();
+      for (const j of jornadas) {
+        const list = porServicio.get(j.servicio_id) ?? [];
+        list.push(j);
+        porServicio.set(j.servicio_id, list);
+      }
+
+      const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const expandidos: Servicio[] = [];
+
+      for (const s of serviciosBase) {
+        const lista = porServicio.get(s.id);
+        if (!lista || lista.length === 0) {
+          expandidos.push(s);
+          continue;
+        }
+
+        for (const j of lista) {
+          const d = parseISO(j.fecha);
+          expandidos.push({
+            ...s,
+            fecha_programada: j.fecha,
+            dia_semana: dias[d.getDay()],
+            semana: getISOWeek(d),
+            estado: j.estado,
+            horas_trabajadas: j.horas_trabajadas,
+            observaciones: j.observaciones,
+          });
+        }
+      }
+
+      expandidos.sort((a, b) => a.fecha_programada.localeCompare(b.fecha_programada));
+
+      setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
       setClientes(cli);
     } catch (e: any) {
@@ -161,7 +205,17 @@ export default function Planificador() {
       return;
     }
 
-    const { error } = await supabase.from("servicios").update({ estado }).eq("id", s.id);
+    // Actualizar la jornada de esa fecha (si existe), no el servicio padre
+    const { data: j } = await supabase
+      .from("servicio_jornadas")
+      .select("id")
+      .eq("servicio_id", s.id)
+      .eq("fecha", s.fecha_programada)
+      .maybeSingle();
+
+    const error = j?.id
+      ? (await supabase.from("servicio_jornadas").update({ estado }).eq("id", j.id)).error
+      : (await supabase.from("servicios").update({ estado }).eq("id", s.id)).error;
 
     if (error) {
       toast.error(error.message);
@@ -369,7 +423,7 @@ export default function Planificador() {
 
                 return (
                   <TableRow
-                    key={s.id}
+                    key={`${s.id}-${s.fecha_programada}`}
                     className={cn(rowClassByEstado(s.estado), "cursor-pointer", unseen && "ring-2 ring-inset ring-primary/40")}
                     onClick={() => openDetalle(s)}
                   >
@@ -454,7 +508,7 @@ export default function Planificador() {
 
           return (
             <Card
-              key={s.id}
+              key={`${s.id}-${s.fecha_programada}`}
               className={cn("p-2.5 cursor-pointer", rowClassByEstado(s.estado), unseen && "ring-2 ring-primary/40")}
               onClick={() => openDetalle(s)}
             >
@@ -499,6 +553,7 @@ export default function Planificador() {
         profiles={profiles}
         clientes={clientes}
         onChanged={load}
+        fechaContexto={detalle?.fecha_programada}
       />
     </div>
   );
