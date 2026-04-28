@@ -425,6 +425,7 @@ export default function Calendario() {
         profiles={profiles}
         clientes={clientes}
         onChanged={load}
+        fechaContexto={detalle?.fecha_programada}
       />
 
       <ServicioFormDialog
