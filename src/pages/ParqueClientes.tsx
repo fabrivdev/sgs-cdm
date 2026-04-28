@@ -177,7 +177,7 @@ export default function ParqueClientes() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="parque">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="parque" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Parque<span className="hidden sm:inline">&nbsp;de máquinas</span></TabsTrigger>
           <TabsTrigger value="agenda" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Agenda<span className="hidden sm:inline">&nbsp;comercial</span></TabsTrigger>
@@ -185,7 +185,7 @@ export default function ParqueClientes() {
         </TabsList>
 
         <TabsContent value="parque" className="mt-4">
-          <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} />
+          <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
         </TabsContent>
         <TabsContent value="agenda" className="mt-4">
           <AgendaTab key={`a-${refreshKey}`} onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
