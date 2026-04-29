@@ -145,36 +145,47 @@ export default function Dashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const [segRes, cliRes, profRes] = await Promise.all([
+        const [segRes, clientesAll, profilesAll] = await Promise.all([
           supabase
             .from("seguimiento_comercial")
             .select("*")
             .order("fecha", { ascending: false })
             .limit(10),
-          supabase.from("clientes").select("id, nombre"),
-          supabase.from("profiles").select("id, nombre"),
+          cargarTodo<{ id: string; nombre: string }>(
+            supabase.from("clientes").select("id, nombre"),
+          ),
+          cargarTodo<{ id: string; nombre: string }>(
+            supabase.from("profiles").select("id, nombre"),
+          ),
         ]);
 
         if (segRes.error) throw segRes.error;
-        if (cliRes.error) throw cliRes.error;
-        if (profRes.error) throw profRes.error;
 
         const clienteNombre = new Map<string, string>(
-          ((cliRes.data ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]),
+          clientesAll.map((c) => [c.id, c.nombre]),
         );
 
         const usuarioNombre = new Map<string, string>(
-          ((profRes.data ?? []) as { id: string; nombre: string }[]).map((p) => [p.id, p.nombre]),
+          profilesAll.map((p) => [p.id, p.nombre]),
         );
 
         const lista: UltimoSeguimiento[] = ((segRes.data ?? []) as any[]).map((s) => {
           const clienteId = s.cliente_id ?? null;
           const userId = s.usuario_id ?? s.creado_por ?? s.user_id ?? null;
 
+          const nombreDesdeRegistro =
+            s.cliente_nombre ??
+            s.nombre_cliente ??
+            s.entidad_nombre ??
+            s.cliente ??
+            null;
+
           return {
             id: s.id,
             clienteId,
-            clienteNombre: clienteId ? clienteNombre.get(clienteId) ?? "Cliente no encontrado" : "Sin cliente",
+            clienteNombre: clienteId
+              ? clienteNombre.get(clienteId) ?? nombreDesdeRegistro ?? "Cliente no encontrado"
+              : nombreDesdeRegistro ?? "Sin cliente",
             fecha: s.fecha ? new Date(s.fecha) : null,
             estado: s.estado ?? s.tipo ?? null,
             observaciones: s.observaciones ?? s.comentario ?? s.notas ?? null,
