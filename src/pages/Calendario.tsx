@@ -43,6 +43,7 @@ interface Servicio {
   observaciones: string | null;
   horas_trabajadas: number | null;
   visto_por: string[];
+  jornada_id?: string | null;
 }
 
 interface Profile {
