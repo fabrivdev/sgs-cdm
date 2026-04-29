@@ -68,12 +68,14 @@ interface Profile {
   nombre: string;
 }
 
-interface ClienteContacto {
-  clienteId: string;
+interface UltimoSeguimiento {
+  id: string;
+  clienteId: string | null;
   clienteNombre: string;
-  ultimoContacto: Date | null;
-  ultimaFacturacion: Date | null;
-  diasUltimaFacturacion: number | null;
+  fecha: Date | null;
+  estado: string | null;
+  observaciones: string | null;
+  usuarioNombre: string | null;
 }
 
 const COLORS_ESTADO: Record<Estado, string> = {
@@ -116,7 +118,7 @@ export default function Dashboard() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
-  const [clientesContactar, setClientesContactar] = useState<ClienteContacto[]>([]);
+  const [ultimosSeguimientos, setUltimosSeguimientos] = useState<UltimoSeguimiento[]>([]);
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [showAllTecnicos, setShowAllTecnicos] = useState(false);
@@ -137,82 +139,50 @@ export default function Dashboard() {
     });
   }, []);
 
-  // Clientes a contactar:
-  // 1 fila por cliente con máquinas activas.
-  // Carga con paginación, porque Supabase devuelve 1000 filas por defecto.
-  // Sin esto, muchos clientes quedan como "Cliente no encontrado" aunque existan.
+  // Últimos seguimientos:
+  // Reemplaza la tarjeta de "clientes a contactar" por los últimos mensajes registrados.
+  // Se muestra 1 fila por seguimiento, ordenado del más reciente al más antiguo.
   useEffect(() => {
     (async () => {
       try {
-        const [maquinas, clientesAll, seguimientos, facturas] = await Promise.all([
-          cargarTodo<{ cliente_id: string | null }>(
-            // No filtramos por activo porque en parque_maquinas algunos registros importados
-            // pueden tener activo NULL o no manejar ese campo igual que la vista del parque.
-            supabase.from("parque_maquinas").select("cliente_id"),
-          ),
-          cargarTodo<{ id: string; nombre: string }>(
-            supabase.from("clientes").select("id, nombre"),
-          ),
-          cargarTodo<{ cliente_id: string; fecha: string }>(
-            supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
-          ),
-          cargarTodo<{ cliente_id: string | null; fecha: string }>(
-            supabase.from("facturacion").select("cliente_id, fecha"),
-          ),
+        const [segRes, cliRes, profRes] = await Promise.all([
+          supabase
+            .from("seguimiento_comercial")
+            .select("*")
+            .order("fecha", { ascending: false })
+            .limit(10),
+          supabase.from("clientes").select("id, nombre"),
+          supabase.from("profiles").select("id, nombre"),
         ]);
 
+        if (segRes.error) throw segRes.error;
+        if (cliRes.error) throw cliRes.error;
+        if (profRes.error) throw profRes.error;
+
         const clienteNombre = new Map<string, string>(
-          clientesAll.map((c) => [c.id, c.nombre]),
+          ((cliRes.data ?? []) as { id: string; nombre: string }[]).map((c) => [c.id, c.nombre]),
         );
 
-        // Universo: clientes únicos con al menos una máquina activa.
-        const clientesConMaquinas = new Set<string>();
-        for (const m of maquinas) {
-          if (m.cliente_id) clientesConMaquinas.add(m.cliente_id);
-        }
+        const usuarioNombre = new Map<string, string>(
+          ((profRes.data ?? []) as { id: string; nombre: string }[]).map((p) => [p.id, p.nombre]),
+        );
 
-        const ultContactoPorCliente = new Map<string, Date>();
-        for (const sg of seguimientos) {
-          if (!sg.cliente_id || !sg.fecha) continue;
-          const f = new Date(sg.fecha);
-          const cur = ultContactoPorCliente.get(sg.cliente_id);
-          if (!cur || f > cur) ultContactoPorCliente.set(sg.cliente_id, f);
-        }
+        const lista: UltimoSeguimiento[] = ((segRes.data ?? []) as any[]).map((s) => {
+          const clienteId = s.cliente_id ?? null;
+          const userId = s.usuario_id ?? s.creado_por ?? s.user_id ?? null;
 
-        const ultFactPorCliente = new Map<string, Date>();
-        for (const fct of facturas) {
-          if (!fct.cliente_id || !fct.fecha) continue;
-          const f = new Date(fct.fecha);
-          const cur = ultFactPorCliente.get(fct.cliente_id);
-          if (!cur || f > cur) ultFactPorCliente.set(fct.cliente_id, f);
-        }
+          return {
+            id: s.id,
+            clienteId,
+            clienteNombre: clienteId ? clienteNombre.get(clienteId) ?? "Cliente no encontrado" : "Sin cliente",
+            fecha: s.fecha ? new Date(s.fecha) : null,
+            estado: s.estado ?? s.tipo ?? null,
+            observaciones: s.observaciones ?? s.comentario ?? s.notas ?? null,
+            usuarioNombre: userId ? usuarioNombre.get(userId) ?? null : null,
+          };
+        });
 
-        const hoy = Date.now();
-
-        const lista: ClienteContacto[] = [...clientesConMaquinas]
-          .map((clienteId) => {
-            const ultimaFacturacion = ultFactPorCliente.get(clienteId) ?? null;
-            const diasUltimaFacturacion = ultimaFacturacion
-              ? Math.floor((hoy - ultimaFacturacion.getTime()) / 86400000)
-              : null;
-
-            return {
-              clienteId,
-              clienteNombre: clienteNombre.get(clienteId) ?? "Cliente no encontrado",
-              ultimoContacto: ultContactoPorCliente.get(clienteId) ?? null,
-              ultimaFacturacion,
-              diasUltimaFacturacion,
-            };
-          })
-          .sort((a, b) => {
-            // Los que nunca facturaron quedan arriba como prioridad máxima.
-            const da = a.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
-            const db = b.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
-            return db - da;
-          })
-          .slice(0, 10);
-
-        setClientesContactar(lista);
+        setUltimosSeguimientos(lista);
       } catch (e) {
         console.error(e);
       }
@@ -617,10 +587,10 @@ export default function Dashboard() {
           )}
         </Card>
 
-        {/* Clientes a contactar */}
+        {/* Últimos contactos registrados */}
         <Card className="p-3 sm:p-4 flex flex-col">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Clientes a contactar</h3>
+            <h3 className="text-sm font-semibold">Últimos contactos registrados</h3>
             <Button
               variant="ghost"
               size="sm"
@@ -635,46 +605,43 @@ export default function Dashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead className="h-8 text-[11px]">Cliente</TableHead>
-                <TableHead className="h-8 text-[11px] whitespace-nowrap">Último contacto</TableHead>
-                <TableHead className="h-8 text-[11px] text-right whitespace-nowrap">Días últ. fact.</TableHead>
+                <TableHead className="h-8 text-[11px]">Mensaje</TableHead>
+                <TableHead className="h-8 text-[11px] text-right whitespace-nowrap">Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clientesContactar.length === 0 ? (
+              {ultimosSeguimientos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">
-                    Sin clientes en el parque
+                    Sin seguimientos registrados
                   </TableCell>
                 </TableRow>
               ) : (
-                clientesContactar.map((c) => {
-                  const dias = c.diasUltimaFacturacion;
-                  const diasCls =
-                    dias == null || dias > 120
-                      ? "text-destructive font-bold"
-                      : dias > 60
-                      ? "text-amber-600 font-semibold"
-                      : "text-muted-foreground";
-
-                  return (
-                    <TableRow key={c.clienteId}>
-                      <TableCell className="py-1.5 text-xs">
-                        <div className="font-medium truncate max-w-[230px]">{c.clienteNombre}</div>
-                        <div className="text-[10px] text-muted-foreground truncate max-w-[230px]">
-                          Últ. fact.: {c.ultimaFacturacion ? format(c.ultimaFacturacion, "dd/MM/yyyy") : "Nunca"}
+                ultimosSeguimientos.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="py-1.5 text-xs align-top">
+                      <div className="font-medium truncate max-w-[180px]">{s.clienteNombre}</div>
+                      <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
+                        {s.usuarioNombre ?? "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5 text-xs align-top">
+                      <div className="flex flex-col gap-1">
+                        {s.estado && (
+                          <Badge variant="outline" className="w-fit text-[9px] px-1.5 py-0 h-4">
+                            {s.estado}
+                          </Badge>
+                        )}
+                        <div className="line-clamp-2 text-muted-foreground">
+                          {s.observaciones || "Sin observaciones"}
                         </div>
-                      </TableCell>
-                      <TableCell className="py-1.5 text-xs whitespace-nowrap">
-                        {c.ultimoContacto ? format(c.ultimoContacto, "dd/MM/yyyy") : "Nunca"}
-                      </TableCell>
-                      <TableCell
-                        className={`py-1.5 text-xs text-right tabular-nums whitespace-nowrap ${diasCls}`}
-                      >
-                        {dias == null ? "Sin fact." : `${dias}d`}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-1.5 text-xs text-right tabular-nums whitespace-nowrap align-top">
+                      {s.fecha ? format(s.fecha, "dd/MM/yy") : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
