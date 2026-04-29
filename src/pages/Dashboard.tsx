@@ -568,7 +568,7 @@ export default function Dashboard() {
               variant="ghost"
               size="sm"
               className="h-7 text-xs"
-              onClick={() => navigate("/parque")}
+              onClick={() => navigate("/parque-clientes")}
             >
               Ver parque completo <ArrowRight className="h-3 w-3 ml-1" />
             </Button>
