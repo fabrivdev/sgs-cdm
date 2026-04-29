@@ -275,7 +275,7 @@ export default function Dashboard() {
   const topTecnicos = porTecnico.slice(0, 5);
   const maxHoras = Math.max(1, ...porTecnico.map((t) => t.horas));
   const tecnicosSinHoras = porTecnico.filter((t) => t.horas === 0);
-  const tecnicosConHoras = porTecnico.filter((t) => t.horas > 0);
+  
 
   const porMarca = MARCAS.map((m) => ({
     name: m,
