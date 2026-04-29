@@ -68,6 +68,14 @@ interface Profile {
   nombre: string;
 }
 
+interface MaquinaContacto {
+  maquinaId: string;
+  clienteNombre: string;
+  equipo: string;
+  ultimoContacto: Date | null;
+  dias: number | null;
+}
+
 const COLORS_ESTADO: Record<Estado, string> = {
   Pendiente: "#EF9F27",
   Iniciado: "#378ADD",
