@@ -146,7 +146,9 @@ export default function Dashboard() {
       try {
         const [maquinas, clientesAll, seguimientos, facturas] = await Promise.all([
           cargarTodo<{ cliente_id: string | null }>(
-            supabase.from("parque_maquinas").select("cliente_id").eq("activo", true),
+            // No filtramos por activo porque en parque_maquinas algunos registros importados
+            // pueden tener activo NULL o no manejar ese campo igual que la vista del parque.
+            supabase.from("parque_maquinas").select("cliente_id"),
           ),
           cargarTodo<{ id: string; nombre: string }>(
             supabase.from("clientes").select("id, nombre"),
