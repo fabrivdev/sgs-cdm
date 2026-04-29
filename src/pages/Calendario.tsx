@@ -192,6 +192,33 @@ export default function Calendario() {
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
 
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  const canDrag = (s: Servicio) => s.estado === "Pendiente" && !!s.jornada_id && (isAdmin || isCabecilla);
+
+  const moverJornada = async (jornadaId: string, nuevaFecha: Date, servicioId: string) => {
+    const fecha = format(nuevaFecha, "yyyy-MM-dd");
+    // Verificar que no exista ya una jornada en esa fecha para el mismo servicio
+    const conflict = servicios.find(
+      (x) => x.id === servicioId && x.fecha_programada === fecha,
+    );
+    if (conflict) {
+      toast.error("Ya existe una jornada de este servicio en esa fecha.");
+      return;
+    }
+    const { error } = await supabase
+      .from("servicio_jornadas")
+      .update({ fecha })
+      .eq("id", jornadaId);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Servicio movido");
+    load();
+  };
+
   const estadoColor = (e: Estado) =>
     e === "Completado"
       ? "bg-estado-completado text-white"
