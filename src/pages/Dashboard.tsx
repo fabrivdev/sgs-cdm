@@ -681,37 +681,6 @@ function TecnicoRow({
   );
 }
 
-function CoberturaBar({
-  label,
-  value,
-  total,
-  color,
-}: {
-  label: string;
-  value: number;
-  total: number;
-  color: string;
-}) {
-  const pct = total > 0 ? (value / total) * 100 : 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="tabular-nums font-semibold">
-          {value}
-          <span className="text-muted-foreground font-normal">/{total}</span>
-        </span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function TrendBadge({ value, suffix }: { value: number; suffix: string }) {
   const Icon = value > 0 ? TrendingUp : value < 0 ? TrendingDown : Minus;
   const cls =
