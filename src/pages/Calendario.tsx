@@ -100,12 +100,13 @@ export default function Calendario() {
       const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
-        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones"),
         cargarTodosLosClientes(),
       ]);
 
       const serviciosBase = (srv ?? []) as Servicio[];
       const jornadas = (jor ?? []) as Array<{
+        id: string;
         servicio_id: string;
         fecha: string;
         estado: Estado;
@@ -126,7 +127,7 @@ export default function Calendario() {
       for (const s of serviciosBase) {
         const lista = porServicio.get(s.id);
         if (!lista || lista.length === 0) {
-          expandidos.push(s);
+          expandidos.push({ ...s, jornada_id: null });
           continue;
         }
         for (const j of lista) {
@@ -138,6 +139,7 @@ export default function Calendario() {
             estado: j.estado,
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
+            jornada_id: j.id,
           });
         }
       }
