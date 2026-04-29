@@ -21,6 +21,7 @@ import {
   parseISO,
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
@@ -43,6 +44,7 @@ interface Servicio {
   observaciones: string | null;
   horas_trabajadas: number | null;
   visto_por: string[];
+  jornada_id?: string | null;
 }
 
 interface Profile {
@@ -99,12 +101,13 @@ export default function Calendario() {
       const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
-        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones"),
         cargarTodosLosClientes(),
       ]);
 
       const serviciosBase = (srv ?? []) as Servicio[];
       const jornadas = (jor ?? []) as Array<{
+        id: string;
         servicio_id: string;
         fecha: string;
         estado: Estado;
@@ -125,7 +128,7 @@ export default function Calendario() {
       for (const s of serviciosBase) {
         const lista = porServicio.get(s.id);
         if (!lista || lista.length === 0) {
-          expandidos.push(s);
+          expandidos.push({ ...s, jornada_id: null });
           continue;
         }
         for (const j of lista) {
@@ -137,6 +140,7 @@ export default function Calendario() {
             estado: j.estado,
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
+            jornada_id: j.id,
           });
         }
       }
@@ -187,6 +191,33 @@ export default function Calendario() {
   const days = eachDayOfInterval({ start, end });
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
+
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  const canDrag = (s: Servicio) => s.estado === "Pendiente" && !!s.jornada_id && (isAdmin || isCabecilla);
+
+  const moverJornada = async (jornadaId: string, nuevaFecha: Date, servicioId: string) => {
+    const fecha = format(nuevaFecha, "yyyy-MM-dd");
+    // Verificar que no exista ya una jornada en esa fecha para el mismo servicio
+    const conflict = servicios.find(
+      (x) => x.id === servicioId && x.fecha_programada === fecha,
+    );
+    if (conflict) {
+      toast.error("Ya existe una jornada de este servicio en esa fecha.");
+      return;
+    }
+    const { error } = await supabase
+      .from("servicio_jornadas")
+      .update({ fecha })
+      .eq("id", jornadaId);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Servicio movido");
+    load();
+  };
 
   const estadoColor = (e: Estado) =>
     e === "Completado"
@@ -277,48 +308,95 @@ export default function Calendario() {
           ))}
         </div>
 
-        <div className="grid grid-cols-7">
+        <div className={cn("grid grid-cols-7", vista === "semana" && "auto-rows-fr")}>
           {days.map((d) => {
             const evs = eventsForDay(d);
             const isCur = isSameMonth(d, cursor);
             const isToday = isSameDay(d, new Date());
+            const dayKey = format(d, "yyyy-MM-dd");
+            const isDragOver = dragOverKey === dayKey;
+            const esSemana = vista === "semana";
+            const visibles = esSemana ? evs : evs.slice(0, 3);
 
             return (
-              <button
+              <div
                 key={d.toISOString()}
+                role="button"
+                tabIndex={0}
                 onClick={() => setDiaSel(d)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setDiaSel(d);
+                }}
+                onDragOver={(e) => {
+                  if (dragId) {
+                    e.preventDefault();
+                    if (dragOverKey !== dayKey) setDragOverKey(dayKey);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverKey === dayKey) setDragOverKey(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverKey(null);
+                  const data = e.dataTransfer.getData("text/plain");
+                  if (!data) return;
+                  const [jornadaId, servicioId, fechaOrigen] = data.split("|");
+                  if (!jornadaId || fechaOrigen === dayKey) return;
+                  moverJornada(jornadaId, d, servicioId);
+                }}
                 className={cn(
-                  "min-h-[56px] sm:min-h-[110px] border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col",
+                  "border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[110px]",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
                   isToday && "bg-primary/5",
+                  isDragOver && "bg-primary/10 ring-2 ring-primary/40",
                 )}
               >
                 <div className={cn("text-right text-[11px] font-semibold tabular-nums sm:mb-1", isToday && "text-primary")}>
                   {format(d, "d")}
                 </div>
 
-                <div className="flex flex-1 items-center justify-center sm:hidden">
-                  {evs.length > 0 && (
-                    <span
-                      className={cn(
-                        "inline-flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white",
-                        dominantColor(evs),
-                      )}
-                    >
-                      {evs.length}
-                    </span>
-                  )}
-                </div>
+                {!esSemana && (
+                  <div className="flex flex-1 items-center justify-center sm:hidden">
+                    {evs.length > 0 && (
+                      <span
+                        className={cn(
+                          "inline-flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white",
+                          dominantColor(evs),
+                        )}
+                      >
+                        {evs.length}
+                      </span>
+                    )}
+                  </div>
+                )}
 
-                <div className="hidden sm:block space-y-1">
-                  {evs.slice(0, 3).map((s) => {
+                <div className={cn("space-y-1", !esSemana && "hidden sm:block")}>
+                  {visibles.map((s) => {
                     const TipoIcon = (s.tipo_trabajo ?? "Visita de campo") === "Máquina en taller" ? Wrench : MapPin;
+                    const draggable = canDrag(s);
 
                     return (
                       <div
                         key={`${s.id}-${s.fecha_programada}`}
                         role="button"
                         tabIndex={0}
+                        draggable={draggable}
+                        onDragStart={(e) => {
+                          if (!draggable || !s.jornada_id) return;
+                          e.stopPropagation();
+                          setDragId(s.jornada_id);
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData(
+                            "text/plain",
+                            `${s.jornada_id}|${s.id}|${s.fecha_programada}`,
+                          );
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDragOverKey(null);
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           setDetalle(s);
@@ -330,9 +408,12 @@ export default function Calendario() {
                           }
                         }}
                         className={cn(
-                          "flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium cursor-pointer",
+                          "flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
+                          esSemana && "text-[11px] py-1",
                           estadoColor(s.estado),
+                          draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
                         )}
+                        title={draggable ? "Arrastrá para mover este servicio a otra fecha" : undefined}
                       >
                         <TipoIcon className="h-2.5 w-2.5 shrink-0" />
                         <span className="truncate">{clienteNombre(s.cliente_id)}</span>
@@ -340,13 +421,13 @@ export default function Calendario() {
                     );
                   })}
 
-                  {evs.length > 3 && (
+                  {!esSemana && evs.length > 3 && (
                     <div className="text-[10px] text-muted-foreground font-medium">
                       +{evs.length - 3} más…
                     </div>
                   )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
