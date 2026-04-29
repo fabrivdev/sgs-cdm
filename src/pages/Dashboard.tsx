@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
+  const [clientesContactar, setClientesContactar] = useState<MaquinaContacto[]>([]);
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [showAllTecnicos, setShowAllTecnicos] = useState(false);
