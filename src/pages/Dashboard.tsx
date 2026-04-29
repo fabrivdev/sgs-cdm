@@ -89,6 +89,27 @@ const COLORS_MARCA: Record<Marca, string> = {
 
 const shortName = (n: string) => n.trim().split(/\s+/).slice(0, 2).join(" ");
 
+const PAGE = 1000;
+
+async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
+  let from = 0;
+  const all: T[] = [];
+
+  while (true) {
+    const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    all.push(...(data as T[]));
+
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -118,79 +139,81 @@ export default function Dashboard() {
 
   // Clientes a contactar:
   // 1 fila por cliente con máquinas activas.
-  // Muestra último contacto comercial y días desde la última facturación.
-  // Ordena de mayor a menor por días desde última facturación.
+  // Carga con paginación, porque Supabase devuelve 1000 filas por defecto.
+  // Sin esto, muchos clientes quedan como "Cliente no encontrado" aunque existan.
   useEffect(() => {
     (async () => {
-      const [maqRes, cliRes, segRes, factRes] = await Promise.all([
-        supabase
-          .from("parque_maquinas")
-          .select("cliente_id")
-          .eq("activo", true),
-        supabase
-          .from("clientes")
-          .select("id, nombre")
-          .eq("activo", true),
-        supabase
-          .from("seguimiento_comercial")
-          .select("cliente_id, fecha"),
-        supabase
-          .from("facturacion")
-          .select("cliente_id, fecha"),
-      ]);
+      try {
+        const [maquinas, clientesAll, seguimientos, facturas] = await Promise.all([
+          cargarTodo<{ cliente_id: string | null }>(
+            supabase.from("parque_maquinas").select("cliente_id").eq("activo", true),
+          ),
+          cargarTodo<{ id: string; nombre: string }>(
+            supabase.from("clientes").select("id, nombre"),
+          ),
+          cargarTodo<{ cliente_id: string; fecha: string }>(
+            supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
+          ),
+          cargarTodo<{ cliente_id: string | null; fecha: string }>(
+            supabase.from("facturacion").select("cliente_id, fecha"),
+          ),
+        ]);
 
-      const clienteNombre = new Map<string, string>(
-        (cliRes.data ?? []).map((c: { id: string; nombre: string }) => [c.id, c.nombre]),
-      );
+        const clienteNombre = new Map<string, string>(
+          clientesAll.map((c) => [c.id, c.nombre]),
+        );
 
-      // Universo: clientes únicos con al menos una máquina activa.
-      const clientesConMaquinas = new Set<string>();
-      for (const m of (maqRes.data ?? []) as { cliente_id: string | null }[]) {
-        if (m.cliente_id) clientesConMaquinas.add(m.cliente_id);
+        // Universo: clientes únicos con al menos una máquina activa.
+        const clientesConMaquinas = new Set<string>();
+        for (const m of maquinas) {
+          if (m.cliente_id) clientesConMaquinas.add(m.cliente_id);
+        }
+
+        const ultContactoPorCliente = new Map<string, Date>();
+        for (const sg of seguimientos) {
+          if (!sg.cliente_id || !sg.fecha) continue;
+          const f = new Date(sg.fecha);
+          const cur = ultContactoPorCliente.get(sg.cliente_id);
+          if (!cur || f > cur) ultContactoPorCliente.set(sg.cliente_id, f);
+        }
+
+        const ultFactPorCliente = new Map<string, Date>();
+        for (const fct of facturas) {
+          if (!fct.cliente_id || !fct.fecha) continue;
+          const f = new Date(fct.fecha);
+          const cur = ultFactPorCliente.get(fct.cliente_id);
+          if (!cur || f > cur) ultFactPorCliente.set(fct.cliente_id, f);
+        }
+
+        const hoy = Date.now();
+
+        const lista: ClienteContacto[] = [...clientesConMaquinas]
+          .map((clienteId) => {
+            const ultimaFacturacion = ultFactPorCliente.get(clienteId) ?? null;
+            const diasUltimaFacturacion = ultimaFacturacion
+              ? Math.floor((hoy - ultimaFacturacion.getTime()) / 86400000)
+              : null;
+
+            return {
+              clienteId,
+              clienteNombre: clienteNombre.get(clienteId) ?? "Cliente no encontrado",
+              ultimoContacto: ultContactoPorCliente.get(clienteId) ?? null,
+              ultimaFacturacion,
+              diasUltimaFacturacion,
+            };
+          })
+          .sort((a, b) => {
+            // Los que nunca facturaron quedan arriba como prioridad máxima.
+            const da = a.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
+            const db = b.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
+            return db - da;
+          })
+          .slice(0, 10);
+
+        setClientesContactar(lista);
+      } catch (e) {
+        console.error(e);
       }
-
-      const ultContactoPorCliente = new Map<string, Date>();
-      for (const sg of (segRes.data ?? []) as { cliente_id: string; fecha: string }[]) {
-        if (!sg.cliente_id || !sg.fecha) continue;
-        const f = new Date(sg.fecha);
-        const cur = ultContactoPorCliente.get(sg.cliente_id);
-        if (!cur || f > cur) ultContactoPorCliente.set(sg.cliente_id, f);
-      }
-
-      const ultFactPorCliente = new Map<string, Date>();
-      for (const fct of (factRes.data ?? []) as { cliente_id: string | null; fecha: string }[]) {
-        if (!fct.cliente_id || !fct.fecha) continue;
-        const f = new Date(fct.fecha);
-        const cur = ultFactPorCliente.get(fct.cliente_id);
-        if (!cur || f > cur) ultFactPorCliente.set(fct.cliente_id, f);
-      }
-
-      const hoy = Date.now();
-
-      const lista: ClienteContacto[] = [...clientesConMaquinas]
-        .map((clienteId) => {
-          const ultimaFacturacion = ultFactPorCliente.get(clienteId) ?? null;
-          const diasUltimaFacturacion = ultimaFacturacion
-            ? Math.floor((hoy - ultimaFacturacion.getTime()) / 86400000)
-            : null;
-
-          return {
-            clienteId,
-            clienteNombre: clienteNombre.get(clienteId) ?? "Cliente no encontrado",
-            ultimoContacto: ultContactoPorCliente.get(clienteId) ?? null,
-            ultimaFacturacion,
-            diasUltimaFacturacion,
-          };
-        })
-        .sort((a, b) => {
-          // Los que nunca facturaron quedan arriba como prioridad máxima.
-          const da = a.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
-          const db = b.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
-          return db - da;
-        })
-        .slice(0, 10);
-
-      setClientesContactar(lista);
     })();
   }, []);
 
