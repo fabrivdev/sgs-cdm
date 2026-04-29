@@ -68,12 +68,12 @@ interface Profile {
   nombre: string;
 }
 
-interface MaquinaContacto {
-  maquinaId: string;
+interface ClienteContacto {
+  clienteId: string;
   clienteNombre: string;
-  equipo: string;
   ultimoContacto: Date | null;
-  dias: number | null;
+  ultimaFacturacion: Date | null;
+  diasUltimaFacturacion: number | null;
 }
 
 const COLORS_ESTADO: Record<Estado, string> = {
@@ -91,10 +91,11 @@ const shortName = (n: string) => n.trim().split(/\s+/).slice(0, 2).join(" ");
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
-  const [clientesContactar, setClientesContactar] = useState<MaquinaContacto[]>([]);
+  const [clientesContactar, setClientesContactar] = useState<ClienteContacto[]>([]);
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [showAllTecnicos, setShowAllTecnicos] = useState(false);
@@ -115,57 +116,79 @@ export default function Dashboard() {
     });
   }, []);
 
-  // Carga clientes/equipos a contactar (último contacto más antiguo)
+  // Clientes a contactar:
+  // 1 fila por cliente con máquinas activas.
+  // Muestra último contacto comercial y días desde la última facturación.
+  // Ordena de mayor a menor por días desde última facturación.
   useEffect(() => {
     (async () => {
-      const [maqRes, cliRes, segRes] = await Promise.all([
+      const [maqRes, cliRes, segRes, factRes] = await Promise.all([
         supabase
           .from("parque_maquinas")
-          .select("id, cliente_id, marca, modelo_tipo, serie")
+          .select("cliente_id")
           .eq("activo", true),
-        supabase.from("clientes").select("id, nombre").eq("activo", true),
-        supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
+        supabase
+          .from("clientes")
+          .select("id, nombre")
+          .eq("activo", true),
+        supabase
+          .from("seguimiento_comercial")
+          .select("cliente_id, fecha"),
+        supabase
+          .from("facturacion")
+          .select("cliente_id, fecha"),
       ]);
 
       const clienteNombre = new Map<string, string>(
         (cliRes.data ?? []).map((c: { id: string; nombre: string }) => [c.id, c.nombre]),
       );
-      const ultPorCliente = new Map<string, Date>();
+
+      // Universo: clientes únicos con al menos una máquina activa.
+      const clientesConMaquinas = new Set<string>();
+      for (const m of (maqRes.data ?? []) as { cliente_id: string | null }[]) {
+        if (m.cliente_id) clientesConMaquinas.add(m.cliente_id);
+      }
+
+      const ultContactoPorCliente = new Map<string, Date>();
       for (const sg of (segRes.data ?? []) as { cliente_id: string; fecha: string }[]) {
+        if (!sg.cliente_id || !sg.fecha) continue;
         const f = new Date(sg.fecha);
-        const cur = ultPorCliente.get(sg.cliente_id);
-        if (!cur || f > cur) ultPorCliente.set(sg.cliente_id, f);
+        const cur = ultContactoPorCliente.get(sg.cliente_id);
+        if (!cur || f > cur) ultContactoPorCliente.set(sg.cliente_id, f);
+      }
+
+      const ultFactPorCliente = new Map<string, Date>();
+      for (const fct of (factRes.data ?? []) as { cliente_id: string | null; fecha: string }[]) {
+        if (!fct.cliente_id || !fct.fecha) continue;
+        const f = new Date(fct.fecha);
+        const cur = ultFactPorCliente.get(fct.cliente_id);
+        if (!cur || f > cur) ultFactPorCliente.set(fct.cliente_id, f);
       }
 
       const hoy = Date.now();
-      const lista: MaquinaContacto[] = ((maqRes.data ?? []) as Array<{
-        id: string;
-        cliente_id: string | null;
-        marca: string;
-        modelo_tipo: string | null;
-        serie: string;
-      }>)
-        .filter((m) => m.cliente_id)
-        .map((m) => {
-          const ult = ultPorCliente.get(m.cliente_id!) ?? null;
-          const dias = ult ? Math.floor((hoy - ult.getTime()) / 86400000) : null;
-          const equipo = [m.marca, m.modelo_tipo, m.serie ? `(${m.serie})` : null]
-            .filter(Boolean)
-            .join(" ");
+
+      const lista: ClienteContacto[] = [...clientesConMaquinas]
+        .map((clienteId) => {
+          const ultimaFacturacion = ultFactPorCliente.get(clienteId) ?? null;
+          const diasUltimaFacturacion = ultimaFacturacion
+            ? Math.floor((hoy - ultimaFacturacion.getTime()) / 86400000)
+            : null;
+
           return {
-            maquinaId: m.id,
-            clienteNombre: clienteNombre.get(m.cliente_id!) ?? "—",
-            equipo,
-            ultimoContacto: ult,
-            dias,
+            clienteId,
+            clienteNombre: clienteNombre.get(clienteId) ?? "Cliente no encontrado",
+            ultimoContacto: ultContactoPorCliente.get(clienteId) ?? null,
+            ultimaFacturacion,
+            diasUltimaFacturacion,
           };
         })
         .sort((a, b) => {
-          const da = a.dias ?? Number.MAX_SAFE_INTEGER;
-          const db = b.dias ?? Number.MAX_SAFE_INTEGER;
+          // Los que nunca facturaron quedan arriba como prioridad máxima.
+          const da = a.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
+          const db = b.diasUltimaFacturacion ?? Number.MAX_SAFE_INTEGER;
           return db - da;
         })
-        .slice(0, 5);
+        .slice(0, 10);
 
       setClientesContactar(lista);
     })();
@@ -185,12 +208,12 @@ export default function Dashboard() {
     [servicios, from, to],
   );
 
-  // Mes anterior (mismo largo de período aprox.) para tendencia
   const prevPeriod = useMemo(() => {
     const fromDate = parseISO(from);
     const toDate = parseISO(to);
     const prevFrom = subMonths(fromDate, 1);
     const prevTo = subMonths(toDate, 1);
+
     return servicios.filter((s) => {
       const d = parseISO(s.fecha_programada);
       return isWithinInterval(d, { start: prevFrom, end: prevTo });
@@ -200,7 +223,6 @@ export default function Dashboard() {
   const total = filtered.length;
   const completados = filtered.filter((s) => s.estado === "Completado").length;
   const pendientes = filtered.filter((s) => s.estado === "Pendiente").length;
-  const iniciados = filtered.filter((s) => s.estado === "Iniciado").length;
   const totalHoras = filtered.reduce((acc, s) => acc + (s.horas_trabajadas ?? 0), 0);
 
   const totalPrev = prevPeriod.length;
@@ -209,16 +231,19 @@ export default function Dashboard() {
   const pctCompletados = total ? Math.round((completados / total) * 100) : 0;
   const pctPendientes = total ? Math.round((pendientes / total) * 100) : 0;
 
-  // Técnicos activos = profiles no admin con al menos 1 servicio en el período
   const tecnicosActivosIds = useMemo(() => {
     const set = new Set<string>();
+
     for (const s of filtered) {
-      if (s.tecnico_responsable_id && !adminIds.has(s.tecnico_responsable_id))
+      if (s.tecnico_responsable_id && !adminIds.has(s.tecnico_responsable_id)) {
         set.add(s.tecnico_responsable_id);
+      }
+
       for (const a of s.auxiliares ?? []) {
         if (a && !adminIds.has(a)) set.add(a);
       }
     }
+
     return set;
   }, [filtered, adminIds]);
 
@@ -226,11 +251,11 @@ export default function Dashboard() {
     ? totalHoras / tecnicosActivosIds.size
     : 0;
 
-  // Por sucursal apilado por estado
   const porSucursal = useMemo(
     () =>
       SUCURSALES.map((suc) => {
         const items = filtered.filter((x) => x.sucursal === suc);
+
         return {
           name: suc,
           Pendiente: items.filter((x) => x.estado === "Pendiente").length,
@@ -242,7 +267,6 @@ export default function Dashboard() {
     [filtered],
   );
 
-  // Por técnico (responsable + auxiliares, excluye admins)
   const porTecnico = useMemo(() => {
     const base = new Map<string, { id: string; name: string; total: number; horas: number }>();
 
@@ -253,29 +277,32 @@ export default function Dashboard() {
 
     for (const s of filtered) {
       const participantes = new Set<string>();
+
       if (s.tecnico_responsable_id) participantes.add(s.tecnico_responsable_id);
       for (const aux of s.auxiliares ?? []) if (aux) participantes.add(aux);
 
       for (const id of participantes) {
         if (adminIds.has(id)) continue;
+
         const actual =
           base.get(id) ??
           { id, name: shortName(profById[id] ?? "Sin nombre"), total: 0, horas: 0 };
+
         actual.total += 1;
         actual.horas += s.horas_trabajadas ?? 0;
+
         base.set(id, actual);
       }
     }
 
     return [...base.values()]
-      .filter((t) => t.total > 0) // sólo con servicios asignados en el período
+      .filter((t) => t.total > 0)
       .sort((a, b) => b.total - a.total || b.horas - a.horas);
   }, [profiles, adminIds, filtered, profById]);
 
   const topTecnicos = porTecnico.slice(0, 5);
   const maxHoras = Math.max(1, ...porTecnico.map((t) => t.horas));
   const tecnicosSinHoras = porTecnico.filter((t) => t.horas === 0);
-  
 
   const porMarca = MARCAS.map((m) => ({
     name: m,
@@ -288,6 +315,11 @@ export default function Dashboard() {
   }));
 
   const showAlert = total > 0 && pctPendientes > 50;
+
+  const irAPendientes = () => {
+    // En App.tsx el Planificador está en "/", no en "/planificador".
+    navigate("/");
+  };
 
   return (
     <div className="container max-w-[1400px] py-4 space-y-4">
@@ -340,7 +372,7 @@ export default function Dashboard() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => navigate("/planificador")}
+            onClick={irAPendientes}
             className="gap-1 self-start sm:self-auto border-[#EF9F27] hover:bg-[#EF9F27]/10"
           >
             Ver pendientes <ArrowRight className="h-3.5 w-3.5" />
@@ -577,41 +609,43 @@ export default function Dashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="h-8 text-[11px]">Cliente / Equipo</TableHead>
+                <TableHead className="h-8 text-[11px]">Cliente</TableHead>
                 <TableHead className="h-8 text-[11px] whitespace-nowrap">Último contacto</TableHead>
-                <TableHead className="h-8 text-[11px] text-right whitespace-nowrap">Días</TableHead>
+                <TableHead className="h-8 text-[11px] text-right whitespace-nowrap">Días últ. fact.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {clientesContactar.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">
-                    Sin equipos en el parque
+                    Sin clientes en el parque
                   </TableCell>
                 </TableRow>
               ) : (
-                clientesContactar.map((m) => {
+                clientesContactar.map((c) => {
+                  const dias = c.diasUltimaFacturacion;
                   const diasCls =
-                    m.dias == null || m.dias > 30
+                    dias == null || dias > 120
                       ? "text-destructive font-bold"
-                      : m.dias > 15
+                      : dias > 60
                       ? "text-amber-600 font-semibold"
                       : "text-muted-foreground";
+
                   return (
-                    <TableRow key={m.maquinaId}>
+                    <TableRow key={c.clienteId}>
                       <TableCell className="py-1.5 text-xs">
-                        <div className="font-medium truncate max-w-[200px]">{m.clienteNombre}</div>
-                        <div className="text-[10px] text-muted-foreground truncate max-w-[200px]">
-                          {m.equipo}
+                        <div className="font-medium truncate max-w-[230px]">{c.clienteNombre}</div>
+                        <div className="text-[10px] text-muted-foreground truncate max-w-[230px]">
+                          Últ. fact.: {c.ultimaFacturacion ? format(c.ultimaFacturacion, "dd/MM/yyyy") : "Nunca"}
                         </div>
                       </TableCell>
                       <TableCell className="py-1.5 text-xs whitespace-nowrap">
-                        {m.ultimoContacto ? format(m.ultimoContacto, "dd/MM/yyyy") : "Nunca"}
+                        {c.ultimoContacto ? format(c.ultimoContacto, "dd/MM/yyyy") : "Nunca"}
                       </TableCell>
                       <TableCell
                         className={`py-1.5 text-xs text-right tabular-nums whitespace-nowrap ${diasCls}`}
                       >
-                        {m.dias == null ? "—" : `${m.dias}d`}
+                        {dias == null ? "Sin fact." : `${dias}d`}
                       </TableCell>
                     </TableRow>
                   );
