@@ -68,6 +68,14 @@ interface Profile {
   nombre: string;
 }
 
+interface MaquinaContacto {
+  maquinaId: string;
+  clienteNombre: string;
+  equipo: string;
+  ultimoContacto: Date | null;
+  dias: number | null;
+}
+
 const COLORS_ESTADO: Record<Estado, string> = {
   Pendiente: "#EF9F27",
   Iniciado: "#378ADD",
@@ -86,6 +94,7 @@ export default function Dashboard() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
+  const [clientesContactar, setClientesContactar] = useState<MaquinaContacto[]>([]);
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [showAllTecnicos, setShowAllTecnicos] = useState(false);
@@ -104,6 +113,62 @@ export default function Dashboard() {
       setProfiles((p.data ?? []) as Profile[]);
       setAdminIds(new Set((r.data ?? []).map((x: { user_id: string }) => x.user_id)));
     });
+  }, []);
+
+  // Carga clientes/equipos a contactar (último contacto más antiguo)
+  useEffect(() => {
+    (async () => {
+      const [maqRes, cliRes, segRes] = await Promise.all([
+        supabase
+          .from("parque_maquinas")
+          .select("id, cliente_id, marca, modelo_tipo, serie")
+          .eq("activo", true),
+        supabase.from("clientes").select("id, nombre").eq("activo", true),
+        supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
+      ]);
+
+      const clienteNombre = new Map<string, string>(
+        (cliRes.data ?? []).map((c: { id: string; nombre: string }) => [c.id, c.nombre]),
+      );
+      const ultPorCliente = new Map<string, Date>();
+      for (const sg of (segRes.data ?? []) as { cliente_id: string; fecha: string }[]) {
+        const f = new Date(sg.fecha);
+        const cur = ultPorCliente.get(sg.cliente_id);
+        if (!cur || f > cur) ultPorCliente.set(sg.cliente_id, f);
+      }
+
+      const hoy = Date.now();
+      const lista: MaquinaContacto[] = ((maqRes.data ?? []) as Array<{
+        id: string;
+        cliente_id: string | null;
+        marca: string;
+        modelo_tipo: string | null;
+        serie: string;
+      }>)
+        .filter((m) => m.cliente_id)
+        .map((m) => {
+          const ult = ultPorCliente.get(m.cliente_id!) ?? null;
+          const dias = ult ? Math.floor((hoy - ult.getTime()) / 86400000) : null;
+          const equipo = [m.marca, m.modelo_tipo, m.serie ? `(${m.serie})` : null]
+            .filter(Boolean)
+            .join(" ");
+          return {
+            maquinaId: m.id,
+            clienteNombre: clienteNombre.get(m.cliente_id!) ?? "—",
+            equipo,
+            ultimoContacto: ult,
+            dias,
+          };
+        })
+        .sort((a, b) => {
+          const da = a.dias ?? Number.MAX_SAFE_INTEGER;
+          const db = b.dias ?? Number.MAX_SAFE_INTEGER;
+          return db - da;
+        })
+        .slice(0, 5);
+
+      setClientesContactar(lista);
+    })();
   }, []);
 
   const profById = useMemo(
@@ -210,7 +275,7 @@ export default function Dashboard() {
   const topTecnicos = porTecnico.slice(0, 5);
   const maxHoras = Math.max(1, ...porTecnico.map((t) => t.horas));
   const tecnicosSinHoras = porTecnico.filter((t) => t.horas === 0);
-  const tecnicosConHoras = porTecnico.filter((t) => t.horas > 0);
+  
 
   const porMarca = MARCAS.map((m) => ({
     name: m,
@@ -495,42 +560,65 @@ export default function Dashboard() {
           )}
         </Card>
 
-        {/* Cobertura de horas */}
-        <Card className="p-3 sm:p-4">
-          <h3 className="text-sm font-semibold mb-3">Cobertura de horas</h3>
-          <CoberturaBar
-            label="Con horas cargadas"
-            value={tecnicosConHoras.length}
-            total={porTecnico.length}
-            color="hsl(var(--estado-completado))"
-          />
-          <div className="mt-3">
-            <CoberturaBar
-              label="Sin horas registradas"
-              value={tecnicosSinHoras.length}
-              total={porTecnico.length}
-              color="hsl(var(--destructive))"
-            />
+        {/* Clientes a contactar */}
+        <Card className="p-3 sm:p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">Clientes a contactar</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => navigate("/parque-clientes")}
+            >
+              Ver parque completo <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
           </div>
 
-          <div className="mt-4 pt-3 border-t grid grid-cols-2 gap-2 text-center">
-            <div>
-              <div className="text-2xl font-bold tabular-nums text-estado-completado">
-                {tecnicosConHoras.length}
-              </div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                con horas
-              </div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold tabular-nums text-destructive">
-                {tecnicosSinHoras.length}
-              </div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                sin horas
-              </div>
-            </div>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="h-8 text-[11px]">Cliente / Equipo</TableHead>
+                <TableHead className="h-8 text-[11px] whitespace-nowrap">Último contacto</TableHead>
+                <TableHead className="h-8 text-[11px] text-right whitespace-nowrap">Días</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {clientesContactar.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">
+                    Sin equipos en el parque
+                  </TableCell>
+                </TableRow>
+              ) : (
+                clientesContactar.map((m) => {
+                  const diasCls =
+                    m.dias == null || m.dias > 30
+                      ? "text-destructive font-bold"
+                      : m.dias > 15
+                      ? "text-amber-600 font-semibold"
+                      : "text-muted-foreground";
+                  return (
+                    <TableRow key={m.maquinaId}>
+                      <TableCell className="py-1.5 text-xs">
+                        <div className="font-medium truncate max-w-[200px]">{m.clienteNombre}</div>
+                        <div className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                          {m.equipo}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-1.5 text-xs whitespace-nowrap">
+                        {m.ultimoContacto ? format(m.ultimoContacto, "dd/MM/yyyy") : "Nunca"}
+                      </TableCell>
+                      <TableCell
+                        className={`py-1.5 text-xs text-right tabular-nums whitespace-nowrap ${diasCls}`}
+                      >
+                        {m.dias == null ? "—" : `${m.dias}d`}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </Card>
       </div>
 
@@ -590,37 +678,6 @@ function TecnicoRow({
         )}
       </TableCell>
     </TableRow>
-  );
-}
-
-function CoberturaBar({
-  label,
-  value,
-  total,
-  color,
-}: {
-  label: string;
-  value: number;
-  total: number;
-  color: string;
-}) {
-  const pct = total > 0 ? (value / total) * 100 : 0;
-  return (
-    <div>
-      <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="tabular-nums font-semibold">
-          {value}
-          <span className="text-muted-foreground font-normal">/{total}</span>
-        </span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
-    </div>
   );
 }
 
