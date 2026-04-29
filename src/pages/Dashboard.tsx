@@ -115,6 +115,62 @@ export default function Dashboard() {
     });
   }, []);
 
+  // Carga clientes/equipos a contactar (último contacto más antiguo)
+  useEffect(() => {
+    (async () => {
+      const [maqRes, cliRes, segRes] = await Promise.all([
+        supabase
+          .from("parque_maquinas")
+          .select("id, cliente_id, marca, modelo_tipo, serie")
+          .eq("activo", true),
+        supabase.from("clientes").select("id, nombre").eq("activo", true),
+        supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
+      ]);
+
+      const clienteNombre = new Map<string, string>(
+        (cliRes.data ?? []).map((c: { id: string; nombre: string }) => [c.id, c.nombre]),
+      );
+      const ultPorCliente = new Map<string, Date>();
+      for (const sg of (segRes.data ?? []) as { cliente_id: string; fecha: string }[]) {
+        const f = new Date(sg.fecha);
+        const cur = ultPorCliente.get(sg.cliente_id);
+        if (!cur || f > cur) ultPorCliente.set(sg.cliente_id, f);
+      }
+
+      const hoy = Date.now();
+      const lista: MaquinaContacto[] = ((maqRes.data ?? []) as Array<{
+        id: string;
+        cliente_id: string | null;
+        marca: string;
+        modelo_tipo: string | null;
+        serie: string;
+      }>)
+        .filter((m) => m.cliente_id)
+        .map((m) => {
+          const ult = ultPorCliente.get(m.cliente_id!) ?? null;
+          const dias = ult ? Math.floor((hoy - ult.getTime()) / 86400000) : null;
+          const equipo = [m.marca, m.modelo_tipo, m.serie ? `(${m.serie})` : null]
+            .filter(Boolean)
+            .join(" ");
+          return {
+            maquinaId: m.id,
+            clienteNombre: clienteNombre.get(m.cliente_id!) ?? "—",
+            equipo,
+            ultimoContacto: ult,
+            dias,
+          };
+        })
+        .sort((a, b) => {
+          const da = a.dias ?? Number.MAX_SAFE_INTEGER;
+          const db = b.dias ?? Number.MAX_SAFE_INTEGER;
+          return db - da;
+        })
+        .slice(0, 5);
+
+      setClientesContactar(lista);
+    })();
+  }, []);
+
   const profById = useMemo(
     () => Object.fromEntries(profiles.map((p) => [p.id, p.nombre])),
     [profiles],
