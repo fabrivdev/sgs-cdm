@@ -364,6 +364,53 @@ export default function Dashboard() {
     navigate("/");
   };
 
+  // Estado de técnicos hoy
+  const tecnicosEstado = useMemo(() => {
+    const tecnicos = profiles.filter((p) => !adminIds.has(p.id));
+
+    // Map técnico -> primer servicio activo hoy
+    const ocupados = new Map<string, JornadaHoy>();
+    for (const j of jornadasHoy) {
+      const ids = new Set<string>();
+      if (j.tecnico_responsable_id) ids.add(j.tecnico_responsable_id);
+      for (const a of j.auxiliares ?? []) if (a) ids.add(a);
+      for (const id of ids) {
+        if (!ocupados.has(id)) ocupados.set(id, j);
+      }
+    }
+
+    // Servicios del período por técnico (para "X servicios este mes")
+    const conteoPeriodo = new Map<string, number>();
+    for (const s of filtered) {
+      const ids = new Set<string>();
+      if (s.tecnico_responsable_id) ids.add(s.tecnico_responsable_id);
+      for (const a of s.auxiliares ?? []) if (a) ids.add(a);
+      for (const id of ids) {
+        conteoPeriodo.set(id, (conteoPeriodo.get(id) ?? 0) + 1);
+      }
+    }
+
+    return tecnicos
+      .map((p) => {
+        const activo = ocupados.get(p.id);
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          sucursalProfile: p.sucursal,
+          disponible: !activo,
+          sucursalActiva: activo?.sucursal ?? null,
+          serviciosPeriodo: conteoPeriodo.get(p.id) ?? 0,
+        };
+      })
+      .sort((a, b) => {
+        if (a.disponible !== b.disponible) return a.disponible ? 1 : -1;
+        return a.nombre.localeCompare(b.nombre);
+      });
+  }, [profiles, adminIds, jornadasHoy, filtered]);
+
+  const cantDisponibles = tecnicosEstado.filter((t) => t.disponible).length;
+  const cantNoDisponibles = tecnicosEstado.length - cantDisponibles;
+
   return (
     <div className="container max-w-[1400px] py-4 space-y-4">
       {/* Header con filtros */}
