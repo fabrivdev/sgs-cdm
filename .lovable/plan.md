@@ -1,71 +1,71 @@
-# Servicios continuables en varias fechas
+# Plan: Tabs en Dashboard + vista "Estado de técnicos hoy"
 
-Hoy cada servicio vive en una sola `fecha_programada`. Vamos a permitir que un mismo servicio aparezca en varias fechas (ej: empezó el lunes, sigue el martes) sin duplicar el trabajo, registrando las horas trabajadas por cada jornada.
+## 1. Reestructurar Dashboard con tabs
 
-## Qué cambia para el usuario
+En `src/pages/Dashboard.tsx`, debajo del título "Dashboard" agregar un selector con dos opciones:
 
-- En el **detalle del servicio**, nuevo botón **"Continuar en otra fecha"** que abre un mini calendario para elegir el próximo día. El servicio queda visible también en esa fecha en el Planificador y Calendario.
-- Nueva sección **"Jornadas"** en el detalle: lista de fechas donde aparece el servicio, con horas trabajadas y estado por cada una. Se pueden agregar y quitar fechas.
-- Las **horas trabajadas se cargan por jornada** (no más un único campo total). El detalle muestra el total acumulado.
-- En el Planificador / Calendario, un servicio multi-fecha muestra un pequeño indicador (ícono de cadena 🔗 o badge "día 2 de 3") para que se vea que es continuación.
+- **Resumen** — toda la vista actual (KPIs, banner alerta, gráficos, top técnicos, clientes a contactar). El filtro de fechas (Desde/Hasta) **solo aparece** cuando esta tab está activa.
+- **Técnicos** — la nueva grilla (descrita abajo). No muestra el filtro de fechas (siempre se basa en "hoy" para disponibilidad, pero usa el período para el contador "X servicios este mes").
 
-## Cambios técnicos
+Implementación: usar el componente `Tabs` de shadcn (`@/components/ui/tabs`) con dos `TabsTrigger` ("Resumen", "Técnicos") debajo del header. Estado `vista: "resumen" | "tecnicos"`.
 
-### Base de datos
+## 2. Nueva vista "Estado de técnicos hoy"
 
-Nueva tabla `servicio_jornadas` (una fila por (servicio, fecha)):
+Cargar todos los técnicos no-admin desde `profiles` (ya disponibles), junto con su `sucursal`. Para determinar el estado del día:
+
+- Calcular `hoy = format(new Date(), "yyyy-MM-dd")`.
+- Para servicios "iniciados hoy": consultar `servicio_jornadas` con `fecha = hoy` y `estado = 'Iniciado'`, y unir con `servicios` para obtener `tecnico_responsable_id`, `auxiliares` y `sucursal`. Un técnico está **No disponible** si participa (responsable o auxiliar) en al menos una jornada activa hoy con estado `Iniciado`.
+- Si no, está **Disponible**.
+
+Cada tarjeta (componente `Card`):
+
+- Borde izquierdo de 4px: gris (`border-l-muted-foreground/40`) si Disponible, verde (`border-l-estado-completado` o `#639922`) si No disponible.
+- Círculo con iniciales (primeras letras de las 2 primeras palabras del nombre): fondo gris si Disponible, verde si No disponible, texto blanco.
+- Nombre completo del técnico.
+- Badge de estado: gris ("Disponible") o verde ("No disponible").
+- Línea secundaria:
+  - Disponible → "N servicios este mes" (cuenta de servicios donde participó dentro del rango `from`/`to` actual del filtro; si la tab Técnicos no usa filtro, usar mes actual por defecto).
+  - No disponible → sucursal/ubicación del primer servicio activo hoy (ej. "En Encarnación").
+
+Layout: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3`.
+
+Al pie: dos pills (Badge):
+- "X disponibles" (estilo gris/secundario)
+- "X no disponibles" (verde)
+
+## 3. Quitar requisito de horas al completar
+
+En `src/components/ServicioDetalleDialog.tsx`, función `save` (líneas 252-260): eliminar el bloque que valida `merged.estado === "Completado" && horas_trabajadas == null` y bloquea el guardado. También quitar el asterisco rojo `*` y el indicador visual de obligatoriedad junto al label "Horas" (línea 484).
+
+Las horas siguen siendo un campo opcional editable; simplemente ya no impiden marcar Completado.
+
+## Detalles técnicos
 
 ```
-- id uuid PK
-- servicio_id uuid (referencia lógica a servicios.id, ON DELETE CASCADE vía trigger)
-- fecha date NOT NULL
-- horas_trabajadas numeric NULL
-- estado estado_servicio NOT NULL DEFAULT 'Pendiente'
-- observaciones text NULL
-- creado_en, actualizado_en timestamptz
-- UNIQUE (servicio_id, fecha)
+Dashboard
+├─ Header (título)
+├─ Tabs [Resumen | Técnicos]
+│   ├─ Resumen
+│   │   ├─ Filtro fechas (Desde/Hasta)
+│   │   ├─ Banner alerta
+│   │   ├─ KPIs
+│   │   ├─ Charts
+│   │   └─ Top técnicos / Clientes a contactar
+│   └─ Técnicos
+│       ├─ Grilla de tarjetas
+│       └─ Pills resumen
 ```
 
-RLS heredando de `servicios`: SELECT/UPDATE si el usuario puede ver/editar el servicio padre (admin, cabecilla de la misma sucursal, responsable o auxiliar). DELETE/INSERT para admin y cabecilla.
+Query para jornadas activas hoy:
+```ts
+supabase
+  .from("servicio_jornadas")
+  .select("servicio_id, estado, fecha, servicios!inner(tecnico_responsable_id, auxiliares, sucursal)")
+  .eq("fecha", hoy)
+  .eq("estado", "Iniciado")
+```
 
-**Migración de datos**: para cada servicio existente, crear una jornada inicial con su `fecha_programada`, `estado`, `horas_trabajadas` y `observaciones` actuales. La columna `fecha_programada` queda como "fecha inicial" (no se borra para no romper nada).
+## Archivos a modificar
 
-### Lectura en el Planificador / Calendario / Historial
-
-Las consultas que hoy filtran por `servicios.fecha_programada` pasan a hacer un JOIN/`in` contra `servicio_jornadas`:
-
-- Planificador: `select ... from servicio_jornadas join servicios ...` filtrando por rango de fechas en `servicio_jornadas.fecha`. Cada jornada se renderiza como un slot, con el mismo servicio detrás.
-- Calendario: idem, una entrada por jornada.
-- Métricas (% completados, etc.): se calculan sobre jornadas, no sobre servicios.
-
-### UI
-
-- **`ServicioDetalleDialog.tsx`**:
-  - Nuevo bloque "Jornadas" arriba de Estado/Horas/Observaciones, listando las jornadas del servicio con sus campos editables inline.
-  - Botón "+ Continuar en otra fecha" → abre Popover con `<Calendar>` (shadcn) y crea una nueva fila en `servicio_jornadas`.
-  - Quitar los inputs sueltos de `estado` / `horas` / `observaciones` del servicio: ahora viven dentro de cada jornada. El `Servicio` mantiene `trabajo_descripcion`, cliente, técnicos, marca, tipo y sucursal (datos del trabajo, no de la jornada).
-
-- **`ServicioFormDialog.tsx`** (crear nuevo): al guardar un servicio nuevo, también insertar la jornada inicial con `fecha = fecha_programada`.
-
-- **Planificador / Calendario**: indicador visual cuando una jornada pertenece a un servicio con varias jornadas (badge "día N/M").
-
-### Limpieza
-
-- El campo `servicios.estado`, `servicios.horas_trabajadas` y `servicios.observaciones` quedan como "snapshot" del último estado por compatibilidad pero ya no se editan directamente. Opcionalmente, en una iteración futura se pueden eliminar.
-
-## Riesgos y consideraciones
-
-- **Historial / reportes existentes**: cualquier query que cuente "servicios completados" debe cambiar a "jornadas completadas" o decidir explícitamente qué cuenta. Voy a revisar `Historial.tsx`, `Dashboard.tsx` y `ParqueTab.tsx` para adaptar.
-- **Permisos**: si un técnico es responsable solo de la jornada del día siguiente (no de la original), igual debe poder verla. La RLS por servicio padre cubre este caso.
-- **Eliminar una jornada** ≠ eliminar el servicio. Si se borra la última jornada, se mantiene el servicio (queda "sin programar") o se borra el servicio entero — voy con la primera opción para evitar pérdidas accidentales.
-
-## Archivos a tocar
-
-- `supabase/migrations/...` (nueva tabla + RLS + backfill)
-- `src/components/ServicioDetalleDialog.tsx` (sección Jornadas + botón continuar)
-- `src/components/ServicioFormDialog.tsx` (crear jornada inicial al insertar)
-- `src/pages/Planificador.tsx` (consulta y render por jornada)
-- `src/pages/Calendario.tsx` (idem)
-- `src/pages/Historial.tsx` (consulta basada en jornadas)
-- `src/pages/Dashboard.tsx` (métricas basadas en jornadas)
-- `src/components/parque/ParqueTab.tsx` (si usa fechas de servicios para "último servicio")
+- `src/pages/Dashboard.tsx` — agregar Tabs, mover contenido actual a tab "Resumen", crear nueva sección "Técnicos", cargar jornadas de hoy.
+- `src/components/ServicioDetalleDialog.tsx` — quitar validación obligatoria de horas al completar y el indicador visual `*`.
