@@ -51,6 +51,7 @@ import {
   format,
 } from "date-fns";
 import { AlertTriangle, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface Servicio {
   id: string;
@@ -66,6 +67,14 @@ interface Servicio {
 interface Profile {
   id: string;
   nombre: string;
+  sucursal: Sucursal | null;
+}
+
+interface JornadaHoy {
+  servicio_id: string;
+  tecnico_responsable_id: string | null;
+  auxiliares: string[];
+  sucursal: Sucursal;
 }
 
 interface UltimoSeguimiento {
@@ -122,6 +131,9 @@ export default function Dashboard() {
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [showAllTecnicos, setShowAllTecnicos] = useState(false);
+  const [vista, setVista] = useState<"resumen" | "tecnicos">("resumen");
+  const [jornadasHoy, setJornadasHoy] = useState<JornadaHoy[]>([]);
+  const hoyStr = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
     Promise.all([
@@ -130,7 +142,7 @@ export default function Dashboard() {
         .select(
           "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas",
         ),
-      supabase.from("profiles").select("id, nombre"),
+      supabase.from("profiles").select("id, nombre, sucursal"),
       supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
     ]).then(([s, p, r]) => {
       setServicios((s.data ?? []) as Servicio[]);
@@ -138,6 +150,31 @@ export default function Dashboard() {
       setAdminIds(new Set((r.data ?? []).map((x: { user_id: string }) => x.user_id)));
     });
   }, []);
+
+  // Jornadas iniciadas hoy (para "Estado de técnicos hoy")
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("servicio_jornadas")
+        .select("servicio_id, estado, fecha, servicios!inner(tecnico_responsable_id, auxiliares, sucursal)")
+        .eq("fecha", hoyStr)
+        .eq("estado", "Iniciado");
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      const items: JornadaHoy[] = ((data ?? []) as any[]).map((j) => ({
+        servicio_id: j.servicio_id,
+        tecnico_responsable_id: j.servicios?.tecnico_responsable_id ?? null,
+        auxiliares: j.servicios?.auxiliares ?? [],
+        sucursal: j.servicios?.sucursal,
+      }));
+
+      setJornadasHoy(items);
+    })();
+  }, [hoyStr]);
 
   // Últimos seguimientos:
   // Reemplaza la tarjeta de "clientes a contactar" por los últimos mensajes registrados.
@@ -327,36 +364,95 @@ export default function Dashboard() {
     navigate("/");
   };
 
+  // Estado de técnicos hoy
+  const tecnicosEstado = useMemo(() => {
+    const tecnicos = profiles.filter((p) => !adminIds.has(p.id));
+
+    // Map técnico -> primer servicio activo hoy
+    const ocupados = new Map<string, JornadaHoy>();
+    for (const j of jornadasHoy) {
+      const ids = new Set<string>();
+      if (j.tecnico_responsable_id) ids.add(j.tecnico_responsable_id);
+      for (const a of j.auxiliares ?? []) if (a) ids.add(a);
+      for (const id of ids) {
+        if (!ocupados.has(id)) ocupados.set(id, j);
+      }
+    }
+
+    // Servicios del período por técnico (para "X servicios este mes")
+    const conteoPeriodo = new Map<string, number>();
+    for (const s of filtered) {
+      const ids = new Set<string>();
+      if (s.tecnico_responsable_id) ids.add(s.tecnico_responsable_id);
+      for (const a of s.auxiliares ?? []) if (a) ids.add(a);
+      for (const id of ids) {
+        conteoPeriodo.set(id, (conteoPeriodo.get(id) ?? 0) + 1);
+      }
+    }
+
+    return tecnicos
+      .map((p) => {
+        const activo = ocupados.get(p.id);
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          sucursalProfile: p.sucursal,
+          disponible: !activo,
+          sucursalActiva: activo?.sucursal ?? null,
+          serviciosPeriodo: conteoPeriodo.get(p.id) ?? 0,
+        };
+      })
+      .sort((a, b) => {
+        if (a.disponible !== b.disponible) return a.disponible ? 1 : -1;
+        return a.nombre.localeCompare(b.nombre);
+      });
+  }, [profiles, adminIds, jornadasHoy, filtered]);
+
+  const cantDisponibles = tecnicosEstado.filter((t) => t.disponible).length;
+  const cantNoDisponibles = tecnicosEstado.length - cantDisponibles;
+
   return (
     <div className="container max-w-[1400px] py-4 space-y-4">
-      {/* Header con filtros */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-xs text-muted-foreground">Resumen del período seleccionado</p>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-xs text-muted-foreground">
+          {vista === "resumen" ? "Resumen del período seleccionado" : "Estado de técnicos hoy"}
+        </p>
+      </div>
+
+      <Tabs value={vista} onValueChange={(v) => setVista(v as "resumen" | "tecnicos")}>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="resumen">Resumen</TabsTrigger>
+            <TabsTrigger value="tecnicos">Técnicos</TabsTrigger>
+          </TabsList>
+
+          {vista === "resumen" && (
+            <div className="flex gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Desde</Label>
+                <Input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Hasta</Label>
+                <Input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-2">
-          <div className="space-y-1">
-            <Label className="text-xs">Desde</Label>
-            <Input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Hasta</Label>
-            <Input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="h-9"
-            />
-          </div>
-        </div>
-      </div>
+        <TabsContent value="resumen" className="space-y-4 mt-4">
 
       {/* Banner alerta */}
       {showAlert && (
@@ -658,6 +754,30 @@ export default function Dashboard() {
           </Table>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="tecnicos" className="space-y-4 mt-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {tecnicosEstado.length === 0 ? (
+              <p className="text-xs text-muted-foreground col-span-full">Sin técnicos cargados.</p>
+            ) : (
+              tecnicosEstado.map((t) => <TecnicoEstadoCard key={t.id} t={t} />)
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Badge variant="secondary" className="px-3 py-1 text-xs">
+              {cantDisponibles} disponible{cantDisponibles === 1 ? "" : "s"}
+            </Badge>
+            <Badge
+              className="px-3 py-1 text-xs border-transparent text-white"
+              style={{ backgroundColor: "#639922" }}
+            >
+              {cantNoDisponibles} no disponible{cantNoDisponibles === 1 ? "" : "s"}
+            </Badge>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Modal todos los técnicos */}
       <Dialog open={showAllTecnicos} onOpenChange={setShowAllTecnicos}>
@@ -760,6 +880,70 @@ function KPI({
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className={`text-2xl font-bold tabular-nums ${accentClass}`}>{value}</div>
       {context && <div className="mt-auto pt-1">{context}</div>}
+    </Card>
+  );
+}
+
+function TecnicoEstadoCard({
+  t,
+}: {
+  t: {
+    id: string;
+    nombre: string;
+    sucursalProfile: Sucursal | null;
+    disponible: boolean;
+    sucursalActiva: Sucursal | null;
+    serviciosPeriodo: number;
+  };
+}) {
+  const iniciales = t.nombre
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p.charAt(0).toUpperCase())
+    .join("");
+
+  const verde = "#639922";
+  const borderColor = t.disponible ? "hsl(var(--muted-foreground) / 0.4)" : verde;
+  const circleStyle = t.disponible
+    ? { backgroundColor: "hsl(var(--muted-foreground) / 0.4)" }
+    : { backgroundColor: verde };
+
+  return (
+    <Card
+      className="p-3 flex items-center gap-3 border-l-4"
+      style={{ borderLeftColor: borderColor }}
+    >
+      <div
+        className="h-10 w-10 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+        style={circleStyle}
+      >
+        {iniciales || "?"}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium truncate">{t.nombre}</span>
+          {t.disponible ? (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+              Disponible
+            </Badge>
+          ) : (
+            <Badge
+              className="text-[10px] px-1.5 py-0 h-4 border-transparent text-white"
+              style={{ backgroundColor: verde }}
+            >
+              No disponible
+            </Badge>
+          )}
+        </div>
+        <div className="text-[11px] text-muted-foreground truncate">
+          {t.disponible
+            ? `${t.serviciosPeriodo} servicio${t.serviciosPeriodo === 1 ? "" : "s"} este período`
+            : t.sucursalActiva
+            ? `En ${t.sucursalActiva}`
+            : "Servicio activo"}
+        </div>
+      </div>
     </Card>
   );
 }

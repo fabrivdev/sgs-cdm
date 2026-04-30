@@ -250,15 +250,6 @@ export function ServicioDetalleDialog({
   };
 
   const save = async () => {
-    // Validar: si una jornada quedó en Completado sin horas
-    for (const j of jornadas) {
-      const merged = { ...j, ...edits[j.id] };
-      if (merged.estado === "Completado" && (merged.horas_trabajadas == null || merged.horas_trabajadas === undefined)) {
-        toast.error(`Cargá horas en la jornada del ${format(parseISO(merged.fecha), "dd/MM/yyyy")} para completarla.`);
-        return;
-      }
-    }
-
     const dirtyIds = Object.keys(edits).filter((id) => Object.keys(edits[id] ?? {}).length > 0);
     if (dirtyIds.length === 0) {
       onOpenChange(false);
@@ -481,7 +472,7 @@ export function ServicioDetalleDialog({
 
                             <div className="space-y-1">
                               <Label className="text-[10px] text-muted-foreground">
-                                Horas {merged.estado === "Completado" && <span className="text-destructive">*</span>}
+                                Horas
                               </Label>
                               <Input
                                 type="number"
