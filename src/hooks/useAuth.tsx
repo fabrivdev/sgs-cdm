@@ -17,6 +17,7 @@ interface AuthCtx {
   roles: Role[];
   loading: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isCabecilla: boolean;
   isTecnico: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
