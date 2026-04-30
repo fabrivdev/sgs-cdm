@@ -754,6 +754,30 @@ export default function Dashboard() {
           </Table>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="tecnicos" className="space-y-4 mt-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {tecnicosEstado.length === 0 ? (
+              <p className="text-xs text-muted-foreground col-span-full">Sin técnicos cargados.</p>
+            ) : (
+              tecnicosEstado.map((t) => <TecnicoEstadoCard key={t.id} t={t} />)
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Badge variant="secondary" className="px-3 py-1 text-xs">
+              {cantDisponibles} disponible{cantDisponibles === 1 ? "" : "s"}
+            </Badge>
+            <Badge
+              className="px-3 py-1 text-xs border-transparent text-white"
+              style={{ backgroundColor: "#639922" }}
+            >
+              {cantNoDisponibles} no disponible{cantNoDisponibles === 1 ? "" : "s"}
+            </Badge>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Modal todos los técnicos */}
       <Dialog open={showAllTecnicos} onOpenChange={setShowAllTecnicos}>
