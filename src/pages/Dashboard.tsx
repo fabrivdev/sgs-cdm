@@ -883,3 +883,67 @@ function KPI({
     </Card>
   );
 }
+
+function TecnicoEstadoCard({
+  t,
+}: {
+  t: {
+    id: string;
+    nombre: string;
+    sucursalProfile: Sucursal | null;
+    disponible: boolean;
+    sucursalActiva: Sucursal | null;
+    serviciosPeriodo: number;
+  };
+}) {
+  const iniciales = t.nombre
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p.charAt(0).toUpperCase())
+    .join("");
+
+  const verde = "#639922";
+  const borderColor = t.disponible ? "hsl(var(--muted-foreground) / 0.4)" : verde;
+  const circleStyle = t.disponible
+    ? { backgroundColor: "hsl(var(--muted-foreground) / 0.4)" }
+    : { backgroundColor: verde };
+
+  return (
+    <Card
+      className="p-3 flex items-center gap-3 border-l-4"
+      style={{ borderLeftColor: borderColor }}
+    >
+      <div
+        className="h-10 w-10 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+        style={circleStyle}
+      >
+        {iniciales || "?"}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium truncate">{t.nombre}</span>
+          {t.disponible ? (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+              Disponible
+            </Badge>
+          ) : (
+            <Badge
+              className="text-[10px] px-1.5 py-0 h-4 border-transparent text-white"
+              style={{ backgroundColor: verde }}
+            >
+              No disponible
+            </Badge>
+          )}
+        </div>
+        <div className="text-[11px] text-muted-foreground truncate">
+          {t.disponible
+            ? `${t.serviciosPeriodo} servicio${t.serviciosPeriodo === 1 ? "" : "s"} este período`
+            : t.sucursalActiva
+            ? `En ${t.sucursalActiva}`
+            : "Servicio activo"}
+        </div>
+      </div>
+    </Card>
+  );
+}
