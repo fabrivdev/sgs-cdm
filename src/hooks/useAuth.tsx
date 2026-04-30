@@ -87,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         loading,
         isAdmin: roles.includes("admin"),
+        isSuperAdmin: (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py",
         isCabecilla: roles.includes("cabecilla"),
         isTecnico: roles.includes("tecnico"),
         signIn,
