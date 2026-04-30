@@ -51,6 +51,7 @@ import {
   format,
 } from "date-fns";
 import { AlertTriangle, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface Servicio {
   id: string;
