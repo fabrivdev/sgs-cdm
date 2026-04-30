@@ -481,7 +481,7 @@ export function ServicioDetalleDialog({
 
                             <div className="space-y-1">
                               <Label className="text-[10px] text-muted-foreground">
-                                Horas {merged.estado === "Completado" && <span className="text-destructive">*</span>}
+                                Horas
                               </Label>
                               <Input
                                 type="number"
