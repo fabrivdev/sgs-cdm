@@ -45,7 +45,7 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requireRoles={["admin", "tecnico"]}>
                   <AppLayout><Dashboard /></AppLayout>
                 </ProtectedRoute>
               }
