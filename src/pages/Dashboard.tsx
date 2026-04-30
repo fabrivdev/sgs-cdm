@@ -413,34 +413,46 @@ export default function Dashboard() {
 
   return (
     <div className="container max-w-[1400px] py-4 space-y-4">
-      {/* Header con filtros */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-xs text-muted-foreground">Resumen del período seleccionado</p>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-xs text-muted-foreground">
+          {vista === "resumen" ? "Resumen del período seleccionado" : "Estado de técnicos hoy"}
+        </p>
+      </div>
+
+      <Tabs value={vista} onValueChange={(v) => setVista(v as "resumen" | "tecnicos")}>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="resumen">Resumen</TabsTrigger>
+            <TabsTrigger value="tecnicos">Técnicos</TabsTrigger>
+          </TabsList>
+
+          {vista === "resumen" && (
+            <div className="flex gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Desde</Label>
+                <Input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Hasta</Label>
+                <Input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-2">
-          <div className="space-y-1">
-            <Label className="text-xs">Desde</Label>
-            <Input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="h-9"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Hasta</Label>
-            <Input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="h-9"
-            />
-          </div>
-        </div>
-      </div>
+        <TabsContent value="resumen" className="space-y-4 mt-4">
 
       {/* Banner alerta */}
       {showAlert && (
