@@ -19,6 +19,7 @@ interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface UserRole { user_id: string; role: Role }
 
 export default function Admin() {
+  const { isSuperAdmin } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
