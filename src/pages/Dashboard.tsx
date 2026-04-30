@@ -143,7 +143,7 @@ export default function Dashboard() {
           "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas",
         ),
       supabase.from("profiles").select("id, nombre, sucursal"),
-      supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
+      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "cabecilla"]),
     ]).then(([s, p, r]) => {
       setServicios((s.data ?? []) as Servicio[]);
       setProfiles((p.data ?? []) as Profile[]);

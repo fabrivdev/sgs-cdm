@@ -11,13 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { UserPlus, Building2, Users, KeyRound } from "lucide-react";
+import { UserPlus, Building2, Users, KeyRound, ShieldAlert } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface UserRole { user_id: string; role: Role }
 
 export default function Admin() {
+  const { isSuperAdmin } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -136,29 +138,43 @@ export default function Admin() {
         </TabsList>
 
         <TabsContent value="usuarios" className="space-y-4">
-          <Card className="p-3 sm:p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><UserPlus className="h-4 w-4" /> Crear nuevo usuario</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div><Label className="text-xs">Nombre</Label><Input value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>
-              <div><Label className="text-xs">Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-              <div><Label className="text-xs">Contraseña</Label><Input type="text" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-              <div>
-                <Label className="text-xs">Sucursal</Label>
-                <Select value={nuSucursal} onValueChange={(v) => setNuSucursal(v as Sucursal)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+          {!isSuperAdmin && (
+            <Card className="p-3 sm:p-4 flex items-start gap-3 border-amber-500/40 bg-amber-500/5">
+              <ShieldAlert className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="text-xs">
+                <div className="font-semibold text-amber-700">Solo lectura</div>
+                <div className="text-muted-foreground">
+                  Únicamente el super administrador puede crear usuarios o modificar credenciales, roles y sucursales.
+                </div>
               </div>
-              <div>
-                <Label className="text-xs">Rol</Label>
-                <Select value={nuRol} onValueChange={(v) => setNuRol(v as Role)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                </Select>
+            </Card>
+          )}
+
+          {isSuperAdmin && (
+            <Card className="p-3 sm:p-4">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><UserPlus className="h-4 w-4" /> Crear nuevo usuario</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div><Label className="text-xs">Nombre</Label><Input value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>
+                <div><Label className="text-xs">Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+                <div><Label className="text-xs">Contraseña</Label><Input type="text" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+                <div>
+                  <Label className="text-xs">Sucursal</Label>
+                  <Select value={nuSucursal} onValueChange={(v) => setNuSucursal(v as Sucursal)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Rol</Label>
+                  <Select value={nuRol} onValueChange={(v) => setNuRol(v as Role)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-            <Button className="mt-3" onClick={crearUsuario} disabled={busy}>{busy ? "Creando…" : "Crear usuario"}</Button>
-          </Card>
+              <Button className="mt-3" onClick={crearUsuario} disabled={busy}>{busy ? "Creando…" : "Crear usuario"}</Button>
+            </Card>
+          )}
 
           {/* Desktop table */}
           <Card className="hidden md:block">
@@ -170,7 +186,7 @@ export default function Admin() {
                   <TableHead>Sucursal</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Activo</TableHead>
-                  <TableHead className="w-[100px]">Acciones</TableHead>
+                  {isSuperAdmin && <TableHead className="w-[100px]">Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -179,27 +195,41 @@ export default function Admin() {
                     <TableCell className="font-medium">{p.nombre}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{emails[p.id] ?? "—"}</TableCell>
                     <TableCell>
-                      <Select value={p.sucursal ?? ""} onValueChange={(v) => cambiarSucursal(p.id, v as Sucursal)}>
-                        <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
+                      {isSuperAdmin ? (
+                        <Select value={p.sucursal ?? ""} onValueChange={(v) => cambiarSucursal(p.id, v as Sucursal)}>
+                          <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs">{p.sucursal ?? "—"}</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Select value={rolesByUser[p.id]?.[0] ?? ""} onValueChange={(v) => cambiarRol(p.id, v as Role)}>
-                        <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                      </Select>
+                      {isSuperAdmin ? (
+                        <Select value={rolesByUser[p.id]?.[0] ?? ""} onValueChange={(v) => cambiarRol(p.id, v as Role)}>
+                          <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant="outline">{ROLE_LABELS[rolesByUser[p.id]?.[0] as Role] ?? "—"}</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Button variant={p.activo ? "default" : "outline"} size="sm" onClick={() => toggleActivo(p)}>
-                        {p.activo ? "Activo" : "Inactivo"}
-                      </Button>
+                      {isSuperAdmin ? (
+                        <Button variant={p.activo ? "default" : "outline"} size="sm" onClick={() => toggleActivo(p)}>
+                          {p.activo ? "Activo" : "Inactivo"}
+                        </Button>
+                      ) : (
+                        <Badge variant={p.activo ? "default" : "outline"}>{p.activo ? "Activo" : "Inactivo"}</Badge>
+                      )}
                     </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
-                        <KeyRound className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
+                    {isSuperAdmin && (
+                      <TableCell>
+                        <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -216,33 +246,50 @@ export default function Admin() {
                     <div className="text-[11px] text-muted-foreground truncate">{emails[p.id] ?? "—"}</div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => openCred(p)} className="h-7 px-2">
-                      <KeyRound className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant={p.activo ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => toggleActivo(p)}
-                      className="h-7 px-2 text-[10px]"
-                    >
-                      {p.activo ? "Activo" : "Inactivo"}
-                    </Button>
+                    {isSuperAdmin && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => openCred(p)} className="h-7 px-2">
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant={p.activo ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleActivo(p)}
+                          className="h-7 px-2 text-[10px]"
+                        >
+                          {p.activo ? "Activo" : "Inactivo"}
+                        </Button>
+                      </>
+                    )}
+                    {!isSuperAdmin && (
+                      <Badge variant={p.activo ? "default" : "outline"} className="text-[10px]">
+                        {p.activo ? "Activo" : "Inactivo"}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
-                    <Select value={p.sucursal ?? ""} onValueChange={(v) => cambiarSucursal(p.id, v as Sucursal)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                      <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                    </Select>
+                    {isSuperAdmin ? (
+                      <Select value={p.sucursal ?? ""} onValueChange={(v) => cambiarSucursal(p.id, v as Sucursal)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="text-xs py-1.5">{p.sucursal ?? "—"}</div>
+                    )}
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Rol</Label>
-                    <Select value={rolesByUser[p.id]?.[0] ?? ""} onValueChange={(v) => cambiarRol(p.id, v as Role)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                      <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                    </Select>
+                    {isSuperAdmin ? (
+                      <Select value={rolesByUser[p.id]?.[0] ?? ""} onValueChange={(v) => cambiarRol(p.id, v as Role)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="text-xs py-1.5">{ROLE_LABELS[rolesByUser[p.id]?.[0] as Role] ?? "—"}</div>
+                    )}
                   </div>
                 </div>
               </Card>

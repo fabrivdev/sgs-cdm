@@ -28,18 +28,18 @@ import { cn } from "@/lib/utils";
 const baseItems = [
   { to: "/", label: "Planificador", icon: ListChecks, end: true },
   { to: "/calendario", label: "Calendario", icon: CalendarDays },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, hideForCabecilla: true },
   { to: "/historial", label: "Historial", icon: History },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { profile, isAdmin, signOut, roles } = useAuth();
+  const { profile, isAdmin, isCabecilla, signOut, roles } = useAuth();
   const unseen = useUnseen();
   const location = useLocation();
   const navigate = useNavigate();
 
   const navItems = [
-    ...baseItems,
+    ...baseItems.filter((it) => !(it.hideForCabecilla && isCabecilla && !isAdmin)),
     ...(isAdmin
       ? [{ to: "/parque-clientes", label: "Parque", icon: Tractor, end: false }]
       : []),

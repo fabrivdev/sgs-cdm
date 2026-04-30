@@ -17,6 +17,7 @@ interface AuthCtx {
   roles: Role[];
   loading: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isCabecilla: boolean;
   isTecnico: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         loading,
         isAdmin: roles.includes("admin"),
+        isSuperAdmin: (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py",
         isCabecilla: roles.includes("cabecilla"),
         isTecnico: roles.includes("tecnico"),
         signIn,
