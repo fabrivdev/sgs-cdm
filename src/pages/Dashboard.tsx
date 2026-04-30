@@ -67,6 +67,14 @@ interface Servicio {
 interface Profile {
   id: string;
   nombre: string;
+  sucursal: Sucursal | null;
+}
+
+interface JornadaHoy {
+  servicio_id: string;
+  tecnico_responsable_id: string | null;
+  auxiliares: string[];
+  sucursal: Sucursal;
 }
 
 interface UltimoSeguimiento {
@@ -123,6 +131,9 @@ export default function Dashboard() {
   const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [showAllTecnicos, setShowAllTecnicos] = useState(false);
+  const [vista, setVista] = useState<"resumen" | "tecnicos">("resumen");
+  const [jornadasHoy, setJornadasHoy] = useState<JornadaHoy[]>([]);
+  const hoyStr = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
     Promise.all([
@@ -131,7 +142,7 @@ export default function Dashboard() {
         .select(
           "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas",
         ),
-      supabase.from("profiles").select("id, nombre"),
+      supabase.from("profiles").select("id, nombre, sucursal"),
       supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
     ]).then(([s, p, r]) => {
       setServicios((s.data ?? []) as Servicio[]);
