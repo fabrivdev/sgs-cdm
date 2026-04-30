@@ -151,6 +151,31 @@ export default function Dashboard() {
     });
   }, []);
 
+  // Jornadas iniciadas hoy (para "Estado de técnicos hoy")
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("servicio_jornadas")
+        .select("servicio_id, estado, fecha, servicios!inner(tecnico_responsable_id, auxiliares, sucursal)")
+        .eq("fecha", hoyStr)
+        .eq("estado", "Iniciado");
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      const items: JornadaHoy[] = ((data ?? []) as any[]).map((j) => ({
+        servicio_id: j.servicio_id,
+        tecnico_responsable_id: j.servicios?.tecnico_responsable_id ?? null,
+        auxiliares: j.servicios?.auxiliares ?? [],
+        sucursal: j.servicios?.sucursal,
+      }));
+
+      setJornadasHoy(items);
+    })();
+  }, [hoyStr]);
+
   // Últimos seguimientos:
   // Reemplaza la tarjeta de "clientes a contactar" por los últimos mensajes registrados.
   // Se muestra 1 fila por seguimiento, ordenado del más reciente al más antiguo.
