@@ -10,42 +10,118 @@ import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 
 interface Servicio {
-  id: string; fecha_programada: string; dia_semana: string; semana: number;
-  tecnico_responsable_id: string | null; auxiliares: string[];
-  sucursal: Sucursal; cliente_id: string | null; marca: Marca;
+  id: string;
+  fecha_programada: string;
+  dia_semana: string;
+  semana: number;
+  tecnico_responsable_id: string | null;
+  auxiliares: string[];
+  sucursal: Sucursal;
+  cliente_id: string | null;
+  marca: Marca;
   tipo_trabajo: TipoTrabajo;
-  trabajo_descripcion: string; estado: Estado; observaciones: string | null; horas_trabajadas: number | null;
+  trabajo_descripcion: string;
+  estado: Estado;
+  observaciones: string | null;
+  horas_trabajadas: number | null;
   visto_por: string[];
 }
-interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
-interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
+
+interface Profile {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+}
+
+const PAGE = 1000;
+
+async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
+  let from = 0;
+  const all: T[] = [];
+
+  while (true) {
+    const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    all.push(...(data as T[]));
+
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
 
 export default function Historial() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteIdsParque, setClienteIdsParque] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Cliente | null>(null);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
 
   const load = async () => {
-    const [{ data: srv }, { data: prof }, { data: cli }] = await Promise.all([
-      supabase.from("servicios").select("*").order("fecha_programada", { ascending: false }),
-      supabase.from("profiles").select("id, nombre, sucursal"),
-      supabase.from("clientes").select("id, nombre, sucursal").order("nombre"),
-    ]);
-    setServicios((srv ?? []) as Servicio[]);
-    setProfiles((prof ?? []) as Profile[]);
-    setClientes((cli ?? []) as Cliente[]);
-  };
-  useEffect(() => { load(); }, []);
+    try {
+      const [srv, prof, cli, parque] = await Promise.all([
+        cargarTodo<Servicio>(
+          supabase.from("servicios").select("*").order("fecha_programada", { ascending: false }),
+        ),
+        cargarTodo<Profile>(
+          supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        ),
+        cargarTodo<Cliente>(
+          supabase.from("clientes").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        ),
+        cargarTodo<{ cliente_id: string | null }>(
+          supabase.from("parque_maquinas").select("cliente_id"),
+        ),
+      ]);
 
-  const profById = Object.fromEntries(profiles.map((p) => [p.id, p.nombre]));
+      setServicios(srv);
+      setProfiles(prof);
+      setClientes(cli);
+
+      const ids = new Set<string>();
+      for (const p of parque) {
+        if (p.cliente_id) ids.add(p.cliente_id);
+      }
+      setClienteIdsParque(ids);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const profById = useMemo(
+    () => Object.fromEntries(profiles.map((p) => [p.id, p.nombre])),
+    [profiles],
+  );
+
+  // Esta pantalla debe buscar SOLO clientes que tienen máquinas en parque.
+  const clientesDelParque = useMemo(() => {
+    return clientes.filter((c) => clienteIdsParque.has(c.id));
+  }, [clientes, clienteIdsParque]);
 
   const matches = useMemo(() => {
-    if (!q.trim()) return [];
-    return clientes.filter((c) => c.nombre.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
-  }, [q, clientes]);
+    const query = q.trim().toLowerCase();
+    if (!query) return [];
+
+    return clientesDelParque
+      .filter((c) => c.nombre.toLowerCase().includes(query))
+      .slice(0, 12);
+  }, [q, clientesDelParque]);
 
   const historial = useMemo(() => {
     if (!selected) return [];
@@ -56,19 +132,42 @@ export default function Historial() {
     <div className="container max-w-4xl py-4 space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Historial por cliente</h1>
-        <p className="text-xs text-muted-foreground">Buscá un cliente para ver todos sus servicios.</p>
+        <p className="text-xs text-muted-foreground">
+          Buscá un cliente del parque para ver todos sus servicios.
+        </p>
       </div>
 
       <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar cliente…" value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} />
+          <Input
+            className="pl-9"
+            placeholder="Buscar cliente del parque…"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setSelected(null);
+            }}
+          />
         </div>
+
+        {q.trim() && matches.length === 0 && !selected && (
+          <div className="mt-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+            No se encontraron clientes del parque con ese nombre.
+          </div>
+        )}
+
         {matches.length > 0 && !selected && (
           <ul className="mt-2 divide-y rounded-md border">
             {matches.map((c) => (
               <li key={c.id}>
-                <button className="w-full px-3 py-2 text-left hover:bg-accent" onClick={() => { setSelected(c); setQ(c.nombre); }}>
+                <button
+                  className="w-full px-3 py-2 text-left hover:bg-accent"
+                  onClick={() => {
+                    setSelected(c);
+                    setQ(c.nombre);
+                  }}
+                >
                   <span className="font-medium">{c.nombre}</span>
                   {c.sucursal && <span className="ml-2 text-xs text-muted-foreground">{c.sucursal}</span>}
                 </button>
@@ -83,9 +182,13 @@ export default function Historial() {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <div className="text-lg font-semibold">{selected.nombre}</div>
-              <div className="text-xs text-muted-foreground">{selected.sucursal ? `${selected.sucursal} · ` : ""}{historial.length} servicio(s)</div>
+              <div className="text-xs text-muted-foreground">
+                {selected.sucursal ? `${selected.sucursal} · ` : ""}
+                {historial.length} servicio(s)
+              </div>
             </div>
           </div>
+
           {historial.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin servicios registrados.</p>
           ) : (
@@ -93,11 +196,17 @@ export default function Historial() {
               {historial.map((s) => {
                 const tipo = s.tipo_trabajo ?? "Visita de campo";
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
+
                 return (
                   <li key={s.id}>
-                    <button onClick={() => setDetalle(s)} className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors">
+                    <button
+                      onClick={() => setDetalle(s)}
+                      className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors"
+                    >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium tabular-nums">{format(parseISO(s.fecha_programada), "dd/MM/yyyy")}</span>
+                        <span className="text-sm font-medium tabular-nums">
+                          {format(parseISO(s.fecha_programada), "dd/MM/yyyy")}
+                        </span>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="gap-0.5 px-1.5 py-0 text-[10px]">
                             <TipoIcon className="h-2.5 w-2.5" />
@@ -107,9 +216,11 @@ export default function Historial() {
                           <EstadoBadge estado={s.estado} />
                         </div>
                       </div>
+
                       <div className="mt-1 text-sm">{s.trabajo_descripcion}</div>
+
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] : "—"}
+                        {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] ?? "—" : "—"}
                         {s.horas_trabajadas != null && ` · ${s.horas_trabajadas} hs`}
                       </div>
                     </button>
@@ -121,7 +232,13 @@ export default function Historial() {
         </Card>
       )}
 
-      <ServicioDetalleDialog servicio={detalle} onOpenChange={(o) => !o && setDetalle(null)} profiles={profiles} clientes={clientes} onChanged={load} />
+      <ServicioDetalleDialog
+        servicio={detalle}
+        onOpenChange={(o) => !o && setDetalle(null)}
+        profiles={profiles}
+        clientes={clientes}
+        onChanged={load}
+      />
     </div>
   );
 }
