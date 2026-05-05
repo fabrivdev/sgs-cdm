@@ -36,6 +36,8 @@ import {
   X,
 } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
@@ -208,6 +210,7 @@ export function ParqueTab({
 
   const [filtrosOpen, setFiltrosOpen] = useState(false);
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
+  const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
@@ -781,6 +784,16 @@ export function ParqueTab({
         </Sheet>
 
         <Button
+          variant="default"
+          size="sm"
+          onClick={() => setNuevaMaquinaOpen(true)}
+          className="h-9 shrink-0"
+          aria-label="Nueva máquina"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+
+        <Button
           variant="outline"
           size="sm"
           onClick={exportar}
@@ -805,7 +818,10 @@ export function ParqueTab({
 
         {filtrosSelects}
 
-        <Button variant="outline" size="sm" onClick={exportar} className="ml-auto">
+        <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="ml-auto">
+          <Plus className="mr-1 h-4 w-4" /> Nueva máquina
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportar}>
           <Download className="mr-1 h-4 w-4" /> Exportar Excel
         </Button>
       </div>
@@ -1008,6 +1024,14 @@ export function ParqueTab({
           </TableBody>
         </Table>
       </div>
+      <NuevaMaquinaDialog
+        open={nuevaMaquinaOpen}
+        onOpenChange={setNuevaMaquinaOpen}
+        onCreated={() => {
+          cargar();
+          _onChanged?.();
+        }}
+      />
     </div>
   );
 }

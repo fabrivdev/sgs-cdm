@@ -164,6 +164,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [editMaquina, setEditMaquina] = useState<string | null>(null);
   const [newMaquina, setNewMaquina] = useState(false);
   const [maquinaForm, setMaquinaForm] = useState<Partial<Maquina>>({});
+  const [mostrarInactivas, setMostrarInactivas] = useState(false);
 
   // Seguimiento form
   const [segResultado, setSegResultado] = useState<string>("Contactado");
@@ -178,7 +179,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         .eq("id", id)
         .maybeSingle(),
       supabase.from("contactos_cliente").select("*").eq("cliente_id", id).order("es_principal", { ascending: false }),
-      supabase.from("parque_maquinas").select("*").eq("cliente_id", id).eq("activo", true),
+      supabase.from("parque_maquinas").select("*").eq("cliente_id", id),
       supabase.from("seguimiento_comercial").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
       supabase.from("facturacion").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
       supabase.from("profiles").select("id, nombre"),
@@ -331,6 +332,14 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     const { error } = await supabase.from("parque_maquinas").update({ activo: false }).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Máquina desactivada");
+    if (cliente) await cargar(cliente.id);
+    onChanged();
+  };
+
+  const reactivarMaquina = async (id: string) => {
+    const { error } = await supabase.from("parque_maquinas").update({ activo: true }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Máquina reactivada");
     if (cliente) await cargar(cliente.id);
     onChanged();
   };
@@ -510,55 +519,88 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
         {/* Máquinas */}
         <section className="mb-5 rounded-lg border bg-card p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Tractor className="h-4 w-4 text-primary" /> Máquinas
-              <Badge variant="secondary" className="text-[10px]">{maquinas.length}</Badge>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => { setNewMaquina(true); setEditMaquina(null); setMaquinaForm({}); }}>
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {maquinas.length === 0 && !newMaquina && (
-              <div className="text-xs text-muted-foreground">Sin máquinas.</div>
-            )}
-            {maquinas.map((m) => (
-              <div key={m.id} className="rounded-md border p-2">
-                {editMaquina === m.id ? (
-                  <MaquinaForm form={maquinaForm} setForm={setMaquinaForm} onSave={guardarMaquina} onCancel={() => { setEditMaquina(null); setMaquinaForm({}); }} />
-                ) : (
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge className={cn("text-[10px]", m.marca === "CLAAS" ? "bg-emerald-600 text-white" : "bg-orange-500 text-white")}>
-                          {m.marca}
-                        </Badge>
-                        <span className="text-sm font-medium">{m.anio ?? "—"}</span>
-                        <Badge variant="outline" className="text-[10px]">{m.subgrupo}</Badge>
-                        {m.agregado_manualmente && <Badge variant="secondary" className="text-[9px]">Manual</Badge>}
-                      </div>
-                      <div className="mt-0.5 text-xs">{m.modelo_tipo ?? "—"}</div>
-                      <div className="text-[11px] text-muted-foreground">Serie: {m.serie}</div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => { setEditMaquina(m.id); setMaquinaForm(m); }}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => desactivarMaquina(m.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+          {(() => {
+            const activas = maquinas.filter((m) => m.activo);
+            const inactivas = maquinas.filter((m) => !m.activo);
+            const visibles = mostrarInactivas ? maquinas : activas;
+            return (
+              <>
+                <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <Tractor className="h-4 w-4 text-primary" /> Máquinas
+                    <Badge variant="secondary" className="text-[10px]">{activas.length} activas</Badge>
+                    {inactivas.length > 0 && (
+                      <Badge variant="outline" className="text-[10px]">{inactivas.length} inactivas</Badge>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-            {newMaquina && (
-              <div className="rounded-md border border-dashed p-2">
-                <MaquinaForm form={maquinaForm} setForm={setMaquinaForm} onSave={guardarMaquina} onCancel={() => { setNewMaquina(false); setMaquinaForm({}); }} />
-              </div>
-            )}
-          </div>
+                  <div className="flex items-center gap-2">
+                    {inactivas.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMostrarInactivas((v) => !v)}
+                        className="h-8 text-xs"
+                      >
+                        {mostrarInactivas ? "Ocultar inactivas" : "Ver inactivas"}
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => { setNewMaquina(true); setEditMaquina(null); setMaquinaForm({}); }}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {visibles.length === 0 && !newMaquina && (
+                    <div className="text-xs text-muted-foreground">Sin máquinas.</div>
+                  )}
+                  {visibles.map((m) => (
+                    <div key={m.id} className={cn("rounded-md border p-2", !m.activo && "opacity-60 bg-muted/30")}>
+                      {editMaquina === m.id ? (
+                        <MaquinaForm form={maquinaForm} setForm={setMaquinaForm} onSave={guardarMaquina} onCancel={() => { setEditMaquina(null); setMaquinaForm({}); }} />
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge className={cn("text-[10px]", m.marca === "CLAAS" ? "bg-emerald-600 text-white" : m.marca === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
+                                {m.marca}
+                              </Badge>
+                              <span className="text-sm font-medium">{m.anio ?? "—"}</span>
+                              <Badge variant="outline" className="text-[10px]">{m.subgrupo}</Badge>
+                              {m.agregado_manualmente && <Badge variant="secondary" className="text-[9px]">Manual</Badge>}
+                              {!m.activo && <Badge variant="destructive" className="text-[9px]">Inactiva</Badge>}
+                            </div>
+                            <div className="mt-0.5 text-xs">{m.modelo_tipo ?? "—"}</div>
+                            <div className="text-[11px] text-muted-foreground">Serie: {m.serie}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            {m.activo ? (
+                              <>
+                                <Button variant="ghost" size="sm" onClick={() => { setEditMaquina(m.id); setMaquinaForm(m); }}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => desactivarMaquina(m.id)} title="Desactivar">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="ghost" size="sm" onClick={() => reactivarMaquina(m.id)} className="text-xs h-8">
+                                Reactivar
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {newMaquina && (
+                    <div className="rounded-md border border-dashed p-2">
+                      <MaquinaForm form={maquinaForm} setForm={setMaquinaForm} onSave={guardarMaquina} onCancel={() => { setNewMaquina(false); setMaquinaForm({}); }} />
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </section>
 
         {/* Seguimientos */}

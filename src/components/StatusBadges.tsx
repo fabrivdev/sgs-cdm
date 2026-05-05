@@ -15,6 +15,7 @@ export function MarcaBadge({ marca, className }: { marca: Marca; className?: str
   const map: Record<Marca, string> = {
     CLAAS: "bg-marca-claas-bg text-marca-claas border-marca-claas/30",
     HORSCH: "bg-marca-horsch-bg text-marca-horsch border-marca-horsch/30",
+    OTROS: "bg-muted text-muted-foreground border-border",
   };
   return <Badge variant="outline" className={cn("font-bold tracking-wide", map[marca], className)}>{marca}</Badge>;
 }

@@ -7,7 +7,7 @@ export const SUCURSALES = [
   "Katuete",
 ] as const;
 
-export const MARCAS = ["CLAAS", "HORSCH"] as const;
+export const MARCAS = ["CLAAS", "HORSCH", "OTROS"] as const;
 export const ESTADOS = ["Pendiente", "Iniciado", "Completado"] as const;
 export const ROLES = ["admin", "cabecilla", "tecnico"] as const;
 export const TIPOS_TRABAJO = ["Visita de campo", "Máquina en taller"] as const;

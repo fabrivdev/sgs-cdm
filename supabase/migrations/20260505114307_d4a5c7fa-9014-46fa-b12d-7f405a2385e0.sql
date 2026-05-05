@@ -1,0 +1,1 @@
+ALTER TYPE public.marca ADD VALUE IF NOT EXISTS 'OTROS';
