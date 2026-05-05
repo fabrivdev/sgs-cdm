@@ -336,6 +336,14 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     onChanged();
   };
 
+  const reactivarMaquina = async (id: string) => {
+    const { error } = await supabase.from("parque_maquinas").update({ activo: true }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Máquina reactivada");
+    if (cliente) await cargar(cliente.id);
+    onChanged();
+  };
+
   // ===== Seguimientos =====
   const agregarSeguimiento = async () => {
     if (!cliente || !user) return;
