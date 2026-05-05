@@ -179,7 +179,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         .eq("id", id)
         .maybeSingle(),
       supabase.from("contactos_cliente").select("*").eq("cliente_id", id).order("es_principal", { ascending: false }),
-      supabase.from("parque_maquinas").select("*").eq("cliente_id", id).eq("activo", true),
+      supabase.from("parque_maquinas").select("*").eq("cliente_id", id),
       supabase.from("seguimiento_comercial").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
       supabase.from("facturacion").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
       supabase.from("profiles").select("id, nombre"),
