@@ -1024,6 +1024,14 @@ export function ParqueTab({
           </TableBody>
         </Table>
       </div>
+      <NuevaMaquinaDialog
+        open={nuevaMaquinaOpen}
+        onOpenChange={setNuevaMaquinaOpen}
+        onCreated={() => {
+          cargar();
+          _onChanged?.();
+        }}
+      />
     </div>
   );
 }
