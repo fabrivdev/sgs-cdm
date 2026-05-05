@@ -818,7 +818,10 @@ export function ParqueTab({
 
         {filtrosSelects}
 
-        <Button variant="outline" size="sm" onClick={exportar} className="ml-auto">
+        <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="ml-auto">
+          <Plus className="mr-1 h-4 w-4" /> Nueva máquina
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportar}>
           <Download className="mr-1 h-4 w-4" /> Exportar Excel
         </Button>
       </div>
