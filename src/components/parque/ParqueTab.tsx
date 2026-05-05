@@ -36,6 +36,8 @@ import {
   X,
 } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
