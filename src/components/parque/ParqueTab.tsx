@@ -210,6 +210,7 @@ export function ParqueTab({
 
   const [filtrosOpen, setFiltrosOpen] = useState(false);
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
+  const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
