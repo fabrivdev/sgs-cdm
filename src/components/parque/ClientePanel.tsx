@@ -531,7 +531,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge className={cn("text-[10px]", m.marca === "CLAAS" ? "bg-emerald-600 text-white" : "bg-orange-500 text-white")}>
+                        <Badge className={cn("text-[10px]", m.marca === "CLAAS" ? "bg-emerald-600 text-white" : m.marca === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
                           {m.marca}
                         </Badge>
                         <span className="text-sm font-medium">{m.anio ?? "—"}</span>
