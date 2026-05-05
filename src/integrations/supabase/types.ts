@@ -543,7 +543,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "cabecilla" | "tecnico"
       estado_servicio: "Pendiente" | "Iniciado" | "Completado"
-      marca: "CLAAS" | "HORSCH"
+      marca: "CLAAS" | "HORSCH" | "OTROS"
       resultado_seguimiento:
         | "Contactado"
         | "No contesta"
@@ -699,7 +699,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "cabecilla", "tecnico"],
       estado_servicio: ["Pendiente", "Iniciado", "Completado"],
-      marca: ["CLAAS", "HORSCH"],
+      marca: ["CLAAS", "HORSCH", "OTROS"],
       resultado_seguimiento: [
         "Contactado",
         "No contesta",
