@@ -164,6 +164,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [editMaquina, setEditMaquina] = useState<string | null>(null);
   const [newMaquina, setNewMaquina] = useState(false);
   const [maquinaForm, setMaquinaForm] = useState<Partial<Maquina>>({});
+  const [mostrarInactivas, setMostrarInactivas] = useState(false);
 
   // Seguimiento form
   const [segResultado, setSegResultado] = useState<string>("Contactado");
