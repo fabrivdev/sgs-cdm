@@ -96,6 +96,7 @@ const COLORS_ESTADO: Record<Estado, string> = {
 const COLORS_MARCA: Record<Marca, string> = {
   CLAAS: "hsl(var(--marca-claas))",
   HORSCH: "hsl(var(--marca-horsch))",
+  OTROS: "hsl(var(--muted-foreground))",
 };
 
 const shortName = (n: string) => n.trim().split(/\s+/).slice(0, 2).join(" ");
