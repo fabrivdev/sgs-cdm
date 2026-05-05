@@ -784,6 +784,16 @@ export function ParqueTab({
         </Sheet>
 
         <Button
+          variant="default"
+          size="sm"
+          onClick={() => setNuevaMaquinaOpen(true)}
+          className="h-9 shrink-0"
+          aria-label="Nueva máquina"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+
+        <Button
           variant="outline"
           size="sm"
           onClick={exportar}
