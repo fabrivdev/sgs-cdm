@@ -30,71 +30,34 @@ export default function ParqueClientes() {
   const [parqueMetricas, setParqueMetricas] = useState<ParqueMetricas | null>(null);
 
   const cargarMetricas = async () => {
-    const hoy = new Date();
-    const haceUnAnio = new Date(hoy);
-    haceUnAnio.setFullYear(hoy.getFullYear() - 1);
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const hace60d = new Date(hoy);
-    hace60d.setDate(hoy.getDate() - 60);
-
-    const [maquinasRes, facturacionRes, facturacion60Res, seguimientosRes] = await Promise.all([
-      supabase.from("parque_maquinas").select("id, cliente_id", { count: "exact" }).eq("activo", true),
-      supabase
-        .from("facturacion")
-        .select("cliente_id, fecha, tipo")
-        .eq("tipo", "Servicio")
-        .gte("fecha", haceUnAnio.toISOString().slice(0, 10)),
-      supabase
-        .from("facturacion")
-        .select("cliente_id")
-        .eq("tipo", "Servicio")
-        .gte("fecha", hace60d.toISOString().slice(0, 10)),
-      supabase.from("seguimiento_comercial").select("cliente_id, fecha"),
-    ]);
-
-    const totalMaquinas = maquinasRes.count ?? 0;
-
-    // Clientes CON máquinas (universo para métricas comerciales)
-    const clientesConMaquinas = new Set<string>();
-    for (const m of maquinasRes.data ?? []) {
-      if (m.cliente_id) clientesConMaquinas.add(m.cliente_id);
+    const { data, error } = await supabase.rpc("parque_kpis");
+    if (error) {
+      console.error(error);
+      return;
     }
+    const row = (data ?? [])[0] as
+      | {
+          total_maquinas: number;
+          total_clientes: number;
+          con_servicio_anio: number;
+          contactados_mes: number;
+          sin_contacto_60d: number;
+        }
+      | undefined;
+    if (!row) return;
 
-    const clientesConServicio = new Set(
-      (facturacionRes.data ?? []).map((f) => f.cliente_id).filter(Boolean) as string[],
-    );
-    const totalClientes = clientesConMaquinas.size;
-    const conServicio = [...clientesConServicio].filter((c) => clientesConMaquinas.has(c)).length;
+    const totalClientes = row.total_clientes || 0;
     const pctConServicioUltimoAnio =
-      totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0;
-
-    // Clientes con servicio en últimos 60 días
-    const clientesConServicio60d = new Set(
-      (facturacion60Res.data ?? []).map((f) => f.cliente_id).filter(Boolean) as string[],
-    );
-
-    const ultimoSegPorCliente = new Map<string, Date>();
-    for (const s of seguimientosRes.data ?? []) {
-      const f = new Date(s.fecha);
-      const prev = ultimoSegPorCliente.get(s.cliente_id);
-      if (!prev || f > prev) ultimoSegPorCliente.set(s.cliente_id, f);
-    }
-
-    let contactadosEsteMes = 0;
-    let sinContacto60d = 0;
-    for (const cid of clientesConMaquinas) {
-      const ult = ultimoSegPorCliente.get(cid);
-      if (ult && ult >= inicioMes) contactadosEsteMes++;
-      // Sin contacto +60d: no consume servicio hace 60d Y no fue contactado hace 60d
-      const sinServicio60d = !clientesConServicio60d.has(cid);
-      const sinSeguimiento60d = !ult || ult < hace60d;
-      if (sinServicio60d && sinSeguimiento60d) sinContacto60d++;
-    }
-
+      totalClientes > 0 ? Math.round((row.con_servicio_anio / totalClientes) * 100) : 0;
     const pctContactadosEsteMes =
-      totalClientes > 0 ? Math.round((contactadosEsteMes / totalClientes) * 100) : 0;
+      totalClientes > 0 ? Math.round((row.contactados_mes / totalClientes) * 100) : 0;
 
-    setMetricas({ totalMaquinas, pctConServicioUltimoAnio, pctContactadosEsteMes, sinContacto60d });
+    setMetricas({
+      totalMaquinas: row.total_maquinas || 0,
+      pctConServicioUltimoAnio,
+      pctContactadosEsteMes,
+      sinContacto60d: row.sin_contacto_60d || 0,
+    });
   };
 
   useEffect(() => {
