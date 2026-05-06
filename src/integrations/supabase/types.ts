@@ -539,6 +539,39 @@ export type Database = {
         }
         Returns: boolean
       }
+      parque_kpis: {
+        Args: never
+        Returns: {
+          con_servicio_anio: number
+          contactados_mes: number
+          sin_contacto_60d: number
+          total_clientes: number
+          total_maquinas: number
+        }[]
+      }
+      parque_resumen_facturacion: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_prev_desde: string
+          p_prev_hasta: string
+        }
+        Returns: {
+          cliente_id: string
+          fact_actual: number
+          fact_prev: number
+          tiene_rep_rango: boolean
+          tiene_srv_rango: boolean
+        }[]
+      }
+      parque_ultimas_facturas: {
+        Args: never
+        Returns: {
+          cliente_id: string
+          ult_repuesto: string
+          ult_servicio: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "cabecilla" | "tecnico"
