@@ -153,15 +153,7 @@ const esPlataformaOCabezal = (subgrupo: string | null | undefined) => {
   );
 };
 
-const esFacturaComercialValida = (fc: Factura) => {
-  const gx = normText(fc.grupo_fx);
-
-  if (gx === "repuestos") return true;
-  if (gx === "mano de obra") return true;
-  if (gx === "kilometraje") return true;
-
-  return false;
-};
+// (criterios de facturación válidos ahora se filtran en SQL via parque_resumen_facturacion / parque_ultimas_facturas)
 
 const antiguedadColor = (a: number | null) => {
   if (a == null) return "bg-muted text-muted-foreground";
