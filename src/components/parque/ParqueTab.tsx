@@ -181,10 +181,11 @@ export function ParqueTab({
   onMetricasChange?: (m: ParqueMetricas) => void;
 }) {
   const [loading, setLoading] = useState(true);
+  const [factLoading, setFactLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
-  const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [factAgregados, setFactAgregados] = useState<Map<string, FactAgregado>>(new Map());
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
 
   const [q, setQ] = useState("");
@@ -223,6 +224,7 @@ export function ParqueTab({
     setIncluirPlataformas(false);
   };
 
+  // Fase A: datos rápidos (clientes, contactos, máquinas, seguimientos)
   const cargar = async () => {
     setLoading(true);
 
@@ -243,9 +245,10 @@ export function ParqueTab({
         setClientes([]);
         setContactos([]);
         setMaquinas(maquinasRows);
-        setFacturas([]);
         setSeguimientos([]);
+        setFactAgregados(new Map());
         setLoading(false);
+        setFactLoading(false);
         return;
       }
 
@@ -273,38 +276,9 @@ export function ParqueTab({
       if (ct.error) throw ct.error;
       if (s.error) throw s.error;
 
-      const facts: Factura[] = [];
-      let from = 0;
-      const PAGE = 1000;
-
-      while (true) {
-        const { data, error } = await supabase
-  .from("facturacion")
-  .select("id, cliente_id, fecha, tipo, grupo, grupo_fx, total_venta")
-  .in("cliente_id", clienteIds)
-  .order("id", { ascending: true })
-  .range(from, from + PAGE - 1);
-
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-
-        facts.push(
-          ...(data as Factura[]).map((x) => ({
-            ...x,
-            grupo: x.grupo ?? null,
-            grupo_fx: (x as any).grupo_fx ?? null,
-            total_venta: Number(x.total_venta) || 0,
-          }))
-        );
-
-        if (data.length < PAGE) break;
-        from += PAGE;
-      }
-
       setClientes((c.data ?? []) as Cliente[]);
       setContactos((ct.data ?? []) as Contacto[]);
       setMaquinas(maquinasRows);
-      setFacturas(facts);
       setSeguimientos((s.data ?? []) as Seguimiento[]);
     } catch (e) {
       console.error(e);
