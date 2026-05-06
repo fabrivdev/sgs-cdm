@@ -1,71 +1,88 @@
-# Plan: Tabs en Dashboard + vista "Estado de técnicos hoy"
 
-## 1. Reestructurar Dashboard con tabs
+# Plan: carga rápida y progresiva del Parque de Máquinas
 
-En `src/pages/Dashboard.tsx`, debajo del título "Dashboard" agregar un selector con dos opciones:
+## Diagnóstico
 
-- **Resumen** — toda la vista actual (KPIs, banner alerta, gráficos, top técnicos, clientes a contactar). El filtro de fechas (Desde/Hasta) **solo aparece** cuando esta tab está activa.
-- **Técnicos** — la nueva grilla (descrita abajo). No muestra el filtro de fechas (siempre se basa en "hoy" para disponibilidad, pero usa el período para el contador "X servicios este mes").
+Hoy, al entrar a la pestaña **Parque & Clientes → Parque**, antes de mostrar nada el frontend descarga:
 
-Implementación: usar el componente `Tabs` de shadcn (`@/components/ui/tabs`) con dos `TabsTrigger` ("Resumen", "Técnicos") debajo del header. Estado `vista: "resumen" | "tecnicos"`.
+- 396 máquinas activas
+- ~195 clientes y ~199 contactos
+- Todo el historial de seguimiento comercial
+- **62.295 facturas completas** (todas las columnas, paginadas de 1.000 en 1.000 → ~63 peticiones encadenadas)
 
-## 2. Nueva vista "Estado de técnicos hoy"
+Las facturas se traen enteras solo para calcular 4 columnas agregadas:
+- Días desde último repuesto / último servicio
+- Facturación del rango actual
+- Facturación del rango previo (mismo período año anterior)
 
-Cargar todos los técnicos no-admin desde `profiles` (ya disponibles), junto con su `sucursal`. Para determinar el estado del día:
+Mientras esa descarga ocurre, la tabla muestra un spinner y la UI se siente "trabada". Además, la página padre (`ParqueClientes.tsx`) también consulta `facturacion` para sus 4 KPIs, duplicando trabajo.
 
-- Calcular `hoy = format(new Date(), "yyyy-MM-dd")`.
-- Para servicios "iniciados hoy": consultar `servicio_jornadas` con `fecha = hoy` y `estado = 'Iniciado'`, y unir con `servicios` para obtener `tecnico_responsable_id`, `auxiliares` y `sucursal`. Un técnico está **No disponible** si participa (responsable o auxiliar) en al menos una jornada activa hoy con estado `Iniciado`.
-- Si no, está **Disponible**.
+## Estrategia
 
-Cada tarjeta (componente `Card`):
+Dos cambios independientes y combinables:
 
-- Borde izquierdo de 4px: gris (`border-l-muted-foreground/40`) si Disponible, verde (`border-l-estado-completado` o `#639922`) si No disponible.
-- Círculo con iniciales (primeras letras de las 2 primeras palabras del nombre): fondo gris si Disponible, verde si No disponible, texto blanco.
-- Nombre completo del técnico.
-- Badge de estado: gris ("Disponible") o verde ("No disponible").
-- Línea secundaria:
-  - Disponible → "N servicios este mes" (cuenta de servicios donde participó dentro del rango `from`/`to` actual del filtro; si la tab Técnicos no usa filtro, usar mes actual por defecto).
-  - No disponible → sucursal/ubicación del primer servicio activo hoy (ej. "En Encarnación").
+1. **Render progresivo**: mostrar la tabla en cuanto haya clientes + máquinas + contactos. Las columnas que dependen de facturación aparecen como skeletons y se llenan después.
+2. **Agregar en el servidor**: reemplazar la descarga completa de `facturacion` por funciones SQL (RPC) que devuelvan solo los agregados que la UI necesita — una fila por cliente, no 62k filas.
 
-Layout: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3`.
+Resultado esperado: **primer render < 1s**, métricas de facturación visibles en 1–2s adicionales, sin volver a tocar las 62k filas.
 
-Al pie: dos pills (Badge):
-- "X disponibles" (estilo gris/secundario)
-- "X no disponibles" (verde)
+## Cambios
 
-## 3. Quitar requisito de horas al completar
+### 1. Funciones SQL agregadas (Lovable Cloud)
 
-En `src/components/ServicioDetalleDialog.tsx`, función `save` (líneas 252-260): eliminar el bloque que valida `merged.estado === "Completado" && horas_trabajadas == null` y bloquea el guardado. También quitar el asterisco rojo `*` y el indicador visual de obligatoriedad junto al label "Horas" (línea 484).
+Crear dos funciones `SECURITY INVOKER` (respetan RLS) que se invocan desde el cliente con `supabase.rpc(...)`:
 
-Las horas siguen siendo un campo opcional editable; simplemente ya no impiden marcar Completado.
+- `parque_resumen_facturacion(desde date, hasta date, prev_desde date, prev_hasta date)`
+  Devuelve por `cliente_id`: `fact_actual`, `fact_prev`, `tiene_rep_rango`, `tiene_srv_rango`.
+- `parque_ultimas_facturas()`
+  Devuelve por `cliente_id`: `ult_repuesto` (max fecha grupo_fx='Repuestos'), `ult_servicio` (max fecha grupo_fx in 'Mano de obra','Kilometraje').
+
+Ambas filtran por los mismos criterios que hoy aplica el cliente (`grupo_fx`) y solo consideran clientes con máquinas activas.
+
+Se agrega además un índice de apoyo:
+```text
+CREATE INDEX IF NOT EXISTS idx_facturacion_cliente_fecha
+  ON facturacion (cliente_id, fecha);
+```
+
+### 2. `ParqueTab.tsx`: carga en dos fases
+
+Fase A (rápida, bloqueante mínima):
+- `parque_maquinas` activas, `clientes`, `contactos_cliente`, `seguimiento_comercial`.
+- Setear `loading = false` y mostrar la tabla con las columnas de facturación en estado "—" / skeleton.
+
+Fase B (no bloqueante):
+- Llamar a las dos RPC en paralelo y mergearlas a un nuevo estado `factAgregados`.
+- Las columnas Facturación / Var % / Días último repuesto / Días último servicio leen de ahí.
+
+Recargar Fase B cuando cambia el rango (`rango`, `customDesde`, `customHasta`), no Fase A.
+
+Eliminar el bucle paginado actual sobre `facturacion` y el estado `facturas`.
+
+### 3. `ParqueClientes.tsx`: usar las mismas RPC
+
+Su `cargarMetricas()` también consulta `facturacion`. Cambiarla para usar los mismos agregados (o una tercera RPC `parque_kpis()`), evitando la doble descarga.
+
+### 4. Pequeñas mejoras de UX
+
+- Cache en memoria a nivel de componente (`useRef`) para que volver a la pestaña Parque dentro de la misma sesión sea instantáneo si nada cambió.
+- Mantener un skeleton de filas en lugar del spinner pantalla-completa actual.
 
 ## Detalles técnicos
 
-```
-Dashboard
-├─ Header (título)
-├─ Tabs [Resumen | Técnicos]
-│   ├─ Resumen
-│   │   ├─ Filtro fechas (Desde/Hasta)
-│   │   ├─ Banner alerta
-│   │   ├─ KPIs
-│   │   ├─ Charts
-│   │   └─ Top técnicos / Clientes a contactar
-│   └─ Técnicos
-│       ├─ Grilla de tarjetas
-│       └─ Pills resumen
-```
+- Las RPC usan `SECURITY INVOKER` + `SET search_path = public` y dependen de las RLS existentes de `facturacion` (ya filtran por sucursal/rol).
+- El payload pasa de ~62k filas con 7 columnas a ~195 filas con 4 columnas: ~300× menos datos.
+- No cambia ninguna lógica de negocio: los criterios (`grupo_fx ∈ {Repuestos, Mano de obra, Kilometraje}`, exclusión de plataformas/cabezales por subgrupo de máquina) se mantienen idénticos. La exclusión "incluir plataformas" sigue aplicándose en el cliente porque depende de `parque_maquinas.subgrupo`, no de la factura.
+- Los tipos de Supabase se regeneran automáticamente tras la migración; no se editan manualmente.
 
-Query para jornadas activas hoy:
-```ts
-supabase
-  .from("servicio_jornadas")
-  .select("servicio_id, estado, fecha, servicios!inner(tecnico_responsable_id, auxiliares, sucursal)")
-  .eq("fecha", hoy)
-  .eq("estado", "Iniciado")
-```
+## Archivos afectados
 
-## Archivos a modificar
+- Nueva migración SQL (funciones + índice).
+- `src/components/parque/ParqueTab.tsx` — refactor de `cargar()` en dos fases, nuevo estado de agregados, eliminación del bucle paginado.
+- `src/pages/ParqueClientes.tsx` — `cargarMetricas()` consume la RPC.
+- (Opcional) pequeño componente de skeleton para las celdas de facturación.
 
-- `src/pages/Dashboard.tsx` — agregar Tabs, mover contenido actual a tab "Resumen", crear nueva sección "Técnicos", cargar jornadas de hoy.
-- `src/components/ServicioDetalleDialog.tsx` — quitar validación obligatoria de horas al completar y el indicador visual `*`.
+## Fuera de alcance
+
+- No se modifica `ClientePanel` (su carga ya es por cliente individual y es rápida).
+- No se cambian filtros, ordenamiento, exportación ni el diseño de la tabla.
