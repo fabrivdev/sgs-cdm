@@ -331,12 +331,72 @@ export function ParqueTab({
     };
   }, [rango, customDesde, customHasta]);
 
+  // Fase B: agregados de facturación (RPC) — depende del rango
+  useEffect(() => {
+    let cancelado = false;
+    const cargarFact = async () => {
+      setFactLoading(true);
+      try {
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const [resumen, ultimas] = await Promise.all([
+          supabase.rpc("parque_resumen_facturacion", {
+            p_desde: fmt(desdeDate),
+            p_hasta: fmt(hastaDate),
+            p_prev_desde: fmt(prevDesdeDate),
+            p_prev_hasta: fmt(prevHastaDate),
+          }),
+          supabase.rpc("parque_ultimas_facturas"),
+        ]);
+        if (cancelado) return;
+        const map = new Map<string, FactAgregado>();
+        for (const r of (resumen.data ?? []) as Array<{
+          cliente_id: string;
+          fact_actual: number | string;
+          fact_prev: number | string;
+          tiene_rep_rango: boolean;
+          tiene_srv_rango: boolean;
+        }>) {
+          map.set(r.cliente_id, {
+            fact_actual: Number(r.fact_actual) || 0,
+            fact_prev: Number(r.fact_prev) || 0,
+            tiene_rep_rango: !!r.tiene_rep_rango,
+            tiene_srv_rango: !!r.tiene_srv_rango,
+            ult_repuesto: null,
+            ult_servicio: null,
+          });
+        }
+        for (const r of (ultimas.data ?? []) as Array<{
+          cliente_id: string;
+          ult_repuesto: string | null;
+          ult_servicio: string | null;
+        }>) {
+          const prev = map.get(r.cliente_id) ?? {
+            fact_actual: 0,
+            fact_prev: 0,
+            tiene_rep_rango: false,
+            tiene_srv_rango: false,
+            ult_repuesto: null,
+            ult_servicio: null,
+          };
+          prev.ult_repuesto = r.ult_repuesto;
+          prev.ult_servicio = r.ult_servicio;
+          map.set(r.cliente_id, prev);
+        }
+        setFactAgregados(map);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelado) setFactLoading(false);
+      }
+    };
+    cargarFact();
+    return () => {
+      cancelado = true;
+    };
+  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate]);
+
   const rows: Row[] = useMemo(() => {
     const hoy = new Date();
-    const desdeT = desdeDate.getTime();
-    const hastaT = hastaDate.getTime();
-    const prevDT = prevDesdeDate.getTime();
-    const prevHT = prevHastaDate.getTime();
 
     const contactosByCliente = new Map<string, Contacto[]>();
     for (const ct of contactos) {
@@ -352,39 +412,6 @@ export function ParqueTab({
       const arr = maquinasByCliente.get(mq.cliente_id) ?? [];
       arr.push(mq);
       maquinasByCliente.set(mq.cliente_id, arr);
-    }
-
-    const ultRepByCliente = new Map<string, string>();
-    const ultSrvByCliente = new Map<string, string>();
-    const factYTDByCliente = new Map<string, number>();
-    const factPrevByCliente = new Map<string, number>();
-    const tieneRepRango = new Set<string>();
-    const tieneSrvRango = new Set<string>();
-
-    for (const fc of facturas) {
-      if (!fc.cliente_id) continue;
-      if (!esFacturaComercialValida(fc)) continue;
-
-      const ft = new Date(fc.fecha).getTime();
-      const gx = normText(fc.grupo_fx);
-
-      if (gx === "repuestos") {
-        const cur = ultRepByCliente.get(fc.cliente_id);
-        if (!cur || new Date(cur).getTime() < ft) ultRepByCliente.set(fc.cliente_id, fc.fecha);
-        if (ft >= desdeT && ft <= hastaT) tieneRepRango.add(fc.cliente_id);
-      } else if (gx === "mano de obra" || gx === "kilometraje") {
-        const cur = ultSrvByCliente.get(fc.cliente_id);
-        if (!cur || new Date(cur).getTime() < ft) ultSrvByCliente.set(fc.cliente_id, fc.fecha);
-        if (ft >= desdeT && ft <= hastaT) tieneSrvRango.add(fc.cliente_id);
-      }
-
-      if (ft >= desdeT && ft <= hastaT) {
-        factYTDByCliente.set(fc.cliente_id, (factYTDByCliente.get(fc.cliente_id) ?? 0) + fc.total_venta);
-      }
-
-      if (ft >= prevDT && ft <= prevHT) {
-        factPrevByCliente.set(fc.cliente_id, (factPrevByCliente.get(fc.cliente_id) ?? 0) + fc.total_venta);
-      }
     }
 
     const ultSegByCliente = new Map<string, Seguimiento>();
@@ -406,8 +433,9 @@ export function ParqueTab({
           ? Math.round((anios.reduce((s, a) => s + (hoy.getFullYear() - a), 0) / anios.length) * 10) / 10
           : null;
 
-      const ytd = factYTDByCliente.get(cli.id) ?? 0;
-      const prev = factPrevByCliente.get(cli.id) ?? 0;
+      const agg = factAgregados.get(cli.id);
+      const ytd = agg?.fact_actual ?? 0;
+      const prev = agg?.fact_prev ?? 0;
       const varPct = prev > 0 ? Math.round(((ytd - prev) / prev) * 100) : ytd > 0 ? 100 : null;
 
       return {
@@ -420,17 +448,17 @@ export function ParqueTab({
         cantTotal: mqs.length,
         subgrupos: subgs,
         antiguedadProm,
-        diasUltRepuesto: dias(ultRepByCliente.get(cli.id) ?? null),
-        diasUltServicio: dias(ultSrvByCliente.get(cli.id) ?? null),
-        tieneRepEnRango: tieneRepRango.has(cli.id),
-        tieneSrvEnRango: tieneSrvRango.has(cli.id),
+        diasUltRepuesto: dias(agg?.ult_repuesto ?? null),
+        diasUltServicio: dias(agg?.ult_servicio ?? null),
+        tieneRepEnRango: agg?.tiene_rep_rango ?? false,
+        tieneSrvEnRango: agg?.tiene_srv_rango ?? false,
         factYTD: ytd,
         factPrev: prev,
         varPct,
         ultSeg: ultSegByCliente.get(cli.id) ?? null,
       };
     });
-  }, [clientes, contactos, maquinas, facturas, seguimientos, desdeDate, hastaDate, prevDesdeDate, prevHastaDate, incluirPlataformas]);
+  }, [clientes, contactos, maquinas, factAgregados, seguimientos, incluirPlataformas]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
