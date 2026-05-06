@@ -85,13 +85,13 @@ type Maquina = {
   activo: boolean;
 };
 
-type Factura = {
-  cliente_id: string | null;
-  fecha: string;
-  tipo: "Repuesto" | "Servicio";
-  grupo: string | null;
-  grupo_fx: string | null;
-  total_venta: number;
+type FactAgregado = {
+  fact_actual: number;
+  fact_prev: number;
+  tiene_rep_rango: boolean;
+  tiene_srv_rango: boolean;
+  ult_repuesto: string | null;
+  ult_servicio: string | null;
 };
 
 type Seguimiento = {
