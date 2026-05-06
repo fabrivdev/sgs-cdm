@@ -817,7 +817,7 @@ export function ParqueTab({
         </Button>
       </div>
 
-      {!loading && facturas.length > 0 && !servicioInfo.hayEnRango && (
+      {!loading && !factLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
           ⚠️ No hay facturas de <strong>Servicio</strong> (Mano de Obra / Kilometraje) en el período seleccionado.
           {servicioInfo.ultimaServicio
