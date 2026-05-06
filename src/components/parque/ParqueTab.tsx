@@ -542,18 +542,15 @@ export function ParqueTab({
   const servicioInfo = useMemo(() => {
     let maxServ: Date | null = null;
     let hayEnRango = false;
-    const desdeT = desdeDate.getTime();
-    const hastaT = hastaDate.getTime();
-    for (const fc of facturas) {
-      if (fc.tipo !== "Servicio") continue;
-      const gx = normText(fc.grupo_fx);
-      if (gx !== "mano de obra" && gx !== "kilometraje") continue;
-      const t = new Date(fc.fecha).getTime();
-      if (!maxServ || t > maxServ.getTime()) maxServ = new Date(fc.fecha);
-      if (t >= desdeT && t <= hastaT) hayEnRango = true;
+    for (const agg of factAgregados.values()) {
+      if (agg.tiene_srv_rango) hayEnRango = true;
+      if (agg.ult_servicio) {
+        const d = new Date(agg.ult_servicio);
+        if (!maxServ || d > maxServ) maxServ = d;
+      }
     }
     return { ultimaServicio: maxServ, hayEnRango };
-  }, [facturas, desdeDate, hastaDate]);
+  }, [factAgregados]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
