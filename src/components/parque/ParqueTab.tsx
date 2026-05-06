@@ -829,6 +829,11 @@ export function ParqueTab({
       <div className="text-xs text-muted-foreground">
         {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
         {format(desdeDate, "dd/MM/yy")} – {format(hastaDate, "dd/MM/yy")}
+        {factLoading && !loading && (
+          <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/80">
+            · cargando facturación…
+          </span>
+        )}
       </div>
 
       <div className="rounded-md border bg-card overflow-x-auto">
