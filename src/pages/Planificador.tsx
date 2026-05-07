@@ -287,7 +287,24 @@ export default function Planificador() {
           <p className="text-xs text-muted-foreground">{filtered.length} servicios visibles</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={fCliente}
+              onChange={(e) => setFCliente(e.target.value)}
+              placeholder="Buscar cliente..."
+              className="h-9 w-[200px] pl-7 text-sm"
+            />
+            {fCliente && (
+              <button
+                onClick={() => setFCliente("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm">
