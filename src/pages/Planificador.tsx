@@ -269,6 +269,7 @@ export default function Planificador() {
     setFTecnico("all");
     setFMarca("all");
     setFEstado("all");
+    setFCliente("");
   };
 
   const activeChips: { label: string; clear: () => void }[] = [];
