@@ -12,7 +12,8 @@ import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBa
 import { ESTADOS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
-import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X } from "lucide-react";
+import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -100,6 +101,7 @@ export default function Planificador() {
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [fMarca, setFMarca] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
+  const [fCliente, setFCliente] = useState<string>("");
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
@@ -186,15 +188,20 @@ export default function Planificador() {
   );
 
   const filtered = useMemo(() => {
+    const q = fCliente.trim().toLowerCase();
     return servicios.filter((s) => {
       if (fSemana !== "all" && s.semana !== Number(fSemana)) return false;
       if (fSucursal !== "all" && s.sucursal !== fSucursal) return false;
       if (fTecnico !== "all" && s.tecnico_responsable_id !== fTecnico && !s.auxiliares.includes(fTecnico)) return false;
       if (fMarca !== "all" && s.marca !== fMarca) return false;
       if (fEstado !== "all" && s.estado !== fEstado) return false;
+      if (q) {
+        const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
+        if (!nombre.toLowerCase().includes(q)) return false;
+      }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById]);
 
   const canCreate = isAdmin || isCabecilla;
 
@@ -262,6 +269,7 @@ export default function Planificador() {
     setFTecnico("all");
     setFMarca("all");
     setFEstado("all");
+    setFCliente("");
   };
 
   const activeChips: { label: string; clear: () => void }[] = [];
@@ -279,7 +287,24 @@ export default function Planificador() {
           <p className="text-xs text-muted-foreground">{filtered.length} servicios visibles</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={fCliente}
+              onChange={(e) => setFCliente(e.target.value)}
+              placeholder="Buscar cliente..."
+              className="h-9 w-[200px] pl-7 text-sm"
+            />
+            {fCliente && (
+              <button
+                onClick={() => setFCliente("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm">
