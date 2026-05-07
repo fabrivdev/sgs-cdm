@@ -578,12 +578,12 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                 <Button variant="ghost" size="sm" onClick={() => { setEditMaquina(m.id); setMaquinaForm(m); }}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => desactivarMaquina(m.id)} title="Desactivar">
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                <Button variant="outline" size="sm" onClick={() => desactivarMaquina(m.id)} className="text-xs h-8" title="Marcar como inactiva">
+                                  Inactivar
                                 </Button>
                               </>
                             ) : (
-                              <Button variant="ghost" size="sm" onClick={() => reactivarMaquina(m.id)} className="text-xs h-8">
+                              <Button variant="outline" size="sm" onClick={() => reactivarMaquina(m.id)} className="text-xs h-8">
                                 Reactivar
                               </Button>
                             )}
