@@ -12,7 +12,8 @@ import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBa
 import { ESTADOS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
-import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X } from "lucide-react";
+import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
