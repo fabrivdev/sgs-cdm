@@ -507,7 +507,7 @@ export function ParqueTab({
       pctConServicioUltimoAnio:
         totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0,
       pctContactadosEsteMes:
-        totalClientes > 0 ? Math.round((contactadosMes / totalClientes) * 100) : 0,
+        totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,
       sinContacto60d: sinContacto,
     });
   }, [filtradas, onMetricasChange]);
