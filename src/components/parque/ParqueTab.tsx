@@ -486,17 +486,16 @@ export function ParqueTab({
   // Métricas calculadas a partir de los clientes filtrados (para las cards superiores)
   useEffect(() => {
     if (!onMetricasChange) return;
-    const hoy = new Date();
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getTime();
+    const desdeMs = desdeDate.getTime();
     const totalClientes = filtradas.length;
     let totalMaquinas = 0;
     let conServicio = 0;
-    let contactadosMes = 0;
+    let contactadosRango = 0;
     let sinContacto = 0;
     for (const r of filtradas) {
       totalMaquinas += r.cantTotal;
       if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
-      if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= inicioMes) contactadosMes++;
+      if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) contactadosRango++;
       const sinServ60 = r.diasUltServicio == null || r.diasUltServicio > 60;
       const sinSeg60 =
         !r.ultSeg ||
