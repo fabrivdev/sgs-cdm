@@ -510,7 +510,7 @@ export function ParqueTab({
         totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,
       sinContacto60d: sinContacto,
     });
-  }, [filtradas, onMetricasChange]);
+  }, [filtradas, onMetricasChange, desdeDate]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
