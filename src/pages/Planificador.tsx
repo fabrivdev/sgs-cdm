@@ -100,6 +100,7 @@ export default function Planificador() {
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [fMarca, setFMarca] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
+  const [fCliente, setFCliente] = useState<string>("");
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
