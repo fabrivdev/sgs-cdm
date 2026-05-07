@@ -187,15 +187,20 @@ export default function Planificador() {
   );
 
   const filtered = useMemo(() => {
+    const q = fCliente.trim().toLowerCase();
     return servicios.filter((s) => {
       if (fSemana !== "all" && s.semana !== Number(fSemana)) return false;
       if (fSucursal !== "all" && s.sucursal !== fSucursal) return false;
       if (fTecnico !== "all" && s.tecnico_responsable_id !== fTecnico && !s.auxiliares.includes(fTecnico)) return false;
       if (fMarca !== "all" && s.marca !== fMarca) return false;
       if (fEstado !== "all" && s.estado !== fEstado) return false;
+      if (q) {
+        const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
+        if (!nombre.toLowerCase().includes(q)) return false;
+      }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById]);
 
   const canCreate = isAdmin || isCabecilla;
 
