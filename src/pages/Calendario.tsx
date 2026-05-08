@@ -452,6 +452,7 @@ export default function Calendario() {
                 size="sm"
                 className="w-full"
                 onClick={() => {
+                  setDiaForm(diaSel);
                   setDiaSel(null);
                   setOpenForm(true);
                 }}
