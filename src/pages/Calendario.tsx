@@ -94,6 +94,7 @@ export default function Calendario() {
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [detalle, setDetalle] = useState<Servicio | null>(null);
   const [diaSel, setDiaSel] = useState<Date | null>(null);
+  const [diaForm, setDiaForm] = useState<Date | null>(null);
   const [openForm, setOpenForm] = useState(false);
 
   const load = async () => {
