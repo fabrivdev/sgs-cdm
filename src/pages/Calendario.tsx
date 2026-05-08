@@ -303,7 +303,13 @@ export default function Calendario() {
       <Card className="overflow-hidden">
         <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
-            <div key={d} className="py-1.5 sm:py-2">
+            <div
+              key={d}
+              className={cn(
+                "py-1.5 sm:py-2",
+                d === "Dom" && "bg-slate-200 text-slate-600"
+              )}
+            >
               {d}
             </div>
           ))}
@@ -318,6 +324,7 @@ export default function Calendario() {
             const isDragOver = dragOverKey === dayKey;
             const esSemana = vista === "semana";
             const visibles = esSemana ? evs : evs.slice(0, 3);
+            const esDomingo = d.getDay() === 0;
 
             return (
               <div
@@ -347,14 +354,29 @@ export default function Calendario() {
                   moverJornada(jornadaId, d, servicioId);
                 }}
                 className={cn(
-                  "border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  "relative border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[110px]",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
-                  isToday && "bg-primary/5",
+                  esDomingo && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
+                  esDomingo && !isCur && vista === "mes" && "bg-slate-200/70 text-slate-500",
+                  isToday && !esDomingo && "bg-primary/5",
+                  isToday && esDomingo && "bg-slate-100 ring-1 ring-primary/30",
                   isDragOver && "bg-primary/10 ring-2 ring-primary/40",
                 )}
               >
-                <div className={cn("text-right text-[11px] font-semibold tabular-nums sm:mb-1", isToday && "text-primary")}>
+                {esDomingo && (
+                  <div className="pointer-events-none absolute left-1 top-1 hidden rounded bg-slate-300/80 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 sm:block">
+                    No laboral
+                  </div>
+                )}
+
+                <div
+                  className={cn(
+                    "text-right text-[11px] font-semibold tabular-nums sm:mb-1",
+                    isToday && !esDomingo && "text-primary",
+                    esDomingo && "text-slate-600"
+                  )}
+                >
                   {format(d, "d")}
                 </div>
 
@@ -443,6 +465,9 @@ export default function Calendario() {
             <SheetDescription>
               {eventosDia.length} servicio{eventosDia.length !== 1 ? "s" : ""} programado
               {eventosDia.length !== 1 ? "s" : ""}
+              {diaSel?.getDay() === 0 && (
+                <span className="ml-1 text-slate-500">(domingo no laboral)</span>
+              )}
             </SheetDescription>
           </SheetHeader>
 
