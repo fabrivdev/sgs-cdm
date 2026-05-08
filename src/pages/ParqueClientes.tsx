@@ -142,14 +142,18 @@ export default function ParqueClientes() {
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-3 h-auto">
+        <TabsList className="grid w-full grid-cols-4 h-auto">
           <TabsTrigger value="parque" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Parque<span className="hidden sm:inline">&nbsp;de máquinas</span></TabsTrigger>
+          <TabsTrigger value="maquinas" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Máquinas</TabsTrigger>
           <TabsTrigger value="agenda" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Agenda<span className="hidden sm:inline">&nbsp;comercial</span></TabsTrigger>
           <TabsTrigger value="importar" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Importar<span className="hidden sm:inline">&nbsp;datos</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="parque" className="mt-4">
           <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
+        </TabsContent>
+        <TabsContent value="maquinas" className="mt-4">
+          <MaquinasTab key={`m-${refreshKey}`} onOpenCliente={handleOpenCliente} />
         </TabsContent>
         <TabsContent value="agenda" className="mt-4">
           <AgendaTab key={`a-${refreshKey}`} onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
