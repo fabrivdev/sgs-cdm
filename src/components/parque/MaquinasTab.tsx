@@ -15,8 +15,10 @@ const SUBGRUPOS = [
   "SEMBRADORAS",
   "PICADORAS",
   "PLATAFORMAS",
+  "PLATAFORMAS/CABEZALES",
   "PULVERIZADORAS",
   "TRACTORES",
+  "SUELO",
   "OTRO",
 ] as const;
 
@@ -31,12 +33,37 @@ type Maquina = {
   vendedor: string | null;
   sucursal: Sucursal | null;
   localidad: string | null;
-  activo: boolean;
+  activo: boolean | null;
 };
 
-type Cliente = { id: string; nombre: string; sucursal: Sucursal | null };
+type Cliente = {
+  id: string;
+  nombre: string;
+  sucursal: Sucursal | null;
+};
 
 type SortKey = "cliente" | "marca" | "subgrupo" | "anio" | "serie" | "sucursal";
+
+const PAGE = 1000;
+
+async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
+  let from = 0;
+  const all: T[] = [];
+
+  while (true) {
+    const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    all.push(...(data as T[]));
+
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
 
 export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) => void }) {
   const [loading, setLoading] = useState(true);
@@ -57,15 +84,29 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [m, c] = await Promise.all([
-        supabase
-          .from("parque_maquinas")
-          .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo"),
-        supabase.from("clientes").select("id, nombre, sucursal"),
-      ]);
-      setMaquinas((m.data ?? []) as Maquina[]);
-      setClientes((c.data ?? []) as Cliente[]);
-      setLoading(false);
+
+      try {
+        const [m, c] = await Promise.all([
+          cargarTodo<Maquina>(
+            supabase
+              .from("parque_maquinas")
+              .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo"),
+          ),
+          cargarTodo<Cliente>(
+            supabase
+              .from("clientes")
+              .select("id, nombre, sucursal")
+              .order("nombre", { ascending: true }),
+          ),
+        ]);
+
+        setMaquinas(m);
+        setClientes(c);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -79,45 +120,63 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
     const ql = q.trim().toLowerCase();
     const ad = anioDesde ? Number(anioDesde) : null;
     const ah = anioHasta ? Number(anioHasta) : null;
+
     return maquinas.filter((m) => {
-      if (fEstado === "activa" && !m.activo) return false;
-      if (fEstado === "inactiva" && m.activo) return false;
+      const activa = m.activo !== false;
+
+      if (fEstado === "activa" && !activa) return false;
+      if (fEstado === "inactiva" && activa) return false;
       if (fSucursal !== "all" && m.sucursal !== fSucursal) return false;
       if (fMarca !== "all" && m.marca !== fMarca) return false;
       if (fSubgrupo !== "all" && m.subgrupo !== fSubgrupo) return false;
       if (ad != null && (m.anio == null || m.anio < ad)) return false;
       if (ah != null && (m.anio == null || m.anio > ah)) return false;
+
       if (ql) {
         const cli = m.cliente_id ? cliById.get(m.cliente_id)?.nombre ?? "" : "";
         const hay =
           cli.toLowerCase().includes(ql) ||
           (m.serie ?? "").toLowerCase().includes(ql) ||
           (m.modelo_tipo ?? "").toLowerCase().includes(ql);
+
         if (!hay) return false;
       }
+
       return true;
     });
   }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, anioDesde, anioHasta]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
+
     return [...filtradas].sort((a, b) => {
       const cliA = a.cliente_id ? cliById.get(a.cliente_id)?.nombre ?? "" : "";
       const cliB = b.cliente_id ? cliById.get(b.cliente_id)?.nombre ?? "" : "";
+
       switch (sortKey) {
-        case "cliente": return cliA.localeCompare(cliB) * dir;
-        case "marca": return a.marca.localeCompare(b.marca) * dir;
-        case "subgrupo": return (a.subgrupo ?? "").localeCompare(b.subgrupo ?? "") * dir;
-        case "anio": return ((a.anio ?? 0) - (b.anio ?? 0)) * dir;
-        case "serie": return (a.serie ?? "").localeCompare(b.serie ?? "") * dir;
-        case "sucursal": return (a.sucursal ?? "").localeCompare(b.sucursal ?? "") * dir;
+        case "cliente":
+          return cliA.localeCompare(cliB) * dir;
+        case "marca":
+          return a.marca.localeCompare(b.marca) * dir;
+        case "subgrupo":
+          return (a.subgrupo ?? "").localeCompare(b.subgrupo ?? "") * dir;
+        case "anio":
+          return ((a.anio ?? 0) - (b.anio ?? 0)) * dir;
+        case "serie":
+          return (a.serie ?? "").localeCompare(b.serie ?? "") * dir;
+        case "sucursal":
+          return (a.sucursal ?? "").localeCompare(b.sucursal ?? "") * dir;
       }
     });
   }, [filtradas, sortKey, sortDir, cliById]);
 
   const toggleSort = (k: SortKey) => {
-    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else { setSortKey(k); setSortDir("asc"); }
+    if (sortKey === k) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(k);
+      setSortDir("asc");
+    }
   };
 
   const sortIcon = (k: SortKey) => {
@@ -127,21 +186,28 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
   const exportar = () => {
     const hoy = new Date().getFullYear();
-    const data = ordenadas.map((m) => ({
-      Cliente: m.cliente_id ? cliById.get(m.cliente_id)?.nombre ?? "" : "",
-      Sucursal: m.sucursal ?? "",
-      Localidad: m.localidad ?? "",
-      Marca: m.marca,
-      Subgrupo: m.subgrupo,
-      "Modelo/Tipo": m.modelo_tipo ?? "",
-      Año: m.anio ?? "",
-      "Antig.": m.anio ? hoy - m.anio : "",
-      Serie: m.serie,
-      Vendedor: m.vendedor ?? "",
-      Estado: m.activo ? "Activa" : "Inactiva",
-    }));
+
+    const data = ordenadas.map((m) => {
+      const activa = m.activo !== false;
+
+      return {
+        Cliente: m.cliente_id ? cliById.get(m.cliente_id)?.nombre ?? "" : "",
+        Sucursal: m.sucursal ?? "",
+        Localidad: m.localidad ?? "",
+        Marca: m.marca,
+        Subgrupo: m.subgrupo,
+        "Modelo/Tipo": m.modelo_tipo ?? "",
+        Año: m.anio ?? "",
+        "Antig.": m.anio ? hoy - m.anio : "",
+        Serie: m.serie,
+        Vendedor: m.vendedor ?? "",
+        Estado: activa ? "Activa" : "Inactiva",
+      };
+    });
+
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
+
     XLSX.utils.book_append_sheet(wb, ws, "Maquinas");
     XLSX.writeFile(wb, `maquinas-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
@@ -163,10 +229,16 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         <div className="flex flex-col gap-1">
           <span className={lblCls}>Sucursal</span>
           <Select value={fSucursal} onValueChange={setFSucursal}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {SUCURSALES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -174,10 +246,16 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         <div className="flex flex-col gap-1">
           <span className={lblCls}>Marca</span>
           <Select value={fMarca} onValueChange={setFMarca}>
-            <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {MARCAS.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -185,10 +263,16 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         <div className="flex flex-col gap-1">
           <span className={lblCls}>Subgrupo</span>
           <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
-            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {SUBGRUPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {SUBGRUPOS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -197,6 +281,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           <span className={lblCls}>Año desde</span>
           <Input type="number" value={anioDesde} onChange={(e) => setAnioDesde(e.target.value)} className="w-[100px]" placeholder="2010" />
         </div>
+
         <div className="flex flex-col gap-1">
           <span className={lblCls}>Año hasta</span>
           <Input type="number" value={anioHasta} onChange={(e) => setAnioHasta(e.target.value)} className="w-[100px]" placeholder={String(hoy)} />
@@ -205,7 +290,9 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         <div className="flex flex-col gap-1">
           <span className={lblCls}>Estado</span>
           <Select value={fEstado} onValueChange={setFEstado}>
-            <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="activa">Activas</SelectItem>
               <SelectItem value="inactiva">Inactivas</SelectItem>
@@ -250,40 +337,58 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
               <TableHead className="text-center">Estado</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {loading && (
-              <TableRow><TableCell colSpan={11} className="h-20 text-center text-muted-foreground">Cargando...</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
+                  Cargando...
+                </TableCell>
+              </TableRow>
             )}
+
             {!loading && ordenadas.length === 0 && (
-              <TableRow><TableCell colSpan={11} className="h-20 text-center text-muted-foreground">Sin máquinas.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
+                  Sin máquinas.
+                </TableCell>
+              </TableRow>
             )}
-            {!loading && ordenadas.map((m) => {
-              const cli = m.cliente_id ? cliById.get(m.cliente_id) : null;
-              const antig = m.anio ? hoy - m.anio : null;
-              return (
-                <TableRow
-                  key={m.id}
-                  className={cn(onOpenCliente && cli && "cursor-pointer hover:bg-accent/40", !m.activo && "opacity-60")}
-                  onClick={() => cli && onOpenCliente?.(cli.id)}
-                >
-                  <TableCell className="font-medium">{cli?.nombre ?? "—"}</TableCell>
-                  <TableCell className="text-xs">{m.sucursal ?? "—"}</TableCell>
-                  <TableCell className="text-xs">{m.localidad ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{m.marca}</Badge></TableCell>
-                  <TableCell className="text-xs">{m.subgrupo}</TableCell>
-                  <TableCell className="text-xs">{m.modelo_tipo ?? "—"}</TableCell>
-                  <TableCell className="text-center tabular-nums">{m.anio ?? "—"}</TableCell>
-                  <TableCell className="text-center tabular-nums text-xs">{antig != null ? `${antig}a` : "—"}</TableCell>
-                  <TableCell className="text-xs font-mono">{m.serie}</TableCell>
-                  <TableCell className="text-xs">{m.vendedor ?? "—"}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={m.activo ? "default" : "secondary"} className="text-[10px]">
-                      {m.activo ? "Activa" : "Inactiva"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+
+            {!loading &&
+              ordenadas.map((m) => {
+                const cli = m.cliente_id ? cliById.get(m.cliente_id) : null;
+                const antig = m.anio ? hoy - m.anio : null;
+                const activa = m.activo !== false;
+
+                return (
+                  <TableRow
+                    key={m.id}
+                    className={cn(onOpenCliente && cli && "cursor-pointer hover:bg-accent/40", !activa && "opacity-60")}
+                    onClick={() => cli && onOpenCliente?.(cli.id)}
+                  >
+                    <TableCell className="font-medium">{cli?.nombre ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{m.sucursal ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{m.localidad ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px]">
+                        {m.marca}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">{m.subgrupo}</TableCell>
+                    <TableCell className="text-xs">{m.modelo_tipo ?? "—"}</TableCell>
+                    <TableCell className="text-center tabular-nums">{m.anio ?? "—"}</TableCell>
+                    <TableCell className="text-center tabular-nums text-xs">{antig != null ? `${antig}a` : "—"}</TableCell>
+                    <TableCell className="text-xs font-mono">{m.serie}</TableCell>
+                    <TableCell className="text-xs">{m.vendedor ?? "—"}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={activa ? "default" : "secondary"} className="text-[10px]">
+                        {activa ? "Activa" : "Inactiva"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
       </div>
