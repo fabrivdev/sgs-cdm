@@ -595,125 +595,127 @@ export function ParqueTab({
     return "hover:bg-accent/40";
   };
 
+  const lblCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
   const filtrosSelects = (
     <>
-      <Select value={fSucursal} onValueChange={setFSucursal}>
-        <SelectTrigger className="w-full md:w-[140px]">
-          <SelectValue placeholder="Sucursal" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todas las sucursales</SelectItem>
-          {SUCURSALES.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex flex-col gap-1 w-full md:w-auto">
+        <span className={lblCls}>Sucursal</span>
+        <Select value={fSucursal} onValueChange={setFSucursal}>
+          <SelectTrigger className="w-full md:w-[140px]">
+            <SelectValue placeholder="Sucursal" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las sucursales</SelectItem>
+            {SUCURSALES.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Select value={fMarca} onValueChange={setFMarca}>
-        <SelectTrigger className="w-full md:w-[120px]">
-          <SelectValue placeholder="Marca" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todas las marcas</SelectItem>
-          {MARCAS.map((m) => (
-            <SelectItem key={m} value={m}>
-              {m}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex flex-col gap-1 w-full md:w-auto">
+        <span className={lblCls}>Marca</span>
+        <Select value={fMarca} onValueChange={setFMarca}>
+          <SelectTrigger className="w-full md:w-[120px]">
+            <SelectValue placeholder="Marca" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las marcas</SelectItem>
+            {MARCAS.map((m) => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
-        <SelectTrigger className="w-full md:w-[150px]">
-          <SelectValue placeholder="Subgrupo" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos los subgrupos</SelectItem>
-          {SUBGRUPOS.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex flex-col gap-1 w-full md:w-auto">
+        <span className={lblCls}>Subgrupo</span>
+        <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
+          <SelectTrigger className="w-full md:w-[150px]">
+            <SelectValue placeholder="Subgrupo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los subgrupos</SelectItem>
+            {SUBGRUPOS.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
-        <SelectTrigger className="w-full md:w-[170px]">
-          <SelectValue placeholder="Seguimiento" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Cualquier seguimiento</SelectItem>
-          <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
-          {RESULTADOS.map((r) => (
-            <SelectItem key={r} value={r}>
-              {r}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex flex-col gap-1 w-full md:w-auto">
+        <span className={lblCls}>Seguimiento</span>
+        <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
+          <SelectTrigger className="w-full md:w-[170px]">
+            <SelectValue placeholder="Seguimiento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Cualquier seguimiento</SelectItem>
+            <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
+            {RESULTADOS.map((r) => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
-        <SelectTrigger className="w-full md:w-[160px]">
-          <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="30d">Últimos 30 días</SelectItem>
-          <SelectItem value="90d">Últimos 90 días</SelectItem>
-          <SelectItem value="180d">Últimos 6 meses</SelectItem>
-          <SelectItem value="365d">Últimos 12 meses</SelectItem>
-          <SelectItem value="ytd">Año en curso (YTD)</SelectItem>
-          <SelectItem value="custom">Personalizado…</SelectItem>
-        </SelectContent>
-      </Select>
+      <div className="flex flex-col gap-1 w-full md:w-auto">
+        <span className={lblCls}>Período</span>
+        <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
+          <SelectTrigger className="w-full md:w-[160px]">
+            <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="30d">Últimos 30 días</SelectItem>
+            <SelectItem value="90d">Últimos 90 días</SelectItem>
+            <SelectItem value="180d">Últimos 6 meses</SelectItem>
+            <SelectItem value="365d">Últimos 12 meses</SelectItem>
+            <SelectItem value="ytd">Año en curso (YTD)</SelectItem>
+            <SelectItem value="custom">Personalizado…</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {rango === "custom" && (
         <>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
-                {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={customDesde}
-                onSelect={setCustomDesde}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
-                {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={customHasta}
-                onSelect={setCustomHasta}
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
+          <div className="flex flex-col gap-1 w-full md:w-auto">
+            <span className={lblCls}>Desde</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
+                  {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customDesde} onSelect={setCustomDesde} className={cn("p-3 pointer-events-auto")} />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex flex-col gap-1 w-full md:w-auto">
+            <span className={lblCls}>Hasta</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
+                  {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={customHasta} onSelect={setCustomHasta} className={cn("p-3 pointer-events-auto")} />
+              </PopoverContent>
+            </Popover>
+          </div>
         </>
       )}
 
-      <div className="flex items-center gap-2 rounded-md border px-3 h-9 w-full md:w-auto">
-        <Switch
-          id="incluir-plataformas"
-          checked={incluirPlataformas}
-          onCheckedChange={setIncluirPlataformas}
-        />
-        <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
-          Incluir plataformas/cabezales
-        </Label>
+      <div className="flex flex-col gap-1 w-full md:w-auto">
+        <span className={lblCls}>Plataformas/cabezales</span>
+        <div className="flex items-center gap-2 rounded-md border px-3 h-9 w-full md:w-auto">
+          <Switch id="incluir-plataformas" checked={incluirPlataformas} onCheckedChange={setIncluirPlataformas} />
+          <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
+            Incluir
+          </Label>
+        </div>
       </div>
     </>
   );
