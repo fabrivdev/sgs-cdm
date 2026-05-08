@@ -797,15 +797,18 @@ export function ParqueTab({
       </div>
 
       {/* Desktop: barra horizontal completa */}
-      <div className="hidden md:flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[180px] flex-1">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="pl-8"
-          />
+      <div className="hidden md:flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1 min-w-[180px] flex-1">
+          <span className={lblCls}>Buscar</span>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Nombre del cliente..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="pl-8"
+            />
+          </div>
         </div>
 
         {filtrosSelects}
