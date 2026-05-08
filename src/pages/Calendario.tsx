@@ -94,6 +94,7 @@ export default function Calendario() {
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [detalle, setDetalle] = useState<Servicio | null>(null);
   const [diaSel, setDiaSel] = useState<Date | null>(null);
+  const [diaForm, setDiaForm] = useState<Date | null>(null);
   const [openForm, setOpenForm] = useState(false);
 
   const load = async () => {
@@ -451,6 +452,7 @@ export default function Calendario() {
                 size="sm"
                 className="w-full"
                 onClick={() => {
+                  setDiaForm(diaSel);
                   setDiaSel(null);
                   setOpenForm(true);
                 }}
@@ -516,7 +518,7 @@ export default function Calendario() {
         profiles={profiles}
         clientes={clientes}
         onSaved={load}
-        defaultDate={diaSel ? format(diaSel, "yyyy-MM-dd") : undefined}
+        defaultDate={diaForm ? format(diaForm, "yyyy-MM-dd") : undefined}
       />
     </div>
   );
