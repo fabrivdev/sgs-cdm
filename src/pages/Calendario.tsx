@@ -518,7 +518,7 @@ export default function Calendario() {
         profiles={profiles}
         clientes={clientes}
         onSaved={load}
-        defaultDate={diaSel ? format(diaSel, "yyyy-MM-dd") : undefined}
+        defaultDate={diaForm ? format(diaForm, "yyyy-MM-dd") : undefined}
       />
     </div>
   );
