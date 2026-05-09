@@ -194,6 +194,21 @@ export function ServicioFormDialog({
   );
 
   /*
+    El listado visual del combobox no debe usar slice sobre todos los clientes,
+    porque eso muestra solo los primeros y deja afuera clientes que existen.
+    Primero filtramos por lo escrito, y recién después limitamos a 100 resultados visibles.
+  */
+  const clientesFiltrados = useMemo(() => {
+    const q = clienteText.trim().toLowerCase();
+
+    if (!q) return clientesDisponibles.slice(0, 100);
+
+    return clientesDisponibles
+      .filter((c) => c.nombre.toLowerCase().includes(q))
+      .slice(0, 100);
+  }, [clientesDisponibles, clienteText]);
+
+  /*
     IMPORTANTE:
     Este efecto inicializa el formulario SOLO cuando se abre o cambia el servicio.
     No depende de clientesDisponibles / cliById porque esos datos cargan segundos después
@@ -454,7 +469,7 @@ export function ServicioFormDialog({
                       )}
                       <CommandEmpty>Sin coincidencias. Podés ingresarlo manualmente arriba.</CommandEmpty>
                       <CommandGroup heading="Clientes existentes">
-                        {clientesDisponibles.slice(0, 200).map((c) => (
+                        {clientesFiltrados.map((c) => (
                           <CommandItem
                             key={c.id}
                             value={c.nombre}
