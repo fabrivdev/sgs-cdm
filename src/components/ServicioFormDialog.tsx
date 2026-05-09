@@ -79,6 +79,7 @@ export function ServicioFormDialog({
   const [observaciones, setObservaciones] = useState("");
   const [busy, setBusy] = useState(false);
   const [obsOpen, setObsOpen] = useState(false);
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
 
   /*
     Este modal ahora carga por su cuenta:
