@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ParqueTab, type ParqueMetricas } from "@/components/parque/ParqueTab";
 import { AgendaTab } from "@/components/parque/AgendaTab";
 import { MaquinasTab } from "@/components/parque/MaquinasTab";
 import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { Tractor, CheckCircle2, PhoneCall, AlertTriangle } from "lucide-react";
+import { Tractor, CheckCircle2, PhoneCall, AlertTriangle, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Metricas {
