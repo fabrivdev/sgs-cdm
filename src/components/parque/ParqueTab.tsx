@@ -460,7 +460,7 @@ export function ParqueTab({
         ultSeg: ultSegByCliente.get(cli.id) ?? null,
       };
     });
-  }, [clientes, contactos, maquinas, factAgregados, seguimientos, incluirPlataformas]);
+  }, [clientes, contactos, maquinas, factAgregados, seguimientos, incluirPlataformas, fMarca, fSubgrupo]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
