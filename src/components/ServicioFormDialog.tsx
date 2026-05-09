@@ -413,21 +413,69 @@ export function ServicioFormDialog({
             {/* Cliente */}
             <div className="space-y-1.5">
               <Label htmlFor="cliente-input">Cliente</Label>
-              <Input
-                id="cliente-input"
-                list="clientes-list"
-                value={clienteText}
-                onChange={(e) => setClienteText(e.target.value)}
-                placeholder="Escribí el nombre del cliente"
-                autoComplete="off"
-              />
-              <datalist id="clientes-list">
-                {clientesDisponibles.map((c) => (
-                  <option key={c.id} value={c.nombre} />
-                ))}
-              </datalist>
+              <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className={cn("truncate", !clienteText && "text-muted-foreground")}>
+                      {clienteText || "Buscá o escribí el nombre del cliente"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command
+                    filter={(value, search) =>
+                      value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                    }
+                  >
+                    <CommandInput
+                      placeholder="Buscar cliente…"
+                      value={clienteText}
+                      onValueChange={setClienteText}
+                      className="h-9"
+                    />
+                    <CommandList>
+                      {clienteText.trim() && (
+                        <CommandGroup heading="Ingreso manual">
+                          <CommandItem
+                            value={`__nuevo__${clienteText}`}
+                            onSelect={() => setClientePopoverOpen(false)}
+                            className="cursor-pointer"
+                          >
+                            Usar “{clienteText.trim()}” como nuevo cliente
+                          </CommandItem>
+                        </CommandGroup>
+                      )}
+                      <CommandEmpty>Sin coincidencias. Podés ingresarlo manualmente arriba.</CommandEmpty>
+                      <CommandGroup heading="Clientes existentes">
+                        {clientesDisponibles.slice(0, 200).map((c) => (
+                          <CommandItem
+                            key={c.id}
+                            value={c.nombre}
+                            onSelect={() => {
+                              setClienteText(c.nombre);
+                              setClientePopoverOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <span className="flex-1 truncate">{c.nombre}</span>
+                            {c.sucursal && (
+                              <span className="ml-2 text-[10px] text-muted-foreground">{c.sucursal}</span>
+                            )}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <p className="text-[11px] text-muted-foreground">
-                Si no existe, se crea automáticamente al guardar.
+                Si no existe en la base, se crea automáticamente al guardar.
               </p>
             </div>
 
