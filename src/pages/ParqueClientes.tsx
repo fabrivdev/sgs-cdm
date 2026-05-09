@@ -29,6 +29,7 @@ export default function ParqueClientes() {
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [tab, setTab] = useState("parque");
+  const [vistaParque, setVistaParque] = useState<"clientes" | "maquinas">("clientes");
   const [parqueMetricas, setParqueMetricas] = useState<ParqueMetricas | null>(null);
 
   const cargarMetricas = async () => {
