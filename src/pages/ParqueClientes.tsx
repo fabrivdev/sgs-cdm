@@ -93,7 +93,7 @@ export default function ParqueClientes() {
         accent: "text-emerald-600",
       },
       {
-        label: "% contactados este mes",
+        label: "% contactados este período",
         value: `${metricasMostradas.pctContactadosEsteMes}%`,
         icon: PhoneCall,
         accent: "text-blue-600",
