@@ -144,18 +144,34 @@ export default function ParqueClientes() {
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-4 h-auto">
+        <TabsList className="grid w-full grid-cols-3 h-auto">
           <TabsTrigger value="parque" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Parque<span className="hidden sm:inline">&nbsp;de máquinas</span></TabsTrigger>
-          <TabsTrigger value="maquinas" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Máquinas</TabsTrigger>
           <TabsTrigger value="agenda" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Agenda<span className="hidden sm:inline">&nbsp;comercial</span></TabsTrigger>
           <TabsTrigger value="importar" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Importar<span className="hidden sm:inline">&nbsp;datos</span></TabsTrigger>
         </TabsList>
 
-        <TabsContent value="parque" className="mt-4">
-          <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
-        </TabsContent>
-        <TabsContent value="maquinas" className="mt-4">
-          <MaquinasTab key={`m-${refreshKey}`} onOpenCliente={handleOpenCliente} />
+        <TabsContent value="parque" className="mt-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <ToggleGroup
+              type="single"
+              value={vistaParque}
+              onValueChange={(v) => v && setVistaParque(v as "clientes" | "maquinas")}
+              className="border rounded-md"
+            >
+              <ToggleGroupItem value="clientes" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <Users className="h-3.5 w-3.5 mr-1" /> Por cliente
+              </ToggleGroupItem>
+              <ToggleGroupItem value="maquinas" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <Wrench className="h-3.5 w-3.5 mr-1" /> Por máquina
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          {vistaParque === "clientes" ? (
+            <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
+          ) : (
+            <MaquinasTab key={`m-${refreshKey}`} onOpenCliente={handleOpenCliente} />
+          )}
         </TabsContent>
         <TabsContent value="agenda" className="mt-4">
           <AgendaTab key={`a-${refreshKey}`} onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
