@@ -87,10 +87,12 @@ async function cargarTodosLosClientes() {
 
 export default function Calendario() {
   const { isAdmin, isCabecilla } = useAuth();
-  const [vista, setVista] = useState<"mes" | "semana">("mes");
+  const [vista, setVista] = useState<"mes" | "semana" | "tecnicos">("mes");
   const [cursor, setCursor] = useState(new Date());
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [tecnicoIds, setTecnicoIds] = useState<Set<string>>(new Set());
+  const [adminCabecillaIds, setAdminCabecillaIds] = useState<Set<string>>(new Set());
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [detalle, setDetalle] = useState<Servicio | null>(null);
