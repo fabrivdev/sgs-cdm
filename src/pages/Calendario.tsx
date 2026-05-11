@@ -282,13 +282,14 @@ export default function Calendario() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Select value={vista} onValueChange={(v) => setVista(v as "mes" | "semana")}>
-            <SelectTrigger className="w-28 sm:w-32 h-9">
+          <Select value={vista} onValueChange={(v) => setVista(v as "mes" | "semana" | "tecnicos")}>
+            <SelectTrigger className="w-32 sm:w-40 h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="mes">Mes</SelectItem>
               <SelectItem value="semana">Semana</SelectItem>
+              <SelectItem value="tecnicos">Por técnico</SelectItem>
             </SelectContent>
           </Select>
 
