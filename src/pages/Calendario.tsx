@@ -51,6 +51,7 @@ interface Profile {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  activo?: boolean;
 }
 
 interface Cliente {
