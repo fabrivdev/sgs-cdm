@@ -331,6 +331,104 @@ export default function Calendario() {
         </div>
       </div>
 
+      {vista === "tecnicos" ? (
+        <Card className="overflow-x-auto">
+          {(() => {
+            const semanaDays = eachDayOfInterval({
+              start: startOfWeek(cursor, { weekStartsOn: 0 }),
+              end: endOfWeek(cursor, { weekStartsOn: 0 }),
+            });
+            return (
+              <div className="min-w-[900px]">
+                <div
+                  className="grid border-b bg-muted/40 text-[10px] sm:text-xs font-semibold uppercase"
+                  style={{ gridTemplateColumns: `180px repeat(7, minmax(0,1fr))` }}
+                >
+                  <div className="py-2 px-2 text-left">Técnico</div>
+                  {semanaDays.map((d) => {
+                    const esDom = d.getDay() === 0;
+                    const isToday = isSameDay(d, new Date());
+                    return (
+                      <div
+                        key={d.toISOString()}
+                        className={cn(
+                          "py-2 text-center",
+                          esDom && "bg-slate-200 text-slate-600",
+                          isToday && !esDom && "text-primary",
+                        )}
+                      >
+                        <div>{format(d, "EEE", { locale: es })}</div>
+                        <div className="text-[11px] tabular-nums">{format(d, "d/M")}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {tecnicosSolo.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    No hay técnicos activos.
+                  </div>
+                ) : (
+                  tecnicosSolo.map((tec) => {
+                    const total = semanaDays.reduce(
+                      (acc, d) => acc + eventsForTecnicoDay(tec.id, d).length,
+                      0,
+                    );
+                    return (
+                      <div
+                        key={tec.id}
+                        className="grid border-b"
+                        style={{ gridTemplateColumns: `180px repeat(7, minmax(0,1fr))` }}
+                      >
+                        <div className="p-2 border-r bg-muted/20 flex flex-col justify-center">
+                          <div className="text-sm font-medium truncate">{tec.nombre}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {tec.sucursal ?? "—"} · {total} {total === 1 ? "servicio" : "servicios"}
+                          </div>
+                        </div>
+                        {semanaDays.map((d) => {
+                          const evs = eventsForTecnicoDay(tec.id, d);
+                          const esDom = d.getDay() === 0;
+                          return (
+                            <div
+                              key={d.toISOString()}
+                              className={cn(
+                                "p-1 border-r min-h-[80px] space-y-1",
+                                esDom && "bg-slate-50",
+                                evs.length === 0 && !esDom && "bg-amber-50/40",
+                              )}
+                            >
+                              {evs.length === 0 ? (
+                                <div className="text-[10px] text-muted-foreground/60 italic text-center pt-3">
+                                  {esDom ? "—" : "libre"}
+                                </div>
+                              ) : (
+                                evs.map((s) => (
+                                  <button
+                                    key={`${s.id}-${s.fecha_programada}`}
+                                    onClick={() => setDetalle(s)}
+                                    className={cn(
+                                      "block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
+                                      estadoColor(s.estado),
+                                    )}
+                                    title={`${clienteNombre(s.cliente_id)} — ${s.trabajo_descripcion}`}
+                                  >
+                                    {clienteNombre(s.cliente_id)}
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            );
+          })()}
+        </Card>
+      ) : (
       <Card className="overflow-hidden">
         <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
