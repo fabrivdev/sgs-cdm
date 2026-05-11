@@ -152,6 +152,14 @@ export default function Calendario() {
 
       setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
+      const tecSet = new Set<string>();
+      const adminCabSet = new Set<string>();
+      for (const r of (roles ?? []) as Array<{ user_id: string; role: string }>) {
+        if (r.role === "tecnico") tecSet.add(r.user_id);
+        if (r.role === "admin" || r.role === "cabecilla") adminCabSet.add(r.user_id);
+      }
+      setTecnicoIds(tecSet);
+      setAdminCabecillaIds(adminCabSet);
       setClientes(cli);
     } catch (e) {
       console.error(e);
