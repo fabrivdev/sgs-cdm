@@ -584,6 +584,7 @@ export default function Calendario() {
           })}
         </div>
       </Card>
+      )}
 
       <Sheet open={!!diaSel} onOpenChange={(o) => !o && setDiaSel(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
