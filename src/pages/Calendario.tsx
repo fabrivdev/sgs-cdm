@@ -205,6 +205,24 @@ export default function Calendario() {
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
 
+  const tecnicosSolo = useMemo(
+    () =>
+      profiles.filter(
+        (p) =>
+          p.activo !== false &&
+          tecnicoIds.has(p.id) &&
+          !adminCabecillaIds.has(p.id),
+      ),
+    [profiles, tecnicoIds, adminCabecillaIds],
+  );
+
+  const eventsForTecnicoDay = (tecId: string, d: Date) =>
+    servicios.filter(
+      (s) =>
+        isSameDay(parseISO(s.fecha_programada), d) &&
+        (s.tecnico_responsable_id === tecId || s.auxiliares.includes(tecId)),
+    );
+
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
