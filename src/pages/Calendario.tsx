@@ -51,6 +51,7 @@ interface Profile {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  activo?: boolean;
 }
 
 interface Cliente {
@@ -86,10 +87,12 @@ async function cargarTodosLosClientes() {
 
 export default function Calendario() {
   const { isAdmin, isCabecilla } = useAuth();
-  const [vista, setVista] = useState<"mes" | "semana">("mes");
+  const [vista, setVista] = useState<"mes" | "semana" | "tecnicos">("mes");
   const [cursor, setCursor] = useState(new Date());
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [tecnicoIds, setTecnicoIds] = useState<Set<string>>(new Set());
+  const [adminCabecillaIds, setAdminCabecillaIds] = useState<Set<string>>(new Set());
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [fTecnico, setFTecnico] = useState<string>("all");
   const [detalle, setDetalle] = useState<Servicio | null>(null);
@@ -99,10 +102,11 @@ export default function Calendario() {
 
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
-        supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("user_roles").select("user_id, role"),
         cargarTodosLosClientes(),
       ]);
 
@@ -148,6 +152,14 @@ export default function Calendario() {
 
       setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
+      const tecSet = new Set<string>();
+      const adminCabSet = new Set<string>();
+      for (const r of (roles ?? []) as Array<{ user_id: string; role: string }>) {
+        if (r.role === "tecnico") tecSet.add(r.user_id);
+        if (r.role === "admin" || r.role === "cabecilla") adminCabSet.add(r.user_id);
+      }
+      setTecnicoIds(tecSet);
+      setAdminCabecillaIds(adminCabSet);
       setClientes(cli);
     } catch (e) {
       console.error(e);
@@ -192,6 +204,24 @@ export default function Calendario() {
   const days = eachDayOfInterval({ start, end });
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
+
+  const tecnicosSolo = useMemo(
+    () =>
+      profiles.filter(
+        (p) =>
+          p.activo !== false &&
+          tecnicoIds.has(p.id) &&
+          !adminCabecillaIds.has(p.id),
+      ),
+    [profiles, tecnicoIds, adminCabecillaIds],
+  );
+
+  const eventsForTecnicoDay = (tecId: string, d: Date) =>
+    servicios.filter(
+      (s) =>
+        isSameDay(parseISO(s.fecha_programada), d) &&
+        (s.tecnico_responsable_id === tecId || s.auxiliares.includes(tecId)),
+    );
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
@@ -252,13 +282,14 @@ export default function Calendario() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Select value={vista} onValueChange={(v) => setVista(v as "mes" | "semana")}>
-            <SelectTrigger className="w-28 sm:w-32 h-9">
+          <Select value={vista} onValueChange={(v) => setVista(v as "mes" | "semana" | "tecnicos")}>
+            <SelectTrigger className="w-32 sm:w-40 h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="mes">Mes</SelectItem>
               <SelectItem value="semana">Semana</SelectItem>
+              <SelectItem value="tecnicos">Por técnico</SelectItem>
             </SelectContent>
           </Select>
 
@@ -300,6 +331,104 @@ export default function Calendario() {
         </div>
       </div>
 
+      {vista === "tecnicos" ? (
+        <Card className="overflow-x-auto">
+          {(() => {
+            const semanaDays = eachDayOfInterval({
+              start: startOfWeek(cursor, { weekStartsOn: 0 }),
+              end: endOfWeek(cursor, { weekStartsOn: 0 }),
+            });
+            return (
+              <div className="min-w-[900px]">
+                <div
+                  className="grid border-b bg-muted/40 text-[10px] sm:text-xs font-semibold uppercase"
+                  style={{ gridTemplateColumns: `180px repeat(7, minmax(0,1fr))` }}
+                >
+                  <div className="py-2 px-2 text-left">Técnico</div>
+                  {semanaDays.map((d) => {
+                    const esDom = d.getDay() === 0;
+                    const isToday = isSameDay(d, new Date());
+                    return (
+                      <div
+                        key={d.toISOString()}
+                        className={cn(
+                          "py-2 text-center",
+                          esDom && "bg-slate-200 text-slate-600",
+                          isToday && !esDom && "text-primary",
+                        )}
+                      >
+                        <div>{format(d, "EEE", { locale: es })}</div>
+                        <div className="text-[11px] tabular-nums">{format(d, "d/M")}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {tecnicosSolo.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    No hay técnicos activos.
+                  </div>
+                ) : (
+                  tecnicosSolo.map((tec) => {
+                    const total = semanaDays.reduce(
+                      (acc, d) => acc + eventsForTecnicoDay(tec.id, d).length,
+                      0,
+                    );
+                    return (
+                      <div
+                        key={tec.id}
+                        className="grid border-b"
+                        style={{ gridTemplateColumns: `180px repeat(7, minmax(0,1fr))` }}
+                      >
+                        <div className="p-2 border-r bg-muted/20 flex flex-col justify-center">
+                          <div className="text-sm font-medium truncate">{tec.nombre}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {tec.sucursal ?? "—"} · {total} {total === 1 ? "servicio" : "servicios"}
+                          </div>
+                        </div>
+                        {semanaDays.map((d) => {
+                          const evs = eventsForTecnicoDay(tec.id, d);
+                          const esDom = d.getDay() === 0;
+                          return (
+                            <div
+                              key={d.toISOString()}
+                              className={cn(
+                                "p-1 border-r min-h-[80px] space-y-1",
+                                esDom && "bg-slate-50",
+                                evs.length === 0 && !esDom && "bg-amber-50/40",
+                              )}
+                            >
+                              {evs.length === 0 ? (
+                                <div className="text-[10px] text-muted-foreground/60 italic text-center pt-3">
+                                  {esDom ? "—" : "libre"}
+                                </div>
+                              ) : (
+                                evs.map((s) => (
+                                  <button
+                                    key={`${s.id}-${s.fecha_programada}`}
+                                    onClick={() => setDetalle(s)}
+                                    className={cn(
+                                      "block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
+                                      estadoColor(s.estado),
+                                    )}
+                                    title={`${clienteNombre(s.cliente_id)} — ${s.trabajo_descripcion}`}
+                                  >
+                                    {clienteNombre(s.cliente_id)}
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            );
+          })()}
+        </Card>
+      ) : (
       <Card className="overflow-hidden">
         <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
@@ -455,6 +584,7 @@ export default function Calendario() {
           })}
         </div>
       </Card>
+      )}
 
       <Sheet open={!!diaSel} onOpenChange={(o) => !o && setDiaSel(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
