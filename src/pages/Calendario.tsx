@@ -102,10 +102,11 @@ export default function Calendario() {
 
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
-        supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("user_roles").select("user_id, role"),
         cargarTodosLosClientes(),
       ]);
 
