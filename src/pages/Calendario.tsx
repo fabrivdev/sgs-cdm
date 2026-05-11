@@ -208,12 +208,9 @@ export default function Calendario() {
   const tecnicosSolo = useMemo(
     () =>
       profiles.filter(
-        (p) =>
-          p.activo !== false &&
-          tecnicoIds.has(p.id) &&
-          !adminCabecillaIds.has(p.id),
+        (p) => p.activo !== false && !adminCabecillaIds.has(p.id),
       ),
-    [profiles, tecnicoIds, adminCabecillaIds],
+    [profiles, adminCabecillaIds],
   );
 
   const eventsForTecnicoDay = (tecId: string, d: Date) =>
