@@ -389,6 +389,28 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!delUser} onOpenChange={(o) => !o && setDelUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar usuario</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a eliminar definitivamente a <span className="font-semibold">{delUser?.nombre}</span>.
+              Esta acción no se puede deshacer y borra su acceso, perfil y roles.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={delBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); eliminarUsuario(); }}
+              disabled={delBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {delBusy ? "Eliminando…" : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
