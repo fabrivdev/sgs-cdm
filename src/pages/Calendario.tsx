@@ -541,8 +541,8 @@ export default function Calendario() {
                 <div
                   className={cn(
                     "text-right text-[11px] font-semibold tabular-nums sm:mb-1",
-                    isToday && !esDomingo && "text-primary",
-                    esDomingo && "text-slate-600"
+                    isToday && !esNL && "text-primary",
+                    esNL && "text-slate-600"
                   )}
                 >
                   {format(d, "d")}
