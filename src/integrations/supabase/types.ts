@@ -116,6 +116,30 @@ export type Database = {
           },
         ]
       }
+      dias_no_laborales: {
+        Row: {
+          creado_en: string
+          creado_por: string | null
+          fecha: string
+          id: string
+          motivo: string | null
+        }
+        Insert: {
+          creado_en?: string
+          creado_por?: string | null
+          fecha: string
+          id?: string
+          motivo?: string | null
+        }
+        Update: {
+          creado_en?: string
+          creado_por?: string | null
+          fecha?: string
+          id?: string
+          motivo?: string | null
+        }
+        Relationships: []
+      }
       facturacion: {
         Row: {
           cliente_id: string | null
