@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { ChevronLeft, ChevronRight, MapPin, Wrench, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Wrench, Plus, Ban, RotateCcw } from "lucide-react";
 import {
   format,
   addMonths,
@@ -99,14 +99,16 @@ export default function Calendario() {
   const [diaSel, setDiaSel] = useState<Date | null>(null);
   const [diaForm, setDiaForm] = useState<Date | null>(null);
   const [openForm, setOpenForm] = useState(false);
+  const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
 
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones"),
         supabase.from("user_roles").select("user_id, role"),
+        supabase.from("dias_no_laborales").select("id, fecha, motivo"),
         cargarTodosLosClientes(),
       ]);
 
@@ -160,6 +162,11 @@ export default function Calendario() {
       }
       setTecnicoIds(tecSet);
       setAdminCabecillaIds(adminCabSet);
+      const nlMap = new Map<string, { id: string; motivo: string | null }>();
+      for (const d of (nl ?? []) as Array<{ id: string; fecha: string; motivo: string | null }>) {
+        nlMap.set(d.fecha, { id: d.id, motivo: d.motivo });
+      }
+      setDiasNL(nlMap);
       setClientes(cli);
     } catch (e) {
       console.error(e);
@@ -256,6 +263,33 @@ export default function Calendario() {
 
   const canCreate = isAdmin || isCabecilla;
   const eventosDia = diaSel ? eventsForDay(diaSel) : [];
+  const diaSelKey = diaSel ? format(diaSel, "yyyy-MM-dd") : "";
+  const diaSelNL = diaSelKey ? diasNL.get(diaSelKey) : undefined;
+
+  const toggleNoLaboral = async () => {
+    if (!diaSel || !canCreate) return;
+    const key = format(diaSel, "yyyy-MM-dd");
+    const existente = diasNL.get(key);
+    if (existente) {
+      const { error } = await supabase.from("dias_no_laborales").delete().eq("id", existente.id);
+      if (error) { toast.error(error.message); return; }
+      const next = new Map(diasNL); next.delete(key); setDiasNL(next);
+      toast.success("Día marcado como laboral");
+    } else {
+      const motivo = window.prompt("Motivo (opcional, ej: Feriado nacional):", "")?.trim() || null;
+      const { data: u } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("dias_no_laborales")
+        .insert({ fecha: key, motivo, creado_por: u.user?.id ?? null })
+        .select("id, fecha, motivo")
+        .single();
+      if (error) { toast.error(error.message); return; }
+      const next = new Map(diasNL);
+      next.set(data.fecha, { id: data.id, motivo: data.motivo });
+      setDiasNL(next);
+      toast.success("Día marcado como No laboral");
+    }
+  };
 
   const dominantColor = (evs: Servicio[]) => {
     if (evs.some((s) => s.estado === "Pendiente")) return "bg-estado-pendiente";
@@ -451,6 +485,8 @@ export default function Calendario() {
             const esSemana = vista === "semana";
             const visibles = esSemana ? evs : evs.slice(0, 3);
             const esDomingo = d.getDay() === 0;
+            const nlInfo = diasNL.get(dayKey);
+            const esNL = !!nlInfo || esDomingo;
 
             return (
               <div
@@ -483,24 +519,30 @@ export default function Calendario() {
                   "relative border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[110px]",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
-                  esDomingo && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
-                  esDomingo && !isCur && vista === "mes" && "bg-slate-200/70 text-slate-500",
-                  isToday && !esDomingo && "bg-primary/5",
-                  isToday && esDomingo && "bg-slate-100 ring-1 ring-primary/30",
+                  esNL && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
+                  esNL && !isCur && vista === "mes" && "bg-slate-200/70 text-slate-500",
+                  isToday && !esNL && "bg-primary/5",
+                  isToday && esNL && "bg-slate-100 ring-1 ring-primary/30",
                   isDragOver && "bg-primary/10 ring-2 ring-primary/40",
                 )}
               >
-                {esDomingo && (
-                  <div className="pointer-events-none absolute left-1 top-1 hidden rounded bg-slate-300/80 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 sm:block">
-                    No laboral
+                {esNL && (
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute left-1 top-1 hidden rounded px-1.5 py-0.5 text-[9px] font-medium sm:block",
+                      nlInfo ? "bg-amber-200 text-amber-900" : "bg-slate-300/80 text-slate-700",
+                    )}
+                    title={nlInfo?.motivo ?? undefined}
+                  >
+                    {nlInfo ? (nlInfo.motivo ? `NL · ${nlInfo.motivo}` : "No laboral") : "No laboral"}
                   </div>
                 )}
 
                 <div
                   className={cn(
                     "text-right text-[11px] font-semibold tabular-nums sm:mb-1",
-                    isToday && !esDomingo && "text-primary",
-                    esDomingo && "text-slate-600"
+                    isToday && !esNL && "text-primary",
+                    esNL && "text-slate-600"
                   )}
                 >
                   {format(d, "d")}
@@ -586,13 +628,36 @@ export default function Calendario() {
       <Sheet open={!!diaSel} onOpenChange={(o) => !o && setDiaSel(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="capitalize">
-              {diaSel && format(diaSel, "EEEE d 'de' MMMM", { locale: es })}
+            <SheetTitle className="capitalize flex items-center gap-2">
+              <span>{diaSel && format(diaSel, "EEEE d 'de' MMMM", { locale: es })}</span>
+              {canCreate && (
+                <Button
+                  size="sm"
+                  variant={diaSelNL ? "default" : "outline"}
+                  onClick={toggleNoLaboral}
+                  className={cn(
+                    "h-6 px-2 text-[10px] gap-1",
+                    diaSelNL && "bg-amber-500 hover:bg-amber-600 text-white",
+                  )}
+                  title={diaSelNL ? "Quitar marca No laboral" : "Marcar como No laboral"}
+                >
+                  {diaSelNL ? <RotateCcw className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
+                  {diaSelNL ? "Laboral" : "NL"}
+                </Button>
+              )}
+              {diaSelNL && !canCreate && (
+                <Badge className="bg-amber-500 text-white text-[10px]">No laboral</Badge>
+              )}
             </SheetTitle>
             <SheetDescription>
               {eventosDia.length} servicio{eventosDia.length !== 1 ? "s" : ""} programado
               {eventosDia.length !== 1 ? "s" : ""}
-              {diaSel?.getDay() === 0 && (
+              {diaSelNL && (
+                <span className="ml-1 text-amber-600">
+                  · No laboral{diaSelNL.motivo ? `: ${diaSelNL.motivo}` : ""}
+                </span>
+              )}
+              {!diaSelNL && diaSel?.getDay() === 0 && (
                 <span className="ml-1 text-slate-500">(domingo no laboral)</span>
               )}
             </SheetDescription>
