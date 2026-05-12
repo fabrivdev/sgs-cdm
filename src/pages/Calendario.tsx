@@ -263,6 +263,33 @@ export default function Calendario() {
 
   const canCreate = isAdmin || isCabecilla;
   const eventosDia = diaSel ? eventsForDay(diaSel) : [];
+  const diaSelKey = diaSel ? format(diaSel, "yyyy-MM-dd") : "";
+  const diaSelNL = diaSelKey ? diasNL.get(diaSelKey) : undefined;
+
+  const toggleNoLaboral = async () => {
+    if (!diaSel || !canCreate) return;
+    const key = format(diaSel, "yyyy-MM-dd");
+    const existente = diasNL.get(key);
+    if (existente) {
+      const { error } = await supabase.from("dias_no_laborales").delete().eq("id", existente.id);
+      if (error) { toast.error(error.message); return; }
+      const next = new Map(diasNL); next.delete(key); setDiasNL(next);
+      toast.success("Día marcado como laboral");
+    } else {
+      const motivo = window.prompt("Motivo (opcional, ej: Feriado nacional):", "")?.trim() || null;
+      const { data: u } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("dias_no_laborales")
+        .insert({ fecha: key, motivo, creado_por: u.user?.id ?? null })
+        .select("id, fecha, motivo")
+        .single();
+      if (error) { toast.error(error.message); return; }
+      const next = new Map(diasNL);
+      next.set(data.fecha, { id: data.id, motivo: data.motivo });
+      setDiasNL(next);
+      toast.success("Día marcado como No laboral");
+    }
+  };
 
   const dominantColor = (evs: Servicio[]) => {
     if (evs.some((s) => s.estado === "Pendiente")) return "bg-estado-pendiente";
