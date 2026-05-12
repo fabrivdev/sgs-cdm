@@ -620,13 +620,36 @@ export default function Calendario() {
       <Sheet open={!!diaSel} onOpenChange={(o) => !o && setDiaSel(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="capitalize">
-              {diaSel && format(diaSel, "EEEE d 'de' MMMM", { locale: es })}
+            <SheetTitle className="capitalize flex items-center gap-2">
+              <span>{diaSel && format(diaSel, "EEEE d 'de' MMMM", { locale: es })}</span>
+              {canCreate && (
+                <Button
+                  size="sm"
+                  variant={diaSelNL ? "default" : "outline"}
+                  onClick={toggleNoLaboral}
+                  className={cn(
+                    "h-6 px-2 text-[10px] gap-1",
+                    diaSelNL && "bg-amber-500 hover:bg-amber-600 text-white",
+                  )}
+                  title={diaSelNL ? "Quitar marca No laboral" : "Marcar como No laboral"}
+                >
+                  {diaSelNL ? <RotateCcw className="h-3 w-3" /> : <Ban className="h-3 w-3" />}
+                  {diaSelNL ? "Laboral" : "NL"}
+                </Button>
+              )}
+              {diaSelNL && !canCreate && (
+                <Badge className="bg-amber-500 text-white text-[10px]">No laboral</Badge>
+              )}
             </SheetTitle>
             <SheetDescription>
               {eventosDia.length} servicio{eventosDia.length !== 1 ? "s" : ""} programado
               {eventosDia.length !== 1 ? "s" : ""}
-              {diaSel?.getDay() === 0 && (
+              {diaSelNL && (
+                <span className="ml-1 text-amber-600">
+                  · No laboral{diaSelNL.motivo ? `: ${diaSelNL.motivo}` : ""}
+                </span>
+              )}
+              {!diaSelNL && diaSel?.getDay() === 0 && (
                 <span className="ml-1 text-slate-500">(domingo no laboral)</span>
               )}
             </SheetDescription>
