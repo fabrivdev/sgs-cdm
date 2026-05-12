@@ -135,6 +135,19 @@ export default function Admin() {
     load();
   };
 
+  const eliminarUsuario = async () => {
+    if (!delUser) return;
+    setDelBusy(true);
+    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+      body: { user_id: delUser.id },
+    });
+    setDelBusy(false);
+    if (error || data?.error) { toast.error(error?.message || data?.error); return; }
+    toast.success("Usuario eliminado");
+    setDelUser(null);
+    load();
+  };
+
   return (
     <div className="container max-w-6xl py-3 px-3 sm:py-4 space-y-4">
       <h1 className="text-2xl font-bold">Administración</h1>
