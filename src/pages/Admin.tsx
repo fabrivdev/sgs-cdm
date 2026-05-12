@@ -246,9 +246,14 @@ export default function Admin() {
                     </TableCell>
                     {isSuperAdmin && (
                       <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
-                          <KeyRound className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
+                            <KeyRound className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setDelUser(p)} title="Eliminar usuario" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
