@@ -11,7 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { UserPlus, Building2, Users, KeyRound, ShieldAlert } from "lucide-react";
+import { UserPlus, Building2, Users, KeyRound, ShieldAlert, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean }
@@ -42,6 +46,10 @@ export default function Admin() {
   const [credEmail, setCredEmail] = useState("");
   const [credPassword, setCredPassword] = useState("");
   const [credBusy, setCredBusy] = useState(false);
+
+  // Eliminar usuario
+  const [delUser, setDelUser] = useState<Profile | null>(null);
+  const [delBusy, setDelBusy] = useState(false);
 
   const load = async () => {
     const [{ data: prof }, { data: rls }, { data: cli }] = await Promise.all([
@@ -124,6 +132,19 @@ export default function Admin() {
     if (error || data?.error) { toast.error(error?.message || data?.error); return; }
     toast.success("Credenciales actualizadas");
     setCredUser(null);
+    load();
+  };
+
+  const eliminarUsuario = async () => {
+    if (!delUser) return;
+    setDelBusy(true);
+    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+      body: { user_id: delUser.id },
+    });
+    setDelBusy(false);
+    if (error || data?.error) { toast.error(error?.message || data?.error); return; }
+    toast.success("Usuario eliminado");
+    setDelUser(null);
     load();
   };
 
@@ -225,9 +246,14 @@ export default function Admin() {
                     </TableCell>
                     {isSuperAdmin && (
                       <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
-                          <KeyRound className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={() => openCred(p)} title="Credenciales">
+                            <KeyRound className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setDelUser(p)} title="Eliminar usuario" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -250,6 +276,9 @@ export default function Admin() {
                       <>
                         <Button variant="outline" size="sm" onClick={() => openCred(p)} className="h-7 px-2">
                           <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setDelUser(p)} className="h-7 px-2 text-destructive hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant={p.activo ? "default" : "outline"}
@@ -360,6 +389,28 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!delUser} onOpenChange={(o) => !o && setDelUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar usuario</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a eliminar definitivamente a <span className="font-semibold">{delUser?.nombre}</span>.
+              Esta acción no se puede deshacer y borra su acceso, perfil y roles.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={delBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); eliminarUsuario(); }}
+              disabled={delBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {delBusy ? "Eliminando…" : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
