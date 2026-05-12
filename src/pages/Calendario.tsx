@@ -485,6 +485,8 @@ export default function Calendario() {
             const esSemana = vista === "semana";
             const visibles = esSemana ? evs : evs.slice(0, 3);
             const esDomingo = d.getDay() === 0;
+            const nlInfo = diasNL.get(dayKey);
+            const esNL = !!nlInfo || esDomingo;
 
             return (
               <div
