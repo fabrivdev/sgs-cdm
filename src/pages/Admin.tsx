@@ -277,6 +277,9 @@ export default function Admin() {
                         <Button variant="outline" size="sm" onClick={() => openCred(p)} className="h-7 px-2">
                           <KeyRound className="h-3.5 w-3.5" />
                         </Button>
+                        <Button variant="outline" size="sm" onClick={() => setDelUser(p)} className="h-7 px-2 text-destructive hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                         <Button
                           variant={p.activo ? "default" : "outline"}
                           size="sm"
