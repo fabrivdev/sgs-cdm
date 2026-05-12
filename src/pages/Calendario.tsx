@@ -162,6 +162,11 @@ export default function Calendario() {
       }
       setTecnicoIds(tecSet);
       setAdminCabecillaIds(adminCabSet);
+      const nlMap = new Map<string, { id: string; motivo: string | null }>();
+      for (const d of (nl ?? []) as Array<{ id: string; fecha: string; motivo: string | null }>) {
+        nlMap.set(d.fecha, { id: d.id, motivo: d.motivo });
+      }
+      setDiasNL(nlMap);
       setClientes(cli);
     } catch (e) {
       console.error(e);
