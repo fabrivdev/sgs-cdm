@@ -11,7 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { UserPlus, Building2, Users, KeyRound, ShieldAlert } from "lucide-react";
+import { UserPlus, Building2, Users, KeyRound, ShieldAlert, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean }
