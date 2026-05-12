@@ -519,16 +519,22 @@ export default function Calendario() {
                   "relative border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[110px]",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
-                  esDomingo && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
-                  esDomingo && !isCur && vista === "mes" && "bg-slate-200/70 text-slate-500",
-                  isToday && !esDomingo && "bg-primary/5",
-                  isToday && esDomingo && "bg-slate-100 ring-1 ring-primary/30",
+                  esNL && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
+                  esNL && !isCur && vista === "mes" && "bg-slate-200/70 text-slate-500",
+                  isToday && !esNL && "bg-primary/5",
+                  isToday && esNL && "bg-slate-100 ring-1 ring-primary/30",
                   isDragOver && "bg-primary/10 ring-2 ring-primary/40",
                 )}
               >
-                {esDomingo && (
-                  <div className="pointer-events-none absolute left-1 top-1 hidden rounded bg-slate-300/80 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 sm:block">
-                    No laboral
+                {esNL && (
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute left-1 top-1 hidden rounded px-1.5 py-0.5 text-[9px] font-medium sm:block",
+                      nlInfo ? "bg-amber-200 text-amber-900" : "bg-slate-300/80 text-slate-700",
+                    )}
+                    title={nlInfo?.motivo ?? undefined}
+                  >
+                    {nlInfo ? (nlInfo.motivo ? `NL · ${nlInfo.motivo}` : "No laboral") : "No laboral"}
                   </div>
                 )}
 
