@@ -47,6 +47,10 @@ export default function Admin() {
   const [credPassword, setCredPassword] = useState("");
   const [credBusy, setCredBusy] = useState(false);
 
+  // Eliminar usuario
+  const [delUser, setDelUser] = useState<Profile | null>(null);
+  const [delBusy, setDelBusy] = useState(false);
+
   const load = async () => {
     const [{ data: prof }, { data: rls }, { data: cli }] = await Promise.all([
       supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre"),
