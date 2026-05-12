@@ -99,6 +99,7 @@ export default function Calendario() {
   const [diaSel, setDiaSel] = useState<Date | null>(null);
   const [diaForm, setDiaForm] = useState<Date | null>(null);
   const [openForm, setOpenForm] = useState(false);
+  const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
 
   const load = async () => {
     try {
