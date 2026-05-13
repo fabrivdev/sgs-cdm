@@ -403,7 +403,7 @@ export function AgendaTab({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                        {cli?.sucursal && <span>{cli.sucursal}</span>}
+                        {cli && sucursalesPorCliente.get(cli.id) && <span>{sucursalesPorCliente.get(cli.id)}</span>}
                         <span>· {format(new Date(s.fecha), "dd/MM/yyyy HH:mm")}</span>
                       </div>
                     </button>
