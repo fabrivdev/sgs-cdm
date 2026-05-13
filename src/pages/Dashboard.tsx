@@ -68,6 +68,7 @@ interface Profile {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  activo: boolean;
 }
 
 interface JornadaHoy {
@@ -143,7 +144,7 @@ export default function Dashboard() {
         .select(
           "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas",
         ),
-      supabase.from("profiles").select("id, nombre, sucursal"),
+      supabase.from("profiles").select("id, nombre, sucursal, activo"),
       supabase.from("user_roles").select("user_id, role").in("role", ["admin", "cabecilla"]),
     ]).then(([s, p, r]) => {
       setServicios((s.data ?? []) as Servicio[]);
@@ -367,7 +368,7 @@ export default function Dashboard() {
 
   // Estado de técnicos hoy
   const tecnicosEstado = useMemo(() => {
-    const tecnicos = profiles.filter((p) => !adminIds.has(p.id));
+    const tecnicos = profiles.filter((p) => !adminIds.has(p.id) && p.activo);
 
     // Map técnico -> primer servicio activo hoy
     const ocupados = new Map<string, JornadaHoy>();
