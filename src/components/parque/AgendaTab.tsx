@@ -106,7 +106,7 @@ export function AgendaTab({
         // No filtramos por activo aquí porque en parque_maquinas algunos importados pueden tener activo NULL.
         // La vista de parque los muestra igual, así que agenda debe partir del mismo universo.
         cargarTodo<Maquina>(
-          supabase.from("parque_maquinas").select("cliente_id"),
+          supabase.from("parque_maquinas").select("cliente_id, sucursal"),
         ),
 
         cargarTodo<Seguimiento>(
