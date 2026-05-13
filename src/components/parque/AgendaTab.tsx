@@ -273,7 +273,7 @@ export function AgendaTab({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                        {cli.sucursal && <span>{cli.sucursal}</span>}
+                        {sucursalesPorCliente.get(cli.id) && <span>{sucursalesPorCliente.get(cli.id)}</span>}
                         <span>· {f.cantMaquinas} máq.</span>
                         {f.ultResultado && (
                           <Badge className={cn("text-[10px]", resultadoColor(f.ultResultado))}>
