@@ -368,7 +368,7 @@ export default function Dashboard() {
 
   // Estado de técnicos hoy
   const tecnicosEstado = useMemo(() => {
-    const tecnicos = profiles.filter((p) => !adminIds.has(p.id));
+    const tecnicos = profiles.filter((p) => !adminIds.has(p.id) && p.activo);
 
     // Map técnico -> primer servicio activo hoy
     const ocupados = new Map<string, JornadaHoy>();
