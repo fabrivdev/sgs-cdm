@@ -70,12 +70,23 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
       vendedor: "",
       notas: "",
     }));
-    supabase
-      .from("clientes")
-      .select("id, nombre")
-      .eq("activo", true)
-      .order("nombre")
-      .then(({ data }) => setClientes((data ?? []) as Cliente[]));
+    (async () => {
+      const all: Cliente[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("clientes")
+          .select("id, nombre")
+          .eq("activo", true)
+          .order("nombre")
+          .range(from, from + pageSize - 1);
+        if (error) break;
+        const rows = (data ?? []) as Cliente[];
+        all.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      setClientes(all);
+    })();
   }, [open]);
 
   const guardar = async () => {
