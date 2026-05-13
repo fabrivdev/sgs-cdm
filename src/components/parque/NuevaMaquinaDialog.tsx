@@ -112,14 +112,43 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
         <div className="grid gap-3">
           <div className="grid gap-1.5">
             <Label className="text-xs">Cliente *</Label>
-            <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar cliente..." /></SelectTrigger>
-              <SelectContent>
-                {clientes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className={cn("w-full justify-between font-normal", !form.cliente_id && "text-muted-foreground")}
+                >
+                  {form.cliente_id
+                    ? clientes.find((c) => c.id === form.cliente_id)?.nombre
+                    : "Seleccionar cliente..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar cliente..." />
+                  <CommandList>
+                    <CommandEmpty>Sin resultados.</CommandEmpty>
+                    <CommandGroup>
+                      {clientes.map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          value={c.nombre}
+                          onSelect={() => {
+                            setForm({ ...form, cliente_id: c.id });
+                            setClientePopoverOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", form.cliente_id === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.nombre}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
