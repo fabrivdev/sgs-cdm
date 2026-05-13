@@ -22,7 +22,7 @@ const RESULTADOS = [
 ] as const;
 
 type Cliente = { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean | null };
-type Maquina = { cliente_id: string | null };
+type Maquina = { cliente_id: string | null; sucursal: Sucursal | null };
 type Seguimiento = {
   id?: string;
   cliente_id: string;
@@ -106,7 +106,7 @@ export function AgendaTab({
         // No filtramos por activo aquí porque en parque_maquinas algunos importados pueden tener activo NULL.
         // La vista de parque los muestra igual, así que agenda debe partir del mismo universo.
         cargarTodo<Maquina>(
-          supabase.from("parque_maquinas").select("cliente_id"),
+          supabase.from("parque_maquinas").select("cliente_id, sucursal"),
         ),
 
         cargarTodo<Seguimiento>(
@@ -137,6 +137,19 @@ export function AgendaTab({
     for (const c of clientes) m.set(c.id, c);
     return m;
   }, [clientes]);
+
+  const sucursalesPorCliente = useMemo(() => {
+    const m = new Map<string, string>();
+    const sets = new Map<string, Set<string>>();
+    for (const mq of maquinas) {
+      if (!mq.cliente_id || !mq.sucursal) continue;
+      const set = sets.get(mq.cliente_id) ?? new Set<string>();
+      set.add(mq.sucursal);
+      sets.set(mq.cliente_id, set);
+    }
+    for (const [k, v] of sets) m.set(k, Array.from(v).sort().join(", "));
+    return m;
+  }, [maquinas]);
 
   const filas = useMemo(() => {
     const cantPorCliente = new Map<string, number>();
@@ -260,7 +273,7 @@ export function AgendaTab({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                        {cli.sucursal && <span>{cli.sucursal}</span>}
+                        {sucursalesPorCliente.get(cli.id) && <span>{sucursalesPorCliente.get(cli.id)}</span>}
                         <span>· {f.cantMaquinas} máq.</span>
                         {f.ultResultado && (
                           <Badge className={cn("text-[10px]", resultadoColor(f.ultResultado))}>
@@ -390,7 +403,7 @@ export function AgendaTab({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                        {cli?.sucursal && <span>{cli.sucursal}</span>}
+                        {cli && sucursalesPorCliente.get(cli.id) && <span>{sucursalesPorCliente.get(cli.id)}</span>}
                         <span>· {format(new Date(s.fecha), "dd/MM/yyyy HH:mm")}</span>
                       </div>
                     </button>

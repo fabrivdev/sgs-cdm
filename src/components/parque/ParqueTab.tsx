@@ -83,6 +83,7 @@ type Maquina = {
   marca: Marca;
   subgrupo: string;
   activo: boolean;
+  sucursal: Sucursal | null;
 };
 
 type FactAgregado = {
@@ -109,6 +110,7 @@ interface Row {
   cantHorsch: number;
   cantTotal: number;
   subgrupos: string[];
+  sucursales: Sucursal[];
   antiguedadProm: number | null;
   diasUltRepuesto: number | null;
   diasUltServicio: number | null;
@@ -231,7 +233,7 @@ export function ParqueTab({
     try {
       const { data: maquinasData, error: maquinasError } = await supabase
         .from("parque_maquinas")
-        .select("id, cliente_id, anio, marca, subgrupo, activo")
+        .select("id, cliente_id, anio, marca, subgrupo, activo, sucursal")
         .eq("activo", true);
 
       if (maquinasError) throw maquinasError;
@@ -429,6 +431,9 @@ export function ParqueTab({
       const cantClaas = mqs.filter((m) => m.marca === "CLAAS").length;
       const cantHorsch = mqs.filter((m) => m.marca === "HORSCH").length;
       const subgs = Array.from(new Set(mqs.map((m) => m.subgrupo))).sort();
+      const sucursales = Array.from(
+        new Set(mqs.map((m) => m.sucursal).filter((s): s is Sucursal => !!s)),
+      ).sort();
       const anios = mqs.map((m) => m.anio).filter((a): a is number => !!a);
       const antiguedadProm =
         anios.length > 0
@@ -449,6 +454,7 @@ export function ParqueTab({
         cantHorsch,
         cantTotal: mqs.length,
         subgrupos: subgs,
+        sucursales,
         antiguedadProm,
         diasUltRepuesto: dias(agg?.ult_repuesto ?? null),
         diasUltServicio: dias(agg?.ult_servicio ?? null),
@@ -467,7 +473,7 @@ export function ParqueTab({
     return rows.filter((r) => {
       if (r.cantTotal === 0) return false;
       if (ql && !r.cliente.nombre.toLowerCase().includes(ql)) return false;
-      if (fSucursal !== "all" && r.cliente.sucursal !== fSucursal) return false;
+      if (fSucursal !== "all" && !r.sucursales.includes(fSucursal as Sucursal)) return false;
 
       if (fMarca !== "all") {
         if (fMarca === "CLAAS" && r.cantClaas === 0) return false;
@@ -569,7 +575,7 @@ export function ParqueTab({
   const exportar = () => {
     const data = ordenadas.map((r) => ({
       Cliente: r.cliente.nombre,
-      Sucursal: r.cliente.sucursal ?? "",
+      Sucursal: r.sucursales.join(", "),
       Teléfono: r.contactoPrincipal?.telefono ?? "",
       Maquinarias: r.cantTotal,
       "Antig. prom (años)": r.antiguedadProm ?? "",
@@ -907,8 +913,8 @@ export function ParqueTab({
                   >
                     <TableCell>
                       <div className="font-medium">{r.cliente.nombre}</div>
-                      {r.cliente.sucursal && (
-                        <div className="text-[11px] text-muted-foreground">{r.cliente.sucursal}</div>
+                      {r.sucursales.length > 0 && (
+                        <div className="text-[11px] text-muted-foreground">{r.sucursales.join(", ")}</div>
                       )}
                     </TableCell>
 
