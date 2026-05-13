@@ -29,6 +29,7 @@ interface Props {
 
 export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<{
     cliente_id: string;
