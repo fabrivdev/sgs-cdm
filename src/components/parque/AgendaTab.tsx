@@ -22,7 +22,7 @@ const RESULTADOS = [
 ] as const;
 
 type Cliente = { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean | null };
-type Maquina = { cliente_id: string | null };
+type Maquina = { cliente_id: string | null; sucursal: Sucursal | null };
 type Seguimiento = {
   id?: string;
   cliente_id: string;
