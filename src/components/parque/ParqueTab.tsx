@@ -575,7 +575,7 @@ export function ParqueTab({
   const exportar = () => {
     const data = ordenadas.map((r) => ({
       Cliente: r.cliente.nombre,
-      Sucursal: r.cliente.sucursal ?? "",
+      Sucursal: r.sucursales.join(", "),
       Teléfono: r.contactoPrincipal?.telefono ?? "",
       Maquinarias: r.cantTotal,
       "Antig. prom (años)": r.antiguedadProm ?? "",
