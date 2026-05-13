@@ -453,6 +453,7 @@ export function ParqueTab({
         cantHorsch,
         cantTotal: mqs.length,
         subgrupos: subgs,
+        sucursales,
         antiguedadProm,
         diasUltRepuesto: dias(agg?.ult_repuesto ?? null),
         diasUltServicio: dias(agg?.ult_servicio ?? null),
