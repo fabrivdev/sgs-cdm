@@ -83,6 +83,7 @@ type Maquina = {
   marca: Marca;
   subgrupo: string;
   activo: boolean;
+  sucursal: Sucursal | null;
 };
 
 type FactAgregado = {
