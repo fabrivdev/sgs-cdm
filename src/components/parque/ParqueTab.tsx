@@ -913,8 +913,8 @@ export function ParqueTab({
                   >
                     <TableCell>
                       <div className="font-medium">{r.cliente.nombre}</div>
-                      {r.cliente.sucursal && (
-                        <div className="text-[11px] text-muted-foreground">{r.cliente.sucursal}</div>
+                      {r.sucursales.length > 0 && (
+                        <div className="text-[11px] text-muted-foreground">{r.sucursales.join(", ")}</div>
                       )}
                     </TableCell>
 
