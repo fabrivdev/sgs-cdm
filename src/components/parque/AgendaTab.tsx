@@ -138,6 +138,19 @@ export function AgendaTab({
     return m;
   }, [clientes]);
 
+  const sucursalesPorCliente = useMemo(() => {
+    const m = new Map<string, string>();
+    const sets = new Map<string, Set<string>>();
+    for (const mq of maquinas) {
+      if (!mq.cliente_id || !mq.sucursal) continue;
+      const set = sets.get(mq.cliente_id) ?? new Set<string>();
+      set.add(mq.sucursal);
+      sets.set(mq.cliente_id, set);
+    }
+    for (const [k, v] of sets) m.set(k, Array.from(v).sort().join(", "));
+    return m;
+  }, [maquinas]);
+
   const filas = useMemo(() => {
     const cantPorCliente = new Map<string, number>();
 
