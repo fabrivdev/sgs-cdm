@@ -110,6 +110,7 @@ interface Row {
   cantHorsch: number;
   cantTotal: number;
   subgrupos: string[];
+  sucursales: Sucursal[];
   antiguedadProm: number | null;
   diasUltRepuesto: number | null;
   diasUltServicio: number | null;
