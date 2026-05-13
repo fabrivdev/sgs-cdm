@@ -434,7 +434,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
           {!editCliente ? (
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div><span className="text-muted-foreground">RUC:</span> {cliente?.ruc ?? "—"}</div>
-              <div><span className="text-muted-foreground">Sucursal:</span> {cliente?.sucursal ?? "—"}</div>
+              <div><span className="text-muted-foreground">Sucursal:</span> {Array.from(new Set(maquinas.map((m) => m.sucursal).filter(Boolean))).join(", ") || "—"}</div>
               <div><span className="text-muted-foreground">Región:</span> {cliente?.region ?? "—"}</div>
               <div><span className="text-muted-foreground">Localidad:</span> {cliente?.localidad ?? "—"}</div>
               <div className="col-span-2"><span className="text-muted-foreground">Dirección:</span> {cliente?.direccion ?? "—"}</div>
