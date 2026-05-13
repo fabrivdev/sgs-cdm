@@ -430,6 +430,9 @@ export function ParqueTab({
       const cantClaas = mqs.filter((m) => m.marca === "CLAAS").length;
       const cantHorsch = mqs.filter((m) => m.marca === "HORSCH").length;
       const subgs = Array.from(new Set(mqs.map((m) => m.subgrupo))).sort();
+      const sucursales = Array.from(
+        new Set(mqs.map((m) => m.sucursal).filter((s): s is Sucursal => !!s)),
+      ).sort();
       const anios = mqs.map((m) => m.anio).filter((a): a is number => !!a);
       const antiguedadProm =
         anios.length > 0
