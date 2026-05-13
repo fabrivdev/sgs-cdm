@@ -232,7 +232,7 @@ export function ParqueTab({
     try {
       const { data: maquinasData, error: maquinasError } = await supabase
         .from("parque_maquinas")
-        .select("id, cliente_id, anio, marca, subgrupo, activo")
+        .select("id, cliente_id, anio, marca, subgrupo, activo, sucursal")
         .eq("activo", true);
 
       if (maquinasError) throw maquinasError;
