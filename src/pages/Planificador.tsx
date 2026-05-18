@@ -103,6 +103,7 @@ export default function Planificador() {
   const [fMarca, setFMarca] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fCliente, setFCliente] = useState<string>("");
+  const [vista, setVista] = useState<"dia" | "semana">("dia");
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
