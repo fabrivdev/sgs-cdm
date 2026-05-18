@@ -14,6 +14,7 @@ import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -102,6 +103,7 @@ export default function Planificador() {
   const [fMarca, setFMarca] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fCliente, setFCliente] = useState<string>("");
+  const [vista, setVista] = useState<"dia" | "semana">("dia");
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
@@ -203,6 +205,31 @@ export default function Planificador() {
     });
   }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById]);
 
+  // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
+  const fechasPorServicio = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const s of filtered) {
+      const a = m.get(s.id) ?? [];
+      a.push(s.fecha_programada);
+      m.set(s.id, a);
+    }
+    for (const a of m.values()) a.sort();
+    return m;
+  }, [filtered]);
+
+  const displayed = useMemo(() => {
+    if (vista === "dia") return filtered;
+    const seen = new Set<string>();
+    const out: Servicio[] = [];
+    for (const s of filtered) {
+      if (seen.has(s.id)) continue;
+      seen.add(s.id);
+      const fechas = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
+      out.push({ ...s, fecha_programada: fechas[0] });
+    }
+    return out;
+  }, [filtered, vista, fechasPorServicio]);
+
   const canCreate = isAdmin || isCabecilla;
 
   const onChangeEstado = async (s: Servicio, estado: Estado) => {
@@ -233,7 +260,7 @@ export default function Planificador() {
   };
 
   const exportExcel = () => {
-    const rows = filtered.map((s) => ({
+    const rows = displayed.map((s) => ({
       Fecha: s.fecha_programada,
       Día: s.dia_semana,
       Semana: s.semana,
@@ -284,7 +311,7 @@ export default function Planificador() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
-          <p className="text-xs text-muted-foreground">{filtered.length} servicios visibles</p>
+          <p className="text-xs text-muted-foreground">{displayed.length} servicios visibles</p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
@@ -305,6 +332,17 @@ export default function Planificador() {
               </button>
             )}
           </div>
+          <ToggleGroup
+            type="single"
+            value={vista}
+            onValueChange={(v) => v && setVista(v as "dia" | "semana")}
+            size="sm"
+            variant="outline"
+          >
+            <ToggleGroupItem value="dia" className="h-9 px-3 text-xs">Por día</ToggleGroupItem>
+            <ToggleGroupItem value="semana" className="h-9 px-3 text-xs">Por semana</ToggleGroupItem>
+          </ToggleGroup>
+
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm">
@@ -433,18 +471,23 @@ export default function Planificador() {
                 </TableRow>
               )}
 
-              {!loading && filtered.length === 0 && (
+              {!loading && displayed.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Sin servicios.</TableCell>
                 </TableRow>
               )}
 
-              {filtered.map((s) => {
+              {displayed.map((s) => {
                 const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
                 const tipo = s.tipo_trabajo ?? "Visita de campo";
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
+                const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
+                const multi = vista === "semana" && fechasSrv.length > 1;
+                const fechaLabel = multi
+                  ? `${format(parseISO(fechasSrv[0]), "dd/MM")} – ${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM/yy")}`
+                  : format(parseISO(s.fecha_programada), "dd/MM/yy");
 
                 return (
                   <TableRow
@@ -453,7 +496,14 @@ export default function Planificador() {
                     onClick={() => openDetalle(s)}
                   >
                     <TableCell className="px-3 py-2 align-top">
-                      <div className="font-medium tabular-nums leading-tight">{format(parseISO(s.fecha_programada), "dd/MM/yy")}</div>
+                      <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
+                        {fechaLabel}
+                        {multi && (
+                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal tabular-nums">
+                            {fechasSrv.length}d
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
 
@@ -522,14 +572,19 @@ export default function Planificador() {
       {/* Mobile list */}
       <div className="md:hidden space-y-2">
         {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
-        {!loading && filtered.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin servicios.</p>}
+        {!loading && displayed.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin servicios.</p>}
 
-        {filtered.map((s) => {
+        {displayed.map((s) => {
           const tipo = s.tipo_trabajo ?? "Visita de campo";
           const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
           const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
           const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
           const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
+          const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
+          const multi = vista === "semana" && fechasSrv.length > 1;
+          const fechaLabel = multi
+            ? `${format(parseISO(fechasSrv[0]), "dd/MM")}–${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM")}`
+            : format(parseISO(s.fecha_programada), "dd/MM");
 
           return (
             <Card
@@ -540,7 +595,8 @@ export default function Planificador() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span className="font-semibold tabular-nums text-foreground">{format(parseISO(s.fecha_programada), "dd/MM")}</span>
+                    <span className="font-semibold tabular-nums text-foreground">{fechaLabel}</span>
+                    {multi && <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">{fechasSrv.length}d</Badge>}
                     <span>·</span>
                     <span>{s.dia_semana.slice(0, 3)}</span>
                     <TipoIcon className="h-3 w-3" />
