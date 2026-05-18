@@ -205,6 +205,31 @@ export default function Planificador() {
     });
   }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById]);
 
+  // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
+  const fechasPorServicio = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const s of filtered) {
+      const a = m.get(s.id) ?? [];
+      a.push(s.fecha_programada);
+      m.set(s.id, a);
+    }
+    for (const a of m.values()) a.sort();
+    return m;
+  }, [filtered]);
+
+  const displayed = useMemo(() => {
+    if (vista === "dia") return filtered;
+    const seen = new Set<string>();
+    const out: Servicio[] = [];
+    for (const s of filtered) {
+      if (seen.has(s.id)) continue;
+      seen.add(s.id);
+      const fechas = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
+      out.push({ ...s, fecha_programada: fechas[0] });
+    }
+    return out;
+  }, [filtered, vista, fechasPorServicio]);
+
   const canCreate = isAdmin || isCabecilla;
 
   const onChangeEstado = async (s: Servicio, estado: Estado) => {
