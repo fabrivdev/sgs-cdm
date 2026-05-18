@@ -580,6 +580,11 @@ export default function Planificador() {
           const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
           const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
           const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
+          const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
+          const multi = vista === "semana" && fechasSrv.length > 1;
+          const fechaLabel = multi
+            ? `${format(parseISO(fechasSrv[0]), "dd/MM")}–${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM")}`
+            : format(parseISO(s.fecha_programada), "dd/MM");
 
           return (
             <Card
@@ -590,7 +595,8 @@ export default function Planificador() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span className="font-semibold tabular-nums text-foreground">{format(parseISO(s.fecha_programada), "dd/MM")}</span>
+                    <span className="font-semibold tabular-nums text-foreground">{fechaLabel}</span>
+                    {multi && <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">{fechasSrv.length}d</Badge>}
                     <span>·</span>
                     <span>{s.dia_semana.slice(0, 3)}</span>
                     <TipoIcon className="h-3 w-3" />
