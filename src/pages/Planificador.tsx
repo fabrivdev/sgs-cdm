@@ -260,7 +260,7 @@ export default function Planificador() {
   };
 
   const exportExcel = () => {
-    const rows = filtered.map((s) => ({
+    const rows = displayed.map((s) => ({
       Fecha: s.fecha_programada,
       Día: s.dia_semana,
       Semana: s.semana,
@@ -311,7 +311,7 @@ export default function Planificador() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
-          <p className="text-xs text-muted-foreground">{filtered.length} servicios visibles</p>
+          <p className="text-xs text-muted-foreground">{displayed.length} servicios visibles</p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
@@ -460,13 +460,13 @@ export default function Planificador() {
                 </TableRow>
               )}
 
-              {!loading && filtered.length === 0 && (
+              {!loading && displayed.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Sin servicios.</TableCell>
                 </TableRow>
               )}
 
-              {filtered.map((s) => {
+              {displayed.map((s) => {
                 const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
                 const tipo = s.tipo_trabajo ?? "Visita de campo";
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
@@ -549,9 +549,9 @@ export default function Planificador() {
       {/* Mobile list */}
       <div className="md:hidden space-y-2">
         {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
-        {!loading && filtered.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin servicios.</p>}
+        {!loading && displayed.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin servicios.</p>}
 
-        {filtered.map((s) => {
+        {displayed.map((s) => {
           const tipo = s.tipo_trabajo ?? "Visita de campo";
           const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
           const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
