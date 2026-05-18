@@ -483,6 +483,11 @@ export default function Planificador() {
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
+                const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
+                const multi = vista === "semana" && fechasSrv.length > 1;
+                const fechaLabel = multi
+                  ? `${format(parseISO(fechasSrv[0]), "dd/MM")} – ${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM/yy")}`
+                  : format(parseISO(s.fecha_programada), "dd/MM/yy");
 
                 return (
                   <TableRow
@@ -491,7 +496,14 @@ export default function Planificador() {
                     onClick={() => openDetalle(s)}
                   >
                     <TableCell className="px-3 py-2 align-top">
-                      <div className="font-medium tabular-nums leading-tight">{format(parseISO(s.fecha_programada), "dd/MM/yy")}</div>
+                      <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
+                        {fechaLabel}
+                        {multi && (
+                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal tabular-nums">
+                            {fechasSrv.length}d
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
 
