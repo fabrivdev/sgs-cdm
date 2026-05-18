@@ -332,6 +332,17 @@ export default function Planificador() {
               </button>
             )}
           </div>
+          <ToggleGroup
+            type="single"
+            value={vista}
+            onValueChange={(v) => v && setVista(v as "dia" | "semana")}
+            size="sm"
+            variant="outline"
+          >
+            <ToggleGroupItem value="dia" className="h-9 px-3 text-xs">Por día</ToggleGroupItem>
+            <ToggleGroupItem value="semana" className="h-9 px-3 text-xs">Por semana</ToggleGroupItem>
+          </ToggleGroup>
+
           <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm">
