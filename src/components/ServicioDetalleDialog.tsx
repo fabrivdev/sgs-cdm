@@ -205,6 +205,51 @@ export function ServicioDetalleDialog({
 
   const fechasExistentes = new Set(jornadas.map((j) => j.fecha));
 
+  /*
+    Sincroniza el Trabajo madre según el estado real de sus jornadas:
+    - si alguna jornada está Iniciado  => trabajo Iniciado
+    - si todas están Completado        => trabajo Completado
+    - si existe al menos una pendiente => trabajo Programado
+    Esto evita completar dos veces o que Planificador y Trabajos queden separados.
+  */
+  const estadoTrabajoDesdeJornadas = (lista: Jornada[]) => {
+    if (lista.length === 0) return "pendiente";
+
+    if (lista.some((j) => j.estado === "Iniciado")) return "iniciado";
+
+    if (lista.every((j) => j.estado === "Completado")) return "completado";
+
+    return "programado";
+  };
+
+  const syncTrabajoMadre = async (servicioId: string, lista: Jornada[]) => {
+    const estado_general = estadoTrabajoDesdeJornadas(lista);
+    const ultimaFecha = [...lista].sort((a, b) => b.fecha.localeCompare(a.fecha))[0]?.fecha ?? null;
+
+    const payload: any = {
+      estado_general,
+      fecha_compromiso: ultimaFecha,
+    };
+
+    if (estado_general === "completado") {
+      payload.cerrado_en = new Date().toISOString();
+      payload.cerrado_por = user?.id ?? null;
+    } else {
+      payload.cerrado_en = null;
+      payload.cerrado_por = null;
+    }
+
+    const { error } = await supabase
+      .from("trabajos")
+      .update(payload)
+      .eq("legacy_servicio_id", servicioId);
+
+    if (error) {
+      console.error(error);
+      toast.error("Se actualizó la jornada, pero no se pudo sincronizar el trabajo madre");
+    }
+  };
+
   const addJornada = async (date: Date | undefined) => {
     if (!date) return;
     const fecha = format(date, "yyyy-MM-dd");
@@ -228,6 +273,19 @@ export function ServicioDetalleDialog({
     }
 
     setAddDateOpen(false);
+    const nuevaLista = [
+      ...jornadas,
+      {
+        id: "__temp__",
+        servicio_id: servicio.id,
+        fecha,
+        estado: "Pendiente" as Estado,
+        horas_trabajadas: null,
+        observaciones: null,
+      },
+    ];
+
+    await syncTrabajoMadre(servicio.id, nuevaLista);
     toast.success("Jornada agregada");
     await loadJornadas(servicio.id);
     onChanged();
@@ -244,6 +302,8 @@ export function ServicioDetalleDialog({
       return;
     }
 
+    const nuevaLista = jornadas.filter((j) => j.id !== id);
+    await syncTrabajoMadre(servicio.id, nuevaLista);
     toast.success("Jornada eliminada");
     await loadJornadas(servicio.id);
     onChanged();
@@ -277,6 +337,7 @@ export function ServicioDetalleDialog({
     const merged = jornadas
       .map((j) => ({ ...j, ...edits[j.id] }))
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
     const ultima = merged[merged.length - 1];
     if (ultima) {
       await supabase
@@ -288,6 +349,9 @@ export function ServicioDetalleDialog({
         })
         .eq("id", servicio.id);
     }
+
+    // Sync nuevo: el Trabajo madre se mueve automáticamente según el estado de todas las jornadas.
+    await syncTrabajoMadre(servicio.id, merged);
 
     setBusy(false);
     toast.success("Jornadas actualizadas");
