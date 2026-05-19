@@ -12,6 +12,7 @@ import Calendario from "./pages/Calendario";
 import Dashboard from "./pages/Dashboard";
 import Historial from "./pages/Historial";
 import ParqueClientes from "./pages/ParqueClientes";
+import Trabajos from "./pages/Trabajos";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -31,6 +32,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout><Planificador /></AppLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/trabajos"
+              element={
+                <ProtectedRoute>
+                  <AppLayout><Trabajos /></AppLayout>
                 </ProtectedRoute>
               }
             />
