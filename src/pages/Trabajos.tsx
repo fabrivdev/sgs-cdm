@@ -360,6 +360,32 @@ export default function Trabajos() {
     return clienteId;
   };
 
+  const quitarDelPlanificador = async (trabajo: Trabajo) => {
+    if (!trabajo.legacy_servicio_id) return;
+
+    // Si vuelve a Pendiente, ya no tiene fecha confirmada.
+    // Entonces se elimina del Planificador/Calendario y se desvincula del trabajo madre.
+    await supabase
+      .from("servicio_jornadas")
+      .delete()
+      .eq("servicio_id", trabajo.legacy_servicio_id);
+
+    await supabase
+      .from("servicios")
+      .delete()
+      .eq("id", trabajo.legacy_servicio_id);
+
+    const { error } = await supabase
+      .from("trabajos")
+      .update({
+        legacy_servicio_id: null,
+        fecha_compromiso: null,
+      })
+      .eq("id", trabajo.id);
+
+    if (error) throw error;
+  };
+
   const sincronizarConPlanificador = async (trabajo: Trabajo) => {
     const estado = normalizarEstado(String(trabajo.estado_general));
 
@@ -491,7 +517,11 @@ export default function Trabajos() {
         trabajoGuardado = data as Trabajo;
       }
 
-      await sincronizarConPlanificador(trabajoGuardado);
+      if (form.estado_general === "pendiente") {
+        await quitarDelPlanificador(trabajoGuardado);
+      } else {
+        await sincronizarConPlanificador(trabajoGuardado);
+      }
 
       toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
       setOpenForm(false);
@@ -523,7 +553,12 @@ export default function Trabajos() {
 
       if (error) throw error;
 
-      await sincronizarConPlanificador(data as Trabajo);
+      if (estado === "pendiente") {
+        await quitarDelPlanificador(data as Trabajo);
+      } else {
+        await sincronizarConPlanificador(data as Trabajo);
+      }
+
       load();
     } catch (e: any) {
       console.error(e);
@@ -808,7 +843,13 @@ export default function Trabajos() {
                 <Label>Estado</Label>
                 <Select
                   value={form.estado_general}
-                  onValueChange={(v) => setForm((f) => ({ ...f, estado_general: v as EstadoTrabajo }))}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      estado_general: v as EstadoTrabajo,
+                      fecha_programada: v === "pendiente" ? "" : f.fecha_programada,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
