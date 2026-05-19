@@ -1,0 +1,1 @@
+ALTER VIEW public.trabajos_horas SET (security_invoker = true);
