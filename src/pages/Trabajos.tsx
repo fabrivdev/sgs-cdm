@@ -124,6 +124,31 @@ const normalizarEstado = (estado: string): EstadoTrabajo => {
   return "pendiente";
 };
 
+const ORDEN_ESTADOS: EstadoTrabajo[] = ["pendiente", "programado", "iniciado", "en_pausa", "completado"];
+
+const siguientesEstados = (estadoActual: string): EstadoTrabajo[] => {
+  const actual = normalizarEstado(estadoActual);
+
+  if (actual === "completado") return [];
+
+  // Flujo normal:
+  // Pendiente -> Programado -> Iniciado -> Completado
+  // Desde Iniciado también se puede poner En pausa.
+  // Desde En pausa solo se puede volver a Iniciado o completar.
+  switch (actual) {
+    case "pendiente":
+      return ["programado"];
+    case "programado":
+      return ["iniciado"];
+    case "iniciado":
+      return ["en_pausa", "completado"];
+    case "en_pausa":
+      return ["iniciado", "completado"];
+    default:
+      return [];
+  }
+};
+
 async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
   let from = 0;
   const all: T[] = [];
@@ -509,23 +534,30 @@ export default function Trabajos() {
                         </div>
                       )}
 
-                      <div className="mt-3 grid grid-cols-2 gap-1">
-                        {ESTADOS.filter((e) => e.key !== normalizarEstado(String(t.estado_general))).map((e) => (
-                          <Button
-                            key={e.key}
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-[10px]"
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              moverEstado(t, e.key);
-                            }}
-                          >
-                            {e.label}
-                          </Button>
-                        ))}
-                      </div>
+                      {siguientesEstados(String(t.estado_general)).length > 0 && (
+                        <div className="mt-3 grid grid-cols-1 gap-1">
+                          {siguientesEstados(String(t.estado_general)).map((estadoSiguiente) => {
+                            const e = ESTADOS.find((x) => x.key === estadoSiguiente);
+                            if (!e) return null;
+
+                            return (
+                              <Button
+                                key={e.key}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-[10px]"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  moverEstado(t, e.key);
+                                }}
+                              >
+                                Pasar a {e.label}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
