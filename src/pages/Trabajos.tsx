@@ -361,19 +361,42 @@ export default function Trabajos() {
   };
 
   const quitarDelPlanificador = async (trabajo: Trabajo) => {
-    if (!trabajo.legacy_servicio_id) return;
+    /*
+      Caso 1: trabajo vinculado correctamente por legacy_servicio_id.
+      Caso 2: quedó un servicio viejo/orfandad en Planificador sin legacy_servicio_id.
+      Para ese caso buscamos por los mismos datos del trabajo y lo eliminamos también.
+    */
+    const idsServicios = new Set<string>();
 
-    // Si vuelve a Pendiente, ya no tiene fecha confirmada.
-    // Entonces se elimina del Planificador/Calendario y se desvincula del trabajo madre.
-    await supabase
-      .from("servicio_jornadas")
-      .delete()
-      .eq("servicio_id", trabajo.legacy_servicio_id);
+    if (trabajo.legacy_servicio_id) {
+      idsServicios.add(trabajo.legacy_servicio_id);
+    }
 
-    await supabase
+    const { data: posibles, error: errBuscar } = await supabase
       .from("servicios")
-      .delete()
-      .eq("id", trabajo.legacy_servicio_id);
+      .select("id")
+      .eq("cliente_id", trabajo.cliente_id)
+      .eq("trabajo_descripcion", trabajo.descripcion_problema)
+      .eq("sucursal", trabajo.sucursal)
+      .eq("marca", trabajo.marca);
+
+    if (errBuscar) throw errBuscar;
+
+    for (const s of posibles ?? []) {
+      idsServicios.add(s.id);
+    }
+
+    for (const servicioId of idsServicios) {
+      await supabase
+        .from("servicio_jornadas")
+        .delete()
+        .eq("servicio_id", servicioId);
+
+      await supabase
+        .from("servicios")
+        .delete()
+        .eq("id", servicioId);
+    }
 
     const { error } = await supabase
       .from("trabajos")
