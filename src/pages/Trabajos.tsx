@@ -3,37 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Plus, Search, CalendarPlus, Clock, UserRound } from "lucide-react";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Wrench } from "lucide-react";
+import { MARCAS, SUCURSALES, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { MARCAS, SUCURSALES, TIPOS_TRABAJO, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
+import { toast } from "sonner";
 
-const ESTADOS_TRABAJO = [
-  { value: "nuevo", label: "Nuevo" },
-  { value: "pendiente_diagnostico", label: "Pend. diagnóstico" },
-  { value: "pendiente_programar", label: "Pend. programar" },
-  { value: "programado", label: "Programado" },
-  { value: "en_ejecucion", label: "En ejecución" },
-  { value: "bloqueado", label: "Bloqueado" },
-  { value: "terminado_pendiente_validar", label: "Pend. validar" },
-  { value: "cerrado", label: "Cerrado" },
-] as const;
+type EstadoTrabajo = "pendiente" | "programado" | "iniciado" | "en_pausa" | "completado";
+type PrioridadTrabajo = "baja" | "media" | "alta" | "urgente";
 
-const PRIORIDADES = ["baja", "media", "alta", "urgente"] as const;
-
-type EstadoTrabajo = (typeof ESTADOS_TRABAJO)[number]["value"];
-type Prioridad = (typeof PRIORIDADES)[number];
-
-type Cliente = { id: string; nombre: string; sucursal: Sucursal | null };
-type Profile = { id: string; nombre: string; sucursal: Sucursal | null };
-type Trabajo = {
+interface Trabajo {
   id: string;
   cliente_id: string | null;
   maquina_id: string | null;
@@ -41,97 +25,179 @@ type Trabajo = {
   sucursal: Sucursal;
   tipo_trabajo: TipoTrabajo;
   descripcion_problema: string;
-  prioridad: Prioridad;
-  estado_general: EstadoTrabajo;
+  prioridad: PrioridadTrabajo;
+  estado_general: EstadoTrabajo | string;
   fecha_compromiso: string | null;
   responsable_principal_id: string | null;
   motivo_bloqueo: string | null;
   proxima_accion: string | null;
   creado_por: string | null;
-  cerrado_por: string | null;
-  cerrado_en: string | null;
   creado_en: string;
   actualizado_en: string;
-};
+  legacy_servicio_id?: string | null;
+}
 
-type Programacion = {
+interface Cliente {
   id: string;
-  trabajo_id: string;
-  fecha_programada: string;
-  tecnico_principal_id: string | null;
-  auxiliares: string[];
-  accion_programada: string | null;
-  horas_estimadas: number | null;
-  estado: "programada" | "cumplida" | "reprogramada" | "cancelada";
-  observacion: string | null;
-};
+  nombre: string;
+  sucursal: Sucursal | null;
+}
 
-type Jornada = {
+interface Profile {
   id: string;
-  trabajo_id: string;
-  programacion_id: string | null;
-  tecnico_id: string;
-  fecha_real: string;
-  horas_reales: number | null;
-  actividad_realizada: string | null;
-  resultado: string | null;
-  estado_jornada: "en_curso" | "completada" | "incompleta";
-  observaciones: string | null;
-};
+  nombre: string;
+  sucursal: Sucursal | null;
+}
+
+interface UserRole {
+  user_id: string;
+  role: string;
+}
 
 const PAGE = 1000;
+
+const ESTADOS: { key: EstadoTrabajo; label: string }[] = [
+  { key: "pendiente", label: "Pendiente" },
+  { key: "programado", label: "Programado" },
+  { key: "iniciado", label: "Iniciado" },
+  { key: "en_pausa", label: "En pausa" },
+  { key: "completado", label: "Completado" },
+];
+
+const PRIORIDADES: { key: PrioridadTrabajo; label: string }[] = [
+  { key: "baja", label: "Baja" },
+  { key: "media", label: "Media" },
+  { key: "alta", label: "Alta" },
+  { key: "urgente", label: "Urgente" },
+];
+
+const estadoLabel = (estado: string) => {
+  const found = ESTADOS.find((e) => e.key === estado);
+  if (found) return found.label;
+
+  const fallback: Record<string, string> = {
+    nuevo: "Pendiente",
+    pendiente_diagnostico: "Pendiente",
+    pendiente_programar: "Pendiente",
+    en_ejecucion: "Iniciado",
+    bloqueado: "En pausa",
+    terminado_pendiente_validar: "Completado",
+    cerrado: "Completado",
+  };
+
+  return fallback[estado] ?? estado;
+};
+
+const estadoColor = (estado: string) => {
+  const normalized =
+    estado === "nuevo" || estado === "pendiente_diagnostico" || estado === "pendiente_programar"
+      ? "pendiente"
+      : estado === "en_ejecucion"
+      ? "iniciado"
+      : estado === "bloqueado"
+      ? "en_pausa"
+      : estado === "cerrado" || estado === "terminado_pendiente_validar"
+      ? "completado"
+      : estado;
+
+  switch (normalized) {
+    case "pendiente":
+      return "border-amber-200 bg-amber-50";
+    case "programado":
+      return "border-blue-200 bg-blue-50";
+    case "iniciado":
+      return "border-emerald-200 bg-emerald-50";
+    case "en_pausa":
+      return "border-slate-300 bg-slate-100";
+    case "completado":
+      return "border-green-200 bg-green-50";
+    default:
+      return "border-border bg-card";
+  }
+};
+
+const normalizarEstado = (estado: string): EstadoTrabajo => {
+  if (estado === "programado") return "programado";
+  if (estado === "iniciado" || estado === "en_ejecucion") return "iniciado";
+  if (estado === "en_pausa" || estado === "bloqueado") return "en_pausa";
+  if (estado === "completado" || estado === "cerrado" || estado === "terminado_pendiente_validar") return "completado";
+  return "pendiente";
+};
+
 async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
   let from = 0;
   const all: T[] = [];
+
   while (true) {
     const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
+
     if (error) throw error;
     if (!data || data.length === 0) break;
+
     all.push(...(data as T[]));
+
     if (data.length < PAGE) break;
     from += PAGE;
   }
+
   return all;
 }
 
-const prioridadClass: Record<Prioridad, string> = {
-  baja: "bg-slate-100 text-slate-700",
-  media: "bg-blue-100 text-blue-700",
-  alta: "bg-amber-100 text-amber-700",
-  urgente: "bg-red-100 text-red-700",
-};
-
 export default function Trabajos() {
   const { user, profile, isAdmin } = useAuth();
+
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [programaciones, setProgramaciones] = useState<Programacion[]>([]);
-  const [jornadas, setJornadas] = useState<Jornada[]>([]);
+  const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState<string>(profile?.sucursal ?? "all");
-  const [fResponsable, setFResponsable] = useState<string>("all");
+  const [fTecnico, setFTecnico] = useState<string>("all");
   const [fPrioridad, setFPrioridad] = useState<string>("all");
-  const [openNuevo, setOpenNuevo] = useState(false);
-  const [detalle, setDetalle] = useState<Trabajo | null>(null);
-  const [dragTrabajoId, setDragTrabajoId] = useState<string | null>(null);
+
+  const [openForm, setOpenForm] = useState(false);
+  const [editing, setEditing] = useState<Trabajo | null>(null);
+
+  const [form, setForm] = useState({
+    cliente_id: "",
+    cliente_text: "",
+    marca: "CLAAS" as Marca,
+    sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
+    tipo_trabajo: "Visita de campo" as TipoTrabajo,
+    descripcion_problema: "",
+    prioridad: "media" as PrioridadTrabajo,
+    estado_general: "pendiente" as EstadoTrabajo,
+    responsable_principal_id: "",
+    fecha_compromiso: "",
+    proxima_accion: "",
+    motivo_bloqueo: "",
+  });
 
   const load = async () => {
     setLoading(true);
+
     try {
-      const [t, c, p, pr, j] = await Promise.all([
-        cargarTodo<Trabajo>(supabase.from("trabajos").select("*").order("actualizado_en", { ascending: false })),
-        cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal").order("nombre", { ascending: true })),
-        cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true })),
-        cargarTodo<Programacion>(supabase.from("programaciones").select("*")),
-        cargarTodo<Jornada>(supabase.from("jornadas").select("*")),
+      const [t, c, p, r] = await Promise.all([
+        cargarTodo<Trabajo>(
+          supabase.from("trabajos").select("*").order("actualizado_en", { ascending: false }),
+        ),
+        cargarTodo<Cliente>(
+          supabase.from("clientes").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        ),
+        cargarTodo<Profile>(
+          supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
+        ),
+        cargarTodo<UserRole>(
+          supabase.from("user_roles").select("user_id, role"),
+        ),
       ]);
+
       setTrabajos(t);
       setClientes(c);
       setProfiles(p);
-      setProgramaciones(pr);
-      setJornadas(j);
+      setRoles(r);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudieron cargar los trabajos");
@@ -144,321 +210,505 @@ export default function Trabajos() {
     load();
   }, []);
 
-  const clienteById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c.nombre])), [clientes]);
-  const profileById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p.nombre])), [profiles]);
-  const progByTrabajo = useMemo(() => {
-    const m = new Map<string, Programacion[]>();
-    for (const p of programaciones) {
-      const list = m.get(p.trabajo_id) ?? [];
-      list.push(p);
-      m.set(p.trabajo_id, list);
-    }
-    for (const list of m.values()) list.sort((a, b) => a.fecha_programada.localeCompare(b.fecha_programada));
-    return m;
-  }, [programaciones]);
-  const horasByTrabajo = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const j of jornadas) m.set(j.trabajo_id, (m.get(j.trabajo_id) ?? 0) + Number(j.horas_reales ?? 0));
-    return m;
-  }, [jornadas]);
+  const adminIds = useMemo(() => {
+    return new Set(
+      roles
+        .filter((r) => String(r.role ?? "").toLowerCase() === "admin")
+        .map((r) => r.user_id),
+    );
+  }, [roles]);
 
-  const filtrados = useMemo(() => {
-    const qq = q.trim().toLowerCase();
+  const tecnicos = useMemo(() => {
+    return profiles.filter((p) => !adminIds.has(p.id));
+  }, [profiles, adminIds]);
+
+  const cliById = useMemo(() => {
+    return new Map(clientes.map((c) => [c.id, c]));
+  }, [clientes]);
+
+  const profById = useMemo(() => {
+    return new Map(profiles.map((p) => [p.id, p]));
+  }, [profiles]);
+
+  const clientesFiltrados = useMemo(() => {
+    const query = form.cliente_text.trim().toLowerCase();
+
+    if (!query) return clientes.slice(0, 100);
+
+    return clientes
+      .filter((c) => c.nombre.toLowerCase().includes(query))
+      .slice(0, 100);
+  }, [clientes, form.cliente_text]);
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+
     return trabajos.filter((t) => {
       if (fSucursal !== "all" && t.sucursal !== fSucursal) return false;
-      if (fResponsable !== "all" && t.responsable_principal_id !== fResponsable) return false;
+      if (fTecnico !== "all" && t.responsable_principal_id !== fTecnico) return false;
       if (fPrioridad !== "all" && t.prioridad !== fPrioridad) return false;
-      if (qq) {
-        const cli = t.cliente_id ? clienteById[t.cliente_id] ?? "" : "";
-        const resp = t.responsable_principal_id ? profileById[t.responsable_principal_id] ?? "" : "";
-        if (![cli, resp, t.descripcion_problema, t.marca, t.sucursal].join(" ").toLowerCase().includes(qq)) return false;
+
+      if (query) {
+        const cliente = t.cliente_id ? cliById.get(t.cliente_id)?.nombre ?? "" : "";
+        const tecnico = t.responsable_principal_id ? profById.get(t.responsable_principal_id)?.nombre ?? "" : "";
+        const hay =
+          cliente.toLowerCase().includes(query) ||
+          tecnico.toLowerCase().includes(query) ||
+          t.descripcion_problema.toLowerCase().includes(query);
+
+        if (!hay) return false;
       }
+
       return true;
     });
-  }, [trabajos, q, fSucursal, fResponsable, fPrioridad, clienteById, profileById]);
+  }, [trabajos, q, fSucursal, fTecnico, fPrioridad, cliById, profById]);
 
-  const cambiarEstado = async (trabajo: Trabajo, estado: EstadoTrabajo) => {
-    if (trabajo.estado_general === estado) return;
-    const { error } = await supabase.from("trabajos").update({ estado_general: estado }).eq("id", trabajo.id);
+  const openNuevo = () => {
+    setEditing(null);
+    setForm({
+      cliente_id: "",
+      cliente_text: "",
+      marca: "CLAAS",
+      sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
+      tipo_trabajo: "Visita de campo",
+      descripcion_problema: "",
+      prioridad: "media",
+      estado_general: "pendiente",
+      responsable_principal_id: "",
+      fecha_compromiso: "",
+      proxima_accion: "",
+      motivo_bloqueo: "",
+    });
+    setOpenForm(true);
+  };
+
+  const openEditar = (t: Trabajo) => {
+    const cliente = t.cliente_id ? cliById.get(t.cliente_id) : null;
+
+    setEditing(t);
+    setForm({
+      cliente_id: t.cliente_id ?? "",
+      cliente_text: cliente?.nombre ?? "",
+      marca: t.marca,
+      sucursal: t.sucursal,
+      tipo_trabajo: t.tipo_trabajo,
+      descripcion_problema: t.descripcion_problema,
+      prioridad: t.prioridad,
+      estado_general: normalizarEstado(String(t.estado_general)),
+      responsable_principal_id: t.responsable_principal_id ?? "",
+      fecha_compromiso: t.fecha_compromiso ?? "",
+      proxima_accion: t.proxima_accion ?? "",
+      motivo_bloqueo: t.motivo_bloqueo ?? "",
+    });
+    setOpenForm(true);
+  };
+
+  const guardar = async () => {
+    if (!form.descripcion_problema.trim()) {
+      toast.error("Cargá el trabajo o problema a resolver");
+      return;
+    }
+
+    let clienteId: string | null = form.cliente_id || null;
+
+    if (!clienteId && form.cliente_text.trim()) {
+      const existente = clientes.find(
+        (c) => c.nombre.toLowerCase() === form.cliente_text.trim().toLowerCase(),
+      );
+
+      if (existente) {
+        clienteId = existente.id;
+      } else {
+        const { data, error } = await supabase
+          .from("clientes")
+          .insert({ nombre: form.cliente_text.trim(), sucursal: form.sucursal })
+          .select("id")
+          .single();
+
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+
+        clienteId = data.id;
+      }
+    }
+
+    const payload = {
+      cliente_id: clienteId,
+      marca: form.marca,
+      sucursal: form.sucursal,
+      tipo_trabajo: form.tipo_trabajo,
+      descripcion_problema: form.descripcion_problema.trim(),
+      prioridad: form.prioridad,
+      estado_general: form.estado_general,
+      responsable_principal_id: form.responsable_principal_id || null,
+      fecha_compromiso: form.fecha_compromiso || null,
+      proxima_accion: form.proxima_accion.trim() || null,
+      motivo_bloqueo: form.estado_general === "en_pausa" ? form.motivo_bloqueo.trim() || null : null,
+      creado_por: editing ? undefined : user?.id,
+    };
+
+    const { error } = editing
+      ? await supabase.from("trabajos").update(payload).eq("id", editing.id)
+      : await supabase.from("trabajos").insert(payload);
+
     if (error) {
       toast.error(error.message);
       return;
     }
-    setTrabajos((prev) => prev.map((t) => (t.id === trabajo.id ? { ...t, estado_general: estado } : t)));
-    toast.success("Estado actualizado");
+
+    toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
+    setOpenForm(false);
+    load();
   };
+
+  const moverEstado = async (trabajo: Trabajo, estado: EstadoTrabajo) => {
+    const { error } = await supabase
+      .from("trabajos")
+      .update({
+        estado_general: estado,
+        cerrado_en: estado === "completado" ? new Date().toISOString() : null,
+        cerrado_por: estado === "completado" ? user?.id : null,
+      })
+      .eq("id", trabajo.id);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    load();
+  };
+
+  const columnas = ESTADOS.map((estado) => ({
+    ...estado,
+    items: filtered.filter((t) => normalizarEstado(String(t.estado_general)) === estado.key),
+  }));
 
   return (
     <div className="container max-w-[1800px] py-4 space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Trabajos</h1>
-          <p className="text-xs text-muted-foreground">Kanban de casos madre, programaciones y jornadas.</p>
+          <p className="text-sm text-muted-foreground">
+            Gestión simple de trabajos: pendiente, programado, iniciado, en pausa y completado.
+          </p>
         </div>
+
         <div className="flex flex-wrap gap-2">
-          <div className="relative min-w-[240px] flex-1">
+          <div className="relative w-full sm:w-[300px]">
             <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-8" placeholder="Buscar cliente, técnico o problema..." value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar cliente, técnico o problema..."
+              className="pl-8"
+            />
           </div>
+
           <Select value={fSucursal} onValueChange={setFSucursal}>
-            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sucursal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las sucursales</SelectItem>
+              {SUCURSALES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={fTecnico} onValueChange={setFTecnico}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Técnico" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los técnicos</SelectItem>
+              {tecnicos.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={fPrioridad} onValueChange={setFPrioridad}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Prioridad" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {PRIORIDADES.map((p) => (
+                <SelectItem key={p.key} value={p.key}>
+                  {p.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Select value={fResponsable} onValueChange={setFResponsable}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Responsable" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={fPrioridad} onValueChange={setFPrioridad}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Prioridad</SelectItem>
-              {PRIORIDADES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setOpenNuevo(true)}><Plus className="mr-2 h-4 w-4" /> Nuevo trabajo</Button>
+
+          <Button onClick={openNuevo}>
+            <Plus className="mr-2 h-4 w-4" /> Nuevo trabajo
+          </Button>
         </div>
       </div>
 
       {loading ? (
         <Card className="p-8 text-center text-muted-foreground">Cargando trabajos...</Card>
       ) : (
-        <div className="grid gap-3 overflow-x-auto pb-3" style={{ gridTemplateColumns: `repeat(${ESTADOS_TRABAJO.length}, minmax(245px, 1fr))` }}>
-          {ESTADOS_TRABAJO.map((col) => {
-            const items = filtrados.filter((t) => t.estado_general === col.value);
-            return (
-              <div
-                key={col.value}
-                className="min-h-[70vh] rounded-lg border bg-muted/20 p-2"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  const t = trabajos.find((x) => x.id === dragTrabajoId);
-                  if (t) cambiarEstado(t, col.value);
-                  setDragTrabajoId(null);
-                }}
-              >
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <h2 className="text-sm font-semibold">{col.label}</h2>
-                  <Badge variant="secondary" className="text-[10px]">{items.length}</Badge>
-                </div>
-                <div className="space-y-2">
-                  {items.map((t) => (
-                    <TrabajoCard
-                      key={t.id}
-                      trabajo={t}
-                      cliente={t.cliente_id ? clienteById[t.cliente_id] : undefined}
-                      responsable={t.responsable_principal_id ? profileById[t.responsable_principal_id] : undefined}
-                      programaciones={progByTrabajo.get(t.id) ?? []}
-                      horas={horasByTrabajo.get(t.id) ?? 0}
-                      onOpen={() => setDetalle(t)}
-                      onDragStart={() => setDragTrabajoId(t.id)}
-                    />
-                  ))}
-                </div>
+        <div className="grid gap-3 lg:grid-cols-5">
+          {columnas.map((col) => (
+            <Card key={col.key} className="min-h-[560px] p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-semibold">{col.label}</h2>
+                <Badge variant="secondary">{col.items.length}</Badge>
               </div>
-            );
-          })}
+
+              <div className="space-y-2">
+                {col.items.map((t) => {
+                  const cli = t.cliente_id ? cliById.get(t.cliente_id) : null;
+                  const tecnico = t.responsable_principal_id ? profById.get(t.responsable_principal_id) : null;
+
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => openEditar(t)}
+                      className={cn(
+                        "w-full rounded-lg border p-3 text-left shadow-sm transition hover:shadow-md",
+                        estadoColor(String(t.estado_general)),
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold">
+                            {cli?.nombre ?? "Sin cliente"}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            {t.sucursal} · {t.marca}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 text-[10px]">
+                          {PRIORIDADES.find((p) => p.key === t.prioridad)?.label ?? t.prioridad}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-2 line-clamp-3 text-sm">
+                        {t.descripcion_problema}
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Wrench className="h-3 w-3" />
+                        <span className="truncate">{tecnico?.nombre ?? "Sin técnico"}</span>
+                      </div>
+
+                      {t.fecha_compromiso && (
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          Fecha: {t.fecha_compromiso}
+                        </div>
+                      )}
+
+                      <div className="mt-3 grid grid-cols-2 gap-1">
+                        {ESTADOS.filter((e) => e.key !== normalizarEstado(String(t.estado_general))).map((e) => (
+                          <Button
+                            key={e.key}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px]"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              moverEstado(t, e.key);
+                            }}
+                          >
+                            {e.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
-      <NuevoTrabajoDialog
-        open={openNuevo}
-        onOpenChange={setOpenNuevo}
-        clientes={clientes}
-        profiles={profiles}
-        defaultSucursal={isAdmin ? "Santa Rita" : profile?.sucursal ?? "Santa Rita"}
-        userId={user?.id ?? null}
-        onSaved={load}
-      />
+      <Dialog open={openForm} onOpenChange={setOpenForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar trabajo" : "Nuevo trabajo"}</DialogTitle>
+          </DialogHeader>
 
-      <DetalleTrabajoSheet
-        trabajo={detalle}
-        onOpenChange={(o) => !o && setDetalle(null)}
-        cliente={detalle?.cliente_id ? clienteById[detalle.cliente_id] : undefined}
-        responsable={detalle?.responsable_principal_id ? profileById[detalle.responsable_principal_id] : undefined}
-        programaciones={detalle ? progByTrabajo.get(detalle.id) ?? [] : []}
-        jornadas={detalle ? jornadas.filter((j) => j.trabajo_id === detalle.id) : []}
-        profiles={profiles}
-        userId={user?.id ?? null}
-        onSaved={load}
-      />
+          <div className="grid gap-4">
+            <div className="space-y-1.5">
+              <Label>Cliente</Label>
+              <Input
+                list="clientes-trabajos"
+                value={form.cliente_text}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const match = clientes.find((c) => c.nombre.toLowerCase() === value.toLowerCase());
+
+                  setForm((f) => ({
+                    ...f,
+                    cliente_text: value,
+                    cliente_id: match?.id ?? "",
+                  }));
+                }}
+                placeholder="Buscar o escribir cliente..."
+              />
+              <datalist id="clientes-trabajos">
+                {clientesFiltrados.map((c) => (
+                  <option key={c.id} value={c.nombre} />
+                ))}
+              </datalist>
+              <p className="text-[11px] text-muted-foreground">
+                Si no existe, se crea automáticamente al guardar.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Sucursal</Label>
+                <Select value={form.sucursal} onValueChange={(v) => setForm((f) => ({ ...f, sucursal: v as Sucursal }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUCURSALES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Marca</Label>
+                <Select value={form.marca} onValueChange={(v) => setForm((f) => ({ ...f, marca: v as Marca }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MARCAS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Técnico responsable</Label>
+                <Select
+                  value={form.responsable_principal_id || "none"}
+                  onValueChange={(v) => setForm((f) => ({ ...f, responsable_principal_id: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar técnico" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[320px]">
+                    <SelectItem value="none">— Sin asignar —</SelectItem>
+                    {tecnicos.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.nombre}{t.sucursal ? ` · ${t.sucursal}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Estado</Label>
+                <Select
+                  value={form.estado_general}
+                  onValueChange={(v) => setForm((f) => ({ ...f, estado_general: v as EstadoTrabajo }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS.map((e) => (
+                      <SelectItem key={e.key} value={e.key}>
+                        {e.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Prioridad</Label>
+                <Select value={form.prioridad} onValueChange={(v) => setForm((f) => ({ ...f, prioridad: v as PrioridadTrabajo }))}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORIDADES.map((p) => (
+                      <SelectItem key={p.key} value={p.key}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Fecha compromiso</Label>
+                <Input
+                  type="date"
+                  value={form.fecha_compromiso}
+                  onChange={(e) => setForm((f) => ({ ...f, fecha_compromiso: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Trabajo o problema a resolver</Label>
+              <Textarea
+                value={form.descripcion_problema}
+                onChange={(e) => setForm((f) => ({ ...f, descripcion_problema: e.target.value }))}
+                rows={4}
+                placeholder="Describí el problema o trabajo pendiente..."
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Próxima acción</Label>
+              <Input
+                value={form.proxima_accion}
+                onChange={(e) => setForm((f) => ({ ...f, proxima_accion: e.target.value }))}
+                placeholder="Ej: Coordinar visita, pedir repuesto, esperar aprobación..."
+              />
+            </div>
+
+            {form.estado_general === "en_pausa" && (
+              <div className="space-y-1.5">
+                <Label>Motivo de pausa</Label>
+                <Textarea
+                  value={form.motivo_bloqueo}
+                  onChange={(e) => setForm((f) => ({ ...f, motivo_bloqueo: e.target.value }))}
+                  rows={2}
+                  placeholder="Ej: esperando repuesto, cliente no confirma, falta autorización..."
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenForm(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={guardar}>
+              {editing ? "Guardar cambios" : "Crear trabajo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  );
-}
-
-function TrabajoCard({ trabajo, cliente, responsable, programaciones, horas, onOpen, onDragStart }: {
-  trabajo: Trabajo; cliente?: string; responsable?: string; programaciones: Programacion[]; horas: number; onOpen: () => void; onDragStart: () => void;
-}) {
-  const prox = programaciones.find((p) => p.estado === "programada") ?? programaciones[0];
-  return (
-    <Card draggable onDragStart={onDragStart} onClick={onOpen} className="cursor-grab p-3 active:cursor-grabbing hover:shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{cliente ?? "Sin cliente"}</div>
-          <div className="text-[11px] text-muted-foreground">{trabajo.sucursal} · {trabajo.marca}</div>
-        </div>
-        <Badge className={cn("text-[9px]", prioridadClass[trabajo.prioridad])}>{trabajo.prioridad}</Badge>
-      </div>
-      <div className="mt-2 line-clamp-3 text-xs text-muted-foreground">{trabajo.descripcion_problema}</div>
-      <div className="mt-3 flex flex-col gap-1 text-[11px] text-muted-foreground">
-        <div className="flex items-center gap-1"><UserRound className="h-3 w-3" /> {responsable ?? "Sin responsable"}</div>
-        <div className="flex items-center gap-1"><CalendarPlus className="h-3 w-3" /> {prox ? prox.fecha_programada : "Sin programación"}</div>
-        <div className="flex items-center gap-1"><Clock className="h-3 w-3" /> {horas.toFixed(1)} h reales</div>
-      </div>
-    </Card>
-  );
-}
-
-function NuevoTrabajoDialog({ open, onOpenChange, clientes, profiles, defaultSucursal, userId, onSaved }: {
-  open: boolean; onOpenChange: (v: boolean) => void; clientes: Cliente[]; profiles: Profile[]; defaultSucursal: Sucursal; userId: string | null; onSaved: () => void;
-}) {
-  const [clienteId, setClienteId] = useState<string>("none");
-  const [marca, setMarca] = useState<Marca>("CLAAS");
-  const [sucursal, setSucursal] = useState<Sucursal>(defaultSucursal);
-  const [tipo, setTipo] = useState<TipoTrabajo>("Visita de campo");
-  const [descripcion, setDescripcion] = useState("");
-  const [prioridad, setPrioridad] = useState<Prioridad>("media");
-  const [responsable, setResponsable] = useState<string>("none");
-  const [fecha, setFecha] = useState("");
-  const [accion, setAccion] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setSucursal(defaultSucursal);
-      setClienteId("none");
-      setMarca("CLAAS");
-      setTipo("Visita de campo");
-      setDescripcion("");
-      setPrioridad("media");
-      setResponsable("none");
-      setFecha("");
-      setAccion("");
-    }
-  }, [open, defaultSucursal]);
-
-  const guardar = async () => {
-    if (!descripcion.trim()) return toast.error("Cargá el problema o trabajo a resolver");
-    setBusy(true);
-    const estado = fecha ? "programado" : "pendiente_programar";
-    const { data, error } = await supabase.from("trabajos").insert({
-      cliente_id: clienteId === "none" ? null : clienteId,
-      marca,
-      sucursal,
-      tipo_trabajo: tipo,
-      descripcion_problema: descripcion.trim(),
-      prioridad,
-      estado_general: estado,
-      responsable_principal_id: responsable === "none" ? null : responsable,
-      creado_por: userId,
-    }).select("id").single();
-
-    if (error) { setBusy(false); return toast.error(error.message); }
-
-    if (fecha && data?.id) {
-      const { error: e2 } = await supabase.from("programaciones").insert({
-        trabajo_id: data.id,
-        fecha_programada: fecha,
-        tecnico_principal_id: responsable === "none" ? null : responsable,
-        accion_programada: accion || descripcion.trim(),
-        creado_por: userId,
-      });
-      if (e2) { setBusy(false); return toast.error(e2.message); }
-    }
-    setBusy(false);
-    toast.success("Trabajo creado");
-    onOpenChange(false);
-    onSaved();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Nuevo trabajo</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div className="space-y-1"><Label>Cliente</Label><Select value={clienteId} onValueChange={setClienteId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin cliente</SelectItem>{clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}</SelectContent></Select></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Sucursal</Label><Select value={sucursal} onValueChange={(v) => setSucursal(v as Sucursal)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1"><Label>Marca</Label><Select value={marca} onValueChange={(v) => setMarca(v as Marca)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Tipo</Label><Select value={tipo} onValueChange={(v) => setTipo(v as TipoTrabajo)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{TIPOS_TRABAJO.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1"><Label>Prioridad</Label><Select value={prioridad} onValueChange={(v) => setPrioridad(v as Prioridad)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PRIORIDADES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
-          </div>
-          <div className="space-y-1"><Label>Problema o trabajo</Label><Textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={3} /></div>
-          <div className="space-y-1"><Label>Responsable</Label><Select value={responsable} onValueChange={setResponsable}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin asignar</SelectItem>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Primera programación (opcional)</Label><Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Acción programada</Label><Input value={accion} onChange={(e) => setAccion(e.target.value)} placeholder="Opcional" /></div>
-          </div>
-        </div>
-        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={guardar} disabled={busy}>{busy ? "Guardando..." : "Guardar"}</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DetalleTrabajoSheet({ trabajo, onOpenChange, cliente, responsable, programaciones, jornadas, profiles, userId, onSaved }: {
-  trabajo: Trabajo | null; onOpenChange: (v: boolean) => void; cliente?: string; responsable?: string; programaciones: Programacion[]; jornadas: Jornada[]; profiles: Profile[]; userId: string | null; onSaved: () => void;
-}) {
-  const [fecha, setFecha] = useState("");
-  const [tecnico, setTecnico] = useState<string>("none");
-  const [accion, setAccion] = useState("");
-  const [horas, setHoras] = useState("");
-  const [actividad, setActividad] = useState("");
-
-  if (!trabajo) return null;
-
-  const crearProgramacion = async () => {
-    if (!fecha) return toast.error("Elegí una fecha");
-    const { error } = await supabase.from("programaciones").insert({ trabajo_id: trabajo.id, fecha_programada: fecha, tecnico_principal_id: tecnico === "none" ? null : tecnico, accion_programada: accion || trabajo.descripcion_problema, creado_por: userId });
-    if (error) return toast.error(error.message);
-    if (trabajo.estado_general === "pendiente_programar" || trabajo.estado_general === "nuevo") await supabase.from("trabajos").update({ estado_general: "programado" }).eq("id", trabajo.id);
-    toast.success("Programación creada");
-    setFecha(""); setAccion(""); setTecnico("none"); onSaved();
-  };
-
-  const cargarJornada = async () => {
-    if (!actividad.trim()) return toast.error("Cargá la actividad realizada");
-    if (tecnico === "none") return toast.error("Elegí el técnico");
-    const { error } = await supabase.from("jornadas").insert({ trabajo_id: trabajo.id, tecnico_id: tecnico, fecha_real: new Date().toISOString().slice(0, 10), horas_reales: horas ? Number(horas) : null, actividad_realizada: actividad.trim(), estado_jornada: "completada", creado_por: userId });
-    if (error) return toast.error(error.message);
-    await supabase.from("trabajos").update({ estado_general: "en_ejecucion" }).eq("id", trabajo.id);
-    toast.success("Jornada cargada");
-    setHoras(""); setActividad(""); onSaved();
-  };
-
-  return (
-    <Sheet open={!!trabajo} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader><SheetTitle>{cliente ?? "Sin cliente"}</SheetTitle></SheetHeader>
-        <div className="mt-4 space-y-4">
-          <Card className="p-3 space-y-2">
-            <div className="flex flex-wrap gap-2"><Badge>{trabajo.marca}</Badge><Badge variant="outline">{trabajo.sucursal}</Badge><Badge className={prioridadClass[trabajo.prioridad]}>{trabajo.prioridad}</Badge></div>
-            <div className="text-sm font-medium">{trabajo.descripcion_problema}</div>
-            <div className="text-xs text-muted-foreground">Responsable: {responsable ?? "Sin asignar"}</div>
-          </Card>
-          <Card className="p-3 space-y-2">
-            <h3 className="text-sm font-semibold">Programar intervención</h3>
-            <div className="grid grid-cols-2 gap-2"><Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /><Select value={tecnico} onValueChange={setTecnico}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin técnico</SelectItem>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select></div>
-            <Input value={accion} onChange={(e) => setAccion(e.target.value)} placeholder="Acción programada" />
-            <Button size="sm" onClick={crearProgramacion}>Programar</Button>
-          </Card>
-          <Card className="p-3 space-y-2">
-            <h3 className="text-sm font-semibold">Cargar jornada</h3>
-            <div className="grid grid-cols-2 gap-2"><Select value={tecnico} onValueChange={setTecnico}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Técnico</SelectItem>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select><Input type="number" value={horas} onChange={(e) => setHoras(e.target.value)} placeholder="Horas" /></div>
-            <Textarea value={actividad} onChange={(e) => setActividad(e.target.value)} placeholder="Actividad realizada" />
-            <Button size="sm" onClick={cargarJornada}>Guardar jornada</Button>
-          </Card>
-          <Card className="p-3"><h3 className="text-sm font-semibold mb-2">Programaciones</h3>{programaciones.length ? programaciones.map((p) => <div key={p.id} className="border-b py-2 text-xs"><b>{p.fecha_programada}</b> · {p.estado} · {p.tecnico_principal_id ? profiles.find((x) => x.id === p.tecnico_principal_id)?.nombre : "Sin técnico"}<div className="text-muted-foreground">{p.accion_programada}</div></div>) : <div className="text-xs text-muted-foreground">Sin programaciones</div>}</Card>
-          <Card className="p-3"><h3 className="text-sm font-semibold mb-2">Jornadas</h3>{jornadas.length ? jornadas.map((j) => <div key={j.id} className="border-b py-2 text-xs"><b>{j.fecha_real}</b> · {profiles.find((x) => x.id === j.tecnico_id)?.nombre ?? "Técnico"} · {Number(j.horas_reales ?? 0).toFixed(1)}h<div className="text-muted-foreground">{j.actividad_realizada}</div></div>) : <div className="text-xs text-muted-foreground">Sin jornadas</div>}</Card>
-        </div>
-      </SheetContent>
-    </Sheet>
   );
 }
