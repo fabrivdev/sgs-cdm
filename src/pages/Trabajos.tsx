@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Wrench } from "lucide-react";
+import { Plus, Search, Wrench, Trash2 } from "lucide-react";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -71,34 +71,35 @@ const PRIORIDADES: { key: PrioridadTrabajo; label: string }[] = [
   { key: "urgente", label: "Urgente" },
 ];
 
-const estadoLabel = (estado: string) => {
-  const found = ESTADOS.find((e) => e.key === estado);
-  if (found) return found.label;
+const normalizarEstado = (estado: string): EstadoTrabajo => {
+  if (estado === "programado") return "programado";
+  if (estado === "iniciado" || estado === "en_ejecucion") return "iniciado";
+  if (estado === "en_pausa" || estado === "bloqueado") return "en_pausa";
+  if (estado === "completado" || estado === "cerrado" || estado === "terminado_pendiente_validar") return "completado";
+  return "pendiente";
+};
 
-  const fallback: Record<string, string> = {
-    nuevo: "Pendiente",
-    pendiente_diagnostico: "Pendiente",
-    pendiente_programar: "Pendiente",
-    en_ejecucion: "Iniciado",
-    bloqueado: "En pausa",
-    terminado_pendiente_validar: "Completado",
-    cerrado: "Completado",
-  };
+const siguientesEstados = (estadoActual: string): EstadoTrabajo[] => {
+  const actual = normalizarEstado(estadoActual);
 
-  return fallback[estado] ?? estado;
+  if (actual === "completado") return [];
+
+  switch (actual) {
+    case "pendiente":
+      return ["programado"];
+    case "programado":
+      return ["iniciado"];
+    case "iniciado":
+      return ["en_pausa", "completado"];
+    case "en_pausa":
+      return ["iniciado", "completado"];
+    default:
+      return [];
+  }
 };
 
 const estadoColor = (estado: string) => {
-  const normalized =
-    estado === "nuevo" || estado === "pendiente_diagnostico" || estado === "pendiente_programar"
-      ? "pendiente"
-      : estado === "en_ejecucion"
-      ? "iniciado"
-      : estado === "bloqueado"
-      ? "en_pausa"
-      : estado === "cerrado" || estado === "terminado_pendiente_validar"
-      ? "completado"
-      : estado;
+  const normalized = normalizarEstado(estado);
 
   switch (normalized) {
     case "pendiente":
@@ -116,37 +117,26 @@ const estadoColor = (estado: string) => {
   }
 };
 
-const normalizarEstado = (estado: string): EstadoTrabajo => {
-  if (estado === "programado") return "programado";
-  if (estado === "iniciado" || estado === "en_ejecucion") return "iniciado";
-  if (estado === "en_pausa" || estado === "bloqueado") return "en_pausa";
-  if (estado === "completado" || estado === "cerrado" || estado === "terminado_pendiente_validar") return "completado";
-  return "pendiente";
+const estadoServicio = (estado: EstadoTrabajo) => {
+  if (estado === "completado") return "Completado";
+  if (estado === "iniciado") return "Iniciado";
+  return "Pendiente";
 };
 
-const ORDEN_ESTADOS: EstadoTrabajo[] = ["pendiente", "programado", "iniciado", "en_pausa", "completado"];
+const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-const siguientesEstados = (estadoActual: string): EstadoTrabajo[] => {
-  const actual = normalizarEstado(estadoActual);
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
-  if (actual === "completado") return [];
+const getDiaSemana = (yyyyMmDd: string) => {
+  const d = new Date(`${yyyyMmDd}T00:00:00`);
+  return dias[d.getDay()];
+};
 
-  // Flujo normal:
-  // Pendiente -> Programado -> Iniciado -> Completado
-  // Desde Iniciado también se puede poner En pausa.
-  // Desde En pausa solo se puede volver a Iniciado o completar.
-  switch (actual) {
-    case "pendiente":
-      return ["programado"];
-    case "programado":
-      return ["iniciado"];
-    case "iniciado":
-      return ["en_pausa", "completado"];
-    case "en_pausa":
-      return ["iniciado", "completado"];
-    default:
-      return [];
-  }
+const getSemana = (yyyyMmDd: string) => {
+  const d = new Date(`${yyyyMmDd}T00:00:00`);
+  const start = new Date(d.getFullYear(), 0, 1);
+  const diff = Math.floor((d.getTime() - start.getTime()) / 86400000);
+  return Math.ceil((diff + start.getDay() + 1) / 7);
 };
 
 async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
@@ -169,7 +159,7 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 }
 
 export default function Trabajos() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile } = useAuth();
 
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -195,8 +185,8 @@ export default function Trabajos() {
     prioridad: "media" as PrioridadTrabajo,
     estado_general: "pendiente" as EstadoTrabajo,
     responsable_principal_id: "",
-    fecha_compromiso: "",
-    proxima_accion: "",
+    fecha_programada: "",
+    observacion: "",
     motivo_bloqueo: "",
   });
 
@@ -300,8 +290,8 @@ export default function Trabajos() {
       prioridad: "media",
       estado_general: "pendiente",
       responsable_principal_id: "",
-      fecha_compromiso: "",
-      proxima_accion: "",
+      fecha_programada: "",
+      observacion: "",
       motivo_bloqueo: "",
     });
     setOpenForm(true);
@@ -321,19 +311,30 @@ export default function Trabajos() {
       prioridad: t.prioridad,
       estado_general: normalizarEstado(String(t.estado_general)),
       responsable_principal_id: t.responsable_principal_id ?? "",
-      fecha_compromiso: t.fecha_compromiso ?? "",
-      proxima_accion: t.proxima_accion ?? "",
+      fecha_programada: t.fecha_compromiso ?? "",
+      observacion: t.proxima_accion ?? "",
       motivo_bloqueo: t.motivo_bloqueo ?? "",
     });
     setOpenForm(true);
   };
 
-  const guardar = async () => {
-    if (!form.descripcion_problema.trim()) {
-      toast.error("Cargá el trabajo o problema a resolver");
-      return;
+  const validarProgramacion = (estado: EstadoTrabajo, fecha?: string, tecnico?: string) => {
+    if (estado === "programado" || estado === "iniciado") {
+      if (!fecha) {
+        toast.error("Para programar un trabajo necesitás cargar fecha programada");
+        return false;
+      }
+
+      if (!tecnico) {
+        toast.error("Para programar un trabajo necesitás asignar un técnico responsable");
+        return false;
+      }
     }
 
+    return true;
+  };
+
+  const asegurarCliente = async () => {
     let clienteId: string | null = form.cliente_id || null;
 
     if (!clienteId && form.cliente_text.trim()) {
@@ -350,60 +351,208 @@ export default function Trabajos() {
           .select("id")
           .single();
 
-        if (error) {
-          toast.error(error.message);
-          return;
-        }
+        if (error) throw error;
 
         clienteId = data.id;
       }
     }
 
-    const payload = {
-      cliente_id: clienteId,
-      marca: form.marca,
-      sucursal: form.sucursal,
-      tipo_trabajo: form.tipo_trabajo,
-      descripcion_problema: form.descripcion_problema.trim(),
-      prioridad: form.prioridad,
-      estado_general: form.estado_general,
-      responsable_principal_id: form.responsable_principal_id || null,
-      fecha_compromiso: form.fecha_compromiso || null,
-      proxima_accion: form.proxima_accion.trim() || null,
-      motivo_bloqueo: form.estado_general === "en_pausa" ? form.motivo_bloqueo.trim() || null : null,
-      creado_por: editing ? undefined : user?.id,
-    };
+    return clienteId;
+  };
 
-    const { error } = editing
-      ? await supabase.from("trabajos").update(payload).eq("id", editing.id)
-      : await supabase.from("trabajos").insert(payload);
+  const sincronizarConPlanificador = async (trabajo: Trabajo) => {
+    const estado = normalizarEstado(String(trabajo.estado_general));
 
-    if (error) {
-      toast.error(error.message);
+    if (!validarProgramacion(estado, trabajo.fecha_compromiso ?? "", trabajo.responsable_principal_id ?? "")) {
       return;
     }
 
-    toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
-    setOpenForm(false);
-    load();
+    if (estado === "pendiente" || estado === "en_pausa") return;
+
+    const fecha = trabajo.fecha_compromiso;
+    const tecnico = trabajo.responsable_principal_id;
+
+    if (!fecha || !tecnico) return;
+
+    let servicioId = trabajo.legacy_servicio_id ?? null;
+
+    const servicioPayload = {
+      fecha_programada: fecha,
+      sucursal: trabajo.sucursal,
+      marca: trabajo.marca,
+      tipo_trabajo: trabajo.tipo_trabajo,
+      tecnico_responsable_id: tecnico,
+      auxiliares: [],
+      cliente_id: trabajo.cliente_id,
+      trabajo_descripcion: trabajo.descripcion_problema,
+      observaciones: trabajo.proxima_accion,
+      creado_por: trabajo.creado_por ?? user?.id,
+      dia_semana: getDiaSemana(fecha),
+      semana: getSemana(fecha),
+      estado: estadoServicio(estado),
+    };
+
+    if (servicioId) {
+      const { error } = await supabase
+        .from("servicios")
+        .update(servicioPayload)
+        .eq("id", servicioId);
+
+      if (error) throw error;
+    } else {
+      const { data, error } = await supabase
+        .from("servicios")
+        .insert(servicioPayload)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      servicioId = data.id;
+
+      const { error: errUpdateTrabajo } = await supabase
+        .from("trabajos")
+        .update({ legacy_servicio_id: servicioId })
+        .eq("id", trabajo.id);
+
+      if (errUpdateTrabajo) throw errUpdateTrabajo;
+    }
+
+    const { data: jornadaExistente, error: errFindJornada } = await supabase
+      .from("servicio_jornadas")
+      .select("id")
+      .eq("servicio_id", servicioId)
+      .eq("fecha", fecha)
+      .maybeSingle();
+
+    if (errFindJornada) throw errFindJornada;
+
+    if (!jornadaExistente?.id) {
+      const { error: errJornada } = await supabase
+        .from("servicio_jornadas")
+        .insert({
+          servicio_id: servicioId,
+          fecha,
+          estado: estadoServicio(estado),
+        });
+
+      if (errJornada) throw errJornada;
+    }
+  };
+
+  const guardar = async () => {
+    if (!form.descripcion_problema.trim()) {
+      toast.error("Cargá el trabajo o problema a resolver");
+      return;
+    }
+
+    if (!validarProgramacion(form.estado_general, form.fecha_programada, form.responsable_principal_id)) {
+      return;
+    }
+
+    try {
+      const clienteId = await asegurarCliente();
+
+      const payload = {
+        cliente_id: clienteId,
+        marca: form.marca,
+        sucursal: form.sucursal,
+        tipo_trabajo: form.tipo_trabajo,
+        descripcion_problema: form.descripcion_problema.trim(),
+        prioridad: form.prioridad,
+        estado_general: form.estado_general,
+        responsable_principal_id: form.responsable_principal_id || null,
+        fecha_compromiso: form.fecha_programada || null,
+        proxima_accion: form.observacion.trim() || null,
+        motivo_bloqueo: form.estado_general === "en_pausa" ? form.motivo_bloqueo.trim() || null : null,
+        creado_por: editing ? undefined : user?.id,
+      };
+
+      let trabajoGuardado: Trabajo;
+
+      if (editing) {
+        const { data, error } = await supabase
+          .from("trabajos")
+          .update(payload)
+          .eq("id", editing.id)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+        trabajoGuardado = data as Trabajo;
+      } else {
+        const { data, error } = await supabase
+          .from("trabajos")
+          .insert(payload)
+          .select("*")
+          .single();
+
+        if (error) throw error;
+        trabajoGuardado = data as Trabajo;
+      }
+
+      await sincronizarConPlanificador(trabajoGuardado);
+
+      toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
+      setOpenForm(false);
+      load();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "No se pudo guardar el trabajo");
+    }
   };
 
   const moverEstado = async (trabajo: Trabajo, estado: EstadoTrabajo) => {
-    const { error } = await supabase
-      .from("trabajos")
-      .update({
-        estado_general: estado,
-        cerrado_en: estado === "completado" ? new Date().toISOString() : null,
-        cerrado_por: estado === "completado" ? user?.id : null,
-      })
-      .eq("id", trabajo.id);
-
-    if (error) {
-      toast.error(error.message);
+    if (!validarProgramacion(estado, trabajo.fecha_compromiso ?? "", trabajo.responsable_principal_id ?? "")) {
+      openEditar(trabajo);
+      setForm((f) => ({ ...f, estado_general: estado }));
       return;
     }
 
-    load();
+    try {
+      const { data, error } = await supabase
+        .from("trabajos")
+        .update({
+          estado_general: estado,
+          cerrado_en: estado === "completado" ? new Date().toISOString() : null,
+          cerrado_por: estado === "completado" ? user?.id : null,
+        })
+        .eq("id", trabajo.id)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      await sincronizarConPlanificador(data as Trabajo);
+      load();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "No se pudo cambiar el estado");
+    }
+  };
+
+  const eliminarTrabajo = async () => {
+    if (!editing) return;
+
+    const ok = window.confirm("¿Eliminar este trabajo? Si está vinculado al Planificador, también se eliminará su servicio programado.");
+    if (!ok) return;
+
+    try {
+      if (editing.legacy_servicio_id) {
+        await supabase.from("servicio_jornadas").delete().eq("servicio_id", editing.legacy_servicio_id);
+        await supabase.from("servicios").delete().eq("id", editing.legacy_servicio_id);
+      }
+
+      const { error } = await supabase.from("trabajos").delete().eq("id", editing.id);
+      if (error) throw error;
+
+      toast.success("Trabajo eliminado");
+      setOpenForm(false);
+      load();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "No se pudo eliminar el trabajo");
+    }
   };
 
   const columnas = ESTADOS.map((estado) => ({
@@ -417,7 +566,7 @@ export default function Trabajos() {
         <div>
           <h1 className="text-2xl font-bold">Trabajos</h1>
           <p className="text-sm text-muted-foreground">
-            Gestión simple de trabajos: pendiente, programado, iniciado, en pausa y completado.
+            El trabajo se carga una sola vez. Al programarlo con fecha y técnico aparece en Planificador/Calendario.
           </p>
         </div>
 
@@ -495,6 +644,7 @@ export default function Trabajos() {
                 {col.items.map((t) => {
                   const cli = t.cliente_id ? cliById.get(t.cliente_id) : null;
                   const tecnico = t.responsable_principal_id ? profById.get(t.responsable_principal_id) : null;
+                  const siguientes = siguientesEstados(String(t.estado_general));
 
                   return (
                     <button
@@ -530,13 +680,13 @@ export default function Trabajos() {
 
                       {t.fecha_compromiso && (
                         <div className="mt-1 text-[11px] text-muted-foreground">
-                          Fecha: {t.fecha_compromiso}
+                          Fecha programada: {t.fecha_compromiso}
                         </div>
                       )}
 
-                      {siguientesEstados(String(t.estado_general)).length > 0 && (
+                      {siguientes.length > 0 && (
                         <div className="mt-3 grid grid-cols-1 gap-1">
-                          {siguientesEstados(String(t.estado_general)).map((estadoSiguiente) => {
+                          {siguientes.map((estadoSiguiente) => {
                             const e = ESTADOS.find((x) => x.key === estadoSiguiente);
                             if (!e) return null;
 
@@ -690,12 +840,15 @@ export default function Trabajos() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Fecha compromiso</Label>
+                <Label>Fecha programada</Label>
                 <Input
                   type="date"
-                  value={form.fecha_compromiso}
-                  onChange={(e) => setForm((f) => ({ ...f, fecha_compromiso: e.target.value }))}
+                  value={form.fecha_programada}
+                  onChange={(e) => setForm((f) => ({ ...f, fecha_programada: e.target.value }))}
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  Obligatoria para pasar a Programado o Iniciado.
+                </p>
               </div>
             </div>
 
@@ -710,11 +863,12 @@ export default function Trabajos() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Próxima acción</Label>
-              <Input
-                value={form.proxima_accion}
-                onChange={(e) => setForm((f) => ({ ...f, proxima_accion: e.target.value }))}
-                placeholder="Ej: Coordinar visita, pedir repuesto, esperar aprobación..."
+              <Label>Observación interna</Label>
+              <Textarea
+                value={form.observacion}
+                onChange={(e) => setForm((f) => ({ ...f, observacion: e.target.value }))}
+                rows={2}
+                placeholder="Notas, repuestos pendientes, indicaciones para el técnico..."
               />
             </div>
 
@@ -731,13 +885,23 @@ export default function Trabajos() {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenForm(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={guardar}>
-              {editing ? "Guardar cambios" : "Crear trabajo"}
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <div>
+              {editing && (
+                <Button variant="destructive" onClick={eliminarTrabajo}>
+                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setOpenForm(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={guardar}>
+                {editing ? "Guardar cambios" : "Crear trabajo"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
