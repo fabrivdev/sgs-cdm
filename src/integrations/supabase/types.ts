@@ -241,6 +241,85 @@ export type Database = {
           },
         ]
       }
+      jornadas: {
+        Row: {
+          actividad_realizada: string | null
+          actualizado_en: string
+          creado_en: string
+          creado_por: string | null
+          estado_jornada: Database["public"]["Enums"]["estado_jornada"]
+          evidencia_urls: string[]
+          fecha_real: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          horas_reales: number | null
+          id: string
+          observaciones: string | null
+          programacion_id: string | null
+          resultado: string | null
+          tecnico_id: string
+          trabajo_id: string
+        }
+        Insert: {
+          actividad_realizada?: string | null
+          actualizado_en?: string
+          creado_en?: string
+          creado_por?: string | null
+          estado_jornada?: Database["public"]["Enums"]["estado_jornada"]
+          evidencia_urls?: string[]
+          fecha_real: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          horas_reales?: number | null
+          id?: string
+          observaciones?: string | null
+          programacion_id?: string | null
+          resultado?: string | null
+          tecnico_id: string
+          trabajo_id: string
+        }
+        Update: {
+          actividad_realizada?: string | null
+          actualizado_en?: string
+          creado_en?: string
+          creado_por?: string | null
+          estado_jornada?: Database["public"]["Enums"]["estado_jornada"]
+          evidencia_urls?: string[]
+          fecha_real?: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          horas_reales?: number | null
+          id?: string
+          observaciones?: string | null
+          programacion_id?: string | null
+          resultado?: string | null
+          tecnico_id?: string
+          trabajo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jornadas_programacion_id_fkey"
+            columns: ["programacion_id"]
+            isOneToOne: false
+            referencedRelation: "programaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jornadas_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jornadas_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos_horas"
+            referencedColumns: ["trabajo_id"]
+          },
+        ]
+      }
       parque_maquinas: {
         Row: {
           activo: boolean
@@ -336,6 +415,79 @@ export type Database = {
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
         Relationships: []
+      }
+      programaciones: {
+        Row: {
+          accion_programada: string | null
+          actualizado_en: string
+          auxiliares: string[]
+          creado_en: string
+          creado_por: string | null
+          estado: Database["public"]["Enums"]["estado_programacion"]
+          fecha_programada: string
+          horas_estimadas: number | null
+          id: string
+          motivo_reprogramacion: string | null
+          observacion: string | null
+          reemplaza_a: string | null
+          tecnico_principal_id: string | null
+          trabajo_id: string
+        }
+        Insert: {
+          accion_programada?: string | null
+          actualizado_en?: string
+          auxiliares?: string[]
+          creado_en?: string
+          creado_por?: string | null
+          estado?: Database["public"]["Enums"]["estado_programacion"]
+          fecha_programada: string
+          horas_estimadas?: number | null
+          id?: string
+          motivo_reprogramacion?: string | null
+          observacion?: string | null
+          reemplaza_a?: string | null
+          tecnico_principal_id?: string | null
+          trabajo_id: string
+        }
+        Update: {
+          accion_programada?: string | null
+          actualizado_en?: string
+          auxiliares?: string[]
+          creado_en?: string
+          creado_por?: string | null
+          estado?: Database["public"]["Enums"]["estado_programacion"]
+          fecha_programada?: string
+          horas_estimadas?: number | null
+          id?: string
+          motivo_reprogramacion?: string | null
+          observacion?: string | null
+          reemplaza_a?: string | null
+          tecnico_principal_id?: string | null
+          trabajo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programaciones_reemplaza_a_fkey"
+            columns: ["reemplaza_a"]
+            isOneToOne: false
+            referencedRelation: "programaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programaciones_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programaciones_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos_horas"
+            referencedColumns: ["trabajo_id"]
+          },
+        ]
       }
       seguimiento_comercial: {
         Row: {
@@ -515,6 +667,114 @@ export type Database = {
           },
         ]
       }
+      trabajo_historial: {
+        Row: {
+          creado_en: string
+          id: string
+          payload: Json
+          tipo_evento: Database["public"]["Enums"]["tipo_evento_historial"]
+          trabajo_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          creado_en?: string
+          id?: string
+          payload?: Json
+          tipo_evento: Database["public"]["Enums"]["tipo_evento_historial"]
+          trabajo_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          creado_en?: string
+          id?: string
+          payload?: Json
+          tipo_evento?: Database["public"]["Enums"]["tipo_evento_historial"]
+          trabajo_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trabajo_historial_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trabajo_historial_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos_horas"
+            referencedColumns: ["trabajo_id"]
+          },
+        ]
+      }
+      trabajos: {
+        Row: {
+          actualizado_en: string
+          cerrado_en: string | null
+          cerrado_por: string | null
+          cliente_id: string | null
+          creado_en: string
+          creado_por: string | null
+          descripcion_problema: string
+          estado_general: Database["public"]["Enums"]["estado_trabajo"]
+          fecha_compromiso: string | null
+          id: string
+          legacy_servicio_id: string | null
+          maquina_id: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          motivo_bloqueo: string | null
+          prioridad: Database["public"]["Enums"]["prioridad_trabajo"]
+          proxima_accion: string | null
+          responsable_principal_id: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_trabajo: Database["public"]["Enums"]["tipo_trabajo"]
+        }
+        Insert: {
+          actualizado_en?: string
+          cerrado_en?: string | null
+          cerrado_por?: string | null
+          cliente_id?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          descripcion_problema: string
+          estado_general?: Database["public"]["Enums"]["estado_trabajo"]
+          fecha_compromiso?: string | null
+          id?: string
+          legacy_servicio_id?: string | null
+          maquina_id?: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          motivo_bloqueo?: string | null
+          prioridad?: Database["public"]["Enums"]["prioridad_trabajo"]
+          proxima_accion?: string | null
+          responsable_principal_id?: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_trabajo?: Database["public"]["Enums"]["tipo_trabajo"]
+        }
+        Update: {
+          actualizado_en?: string
+          cerrado_en?: string | null
+          cerrado_por?: string | null
+          cliente_id?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          descripcion_problema?: string
+          estado_general?: Database["public"]["Enums"]["estado_trabajo"]
+          fecha_compromiso?: string | null
+          id?: string
+          legacy_servicio_id?: string | null
+          maquina_id?: string | null
+          marca?: Database["public"]["Enums"]["marca"]
+          motivo_bloqueo?: string | null
+          prioridad?: Database["public"]["Enums"]["prioridad_trabajo"]
+          proxima_accion?: string | null
+          responsable_principal_id?: string | null
+          sucursal?: Database["public"]["Enums"]["sucursal"]
+          tipo_trabajo?: Database["public"]["Enums"]["tipo_trabajo"]
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           creado_en: string
@@ -538,6 +798,14 @@ export type Database = {
       }
     }
     Views: {
+      trabajos_horas: {
+        Row: {
+          horas_reales_total: number | null
+          jornadas_count: number | null
+          trabajo_id: string | null
+        }
+        Relationships: []
+      }
       v_clientes_resumen: {
         Row: {
           antiguedad: number | null
@@ -599,8 +867,24 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "cabecilla" | "tecnico"
+      estado_jornada: "en_curso" | "completada" | "incompleta"
+      estado_programacion:
+        | "programada"
+        | "cumplida"
+        | "reprogramada"
+        | "cancelada"
       estado_servicio: "Pendiente" | "Iniciado" | "Completado"
+      estado_trabajo:
+        | "nuevo"
+        | "pendiente_diagnostico"
+        | "pendiente_programar"
+        | "programado"
+        | "en_ejecucion"
+        | "bloqueado"
+        | "terminado_pendiente_validar"
+        | "cerrado"
       marca: "CLAAS" | "HORSCH" | "OTROS"
+      prioridad_trabajo: "baja" | "media" | "alta" | "urgente"
       resultado_seguimiento:
         | "Contactado"
         | "No contesta"
@@ -624,6 +908,17 @@ export type Database = {
         | "Misiones"
         | "Loma Plata"
         | "Katuete"
+      tipo_evento_historial:
+        | "creacion"
+        | "cambio_estado"
+        | "cambio_responsable"
+        | "programacion_creada"
+        | "programacion_actualizada"
+        | "reprogramacion"
+        | "jornada_creada"
+        | "jornada_actualizada"
+        | "cierre"
+        | "observacion"
       tipo_facturacion: "Repuesto" | "Servicio"
       tipo_importacion: "parque" | "facturacion"
       tipo_trabajo: "Visita de campo" | "Máquina en taller"
@@ -755,8 +1050,26 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "cabecilla", "tecnico"],
+      estado_jornada: ["en_curso", "completada", "incompleta"],
+      estado_programacion: [
+        "programada",
+        "cumplida",
+        "reprogramada",
+        "cancelada",
+      ],
       estado_servicio: ["Pendiente", "Iniciado", "Completado"],
+      estado_trabajo: [
+        "nuevo",
+        "pendiente_diagnostico",
+        "pendiente_programar",
+        "programado",
+        "en_ejecucion",
+        "bloqueado",
+        "terminado_pendiente_validar",
+        "cerrado",
+      ],
       marca: ["CLAAS", "HORSCH", "OTROS"],
+      prioridad_trabajo: ["baja", "media", "alta", "urgente"],
       resultado_seguimiento: [
         "Contactado",
         "No contesta",
@@ -782,6 +1095,18 @@ export const Constants = {
         "Misiones",
         "Loma Plata",
         "Katuete",
+      ],
+      tipo_evento_historial: [
+        "creacion",
+        "cambio_estado",
+        "cambio_responsable",
+        "programacion_creada",
+        "programacion_actualizada",
+        "reprogramacion",
+        "jornada_creada",
+        "jornada_actualizada",
+        "cierre",
+        "observacion",
       ],
       tipo_facturacion: ["Repuesto", "Servicio"],
       tipo_importacion: ["parque", "facturacion"],
