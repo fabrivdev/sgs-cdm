@@ -553,10 +553,15 @@ export default function Trabajos() {
 
       if (error) throw error;
 
+      const trabajoActualizado: Trabajo = {
+        ...(data as Trabajo),
+        estado_general: estado,
+      };
+
       if (estado === "pendiente") {
-        await quitarDelPlanificador(data as Trabajo);
+        await quitarDelPlanificador(trabajoActualizado);
       } else {
-        await sincronizarConPlanificador(data as Trabajo);
+        await sincronizarConPlanificador(trabajoActualizado);
       }
 
       load();
