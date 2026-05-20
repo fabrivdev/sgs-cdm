@@ -1,0 +1,221 @@
+import { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MARCAS, SUCURSALES, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
+import { PRIORIDADES, type Prioridad } from "@/lib/trabajos";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
+interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
+
+interface Props {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  clientes: Cliente[];
+  tecnicos: Profile[];
+  trabajo?: any | null;
+  onSaved: () => void;
+}
+
+export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, trabajo, onSaved }: Props) {
+  const { user, profile } = useAuth();
+  const editing = !!trabajo;
+
+  const [form, setForm] = useState({
+    cliente_id: "",
+    cliente_text: "",
+    marca: "CLAAS" as Marca,
+    sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
+    tipo_trabajo: "Visita de campo" as TipoTrabajo,
+    descripcion_problema: "",
+    prioridad: "media" as Prioridad,
+    fecha_compromiso: "",
+    responsable_principal_id: "",
+    proxima_accion: "",
+  });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      if (trabajo) {
+        const cli = clientes.find(c => c.id === trabajo.cliente_id);
+        setForm({
+          cliente_id: trabajo.cliente_id ?? "",
+          cliente_text: cli?.nombre ?? "",
+          marca: trabajo.marca,
+          sucursal: trabajo.sucursal,
+          tipo_trabajo: trabajo.tipo_trabajo,
+          descripcion_problema: trabajo.descripcion_problema,
+          prioridad: trabajo.prioridad,
+          fecha_compromiso: trabajo.fecha_compromiso ?? "",
+          responsable_principal_id: trabajo.responsable_principal_id ?? "",
+          proxima_accion: trabajo.proxima_accion ?? "",
+        });
+      } else {
+        setForm({
+          cliente_id: "", cliente_text: "", marca: "CLAAS",
+          sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
+          tipo_trabajo: "Visita de campo", descripcion_problema: "",
+          prioridad: "media", fecha_compromiso: "", responsable_principal_id: "",
+          proxima_accion: "",
+        });
+      }
+    }
+  }, [open, trabajo]);
+
+  const guardar = async () => {
+    if (!form.descripcion_problema.trim()) {
+      toast.error("Cargá el problema o trabajo a resolver");
+      return;
+    }
+    setBusy(true);
+    try {
+      let clienteId: string | null = form.cliente_id || null;
+      if (!clienteId && form.cliente_text.trim()) {
+        const ex = clientes.find(c => c.nombre.toLowerCase() === form.cliente_text.trim().toLowerCase());
+        if (ex) clienteId = ex.id;
+        else {
+          const { data, error } = await supabase.from("clientes")
+            .insert({ nombre: form.cliente_text.trim(), sucursal: form.sucursal })
+            .select("id").single();
+          if (error) throw error;
+          clienteId = data.id;
+        }
+      }
+      const payload: any = {
+        cliente_id: clienteId,
+        marca: form.marca,
+        sucursal: form.sucursal,
+        tipo_trabajo: form.tipo_trabajo,
+        descripcion_problema: form.descripcion_problema.trim(),
+        prioridad: form.prioridad,
+        fecha_compromiso: form.fecha_compromiso || null,
+        responsable_principal_id: form.responsable_principal_id || null,
+        proxima_accion: form.proxima_accion.trim() || null,
+      };
+      if (editing) {
+        const { error } = await supabase.from("trabajos").update(payload).eq("id", trabajo.id);
+        if (error) throw error;
+      } else {
+        payload.creado_por = user?.id;
+        payload.estado_general = "nuevo";
+        const { error } = await supabase.from("trabajos").insert(payload);
+        if (error) throw error;
+      }
+      toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
+      onSaved();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo guardar");
+    } finally { setBusy(false); }
+  };
+
+  const clientesFiltrados = (() => {
+    const q = form.cliente_text.trim().toLowerCase();
+    if (!q) return clientes.slice(0, 100);
+    return clientes.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 100);
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editing ? "Editar trabajo" : "Nuevo trabajo"}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <div className="space-y-1.5">
+            <Label>Cliente</Label>
+            <Input
+              list="clientes-nuevotrabajo"
+              value={form.cliente_text}
+              onChange={(e) => {
+                const v = e.target.value;
+                const m = clientes.find(c => c.nombre.toLowerCase() === v.toLowerCase());
+                setForm(f => ({ ...f, cliente_text: v, cliente_id: m?.id ?? "" }));
+              }}
+              placeholder="Buscar o escribir cliente..."
+            />
+            <datalist id="clientes-nuevotrabajo">
+              {clientesFiltrados.map(c => <option key={c.id} value={c.nombre} />)}
+            </datalist>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Sucursal">
+              <Select value={form.sucursal} onValueChange={(v) => setForm(f => ({ ...f, sucursal: v as Sucursal }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{SUCURSALES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field label="Marca">
+              <Select value={form.marca} onValueChange={(v) => setForm(f => ({ ...f, marca: v as Marca }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{MARCAS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field label="Tipo">
+              <Select value={form.tipo_trabajo} onValueChange={(v) => setForm(f => ({ ...f, tipo_trabajo: v as TipoTrabajo }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Visita de campo">Visita de campo</SelectItem>
+                  <SelectItem value="Máquina en taller">Máquina en taller</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Prioridad">
+              <Select value={form.prioridad} onValueChange={(v) => setForm(f => ({ ...f, prioridad: v as Prioridad }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{PRIORIDADES.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field label="Responsable principal">
+              <Select
+                value={form.responsable_principal_id || "none"}
+                onValueChange={(v) => setForm(f => ({ ...f, responsable_principal_id: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="none">— Sin asignar —</SelectItem>
+                  {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}{t.sucursal ? ` · ${t.sucursal}` : ""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Fecha compromiso">
+              <Input type="date" value={form.fecha_compromiso}
+                onChange={(e) => setForm(f => ({ ...f, fecha_compromiso: e.target.value }))} />
+            </Field>
+          </div>
+
+          <Field label="Trabajo o problema a resolver">
+            <Textarea rows={4} value={form.descripcion_problema}
+              onChange={(e) => setForm(f => ({ ...f, descripcion_problema: e.target.value }))} />
+          </Field>
+          <Field label="Próxima acción (opcional)">
+            <Textarea rows={2} value={form.proxima_accion}
+              onChange={(e) => setForm(f => ({ ...f, proxima_accion: e.target.value }))}
+              placeholder="Qué hay que hacer a continuación..." />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancelar</Button>
+          <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : (editing ? "Guardar" : "Crear trabajo")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
