@@ -365,7 +365,7 @@ export default function Planificador() {
       </div>
 
       <FiltersBar
-        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar cliente…" }}
+        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar TR-000123 o cliente…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} servicio${displayed.length !== 1 ? "s" : ""}`}
