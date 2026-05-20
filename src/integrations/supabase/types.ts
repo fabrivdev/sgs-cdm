@@ -728,6 +728,7 @@ export type Database = {
           cerrado_en: string | null
           cerrado_por: string | null
           cliente_id: string | null
+          codigo: string | null
           creado_en: string
           creado_por: string | null
           descripcion_problema: string
@@ -738,6 +739,7 @@ export type Database = {
           maquina_id: string | null
           marca: Database["public"]["Enums"]["marca"]
           motivo_bloqueo: string | null
+          numero: number
           prioridad: Database["public"]["Enums"]["prioridad_trabajo"]
           proxima_accion: string | null
           responsable_principal_id: string | null
@@ -749,6 +751,7 @@ export type Database = {
           cerrado_en?: string | null
           cerrado_por?: string | null
           cliente_id?: string | null
+          codigo?: string | null
           creado_en?: string
           creado_por?: string | null
           descripcion_problema: string
@@ -759,6 +762,7 @@ export type Database = {
           maquina_id?: string | null
           marca: Database["public"]["Enums"]["marca"]
           motivo_bloqueo?: string | null
+          numero?: number
           prioridad?: Database["public"]["Enums"]["prioridad_trabajo"]
           proxima_accion?: string | null
           responsable_principal_id?: string | null
@@ -770,6 +774,7 @@ export type Database = {
           cerrado_en?: string | null
           cerrado_por?: string | null
           cliente_id?: string | null
+          codigo?: string | null
           creado_en?: string
           creado_por?: string | null
           descripcion_problema?: string
@@ -780,6 +785,7 @@ export type Database = {
           maquina_id?: string | null
           marca?: Database["public"]["Enums"]["marca"]
           motivo_bloqueo?: string | null
+          numero?: number
           prioridad?: Database["public"]["Enums"]["prioridad_trabajo"]
           proxima_accion?: string | null
           responsable_principal_id?: string | null
