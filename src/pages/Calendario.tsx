@@ -262,8 +262,8 @@ export default function Calendario() {
   const estadoColor = (e: Estado) =>
     e === "Completado"
       ? "bg-estado-completado text-white"
-      : e === "Iniciado"
-      ? "bg-estado-iniciado text-white"
+      : e === "Cancelada"
+      ? "bg-muted text-muted-foreground"
       : "bg-estado-pendiente text-white";
 
   const canCreate = isAdmin || isCabecilla;
