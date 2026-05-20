@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CalendarPlus, ClipboardList, Pencil, Trash2 } from "lucide-react";
-import { ESTADOS_TRABAJO, ESTADOS_PROGRAMACION, ESTADOS_JORNADA, PRIORIDADES, prioridadBadge, type EstadoTrabajo } from "@/lib/trabajos";
+import { ESTADOS_TRABAJO, ESTADOS_PROGRAMACION, ESTADOS_JORNADA, PRIORIDADES, prioridadBadge, type EstadoTrabajo, siguientesEstadosTrabajo, estadoTrabajoLabel, normalizarEstadoTrabajo } from "@/lib/trabajos";
 import { ProgramarIntervencionDialog } from "./ProgramarIntervencionDialog";
 import { CargarJornadaDialog } from "./CargarJornadaDialog";
 import { NuevoTrabajoDialog } from "./NuevoTrabajoDialog";
@@ -60,24 +60,87 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, tecnic
   const horasTotal = useMemo(() => jornadas.reduce((a, j) => a + (Number(j.horas_reales) || 0), 0), [jornadas]);
   const puedeCerrar = isAdmin || isCabecilla;
 
+  const estadoServicio = (estado: EstadoTrabajo) => {
+    if (estado === "completado") return "Completado";
+    if (estado === "iniciado") return "Iniciado";
+    return "Pendiente";
+  };
+
+  const quitarDelPlanificador = async () => {
+    if (!trabajo?.legacy_servicio_id) return;
+
+    await supabase.from("servicio_jornadas").delete().eq("servicio_id", trabajo.legacy_servicio_id);
+    await supabase.from("servicios").delete().eq("id", trabajo.legacy_servicio_id);
+
+    await supabase
+      .from("trabajos")
+      .update({
+        legacy_servicio_id: null,
+        fecha_compromiso: null,
+      })
+      .eq("id", trabajo.id);
+  };
+
   const cambiarEstado = async (nuevo: EstadoTrabajo) => {
     if (!trabajo) return;
-    if (nuevo === "cerrado" && trabajo.estado_general !== "terminado_pendiente_validar") {
-      toast.error("Primero pasá el trabajo a 'Terminado pendiente validar'");
-      return;
+
+    if (nuevo === "programado") {
+      const tieneProgramacionActiva = programaciones.some((p) => p.estado === "programada");
+      if (!tieneProgramacionActiva) {
+        toast.error("Primero programá una intervención con fecha y técnico.");
+        setProgramOpen(true);
+        return;
+      }
     }
-    const patch: any = { estado_general: nuevo };
-    if (nuevo !== "bloqueado") patch.motivo_bloqueo = null;
-    const { error } = await supabase.from("trabajos").update(patch).eq("id", trabajo.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Estado actualizado");
-    cargar();
-    onChanged();
+
+    try {
+      if (nuevo === "pendiente") {
+        await quitarDelPlanificador();
+        await supabase
+          .from("programaciones")
+          .update({ estado: "cancelada" })
+          .eq("trabajo_id", trabajo.id)
+          .eq("estado", "programada");
+      }
+
+      const patch: any = {
+        estado_general: nuevo,
+        cerrado_en: nuevo === "completado" ? new Date().toISOString() : null,
+      };
+
+      if (nuevo !== "en_pausa") patch.motivo_bloqueo = null;
+
+      const { error } = await supabase.from("trabajos").update(patch).eq("id", trabajo.id);
+      if (error) throw error;
+
+      if (trabajo.legacy_servicio_id && nuevo !== "pendiente") {
+        await supabase
+          .from("servicios")
+          .update({ estado: estadoServicio(nuevo) })
+          .eq("id", trabajo.legacy_servicio_id);
+
+        await supabase
+          .from("servicio_jornadas")
+          .update({ estado: estadoServicio(nuevo) })
+          .eq("servicio_id", trabajo.legacy_servicio_id);
+      }
+
+      toast.success(`Estado actualizado a ${estadoTrabajoLabel(nuevo)}`);
+      cargar();
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo actualizar el estado");
+    }
   };
 
   const eliminar = async () => {
     if (!trabajo) return;
     if (!window.confirm("¿Eliminar este trabajo y toda su historia?")) return;
+    if (trabajo.legacy_servicio_id) {
+      await supabase.from("servicio_jornadas").delete().eq("servicio_id", trabajo.legacy_servicio_id);
+      await supabase.from("servicios").delete().eq("id", trabajo.legacy_servicio_id);
+    }
+
     const { error } = await supabase.from("trabajos").delete().eq("id", trabajo.id);
     if (error) { toast.error(error.message); return; }
     toast.success("Trabajo eliminado");
@@ -129,24 +192,27 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, tecnic
 
               <TabsContent value="resumen" className="space-y-3 pt-3">
                 <Row k="Estado">
-                  <Select value={trabajo.estado_general} onValueChange={(v) => cambiarEstado(v as EstadoTrabajo)}>
-                    <SelectTrigger className="h-8 w-auto text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ESTADOS_TRABAJO.map(e => (
-                        <SelectItem key={e.key} value={e.key}
-                          disabled={e.key === "cerrado" && (!puedeCerrar || trabajo.estado_general !== "terminado_pendiente_validar")}>
-                          {e.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Badge variant="outline">{estadoTrabajoLabel(trabajo.estado_general)}</Badge>
+                    {siguientesEstadosTrabajo(trabajo.estado_general).map((estadoSiguiente) => (
+                      <Button
+                        key={estadoSiguiente}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => cambiarEstado(estadoSiguiente)}
+                      >
+                        Pasar a {estadoTrabajoLabel(estadoSiguiente)}
+                      </Button>
+                    ))}
+                  </div>
                 </Row>
                 <Row k="Tipo">{trabajo.tipo_trabajo}</Row>
                 <Row k="Responsable principal">{trabajo.responsable_principal_id ? profileMap.get(trabajo.responsable_principal_id)?.nombre ?? "—" : "—"}</Row>
                 <Row k="Fecha compromiso">{trabajo.fecha_compromiso ?? "—"}</Row>
                 <Row k="Horas reales acumuladas">{horasTotal} hs</Row>
-                {trabajo.motivo_bloqueo && <Row k="Motivo de bloqueo">{trabajo.motivo_bloqueo}</Row>}
-                {trabajo.proxima_accion && <Row k="Próxima acción">{trabajo.proxima_accion}</Row>}
+                {trabajo.motivo_bloqueo && <Row k="Motivo de pausa">{trabajo.motivo_bloqueo}</Row>}
+                {trabajo.proxima_accion && <Row k="Observación interna">{trabajo.proxima_accion}</Row>}
                 <div>
                   <div className="text-xs text-muted-foreground">Problema</div>
                   <div className="rounded-md bg-muted/40 p-2 text-sm">{trabajo.descripcion_problema}</div>
