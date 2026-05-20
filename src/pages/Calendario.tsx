@@ -102,16 +102,24 @@ export default function Calendario() {
   const [openForm, setOpenForm] = useState(false);
   const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
 
+  const [codigoByServicio, setCodigoByServicio] = useState<Map<string, string>>(new Map());
+
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli, { data: trabs }] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("dias_no_laborales").select("id, fecha, motivo"),
         cargarTodosLosClientes(),
+        supabase.from("trabajos").select("codigo, legacy_servicio_id"),
       ]);
+      const codMap = new Map<string, string>();
+      for (const t of (trabs ?? []) as any[]) {
+        if (t.legacy_servicio_id && t.codigo) codMap.set(t.legacy_servicio_id, t.codigo);
+      }
+      setCodigoByServicio(codMap);
 
       const serviciosBase = (srv ?? []) as Servicio[];
       const jornadas = (jor ?? []) as Array<{
