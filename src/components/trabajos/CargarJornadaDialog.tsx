@@ -44,9 +44,13 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         tecnico_id: user?.id ?? "",
         programacion_id: programaciones[0]?.id ?? "",
         fecha_real: new Date().toISOString().slice(0, 10),
-        hora_inicio: "", hora_fin: "", horas_reales: "",
-        actividad_realizada: "", resultado: "",
-        estado_jornada: "completada", observaciones: "",
+        hora_inicio: "",
+        hora_fin: "",
+        horas_reales: "",
+        actividad_realizada: "",
+        resultado: "",
+        estado_jornada: "completada",
+        observaciones: "",
       });
     }
   }, [open, user?.id, programaciones]);
@@ -60,10 +64,122 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
     });
   };
 
+  const syncLegacyServicio = async (trabajo: any, estadoServicio: "Pendiente" | "Iniciado" | "Completado") => {
+    if (!trabajo?.legacy_servicio_id) return;
+
+    await supabase
+      .from("servicios")
+      .update({
+        estado: estadoServicio,
+        horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
+        observaciones: form.resultado.trim() || form.observaciones.trim() || null,
+      })
+      .eq("id", trabajo.legacy_servicio_id);
+
+    // Actualiza la jornada legacy de la misma fecha si existe.
+    const { data: legacyJornada } = await supabase
+      .from("servicio_jornadas")
+      .select("id")
+      .eq("servicio_id", trabajo.legacy_servicio_id)
+      .eq("fecha", form.fecha_real)
+      .maybeSingle();
+
+    if (legacyJornada?.id) {
+      await supabase
+        .from("servicio_jornadas")
+        .update({
+          estado: estadoServicio,
+          horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
+          observaciones: form.resultado.trim() || form.observaciones.trim() || null,
+        })
+        .eq("id", legacyJornada.id);
+    } else {
+      await supabase
+        .from("servicio_jornadas")
+        .insert({
+          servicio_id: trabajo.legacy_servicio_id,
+          fecha: form.fecha_real,
+          estado: estadoServicio,
+          horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
+          observaciones: form.resultado.trim() || form.observaciones.trim() || null,
+        });
+    }
+  };
+
+  const actualizarEstadoTrabajo = async () => {
+    const { data: trabajo, error: errTrabajo } = await supabase
+      .from("trabajos")
+      .select("id, legacy_servicio_id")
+      .eq("id", trabajoId)
+      .single();
+
+    if (errTrabajo) throw errTrabajo;
+
+    // Si hubo jornada real, la programación ya no debe quedar como "programada".
+    // Aunque la jornada sea incompleta, esa visita ya ocurrió.
+    if (form.programacion_id && ["completada", "incompleta"].includes(form.estado_jornada)) {
+      const { error } = await supabase
+        .from("programaciones")
+        .update({ estado: "cumplida" })
+        .eq("id", form.programacion_id);
+
+      if (error) throw error;
+    }
+
+    const { data: programacionesActivas, error: errProg } = await supabase
+      .from("programaciones")
+      .select("id")
+      .eq("trabajo_id", trabajoId)
+      .eq("estado", "programada");
+
+    if (errProg) throw errProg;
+
+    const quedanProgramadas = (programacionesActivas ?? []).length > 0;
+
+    let nuevoEstadoTrabajo: "iniciado" | "en_pausa" | "completado";
+
+    if (form.estado_jornada === "en_curso") {
+      nuevoEstadoTrabajo = "iniciado";
+    } else if (form.estado_jornada === "incompleta") {
+      nuevoEstadoTrabajo = "en_pausa";
+    } else {
+      nuevoEstadoTrabajo = quedanProgramadas ? "iniciado" : "completado";
+    }
+
+    const { error: errUpdateTrabajo } = await supabase
+      .from("trabajos")
+      .update({
+        estado_general: nuevoEstadoTrabajo,
+        cerrado_en: nuevoEstadoTrabajo === "completado" ? new Date().toISOString() : null,
+        cerrado_por: nuevoEstadoTrabajo === "completado" ? user?.id : null,
+      })
+      .eq("id", trabajoId);
+
+    if (errUpdateTrabajo) throw errUpdateTrabajo;
+
+    const estadoLegacy =
+      nuevoEstadoTrabajo === "completado"
+        ? "Completado"
+        : nuevoEstadoTrabajo === "iniciado"
+        ? "Iniciado"
+        : "Pendiente";
+
+    await syncLegacyServicio(trabajo, estadoLegacy);
+  };
+
   const guardar = async () => {
-    if (!form.tecnico_id) { toast.error("Seleccioná el técnico"); return; }
-    if (!form.fecha_real) { toast.error("Fecha requerida"); return; }
+    if (!form.tecnico_id) {
+      toast.error("Seleccioná el técnico");
+      return;
+    }
+
+    if (!form.fecha_real) {
+      toast.error("Fecha requerida");
+      return;
+    }
+
     setBusy(true);
+
     try {
       const { error } = await supabase.from("jornadas").insert({
         trabajo_id: trabajoId,
@@ -79,74 +195,20 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         observaciones: form.observaciones.trim() || null,
         creado_por: user?.id,
       });
+
       if (error) throw error;
 
-      // Si la jornada está completada y vincula una programación, marcarla cumplida
-      if (form.estado_jornada === "completada" && form.programacion_id) {
-        await supabase.from("programaciones").update({ estado: "cumplida" }).eq("id", form.programacion_id);
-      }
-
-      const { data: trabajo } = await supabase
-        .from("trabajos")
-        .select("id, estado_general, legacy_servicio_id")
-        .eq("id", trabajoId)
-        .single();
-
-      const { data: programacionesRestantes } = await supabase
-        .from("programaciones")
-        .select("id, estado")
-        .eq("trabajo_id", trabajoId);
-
-      const quedanProgramadas = (programacionesRestantes ?? []).some((p: any) => p.estado === "programada");
-
-      const nuevoEstadoTrabajo =
-        form.estado_jornada === "completada" && !quedanProgramadas
-          ? "completado"
-          : "iniciado";
-
-      await supabase
-        .from("trabajos")
-        .update({
-          estado_general: nuevoEstadoTrabajo,
-          cerrado_en: nuevoEstadoTrabajo === "completado" ? new Date().toISOString() : null,
-          cerrado_por: nuevoEstadoTrabajo === "completado" ? user?.id : null,
-        })
-        .eq("id", trabajoId);
-
-      if (trabajo?.legacy_servicio_id) {
-        const estadoServicio =
-          nuevoEstadoTrabajo === "completado"
-            ? "Completado"
-            : nuevoEstadoTrabajo === "iniciado"
-            ? "Iniciado"
-            : "Pendiente";
-
-        await supabase
-          .from("servicios")
-          .update({
-            estado: estadoServicio,
-            horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
-            observaciones: form.resultado.trim() || form.observaciones.trim() || null,
-          })
-          .eq("id", trabajo.legacy_servicio_id);
-
-        await supabase
-          .from("servicio_jornadas")
-          .update({
-            estado: estadoServicio,
-            horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
-            observaciones: form.resultado.trim() || form.observaciones.trim() || null,
-          })
-          .eq("servicio_id", trabajo.legacy_servicio_id)
-          .eq("fecha", form.fecha_real);
-      }
+      await actualizarEstadoTrabajo();
 
       toast.success("Jornada cargada");
       onSaved();
       onOpenChange(false);
     } catch (e: any) {
+      console.error(e);
       toast.error(e?.message ?? "No se pudo guardar la jornada");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -155,32 +217,35 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         <DialogHeader>
           <DialogTitle>Cargar jornada / parte de trabajo</DialogTitle>
         </DialogHeader>
+
         <div className="grid gap-3">
           <div className="space-y-1.5">
             <Label>Técnico</Label>
             <Select value={form.tecnico_id} onValueChange={(v) => setForm(f => ({ ...f, tecnico_id: v }))}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
-                {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)}
+                {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}{t.sucursal ? ` · ${t.sucursal}` : ""}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
+
           {programaciones.length > 0 && (
             <div className="space-y-1.5">
-              <Label>Vincular a programación</Label>
+              <Label>Vincular a agenda</Label>
               <Select value={form.programacion_id || "none"}
                 onValueChange={(v) => setForm(f => ({ ...f, programacion_id: v === "none" ? "" : v }))}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">— Sin programación —</SelectItem>
+                  <SelectItem value="none">— Sin agenda —</SelectItem>
                   {programaciones.map(p => <SelectItem key={p.id} value={p.id}>{p.fecha_programada}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           )}
+
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label>Fecha</Label>
+              <Label>Fecha real</Label>
               <Input type="date" value={form.fecha_real}
                 onChange={(e) => setForm(f => ({ ...f, fecha_real: e.target.value }))} />
             </div>
@@ -195,6 +260,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
                 onChange={(e) => onHoraChange("hora_fin", e.target.value)} />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Horas reales</Label>
@@ -202,7 +268,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
                 onChange={(e) => setForm(f => ({ ...f, horas_reales: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label>Resultado de la jornada</Label>
               <Select value={form.estado_jornada}
                 onValueChange={(v) => setForm(f => ({ ...f, estado_jornada: v as EstadoJornada }))}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -210,23 +276,27 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
               </Select>
             </div>
           </div>
+
           <div className="space-y-1.5">
             <Label>Actividad realizada</Label>
             <Textarea rows={2} value={form.actividad_realizada}
               onChange={(e) => setForm(f => ({ ...f, actividad_realizada: e.target.value }))} />
           </div>
+
           <div className="space-y-1.5">
-            <Label>Resultado</Label>
+            <Label>Resultado / qué falta</Label>
             <Textarea rows={2} value={form.resultado}
               onChange={(e) => setForm(f => ({ ...f, resultado: e.target.value }))}
               placeholder="¿Qué se resolvió? ¿Qué falta?" />
           </div>
+
           <div className="space-y-1.5">
             <Label>Observaciones</Label>
             <Textarea rows={2} value={form.observaciones}
               onChange={(e) => setForm(f => ({ ...f, observaciones: e.target.value }))} />
           </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancelar</Button>
           <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : "Cargar jornada"}</Button>
