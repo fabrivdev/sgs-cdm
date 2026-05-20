@@ -249,5 +249,5 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
     </ResponsiveDrawer>
   );
 
-  );
+
 }
