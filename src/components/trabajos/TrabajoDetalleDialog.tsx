@@ -60,6 +60,39 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, tecnic
   const horasTotal = useMemo(() => jornadas.reduce((a, j) => a + (Number(j.horas_reales) || 0), 0), [jornadas]);
   const puedeCerrar = isAdmin || isCabecilla;
 
+  const hoy = new Date(new Date().toDateString());
+
+  const jornadasPorProgramacion = useMemo(() => {
+    const map = new Map<string, any[]>();
+
+    for (const j of jornadas) {
+      if (!j.programacion_id) continue;
+      const arr = map.get(j.programacion_id) ?? [];
+      arr.push(j);
+      map.set(j.programacion_id, arr);
+    }
+
+    return map;
+  }, [jornadas]);
+
+  const programacionCumplidaPorJornada = (programacionId: string) => {
+    return (jornadasPorProgramacion.get(programacionId) ?? []).some(
+      (j) => j.estado_jornada === "completada",
+    );
+  };
+
+  const programacionVencida = (p: any) => {
+    if (p.estado !== "programada") return false;
+    if (programacionCumplidaPorJornada(p.id)) return false;
+
+    return new Date(`${p.fecha_programada}T00:00:00`) < hoy;
+  };
+
+  const estadoProgramacionVisual = (p: any) => {
+    if (programacionCumplidaPorJornada(p.id)) return "cumplida";
+    return p.estado;
+  };
+
   const estadoServicio = (estado: EstadoTrabajo) => {
     if (estado === "completado") return "Completado";
     if (estado === "iniciado") return "Iniciado";
@@ -185,7 +218,7 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, tecnic
             <Tabs defaultValue="resumen">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="resumen">Resumen</TabsTrigger>
-                <TabsTrigger value="programaciones">Programaciones ({programaciones.length})</TabsTrigger>
+                <TabsTrigger value="programaciones">Agenda ({programaciones.length})</TabsTrigger>
                 <TabsTrigger value="jornadas">Jornadas ({jornadas.length})</TabsTrigger>
                 <TabsTrigger value="historial">Historial</TabsTrigger>
               </TabsList>
@@ -230,41 +263,73 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, tecnic
               </TabsContent>
 
               <TabsContent value="programaciones" className="space-y-2 pt-3">
-                <div className="flex justify-end">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    Agenda = fechas previstas. Jornada = lo que realmente se hizo.
+                  </p>
                   <Button size="sm" onClick={() => { setReprog(null); setProgramOpen(true); }}>
                     <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Programar intervención
                   </Button>
                 </div>
-                {programaciones.length === 0 && <p className="text-xs text-muted-foreground">Sin programaciones.</p>}
-                {programaciones.map(p => (
-                  <div key={p.id} className="rounded-md border p-2.5 space-y-1 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="font-semibold">{p.fecha_programada}</div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="text-[10px]">{ESTADOS_PROGRAMACION.find(e => e.key === p.estado)?.label}</Badge>
-                        {p.estado === "programada" && (
-                          <Button variant="ghost" size="sm" className="h-7 text-[11px]"
-                            onClick={() => { setReprog({ id: p.id, fecha: p.fecha_programada, tecnico: p.tecnico_principal_id }); setProgramOpen(true); }}>
-                            Reprogramar
+
+                {programaciones.length === 0 && <p className="text-xs text-muted-foreground">Sin fechas agendadas.</p>}
+
+                {programaciones.map(p => {
+                  const estadoVisual = estadoProgramacionVisual(p);
+                  const vencida = programacionVencida(p);
+                  const jornadasVinculadas = jornadasPorProgramacion.get(p.id) ?? [];
+
+                  return (
+                    <div key={p.id} className="rounded-md border p-2.5 space-y-1 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <div className="font-semibold">{p.fecha_programada}</div>
+                          {vencida && (
+                            <Badge variant="destructive" className="mt-1 text-[10px]">
+                              Vencida sin jornada completada
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-[10px]">
+                            {ESTADOS_PROGRAMACION.find(e => e.key === estadoVisual)?.label ?? estadoVisual}
+                          </Badge>
+
+                          {estadoVisual === "programada" && (
+                            <Button variant="ghost" size="sm" className="h-7 text-[11px]"
+                              onClick={() => { setReprog({ id: p.id, fecha: p.fecha_programada, tecnico: p.tecnico_principal_id }); setProgramOpen(true); }}>
+                              Reprogramar
+                            </Button>
+                          )}
+
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => eliminarProgramacion(p.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => eliminarProgramacion(p.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        </div>
                       </div>
+
+                      <div className="text-xs text-muted-foreground">
+                        Técnico: <span className="text-foreground">{p.tecnico_principal_id ? profileMap.get(p.tecnico_principal_id)?.nombre ?? "—" : "—"}</span>
+                        {p.auxiliares?.length > 0 && <> · Aux: {p.auxiliares.map((a: string) => profileMap.get(a)?.nombre).filter(Boolean).join(", ")}</>}
+                        {p.horas_estimadas && <> · Estim: {p.horas_estimadas} hs</>}
+                      </div>
+
+                      {p.accion_programada && <div className="text-xs"><b>Trabajo previsto:</b> {p.accion_programada}</div>}
+                      {p.observacion && <div className="text-xs text-muted-foreground">{p.observacion}</div>}
+
+                      {jornadasVinculadas.length > 0 && (
+                        <div className="text-[11px] text-muted-foreground">
+                          Jornada vinculada: {jornadasVinculadas.map((j) => ESTADOS_JORNADA.find(e => e.key === j.estado_jornada)?.label ?? j.estado_jornada).join(", ")}
+                        </div>
+                      )}
+
+                      {p.motivo_reprogramacion && <div className="text-xs text-amber-700"><b>Reprogramada:</b> {p.motivo_reprogramacion}</div>}
+                      {p.reemplaza_a && <div className="text-[10px] text-muted-foreground">Reemplaza programación previa</div>}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Técnico: <span className="text-foreground">{p.tecnico_principal_id ? profileMap.get(p.tecnico_principal_id)?.nombre ?? "—" : "—"}</span>
-                      {p.auxiliares?.length > 0 && <> · Aux: {p.auxiliares.map((a: string) => profileMap.get(a)?.nombre).filter(Boolean).join(", ")}</>}
-                      {p.horas_estimadas && <> · Estim: {p.horas_estimadas} hs</>}
-                    </div>
-                    {p.accion_programada && <div className="text-xs"><b>Acción:</b> {p.accion_programada}</div>}
-                    {p.observacion && <div className="text-xs text-muted-foreground">{p.observacion}</div>}
-                    {p.motivo_reprogramacion && <div className="text-xs text-amber-700"><b>Reprogramada:</b> {p.motivo_reprogramacion}</div>}
-                    {p.reemplaza_a && <div className="text-[10px] text-muted-foreground">Reemplaza programación previa</div>}
-                  </div>
-                ))}
+                  );
+                })}
               </TabsContent>
 
               <TabsContent value="jornadas" className="space-y-2 pt-3">
