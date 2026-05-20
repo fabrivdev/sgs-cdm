@@ -28,8 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
 import { ESTADOS, ESTADO_LABELS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
