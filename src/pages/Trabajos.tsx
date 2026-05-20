@@ -221,16 +221,19 @@ export default function Trabajos() {
                             col.color,
                           )}
                         >
-                          <div className="flex items-start justify-between gap-1.5">
-                            <div className="truncate text-[12px] font-semibold leading-tight flex-1">
-                              {cli?.nombre ?? "Sin cliente"}
-                            </div>
-                            <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium", prioridadBadge(t.prioridad))}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="rounded bg-muted px-1 py-0 text-[9px] font-mono font-semibold text-muted-foreground tabular-nums">
+                              {t.codigo ?? "TR-—"}
+                            </span>
+                            <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium ml-auto", prioridadBadge(t.prioridad))}>
                               {prioLabel.charAt(0)}
                             </Badge>
                           </div>
+                          <div className="mt-0.5 truncate text-[12px] font-semibold leading-tight">
+                            {cli?.nombre ?? "Sin cliente"}
+                          </div>
 
-                          <div className="mt-1 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
+                          <div className="mt-0.5 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
                             {t.descripcion_problema}
                           </div>
 
