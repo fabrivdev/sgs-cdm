@@ -1,15 +1,58 @@
 export const ESTADOS_TRABAJO = [
-  { key: "nuevo", label: "Nuevo / Sin revisar", color: "bg-slate-100 border-slate-300" },
-  { key: "pendiente_diagnostico", label: "Pendiente de diagnóstico", color: "bg-amber-50 border-amber-200" },
-  { key: "pendiente_programar", label: "Pendiente de programar", color: "bg-orange-50 border-orange-200" },
+  { key: "pendiente", label: "Pendiente", color: "bg-amber-50 border-amber-200" },
   { key: "programado", label: "Programado", color: "bg-blue-50 border-blue-200" },
-  { key: "en_ejecucion", label: "En ejecución", color: "bg-emerald-50 border-emerald-200" },
-  { key: "bloqueado", label: "Bloqueado", color: "bg-red-50 border-red-200" },
-  { key: "terminado_pendiente_validar", label: "Terminado pendiente validar", color: "bg-violet-50 border-violet-200" },
-  { key: "cerrado", label: "Cerrado", color: "bg-green-50 border-green-200" },
+  { key: "iniciado", label: "Iniciado", color: "bg-emerald-50 border-emerald-200" },
+  { key: "en_pausa", label: "En pausa", color: "bg-slate-100 border-slate-300" },
+  { key: "completado", label: "Completado", color: "bg-green-50 border-green-200" },
 ] as const;
 
 export type EstadoTrabajo = (typeof ESTADOS_TRABAJO)[number]["key"];
+
+export function normalizarEstadoTrabajo(estado: string | null | undefined): EstadoTrabajo {
+  switch (estado) {
+    case "programado":
+      return "programado";
+    case "iniciado":
+    case "en_ejecucion":
+      return "iniciado";
+    case "en_pausa":
+    case "bloqueado":
+      return "en_pausa";
+    case "completado":
+    case "cerrado":
+    case "terminado_pendiente_validar":
+      return "completado";
+    case "pendiente":
+    case "nuevo":
+    case "pendiente_diagnostico":
+    case "pendiente_programar":
+    default:
+      return "pendiente";
+  }
+}
+
+export function siguientesEstadosTrabajo(estado: string | null | undefined): EstadoTrabajo[] {
+  const actual = normalizarEstadoTrabajo(estado);
+
+  switch (actual) {
+    case "pendiente":
+      return ["programado"];
+    case "programado":
+      return ["iniciado"];
+    case "iniciado":
+      return ["en_pausa", "completado"];
+    case "en_pausa":
+      return ["iniciado", "completado"];
+    case "completado":
+    default:
+      return [];
+  }
+}
+
+export function estadoTrabajoLabel(estado: string | null | undefined) {
+  const key = normalizarEstadoTrabajo(estado);
+  return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
+}
 
 export const PRIORIDADES = [
   { key: "baja", label: "Baja" },
