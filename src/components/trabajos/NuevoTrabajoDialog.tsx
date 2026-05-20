@@ -12,18 +12,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
-interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   clientes: Cliente[];
-  tecnicos: Profile[];
   trabajo?: any | null;
-  onSaved: () => void;
+  onSaved: (trabajoId?: string) => void;
 }
 
-export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, trabajo, onSaved }: Props) {
+/**
+ * Caso madre = solo registra el problema. NO se asignan fechas ni técnicos acá.
+ * Toda la programación se hace después desde el Planificador / Calendario.
+ */
+export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSaved }: Props) {
   const { user, profile } = useAuth();
   const editing = !!trabajo;
 
@@ -35,37 +37,28 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
     tipo_trabajo: "Visita de campo" as TipoTrabajo,
     descripcion_problema: "",
     prioridad: "media" as Prioridad,
-    fecha_compromiso: "",
-    responsable_principal_id: "",
-    proxima_accion: "",
   });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      if (trabajo) {
-        const cli = clientes.find(c => c.id === trabajo.cliente_id);
-        setForm({
-          cliente_id: trabajo.cliente_id ?? "",
-          cliente_text: cli?.nombre ?? "",
-          marca: trabajo.marca,
-          sucursal: trabajo.sucursal,
-          tipo_trabajo: trabajo.tipo_trabajo,
-          descripcion_problema: trabajo.descripcion_problema,
-          prioridad: trabajo.prioridad,
-          fecha_compromiso: trabajo.fecha_compromiso ?? "",
-          responsable_principal_id: trabajo.responsable_principal_id ?? "",
-          proxima_accion: trabajo.proxima_accion ?? "",
-        });
-      } else {
-        setForm({
-          cliente_id: "", cliente_text: "", marca: "CLAAS",
-          sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
-          tipo_trabajo: "Visita de campo", descripcion_problema: "",
-          prioridad: "media", fecha_compromiso: "", responsable_principal_id: "",
-          proxima_accion: "",
-        });
-      }
+    if (!open) return;
+    if (trabajo) {
+      const cli = clientes.find(c => c.id === trabajo.cliente_id);
+      setForm({
+        cliente_id: trabajo.cliente_id ?? "",
+        cliente_text: cli?.nombre ?? "",
+        marca: trabajo.marca,
+        sucursal: trabajo.sucursal,
+        tipo_trabajo: trabajo.tipo_trabajo,
+        descripcion_problema: trabajo.descripcion_problema,
+        prioridad: trabajo.prioridad,
+      });
+    } else {
+      setForm({
+        cliente_id: "", cliente_text: "", marca: "CLAAS",
+        sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
+        tipo_trabajo: "Visita de campo", descripcion_problema: "", prioridad: "media",
+      });
     }
   }, [open, trabajo]);
 
@@ -95,21 +88,21 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
         tipo_trabajo: form.tipo_trabajo,
         descripcion_problema: form.descripcion_problema.trim(),
         prioridad: form.prioridad,
-        fecha_compromiso: form.fecha_compromiso || null,
-        responsable_principal_id: form.responsable_principal_id || null,
-        proxima_accion: form.proxima_accion.trim() || null,
       };
+      let trabajoId: string | undefined;
       if (editing) {
         const { error } = await supabase.from("trabajos").update(payload).eq("id", trabajo.id);
         if (error) throw error;
+        trabajoId = trabajo.id;
       } else {
         payload.creado_por = user?.id;
         payload.estado_general = "pendiente";
-        const { error } = await supabase.from("trabajos").insert(payload);
+        const { data, error } = await supabase.from("trabajos").insert(payload).select("id").single();
         if (error) throw error;
+        trabajoId = data.id;
       }
       toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
-      onSaved();
+      onSaved(trabajoId);
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message ?? "No se pudo guardar");
@@ -127,6 +120,9 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar trabajo" : "Nuevo trabajo"}</DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            Sólo registrá el caso. La fecha y el técnico se asignan después desde el Planificador o Calendario.
+          </p>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="space-y-1.5">
@@ -174,32 +170,11 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
                 <SelectContent>{PRIORIDADES.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            <Field label="Responsable principal">
-              <Select
-                value={form.responsable_principal_id || "none"}
-                onValueChange={(v) => setForm(f => ({ ...f, responsable_principal_id: v === "none" ? "" : v }))}
-              >
-                <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
-                  <SelectItem value="none">— Sin asignar —</SelectItem>
-                  {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}{t.sucursal ? ` · ${t.sucursal}` : ""}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Fecha objetivo">
-              <Input type="date" value={form.fecha_compromiso}
-                onChange={(e) => setForm(f => ({ ...f, fecha_compromiso: e.target.value }))} />
-            </Field>
           </div>
 
           <Field label="Trabajo o problema a resolver">
             <Textarea rows={4} value={form.descripcion_problema}
               onChange={(e) => setForm(f => ({ ...f, descripcion_problema: e.target.value }))} />
-          </Field>
-          <Field label="Observación interna (opcional)">
-            <Textarea rows={2} value={form.proxima_accion}
-              onChange={(e) => setForm(f => ({ ...f, proxima_accion: e.target.value }))}
-              placeholder="Notas, repuestos pendientes o indicaciones internas..." />
           </Field>
         </div>
         <DialogFooter>

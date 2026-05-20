@@ -10,42 +10,15 @@ export type EstadoTrabajo = (typeof ESTADOS_TRABAJO)[number]["key"];
 
 export function normalizarEstadoTrabajo(estado: string | null | undefined): EstadoTrabajo {
   switch (estado) {
-    case "programado":
-      return "programado";
+    case "programado": return "programado";
     case "iniciado":
-    case "en_ejecucion":
-      return "iniciado";
+    case "en_ejecucion": return "iniciado";
     case "en_pausa":
-    case "bloqueado":
-      return "en_pausa";
+    case "bloqueado": return "en_pausa";
     case "completado":
     case "cerrado":
-    case "terminado_pendiente_validar":
-      return "completado";
-    case "pendiente":
-    case "nuevo":
-    case "pendiente_diagnostico":
-    case "pendiente_programar":
-    default:
-      return "pendiente";
-  }
-}
-
-export function siguientesEstadosTrabajo(estado: string | null | undefined): EstadoTrabajo[] {
-  const actual = normalizarEstadoTrabajo(estado);
-
-  switch (actual) {
-    case "pendiente":
-      return ["programado"];
-    case "programado":
-      return ["iniciado"];
-    case "iniciado":
-      return ["en_pausa", "completado"];
-    case "en_pausa":
-      return ["iniciado", "completado"];
-    case "completado":
-    default:
-      return [];
+    case "terminado_pendiente_validar": return "completado";
+    default: return "pendiente";
   }
 }
 
@@ -62,16 +35,7 @@ export const PRIORIDADES = [
 ] as const;
 export type Prioridad = (typeof PRIORIDADES)[number]["key"];
 
-export const ESTADOS_PROGRAMACION = [
-  { key: "programada", label: "Programada" },
-  { key: "cumplida", label: "Cumplida" },
-  { key: "reprogramada", label: "Reprogramada" },
-  { key: "cancelada", label: "Cancelada" },
-] as const;
-export type EstadoProgramacion = (typeof ESTADOS_PROGRAMACION)[number]["key"];
-
 export const ESTADOS_JORNADA = [
-  { key: "en_curso", label: "En curso" },
   { key: "completada", label: "Completada" },
   { key: "incompleta", label: "Incompleta" },
 ] as const;
