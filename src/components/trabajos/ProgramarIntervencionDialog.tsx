@@ -208,8 +208,13 @@ export function ProgramarIntervencionDialog({
                       >
                         {trabajoActivo ? (
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] font-medium truncate">
-                              {trabajoActivo.nombre_cliente}
+                            <div className="flex items-center gap-1.5 text-[13px] font-medium truncate">
+                              {trabajoActivo.codigo && (
+                                <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
+                                  {trabajoActivo.codigo}
+                                </span>
+                              )}
+                              <span className="truncate">{trabajoActivo.nombre_cliente}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground truncate">
                               {trabajoActivo.descripcion_problema}
