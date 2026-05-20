@@ -205,12 +205,14 @@ export default function Trabajos() {
                       const cli = t.cliente_id ? clienteMap.get(t.cliente_id) : null;
                       const progs = agendasByTrabajo.get(t.id) ?? [];
                       const hoy = new Date(new Date().toDateString());
-                      const futurosActivos = progs.filter(p => {
-                        return p.estado !== "Completado" && new Date(`${p.fecha_programada}T00:00:00`) >= hoy;
-                      });
-                      const proxima = futurosActivos[0];
+                      // Agendas sin resultado cargado (pendientes)
+                      const agendasPendientes = progs.filter(p => p.estado === "Pendiente");
+                      const agendasFuturas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) >= hoy);
+                      const agendasVencidas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) < hoy);
+                      const proxima = agendasFuturas[0];
                       const prioLabel = PRIORIDADES.find(p => p.key === t.prioridad)?.label ?? "";
-                      const pendCount = futurosActivos.length;
+                      const pendCount = agendasFuturas.length;
+                      const vencidasCount = agendasVencidas.length;
 
                       return (
                         <button
