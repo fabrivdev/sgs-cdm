@@ -425,35 +425,22 @@ export default function Dashboard() {
       </div>
 
       <Tabs value={vista} onValueChange={(v) => setVista(v as "resumen" | "tecnicos")}>
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <TabsList>
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
             <TabsTrigger value="tecnicos">Técnicos</TabsTrigger>
           </TabsList>
 
           {vista === "resumen" && (
-            <div className="flex gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Desde</Label>
-                <Input
-                  type="date"
-                  value={from}
-                  onChange={(e) => setFrom(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Hasta</Label>
-                <Input
-                  type="date"
-                  value={to}
-                  onChange={(e) => setTo(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-            </div>
+            <FiltersBar className="w-full sm:w-auto">
+              <span className="text-[11px] text-muted-foreground">Desde</span>
+              <FilterDate value={from} onChange={setFrom} />
+              <span className="text-[11px] text-muted-foreground">Hasta</span>
+              <FilterDate value={to} onChange={setTo} />
+            </FiltersBar>
           )}
         </div>
+
 
         <TabsContent value="resumen" className="space-y-4 mt-4">
 
