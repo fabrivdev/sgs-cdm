@@ -35,6 +35,7 @@ export default function Trabajos() {
   const { profile } = useAuth();
   const [trabajos, setTrabajos] = useState<any[]>([]);
   const [progByTrabajo, setProgByTrabajo] = useState<Map<string, any[]>>(new Map());
+  const [jornadasByProgramacion, setJornadasByProgramacion] = useState<Map<string, any[]>>(new Map());
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<{ user_id: string; role: string }[]>([]);
@@ -112,9 +113,10 @@ export default function Trabajos() {
   const load = async () => {
     setLoading(true);
     try {
-      const [t, p, c, pr, r] = await Promise.all([
+      const [t, p, j, c, pr, r] = await Promise.all([
         cargarTodo<any>(supabase.from("trabajos").select("*").order("actualizado_en", { ascending: false })),
         cargarTodo<any>(supabase.from("programaciones").select("id, trabajo_id, fecha_programada, estado, tecnico_principal_id").order("fecha_programada", { ascending: true })),
+        cargarTodo<any>(supabase.from("jornadas").select("id, programacion_id, estado_jornada")),
         cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal").order("nombre")),
         cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal").order("nombre")),
         cargarTodo<any>(supabase.from("user_roles").select("user_id, role")),
@@ -127,6 +129,16 @@ export default function Trabajos() {
         map.set(x.trabajo_id, arr);
       }
       setProgByTrabajo(map);
+
+      const jornadasMap = new Map<string, any[]>();
+      for (const x of j) {
+        if (!x.programacion_id) continue;
+        const arr = jornadasMap.get(x.programacion_id) ?? [];
+        arr.push(x);
+        jornadasMap.set(x.programacion_id, arr);
+      }
+      setJornadasByProgramacion(jornadasMap);
+
       setClientes(c);
       setProfiles(pr);
       setRoles(r);
@@ -217,9 +229,14 @@ export default function Trabajos() {
                       const cli = t.cliente_id ? clienteMap.get(t.cliente_id) : null;
                       const resp = t.responsable_principal_id ? profileMap.get(t.responsable_principal_id) : null;
                       const progs = progByTrabajo.get(t.id) ?? [];
-                      const activas = progs.filter(p => p.estado === "programada");
+                      const activas = progs.filter(p => {
+                        const jornadas = jornadasByProgramacion.get(p.id) ?? [];
+                        const cumplidaPorJornada = jornadas.some((j) => j.estado_jornada === "completada");
+                        return p.estado === "programada" && !cumplidaPorJornada;
+                      });
                       const proxima = activas[0];
-                      const vencido = t.fecha_compromiso && new Date(t.fecha_compromiso) < new Date(new Date().toDateString())
+                      const vencido = proxima
+                        && new Date(`${proxima.fecha_programada}T00:00:00`) < new Date(new Date().toDateString())
                         && normalizarEstadoTrabajo(t.estado_general) !== "completado";
                       return (
                         <button key={t.id} onClick={() => setDetalleId(t.id)}
