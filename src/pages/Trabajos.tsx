@@ -9,7 +9,7 @@ import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, normalizarEstadoTrabajo }
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
-import { TrabajoDetalleDialog } from "@/components/trabajos/TrabajoDetalleDialog";
+import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
 import { getISOWeek, parseISO, format } from "date-fns";
 
@@ -297,7 +297,7 @@ export default function Trabajos() {
         clientes={clientes}
         onSaved={load}
       />
-      <TrabajoDetalleDialog
+      <TrabajoDetalleDrawer
         trabajoId={detalleId}
         onOpenChange={(o) => !o && setDetalleId(null)}
         clientes={clientes}
