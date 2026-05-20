@@ -114,6 +114,11 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, profil
         <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 flex-wrap">
+              {trabajo && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
+                  {trabajo.codigo ?? "TR-—"}
+                </span>
+              )}
               {trabajo ? (clienteMap.get(trabajo.cliente_id)?.nombre ?? "Sin cliente") : "Cargando…"}
               {trabajo && (
                 <>
