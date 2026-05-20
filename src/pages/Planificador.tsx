@@ -125,7 +125,7 @@ export default function Planificador() {
       const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }, { data: rls }] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
-        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
         supabase.from("trabajos").select("id, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
