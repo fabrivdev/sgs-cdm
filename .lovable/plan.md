@@ -1,61 +1,83 @@
 ## Objetivo
 
-Simplificar el módulo de Trabajos eliminando lógica duplicada. El "trabajo madre" pasa a ser solo un caso pendiente (sin responsable, sin fecha objetivo, sin auxiliares). Toda la programación operativa vive en el Planificador/Calendario.
+Corregir la lógica conceptual de **Agenda**, **Jornada** y **Estado del Trabajo** antes de tocar UI. Una agenda futura es solo una visita prevista; la jornada es el resultado real (solo Realizada / No realizada); el estado del trabajo se deriva automáticamente.
 
-## Cambios funcionales
+## Modelo conceptual final
 
-### 1. Nuevo Trabajo (modal simplificado)
-Campos: **Cliente, Máquina (opcional), Sucursal, Marca, Tipo, Descripción/Problema, Prioridad**.
-Eliminar del formulario: responsable principal, fecha objetivo / fecha compromiso, próxima acción.
-Estado inicial siempre `pendiente`.
+- **Agenda** (`servicio_jornadas` actual usada como "agenda"): visita planificada con una fecha. No tiene estado de resultado propio; mientras la fecha no llega, simplemente está pendiente de ejecutarse.
+- **Jornada** (resultado de una agenda): solo dos resultados posibles → `Realizada` o `No realizada`.
+- **Trabajo** (`trabajos.estado_general`): siempre derivado, nunca manual.
 
-### 2. Kanban de Trabajos (vista macro)
-- Solo lectura del estado general + filtros.
-- Quitar botón "Programar intervención" del detalle del trabajo (o mantenerlo redirigiendo al Planificador).
-- El detalle muestra: datos del caso, agendas (solo info), jornadas (solo info), historial.
-- Quitar tab/acciones que dupliquen lo del planificador.
-- Quitar campos de responsable/fecha objetivo del header del trabajo.
+## Cambios en base de datos
 
-### 3. Planificador / Calendario = único punto de programación
-- "Programar intervención" se ejecuta desde acá, vinculado a un trabajo existente (selector de trabajo) o creando un trabajo nuevo en línea.
-- Al programar: se crea una `agenda` (renombre conceptual de `programaciones`) con `fecha` + `tecnico_principal_id` + `auxiliares`. Sin estado propio.
+### 1. Enum de resultado de jornada
+Actualmente `estado_servicio` se usa para marcar agendas/jornadas con `Pendiente` / `Completado` / `Cancelada`. Reinterpretarlo así:
+- `Pendiente` = agenda aún sin resultado cargado (independiente de si la fecha pasó o no).
+- `Completado` → renombrar conceptualmente a **Realizada** (mantener valor enum por compatibilidad, mapearlo en UI).
+- `Cancelada` → renombrar conceptualmente a **No realizada**.
 
-### 4. Reglas automáticas de estado del trabajo (trigger en DB)
-- Sin agendas futuras y sin jornadas → `pendiente`.
-- Con ≥1 agenda futura y sin jornadas iniciadas/incompletas → `programado`.
-- Con ≥1 jornada `completada` y aún quedan agendas futuras o jornadas pendientes → `iniciado`.
-- Con jornada `incompleta` activa → `en_pausa`.
-- Sin agendas futuras y todas las jornadas vinculadas marcadas como `completada` + flag manual de cierre → `completado`.
-- Eliminar última agenda + sin jornadas → vuelve a `pendiente`.
+No se introducen estados nuevos (incompleta, en curso, pausa, bloqueado quedan fuera, como ya estaba).
 
-### 5. Agendas (programaciones) sin estado propio
-- Quitar el enum `estado_programacion` del uso operativo (dejarlo en DB por compatibilidad, ignorado).
-- Una agenda con jornada vinculada se considera "usada" — el planificador la oculta de "pendientes del día".
-- Sin reprogramaciones encadenadas. Para mover una fecha: se borra la agenda y se crea una nueva.
+### 2. Reescribir `recalcular_estado_trabajo(p_trabajo_id)`
 
-### 6. Jornadas
-- Una jornada se vincula opcionalmente a una agenda (`programacion_id`).
-- Solo dos estados útiles: `completada` (jornada del día cerrada, aunque el caso continúe) e `incompleta` (técnico no pudo cerrar su día).
-- Sin auxiliares en el trabajo madre: los técnicos que trabajaron se derivan únicamente de `jornadas.tecnico_id`.
+Nueva lógica (sobre `servicio_jornadas` del `legacy_servicio_id` del trabajo):
 
-## Implementación técnica
+```text
+hoy            := CURRENT_DATE
+realizadas     := count(estado = 'Completado')              -- jornadas Realizadas
+no_realizadas  := count(estado = 'Cancelada')               -- jornadas No realizadas
+agenda_futura  := count(estado = 'Pendiente' AND fecha >= hoy)
+agenda_vencida := count(estado = 'Pendiente' AND fecha <  hoy)  -- pendiente de cierre
 
-### Migración SQL
-1. Trigger `recalcular_estado_trabajo()` que se dispara en INSERT/UPDATE/DELETE de `programaciones` y `jornadas`, recalcula `trabajos.estado_general` según las reglas.
-2. Quitar `NOT NULL` / dejar opcionales `responsable_principal_id`, `fecha_compromiso`, `proxima_accion` en `trabajos` (ya son opcionales, solo dejar de usarlos desde la UI).
-3. Dejar de escribir `auxiliares` en el trabajo madre.
+SI realizadas = 0 Y agenda_futura = 0 Y agenda_vencida = 0  → 'pendiente'
+SI realizadas = 0 Y agenda_futura > 0                       → 'programado'
+SI realizadas = 0 Y agenda_vencida > 0                      → 'programado'   -- pendiente de cierre, no completado
+SI realizadas > 0 Y (agenda_futura > 0 OR agenda_vencida > 0) → 'iniciado'
+SI realizadas > 0 Y agenda_futura = 0 Y agenda_vencida = 0  → 'completado'
+```
 
-### Frontend
-- `NuevoTrabajoDialog.tsx`: eliminar campos responsable, fecha objetivo y observación interna.
-- `TrabajoDetalleDialog.tsx`: simplificar a vista informativa. Quitar acciones de cambio manual de estado (lo hace el trigger). Mostrar agendas y jornadas en modo lectura. Quitar botón "Programar intervención" desde acá.
-- `Planificador.tsx`: agregar botón "Programar intervención" que abre `ProgramarIntervencionDialog` con selector de trabajo pendiente (o crear nuevo trabajo inline).
-- `Calendario.tsx`: igual, acción primaria "Programar intervención".
-- `ProgramarIntervencionDialog.tsx`: agregar selector de trabajo; quitar lógica de `reemplaza_a`, motivo reprogramación, horas estimadas y acción programada (queda mínimo: fecha + técnico + auxiliares + observación opcional). Quitar sync legacy duplicado.
-- `CargarJornadaDialog.tsx`: dejar solo estados `completada` / `incompleta`. Vincular siempre a una agenda si hay una abierta del día.
-- `Trabajos.tsx` (Kanban): quitar acciones operativas, dejar como vista macro con filtros.
+Notas clave:
+- Una agenda pasada sin jornada cargada **nunca** mueve a `completado` ni a `iniciado`. Cuenta como pendiente de cierre y mantiene el trabajo en `programado` (o `iniciado` si ya había realizadas previas).
+- Jornadas `No realizada` (Cancelada) **no cuentan como avance**: si solo hay no_realizadas y no hay agenda futura ni vencida pendiente, el trabajo vuelve a `pendiente`. Si hay no_realizadas + agenda futura → `programado`.
+- Resultado idéntico al set de ejemplos del usuario.
 
-### Sin cambios de auth/roles ni de estructura mayor de tablas.
+### 3. Triggers
+Los triggers existentes (`trg_recalc_trabajo_from_servicio_jornada`, `trg_recalc_trabajo_on_link`) ya disparan recálculo en INSERT/UPDATE/DELETE de `servicio_jornadas` y en cambios de `legacy_servicio_id`. Se mantienen.
+
+**Agregar**: job/recalculo diario opcional (fuera de alcance ahora). El recálculo se hace en cada mutación, suficiente para la operativa.
+
+### 4. Backfill
+Recalcular `estado_general` de **todos** los trabajos existentes con la nueva fórmula una vez aplicada la función.
+
+## Cambios en frontend (terminología, sin rediseño)
+
+Solo renombres de etiquetas y opciones — sin tocar layouts. Se hace en este mismo paso para que la UI no contradiga la lógica nueva.
+
+- `src/lib/constants.ts` → `ESTADOS` actual `["Pendiente","Completado","Cancelada"]` se conserva como valores DB, pero se agregan labels:
+  - `Pendiente` → "Pendiente"
+  - `Completado` → "Realizada"
+  - `Cancelada` → "No realizada"
+- `src/components/StatusBadges.tsx` (`EstadoBadge`) → usar los nuevos labels.
+- `src/lib/trabajos.ts` (`ESTADOS_JORNADA`, `estadoJornadaLabel`) → solo dos resultados `Realizada` / `No realizada` (mapeados a `completada` / `incompleta` legacy si aplica en `jornadas` aparte, o ignorado si esa tabla quedó muerta).
+- Diálogo `CargarJornadaDialog.tsx` y `ServicioDetalleDialog.tsx` → botones "Marcar como Realizada" / "Marcar como No realizada" (en vez de Completada / Cancelada).
+- Kanban `Trabajos.tsx`, `Calendario.tsx`, `Planificador.tsx` → contar `futurosActivos` con la nueva semántica (`fecha >= hoy` y `estado='Pendiente'`); las vencidas sin cierre se muestran como "pendiente de cierre" en lugar de futuras.
+
+No se tocan: layouts, filtros, columnas, diseño visual.
 
 ## Fuera de alcance
-- Migración de datos viejos: los trabajos existentes ya creados con responsable/fecha objetivo se respetan, pero la UI ya no los expone como editables.
-- Dashboard: no se toca en esta iteración.
+
+- Rediseño de modales o vistas.
+- Renombrar enums en DB (`Completado`/`Cancelada` siguen siendo los valores físicos; cambia solo la lectura).
+- Nuevos estados de trabajo: se mantienen `pendiente`, `programado`, `iniciado`, `completado`.
+
+## Detalles técnicos
+
+Archivos a modificar:
+- **Migración SQL**: `recalcular_estado_trabajo` (reemplazar función) + UPDATE de backfill iterando `trabajos`.
+- `src/lib/constants.ts`, `src/lib/trabajos.ts`
+- `src/components/StatusBadges.tsx`
+- `src/components/ServicioDetalleDialog.tsx`
+- `src/components/trabajos/CargarJornadaDialog.tsx`
+- `src/pages/Trabajos.tsx`, `src/pages/Calendario.tsx`, `src/pages/Planificador.tsx` (solo cálculo de "futurosActivos" + labels)
+
+Aprobación: la migración SQL se ejecuta primero, luego los renombres de UI.
