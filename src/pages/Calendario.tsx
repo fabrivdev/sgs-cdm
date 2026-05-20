@@ -120,6 +120,8 @@ export default function Calendario() {
         estado: Estado;
         horas_trabajadas: number | null;
         observaciones: string | null;
+        tecnico_responsable_id: string | null;
+        auxiliares: string[] | null;
       }>;
 
       const porServicio = new Map<string, typeof jornadas>();
@@ -148,6 +150,8 @@ export default function Calendario() {
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
             jornada_id: j.id,
+            tecnico_responsable_id: j.tecnico_responsable_id ?? s.tecnico_responsable_id,
+            auxiliares: (j.auxiliares && j.auxiliares.length > 0) ? j.auxiliares : s.auxiliares,
           });
         }
       }
