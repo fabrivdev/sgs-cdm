@@ -305,8 +305,8 @@ export default function Dashboard() {
         return {
           name: suc,
           Pendiente: items.filter((x) => x.estado === "Pendiente").length,
-          Iniciado: items.filter((x) => x.estado === "Iniciado").length,
           Completado: items.filter((x) => x.estado === "Completado").length,
+          Cancelada: items.filter((x) => x.estado === "Cancelada").length,
           total: items.length,
         };
       }),
