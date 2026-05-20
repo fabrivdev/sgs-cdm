@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, User as UserIcon, CalendarDays } from "lucide-react";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge } from "@/lib/trabajos";
+import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, siguientesEstadosTrabajo, normalizarEstadoTrabajo, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
@@ -47,6 +47,67 @@ export default function Trabajos() {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+
+  const estadoServicio = (estado: EstadoTrabajo) => {
+    if (estado === "completado") return "Completado";
+    if (estado === "iniciado") return "Iniciado";
+    return "Pendiente";
+  };
+
+  const quitarDelPlanificador = async (trabajo: any) => {
+    if (!trabajo?.legacy_servicio_id) return;
+
+    await supabase.from("servicio_jornadas").delete().eq("servicio_id", trabajo.legacy_servicio_id);
+    await supabase.from("servicios").delete().eq("id", trabajo.legacy_servicio_id);
+
+    await supabase
+      .from("trabajos")
+      .update({
+        legacy_servicio_id: null,
+        fecha_compromiso: null,
+      })
+      .eq("id", trabajo.id);
+  };
+
+  const cambiarEstadoRapido = async (trabajo: any, estado: EstadoTrabajo) => {
+    try {
+      if (estado === "programado") {
+        const progs = progByTrabajo.get(trabajo.id) ?? [];
+        const activa = progs.some((p) => p.estado === "programada");
+        if (!activa) {
+          toast.error("Primero programá una intervención con fecha y técnico desde el detalle.");
+          setDetalleId(trabajo.id);
+          return;
+        }
+      }
+
+      if (estado === "pendiente") {
+        await quitarDelPlanificador(trabajo);
+      }
+
+      const patch: any = {
+        estado_general: estado,
+        cerrado_en: estado === "completado" ? new Date().toISOString() : null,
+      };
+
+      if (estado !== "en_pausa") patch.motivo_bloqueo = null;
+
+      const { error } = await supabase.from("trabajos").update(patch).eq("id", trabajo.id);
+      if (error) throw error;
+
+      if (trabajo.legacy_servicio_id && estado !== "pendiente") {
+        await supabase
+          .from("servicios")
+          .update({ estado: estadoServicio(estado) })
+          .eq("id", trabajo.legacy_servicio_id);
+      }
+
+      toast.success(`Trabajo actualizado a ${estadoTrabajoLabel(estado)}`);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo cambiar el estado");
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -143,7 +204,7 @@ export default function Trabajos() {
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-3">
           {ESTADOS_TRABAJO.map(col => {
-            const items = filtered.filter(t => t.estado_general === col.key);
+            const items = filtered.filter(t => normalizarEstadoTrabajo(t.estado_general) === col.key);
             return (
               <div key={col.key} className="w-[280px] shrink-0">
                 <Card className="min-h-[560px] p-3 bg-muted/30">
@@ -159,7 +220,7 @@ export default function Trabajos() {
                       const activas = progs.filter(p => p.estado === "programada");
                       const proxima = activas[0];
                       const vencido = t.fecha_compromiso && new Date(t.fecha_compromiso) < new Date(new Date().toDateString())
-                        && t.estado_general !== "cerrado";
+                        && normalizarEstadoTrabajo(t.estado_general) !== "completado";
                       return (
                         <button key={t.id} onClick={() => setDetalleId(t.id)}
                           className={cn("w-full rounded-lg border p-3 text-left shadow-sm transition hover:shadow-md bg-card", col.color)}>
@@ -178,8 +239,28 @@ export default function Trabajos() {
                             {proxima && <div className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> {proxima.fecha_programada}</div>}
                             {progs.length > 0 && <div>{progs.length} programación(es) · {activas.length} activa(s)</div>}
                             {vencido && <Badge variant="destructive" className="text-[10px] w-fit">Vencido</Badge>}
-                            {t.motivo_bloqueo && <div className="text-red-700"><b>Bloqueado:</b> {t.motivo_bloqueo}</div>}
+                            {t.motivo_bloqueo && <div className="text-red-700"><b>En pausa:</b> {t.motivo_bloqueo}</div>}
                           </div>
+
+                          {siguientesEstadosTrabajo(t.estado_general).length > 0 && (
+                            <div className="mt-3 grid grid-cols-1 gap-1">
+                              {siguientesEstadosTrabajo(t.estado_general).map((estadoSiguiente) => (
+                                <Button
+                                  key={estadoSiguiente}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-[10px]"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    cambiarEstadoRapido(t, estadoSiguiente);
+                                  }}
+                                >
+                                  Pasar a {estadoTrabajoLabel(estadoSiguiente)}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
                         </button>
                       );
                     })}
