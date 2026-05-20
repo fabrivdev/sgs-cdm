@@ -254,7 +254,7 @@ export function ProgramarIntervencionDialog({
                                       <span className="text-[10px] text-muted-foreground">·</span>
                                       <span className="text-[10px] text-muted-foreground">{t.sucursal}</span>
                                       {t.prioridad && (
-                                        <Badge className={cn("h-4 px-1 text-[9px] font-medium ml-0.5", prioridadBadge(t.prioridad))}>
+                                        <Badge className={cn("h-4 px-1 text-[9px] font-medium ml-0.5", prioridadBadge(t.prioridad as any))}>
                                           {prioLabel(t.prioridad)}
                                         </Badge>
                                       )}
