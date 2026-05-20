@@ -230,49 +230,8 @@ export function TrabajoDetalleDrawer({
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
             <>
-              {/* Próxima acción */}
-              <section
-                className={cn(
-                  "rounded-xl border p-4 shadow-sm",
-                  proxima.tipo === "tiene_vencida"
-                    ? "border-amber-200 bg-amber-50/60"
-                    : proxima.tipo === "sin_pendientes_con_jornadas"
-                    ? "border-emerald-200 bg-emerald-50/60"
-                    : proxima.tipo === "completado"
-                    ? "border-green-200 bg-green-50/60"
-                    : "border-blue-200 bg-blue-50/60",
-                )}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-lg bg-background p-2 border">
-                    {proxima.tipo === "tiene_vencida" ? (
-                      <AlertCircle className="h-4 w-4 text-amber-600" />
-                    ) : proxima.tipo === "tiene_futura" ? (
-                      <Clock className="h-4 w-4 text-blue-600" />
-                    ) : (
-                      <CalendarPlus className="h-4 w-4 text-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm">{proxima.titulo}</h3>
-                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      {proxima.descripcion}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => handleAccion(proxima.primaria.action)}>
-                        {proxima.primaria.label}
-                      </Button>
-                      {proxima.secundaria && (
-                        <Button size="sm" variant="outline" onClick={() => handleAccion(proxima.secundaria!.action)}>
-                          {proxima.secundaria.label}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
               {/* Resumen operativo */}
+
               <section className="rounded-xl border bg-card p-4 space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Resumen operativo
