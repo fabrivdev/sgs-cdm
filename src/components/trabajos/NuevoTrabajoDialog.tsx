@@ -104,7 +104,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
         if (error) throw error;
       } else {
         payload.creado_por = user?.id;
-        payload.estado_general = "nuevo";
+        payload.estado_general = "pendiente";
         const { error } = await supabase.from("trabajos").insert(payload);
         if (error) throw error;
       }
@@ -149,19 +149,19 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Sucursal">
               <Select value={form.sucursal} onValueChange={(v) => setForm(f => ({ ...f, sucursal: v as Sucursal }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{SUCURSALES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <Field label="Marca">
               <Select value={form.marca} onValueChange={(v) => setForm(f => ({ ...f, marca: v as Marca }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{MARCAS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <Field label="Tipo">
               <Select value={form.tipo_trabajo} onValueChange={(v) => setForm(f => ({ ...f, tipo_trabajo: v as TipoTrabajo }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Visita de campo">Visita de campo</SelectItem>
                   <SelectItem value="Máquina en taller">Máquina en taller</SelectItem>
@@ -170,7 +170,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
             </Field>
             <Field label="Prioridad">
               <Select value={form.prioridad} onValueChange={(v) => setForm(f => ({ ...f, prioridad: v as Prioridad }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{PRIORIDADES.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
@@ -179,14 +179,14 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
                 value={form.responsable_principal_id || "none"}
                 onValueChange={(v) => setForm(f => ({ ...f, responsable_principal_id: v === "none" ? "" : v }))}
               >
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent className="max-h-[300px]">
+                <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
                   <SelectItem value="none">— Sin asignar —</SelectItem>
                   {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}{t.sucursal ? ` · ${t.sucursal}` : ""}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Fecha compromiso">
+            <Field label="Fecha objetivo">
               <Input type="date" value={form.fecha_compromiso}
                 onChange={(e) => setForm(f => ({ ...f, fecha_compromiso: e.target.value }))} />
             </Field>
@@ -196,10 +196,10 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, tecnicos, tra
             <Textarea rows={4} value={form.descripcion_problema}
               onChange={(e) => setForm(f => ({ ...f, descripcion_problema: e.target.value }))} />
           </Field>
-          <Field label="Próxima acción (opcional)">
+          <Field label="Observación interna (opcional)">
             <Textarea rows={2} value={form.proxima_accion}
               onChange={(e) => setForm(f => ({ ...f, proxima_accion: e.target.value }))}
-              placeholder="Qué hay que hacer a continuación..." />
+              placeholder="Notas, repuestos pendientes o indicaciones internas..." />
           </Field>
         </div>
         <DialogFooter>
