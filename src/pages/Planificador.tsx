@@ -556,7 +556,14 @@ export default function Planificador() {
                     <TipoIcon className="h-3 w-3" />
                   </div>
 
-                  <div className="text-sm font-semibold truncate">{clienteNombre}</div>
+                  <div className="flex items-center gap-1.5">
+                    {codigoByServicio.get(s.id) && (
+                      <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
+                        {codigoByServicio.get(s.id)}
+                      </span>
+                    )}
+                    <div className="text-sm font-semibold truncate">{clienteNombre}</div>
+                  </div>
                   <div className="text-xs text-muted-foreground line-clamp-2 leading-snug">{s.trabajo_descripcion}</div>
 
                   <div className="text-[10px] text-muted-foreground pt-0.5">
