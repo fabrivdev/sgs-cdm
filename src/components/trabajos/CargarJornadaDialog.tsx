@@ -86,10 +86,59 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         await supabase.from("programaciones").update({ estado: "cumplida" }).eq("id", form.programacion_id);
       }
 
-      // Pasar el trabajo a "en_ejecucion" si está en estados anteriores
-      const { data: t } = await supabase.from("trabajos").select("estado_general").eq("id", trabajoId).single();
-      if (t && ["nuevo", "pendiente_diagnostico", "pendiente_programar", "programado"].includes(t.estado_general)) {
-        await supabase.from("trabajos").update({ estado_general: "en_ejecucion" }).eq("id", trabajoId);
+      const { data: trabajo } = await supabase
+        .from("trabajos")
+        .select("id, estado_general, legacy_servicio_id")
+        .eq("id", trabajoId)
+        .single();
+
+      const { data: programacionesRestantes } = await supabase
+        .from("programaciones")
+        .select("id, estado")
+        .eq("trabajo_id", trabajoId);
+
+      const quedanProgramadas = (programacionesRestantes ?? []).some((p: any) => p.estado === "programada");
+
+      const nuevoEstadoTrabajo =
+        form.estado_jornada === "completada" && !quedanProgramadas
+          ? "completado"
+          : "iniciado";
+
+      await supabase
+        .from("trabajos")
+        .update({
+          estado_general: nuevoEstadoTrabajo,
+          cerrado_en: nuevoEstadoTrabajo === "completado" ? new Date().toISOString() : null,
+          cerrado_por: nuevoEstadoTrabajo === "completado" ? user?.id : null,
+        })
+        .eq("id", trabajoId);
+
+      if (trabajo?.legacy_servicio_id) {
+        const estadoServicio =
+          nuevoEstadoTrabajo === "completado"
+            ? "Completado"
+            : nuevoEstadoTrabajo === "iniciado"
+            ? "Iniciado"
+            : "Pendiente";
+
+        await supabase
+          .from("servicios")
+          .update({
+            estado: estadoServicio,
+            horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
+            observaciones: form.resultado.trim() || form.observaciones.trim() || null,
+          })
+          .eq("id", trabajo.legacy_servicio_id);
+
+        await supabase
+          .from("servicio_jornadas")
+          .update({
+            estado: estadoServicio,
+            horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
+            observaciones: form.resultado.trim() || form.observaciones.trim() || null,
+          })
+          .eq("servicio_id", trabajo.legacy_servicio_id)
+          .eq("fecha", form.fecha_real);
       }
 
       toast.success("Jornada cargada");
@@ -110,8 +159,8 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
           <div className="space-y-1.5">
             <Label>Técnico</Label>
             <Select value={form.tecnico_id} onValueChange={(v) => setForm(f => ({ ...f, tecnico_id: v }))}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-              <SelectContent className="max-h-[300px]">
+              <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
                 {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -121,7 +170,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
               <Label>Vincular a programación</Label>
               <Select value={form.programacion_id || "none"}
                 onValueChange={(v) => setForm(f => ({ ...f, programacion_id: v === "none" ? "" : v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— Sin programación —</SelectItem>
                   {programaciones.map(p => <SelectItem key={p.id} value={p.id}>{p.fecha_programada}</SelectItem>)}
@@ -156,7 +205,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
               <Label>Estado</Label>
               <Select value={form.estado_jornada}
                 onValueChange={(v) => setForm(f => ({ ...f, estado_jornada: v as EstadoJornada }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>{ESTADOS_JORNADA.map(e => <SelectItem key={e.key} value={e.key}>{e.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
