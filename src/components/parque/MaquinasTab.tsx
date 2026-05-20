@@ -3,10 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
