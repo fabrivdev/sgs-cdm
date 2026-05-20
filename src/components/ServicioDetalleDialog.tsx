@@ -382,9 +382,9 @@ export function ServicioDetalleDialog({
         <ResponsiveDrawerHeader>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap pr-8 text-base font-semibold">
-              {trabajoCodigo && (
+              {trabajoMadre?.codigo && (
                 <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
-                  {trabajoCodigo}
+                  {trabajoMadre.codigo}
                 </span>
               )}
               Detalle del servicio
