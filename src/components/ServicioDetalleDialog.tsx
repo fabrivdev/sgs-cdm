@@ -478,22 +478,46 @@ export function ServicioDetalleDialog({
                 </Label>
 
                 {canEdit && (
-                  <Popover open={addDateOpen} onOpenChange={setAddDateOpen}>
+                  <Popover open={addOpen} onOpenChange={setAddOpen}>
                     <PopoverTrigger asChild>
                       <Button size="sm" variant="outline" className="h-7 text-xs">
                         <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
                         Continuar en otra fecha
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <Calendar
-                        mode="single"
-                        onSelect={addJornada}
-                        locale={es}
-                        disabled={(d) => fechasExistentes.has(format(d, "yyyy-MM-dd"))}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
+                    <PopoverContent className="w-[320px] p-3 space-y-3" align="end">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Fecha</Label>
+                        <Input
+                          type="date"
+                          value={nuevaJornada.fecha}
+                          onChange={(e) => setNuevaJornada(n => ({ ...n, fecha: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                        {fechasExistentes.has(nuevaJornada.fecha) && (
+                          <p className="text-[10px] text-destructive">Ya hay una jornada en esa fecha.</p>
+                        )}
+                      </div>
+
+                      <TecnicosPicker
+                        tecnicos={profiles.filter(p => !adminCabIds.has(p.id))}
+                        principalId={nuevaJornada.tecnico_principal_id}
+                        auxiliares={nuevaJornada.auxiliares}
+                        onChange={({ principalId, auxiliares }) =>
+                          setNuevaJornada(n => ({ ...n, tecnico_principal_id: principalId, auxiliares }))
+                        }
+                        label="Cuadrilla para esta fecha"
+                        helperText="No se hereda de fechas anteriores; elegí libremente."
                       />
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAddOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button size="sm" className="h-7 text-xs" onClick={addJornada} disabled={busy}>
+                          {busy ? "Guardando…" : "Agregar"}
+                        </Button>
+                      </div>
                     </PopoverContent>
                   </Popover>
                 )}
