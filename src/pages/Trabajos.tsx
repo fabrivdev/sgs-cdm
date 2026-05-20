@@ -108,7 +108,7 @@ export default function Trabajos() {
           && !t.descripcion_problema.toLowerCase().includes(query)) return false;
       }
       if (fFecha || fSemana !== "all") {
-        const progs = progByTrabajo.get(t.id) ?? [];
+        const progs = agendasByTrabajo.get(t.id) ?? [];
         const matchProg = progs.some(p => {
           if (fFecha && p.fecha_programada !== fFecha) return false;
           if (fSemana !== "all" && getISOWeek(parseISO(p.fecha_programada)) !== Number(fSemana)) return false;
@@ -118,7 +118,7 @@ export default function Trabajos() {
       }
       return true;
     });
-  }, [trabajos, q, fSucursal, fPrio, fEstado, fFecha, fSemana, clienteMap, progByTrabajo]);
+  }, [trabajos, q, fSucursal, fPrio, fEstado, fFecha, fSemana, clienteMap, agendasByTrabajo]);
 
   const limpiar = () => {
     setQ(""); setFSucursal("all"); setFPrio("all"); setFEstado("all");
