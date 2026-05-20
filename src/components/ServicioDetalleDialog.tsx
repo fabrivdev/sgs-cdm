@@ -195,13 +195,18 @@ export function ServicioDetalleDialog({
   useEffect(() => {
     if (servicio) {
       loadJornadas(servicio.id);
-      supabase.from("trabajos").select("codigo").eq("legacy_servicio_id", servicio.id).maybeSingle().then(({ data }) => {
-        setTrabajoCodigo((data as any)?.codigo ?? null);
-      });
+      supabase
+        .from("trabajos")
+        .select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, prioridad, legacy_servicio_id")
+        .eq("legacy_servicio_id", servicio.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          setTrabajoMadre((data as any) ?? null);
+        });
     } else {
       setJornadas([]);
       setEdits({});
-      setTrabajoCodigo(null);
+      setTrabajoMadre(null);
     }
   }, [servicio?.id]);
 
