@@ -147,70 +147,31 @@ export default function Trabajos() {
         </Button>
       </div>
 
-      {/* Barra de filtros unificada */}
-      <Card className="p-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative w-full sm:w-[240px]">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar cliente o problema…"
-              className="h-9 pl-7 text-sm"
-            />
-          </div>
+      <FiltersBar
+        search={{ value: q, onChange: setQ, placeholder: "Buscar cliente o problema…" }}
+        activeCount={activosCount}
+        onClear={limpiar}
+        meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
+      >
+        <FilterSelect
+          value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
+          options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        />
+        <FilterSelect
+          value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-[130px]"
+          options={[{ value: "all", label: "Toda prioridad" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]}
+        />
+        <FilterSelect
+          value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
+          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
+        />
+        <FilterDate value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programación" />
+        <FilterSelect
+          value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
+          options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
+        />
+      </FiltersBar>
 
-          <Select value={fSucursal} onValueChange={setFSucursal}>
-            <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Sucursal" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las sucursales</SelectItem>
-              {SUCURSALES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          <Select value={fPrio} onValueChange={setFPrio}>
-            <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Prioridad" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toda prioridad</SelectItem>
-              {PRIORIDADES.map(p => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          <Select value={fEstado} onValueChange={setFEstado}>
-            <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo estado</SelectItem>
-              {ESTADOS_TRABAJO.map(e => <SelectItem key={e.key} value={e.key}>{e.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          <Input
-            type="date"
-            value={fFecha}
-            onChange={(e) => setFFecha(e.target.value)}
-            className="h-9 w-[150px] text-xs"
-            title="Filtrar por fecha de programación"
-          />
-
-          <Select value={fSemana} onValueChange={setFSemana}>
-            <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Semana" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toda semana</SelectItem>
-              {semanasDisponibles.map(s => <SelectItem key={s} value={String(s)}>Semana {s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {activosCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={limpiar} className="h-9 text-xs">
-              <X className="mr-1 h-3 w-3" /> Limpiar ({activosCount})
-            </Button>
-          )}
-
-          <div className="ml-auto text-[11px] text-muted-foreground">
-            {filtered.length} trabajo{filtered.length !== 1 ? "s" : ""}
-          </div>
-        </div>
-      </Card>
 
       {loading ? (
         <Card className="p-8 text-center text-muted-foreground">Cargando…</Card>
