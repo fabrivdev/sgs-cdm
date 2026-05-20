@@ -459,7 +459,14 @@ export default function Planificador() {
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
-                      {s.trabajo_descripcion}
+                      <div className="flex items-center gap-1.5">
+                        {codigoByServicio.get(s.id) && (
+                          <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
+                            {codigoByServicio.get(s.id)}
+                          </span>
+                        )}
+                        <span className="truncate">{s.trabajo_descripcion}</span>
+                      </div>
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top">
