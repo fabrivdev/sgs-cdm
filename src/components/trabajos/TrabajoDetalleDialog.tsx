@@ -106,6 +106,36 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, profil
     onChanged();
   };
 
+  const cerrarTrabajo = async () => {
+    if (!trabajo) return;
+    const incompletas = jornadas.filter(j => j.estado_jornada === "incompleta").length;
+    const msg = incompletas > 0
+      ? `Hay ${incompletas} jornada(s) marcada(s) como incompleta(s). ¿Cerrar el trabajo igualmente?`
+      : "¿Marcar este trabajo como completado y cerrarlo?";
+    if (!window.confirm(msg)) return;
+    const { error } = await supabase.from("trabajos")
+      .update({ cerrado_en: new Date().toISOString(), cerrado_por: (await supabase.auth.getUser()).data.user?.id ?? null })
+      .eq("id", trabajo.id);
+    if (error) { toast.error(error.message); return; }
+    await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajo.id });
+    toast.success("Trabajo cerrado");
+    cargar(); onChanged();
+  };
+
+  const reabrirTrabajo = async () => {
+    if (!trabajo) return;
+    if (!window.confirm("¿Reabrir este trabajo? Su estado se recalculará automáticamente.")) return;
+    const { error } = await supabase.from("trabajos")
+      .update({ cerrado_en: null, cerrado_por: null })
+      .eq("id", trabajo.id);
+    if (error) { toast.error(error.message); return; }
+    // Forzar recálculo tocando una jornada o programación no es necesario: el trigger recalcula al cambiar cerrado_en? No, no hay trigger en trabajos.
+    // Llamamos RPC manual:
+    await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajo.id });
+    toast.success("Trabajo reabierto");
+    cargar(); onChanged();
+  };
+
   if (!trabajoId) return null;
 
   return (
@@ -141,21 +171,38 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, profil
               <TabsContent value="resumen" className="space-y-3 pt-3">
                 <Row k="Tipo">{trabajo.tipo_trabajo}</Row>
                 <Row k="Horas reales acumuladas">{horasTotal} hs</Row>
+                {trabajo.cerrado_en && (
+                  <Row k="Cerrado el">{new Date(trabajo.cerrado_en).toLocaleString("es-PY")}</Row>
+                )}
                 <div>
                   <div className="text-xs text-muted-foreground">Problema</div>
                   <div className="rounded-md bg-muted/40 p-2 text-sm">{trabajo.descripcion_problema}</div>
                 </div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                     <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar datos
                   </Button>
+                  {puedeAdmin && !trabajo.cerrado_en && (
+                    <Button size="sm" onClick={cerrarTrabajo}>
+                      Cerrar trabajo
+                    </Button>
+                  )}
+                  {puedeAdmin && trabajo.cerrado_en && (
+                    <Button size="sm" variant="outline" onClick={reabrirTrabajo}>
+                      Reabrir trabajo
+                    </Button>
+                  )}
                   {puedeAdmin && (
                     <Button size="sm" variant="outline" className="text-destructive" onClick={eliminar}>
                       <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
                     </Button>
                   )}
                 </div>
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  Un trabajo solo pasa a <b>Completado</b> cuando se cierra manualmente. Mientras tenga jornadas incompletas y sin agendas futuras, queda en <b>En pausa</b>.
+                </p>
               </TabsContent>
+
 
               <TabsContent value="agenda" className="space-y-2 pt-3">
                 <p className="text-xs text-muted-foreground">
