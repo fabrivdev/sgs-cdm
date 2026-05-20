@@ -143,6 +143,8 @@ export default function Planificador() {
         estado: Estado;
         horas_trabajadas: number | null;
         observaciones: string | null;
+        tecnico_responsable_id: string | null;
+        auxiliares: string[] | null;
       }>;
 
       // Expandir: una entrada por jornada. Si un servicio no tiene jornadas (legado), usar su fecha.
@@ -173,6 +175,9 @@ export default function Planificador() {
             estado: j.estado,
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
+            // Cada jornada puede tener su propia cuadrilla; si no, hereda del servicio padre.
+            tecnico_responsable_id: j.tecnico_responsable_id ?? s.tecnico_responsable_id,
+            auxiliares: (j.auxiliares && j.auxiliares.length > 0) ? j.auxiliares : s.auxiliares,
           });
         }
       }
