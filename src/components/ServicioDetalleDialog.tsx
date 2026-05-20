@@ -34,6 +34,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, MapPin, MoreVertical, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
+import { TecnicosPicker } from "@/components/trabajos/TecnicosPicker";
 import { cn } from "@/lib/utils";
 
 interface Servicio {
