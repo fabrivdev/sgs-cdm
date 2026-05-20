@@ -109,7 +109,7 @@ export default function Trabajos() {
         <div>
           <h1 className="text-2xl font-bold">Trabajos</h1>
           <p className="text-sm text-muted-foreground">
-            Vista macro de casos. Para programar fechas y técnicos, andá al Planificador o Calendario.
+            Vista macro de casos. Lo operativo se maneja en Planificador/Calendario.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
