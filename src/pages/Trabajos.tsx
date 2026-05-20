@@ -188,15 +188,15 @@ export default function Trabajos() {
 
             return (
               <div key={col.key} className="min-w-0">
-                <Card className="p-2.5 bg-muted/30 min-h-[300px]">
+                <Card className="p-2 bg-muted/30 min-h-[180px]">
                   <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide">{col.label}</h2>
+                    <h2 className="text-[11px] font-semibold uppercase tracking-wide">{col.label}</h2>
                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{items.length}</Badge>
                   </div>
 
                   <div className="space-y-1.5">
                     {items.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground text-center py-6">—</p>
+                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">—</p>
                     )}
 
                     {visibles.map(t => {
@@ -209,54 +209,49 @@ export default function Trabajos() {
                       });
                       const proxima = futurosActivos[0];
                       const prioLabel = PRIORIDADES.find(p => p.key === t.prioridad)?.label ?? "";
+                      const pendCount = futurosActivos.length;
 
                       return (
                         <button
                           key={t.id}
                           onClick={() => setDetalleId(t.id)}
                           className={cn(
-                            "w-full rounded-md border bg-card p-2 text-left shadow-sm transition-all hover:shadow-md hover:border-primary/40",
+                            "w-full rounded-md border bg-card px-2 py-1.5 text-left shadow-sm transition-all hover:shadow-md hover:border-primary/40",
                             col.color,
                           )}
                         >
                           <div className="flex items-start justify-between gap-1.5">
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-[13px] font-semibold leading-tight">
-                                {cli?.nombre ?? "Sin cliente"}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground leading-tight">
-                                {t.sucursal} · {t.marca}
-                              </div>
+                            <div className="truncate text-[12px] font-semibold leading-tight flex-1">
+                              {cli?.nombre ?? "Sin cliente"}
                             </div>
                             <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium", prioridadBadge(t.prioridad))}>
                               {prioLabel.charAt(0)}
                             </Badge>
                           </div>
 
-                          <div className="mt-1.5 line-clamp-2 text-[11px] text-foreground/80 leading-snug">
+                          <div className="mt-1 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
                             {t.descripcion_problema}
                           </div>
 
-                          {proxima ? (
-                            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <CalendarDays className="h-3 w-3" />
-                              <span className="tabular-nums">
-                                {format(parseISO(proxima.fecha_programada), "dd/MM")}
-                              </span>
-                              {futurosActivos.length > 1 && (
-                                <span className="text-foreground/60">+{futurosActivos.length - 1}</span>
+                          {(proxima || pendCount > 0) && (
+                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                              {proxima && (
+                                <span className="flex items-center gap-0.5">
+                                  <CalendarDays className="h-3 w-3" />
+                                  <span className="tabular-nums">
+                                    {format(parseISO(proxima.fecha_programada), "dd/MM")}
+                                  </span>
+                                </span>
+                              )}
+                              {pendCount > 0 && (
+                                <span>· {pendCount} pend.</span>
                               )}
                             </div>
-                          ) : (
-                            progs.length > 0 && (
-                              <div className="mt-1.5 text-[10px] text-muted-foreground italic">
-                                {progs.length} agenda{progs.length !== 1 ? "s" : ""}
-                              </div>
-                            )
                           )}
                         </button>
                       );
                     })}
+
 
                     {restantes > 0 && (
                       <button
