@@ -864,6 +864,10 @@ export type Database = {
           ult_servicio: string
         }[]
       }
+      recalcular_estado_trabajo: {
+        Args: { p_trabajo_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "cabecilla" | "tecnico"
