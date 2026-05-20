@@ -105,7 +105,8 @@ export default function Trabajos() {
       if (query) {
         const cli = t.cliente_id ? clienteMap.get(t.cliente_id)?.nombre ?? "" : "";
         if (!cli.toLowerCase().includes(query)
-          && !t.descripcion_problema.toLowerCase().includes(query)) return false;
+          && !t.descripcion_problema.toLowerCase().includes(query)
+          && !(t.codigo ?? "").toLowerCase().includes(query)) return false;
       }
       if (fFecha || fSemana !== "all") {
         const progs = agendasByTrabajo.get(t.id) ?? [];
