@@ -715,6 +715,11 @@ export default function Calendario() {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <TipoIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {codigoByServicio.get(s.id) && (
+                          <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
+                            {codigoByServicio.get(s.id)}
+                          </span>
+                        )}
                         <span className="truncate text-sm font-medium">{clienteNombre(s.cliente_id)}</span>
                       </div>
                       <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
