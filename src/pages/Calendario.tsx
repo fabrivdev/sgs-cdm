@@ -460,9 +460,9 @@ export default function Calendario() {
                                       "block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
                                       estadoColor(s.estado),
                                     )}
-                                    title={`${clienteNombre(s.cliente_id)} — ${s.trabajo_descripcion}`}
+                                    title={`${codigoByServicio.get(s.id) ?? ""} ${clienteNombre(s.cliente_id)} — ${s.trabajo_descripcion}`}
                                   >
-                                    {clienteNombre(s.cliente_id)}
+                                    {codigoByServicio.get(s.id) ? `${codigoByServicio.get(s.id)} · ` : ""}{clienteNombre(s.cliente_id)}
                                   </button>
                                 ))
                               )}
