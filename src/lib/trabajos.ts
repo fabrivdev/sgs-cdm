@@ -1,70 +1,70 @@
--- 1) Normalizar estados viejos
+export const ESTADOS_TRABAJO = [
+  { key: "pendiente", label: "Pendiente", color: "bg-amber-50 border-amber-200" },
+  { key: "programado", label: "Programado", color: "bg-blue-50 border-blue-200" },
+  { key: "iniciado", label: "Iniciado", color: "bg-emerald-50 border-emerald-200" },
+  { key: "completado", label: "Completado", color: "bg-green-50 border-green-200" },
+] as const;
 
-UPDATE public.jornadas
-SET estado_jornada = 'completada'::public.estado_jornada
-WHERE estado_jornada::text IN ('en_curso', 'incompleta');
+export type EstadoTrabajo = (typeof ESTADOS_TRABAJO)[number]["key"];
 
-UPDATE public.trabajos
-SET estado_general = 'iniciado'::public.estado_trabajo
-WHERE estado_general::text = 'en_pausa';
+export function normalizarEstadoTrabajo(estado: string | null | undefined): EstadoTrabajo {
+  switch (estado) {
+    case "programado":
+      return "programado";
+    case "iniciado":
+    case "en_ejecucion":
+    case "en_pausa":
+    case "bloqueado":
+      return "iniciado";
+    case "completado":
+    case "cerrado":
+    case "terminado_pendiente_validar":
+      return "completado";
+    case "pendiente":
+    case "nuevo":
+    case "pendiente_diagnostico":
+    case "pendiente_programar":
+    default:
+      return "pendiente";
+  }
+}
 
+export function estadoTrabajoLabel(estado: string | null | undefined) {
+  const key = normalizarEstadoTrabajo(estado);
+  return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
+}
 
+export const PRIORIDADES = [
+  { key: "baja", label: "Baja" },
+  { key: "media", label: "Media" },
+  { key: "alta", label: "Alta" },
+  { key: "urgente", label: "Urgente" },
+] as const;
+export type Prioridad = (typeof PRIORIDADES)[number]["key"];
 
--- 2) Reemplazar función de recalculo
+export const ESTADOS_JORNADA = [
+  { key: "completada", label: "Completada" },
+] as const;
+export type EstadoJornada = "completada";
 
-CREATE OR REPLACE FUNCTION public.recalcular_estado_trabajo(p_trabajo_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO public
-AS $$
-DECLARE
-  v_cnt_jornadas int;
-  v_cnt_agendas_pendientes int;
-  v_nuevo public.estado_trabajo;
-BEGIN
+export function estadoJornadaLabel() {
+  return "Completada";
+}
 
-  SELECT COUNT(*) INTO v_cnt_jornadas
-  FROM public.jornadas
-  WHERE trabajo_id = p_trabajo_id;
+export function prioridadBadge(p: Prioridad) {
+  switch (p) {
+    case "urgente": return "bg-red-600 text-white";
+    case "alta": return "bg-orange-500 text-white";
+    case "media": return "bg-blue-500 text-white";
+    case "baja": return "bg-slate-400 text-white";
+  }
+}
 
-  SELECT COUNT(*) INTO v_cnt_agendas_pendientes
-  FROM public.programaciones p
-  WHERE p.trabajo_id = p_trabajo_id
-    AND NOT EXISTS (
-      SELECT 1
-      FROM public.jornadas j
-      WHERE j.programacion_id = p.id
-    );
-
-  IF v_cnt_jornadas = 0 AND v_cnt_agendas_pendientes = 0 THEN
-    v_nuevo := 'pendiente'::public.estado_trabajo;
-
-  ELSIF v_cnt_jornadas = 0 AND v_cnt_agendas_pendientes > 0 THEN
-    v_nuevo := 'programado'::public.estado_trabajo;
-
-  ELSIF v_cnt_jornadas > 0 AND v_cnt_agendas_pendientes > 0 THEN
-    v_nuevo := 'iniciado'::public.estado_trabajo;
-
-  ELSE
-    v_nuevo := 'completado'::public.estado_trabajo;
-  END IF;
-
-  UPDATE public.trabajos
-  SET estado_general = v_nuevo
-  WHERE id = p_trabajo_id;
-
-END;
-$$;
-
-
-
--- 3) Recalcular todos los trabajos
-
-DO $$
-DECLARE r record;
-BEGIN
-  FOR r IN SELECT id FROM public.trabajos LOOP
-    PERFORM public.recalcular_estado_trabajo(r.id);
-  END LOOP;
-END $$;
+export function calcularHoras(inicio?: string | null, fin?: string | null): number | null {
+  if (!inicio || !fin) return null;
+  const [hi, mi] = inicio.split(":").map(Number);
+  const [hf, mf] = fin.split(":").map(Number);
+  const mins = (hf * 60 + mf) - (hi * 60 + mi);
+  if (mins <= 0) return null;
+  return Math.round((mins / 60) * 100) / 100;
+}
