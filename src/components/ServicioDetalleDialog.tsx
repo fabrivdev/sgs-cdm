@@ -107,22 +107,26 @@ export function ServicioDetalleDialog({
   // Jornadas
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loadingJornadas, setLoadingJornadas] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
-  const [trabajoCodigo, setTrabajoCodigo] = useState<string | null>(null);
+  const [trabajoMadre, setTrabajoMadre] = useState<{
+    id: string;
+    codigo: string | null;
+    descripcion_problema: string;
+    cliente_id: string | null;
+    sucursal: Sucursal;
+    marca: Marca;
+    tipo_trabajo: TipoTrabajo;
+    estado_general: string;
+    prioridad?: string;
+    legacy_servicio_id?: string | null;
+  } | null>(null);
+  const [programarOpen, setProgramarOpen] = useState(false);
 
   // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
 
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
   const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
-
-  // Form para nueva jornada (crew elegible, no se hereda)
-  const [nuevaJornada, setNuevaJornada] = useState<{
-    fecha: string;
-    tecnico_principal_id: string | null;
-    auxiliares: string[];
-  }>({ fecha: format(new Date(), "yyyy-MM-dd"), tecnico_principal_id: null, auxiliares: [] });
 
   useEffect(() => {
     supabase.from("user_roles").select("user_id, role").then(({ data }) => {
