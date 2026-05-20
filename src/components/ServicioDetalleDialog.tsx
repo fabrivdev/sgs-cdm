@@ -418,6 +418,11 @@ export function ServicioDetalleDialog({
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
               <DialogTitle className="flex items-center gap-2 flex-wrap pr-8">
+                {trabajoCodigo && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
+                    {trabajoCodigo}
+                  </span>
+                )}
                 Detalle del servicio
                 <MarcaBadge marca={servicio.marca} />
                 <Badge variant="outline" className="gap-1 text-[10px]">
