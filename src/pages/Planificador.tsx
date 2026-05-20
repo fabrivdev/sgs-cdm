@@ -222,11 +222,12 @@ export default function Planificador() {
       if (fEstado !== "all" && s.estado !== fEstado) return false;
       if (q) {
         const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
-        if (!nombre.toLowerCase().includes(q)) return false;
+        const codigo = codigoByServicio.get(s.id) ?? "";
+        if (!nombre.toLowerCase().includes(q) && !codigo.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById, codigoByServicio]);
 
   // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
   const fechasPorServicio = useMemo(() => {
