@@ -655,7 +655,7 @@ export default function Planificador() {
         onOpenChange={setOpenProgramar}
         trabajos={trabajosLite}
         clientes={clientes}
-        tecnicos={profiles}
+        tecnicos={tecnicosSolo}
         onSaved={load}
       />
     </div>
