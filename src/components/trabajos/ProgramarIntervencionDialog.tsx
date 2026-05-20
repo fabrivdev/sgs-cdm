@@ -34,6 +34,85 @@ export function ProgramarIntervencionDialog({ open, onOpenChange, trabajoId, tec
   });
   const [busy, setBusy] = useState(false);
 
+  const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+  const getDiaSemana = (yyyyMmDd: string) => {
+    const d = new Date(`${yyyyMmDd}T00:00:00`);
+    return dias[d.getDay()];
+  };
+
+  const getSemana = (yyyyMmDd: string) => {
+    const d = new Date(`${yyyyMmDd}T00:00:00`);
+    const start = new Date(d.getFullYear(), 0, 1);
+    const diff = Math.floor((d.getTime() - start.getTime()) / 86400000);
+    return Math.ceil((diff + start.getDay() + 1) / 7);
+  };
+
+  const syncLegacyPlanificador = async (programacionId: string) => {
+    const { data: trabajo, error: errTrabajo } = await supabase
+      .from("trabajos")
+      .select("*")
+      .eq("id", trabajoId)
+      .single();
+
+    if (errTrabajo) throw errTrabajo;
+
+    const servicioPayload = {
+      fecha_programada: form.fecha_programada,
+      sucursal: trabajo.sucursal,
+      marca: trabajo.marca,
+      tipo_trabajo: trabajo.tipo_trabajo,
+      tecnico_responsable_id: form.tecnico_principal_id || null,
+      auxiliares: form.auxiliares,
+      cliente_id: trabajo.cliente_id,
+      trabajo_descripcion: trabajo.descripcion_problema,
+      observaciones: form.observacion.trim() || form.accion_programada.trim() || null,
+      creado_por: user?.id,
+      dia_semana: getDiaSemana(form.fecha_programada),
+      semana: getSemana(form.fecha_programada),
+      estado: "Pendiente",
+    };
+
+    let servicioId = trabajo.legacy_servicio_id as string | null;
+
+    if (servicioId) {
+      const { error } = await supabase.from("servicios").update(servicioPayload).eq("id", servicioId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await supabase.from("servicios").insert(servicioPayload).select("id").single();
+      if (error) throw error;
+      servicioId = data.id;
+
+      const { error: errUpdate } = await supabase
+        .from("trabajos")
+        .update({ legacy_servicio_id: servicioId })
+        .eq("id", trabajoId);
+
+      if (errUpdate) throw errUpdate;
+    }
+
+    const { data: jornadaExistente, error: errJornadaFind } = await supabase
+      .from("servicio_jornadas")
+      .select("id")
+      .eq("servicio_id", servicioId)
+      .eq("fecha", form.fecha_programada)
+      .maybeSingle();
+
+    if (errJornadaFind) throw errJornadaFind;
+
+    if (!jornadaExistente?.id) {
+      const { error } = await supabase
+        .from("servicio_jornadas")
+        .insert({
+          servicio_id: servicioId,
+          fecha: form.fecha_programada,
+          estado: "Pendiente",
+        });
+
+      if (error) throw error;
+    }
+  };
+
   useEffect(() => {
     if (open) {
       setForm({
@@ -50,6 +129,7 @@ export function ProgramarIntervencionDialog({ open, onOpenChange, trabajoId, tec
 
   const guardar = async () => {
     if (!form.fecha_programada) { toast.error("Fecha requerida"); return; }
+    if (!form.tecnico_principal_id) { toast.error("Seleccioná técnico principal"); return; }
     setBusy(true);
     try {
       if (reprogramarDe) {
@@ -59,7 +139,7 @@ export function ProgramarIntervencionDialog({ open, onOpenChange, trabajoId, tec
         }).eq("id", reprogramarDe.id);
         if (e1) throw e1;
       }
-      const { error } = await supabase.from("programaciones").insert({
+      const { data: nuevaProgramacion, error } = await supabase.from("programaciones").insert({
         trabajo_id: trabajoId,
         fecha_programada: form.fecha_programada,
         tecnico_principal_id: form.tecnico_principal_id || null,
@@ -69,14 +149,19 @@ export function ProgramarIntervencionDialog({ open, onOpenChange, trabajoId, tec
         observacion: form.observacion.trim() || null,
         reemplaza_a: reprogramarDe?.id ?? null,
         creado_por: user?.id,
-      });
+      }).select("id").single();
       if (error) throw error;
 
-      // Si el trabajo estaba en pendiente_programar/nuevo/pendiente_diagnostico → pasarlo a programado
-      const { data: t } = await supabase.from("trabajos").select("estado_general").eq("id", trabajoId).single();
-      if (t && ["nuevo", "pendiente_diagnostico", "pendiente_programar"].includes(t.estado_general)) {
-        await supabase.from("trabajos").update({ estado_general: "programado" }).eq("id", trabajoId);
-      }
+      await supabase
+        .from("trabajos")
+        .update({
+          estado_general: "programado",
+          fecha_compromiso: form.fecha_programada,
+          responsable_principal_id: form.tecnico_principal_id || null,
+        })
+        .eq("id", trabajoId);
+
+      await syncLegacyPlanificador(nuevaProgramacion.id);
 
       toast.success(reprogramarDe ? "Reprogramado" : "Intervención programada");
       onSaved();
@@ -109,8 +194,8 @@ export function ProgramarIntervencionDialog({ open, onOpenChange, trabajoId, tec
             <Label>Técnico principal</Label>
             <Select value={form.tecnico_principal_id || "none"}
               onValueChange={(v) => setForm(f => ({ ...f, tecnico_principal_id: v === "none" ? "" : v }))}>
-              <SelectTrigger><SelectValue placeholder="Asignar" /></SelectTrigger>
-              <SelectContent className="max-h-[300px]">
+              <SelectTrigger className="w-full"><SelectValue placeholder="Asignar" /></SelectTrigger>
+              <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
                 <SelectItem value="none">— Sin asignar —</SelectItem>
                 {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)}
               </SelectContent>
@@ -133,10 +218,10 @@ export function ProgramarIntervencionDialog({ open, onOpenChange, trabajoId, tec
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Acción programada</Label>
+            <Label>Trabajo previsto para esta visita</Label>
             <Textarea rows={2} value={form.accion_programada}
               onChange={(e) => setForm(f => ({ ...f, accion_programada: e.target.value }))}
-              placeholder="Qué se va a hacer en esta visita..." />
+              placeholder="Ej: revisar pérdida, cambiar buje, diagnosticar falla..." />
           </div>
           <div className="space-y-1.5">
             <Label>Observación</Label>
