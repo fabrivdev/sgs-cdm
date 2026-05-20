@@ -34,8 +34,7 @@ const MAX_VISIBLES = 5;
 
 export default function Trabajos() {
   const [trabajos, setTrabajos] = useState<any[]>([]);
-  const [progByTrabajo, setProgByTrabajo] = useState<Map<string, any[]>>(new Map());
-  const [jornadasByProgramacion, setJornadasByProgramacion] = useState<Map<string, any[]>>(new Map());
+  const [agendasByTrabajo, setAgendasByTrabajo] = useState<Map<string, any[]>>(new Map());
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,28 +53,28 @@ export default function Trabajos() {
   const load = async () => {
     setLoading(true);
     try {
-      const [t, p, j, c, pr] = await Promise.all([
+      const [t, sj, c, pr] = await Promise.all([
         cargarTodo<any>(supabase.from("trabajos").select("*").order("actualizado_en", { ascending: false })),
-        cargarTodo<any>(supabase.from("programaciones").select("id, trabajo_id, fecha_programada, tecnico_principal_id").order("fecha_programada", { ascending: true })),
-        cargarTodo<any>(supabase.from("jornadas").select("id, programacion_id, estado_jornada")),
+        cargarTodo<any>(supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, tecnico_responsable_id").order("fecha", { ascending: true })),
         cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal").order("nombre")),
         cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal").order("nombre")),
       ]);
       setTrabajos(t);
-      const map = new Map<string, any[]>();
-      for (const x of p) {
-        const arr = map.get(x.trabajo_id) ?? [];
-        arr.push(x); map.set(x.trabajo_id, arr);
-      }
-      setProgByTrabajo(map);
 
-      const jMap = new Map<string, any[]>();
-      for (const x of j) {
-        if (!x.programacion_id) continue;
-        const arr = jMap.get(x.programacion_id) ?? [];
-        arr.push(x); jMap.set(x.programacion_id, arr);
+      // Mapear servicio_jornadas → trabajo via legacy_servicio_id
+      const servToTrabajo = new Map<string, string>();
+      for (const tr of t) {
+        if (tr.legacy_servicio_id) servToTrabajo.set(tr.legacy_servicio_id, tr.id);
       }
-      setJornadasByProgramacion(jMap);
+      const map = new Map<string, any[]>();
+      for (const x of sj) {
+        const trabajoId = servToTrabajo.get(x.servicio_id);
+        if (!trabajoId) continue;
+        const arr = map.get(trabajoId) ?? [];
+        arr.push({ ...x, fecha_programada: x.fecha });
+        map.set(trabajoId, arr);
+      }
+      setAgendasByTrabajo(map);
 
       setClientes(c);
       setProfiles(pr);
@@ -90,11 +89,12 @@ export default function Trabajos() {
 
   const semanasDisponibles = useMemo(() => {
     const s = new Set<number>();
-    for (const arr of progByTrabajo.values()) {
+    for (const arr of agendasByTrabajo.values()) {
       for (const p of arr) s.add(getISOWeek(parseISO(p.fecha_programada)));
     }
     return Array.from(s).sort((a, b) => a - b);
-  }, [progByTrabajo]);
+  }, [agendasByTrabajo]);
+
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
