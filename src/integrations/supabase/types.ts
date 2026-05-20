@@ -883,6 +883,10 @@ export type Database = {
         | "bloqueado"
         | "terminado_pendiente_validar"
         | "cerrado"
+        | "pendiente"
+        | "iniciado"
+        | "en_pausa"
+        | "completado"
       marca: "CLAAS" | "HORSCH" | "OTROS"
       prioridad_trabajo: "baja" | "media" | "alta" | "urgente"
       resultado_seguimiento:
@@ -1067,6 +1071,10 @@ export const Constants = {
         "bloqueado",
         "terminado_pendiente_validar",
         "cerrado",
+        "pendiente",
+        "iniciado",
+        "en_pausa",
+        "completado",
       ],
       marca: ["CLAAS", "HORSCH", "OTROS"],
       prioridad_trabajo: ["baja", "media", "alta", "urgente"],
