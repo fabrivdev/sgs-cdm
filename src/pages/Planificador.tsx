@@ -384,7 +384,7 @@ export default function Planificador() {
         />
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
-          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: e }))]}
+          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
         />
         <FilterSelect
           label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
