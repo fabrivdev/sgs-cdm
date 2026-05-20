@@ -1,83 +1,140 @@
-## Objetivo
 
-Corregir la lógica conceptual de **Agenda**, **Jornada** y **Estado del Trabajo** antes de tocar UI. Una agenda futura es solo una visita prevista; la jornada es el resultado real (solo Realizada / No realizada); el estado del trabajo se deriva automáticamente.
+# Rediseño UI/UX módulo Trabajos
 
-## Modelo conceptual final
+## 1. Nuevo componente base: `ResponsiveDrawer`
 
-- **Agenda** (`servicio_jornadas` actual usada como "agenda"): visita planificada con una fecha. No tiene estado de resultado propio; mientras la fecha no llega, simplemente está pendiente de ejecutarse.
-- **Jornada** (resultado de una agenda): solo dos resultados posibles → `Realizada` o `No realizada`.
-- **Trabajo** (`trabajos.estado_general`): siempre derivado, nunca manual.
+Crear `src/components/ui/responsive-drawer.tsx` que envuelva:
+- Desktop (`md+`): `Sheet` de shadcn con `side="right"`, ancho `w-full sm:max-w-xl lg:max-w-2xl`.
+- Mobile: el mismo `Sheet` con `side="bottom"` y altura `h-[92vh] rounded-t-2xl`.
+- Estructura interna fija: `Header` sticky · `Body` scrolleable · `Footer` sticky con acciones.
+- Botón de cerrar siempre visible.
+- Permite seguir viendo el Kanban detrás (overlay translúcido, no bloqueante visual).
 
-## Cambios en base de datos
+Este componente reemplaza a `Dialog` en todos los flujos de Trabajos.
 
-### 1. Enum de resultado de jornada
-Actualmente `estado_servicio` se usa para marcar agendas/jornadas con `Pendiente` / `Completado` / `Cancelada`. Reinterpretarlo así:
-- `Pendiente` = agenda aún sin resultado cargado (independiente de si la fecha pasó o no).
-- `Completado` → renombrar conceptualmente a **Realizada** (mantener valor enum por compatibilidad, mapearlo en UI).
-- `Cancelada` → renombrar conceptualmente a **No realizada**.
+## 2. Reemplazo del detalle del trabajo
 
-No se introducen estados nuevos (incompleta, en curso, pausa, bloqueado quedan fuera, como ya estaba).
+Reescribir `TrabajoDetalleDialog.tsx` → `TrabajoDetalleDrawer.tsx`. Sin tabs. Vista única scrolleable con estas secciones en orden:
 
-### 2. Reescribir `recalcular_estado_trabajo(p_trabajo_id)`
+### 2.1 Header fijo
+- Código `TR-000048` en mono.
+- Cliente · Marca · Sucursal (chips).
+- Badges: Prioridad + Estado del trabajo.
+- Línea de microcopy según estado:
+  - pendiente: "Aún no tiene fechas programadas."
+  - programado: "Tiene fechas previstas, todavía sin jornadas."
+  - iniciado: "El trabajo está activo y puede recibir nuevas jornadas."
+  - completado: "Todas las fechas tienen jornada y no quedan pendientes."
 
-Nueva lógica (sobre `servicio_jornadas` del `legacy_servicio_id` del trabajo):
+### 2.2 Tarjeta destacada "Próxima acción"
+Lógica derivada en cliente desde `programaciones` + `jornadas`:
 
 ```text
-hoy            := CURRENT_DATE
-realizadas     := count(estado = 'Completado')              -- jornadas Realizadas
-no_realizadas  := count(estado = 'Cancelada')               -- jornadas No realizadas
-agenda_futura  := count(estado = 'Pendiente' AND fecha >= hoy)
-agenda_vencida := count(estado = 'Pendiente' AND fecha <  hoy)  -- pendiente de cierre
-
-SI realizadas = 0 Y agenda_futura = 0 Y agenda_vencida = 0  → 'pendiente'
-SI realizadas = 0 Y agenda_futura > 0                       → 'programado'
-SI realizadas = 0 Y agenda_vencida > 0                      → 'programado'   -- pendiente de cierre, no completado
-SI realizadas > 0 Y (agenda_futura > 0 OR agenda_vencida > 0) → 'iniciado'
-SI realizadas > 0 Y agenda_futura = 0 Y agenda_vencida = 0  → 'completado'
+pendientes  = programaciones cuya fecha no tiene jornada asociada
+futuras     = pendientes con fecha >= hoy
+vencidas    = pendientes con fecha <  hoy
 ```
 
-Notas clave:
-- Una agenda pasada sin jornada cargada **nunca** mueve a `completado` ni a `iniciado`. Cuenta como pendiente de cierre y mantiene el trabajo en `programado` (o `iniciado` si ya había realizadas previas).
-- Jornadas `No realizada` (Cancelada) **no cuentan como avance**: si solo hay no_realizadas y no hay agenda futura ni vencida pendiente, el trabajo vuelve a `pendiente`. Si hay no_realizadas + agenda futura → `programado`.
-- Resultado idéntico al set de ejemplos del usuario.
+Estados de la tarjeta:
+- Sin programaciones → "Programá la primera fecha" · CTA *Programar fecha*.
+- `futuras > 0` → "Próxima visita: {fecha} con {técnico}" · CTA *Cargar jornada de esa fecha* (si ya pasó) o *Reprogramar*.
+- `vencidas > 0` → "Hay {n} fecha(s) sin jornada cargada" · CTA *Cargar jornada*.
+- `pendientes == 0 && jornadas > 0` → caso TR-000048: "No hay fechas pendientes para continuar. Las {n} fechas ya tienen jornada. Si el trabajo debe seguir otro día, programá una nueva fecha." · CTA principal *Programar nueva fecha*, secundaria *Ver jornadas*.
+- estado `completado` → "Trabajo cerrado" · CTA *Reabrir* (si corresponde).
 
-### 3. Triggers
-Los triggers existentes (`trg_recalc_trabajo_from_servicio_jornada`, `trg_recalc_trabajo_on_link`) ya disparan recálculo en INSERT/UPDATE/DELETE de `servicio_jornadas` y en cambios de `legacy_servicio_id`. Se mantienen.
+### 2.3 Resumen operativo
+Reemplaza al tab "Resumen". Grid 2 columnas en desktop:
+- Problema reportado, Tipo, Estado actual.
+- Fechas programadas, Fechas pendientes, Jornadas cargadas, Horas acumuladas, Última actividad.
+- Párrafo interpretativo derivado de la misma lógica de "Próxima acción".
 
-**Agregar**: job/recalculo diario opcional (fuera de alcance ahora). El recálculo se hace en cada mutación, suficiente para la operativa.
+### 2.4 Fechas y jornadas (unificadas)
+Una sola lista cronológica descendente. Cada item es un `card` que combina programación + jornada (si existe), evitando duplicados:
 
-### 4. Backfill
-Recalcular `estado_general` de **todos** los trabajos existentes con la nueva fórmula una vez aplicada la función.
+- Fecha grande + día de semana.
+- Técnico principal + auxiliares.
+- Badge de estado de fila:
+  - `Fecha pendiente` (futura sin jornada)
+  - `Pendiente de cargar jornada` (vencida sin jornada)
+  - `Jornada incompleta`
+  - `Jornada completada`
+  - `Fecha reprogramada`
+  - `Fecha cancelada`
+- Acciones según estado:
+  - Pendiente: *Cargar jornada* · *Reprogramar* · *Cancelar fecha*.
+  - Con jornada: *Ver detalle* · *Editar jornada*.
+- Si la jornada tiene observaciones / horas, mostrarlas inline.
 
-## Cambios en frontend (terminología, sin rediseño)
+Botón al pie de la sección: *+ Programar nueva fecha*.
 
-Solo renombres de etiquetas y opciones — sin tocar layouts. Se hace en este mismo paso para que la UI no contradiga la lógica nueva.
+### 2.5 Historial humanizado
+Helper nuevo `src/lib/historial.ts` con `formatEvento(evento)` que mapea `tipo_evento` + `payload` a texto natural:
 
-- `src/lib/constants.ts` → `ESTADOS` actual `["Pendiente","Completado","Cancelada"]` se conserva como valores DB, pero se agregan labels:
-  - `Pendiente` → "Pendiente"
-  - `Completado` → "Realizada"
-  - `Cancelada` → "No realizada"
-- `src/components/StatusBadges.tsx` (`EstadoBadge`) → usar los nuevos labels.
-- `src/lib/trabajos.ts` (`ESTADOS_JORNADA`, `estadoJornadaLabel`) → solo dos resultados `Realizada` / `No realizada` (mapeados a `completada` / `incompleta` legacy si aplica en `jornadas` aparte, o ignorado si esa tabla quedó muerta).
-- Diálogo `CargarJornadaDialog.tsx` y `ServicioDetalleDialog.tsx` → botones "Marcar como Realizada" / "Marcar como No realizada" (en vez de Completada / Cancelada).
-- Kanban `Trabajos.tsx`, `Calendario.tsx`, `Planificador.tsx` → contar `futurosActivos` con la nueva semántica (`fecha >= hoy` y `estado='Pendiente'`); las vencidas sin cierre se muestran como "pendiente de cierre" en lugar de futuras.
+| tipo_evento | Texto |
+|---|---|
+| `trabajo_creado` | "Se creó el trabajo." |
+| `cambio_estado` | "El trabajo cambió de {de} a {a}." |
+| `programacion_creada` | "Se programó una nueva fecha para {fecha} con {tecnico}." |
+| `programacion_actualizada` | "Se modificó la programación del {fecha}." |
+| `programacion_eliminada` | "Se eliminó la programación del {fecha}." |
+| `jornada_creada` | "Se cargó una jornada del {fecha} ({estado})." |
+| `jornada_actualizada` | "Se actualizó una jornada: pasó de {de} a {a}." |
+| `jornada_eliminada` | "Se eliminó una jornada del {fecha}." |
 
-No se tocan: layouts, filtros, columnas, diseño visual.
+Cada item: timestamp formato `es-PY` + texto humano + collapsible "Ver detalle técnico" con el JSON.
 
-## Fuera de alcance
+### 2.6 Footer fijo con acciones contextuales
+Mapeo por estado del trabajo:
 
-- Rediseño de modales o vistas.
-- Renombrar enums en DB (`Completado`/`Cancelada` siguen siendo los valores físicos; cambia solo la lectura).
-- Nuevos estados de trabajo: se mantienen `pendiente`, `programado`, `iniciado`, `completado`.
+- `pendiente`: *Programar fecha* (primaria) · *Editar* · overflow: *Eliminar*.
+- `programado`: *Cargar jornada* (si hay fecha vencida o de hoy) o *Reprogramar* (si todo futuro) · *Programar otra fecha* · overflow: *Editar / Cancelar trabajo*.
+- `iniciado`:
+  - si hay pendientes: *Cargar jornada* primaria, *Programar otra fecha* secundaria.
+  - si no hay pendientes: *Programar nueva fecha* primaria, *Ver jornadas* secundaria.
+  - overflow: *Pausar / Completar (solo si no quedan pendientes) / Editar*.
+- `completado`: *Ver resumen* · *Reabrir*.
+
+"Completar trabajo" nunca aparece si quedan fechas pendientes.
+
+## 3. Formularios migrados al patrón drawer
+
+Todos pasan a usar `ResponsiveDrawer` (header sticky · body scroll · footer con Cancelar + acción primaria):
+
+- `NuevoTrabajoDialog` → `NuevoTrabajoDrawer` (sirve también para Editar).
+- `ProgramarIntervencionDialog` → `ProgramarFechaDrawer` con subtítulo `TR-XXXX · Cliente`, campos: Fecha, Técnico principal (TecnicosPicker), Auxiliar, Acción prevista, Observaciones.
+- `CargarJornadaDialog` → `CargarJornadaDrawer` con campos: Fecha, Técnico, Horas reales, Trabajo realizado, Observaciones, Estado (Incompleta / Completada). Tras guardar, dispara `recalcular_estado_trabajo` y refresca el detalle.
+- Nuevos micro-drawers: *Reprogramar fecha*, *Cancelar fecha*, *Pausar trabajo*, *Completar trabajo* (con confirmación + validación de pendientes), *Eliminar trabajo*.
+
+Cuando un sub-drawer se abre desde el detalle, se apila encima sin cerrar el de fondo (mobile: el bottom sheet superior cubre el otro).
+
+## 4. Integración en el resto del módulo
+- `Trabajos.tsx` (Kanban): al clickear card abrir el nuevo `TrabajoDetalleDrawer` en lugar del dialog.
+- `Planificador.tsx` y `Calendario.tsx`: usar el mismo drawer al abrir un trabajo.
+- Mantener búsqueda por `TR-XXXX`, estados y lógica de `recalcular_estado_trabajo` actuales — sin cambios de backend.
+
+## 5. Diseño visual
+- Tokens semánticos existentes (`bg-card`, `bg-muted`, `border`, `text-muted-foreground`).
+- Badges con colores derivados del estado (reutilizar `StatusBadges`).
+- Cards de fechas con borde izquierdo de color según estado para escaneo rápido.
+- Sin tabs en el detalle; sí secciones colapsables para "Historial" y "Resumen operativo" en mobile.
 
 ## Detalles técnicos
 
-Archivos a modificar:
-- **Migración SQL**: `recalcular_estado_trabajo` (reemplazar función) + UPDATE de backfill iterando `trabajos`.
-- `src/lib/constants.ts`, `src/lib/trabajos.ts`
-- `src/components/StatusBadges.tsx`
-- `src/components/ServicioDetalleDialog.tsx`
-- `src/components/trabajos/CargarJornadaDialog.tsx`
-- `src/pages/Trabajos.tsx`, `src/pages/Calendario.tsx`, `src/pages/Planificador.tsx` (solo cálculo de "futurosActivos" + labels)
+Archivos nuevos:
+- `src/components/ui/responsive-drawer.tsx`
+- `src/components/trabajos/TrabajoDetalleDrawer.tsx`
+- `src/components/trabajos/ProximaAccionCard.tsx`
+- `src/components/trabajos/FechasJornadasList.tsx`
+- `src/components/trabajos/HistorialList.tsx`
+- `src/components/trabajos/drawers/ProgramarFechaDrawer.tsx`
+- `src/components/trabajos/drawers/CargarJornadaDrawer.tsx`
+- `src/components/trabajos/drawers/ReprogramarFechaDrawer.tsx`
+- `src/lib/historial.ts` (formateo humano)
+- `src/lib/trabajo-derivado.ts` (cálculo de pendientes/futuras/vencidas y "próxima acción")
 
-Aprobación: la migración SQL se ejecuta primero, luego los renombres de UI.
+Archivos editados:
+- `Trabajos.tsx`, `Planificador.tsx`, `Calendario.tsx`: cambiar uso del dialog por drawer.
+- `NuevoTrabajoDialog.tsx`, `ProgramarIntervencionDialog.tsx`, `CargarJornadaDialog.tsx`: portar contenido al nuevo wrapper o reemplazar.
+- `ServicioDetalleDialog.tsx`: alinear estilo al nuevo patrón.
+
+Sin migraciones de base de datos. La lógica de estados/triggers ya implementada se conserva.
