@@ -91,8 +91,8 @@ interface UltimoSeguimiento {
 
 const COLORS_ESTADO: Record<Estado, string> = {
   Pendiente: "#EF9F27",
-  Iniciado: "#378ADD",
   Completado: "#639922",
+  Cancelada: "#9CA3AF",
 };
 
 const COLORS_MARCA: Record<Marca, string> = {
