@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader,
+  ResponsiveDrawerBody,
+  ResponsiveDrawerFooter,
+} from "@/components/ui/responsive-drawer";
 import {
   AlertDialog,
   AlertDialogAction,
