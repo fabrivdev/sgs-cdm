@@ -117,6 +117,7 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, profil
       .update({ cerrado_en: new Date().toISOString(), cerrado_por: (await supabase.auth.getUser()).data.user?.id ?? null })
       .eq("id", trabajo.id);
     if (error) { toast.error(error.message); return; }
+    await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajo.id });
     toast.success("Trabajo cerrado");
     cargar(); onChanged();
   };
