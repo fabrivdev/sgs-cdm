@@ -270,9 +270,10 @@ export function ServicioDetalleDialog({
     }
   };
 
-  const addJornada = async (date: Date | undefined) => {
-    if (!date) return;
-    const fecha = format(date, "yyyy-MM-dd");
+  const addJornada = async () => {
+    const { fecha, tecnico_principal_id, auxiliares } = nuevaJornada;
+    if (!fecha) { toast.error("Fecha requerida"); return; }
+    if (!tecnico_principal_id) { toast.error("Marcá un técnico principal (estrella)"); return; }
 
     if (fechasExistentes.has(fecha)) {
       toast.error("Ya existe una jornada en esa fecha.");
@@ -284,6 +285,8 @@ export function ServicioDetalleDialog({
       servicio_id: servicio.id,
       fecha,
       estado: "Pendiente" as Estado,
+      tecnico_responsable_id: tecnico_principal_id,
+      auxiliares,
     });
     setBusy(false);
 
@@ -292,7 +295,13 @@ export function ServicioDetalleDialog({
       return;
     }
 
-    setAddDateOpen(false);
+    setAddOpen(false);
+    setNuevaJornada({
+      fecha: format(new Date(), "yyyy-MM-dd"),
+      tecnico_principal_id: null,
+      auxiliares: [],
+    });
+
     const nuevaLista = [
       ...jornadas,
       {
