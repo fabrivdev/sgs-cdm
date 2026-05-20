@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody, ResponsiveDrawerFooter } from "@/components/ui/responsive-drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -133,12 +133,15 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Cargar resultado de jornada</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">
+      <ResponsiveDrawerHeader>
+        <h2 className="text-base font-semibold">Cargar jornada</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          Registrá el resultado real de una visita.
+        </p>
+      </ResponsiveDrawerHeader>
 
+      <ResponsiveDrawerBody>
         <div className="grid gap-3">
           <div className="space-y-1.5">
             <Label>Resultado</Label>
@@ -206,7 +209,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
           <div className="space-y-1.5">
             <Label>Observación</Label>
             <Textarea
-              rows={3}
+              rows={4}
               value={form.observaciones}
               onChange={(e) => setForm(f => ({ ...f, observaciones: e.target.value }))}
               placeholder={
@@ -218,19 +221,19 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Si el trabajo necesita continuar otro día, guardá esta jornada como Realizada y programá una nueva fecha en el Planificador.
+            Si el trabajo necesita continuar otro día, guardá esta jornada como Realizada y programá una nueva fecha.
           </p>
         </div>
+      </ResponsiveDrawerBody>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            Cancelar
-          </Button>
-          <Button onClick={guardar} disabled={busy}>
-            {busy ? "Guardando…" : "Guardar"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <ResponsiveDrawerFooter>
+        <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+          Cancelar
+        </Button>
+        <Button onClick={guardar} disabled={busy}>
+          {busy ? "Guardando…" : "Guardar jornada"}
+        </Button>
+      </ResponsiveDrawerFooter>
+    </ResponsiveDrawer>
   );
 }

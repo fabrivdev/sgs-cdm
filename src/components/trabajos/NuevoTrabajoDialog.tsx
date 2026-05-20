@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader,
+  ResponsiveDrawerBody,
+  ResponsiveDrawerFooter,
+} from "@/components/ui/responsive-drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,14 +121,14 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
   })();
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Editar trabajo" : "Nuevo trabajo"}</DialogTitle>
-          <p className="text-xs text-muted-foreground">
-            Sólo registrá el caso. La fecha y el técnico se asignan después desde el Planificador o Calendario.
-          </p>
-        </DialogHeader>
+    <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
+      <ResponsiveDrawerHeader>
+        <h2 className="text-base font-semibold">{editing ? "Editar trabajo" : "Nuevo trabajo"}</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          Sólo registrá el caso. La fecha y el técnico se asignan después desde el Planificador o Calendario.
+        </p>
+      </ResponsiveDrawerHeader>
+      <ResponsiveDrawerBody>
         <div className="grid gap-4">
           <div className="space-y-1.5">
             <Label>Cliente</Label>
@@ -173,16 +178,16 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
           </div>
 
           <Field label="Trabajo o problema a resolver">
-            <Textarea rows={4} value={form.descripcion_problema}
+            <Textarea rows={5} value={form.descripcion_problema}
               onChange={(e) => setForm(f => ({ ...f, descripcion_problema: e.target.value }))} />
           </Field>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancelar</Button>
-          <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : (editing ? "Guardar" : "Crear trabajo")}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDrawerBody>
+      <ResponsiveDrawerFooter>
+        <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancelar</Button>
+        <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : (editing ? "Guardar" : "Crear trabajo")}</Button>
+      </ResponsiveDrawerFooter>
+    </ResponsiveDrawer>
   );
 }
 
