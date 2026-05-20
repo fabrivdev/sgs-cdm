@@ -102,16 +102,24 @@ export default function Calendario() {
   const [openForm, setOpenForm] = useState(false);
   const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
 
+  const [codigoByServicio, setCodigoByServicio] = useState<Map<string, string>>(new Map());
+
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli, { data: trabs }] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("dias_no_laborales").select("id, fecha, motivo"),
         cargarTodosLosClientes(),
+        supabase.from("trabajos").select("codigo, legacy_servicio_id"),
       ]);
+      const codMap = new Map<string, string>();
+      for (const t of (trabs ?? []) as any[]) {
+        if (t.legacy_servicio_id && t.codigo) codMap.set(t.legacy_servicio_id, t.codigo);
+      }
+      setCodigoByServicio(codMap);
 
       const serviciosBase = (srv ?? []) as Servicio[];
       const jornadas = (jor ?? []) as Array<{
@@ -452,9 +460,9 @@ export default function Calendario() {
                                       "block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
                                       estadoColor(s.estado),
                                     )}
-                                    title={`${clienteNombre(s.cliente_id)} — ${s.trabajo_descripcion}`}
+                                    title={`${codigoByServicio.get(s.id) ?? ""} ${clienteNombre(s.cliente_id)} — ${s.trabajo_descripcion}`}
                                   >
-                                    {clienteNombre(s.cliente_id)}
+                                    {codigoByServicio.get(s.id) ? `${codigoByServicio.get(s.id)} · ` : ""}{clienteNombre(s.cliente_id)}
                                   </button>
                                 ))
                               )}
@@ -707,6 +715,11 @@ export default function Calendario() {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <TipoIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {codigoByServicio.get(s.id) && (
+                          <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
+                            {codigoByServicio.get(s.id)}
+                          </span>
+                        )}
                         <span className="truncate text-sm font-medium">{clienteNombre(s.cliente_id)}</span>
                       </div>
                       <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />

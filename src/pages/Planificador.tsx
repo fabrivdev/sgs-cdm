@@ -125,7 +125,7 @@ export default function Planificador() {
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
-        supabase.from("trabajos").select("id, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
+        supabase.from("trabajos").select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       const adminCab = new Set<string>();
@@ -199,6 +199,13 @@ export default function Planificador() {
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c])), [clientes]);
   const tecnicosSolo = useMemo(() => profiles.filter(p => !adminCabIds.has(p.id)), [profiles, adminCabIds]);
+  const codigoByServicio = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of trabajosLite) {
+      if (t.legacy_servicio_id && t.codigo) m.set(t.legacy_servicio_id, t.codigo);
+    }
+    return m;
+  }, [trabajosLite]);
 
   const semanasDisponibles = useMemo(
     () => Array.from(new Set(servicios.map((s) => s.semana))).sort((a, b) => a - b),
@@ -215,11 +222,12 @@ export default function Planificador() {
       if (fEstado !== "all" && s.estado !== fEstado) return false;
       if (q) {
         const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
-        if (!nombre.toLowerCase().includes(q)) return false;
+        const codigo = codigoByServicio.get(s.id) ?? "";
+        if (!nombre.toLowerCase().includes(q) && !codigo.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById, codigoByServicio]);
 
   // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
   const fechasPorServicio = useMemo(() => {
@@ -357,7 +365,7 @@ export default function Planificador() {
       </div>
 
       <FiltersBar
-        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar cliente…" }}
+        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar TR-000123 o cliente…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} servicio${displayed.length !== 1 ? "s" : ""}`}
@@ -451,7 +459,14 @@ export default function Planificador() {
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
-                      {s.trabajo_descripcion}
+                      <div className="flex items-center gap-1.5">
+                        {codigoByServicio.get(s.id) && (
+                          <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
+                            {codigoByServicio.get(s.id)}
+                          </span>
+                        )}
+                        <span className="truncate">{s.trabajo_descripcion}</span>
+                      </div>
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top">
@@ -541,7 +556,14 @@ export default function Planificador() {
                     <TipoIcon className="h-3 w-3" />
                   </div>
 
-                  <div className="text-sm font-semibold truncate">{clienteNombre}</div>
+                  <div className="flex items-center gap-1.5">
+                    {codigoByServicio.get(s.id) && (
+                      <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
+                        {codigoByServicio.get(s.id)}
+                      </span>
+                    )}
+                    <div className="text-sm font-semibold truncate">{clienteNombre}</div>
+                  </div>
                   <div className="text-xs text-muted-foreground line-clamp-2 leading-snug">{s.trabajo_descripcion}</div>
 
                   <div className="text-[10px] text-muted-foreground pt-0.5">

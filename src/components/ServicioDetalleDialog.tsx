@@ -104,6 +104,7 @@ export function ServicioDetalleDialog({
   const [loadingJornadas, setLoadingJornadas] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
+  const [trabajoCodigo, setTrabajoCodigo] = useState<string | null>(null);
 
   // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
@@ -183,10 +184,15 @@ export function ServicioDetalleDialog({
   };
 
   useEffect(() => {
-    if (servicio) loadJornadas(servicio.id);
-    else {
+    if (servicio) {
+      loadJornadas(servicio.id);
+      supabase.from("trabajos").select("codigo").eq("legacy_servicio_id", servicio.id).maybeSingle().then(({ data }) => {
+        setTrabajoCodigo((data as any)?.codigo ?? null);
+      });
+    } else {
       setJornadas([]);
       setEdits({});
+      setTrabajoCodigo(null);
     }
   }, [servicio?.id]);
 
@@ -412,6 +418,11 @@ export function ServicioDetalleDialog({
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
               <DialogTitle className="flex items-center gap-2 flex-wrap pr-8">
+                {trabajoCodigo && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
+                    {trabajoCodigo}
+                  </span>
+                )}
                 Detalle del servicio
                 <MarcaBadge marca={servicio.marca} />
                 <Badge variant="outline" className="gap-1 text-[10px]">
