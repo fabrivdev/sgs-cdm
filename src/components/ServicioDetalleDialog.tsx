@@ -591,7 +591,7 @@ export function ServicioDetalleDialog({
                                 <SelectContent>
                                   {ESTADOS.map((e) => (
                                     <SelectItem key={e} value={e}>
-                                      {e}
+                                      {ESTADO_LABELS[e]}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
