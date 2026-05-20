@@ -300,10 +300,8 @@ export function TrabajoDetalleDrawer({
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Fechas y jornadas
                   </h3>
-                  <Button size="sm" variant="ghost" onClick={irAProgramar}>
-                    <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Programar nueva fecha
-                  </Button>
                 </div>
+
 
                 {filas.length === 0 && (
                   <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">

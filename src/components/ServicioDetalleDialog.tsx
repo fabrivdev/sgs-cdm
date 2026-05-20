@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader,
+  ResponsiveDrawerBody,
+  ResponsiveDrawerFooter,
+} from "@/components/ui/responsive-drawer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -413,53 +418,54 @@ export function ServicioDetalleDialog({
 
   return (
     <>
-      <Dialog open={!!servicio && !editOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-2">
-              <DialogTitle className="flex items-center gap-2 flex-wrap pr-8">
-                {trabajoCodigo && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
-                    {trabajoCodigo}
-                  </span>
-                )}
-                Detalle del servicio
-                <MarcaBadge marca={servicio.marca} />
-                <Badge variant="outline" className="gap-1 text-[10px]">
-                  {tipo === "Máquina en taller" ? (
-                    <Wrench className="h-3 w-3" />
-                  ) : (
-                    <MapPin className="h-3 w-3" />
-                  )}
-                  {tipo}
-                </Badge>
-              </DialogTitle>
-
-              {canManage && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 shrink-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                      <Pencil className="mr-2 h-4 w-4" /> Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setConfirmDelete(true)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+      <ResponsiveDrawer open={!!servicio && !editOpen} onOpenChange={onOpenChange} size="xl">
+        <ResponsiveDrawerHeader>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap pr-8 text-base font-semibold">
+              {trabajoCodigo && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
+                  {trabajoCodigo}
+                </span>
               )}
+              Detalle del servicio
+              <MarcaBadge marca={servicio.marca} />
+              <Badge variant="outline" className="gap-1 text-[10px]">
+                {tipo === "Máquina en taller" ? (
+                  <Wrench className="h-3 w-3" />
+                ) : (
+                  <MapPin className="h-3 w-3" />
+                )}
+                {tipo}
+              </Badge>
             </div>
-          </DialogHeader>
 
+            {canManage && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 shrink-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setConfirmDelete(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </ResponsiveDrawerHeader>
+
+        <ResponsiveDrawerBody>
           <div className="space-y-3 text-sm">
+
             <Row k="Sucursal" v={servicio.sucursal} />
             <Row k="Cliente" v={clienteNombre} />
             <Row
@@ -645,19 +651,20 @@ export function ServicioDetalleDialog({
               </div>
             </div>
           </div>
+        </ResponsiveDrawerBody>
 
-          {canEdit && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cerrar
-              </Button>
-              <Button onClick={save} disabled={busy || !dirty}>
-                {busy ? "Guardando…" : "Guardar"}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+        {canEdit && (
+          <ResponsiveDrawerFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cerrar
+            </Button>
+            <Button onClick={save} disabled={busy || !dirty}>
+              {busy ? "Guardando…" : "Guardar"}
+            </Button>
+          </ResponsiveDrawerFooter>
+        )}
+      </ResponsiveDrawer>
+
 
       {canManage && (
         <ServicioFormDialog
