@@ -22,6 +22,11 @@ interface Props {
   onSaved: () => void;
 }
 
+/**
+ * Carga la jornada real. Estados posibles: "completada" (jornada del día cerrada)
+ * o "incompleta" (técnico no pudo cerrar su día).
+ * El estado general del trabajo lo recalcula el trigger DB.
+ */
 export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, programaciones, onSaved }: Props) {
   const { user } = useAuth();
   const [form, setForm] = useState({
@@ -64,122 +69,10 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
     });
   };
 
-  const syncLegacyServicio = async (trabajo: any, estadoServicio: "Pendiente" | "Iniciado" | "Completado") => {
-    if (!trabajo?.legacy_servicio_id) return;
-
-    await supabase
-      .from("servicios")
-      .update({
-        estado: estadoServicio,
-        horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
-        observaciones: form.resultado.trim() || form.observaciones.trim() || null,
-      })
-      .eq("id", trabajo.legacy_servicio_id);
-
-    // Actualiza la jornada legacy de la misma fecha si existe.
-    const { data: legacyJornada } = await supabase
-      .from("servicio_jornadas")
-      .select("id")
-      .eq("servicio_id", trabajo.legacy_servicio_id)
-      .eq("fecha", form.fecha_real)
-      .maybeSingle();
-
-    if (legacyJornada?.id) {
-      await supabase
-        .from("servicio_jornadas")
-        .update({
-          estado: estadoServicio,
-          horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
-          observaciones: form.resultado.trim() || form.observaciones.trim() || null,
-        })
-        .eq("id", legacyJornada.id);
-    } else {
-      await supabase
-        .from("servicio_jornadas")
-        .insert({
-          servicio_id: trabajo.legacy_servicio_id,
-          fecha: form.fecha_real,
-          estado: estadoServicio,
-          horas_trabajadas: form.horas_reales ? Number(form.horas_reales) : null,
-          observaciones: form.resultado.trim() || form.observaciones.trim() || null,
-        });
-    }
-  };
-
-  const actualizarEstadoTrabajo = async () => {
-    const { data: trabajo, error: errTrabajo } = await supabase
-      .from("trabajos")
-      .select("id, legacy_servicio_id")
-      .eq("id", trabajoId)
-      .single();
-
-    if (errTrabajo) throw errTrabajo;
-
-    // Si hubo jornada real, la programación ya no debe quedar como "programada".
-    // Aunque la jornada sea incompleta, esa visita ya ocurrió.
-    if (form.programacion_id && ["completada", "incompleta"].includes(form.estado_jornada)) {
-      const { error } = await supabase
-        .from("programaciones")
-        .update({ estado: "cumplida" })
-        .eq("id", form.programacion_id);
-
-      if (error) throw error;
-    }
-
-    const { data: programacionesActivas, error: errProg } = await supabase
-      .from("programaciones")
-      .select("id")
-      .eq("trabajo_id", trabajoId)
-      .eq("estado", "programada");
-
-    if (errProg) throw errProg;
-
-    const quedanProgramadas = (programacionesActivas ?? []).length > 0;
-
-    let nuevoEstadoTrabajo: "iniciado" | "en_pausa" | "completado";
-
-    if (form.estado_jornada === "en_curso") {
-      nuevoEstadoTrabajo = "iniciado";
-    } else if (form.estado_jornada === "incompleta") {
-      nuevoEstadoTrabajo = "en_pausa";
-    } else {
-      nuevoEstadoTrabajo = quedanProgramadas ? "iniciado" : "completado";
-    }
-
-    const { error: errUpdateTrabajo } = await supabase
-      .from("trabajos")
-      .update({
-        estado_general: nuevoEstadoTrabajo,
-        cerrado_en: nuevoEstadoTrabajo === "completado" ? new Date().toISOString() : null,
-        cerrado_por: nuevoEstadoTrabajo === "completado" ? user?.id : null,
-      })
-      .eq("id", trabajoId);
-
-    if (errUpdateTrabajo) throw errUpdateTrabajo;
-
-    const estadoLegacy =
-      nuevoEstadoTrabajo === "completado"
-        ? "Completado"
-        : nuevoEstadoTrabajo === "iniciado"
-        ? "Iniciado"
-        : "Pendiente";
-
-    await syncLegacyServicio(trabajo, estadoLegacy);
-  };
-
   const guardar = async () => {
-    if (!form.tecnico_id) {
-      toast.error("Seleccioná el técnico");
-      return;
-    }
-
-    if (!form.fecha_real) {
-      toast.error("Fecha requerida");
-      return;
-    }
-
+    if (!form.tecnico_id) { toast.error("Seleccioná el técnico"); return; }
+    if (!form.fecha_real) { toast.error("Fecha requerida"); return; }
     setBusy(true);
-
     try {
       const { error } = await supabase.from("jornadas").insert({
         trabajo_id: trabajoId,
@@ -195,10 +88,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         observaciones: form.observaciones.trim() || null,
         creado_por: user?.id,
       });
-
       if (error) throw error;
-
-      await actualizarEstadoTrabajo();
 
       toast.success("Jornada cargada");
       onSaved();
@@ -206,9 +96,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudo guardar la jornada");
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -268,7 +156,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
                 onChange={(e) => setForm(f => ({ ...f, horas_reales: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Resultado de la jornada</Label>
+              <Label>Estado de la jornada</Label>
               <Select value={form.estado_jornada}
                 onValueChange={(v) => setForm(f => ({ ...f, estado_jornada: v as EstadoJornada }))}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>

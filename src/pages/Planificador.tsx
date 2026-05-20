@@ -12,7 +12,8 @@ import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBa
 import { ESTADOS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
-import { Plus, FileSpreadsheet, Filter, MapPin, Wrench, X, Search } from "lucide-react";
+import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
+import { CalendarPlus, FileSpreadsheet, Filter, MapPin, Wrench, X, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
@@ -95,6 +96,8 @@ export default function Planificador() {
   const [detalle, setDetalle] = useState<Servicio | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [defaultsApplied, setDefaultsApplied] = useState(false);
+  const [openProgramar, setOpenProgramar] = useState(false);
+  const [trabajosLite, setTrabajosLite] = useState<any[]>([]);
 
   const currentWeek = useMemo(() => String(getISOWeek(new Date())), []);
   const [fSemana, setFSemana] = useState<string>(currentWeek);
@@ -118,11 +121,12 @@ export default function Planificador() {
     setLoading(true);
 
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, cli] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
         cargarTodosLosClientes(),
+        supabase.from("trabajos").select("id, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
       ]);
 
       const serviciosBase = (srv ?? []) as Servicio[];
@@ -171,6 +175,7 @@ export default function Planificador() {
       setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
       setClientes(cli);
+      setTrabajosLite(trabs ?? []);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudieron cargar los datos del planificador");
@@ -422,8 +427,8 @@ export default function Planificador() {
           </Button>
 
           {canCreate && (
-            <Button size="sm" onClick={() => { setEditing(null); setOpenForm(true); }}>
-              <Plus className="mr-2 h-4 w-4" /> Nuevo
+            <Button size="sm" onClick={() => setOpenProgramar(true)}>
+              <CalendarPlus className="mr-2 h-4 w-4" /> Programar intervención
             </Button>
           )}
         </div>
@@ -635,6 +640,15 @@ export default function Planificador() {
         clientes={clientes}
         onChanged={load}
         fechaContexto={detalle?.fecha_programada}
+      />
+
+      <ProgramarIntervencionDialog
+        open={openProgramar}
+        onOpenChange={setOpenProgramar}
+        trabajos={trabajosLite}
+        clientes={clientes}
+        tecnicos={profiles}
+        onSaved={load}
       />
     </div>
   );
