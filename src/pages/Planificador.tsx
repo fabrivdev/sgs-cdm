@@ -92,7 +92,7 @@ export default function Planificador() {
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Servicio | null>(null);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [openProgramar, setOpenProgramar] = useState(false);
   const [trabajosLite, setTrabajosLite] = useState<any[]>([]);
