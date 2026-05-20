@@ -21,6 +21,7 @@ interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface TrabajoLite {
   id: string;
+  codigo?: string | null;
   descripcion_problema: string;
   cliente_id: string | null;
   sucursal: Sucursal;
