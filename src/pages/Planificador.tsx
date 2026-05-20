@@ -505,7 +505,7 @@ export default function Planificador() {
                                 s.estado === e && "bg-accent font-semibold",
                               )}
                             >
-                              {e}
+                              {ESTADO_LABELS[e]}
                             </button>
                           ))}
                         </PopoverContent>
