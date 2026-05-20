@@ -171,21 +171,38 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, profil
               <TabsContent value="resumen" className="space-y-3 pt-3">
                 <Row k="Tipo">{trabajo.tipo_trabajo}</Row>
                 <Row k="Horas reales acumuladas">{horasTotal} hs</Row>
+                {trabajo.cerrado_en && (
+                  <Row k="Cerrado el">{new Date(trabajo.cerrado_en).toLocaleString("es-PY")}</Row>
+                )}
                 <div>
                   <div className="text-xs text-muted-foreground">Problema</div>
                   <div className="rounded-md bg-muted/40 p-2 text-sm">{trabajo.descripcion_problema}</div>
                 </div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                     <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar datos
                   </Button>
+                  {puedeAdmin && !trabajo.cerrado_en && (
+                    <Button size="sm" onClick={cerrarTrabajo}>
+                      Cerrar trabajo
+                    </Button>
+                  )}
+                  {puedeAdmin && trabajo.cerrado_en && (
+                    <Button size="sm" variant="outline" onClick={reabrirTrabajo}>
+                      Reabrir trabajo
+                    </Button>
+                  )}
                   {puedeAdmin && (
                     <Button size="sm" variant="outline" className="text-destructive" onClick={eliminar}>
                       <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
                     </Button>
                   )}
                 </div>
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  Un trabajo solo pasa a <b>Completado</b> cuando se cierra manualmente. Mientras tenga jornadas incompletas y sin agendas futuras, queda en <b>En pausa</b>.
+                </p>
               </TabsContent>
+
 
               <TabsContent value="agenda" className="space-y-2 pt-3">
                 <p className="text-xs text-muted-foreground">
