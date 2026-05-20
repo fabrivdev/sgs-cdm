@@ -21,11 +21,13 @@ interface Props {
   onSaved: () => void;
 }
 
+type Resultado = "realizada" | "no_realizada";
+
 /**
- * Jornada simple:
- * - La jornada cargada siempre queda completada.
- * - Si el trabajo necesita continuar, se programa otra fecha.
- * - No existe "en curso" ni "incompleta" porque eso confundía el estado macro del trabajo.
+ * Resultado de una agenda:
+ * - Realizada: el técnico fue y trabajó ese día (aunque el trabajo macro siga).
+ * - No realizada: la visita no se pudo ejecutar (cliente ausente, lluvia, etc.).
+ * El estado del trabajo se recalcula automáticamente.
  */
 export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, programaciones, onSaved }: Props) {
   const { user } = useAuth();
@@ -34,6 +36,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
     tecnico_id: "",
     programacion_id: "",
     fecha_real: new Date().toISOString().slice(0, 10),
+    resultado: "realizada" as Resultado,
     observaciones: "",
   });
 
@@ -45,6 +48,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         tecnico_id: user?.id ?? "",
         programacion_id: programaciones[0]?.id ?? "",
         fecha_real: new Date().toISOString().slice(0, 10),
+        resultado: "realizada",
         observaciones: "",
       });
     }
@@ -59,13 +63,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
 
     if (!trabajo?.legacy_servicio_id) return;
 
-    await supabase
-      .from("servicios")
-      .update({
-        estado: "Completado",
-        observaciones: form.observaciones.trim() || null,
-      })
-      .eq("id", trabajo.legacy_servicio_id);
+    const estadoLegacy = form.resultado === "realizada" ? "Completado" : "Cancelada";
 
     const { data: legacyJornada } = await supabase
       .from("servicio_jornadas")
@@ -78,7 +76,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
       await supabase
         .from("servicio_jornadas")
         .update({
-          estado: "Completado",
+          estado: estadoLegacy,
           observaciones: form.observaciones.trim() || null,
         })
         .eq("id", legacyJornada.id);
@@ -88,7 +86,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         .insert({
           servicio_id: trabajo.legacy_servicio_id,
           fecha: form.fecha_real,
-          estado: "Completado",
+          estado: estadoLegacy,
           observaciones: form.observaciones.trim() || null,
         });
     }
@@ -113,7 +111,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         programacion_id: form.programacion_id || null,
         tecnico_id: form.tecnico_id,
         fecha_real: form.fecha_real,
-        estado_jornada: "completada",
+        estado_jornada: form.resultado === "realizada" ? "completada" : "incompleta",
         observaciones: form.observaciones.trim() || null,
         creado_por: user?.id,
       });
@@ -123,7 +121,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
       await syncLegacy();
       await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajoId });
 
-      toast.success("Jornada cargada");
+      toast.success(form.resultado === "realizada" ? "Jornada Realizada" : "Marcada como No realizada");
       onSaved();
       onOpenChange(false);
     } catch (e: any) {
@@ -138,10 +136,26 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Cargar jornada</DialogTitle>
+          <DialogTitle>Cargar resultado de jornada</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-3">
+          <div className="space-y-1.5">
+            <Label>Resultado</Label>
+            <Select
+              value={form.resultado}
+              onValueChange={(v) => setForm(f => ({ ...f, resultado: v as Resultado }))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="realizada">Realizada — el técnico trabajó ese día</SelectItem>
+                <SelectItem value="no_realizada">No realizada — no se pudo ejecutar</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Técnico</Label>
             <Select value={form.tecnico_id} onValueChange={(v) => setForm(f => ({ ...f, tecnico_id: v }))}>
@@ -195,12 +209,16 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
               rows={3}
               value={form.observaciones}
               onChange={(e) => setForm(f => ({ ...f, observaciones: e.target.value }))}
-              placeholder="Qué se hizo, qué quedó pendiente o comentario breve..."
+              placeholder={
+                form.resultado === "realizada"
+                  ? "Qué se hizo, qué quedó pendiente o comentario breve…"
+                  : "Motivo por el que no se pudo realizar (cliente ausente, lluvia, falta de repuesto…)"
+              }
             />
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Si este trabajo necesita continuar otro día, guardá esta jornada y después programá una nueva fecha.
+            Si el trabajo necesita continuar otro día, guardá esta jornada como Realizada y programá una nueva fecha en el Planificador.
           </p>
         </div>
 
@@ -209,7 +227,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
             Cancelar
           </Button>
           <Button onClick={guardar} disabled={busy}>
-            {busy ? "Guardando…" : "Guardar jornada"}
+            {busy ? "Guardando…" : "Guardar"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
-import { ESTADOS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
+import { ESTADOS, ESTADO_LABELS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
@@ -384,7 +384,7 @@ export default function Planificador() {
         />
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
-          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: e }))]}
+          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
         />
         <FilterSelect
           label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
@@ -505,7 +505,7 @@ export default function Planificador() {
                                 s.estado === e && "bg-accent font-semibold",
                               )}
                             >
-                              {e}
+                              {ESTADO_LABELS[e]}
                             </button>
                           ))}
                         </PopoverContent>

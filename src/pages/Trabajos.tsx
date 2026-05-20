@@ -205,12 +205,14 @@ export default function Trabajos() {
                       const cli = t.cliente_id ? clienteMap.get(t.cliente_id) : null;
                       const progs = agendasByTrabajo.get(t.id) ?? [];
                       const hoy = new Date(new Date().toDateString());
-                      const futurosActivos = progs.filter(p => {
-                        return p.estado !== "Completado" && new Date(`${p.fecha_programada}T00:00:00`) >= hoy;
-                      });
-                      const proxima = futurosActivos[0];
+                      // Agendas sin resultado cargado (pendientes)
+                      const agendasPendientes = progs.filter(p => p.estado === "Pendiente");
+                      const agendasFuturas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) >= hoy);
+                      const agendasVencidas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) < hoy);
+                      const proxima = agendasFuturas[0];
                       const prioLabel = PRIORIDADES.find(p => p.key === t.prioridad)?.label ?? "";
-                      const pendCount = futurosActivos.length;
+                      const pendCount = agendasFuturas.length;
+                      const vencidasCount = agendasVencidas.length;
 
                       return (
                         <button
@@ -237,8 +239,8 @@ export default function Trabajos() {
                             {t.descripcion_problema}
                           </div>
 
-                          {(proxima || pendCount > 0) && (
-                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                          {(proxima || pendCount > 0 || vencidasCount > 0) && (
+                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground flex-wrap">
                               {proxima && (
                                 <span className="flex items-center gap-0.5">
                                   <CalendarDays className="h-3 w-3" />
@@ -249,6 +251,9 @@ export default function Trabajos() {
                               )}
                               {pendCount > 0 && (
                                 <span>· {pendCount} pend.</span>
+                              )}
+                              {vencidasCount > 0 && (
+                                <span className="text-amber-600">· {vencidasCount} sin cargar</span>
                               )}
                             </div>
                           )}
