@@ -609,6 +609,21 @@ export function ServicioDetalleDialog({
         />
       )}
 
+      {trabajoMadre && (
+        <ProgramarIntervencionDialog
+          open={programarOpen}
+          onOpenChange={setProgramarOpen}
+          trabajoId={trabajoMadre.id}
+          trabajos={[trabajoMadre as any]}
+          clientes={clientesAll.length > 0 ? clientesAll : clientes}
+          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+          onSaved={() => {
+            loadJornadas(servicio.id);
+            onChanged();
+          }}
+        />
+      )}
+
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
