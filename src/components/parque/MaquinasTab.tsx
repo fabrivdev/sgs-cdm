@@ -212,101 +212,58 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
     XLSX.writeFile(wb, `maquinas-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const lblCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
   const hoy = new Date().getFullYear();
+
+  const limpiar = () => {
+    setQ(""); setFSucursal("all"); setFMarca("all"); setFSubgrupo("all");
+    setFEstado("activa"); setAnioDesde(""); setAnioHasta("");
+  };
+  const activos =
+    (q ? 1 : 0) + (fSucursal !== "all" ? 1 : 0) + (fMarca !== "all" ? 1 : 0) +
+    (fSubgrupo !== "all" ? 1 : 0) + (fEstado !== "activa" ? 1 : 0) +
+    (anioDesde ? 1 : 0) + (anioHasta ? 1 : 0);
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1 min-w-[200px] flex-1">
-          <span className={lblCls}>Buscar (cliente, serie, modelo)</span>
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar..." className="pl-8" />
-          </div>
-        </div>
+      <FiltersBar
+        search={{ value: q, onChange: setQ, placeholder: "Cliente, serie o modelo…", label: "Buscar" }}
+        activeCount={activos}
+        onClear={limpiar}
+        meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
+        actions={
+          <Button variant="outline" size="sm" onClick={exportar} className="h-9">
+            <Download className="mr-1 h-4 w-4" /> Exportar
+          </Button>
+        }
+      >
+        <FilterSelect
+          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[140px]"
+          options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        />
+        <FilterSelect
+          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
+          options={[{ value: "all", label: "Todas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+        />
+        <FilterSelect
+          label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[170px]"
+          options={[{ value: "all", label: "Todos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
+        />
+        <FilterCustom label="Año desde" width="w-[100px]">
+          <Input type="number" value={anioDesde} onChange={(e) => setAnioDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
+        </FilterCustom>
+        <FilterCustom label="Año hasta" width="w-[100px]">
+          <Input type="number" value={anioHasta} onChange={(e) => setAnioHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
+        </FilterCustom>
+        <FilterSelect
+          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
+          options={[
+            { value: "activa", label: "Activas" },
+            { value: "inactiva", label: "Inactivas" },
+            { value: "all", label: "Todas" },
+          ]}
+        />
+      </FiltersBar>
 
-        <div className="flex flex-col gap-1">
-          <span className={lblCls}>Sucursal</span>
-          <Select value={fSucursal} onValueChange={setFSucursal}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {SUCURSALES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className={lblCls}>Marca</span>
-          <Select value={fMarca} onValueChange={setFMarca}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {MARCAS.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className={lblCls}>Subgrupo</span>
-          <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {SUBGRUPOS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className={lblCls}>Año desde</span>
-          <Input type="number" value={anioDesde} onChange={(e) => setAnioDesde(e.target.value)} className="w-[100px]" placeholder="2010" />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className={lblCls}>Año hasta</span>
-          <Input type="number" value={anioHasta} onChange={(e) => setAnioHasta(e.target.value)} className="w-[100px]" placeholder={String(hoy)} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className={lblCls}>Estado</span>
-          <Select value={fEstado} onValueChange={setFEstado}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="activa">Activas</SelectItem>
-              <SelectItem value="inactiva">Inactivas</SelectItem>
-              <SelectItem value="all">Todas</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button variant="outline" size="sm" onClick={exportar} className="ml-auto">
-          <Download className="mr-1 h-4 w-4" /> Exportar
-        </Button>
-      </div>
-
-      <div className="text-xs text-muted-foreground">{ordenadas.length} máquinas</div>
 
       <div className="rounded-md border bg-card overflow-x-auto">
         <Table>
