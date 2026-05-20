@@ -104,6 +104,7 @@ export function ServicioDetalleDialog({
   const [loadingJornadas, setLoadingJornadas] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
+  const [trabajoCodigo, setTrabajoCodigo] = useState<string | null>(null);
 
   // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
