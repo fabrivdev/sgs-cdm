@@ -545,7 +545,7 @@ export default function Dashboard() {
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Pendiente" stackId="a" fill={COLORS_ESTADO.Pendiente} />
-              <Bar dataKey="Iniciado" stackId="a" fill={COLORS_ESTADO.Iniciado} />
+              <Bar dataKey="Cancelada" stackId="a" fill={COLORS_ESTADO.Cancelada} />
               <Bar dataKey="Completado" stackId="a" fill={COLORS_ESTADO.Completado}>
                 <LabelList
                   dataKey="total"
