@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Estado, Marca } from "@/lib/constants";
+import { ESTADO_LABELS, type Estado, type Marca } from "@/lib/constants";
 
 export function EstadoBadge({ estado, className }: { estado: Estado; className?: string }) {
   const map: Record<Estado, string> = {
@@ -8,7 +8,7 @@ export function EstadoBadge({ estado, className }: { estado: Estado; className?:
     Completado: "bg-estado-completado-bg text-estado-completado border-estado-completado/30",
     Cancelada: "bg-muted text-muted-foreground border-border line-through",
   };
-  return <Badge variant="outline" className={cn("font-medium", map[estado], className)}>{estado}</Badge>;
+  return <Badge variant="outline" className={cn("font-medium", map[estado], className)}>{ESTADO_LABELS[estado]}</Badge>;
 }
 
 export function MarcaBadge({ marca, className }: { marca: Marca; className?: string }) {
