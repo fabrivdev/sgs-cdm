@@ -398,7 +398,7 @@ export default function Planificador() {
                   onChange={setFTecnico}
                   options={[
                     { v: "all", l: "Todos" },
-                    ...profiles.map((p) => ({ v: p.id, l: p.nombre })),
+                    ...tecnicosSolo.map((p) => ({ v: p.id, l: p.nombre })),
                   ]}
                 />
 
