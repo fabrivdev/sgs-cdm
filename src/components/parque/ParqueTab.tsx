@@ -3,25 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import {
   ArrowDown,
   ArrowUp,
@@ -29,13 +15,12 @@ import {
   CalendarIcon,
   Check,
   Download,
-  Filter,
   Flag,
   Phone,
-  Search,
   X,
 } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -203,7 +188,6 @@ export function ParqueTab({
   const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const [filtrosOpen, setFiltrosOpen] = useState(false);
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
   const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
@@ -603,231 +587,95 @@ export function ParqueTab({
     return "hover:bg-accent/40";
   };
 
-  const lblCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
-  const filtrosSelects = (
-    <>
-      <div className="flex flex-col gap-1 w-full md:w-auto">
-        <span className={lblCls}>Sucursal</span>
-        <Select value={fSucursal} onValueChange={setFSucursal}>
-          <SelectTrigger className="w-full md:w-[140px]">
-            <SelectValue placeholder="Sucursal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las sucursales</SelectItem>
-            {SUCURSALES.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1 w-full md:w-auto">
-        <span className={lblCls}>Marca</span>
-        <Select value={fMarca} onValueChange={setFMarca}>
-          <SelectTrigger className="w-full md:w-[120px]">
-            <SelectValue placeholder="Marca" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las marcas</SelectItem>
-            {MARCAS.map((m) => (
-              <SelectItem key={m} value={m}>{m}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1 w-full md:w-auto">
-        <span className={lblCls}>Subgrupo</span>
-        <Select value={fSubgrupo} onValueChange={setFSubgrupo}>
-          <SelectTrigger className="w-full md:w-[150px]">
-            <SelectValue placeholder="Subgrupo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los subgrupos</SelectItem>
-            {SUBGRUPOS.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1 w-full md:w-auto">
-        <span className={lblCls}>Seguimiento</span>
-        <Select value={fSeguimiento} onValueChange={setFSeguimiento}>
-          <SelectTrigger className="w-full md:w-[170px]">
-            <SelectValue placeholder="Seguimiento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Cualquier seguimiento</SelectItem>
-            <SelectItem value="sin_seguimiento">Sin seguimiento</SelectItem>
-            {RESULTADOS.map((r) => (
-              <SelectItem key={r} value={r}>{r}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1 w-full md:w-auto">
-        <span className={lblCls}>Período</span>
-        <Select value={rango} onValueChange={(v) => setRango(v as RangoPreset)}>
-          <SelectTrigger className="w-full md:w-[160px]">
-            <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="30d">Últimos 30 días</SelectItem>
-            <SelectItem value="90d">Últimos 90 días</SelectItem>
-            <SelectItem value="180d">Últimos 6 meses</SelectItem>
-            <SelectItem value="365d">Últimos 12 meses</SelectItem>
-            <SelectItem value="ytd">Año en curso (YTD)</SelectItem>
-            <SelectItem value="custom">Personalizado…</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {rango === "custom" && (
-        <>
-          <div className="flex flex-col gap-1 w-full md:w-auto">
-            <span className={lblCls}>Desde</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
-                  {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={customDesde} onSelect={setCustomDesde} className={cn("p-3 pointer-events-auto")} />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="flex flex-col gap-1 w-full md:w-auto">
-            <span className={lblCls}>Hasta</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 w-full md:w-auto">
-                  {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={customHasta} onSelect={setCustomHasta} className={cn("p-3 pointer-events-auto")} />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </>
-      )}
-
-      <div className="flex flex-col gap-1 w-full md:w-auto">
-        <span className={lblCls}>Plataformas/cabezales</span>
-        <div className="flex items-center gap-2 rounded-md border px-3 h-9 w-full md:w-auto">
-          <Switch id="incluir-plataformas" checked={incluirPlataformas} onCheckedChange={setIncluirPlataformas} />
-          <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
-            Incluir
-          </Label>
-        </div>
-      </div>
-    </>
-  );
-
   return (
     <div className="space-y-3">
-      {/* Móvil: buscador + botón filtros + exportar (icono) */}
-      <div className="flex items-center gap-2 md:hidden">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-
-        <Sheet open={filtrosOpen} onOpenChange={setFiltrosOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 relative shrink-0">
-              <Filter className="h-4 w-4" />
-              {filtrosActivos > 0 && (
-                <Badge
-                  className="ml-1 h-5 min-w-5 px-1 text-[10px] tabular-nums"
-                  variant="secondary"
-                >
-                  {filtrosActivos}
-                </Badge>
-              )}
+      <FiltersBar
+        search={{ value: q, onChange: setQ, placeholder: "Nombre del cliente…", label: "Buscar" }}
+        activeCount={filtrosActivos + (q ? 1 : 0)}
+        onClear={() => { setQ(""); limpiarFiltros(); }}
+        meta={`${filtradas.length} cliente${filtradas.length !== 1 ? "s" : ""}`}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9">
+              <Plus className="mr-1 h-4 w-4" /> Nueva máquina
             </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[85vw] sm:max-w-sm overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Filtros</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 flex flex-col gap-3">
-              {filtrosSelects}
-              {filtrosActivos > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={limpiarFiltros}
-                  className="mt-2"
-                >
-                  <X className="mr-1 h-4 w-4" /> Limpiar filtros
-                </Button>
-              )}
-              <Button
-                size="sm"
-                onClick={() => setFiltrosOpen(false)}
-                className="mt-1"
-              >
-                Aplicar
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => setNuevaMaquinaOpen(true)}
-          className="h-9 shrink-0"
-          aria-label="Nueva máquina"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={exportar}
-          className="h-9 shrink-0"
-          aria-label="Exportar Excel"
-        >
-          <Download className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Desktop: barra horizontal completa */}
-      <div className="hidden md:flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1 min-w-[180px] flex-1">
-          <span className={lblCls}>Buscar</span>
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Nombre del cliente..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="pl-8"
-            />
+            <Button variant="outline" size="sm" onClick={exportar} className="h-9">
+              <Download className="mr-1 h-4 w-4" /> Exportar
+            </Button>
           </div>
-        </div>
+        }
+      >
+        <FilterSelect
+          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
+          options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        />
+        <FilterSelect
+          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
+          options={[{ value: "all", label: "Todas las marcas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+        />
+        <FilterSelect
+          label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"
+          options={[{ value: "all", label: "Todos los subgrupos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
+        />
+        <FilterSelect
+          label="Seguimiento" value={fSeguimiento} onChange={setFSeguimiento} placeholder="Seguimiento" width="w-[170px]"
+          options={[
+            { value: "all", label: "Cualquier seguimiento" },
+            { value: "sin_seguimiento", label: "Sin seguimiento" },
+            ...RESULTADOS.map(r => ({ value: r, label: r })),
+          ]}
+        />
+        <FilterSelect
+          label="Período" value={rango} onChange={(v) => setRango(v as RangoPreset)} placeholder="Período" width="w-[160px]"
+          options={[
+            { value: "30d", label: "Últimos 30 días" },
+            { value: "90d", label: "Últimos 90 días" },
+            { value: "180d", label: "Últimos 6 meses" },
+            { value: "365d", label: "Últimos 12 meses" },
+            { value: "ytd", label: "Año en curso (YTD)" },
+            { value: "custom", label: "Personalizado…" },
+          ]}
+        />
+        {rango === "custom" && (
+          <>
+            <FilterCustom label="Desde" width="w-[120px]">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
+                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                    {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customDesde} onSelect={setCustomDesde} className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </FilterCustom>
+            <FilterCustom label="Hasta" width="w-[120px]">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
+                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                    {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={customHasta} onSelect={setCustomHasta} className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </FilterCustom>
+          </>
+        )}
+        <FilterCustom label="Plataformas / cabezales">
+          <div className="flex items-center gap-2 rounded-md border px-3 h-9">
+            <Switch id="incluir-plataformas" checked={incluirPlataformas} onCheckedChange={setIncluirPlataformas} />
+            <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
+              Incluir
+            </Label>
+          </div>
+        </FilterCustom>
+      </FiltersBar>
 
-        {filtrosSelects}
-
-        <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="ml-auto">
-          <Plus className="mr-1 h-4 w-4" /> Nueva máquina
-        </Button>
-        <Button variant="outline" size="sm" onClick={exportar}>
-          <Download className="mr-1 h-4 w-4" /> Exportar Excel
-        </Button>
-      </div>
 
       {!loading && !factLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">

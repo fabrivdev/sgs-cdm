@@ -433,10 +433,8 @@ export default function Dashboard() {
 
           {vista === "resumen" && (
             <FiltersBar className="w-full sm:w-auto">
-              <span className="text-[11px] text-muted-foreground">Desde</span>
-              <FilterDate value={from} onChange={setFrom} />
-              <span className="text-[11px] text-muted-foreground">Hasta</span>
-              <FilterDate value={to} onChange={setTo} />
+              <FilterDate label="Desde" value={from} onChange={setFrom} />
+              <FilterDate label="Hasta" value={to} onChange={setTo} />
             </FiltersBar>
           )}
         </div>

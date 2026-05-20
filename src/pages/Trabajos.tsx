@@ -154,23 +154,24 @@ export default function Trabajos() {
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
       >
         <FilterSelect
-          value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
+          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
           options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-[130px]"
+          label="Prioridad" value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-[130px]"
           options={[{ value: "all", label: "Toda prioridad" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]}
         />
         <FilterSelect
-          value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
+          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
         />
-        <FilterDate value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programación" />
+        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programación" />
         <FilterSelect
-          value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
+          label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
           options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
         />
       </FiltersBar>
+
 
 
       {loading ? (

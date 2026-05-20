@@ -345,17 +345,19 @@ export default function Calendario() {
         onClear={() => setFTecnico("all")}
       >
         <FilterSelect
+          label="Vista"
           value={vista}
           onChange={(v) => setVista(v as "mes" | "semana" | "tecnicos")}
           placeholder="Vista"
           width="w-[140px]"
           options={[
-            { value: "mes", label: "Vista: Mes" },
-            { value: "semana", label: "Vista: Semana" },
-            { value: "tecnicos", label: "Vista: Por técnico" },
+            { value: "mes", label: "Mes" },
+            { value: "semana", label: "Semana" },
+            { value: "tecnicos", label: "Por técnico" },
           ]}
         />
         <FilterSelect
+          label="Técnico"
           value={fTecnico}
           onChange={setFTecnico}
           placeholder="Técnico"

@@ -363,23 +363,23 @@ export default function Planificador() {
         meta={`${displayed.length} servicio${displayed.length !== 1 ? "s" : ""}`}
       >
         <FilterSelect
-          value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
+          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
           options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
+          label="Técnico" value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
           options={[{ value: "all", label: "Todos los técnicos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
         />
         <FilterSelect
-          value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
+          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
           options={[{ value: "all", label: "Todas las marcas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
         />
         <FilterSelect
-          value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
+          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: e }))]}
         />
         <FilterSelect
-          value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
+          label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
           options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
         />
       </FiltersBar>
