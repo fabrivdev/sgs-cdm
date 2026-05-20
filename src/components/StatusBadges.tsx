@@ -5,8 +5,8 @@ import type { Estado, Marca } from "@/lib/constants";
 export function EstadoBadge({ estado, className }: { estado: Estado; className?: string }) {
   const map: Record<Estado, string> = {
     Pendiente: "bg-estado-pendiente-bg text-estado-pendiente border-estado-pendiente/30",
-    Iniciado: "bg-estado-iniciado-bg text-estado-iniciado border-estado-iniciado/30",
     Completado: "bg-estado-completado-bg text-estado-completado border-estado-completado/30",
+    Cancelada: "bg-muted text-muted-foreground border-border line-through",
   };
   return <Badge variant="outline" className={cn("font-medium", map[estado], className)}>{estado}</Badge>;
 }
@@ -22,6 +22,6 @@ export function MarcaBadge({ marca, className }: { marca: Marca; className?: str
 
 export function rowClassByEstado(estado: Estado): string {
   if (estado === "Completado") return "row-completado";
-  if (estado === "Iniciado") return "row-iniciado";
+  if (estado === "Cancelada") return "row-pendiente opacity-60";
   return "row-pendiente";
 }
