@@ -230,7 +230,7 @@ export function ProgramarIntervencionDialog({
                     </PopoverTrigger>
                     <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
                       <Command>
-                        <CommandInput placeholder="Buscar cliente o problema…" className="h-9" />
+                        <CommandInput placeholder="Buscar TR-000123, cliente o problema…" className="h-9" />
                         <CommandList className="max-h-72">
                           <CommandEmpty className="py-6 text-center text-xs text-muted-foreground">
                             <Briefcase className="mx-auto mb-2 h-5 w-5 opacity-40" />
@@ -242,7 +242,7 @@ export function ProgramarIntervencionDialog({
                               return (
                                 <CommandItem
                                   key={t.id}
-                                  value={`${t.nombre_cliente} ${t.descripcion_problema} ${t.marca} ${t.sucursal}`}
+                                  value={`${t.codigo ?? ""} ${t.nombre_cliente} ${t.descripcion_problema} ${t.marca} ${t.sucursal}`}
                                   onSelect={() => {
                                     setSelectedTrabajoId(t.id);
                                     setOpenCombo(false);
@@ -251,9 +251,16 @@ export function ProgramarIntervencionDialog({
                                 >
                                   <Check className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} />
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-[13px] font-medium leading-tight truncate">
-                                      {t.nombre_cliente}
-                                      <span className="font-normal text-muted-foreground"> — {t.descripcion_problema}</span>
+                                    <div className="flex items-center gap-1.5 text-[13px] font-medium leading-tight">
+                                      {t.codigo && (
+                                        <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
+                                          {t.codigo}
+                                        </span>
+                                      )}
+                                      <span className="truncate">
+                                        {t.nombre_cliente}
+                                        <span className="font-normal text-muted-foreground"> — {t.descripcion_problema}</span>
+                                      </span>
                                     </div>
                                     <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                       <span className="text-[10px] text-muted-foreground">{t.marca}</span>
