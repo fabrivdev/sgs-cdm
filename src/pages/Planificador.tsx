@@ -2,19 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
 import { ESTADOS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
-import { CalendarPlus, FileSpreadsheet, Filter, MapPin, Wrench, X, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { CalendarPlus, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
@@ -94,7 +92,7 @@ export default function Planificador() {
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Servicio | null>(null);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [openProgramar, setOpenProgramar] = useState(false);
   const [trabajosLite, setTrabajosLite] = useState<any[]>([]);
@@ -329,27 +327,12 @@ export default function Planificador() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
-          <p className="text-xs text-muted-foreground">{displayed.length} servicios visibles</p>
+          <p className="text-xs text-muted-foreground">
+            {displayed.length} servicios visibles · Lo operativo se gestiona desde aquí.
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              value={fCliente}
-              onChange={(e) => setFCliente(e.target.value)}
-              placeholder="Buscar cliente..."
-              className="h-9 w-[200px] pl-7 text-sm"
-            />
-            {fCliente && (
-              <button
-                onClick={() => setFCliente("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
           <ToggleGroup
             type="single"
             value={vista}
@@ -360,80 +343,6 @@ export default function Planificador() {
             <ToggleGroupItem value="dia" className="h-9 px-3 text-xs">Por día</ToggleGroupItem>
             <ToggleGroupItem value="semana" className="h-9 px-3 text-xs">Por semana</ToggleGroupItem>
           </ToggleGroup>
-
-          <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" /> Filtros
-                {activeChips.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">{activeChips.length}</Badge>
-                )}
-              </Button>
-            </SheetTrigger>
-
-            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Filtros</SheetTitle>
-              </SheetHeader>
-
-              <div className="mt-6 space-y-4">
-                <FilterField
-                  label="Semana"
-                  value={fSemana}
-                  onChange={setFSemana}
-                  options={[
-                    { v: "all", l: "Todas" },
-                    ...semanasDisponibles.map((s) => ({ v: String(s), l: `Semana ${s}` })),
-                  ]}
-                />
-
-                <FilterField
-                  label="Sucursal"
-                  value={fSucursal}
-                  onChange={setFSucursal}
-                  options={[
-                    { v: "all", l: "Todas" },
-                    ...SUCURSALES.map((s) => ({ v: s, l: s })),
-                  ]}
-                />
-
-                <FilterField
-                  label="Técnico"
-                  value={fTecnico}
-                  onChange={setFTecnico}
-                  options={[
-                    { v: "all", l: "Todos" },
-                    ...tecnicosSolo.map((p) => ({ v: p.id, l: p.nombre })),
-                  ]}
-                />
-
-                <FilterField
-                  label="Marca"
-                  value={fMarca}
-                  onChange={setFMarca}
-                  options={[
-                    { v: "all", l: "Todas" },
-                    ...MARCAS.map((m) => ({ v: m, l: m })),
-                  ]}
-                />
-
-                <FilterField
-                  label="Estado"
-                  value={fEstado}
-                  onChange={setFEstado}
-                  options={[
-                    { v: "all", l: "Todos" },
-                    ...ESTADOS.map((e) => ({ v: e, l: e })),
-                  ]}
-                />
-
-                <div className="pt-2 flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={limpiarFiltros}>Limpiar</Button>
-                  <Button className="flex-1" onClick={() => setFiltersOpen(false)}>Aplicar</Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
 
           <Button variant="outline" size="sm" onClick={exportExcel}>
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
@@ -447,23 +356,35 @@ export default function Planificador() {
         </div>
       </div>
 
-      {/* Chips de filtros activos */}
-      {activeChips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {activeChips.map((c, i) => (
-            <Badge key={i} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px] font-normal">
-              {c.label}
-              <button onClick={c.clear} className="rounded-sm hover:bg-background/60 p-0.5">
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
+      <FiltersBar
+        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar cliente…" }}
+        activeCount={activeChips.length}
+        onClear={limpiarFiltros}
+        meta={`${displayed.length} servicio${displayed.length !== 1 ? "s" : ""}`}
+      >
+        <FilterSelect
+          value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
+          options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        />
+        <FilterSelect
+          value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
+          options={[{ value: "all", label: "Todos los técnicos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
+        />
+        <FilterSelect
+          value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
+          options={[{ value: "all", label: "Todas las marcas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+        />
+        <FilterSelect
+          value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
+          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: e }))]}
+        />
+        <FilterSelect
+          value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
+          options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
+        />
+      </FiltersBar>
 
-          <button onClick={limpiarFiltros} className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2">
-            Limpiar todo
-          </button>
-        </div>
-      )}
+
 
       {/* Desktop table */}
       <Card className="hidden md:block overflow-hidden">
@@ -667,32 +588,3 @@ export default function Planificador() {
   );
 }
 
-function FilterField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { v: string; l: string }[];
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.v} value={o.v}>
-              {o.l}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}

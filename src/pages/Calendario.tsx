@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { ChevronLeft, ChevronRight, MapPin, Wrench, Plus, Ban, RotateCcw } from "lucide-react";
 import {
@@ -317,31 +318,6 @@ export default function Calendario() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Select value={vista} onValueChange={(v) => setVista(v as "mes" | "semana" | "tecnicos")}>
-            <SelectTrigger className="w-32 sm:w-40 h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mes">Mes</SelectItem>
-              <SelectItem value="semana">Semana</SelectItem>
-              <SelectItem value="tecnicos">Por técnico</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={fTecnico} onValueChange={setFTecnico}>
-            <SelectTrigger className="w-40 sm:w-48 h-9">
-              <SelectValue placeholder="Técnico" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los técnicos</SelectItem>
-              {profiles.filter(p => !adminCabecillaIds.has(p.id)).map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Button
             variant="outline"
             size="icon"
@@ -350,11 +326,9 @@ export default function Calendario() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-
           <Button variant="outline" size="sm" className="h-9" onClick={() => setCursor(new Date())}>
             Hoy
           </Button>
-
           <Button
             variant="outline"
             size="icon"
@@ -365,6 +339,35 @@ export default function Calendario() {
           </Button>
         </div>
       </div>
+
+      <FiltersBar
+        activeCount={fTecnico !== "all" ? 1 : 0}
+        onClear={() => setFTecnico("all")}
+      >
+        <FilterSelect
+          value={vista}
+          onChange={(v) => setVista(v as "mes" | "semana" | "tecnicos")}
+          placeholder="Vista"
+          width="w-[140px]"
+          options={[
+            { value: "mes", label: "Vista: Mes" },
+            { value: "semana", label: "Vista: Semana" },
+            { value: "tecnicos", label: "Vista: Por técnico" },
+          ]}
+        />
+        <FilterSelect
+          value={fTecnico}
+          onChange={setFTecnico}
+          placeholder="Técnico"
+          width="w-[180px]"
+          options={[
+            { value: "all", label: "Todos los técnicos" },
+            ...profiles.filter(p => !adminCabecillaIds.has(p.id)).map(p => ({ value: p.id, label: p.nombre })),
+          ]}
+        />
+      </FiltersBar>
+
+
 
       {vista === "tecnicos" ? (
         <Card className="overflow-x-auto">
