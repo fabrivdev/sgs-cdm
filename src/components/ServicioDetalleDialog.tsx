@@ -184,10 +184,15 @@ export function ServicioDetalleDialog({
   };
 
   useEffect(() => {
-    if (servicio) loadJornadas(servicio.id);
-    else {
+    if (servicio) {
+      loadJornadas(servicio.id);
+      supabase.from("trabajos").select("codigo").eq("legacy_servicio_id", servicio.id).maybeSingle().then(({ data }) => {
+        setTrabajoCodigo((data as any)?.codigo ?? null);
+      });
+    } else {
       setJornadas([]);
       setEdits({});
+      setTrabajoCodigo(null);
     }
   }, [servicio?.id]);
 
