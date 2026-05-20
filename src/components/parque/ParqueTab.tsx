@@ -188,7 +188,8 @@ export function ParqueTab({
   const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const [filtrosOpen, setFiltrosOpen] = useState(false);
+  const [_unusedFiltrosOpen, _setUnusedFiltrosOpen] = useState(false); // legacy: barra ahora inline
+  void _unusedFiltrosOpen; void _setUnusedFiltrosOpen;
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
   const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
