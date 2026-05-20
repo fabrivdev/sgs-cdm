@@ -98,6 +98,7 @@ export default function Planificador() {
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [openProgramar, setOpenProgramar] = useState(false);
   const [trabajosLite, setTrabajosLite] = useState<any[]>([]);
+  const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
 
   const currentWeek = useMemo(() => String(getISOWeek(new Date())), []);
   const [fSemana, setFSemana] = useState<string>(currentWeek);
