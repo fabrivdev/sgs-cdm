@@ -98,6 +98,7 @@ export default function Planificador() {
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [openProgramar, setOpenProgramar] = useState(false);
   const [trabajosLite, setTrabajosLite] = useState<any[]>([]);
+  const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
 
   const currentWeek = useMemo(() => String(getISOWeek(new Date())), []);
   const [fSemana, setFSemana] = useState<string>(currentWeek);
@@ -121,13 +122,19 @@ export default function Planificador() {
     setLoading(true);
 
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }, { data: rls }] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
-        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
         supabase.from("trabajos").select("id, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
+        supabase.from("user_roles").select("user_id, role"),
       ]);
+      const adminCab = new Set<string>();
+      for (const r of (rls ?? []) as Array<{ user_id: string; role: string }>) {
+        if (r.role === "admin" || r.role === "cabecilla") adminCab.add(r.user_id);
+      }
+      setAdminCabIds(adminCab);
 
       const serviciosBase = (srv ?? []) as Servicio[];
       const jornadas = (jor ?? []) as Array<{
@@ -136,6 +143,8 @@ export default function Planificador() {
         estado: Estado;
         horas_trabajadas: number | null;
         observaciones: string | null;
+        tecnico_responsable_id: string | null;
+        auxiliares: string[] | null;
       }>;
 
       // Expandir: una entrada por jornada. Si un servicio no tiene jornadas (legado), usar su fecha.
@@ -166,6 +175,9 @@ export default function Planificador() {
             estado: j.estado,
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
+            // Cada jornada puede tener su propia cuadrilla; si no, hereda del servicio padre.
+            tecnico_responsable_id: j.tecnico_responsable_id ?? s.tecnico_responsable_id,
+            auxiliares: (j.auxiliares && j.auxiliares.length > 0) ? j.auxiliares : s.auxiliares,
           });
         }
       }
@@ -188,6 +200,7 @@ export default function Planificador() {
 
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c])), [clientes]);
+  const tecnicosSolo = useMemo(() => profiles.filter(p => !adminCabIds.has(p.id)), [profiles, adminCabIds]);
 
   const semanasDisponibles = useMemo(
     () => Array.from(new Set(servicios.map((s) => s.semana))).sort((a, b) => a - b),
@@ -390,7 +403,7 @@ export default function Planificador() {
                   onChange={setFTecnico}
                   options={[
                     { v: "all", l: "Todos" },
-                    ...profiles.map((p) => ({ v: p.id, l: p.nombre })),
+                    ...tecnicosSolo.map((p) => ({ v: p.id, l: p.nombre })),
                   ]}
                 />
 
@@ -647,7 +660,7 @@ export default function Planificador() {
         onOpenChange={setOpenProgramar}
         trabajos={trabajosLite}
         clientes={clientes}
-        tecnicos={profiles}
+        tecnicos={tecnicosSolo}
         onSaved={load}
       />
     </div>

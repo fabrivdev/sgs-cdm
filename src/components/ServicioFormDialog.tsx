@@ -176,17 +176,20 @@ export function ServicioFormDialog({
   // Si todavía no cargaron, usamos los clientes recibidos por props como fallback temporal.
   const clientesDisponibles = clientesInternos.length > 0 ? clientesInternos : clientes;
 
-  const adminIds = useMemo(() => {
+  const adminCabIds = useMemo(() => {
     return new Set(
       roles
-        .filter((r) => String(r.role ?? "").trim().toLowerCase() === "admin")
+        .filter((r) => {
+          const role = String(r.role ?? "").trim().toLowerCase();
+          return role === "admin" || role === "cabecilla";
+        })
         .map((r) => r.user_id),
     );
   }, [roles]);
 
   const tecnicos = useMemo(() => {
-    return profilesDisponibles.filter((p) => !adminIds.has(p.id));
-  }, [profilesDisponibles, adminIds]);
+    return profilesDisponibles.filter((p) => !adminCabIds.has(p.id));
+  }, [profilesDisponibles, adminCabIds]);
 
   const cliById = useMemo(
     () => Object.fromEntries(clientesDisponibles.map((c) => [c.id, c.nombre])),

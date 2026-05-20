@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import type { Sucursal } from "@/lib/constants";
 import { NuevoTrabajoDialog } from "./NuevoTrabajoDialog";
+import { TecnicosPicker } from "./TecnicosPicker";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
@@ -28,19 +29,18 @@ interface TrabajoLite {
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  trabajoId?: string | null;            // si viene fijo (desde Detalle), no se elige
-  trabajos?: TrabajoLite[];             // catálogo cuando se invoca desde Planificador
+  trabajoId?: string | null;
+  trabajos?: TrabajoLite[];
   clientes?: Cliente[];
-  tecnicos: Profile[];
+  tecnicos: Profile[];           // ya filtrados (solo rol técnico)
   fechaInicial?: string | null;
   onSaved: () => void;
 }
 
 /**
- * Crea una AGENDA (programación) para un trabajo.
- * - Sin estados propios: la agenda es solo fecha + técnicos.
- * - El estado del trabajo lo calcula automáticamente el trigger DB.
- * - Sincroniza el legacy `servicios` para que aparezca en el Planificador clásico.
+ * Programa una intervención (agenda) sobre un trabajo madre.
+ * - La cuadrilla NO se hereda de programaciones anteriores: se elige acá.
+ * - El estado del trabajo lo recalcula el trigger DB.
  */
 export function ProgramarIntervencionDialog({
   open, onOpenChange, trabajoId, trabajos, clientes, tecnicos, fechaInicial, onSaved,
@@ -50,7 +50,7 @@ export function ProgramarIntervencionDialog({
   const [openNuevoTrabajo, setOpenNuevoTrabajo] = useState(false);
   const [form, setForm] = useState({
     fecha_programada: fechaInicial ?? new Date().toISOString().slice(0, 10),
-    tecnico_principal_id: "",
+    tecnico_principal_id: null as string | null,
     auxiliares: [] as string[],
     observacion: "",
   });
@@ -70,7 +70,7 @@ export function ProgramarIntervencionDialog({
     setSelectedTrabajoId(trabajoId ?? "");
     setForm({
       fecha_programada: fechaInicial ?? new Date().toISOString().slice(0, 10),
-      tecnico_principal_id: "",
+      tecnico_principal_id: null,
       auxiliares: [],
       observacion: "",
     });
@@ -129,8 +129,17 @@ export function ProgramarIntervencionDialog({
       .select("id").eq("servicio_id", servicioId).eq("fecha", form.fecha_programada).maybeSingle();
     if (!existe?.id) {
       await supabase.from("servicio_jornadas").insert({
-        servicio_id: servicioId, fecha: form.fecha_programada, estado: "Pendiente",
+        servicio_id: servicioId,
+        fecha: form.fecha_programada,
+        estado: "Pendiente",
+        tecnico_responsable_id: form.tecnico_principal_id || null,
+        auxiliares: form.auxiliares,
       });
+    } else {
+      await supabase.from("servicio_jornadas").update({
+        tecnico_responsable_id: form.tecnico_principal_id || null,
+        auxiliares: form.auxiliares,
+      }).eq("id", existe.id);
     }
   };
 
@@ -138,7 +147,7 @@ export function ProgramarIntervencionDialog({
     const tId = selectedTrabajoId || trabajoId;
     if (!tId) { toast.error("Seleccioná un trabajo"); return; }
     if (!form.fecha_programada) { toast.error("Fecha requerida"); return; }
-    if (!form.tecnico_principal_id) { toast.error("Seleccioná técnico principal"); return; }
+    if (!form.tecnico_principal_id) { toast.error("Marcá un técnico principal (estrella)"); return; }
     setBusy(true);
     try {
       const { error } = await supabase.from("programaciones").insert({
@@ -166,18 +175,19 @@ export function ProgramarIntervencionDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Programar intervención</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+
+          <div className="grid gap-4">
             {necesitaSelector && (
               <div className="space-y-1.5">
-                <Label>Trabajo</Label>
+                <Label className="text-xs font-medium text-muted-foreground">Trabajo</Label>
                 <div className="flex gap-2">
                   <Select value={selectedTrabajoId} onValueChange={setSelectedTrabajoId}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Elegí un trabajo pendiente…" />
+                      <SelectValue placeholder="Elegí un trabajo abierto…" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
                       {trabajosOrden.length === 0 && (
@@ -190,7 +200,7 @@ export function ProgramarIntervencionDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" onClick={() => setOpenNuevoTrabajo(true)}>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setOpenNuevoTrabajo(true)} title="Nuevo trabajo">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -203,46 +213,27 @@ export function ProgramarIntervencionDialog({
             )}
 
             <div className="space-y-1.5">
-              <Label>Fecha</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Fecha</Label>
               <Input type="date" value={form.fecha_programada}
                 onChange={(e) => setForm(f => ({ ...f, fecha_programada: e.target.value }))} />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Técnico principal</Label>
-              <Select value={form.tecnico_principal_id || "none"}
-                onValueChange={(v) => setForm(f => ({ ...f, tecnico_principal_id: v === "none" ? "" : v }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Asignar" /></SelectTrigger>
-                <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
-                  <SelectItem value="none">— Sin asignar —</SelectItem>
-                  {tecnicos.map(t => <SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            <TecnicosPicker
+              tecnicos={tecnicos}
+              principalId={form.tecnico_principal_id}
+              auxiliares={form.auxiliares}
+              onChange={({ principalId, auxiliares }) =>
+                setForm(f => ({ ...f, tecnico_principal_id: principalId, auxiliares }))
+              }
+            />
 
             <div className="space-y-1.5">
-              <Label>Auxiliares</Label>
-              <div className="rounded-md border p-2 max-h-32 overflow-y-auto space-y-1">
-                {tecnicos.filter(t => t.id !== form.tecnico_principal_id).map(t => (
-                  <label key={t.id} className="flex items-center gap-2 text-xs">
-                    <input type="checkbox" checked={form.auxiliares.includes(t.id)}
-                      onChange={(e) => setForm(f => ({
-                        ...f, auxiliares: e.target.checked
-                          ? [...f.auxiliares, t.id]
-                          : f.auxiliares.filter(x => x !== t.id)
-                      }))} />
-                    {t.nombre}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Observación (opcional)</Label>
+              <Label className="text-xs font-medium text-muted-foreground">Observación (opcional)</Label>
               <Textarea rows={2} value={form.observacion}
                 onChange={(e) => setForm(f => ({ ...f, observacion: e.target.value }))} />
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancelar</Button>
             <Button onClick={guardar} disabled={busy}>{busy ? "Guardando…" : "Programar"}</Button>

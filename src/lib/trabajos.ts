@@ -44,10 +44,12 @@ export type Prioridad = (typeof PRIORIDADES)[number]["key"];
 
 export const ESTADOS_JORNADA = [
   { key: "completada", label: "Completada" },
+  { key: "incompleta", label: "Incompleta" },
 ] as const;
-export type EstadoJornada = "completada";
+export type EstadoJornada = "completada" | "incompleta";
 
-export function estadoJornadaLabel() {
+export function estadoJornadaLabel(estado?: string | null) {
+  if (estado === "incompleta") return "Incompleta";
   return "Completada";
 }
 

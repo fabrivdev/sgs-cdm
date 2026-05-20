@@ -106,7 +106,7 @@ export default function Calendario() {
       const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
-        supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones"),
+        supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("dias_no_laborales").select("id, fecha, motivo"),
         cargarTodosLosClientes(),
@@ -120,6 +120,8 @@ export default function Calendario() {
         estado: Estado;
         horas_trabajadas: number | null;
         observaciones: string | null;
+        tecnico_responsable_id: string | null;
+        auxiliares: string[] | null;
       }>;
 
       const porServicio = new Map<string, typeof jornadas>();
@@ -148,6 +150,8 @@ export default function Calendario() {
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
             jornada_id: j.id,
+            tecnico_responsable_id: j.tecnico_responsable_id ?? s.tecnico_responsable_id,
+            auxiliares: (j.auxiliares && j.auxiliares.length > 0) ? j.auxiliares : s.auxiliares,
           });
         }
       }
@@ -330,7 +334,7 @@ export default function Calendario() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los técnicos</SelectItem>
-              {profiles.map((p) => (
+              {profiles.filter(p => !adminCabecillaIds.has(p.id)).map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.nombre}
                 </SelectItem>

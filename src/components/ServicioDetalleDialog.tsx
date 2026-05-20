@@ -34,6 +34,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, MapPin, MoreVertical, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
+import { TecnicosPicker } from "@/components/trabajos/TecnicosPicker";
 import { cn } from "@/lib/utils";
 
 interface Servicio {
@@ -101,13 +102,32 @@ export function ServicioDetalleDialog({
   // Jornadas
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loadingJornadas, setLoadingJornadas] = useState(false);
-  const [addDateOpen, setAddDateOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
 
   // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
 
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
+  const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
+
+  // Form para nueva jornada (crew elegible, no se hereda)
+  const [nuevaJornada, setNuevaJornada] = useState<{
+    fecha: string;
+    tecnico_principal_id: string | null;
+    auxiliares: string[];
+  }>({ fecha: format(new Date(), "yyyy-MM-dd"), tecnico_principal_id: null, auxiliares: [] });
+
+  useEffect(() => {
+    supabase.from("user_roles").select("user_id, role").then(({ data }) => {
+      const s = new Set<string>();
+      for (const r of (data ?? []) as Array<{ user_id: string; role: string }>) {
+        if (r.role === "admin" || r.role === "cabecilla") s.add(r.user_id);
+      }
+      setAdminCabIds(s);
+    });
+  }, []);
+
 
   useEffect(() => {
     if (!servicio) return;
@@ -250,9 +270,10 @@ export function ServicioDetalleDialog({
     }
   };
 
-  const addJornada = async (date: Date | undefined) => {
-    if (!date) return;
-    const fecha = format(date, "yyyy-MM-dd");
+  const addJornada = async () => {
+    const { fecha, tecnico_principal_id, auxiliares } = nuevaJornada;
+    if (!fecha) { toast.error("Fecha requerida"); return; }
+    if (!tecnico_principal_id) { toast.error("Marcá un técnico principal (estrella)"); return; }
 
     if (fechasExistentes.has(fecha)) {
       toast.error("Ya existe una jornada en esa fecha.");
@@ -264,6 +285,8 @@ export function ServicioDetalleDialog({
       servicio_id: servicio.id,
       fecha,
       estado: "Pendiente" as Estado,
+      tecnico_responsable_id: tecnico_principal_id,
+      auxiliares,
     });
     setBusy(false);
 
@@ -272,7 +295,13 @@ export function ServicioDetalleDialog({
       return;
     }
 
-    setAddDateOpen(false);
+    setAddOpen(false);
+    setNuevaJornada({
+      fecha: format(new Date(), "yyyy-MM-dd"),
+      tecnico_principal_id: null,
+      auxiliares: [],
+    });
+
     const nuevaLista = [
       ...jornadas,
       {
@@ -449,22 +478,46 @@ export function ServicioDetalleDialog({
                 </Label>
 
                 {canEdit && (
-                  <Popover open={addDateOpen} onOpenChange={setAddDateOpen}>
+                  <Popover open={addOpen} onOpenChange={setAddOpen}>
                     <PopoverTrigger asChild>
                       <Button size="sm" variant="outline" className="h-7 text-xs">
                         <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
                         Continuar en otra fecha
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <Calendar
-                        mode="single"
-                        onSelect={addJornada}
-                        locale={es}
-                        disabled={(d) => fechasExistentes.has(format(d, "yyyy-MM-dd"))}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto")}
+                    <PopoverContent className="w-[320px] p-3 space-y-3" align="end">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Fecha</Label>
+                        <Input
+                          type="date"
+                          value={nuevaJornada.fecha}
+                          onChange={(e) => setNuevaJornada(n => ({ ...n, fecha: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                        {fechasExistentes.has(nuevaJornada.fecha) && (
+                          <p className="text-[10px] text-destructive">Ya hay una jornada en esa fecha.</p>
+                        )}
+                      </div>
+
+                      <TecnicosPicker
+                        tecnicos={profiles.filter(p => !adminCabIds.has(p.id))}
+                        principalId={nuevaJornada.tecnico_principal_id}
+                        auxiliares={nuevaJornada.auxiliares}
+                        onChange={({ principalId, auxiliares }) =>
+                          setNuevaJornada(n => ({ ...n, tecnico_principal_id: principalId, auxiliares }))
+                        }
+                        label="Cuadrilla para esta fecha"
+                        helperText="No se hereda de fechas anteriores; elegí libremente."
                       />
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAddOpen(false)}>
+                          Cancelar
+                        </Button>
+                        <Button size="sm" className="h-7 text-xs" onClick={addJornada} disabled={busy}>
+                          {busy ? "Guardando…" : "Agregar"}
+                        </Button>
+                      </div>
                     </PopoverContent>
                   </Popover>
                 )}
