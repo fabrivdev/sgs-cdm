@@ -262,8 +262,8 @@ export default function Calendario() {
   const estadoColor = (e: Estado) =>
     e === "Completado"
       ? "bg-estado-completado text-white"
-      : e === "Iniciado"
-      ? "bg-estado-iniciado text-white"
+      : e === "Cancelada"
+      ? "bg-muted text-muted-foreground"
       : "bg-estado-pendiente text-white";
 
   const canCreate = isAdmin || isCabecilla;
@@ -297,8 +297,9 @@ export default function Calendario() {
   };
 
   const dominantColor = (evs: Servicio[]) => {
-    if (evs.some((s) => s.estado === "Pendiente")) return "bg-estado-pendiente";
-    if (evs.some((s) => s.estado === "Iniciado")) return "bg-estado-iniciado";
+    const activas = evs.filter((s) => s.estado !== "Cancelada");
+    if (activas.length === 0) return "bg-muted";
+    if (activas.some((s) => s.estado === "Pendiente")) return "bg-estado-pendiente";
     return "bg-estado-completado";
   };
 

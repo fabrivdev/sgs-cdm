@@ -91,8 +91,8 @@ interface UltimoSeguimiento {
 
 const COLORS_ESTADO: Record<Estado, string> = {
   Pendiente: "#EF9F27",
-  Iniciado: "#378ADD",
   Completado: "#639922",
+  Cancelada: "#9CA3AF",
 };
 
 const COLORS_MARCA: Record<Marca, string> = {
@@ -305,8 +305,8 @@ export default function Dashboard() {
         return {
           name: suc,
           Pendiente: items.filter((x) => x.estado === "Pendiente").length,
-          Iniciado: items.filter((x) => x.estado === "Iniciado").length,
           Completado: items.filter((x) => x.estado === "Completado").length,
+          Cancelada: items.filter((x) => x.estado === "Cancelada").length,
           total: items.length,
         };
       }),
@@ -545,7 +545,7 @@ export default function Dashboard() {
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Pendiente" stackId="a" fill={COLORS_ESTADO.Pendiente} />
-              <Bar dataKey="Iniciado" stackId="a" fill={COLORS_ESTADO.Iniciado} />
+              <Bar dataKey="Cancelada" stackId="a" fill={COLORS_ESTADO.Cancelada} />
               <Bar dataKey="Completado" stackId="a" fill={COLORS_ESTADO.Completado}>
                 <LabelList
                   dataKey="total"
