@@ -195,6 +195,7 @@ export default function Planificador() {
 
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c])), [clientes]);
+  const tecnicosSolo = useMemo(() => profiles.filter(p => !adminCabIds.has(p.id)), [profiles, adminCabIds]);
 
   const semanasDisponibles = useMemo(
     () => Array.from(new Set(servicios.map((s) => s.semana))).sort((a, b) => a - b),
