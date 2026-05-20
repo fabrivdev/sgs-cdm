@@ -651,19 +651,20 @@ export function ServicioDetalleDialog({
               </div>
             </div>
           </div>
+        </ResponsiveDrawerBody>
 
-          {canEdit && (
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cerrar
-              </Button>
-              <Button onClick={save} disabled={busy || !dirty}>
-                {busy ? "Guardando…" : "Guardar"}
-              </Button>
-            </DialogFooter>
-          )}
-        </DialogContent>
-      </Dialog>
+        {canEdit && (
+          <ResponsiveDrawerFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cerrar
+            </Button>
+            <Button onClick={save} disabled={busy || !dirty}>
+              {busy ? "Guardando…" : "Guardar"}
+            </Button>
+          </ResponsiveDrawerFooter>
+        )}
+      </ResponsiveDrawer>
+
 
       {canManage && (
         <ServicioFormDialog
