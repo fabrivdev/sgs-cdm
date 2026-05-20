@@ -28,8 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
 import { ESTADOS, ESTADO_LABELS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +37,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, MapPin, MoreVertical, Pencil, Trash2, Wrench, X } from "lucide-react";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
-import { TecnicosPicker } from "@/components/trabajos/TecnicosPicker";
+import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
 import { cn } from "@/lib/utils";
 
 interface Servicio {
@@ -107,22 +105,26 @@ export function ServicioDetalleDialog({
   // Jornadas
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loadingJornadas, setLoadingJornadas] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
-  const [trabajoCodigo, setTrabajoCodigo] = useState<string | null>(null);
+  const [trabajoMadre, setTrabajoMadre] = useState<{
+    id: string;
+    codigo: string | null;
+    descripcion_problema: string;
+    cliente_id: string | null;
+    sucursal: Sucursal;
+    marca: Marca;
+    tipo_trabajo: TipoTrabajo;
+    estado_general: string;
+    prioridad?: string;
+    legacy_servicio_id?: string | null;
+  } | null>(null);
+  const [programarOpen, setProgramarOpen] = useState(false);
 
   // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
 
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
   const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
-
-  // Form para nueva jornada (crew elegible, no se hereda)
-  const [nuevaJornada, setNuevaJornada] = useState<{
-    fecha: string;
-    tecnico_principal_id: string | null;
-    auxiliares: string[];
-  }>({ fecha: format(new Date(), "yyyy-MM-dd"), tecnico_principal_id: null, auxiliares: [] });
 
   useEffect(() => {
     supabase.from("user_roles").select("user_id, role").then(({ data }) => {
@@ -191,13 +193,18 @@ export function ServicioDetalleDialog({
   useEffect(() => {
     if (servicio) {
       loadJornadas(servicio.id);
-      supabase.from("trabajos").select("codigo").eq("legacy_servicio_id", servicio.id).maybeSingle().then(({ data }) => {
-        setTrabajoCodigo((data as any)?.codigo ?? null);
-      });
+      supabase
+        .from("trabajos")
+        .select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, prioridad, legacy_servicio_id")
+        .eq("legacy_servicio_id", servicio.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          setTrabajoMadre((data as any) ?? null);
+        });
     } else {
       setJornadas([]);
       setEdits({});
-      setTrabajoCodigo(null);
+      setTrabajoMadre(null);
     }
   }, [servicio?.id]);
 
@@ -281,55 +288,6 @@ export function ServicioDetalleDialog({
     }
   };
 
-  const addJornada = async () => {
-    const { fecha, tecnico_principal_id, auxiliares } = nuevaJornada;
-    if (!fecha) { toast.error("Fecha requerida"); return; }
-    if (!tecnico_principal_id) { toast.error("Marcá un técnico principal (estrella)"); return; }
-
-    if (fechasExistentes.has(fecha)) {
-      toast.error("Ya existe una jornada en esa fecha.");
-      return;
-    }
-
-    setBusy(true);
-    const { error } = await supabase.from("servicio_jornadas").insert({
-      servicio_id: servicio.id,
-      fecha,
-      estado: "Pendiente" as Estado,
-      tecnico_responsable_id: tecnico_principal_id,
-      auxiliares,
-    });
-    setBusy(false);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    setAddOpen(false);
-    setNuevaJornada({
-      fecha: format(new Date(), "yyyy-MM-dd"),
-      tecnico_principal_id: null,
-      auxiliares: [],
-    });
-
-    const nuevaLista = [
-      ...jornadas,
-      {
-        id: "__temp__",
-        servicio_id: servicio.id,
-        fecha,
-        estado: "Pendiente" as Estado,
-        horas_trabajadas: null,
-        observaciones: null,
-      },
-    ];
-
-    await syncTrabajoMadre(servicio.id, nuevaLista);
-    toast.success("Jornada agregada");
-    await loadJornadas(servicio.id);
-    onChanged();
-  };
 
   const deleteJornada = async (id: string) => {
     setBusy(true);
@@ -422,9 +380,9 @@ export function ServicioDetalleDialog({
         <ResponsiveDrawerHeader>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap pr-8 text-base font-semibold">
-              {trabajoCodigo && (
+              {trabajoMadre?.codigo && (
                 <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
-                  {trabajoCodigo}
+                  {trabajoMadre.codigo}
                 </span>
               )}
               Detalle del servicio
@@ -494,49 +452,16 @@ export function ServicioDetalleDialog({
                   </span>
                 </Label>
 
-                {canEdit && (
-                  <Popover open={addOpen} onOpenChange={setAddOpen}>
-                    <PopoverTrigger asChild>
-                      <Button size="sm" variant="outline" className="h-7 text-xs">
-                        <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
-                        Continuar en otra fecha
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[320px] p-3 space-y-3" align="end">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">Fecha</Label>
-                        <Input
-                          type="date"
-                          value={nuevaJornada.fecha}
-                          onChange={(e) => setNuevaJornada(n => ({ ...n, fecha: e.target.value }))}
-                          className="h-8 text-xs"
-                        />
-                        {fechasExistentes.has(nuevaJornada.fecha) && (
-                          <p className="text-[10px] text-destructive">Ya hay una jornada en esa fecha.</p>
-                        )}
-                      </div>
-
-                      <TecnicosPicker
-                        tecnicos={profiles.filter(p => !adminCabIds.has(p.id))}
-                        principalId={nuevaJornada.tecnico_principal_id}
-                        auxiliares={nuevaJornada.auxiliares}
-                        onChange={({ principalId, auxiliares }) =>
-                          setNuevaJornada(n => ({ ...n, tecnico_principal_id: principalId, auxiliares }))
-                        }
-                        label="Cuadrilla para esta fecha"
-                        helperText="No se hereda de fechas anteriores; elegí libremente."
-                      />
-
-                      <div className="flex justify-end gap-2 pt-1">
-                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAddOpen(false)}>
-                          Cancelar
-                        </Button>
-                        <Button size="sm" className="h-7 text-xs" onClick={addJornada} disabled={busy}>
-                          {busy ? "Guardando…" : "Agregar"}
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                {canEdit && trabajoMadre && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => setProgramarOpen(true)}
+                  >
+                    <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
+                    Continuar en otra fecha
+                  </Button>
                 )}
               </div>
 
@@ -677,6 +602,21 @@ export function ServicioDetalleDialog({
           profiles={profiles}
           clientes={clientesAll.length > 0 ? clientesAll : clientes}
           onSaved={() => {
+            onChanged();
+          }}
+        />
+      )}
+
+      {trabajoMadre && (
+        <ProgramarIntervencionDialog
+          open={programarOpen}
+          onOpenChange={setProgramarOpen}
+          trabajoId={trabajoMadre.id}
+          trabajos={[trabajoMadre as any]}
+          clientes={clientesAll.length > 0 ? clientesAll : clientes}
+          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+          onSaved={() => {
+            loadJornadas(servicio.id);
             onChanged();
           }}
         />

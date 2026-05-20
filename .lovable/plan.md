@@ -1,58 +1,72 @@
+
 ## Objetivo
 
-Unificar la experiencia drawer en todo el sistema y eliminar redundancias en el detalle del trabajo.
+Eliminar el popover viejo "Continuar en otra fecha" del `ServicioDetalleDialog` y reusar **exactamente** el mismo panel lateral moderno (`ProgramarIntervencionDialog`) que ya utiliza "Programar nueva fecha". Además, arreglar el `TecnicosPicker` para que no rompa en anchos chicos y mostrar al principal con más claridad.
 
-## 1. Migrar `ServicioDetalleDialog` al patrón drawer
+---
 
-Hoy `Planificador.tsx`, `Calendario.tsx` e `Historial.tsx` siguen abriendo `ServicioDetalleDialog`, que es el modal centrado viejo. La forma más limpia y de menor riesgo es:
+## 1. Reusar `ProgramarIntervencionDialog` desde el detalle de servicio
 
-- Reescribir `src/components/ServicioDetalleDialog.tsx` por dentro para usar `ResponsiveDrawer` (header sticky, body scrolleable, footer con acciones) — mismo nombre, misma API (`open`, `onOpenChange`, `servicioId`, callbacks), para no tocar los 3 lugares que lo consumen.
-- Reorganizar su contenido siguiendo el mismo lenguaje visual que `TrabajoDetalleDrawer`:
-  - Header: código `TR-XXXX` (mono) + cliente + chips de sucursal/marca + badges de prioridad y estado, microcopy del estado.
-  - Cuerpo: tarjeta "Próxima acción" reutilizando la lógica derivada (`trabajo-derivado.ts`), bloque "Resumen operativo", lista única "Fechas y jornadas", "Historial" humanizado.
-  - Footer: acción primaria contextual + Cancelar/Cerrar.
-- Mantener el flujo legacy de `servicios` + `servicio_jornadas` ya implementado en el archivo actual; sólo cambia la presentación.
+**Archivo:** `src/components/ServicioDetalleDialog.tsx`
 
-Resultado: al clickear desde Planificador, Calendario o Historial se abre el mismo drawer lateral/bottom-sheet que en Kanban.
+- Quitar el `Popover` interno (líneas ~498–540) que renderiza inputs `fecha` + `TecnicosPicker` + botón "Agregar".
+- Quitar el state `addOpen`, `nuevaJornada` y la función local `addJornada` que insertaba en `servicio_jornadas`.
+- Quitar imports ya no usados: `Popover/PopoverTrigger/PopoverContent`, `Input` (si no se usa en otro lado del archivo), `TecnicosPicker`.
+- Reemplazar el botón por uno que abra `ProgramarIntervencionDialog` con `trabajoId` precargado:
+  - Al abrir el detalle de un servicio legacy, resolver el `trabajo_id` consultando `trabajos` por `legacy_servicio_id` (ya se hace para `trabajoCodigo`; ampliar el select a `id, codigo`).
+  - Si existe trabajo madre: el botón "Continuar en otra fecha" llama a `<ProgramarIntervencionDialog open trabajoId={trabajoMadreId} tecnicos={...} fechaInicial={hoy} onSaved={...}/>`. Cargar `trabajos`, `clientes` y `profiles` necesarios (los `profiles` ya están como prop; los `trabajos` y `clientes` se obtienen en el mismo efecto que ya consulta clientes — bastará con un single fetch del trabajo madre).
+  - Tras `onSaved`, recargar jornadas (`loadJornadas`) y avisar al padre (`onChanged()`).
+- Texto del botón: mantener "Continuar en otra fecha" (mismo wording, pero abre el panel moderno).
+- Si el servicio legacy aún no tiene trabajo madre vinculado, ocultar el botón y mostrar un `EmptyState` mínimo ("Este servicio aún no está vinculado a un trabajo del nuevo sistema"). Esto cubre datos heredados sin reintroducir el formulario viejo.
 
-## 2. Quitar duplicación de "Programar nueva fecha"
+**Resultado:** una sola UI (drawer lateral) para crear programaciones en todo el sistema. No hay popover flotante encima de Jornadas.
 
-En `TrabajoDetalleDrawer.tsx` el CTA aparece hoy en tres lugares simultáneamente:
+---
 
-1. CTA principal dentro de `ProximaAccionCard` (cuando corresponde).
-2. Botón ghost al lado del título de la sección "Fechas y jornadas".
-3. Botón primario del footer cuando el estado lo amerita.
+## 2. Sugerir última cuadrilla utilizada
 
-Cambios:
+**Archivo:** `src/components/trabajos/ProgramarIntervencionDialog.tsx`
 
-- Conservar el CTA del footer como acción primaria persistente y siempre visible.
-- Conservar el CTA contextual de `ProximaAccionCard` sólo cuando el estado del trabajo realmente lo pide (sin pendientes, completado reabrible, etc.). En el resto de los casos esa tarjeta muestra otra acción (Cargar jornada, Reprogramar) y no repite "Programar".
-- Eliminar el botón ghost del header de "Fechas y jornadas". En su lugar dejar un único `+ Programar nueva fecha` al pie de la lista, y sólo si el footer no ya lo está mostrando como primaria (para evitar dos botones iguales pegados en mobile).
+- Cuando se abre con `trabajoId` (modo "continuar"), al montar consultar la última `programacion` o `servicio_jornada` del trabajo para precargar `tecnico_principal_id` y `auxiliares` en `form`.
+  - Estrategia: `supabase.from('programaciones').select('tecnico_principal_id, auxiliares').eq('trabajo_id', trabajoId).order('fecha_programada', { ascending: false }).limit(1)`.
+  - Si no hay programación previa pero existe `legacy_servicio_id`, fallback a `servicio_jornadas` por `servicio_id` ordenado desc.
+- El usuario puede cambiarlos libremente; es solo un default.
+- Sin `trabajoId` (modo "programar nuevo desde 0") el form sigue vacío como hoy.
 
-Regla: en cualquier momento el usuario ve como máximo dos puntos de entrada distintos a "Programar nueva fecha" — la acción contextual (cuando aplica) y la del footer.
+---
 
-## 3. Migrar "Nueva máquina" del Parque al patrón drawer
+## 3. Rediseñar `TecnicosPicker` (usado en todos lados)
 
-`src/components/parque/NuevaMaquinaDialog.tsx` sigue siendo un `Dialog` centrado.
+**Archivo:** `src/components/trabajos/TecnicosPicker.tsx`
 
-- Reescribirlo internamente con `ResponsiveDrawer` (size `lg`), manteniendo nombre, props y consumidores (`ParqueTab.tsx`).
-- Reordenar los campos en secciones cortas: Identificación (Cliente, Marca, Subgrupo), Datos de la máquina (Serie, Año, Modelo/Tipo), Ubicación (Sucursal, Localidad), Comercial (Vendedor, Notas).
-- Footer sticky con `Cancelar` + `Crear máquina`.
+Cambios visuales/UX (la API pública — props — se mantiene exactamente igual para no tocar consumidores):
 
-## 4. Revisión rápida de otros popups del módulo
+- Contenedor con altura fija (`max-h-56`) y **solo** `overflow-y-auto`; agregar `overflow-x-hidden` para eliminar el scroll horizontal que aparece en drawers angostos.
+- Cada fila: `flex min-w-0` con `truncate` real en el nombre y badges/estrella en columnas `shrink-0`. El nombre nunca empuja el layout.
+- Técnico principal visualmente más claro:
+  - Fila destacada con `bg-primary/5` + `border-l-2 border-primary`.
+  - Badge "Principal" más fuerte (texto bold, fondo `bg-primary text-primary-foreground`).
+  - Estrella rellena en color primary cuando está activo.
+- Reemplazar el `<input type="checkbox">` nativo por el componente `Checkbox` de shadcn para coherencia visual.
+- Spacing más generoso (`py-2 px-3`, `divide-y divide-border`), redondeado consistente con el resto de los drawers.
+- Helper text en `text-[11px]` con `text-muted-foreground`.
 
-Para asegurar consistencia visual sin cambiar lógica:
+Como la API queda igual, **automáticamente** ProgramarIntervencionDialog, CargarJornadaDialog y cualquier otro consumidor heredan el fix — quedando "el mismo componente de cuadrilla en TODOS los lugares del sistema".
 
-- Verificar `ServicioFormDialog.tsx` (alta/edición de servicio legacy si todavía se usa) y migrar a `ResponsiveDrawer` si aparece en flujos activos.
-- Confirmar que `NuevoTrabajoDialog`, `ProgramarIntervencionDialog`, `CargarJornadaDialog` ya están sobre `ResponsiveDrawer` (lo están, según el trabajo anterior) y que se apilan correctamente sobre el nuevo `ServicioDetalleDialog` drawer-izado.
+---
 
-## Detalles técnicos
+## 4. Verificación final
 
-Archivos editados:
+- Buscar y eliminar cualquier referencia residual a un formulario local de jornadas en `ServicioDetalleDialog` (state, handlers, imports).
+- Confirmar que `CargarJornadaDialog`, `NuevoTrabajoDialog`, `ProgramarIntervencionDialog` y `NuevaMaquinaDialog` siguen usando `ResponsiveDrawer`.
+- Probar responsive (móvil y desktop) que el drawer no se monta encima de otro y no aparece scroll horizontal.
 
-- `src/components/ServicioDetalleDialog.tsx` — reemplazar `Dialog` por `ResponsiveDrawer` y rehacer estructura interna (header / cuerpo en secciones / footer). Reusar helpers ya creados: `unificarFechas`, `calcularProximaAccion`, `humanizarEvento`.
-- `src/components/trabajos/TrabajoDetalleDrawer.tsx` — quitar botón ghost de la cabecera de "Fechas y jornadas", mover/condicionar el `+ Programar nueva fecha` al pie de la lista y ajustar la lógica de `ProximaAccionCard` para no duplicar el CTA del footer.
-- `src/components/parque/NuevaMaquinaDialog.tsx` — migrar a `ResponsiveDrawer`, reorganizar campos en secciones, footer sticky.
-- (Si aplica) `src/components/ServicioFormDialog.tsx` — mismo patrón drawer.
+---
 
-Sin cambios de backend, ni de triggers, ni de RLS, ni de tipos. Los nombres de componentes y sus props se mantienen para no tocar a los consumidores (Planificador, Calendario, Historial, Parque).
+## Archivos a modificar
+
+- `src/components/ServicioDetalleDialog.tsx` — quitar popover viejo, integrar `ProgramarIntervencionDialog`.
+- `src/components/trabajos/ProgramarIntervencionDialog.tsx` — precargar última cuadrilla cuando viene `trabajoId`.
+- `src/components/trabajos/TecnicosPicker.tsx` — rediseño visual + fix overflow + checkbox shadcn.
+
+Sin cambios de backend ni de esquema. La inserción sigue pasando por `programaciones` + `syncLegacyPlanificador` existentes, por lo que el resultado en `servicio_jornadas` y en el trabajo madre es el mismo que el flujo actual de "Programar nueva fecha".

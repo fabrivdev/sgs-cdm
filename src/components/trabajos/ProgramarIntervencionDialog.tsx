@@ -76,6 +76,53 @@ export function ProgramarIntervencionDialog({
       auxiliares: [],
       observacion: "",
     });
+
+    // Si abrimos en modo "continuar" (con trabajo), sugerir la última cuadrilla utilizada.
+    const tId = trabajoId;
+    if (!tId) return;
+    (async () => {
+      const { data: ultProg } = await supabase
+        .from("programaciones")
+        .select("tecnico_principal_id, auxiliares")
+        .eq("trabajo_id", tId)
+        .order("fecha_programada", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ultProg?.tecnico_principal_id) {
+        setForm((f) => ({
+          ...f,
+          tecnico_principal_id: ultProg.tecnico_principal_id as string,
+          auxiliares: (ultProg.auxiliares as string[]) ?? [],
+        }));
+        return;
+      }
+
+      // Fallback al sistema legacy
+      const { data: trab } = await supabase
+        .from("trabajos")
+        .select("legacy_servicio_id")
+        .eq("id", tId)
+        .maybeSingle();
+      const legacyId = (trab as any)?.legacy_servicio_id as string | null;
+      if (!legacyId) return;
+
+      const { data: ultJor } = await supabase
+        .from("servicio_jornadas")
+        .select("tecnico_responsable_id, auxiliares")
+        .eq("servicio_id", legacyId)
+        .order("fecha", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ultJor?.tecnico_responsable_id) {
+        setForm((f) => ({
+          ...f,
+          tecnico_principal_id: ultJor.tecnico_responsable_id as string,
+          auxiliares: (ultJor.auxiliares as string[]) ?? [],
+        }));
+      }
+    })();
   }, [open, trabajoId, fechaInicial]);
 
   // Solo trabajos SIN programación pendiente => estado_general === 'pendiente'
