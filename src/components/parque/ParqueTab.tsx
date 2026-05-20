@@ -3,25 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import {
   ArrowDown,
   ArrowUp,
@@ -29,13 +15,12 @@ import {
   CalendarIcon,
   Check,
   Download,
-  Filter,
   Flag,
   Phone,
-  Search,
   X,
 } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
