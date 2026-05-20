@@ -106,6 +106,35 @@ export function TrabajoDetalleDialog({ trabajoId, onOpenChange, clientes, profil
     onChanged();
   };
 
+  const cerrarTrabajo = async () => {
+    if (!trabajo) return;
+    const incompletas = jornadas.filter(j => j.estado_jornada === "incompleta").length;
+    const msg = incompletas > 0
+      ? `Hay ${incompletas} jornada(s) marcada(s) como incompleta(s). ¿Cerrar el trabajo igualmente?`
+      : "¿Marcar este trabajo como completado y cerrarlo?";
+    if (!window.confirm(msg)) return;
+    const { error } = await supabase.from("trabajos")
+      .update({ cerrado_en: new Date().toISOString(), cerrado_por: (await supabase.auth.getUser()).data.user?.id ?? null })
+      .eq("id", trabajo.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Trabajo cerrado");
+    cargar(); onChanged();
+  };
+
+  const reabrirTrabajo = async () => {
+    if (!trabajo) return;
+    if (!window.confirm("¿Reabrir este trabajo? Su estado se recalculará automáticamente.")) return;
+    const { error } = await supabase.from("trabajos")
+      .update({ cerrado_en: null, cerrado_por: null })
+      .eq("id", trabajo.id);
+    if (error) { toast.error(error.message); return; }
+    // Forzar recálculo tocando una jornada o programación no es necesario: el trigger recalcula al cambiar cerrado_en? No, no hay trigger en trabajos.
+    // Llamamos RPC manual:
+    await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajo.id });
+    toast.success("Trabajo reabierto");
+    cargar(); onChanged();
+  };
+
   if (!trabajoId) return null;
 
   return (
