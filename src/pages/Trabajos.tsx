@@ -202,11 +202,10 @@ export default function Trabajos() {
 
                     {visibles.map(t => {
                       const cli = t.cliente_id ? clienteMap.get(t.cliente_id) : null;
-                      const progs = progByTrabajo.get(t.id) ?? [];
+                      const progs = agendasByTrabajo.get(t.id) ?? [];
                       const hoy = new Date(new Date().toDateString());
                       const futurosActivos = progs.filter(p => {
-                        const jvs = jornadasByProgramacion.get(p.id) ?? [];
-                        return jvs.length === 0 && new Date(`${p.fecha_programada}T00:00:00`) >= hoy;
+                        return p.estado !== "Completado" && new Date(`${p.fecha_programada}T00:00:00`) >= hoy;
                       });
                       const proxima = futurosActivos[0];
                       const prioLabel = PRIORIDADES.find(p => p.key === t.prioridad)?.label ?? "";
