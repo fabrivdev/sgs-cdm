@@ -330,7 +330,7 @@ export default function Calendario() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los técnicos</SelectItem>
-              {profiles.map((p) => (
+              {profiles.filter(p => !adminCabecillaIds.has(p.id)).map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.nombre}
                 </SelectItem>
