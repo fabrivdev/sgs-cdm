@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
-import { ESTADOS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
+import { ESTADOS, ESTADO_LABELS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
