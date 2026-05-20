@@ -890,7 +890,7 @@ export type Database = {
         | "cumplida"
         | "reprogramada"
         | "cancelada"
-      estado_servicio: "Pendiente" | "Iniciado" | "Completado"
+      estado_servicio: "Pendiente" | "Iniciado" | "Completado" | "Cancelada"
       estado_trabajo:
         | "nuevo"
         | "pendiente_diagnostico"
@@ -1078,7 +1078,7 @@ export const Constants = {
         "reprogramada",
         "cancelada",
       ],
-      estado_servicio: ["Pendiente", "Iniciado", "Completado"],
+      estado_servicio: ["Pendiente", "Iniciado", "Completado", "Cancelada"],
       estado_trabajo: [
         "nuevo",
         "pendiente_diagnostico",
