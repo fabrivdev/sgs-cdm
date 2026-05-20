@@ -102,13 +102,21 @@ export function ServicioDetalleDialog({
   // Jornadas
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loadingJornadas, setLoadingJornadas] = useState(false);
-  const [addDateOpen, setAddDateOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
 
   // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
 
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
+  const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
+
+  // Form para nueva jornada (crew elegible, no se hereda)
+  const [nuevaJornada, setNuevaJornada] = useState<{
+    fecha: string;
+    tecnico_principal_id: string | null;
+    auxiliares: string[];
+  }>({ fecha: format(new Date(), "yyyy-MM-dd"), tecnico_principal_id: null, auxiliares: [] });
 
   useEffect(() => {
     if (!servicio) return;
