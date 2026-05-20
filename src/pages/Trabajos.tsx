@@ -149,7 +149,7 @@ export default function Trabajos() {
       </div>
 
       <FiltersBar
-        search={{ value: q, onChange: setQ, placeholder: "Buscar cliente o problema…" }}
+        search={{ value: q, onChange: setQ, placeholder: "Buscar TR-000123, cliente o problema…" }}
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
