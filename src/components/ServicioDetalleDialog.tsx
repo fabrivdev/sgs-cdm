@@ -233,13 +233,13 @@ export function ServicioDetalleDialog({
     Esto evita completar dos veces o que Planificador y Trabajos queden separados.
   */
   const estadoTrabajoDesdeJornadas = (lista: Jornada[]) => {
-    if (lista.length === 0) return "pendiente";
-
-    if (lista.some((j) => j.estado === "Iniciado")) return "iniciado";
-
-    if (lista.every((j) => j.estado === "Completado")) return "completado";
-
-    return "programado";
+    const activas = lista.filter(j => j.estado !== "Cancelada");
+    if (activas.length === 0) return "pendiente";
+    const pendientes = activas.filter(j => j.estado === "Pendiente").length;
+    const completadas = activas.filter(j => j.estado === "Completado").length;
+    if (completadas === 0) return "programado";
+    if (pendientes === 0) return "completado";
+    return "iniciado";
   };
 
   const syncTrabajoMadre = async (servicioId: string, lista: Jornada[]) => {
