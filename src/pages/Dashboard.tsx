@@ -52,6 +52,7 @@ import {
 } from "date-fns";
 import { AlertTriangle, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 
 interface Servicio {
   id: string;
