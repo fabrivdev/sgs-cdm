@@ -544,6 +544,7 @@ export type Database = {
       servicio_jornadas: {
         Row: {
           actualizado_en: string
+          auxiliares: string[]
           creado_en: string
           estado: Database["public"]["Enums"]["estado_servicio"]
           fecha: string
@@ -551,9 +552,11 @@ export type Database = {
           id: string
           observaciones: string | null
           servicio_id: string
+          tecnico_responsable_id: string | null
         }
         Insert: {
           actualizado_en?: string
+          auxiliares?: string[]
           creado_en?: string
           estado?: Database["public"]["Enums"]["estado_servicio"]
           fecha: string
@@ -561,9 +564,11 @@ export type Database = {
           id?: string
           observaciones?: string | null
           servicio_id: string
+          tecnico_responsable_id?: string | null
         }
         Update: {
           actualizado_en?: string
+          auxiliares?: string[]
           creado_en?: string
           estado?: Database["public"]["Enums"]["estado_servicio"]
           fecha?: string
@@ -571,6 +576,7 @@ export type Database = {
           id?: string
           observaciones?: string | null
           servicio_id?: string
+          tecnico_responsable_id?: string | null
         }
         Relationships: [
           {
@@ -578,6 +584,13 @@ export type Database = {
             columns: ["servicio_id"]
             isOneToOne: false
             referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicio_jornadas_tecnico_responsable_id_fkey"
+            columns: ["tecnico_responsable_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
