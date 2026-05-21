@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, ClipboardList, Clock, User, Users } from "lucide-react";
-import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, normalizarEstadoTrabajo } from "@/lib/trabajos";
+import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 import { ESTADO_LABELS, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -73,6 +73,7 @@ export function TrabajoDetalleDrawer({
   const [loading, setLoading] = useState(false);
   const [programarOpen, setProgramarOpen] = useState(false);
   const [cargarOpen, setCargarOpen] = useState(false);
+  const [selectedJornadaId, setSelectedJornadaId] = useState<string | null>(null);
 
   const cargar = async () => {
     if (!trabajoId) return;
@@ -129,7 +130,7 @@ export function TrabajoDetalleDrawer({
   if (!trabajoId) return null;
 
   const open = !!trabajoId && !programarOpen && !cargarOpen;
-  const estado = trabajo ? normalizarEstadoTrabajo(trabajo.estado_general) : "pendiente";
+  const estado = trabajo ? estadoTrabajoDesdeJornadas(jornadas, trabajo.estado_general) : "pendiente";
   const cliente = trabajo ? clienteMap.get(trabajo.cliente_id) : null;
   const hint = jornadas.length === 0
     ? "Aun no tiene jornadas programadas."
@@ -216,7 +217,16 @@ export function TrabajoDetalleDrawer({
                           {j.observaciones && <p className="text-[11px] text-muted-foreground italic">"{j.observaciones}"</p>}
                         </div>
                         {j.estado === "Pendiente" && (
-                          <Button size="sm" variant="outline" onClick={() => setCargarOpen(true)}>Cargar resultado</Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedJornadaId(j.id);
+                              setCargarOpen(true);
+                            }}
+                          >
+                            Cargar resultado
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -230,7 +240,14 @@ export function TrabajoDetalleDrawer({
         <ResponsiveDrawerFooter>
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cerrar</Button>
           {trabajo && resumen.pendientes.length > 0 && (
-            <Button size="sm" variant="outline" onClick={() => setCargarOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSelectedJornadaId(null);
+                setCargarOpen(true);
+              }}
+            >
               <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Cargar resultado
             </Button>
           )}
@@ -262,6 +279,7 @@ export function TrabajoDetalleDrawer({
           legacyServicioId={trabajo.legacy_servicio_id}
           tecnicos={tecnicosOnly}
           jornadas={jornadas.filter((j) => j.estado === "Pendiente")}
+          initialJornadaId={selectedJornadaId}
           onSaved={() => { cargar(); onChanged(); }}
         />
       )}
