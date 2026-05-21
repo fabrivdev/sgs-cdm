@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ResponsiveDrawer,
-  ResponsiveDrawerHeader,
   ResponsiveDrawerBody,
   ResponsiveDrawerFooter,
+  ResponsiveDrawerHeader,
 } from "@/components/ui/responsive-drawer";
 import {
   AlertDialog,
@@ -22,23 +22,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
-import { ESTADOS, ESTADO_LABELS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
+import { ESTADO_LABELS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarPlus, MapPin, MoreVertical, Pencil, Trash2, Wrench, X } from "lucide-react";
+import { CalendarPlus, CheckCircle2, MapPin, MoreVertical, Pencil, RotateCcw, Trash2, Wrench, X, XCircle } from "lucide-react";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
 import { cn } from "@/lib/utils";
+import { estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 
 interface Servicio {
   id: string;
@@ -78,13 +78,25 @@ interface Jornada {
   observaciones: string | null;
 }
 
+interface TrabajoMadre {
+  id: string;
+  codigo: string | null;
+  descripcion_problema: string;
+  cliente_id: string | null;
+  sucursal: Sucursal;
+  marca: Marca;
+  tipo_trabajo: TipoTrabajo;
+  estado_general: string;
+  prioridad?: string;
+  legacy_servicio_id?: string | null;
+}
+
 interface Props {
   servicio: Servicio | null;
   onOpenChange: (o: boolean) => void;
   profiles: Profile[];
   clientes: Cliente[];
   onChanged: () => void;
-  /** Fecha (yyyy-MM-dd) desde la que se abrió el detalle, para destacar esa jornada */
   fechaContexto?: string;
 }
 
@@ -97,32 +109,16 @@ export function ServicioDetalleDialog({
   fechaContexto,
 }: Props) {
   const { user, isAdmin, isCabecilla } = useAuth();
-
   const [busy, setBusy] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  // Jornadas
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [loadingJornadas, setLoadingJornadas] = useState(false);
+  const [activeJornadaId, setActiveJornadaId] = useState<string | null>(null);
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
-  const [trabajoMadre, setTrabajoMadre] = useState<{
-    id: string;
-    codigo: string | null;
-    descripcion_problema: string;
-    cliente_id: string | null;
-    sucursal: Sucursal;
-    marca: Marca;
-    tipo_trabajo: TipoTrabajo;
-    estado_general: string;
-    prioridad?: string;
-    legacy_servicio_id?: string | null;
-  } | null>(null);
+  const [trabajoMadre, setTrabajoMadre] = useState<TrabajoMadre | null>(null);
   const [programarOpen, setProgramarOpen] = useState(false);
-
-  // Cache de cambios pendientes por jornada (id -> patch)
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
-
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
   const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
 
@@ -135,7 +131,6 @@ export function ServicioDetalleDialog({
       setAdminCabIds(s);
     });
   }, []);
-
 
   useEffect(() => {
     if (!servicio) return;
@@ -153,7 +148,6 @@ export function ServicioDetalleDialog({
           .range(from, from + PAGE - 1);
 
         if (error) {
-          console.error(error);
           toast.error("No se pudo cargar el nombre del cliente");
           return;
         }
@@ -181,7 +175,6 @@ export function ServicioDetalleDialog({
     setLoadingJornadas(false);
 
     if (error) {
-      console.error(error);
       toast.error("No se pudieron cargar las jornadas");
       return;
     }
@@ -191,27 +184,40 @@ export function ServicioDetalleDialog({
   };
 
   useEffect(() => {
-    if (servicio) {
-      loadJornadas(servicio.id);
-      supabase
-        .from("trabajos")
-        .select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, prioridad, legacy_servicio_id")
-        .eq("legacy_servicio_id", servicio.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          setTrabajoMadre((data as any) ?? null);
-        });
-    } else {
+    if (!servicio) {
       setJornadas([]);
       setEdits({});
       setTrabajoMadre(null);
+      setActiveJornadaId(null);
+      return;
     }
+
+    loadJornadas(servicio.id);
+    supabase
+      .from("trabajos")
+      .select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, prioridad, legacy_servicio_id")
+      .eq("legacy_servicio_id", servicio.id)
+      .maybeSingle()
+      .then(({ data }) => setTrabajoMadre((data as TrabajoMadre) ?? null));
   }, [servicio?.id]);
 
-  const profById = useMemo(() => {
-    return Object.fromEntries(profiles.map((p) => [p.id, p.nombre]));
-  }, [profiles]);
+  useEffect(() => {
+    if (jornadas.length === 0) {
+      setActiveJornadaId(null);
+      return;
+    }
 
+    const byContext = fechaContexto ? jornadas.find((j) => j.fecha === fechaContexto) : null;
+    const pending = jornadas.find((j) => j.estado === "Pendiente");
+    const fallback = jornadas[jornadas.length - 1];
+    const next = byContext ?? pending ?? fallback;
+
+    setActiveJornadaId((current) =>
+      current && jornadas.some((j) => j.id === current) ? current : next.id,
+    );
+  }, [jornadas, fechaContexto]);
+
+  const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p.nombre])), [profiles]);
   const cliById = useMemo(() => {
     const fuente = clientesAll.length > 0 ? clientesAll : clientes;
     return Object.fromEntries(fuente.map((c) => [c.id, c.nombre]));
@@ -222,16 +228,11 @@ export function ServicioDetalleDialog({
   const isAssigned =
     user &&
     (servicio.tecnico_responsable_id === user.id || servicio.auxiliares.includes(user.id));
-
   const canEdit = isAdmin || isCabecilla || isAssigned;
   const canManage = isAdmin || isCabecilla;
   const tipo = servicio.tipo_trabajo ?? "Visita de campo";
+  const clienteNombre = servicio.cliente_id ? cliById[servicio.cliente_id] ?? "Cliente no encontrado" : "-";
 
-  const clienteNombre = servicio.cliente_id
-    ? cliById[servicio.cliente_id] ?? "Cliente no encontrado"
-    : "—";
-
-  // Total horas acumulado (incluyendo cambios sin guardar)
   const totalHoras = jornadas.reduce((acc, j) => {
     const v = edits[j.id]?.horas_trabajadas ?? j.horas_trabajadas;
     return acc + (typeof v === "number" ? v : 0);
@@ -241,24 +242,10 @@ export function ServicioDetalleDialog({
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   };
 
-  const fechasExistentes = new Set(jornadas.map((j) => j.fecha));
-
-  /*
-    Sincroniza el Trabajo madre según el estado real de sus jornadas:
-    - si alguna jornada está Iniciado  => trabajo Iniciado
-    - si todas están Completado        => trabajo Completado
-    - si existe al menos una pendiente => trabajo Programado
-    Esto evita completar dos veces o que Planificador y Trabajos queden separados.
-  */
-  const estadoTrabajoDesdeJornadas = (lista: Jornada[]) => {
-    const activas = lista.filter(j => j.estado !== "Cancelada");
-    if (activas.length === 0) return "pendiente";
-    const pendientes = activas.filter(j => j.estado === "Pendiente").length;
-    const completadas = activas.filter(j => j.estado === "Completado").length;
-    if (completadas === 0) return "programado";
-    if (pendientes === 0) return "completado";
-    return "iniciado";
-  };
+  const activeJornada = jornadas.find((j) => j.id === activeJornadaId) ?? null;
+  const activeMerged = activeJornada ? { ...activeJornada, ...edits[activeJornada.id] } : null;
+  const historial = jornadas.filter((j) => j.id !== activeJornadaId);
+  const dirty = Object.values(edits).some((p) => p && Object.keys(p).length > 0);
 
   const syncTrabajoMadre = async (servicioId: string, lista: Jornada[]) => {
     const estado_general = estadoTrabajoDesdeJornadas(lista);
@@ -267,44 +254,16 @@ export function ServicioDetalleDialog({
     const payload: any = {
       estado_general,
       fecha_compromiso: ultimaFecha,
+      cerrado_en: estado_general === "completado" ? new Date().toISOString() : null,
+      cerrado_por: estado_general === "completado" ? user?.id ?? null : null,
     };
-
-    if (estado_general === "completado") {
-      payload.cerrado_en = new Date().toISOString();
-      payload.cerrado_por = user?.id ?? null;
-    } else {
-      payload.cerrado_en = null;
-      payload.cerrado_por = null;
-    }
 
     const { error } = await supabase
       .from("trabajos")
       .update(payload)
       .eq("legacy_servicio_id", servicioId);
 
-    if (error) {
-      console.error(error);
-      toast.error("Se actualizó la jornada, pero no se pudo sincronizar el trabajo madre");
-    }
-  };
-
-
-  const deleteJornada = async (id: string) => {
-    setBusy(true);
-    const { error } = await supabase.from("servicio_jornadas").delete().eq("id", id);
-    setBusy(false);
-    setConfirmDeleteJornadaId(null);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    const nuevaLista = jornadas.filter((j) => j.id !== id);
-    await syncTrabajoMadre(servicio.id, nuevaLista);
-    toast.success("Jornada eliminada");
-    await loadJornadas(servicio.id);
-    onChanged();
+    if (error) toast.error("Se actualizo la jornada, pero no se pudo sincronizar el trabajo");
   };
 
   const save = async () => {
@@ -331,12 +290,11 @@ export function ServicioDetalleDialog({
       }
     }
 
-    // Sync legado: el servicio padre refleja la jornada más reciente (snapshot)
     const merged = jornadas
       .map((j) => ({ ...j, ...edits[j.id] }))
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
-
     const ultima = merged[merged.length - 1];
+
     if (ultima) {
       await supabase
         .from("servicios")
@@ -348,13 +306,30 @@ export function ServicioDetalleDialog({
         .eq("id", servicio.id);
     }
 
-    // Sync nuevo: el Trabajo madre se mueve automáticamente según el estado de todas las jornadas.
     await syncTrabajoMadre(servicio.id, merged);
 
     setBusy(false);
-    toast.success("Jornadas actualizadas");
+    toast.success("Resultado guardado");
     onChanged();
     onOpenChange(false);
+  };
+
+  const deleteJornada = async (id: string) => {
+    setBusy(true);
+    const { error } = await supabase.from("servicio_jornadas").delete().eq("id", id);
+    setBusy(false);
+    setConfirmDeleteJornadaId(null);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const nuevaLista = jornadas.filter((j) => j.id !== id);
+    await syncTrabajoMadre(servicio.id, nuevaLista);
+    toast.success("Jornada eliminada");
+    await loadJornadas(servicio.id);
+    onChanged();
   };
 
   const handleDelete = async () => {
@@ -372,29 +347,29 @@ export function ServicioDetalleDialog({
     }
   };
 
-  const dirty = Object.values(edits).some((p) => p && Object.keys(p).length > 0);
-
   return (
     <>
       <ResponsiveDrawer open={!!servicio && !editOpen} onOpenChange={onOpenChange} size="xl">
         <ResponsiveDrawerHeader>
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 flex-wrap pr-8 text-base font-semibold">
-              {trabajoMadre?.codigo && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
-                  {trabajoMadre.codigo}
-                </span>
-              )}
-              Detalle del servicio
-              <MarcaBadge marca={servicio.marca} />
-              <Badge variant="outline" className="gap-1 text-[10px]">
-                {tipo === "Máquina en taller" ? (
-                  <Wrench className="h-3 w-3" />
-                ) : (
-                  <MapPin className="h-3 w-3" />
+            <div className="min-w-0 space-y-1 pr-8">
+              <div className="flex flex-wrap items-center gap-2">
+                {trabajoMadre?.codigo && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
+                    {trabajoMadre.codigo}
+                  </span>
                 )}
-                {tipo}
-              </Badge>
+                <MarcaBadge marca={servicio.marca} />
+                <Badge variant="outline" className="gap-1 text-[10px]">
+                  {tipo === "Maquina en taller" || tipo === "Máquina en taller" ? (
+                    <Wrench className="h-3 w-3" />
+                  ) : (
+                    <MapPin className="h-3 w-3" />
+                  )}
+                  {tipo}
+                </Badge>
+              </div>
+              <h2 className="truncate text-lg font-semibold">{clienteNombre}</h2>
             </div>
 
             {canManage && (
@@ -406,7 +381,7 @@ export function ServicioDetalleDialog({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                    <Pencil className="mr-2 h-4 w-4" /> Editar
+                    <Pencil className="mr-2 h-4 w-4" /> Editar servicio
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -422,174 +397,194 @@ export function ServicioDetalleDialog({
         </ResponsiveDrawerHeader>
 
         <ResponsiveDrawerBody>
-          <div className="space-y-3 text-sm">
-
-            <Row k="Sucursal" v={servicio.sucursal} />
-            <Row k="Cliente" v={clienteNombre} />
-            <Row
-              k="Responsable"
-              v={servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] ?? "—" : "—"}
-            />
-            <Row
-              k="Auxiliares"
-              v={servicio.auxiliares.map((a) => profById[a]).filter(Boolean).join(", ") || "—"}
-            />
-
-            <div>
-              <div className="text-xs text-muted-foreground">Trabajo o problema a resolver</div>
-              <div className="rounded-md bg-muted/40 p-2 text-sm">
-                {servicio.trabajo_descripcion}
+          <div className="space-y-4 text-sm">
+            <section className="rounded-lg border bg-card p-3 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="rounded-md bg-muted/40 p-2.5 text-sm leading-snug flex-1">
+                  {servicio.trabajo_descripcion}
+                </div>
+                <Badge variant="secondary" className="shrink-0">{servicio.sucursal}</Badge>
               </div>
-            </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>
+                  Responsable: <span className="text-foreground">{servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] ?? "-" : "-"}</span>
+                </span>
+                <span>
+                  Auxiliares: <span className="text-foreground">{servicio.auxiliares.map((a) => profById[a]).filter(Boolean).join(", ") || "-"}</span>
+                </span>
+              </div>
+            </section>
 
-            {/* Jornadas */}
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between">
+            {loadingJornadas && <p className="text-xs text-muted-foreground">Cargando jornadas...</p>}
+
+            {!loadingJornadas && !activeMerged && (
+              <div className="rounded-lg border border-dashed p-5 text-center text-xs text-muted-foreground">
+                Este servicio aun no tiene jornadas.
+              </div>
+            )}
+
+            {activeJornada && activeMerged && (
+              <section className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Jornada a cerrar</div>
+                    <div className="text-base font-semibold capitalize">
+                      {format(parseISO(activeJornada.fecha), "EEEE d 'de' MMMM yyyy", { locale: es })}
+                    </div>
+                  </div>
+                  <EstadoBadge estado={activeMerged.estado} className="text-[10px]" />
+                </div>
+
+                {canEdit ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <ResultButton
+                        active={activeMerged.estado === "Completado"}
+                        icon={<CheckCircle2 className="h-4 w-4" />}
+                        label="Realizada"
+                        onClick={() => jornadaPatch(activeJornada.id, { estado: "Completado" })}
+                      />
+                      <ResultButton
+                        active={activeMerged.estado === "Cancelada"}
+                        icon={<XCircle className="h-4 w-4" />}
+                        label="No realizada"
+                        onClick={() => jornadaPatch(activeJornada.id, { estado: "Cancelada" })}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 justify-start gap-2 bg-card"
+                        onClick={() => setProgramarOpen(true)}
+                        disabled={!trabajoMadre}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Continuar otro dia
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
+                      <div className="space-y-1.5">
+                        <Label>Horas trabajadas</Label>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          inputMode="decimal"
+                          className="h-11 text-base"
+                          value={activeMerged.horas_trabajadas ?? ""}
+                          onChange={(e) =>
+                            jornadaPatch(activeJornada.id, {
+                              horas_trabajadas: e.target.value === "" ? null : Number(e.target.value),
+                            })
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label>Observacion</Label>
+                        <Textarea
+                          rows={3}
+                          className="text-sm"
+                          value={activeMerged.observaciones ?? ""}
+                          onChange={(e) => jornadaPatch(activeJornada.id, { observaciones: e.target.value || null })}
+                          placeholder="Que se hizo, que quedo pendiente o por que no se pudo realizar..."
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
+                    No tenes permisos para editar esta jornada.
+                  </div>
+                )}
+              </section>
+            )}
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
                 <Label className="text-sm font-semibold">
-                  Jornadas{" "}
+                  Historial{" "}
                   <span className="text-xs font-normal text-muted-foreground">
-                    ({jornadas.length}) · Total {totalHoras || 0} hs
+                    ({jornadas.length}) - Total {totalHoras || 0} hs
                   </span>
                 </Label>
-
                 {canEdit && trabajoMadre && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => setProgramarOpen(true)}
-                  >
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setProgramarOpen(true)}>
                     <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
-                    Continuar en otra fecha
+                    Nueva jornada
                   </Button>
                 )}
               </div>
 
-              {loadingJornadas && (
-                <p className="text-xs text-muted-foreground">Cargando jornadas…</p>
-              )}
-
-              {!loadingJornadas && jornadas.length === 0 && (
-                <p className="text-xs text-muted-foreground">Este servicio aún no tiene jornadas.</p>
-              )}
-
-              <div className="space-y-2">
-                {jornadas.map((j) => {
+              <div className="space-y-1.5">
+                {historial.map((j) => {
                   const merged = { ...j, ...edits[j.id] };
                   const isContexto = fechaContexto && j.fecha === fechaContexto;
-
                   return (
-                    <div
+                    <button
                       key={j.id}
+                      type="button"
+                      onClick={() => setActiveJornadaId(j.id)}
                       className={cn(
-                        "rounded-md border p-2.5 space-y-2",
-                        isContexto && "ring-2 ring-primary/40 border-primary/40",
+                        "w-full rounded-md border bg-card p-2 text-left transition-colors hover:border-primary/50",
+                        isContexto && "ring-1 ring-primary/40",
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-semibold capitalize">
-                          {format(parseISO(j.fecha), "EEE d 'de' MMM yyyy", { locale: es })}
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold capitalize">
+                            {format(parseISO(j.fecha), "EEE d MMM yyyy", { locale: es })}
+                          </div>
+                          <div className="truncate text-[11px] text-muted-foreground">
+                            {ESTADO_LABELS[merged.estado]} - {merged.horas_trabajadas ?? 0} hs
+                            {merged.observaciones ? ` - ${merged.observaciones}` : ""}
+                          </div>
                         </div>
-
-                        <div className="flex items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-1">
                           <EstadoBadge estado={merged.estado} className="text-[10px]" />
                           {canManage && jornadas.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={() => setConfirmDeleteJornadaId(j.id)}
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="rounded p-1 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteJornadaId(j.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setConfirmDeleteJornadaId(j.id);
+                                }
+                              }}
                               title="Quitar esta fecha"
                             >
                               <X className="h-3.5 w-3.5" />
-                            </Button>
+                            </span>
                           )}
                         </div>
                       </div>
-
-                      {canEdit ? (
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground">Estado</Label>
-                              <Select
-                                value={merged.estado}
-                                onValueChange={(v) => jornadaPatch(j.id, { estado: v as Estado })}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {ESTADOS.map((e) => (
-                                    <SelectItem key={e} value={e}>
-                                      {ESTADO_LABELS[e]}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground">
-                                Horas
-                              </Label>
-                              <Input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                className="h-8 text-xs"
-                                value={merged.horas_trabajadas ?? ""}
-                                onChange={(e) =>
-                                  jornadaPatch(j.id, {
-                                    horas_trabajadas: e.target.value === "" ? null : Number(e.target.value),
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">Observaciones</Label>
-                            <Textarea
-                              rows={2}
-                              className="text-xs"
-                              value={merged.observaciones ?? ""}
-                              onChange={(e) => jornadaPatch(j.id, { observaciones: e.target.value || null })}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-xs space-y-1">
-                          <div className="text-muted-foreground">
-                            Horas: <span className="text-foreground">{merged.horas_trabajadas ?? "—"}</span>
-                          </div>
-                          {merged.observaciones && (
-                            <div className="text-muted-foreground">
-                              Obs: <span className="text-foreground">{merged.observaciones}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
-            </div>
+            </section>
           </div>
         </ResponsiveDrawerBody>
 
-        {canEdit && (
-          <ResponsiveDrawerFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cerrar
-            </Button>
+        <ResponsiveDrawerFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
+          {canEdit && (
             <Button onClick={save} disabled={busy || !dirty}>
-              {busy ? "Guardando…" : "Guardar"}
+              {busy ? "Guardando..." : "Guardar resultado"}
             </Button>
-          </ResponsiveDrawerFooter>
-        )}
+          )}
+        </ResponsiveDrawerFooter>
       </ResponsiveDrawer>
-
 
       {canManage && (
         <ServicioFormDialog
@@ -601,9 +596,7 @@ export function ServicioDetalleDialog({
           servicio={servicio}
           profiles={profiles}
           clientes={clientesAll.length > 0 ? clientesAll : clientes}
-          onSaved={() => {
-            onChanged();
-          }}
+          onSaved={onChanged}
         />
       )}
 
@@ -625,9 +618,9 @@ export function ServicioDetalleDialog({
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este servicio?</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar este servicio?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente el servicio, todas sus jornadas y sus datos.
+              Esta accion no se puede deshacer. Se eliminara el servicio, todas sus jornadas y sus datos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -637,7 +630,7 @@ export function ServicioDetalleDialog({
               disabled={busy}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {busy ? "Eliminando…" : "Eliminar"}
+              {busy ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -646,9 +639,9 @@ export function ServicioDetalleDialog({
       <AlertDialog open={!!confirmDeleteJornadaId} onOpenChange={(o) => !o && setConfirmDeleteJornadaId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Quitar esta jornada?</AlertDialogTitle>
+            <AlertDialogTitle>Quitar esta jornada?</AlertDialogTitle>
             <AlertDialogDescription>
-              El servicio dejará de aparecer en esa fecha. Esta acción no afecta a las demás jornadas.
+              El servicio dejara de aparecer en esa fecha. Esta accion no afecta a las demas jornadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -658,7 +651,7 @@ export function ServicioDetalleDialog({
               disabled={busy}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {busy ? "Quitando…" : "Quitar"}
+              {busy ? "Quitando..." : "Quitar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -667,11 +660,26 @@ export function ServicioDetalleDialog({
   );
 }
 
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
+function ResultButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <div className="flex justify-between gap-4 border-b border-border/50 py-1">
-      <span className="text-xs text-muted-foreground">{k}</span>
-      <span className="text-sm text-right">{v}</span>
-    </div>
+    <Button
+      type="button"
+      variant={active ? "default" : "outline"}
+      className={cn("h-11 justify-start gap-2", !active && "bg-card")}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </Button>
   );
 }
