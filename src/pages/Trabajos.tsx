@@ -250,11 +250,20 @@ export default function Trabajos() {
                                     </span>
                                   </span>
                                   {pendCount > 1 && <span>· {pendCount} pend.</span>}
+                                  {vencidasCount > 0 && col.key === "iniciado" && (
+                                    <span className="text-amber-600">· {vencidasCount} pend. de cierre</span>
+                                  )}
                                 </>
                               ) : vencidasCount > 0 ? (
-                                <span className="text-amber-600">
-                                  Sin agenda vigente · {vencidasCount} fecha{vencidasCount > 1 ? "s" : ""} vencida{vencidasCount > 1 ? "s" : ""}
-                                </span>
+                                col.key === "iniciado" ? (
+                                  <span className="text-amber-600">
+                                    {vencidasCount} fecha{vencidasCount > 1 ? "s" : ""} pendiente{vencidasCount > 1 ? "s" : ""} de cierre
+                                  </span>
+                                ) : col.key === "pendiente" ? (
+                                  <span className="text-amber-600">
+                                    Sin agenda vigente · {vencidasCount} fecha{vencidasCount > 1 ? "s" : ""} vencida{vencidasCount > 1 ? "s" : ""}
+                                  </span>
+                                ) : null
                               ) : null}
                             </div>
                           )}
