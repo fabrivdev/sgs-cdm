@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role, Sucursal } from "@/lib/constants";
@@ -33,30 +33,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedUserRef = useRef<string | null>(null);
+  const loadingUserRef = useRef<string | null>(null);
+  const loadingPromiseRef = useRef<Promise<void> | null>(null);
 
   const clearUserData = () => {
     setUser(null);
     setSession(null);
     setProfile(null);
     setRoles([]);
+    loadedUserRef.current = null;
+    loadingUserRef.current = null;
+    loadingPromiseRef.current = null;
   };
 
-  const loadUserData = async (uid: string) => {
-    const [{ data: prof }, { data: rls }] = await Promise.all([
-      supabase.from("profiles").select("id, nombre, sucursal, activo").eq("id", uid).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", uid),
-    ]);
-
-    const loadedProfile = prof as Profile | null;
-    if (loadedProfile && !loadedProfile.activo) {
-      await supabase.auth.signOut();
-      clearUserData();
+  const loadUserData = useCallback(async (uid: string, force = false) => {
+    if (!force && loadedUserRef.current === uid) return;
+    if (!force && loadingUserRef.current === uid && loadingPromiseRef.current) {
+      await loadingPromiseRef.current;
       return;
     }
 
-    setProfile(loadedProfile);
-    setRoles((rls ?? []).map((r: { role: Role }) => r.role));
-  };
+    loadingUserRef.current = uid;
+
+    const promise = (async () => {
+      const [{ data: prof }, { data: rls }] = await Promise.all([
+        supabase.from("profiles").select("id, nombre, sucursal, activo").eq("id", uid).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", uid),
+      ]);
+
+      const loadedProfile = prof as Profile | null;
+      if (loadedProfile && !loadedProfile.activo) {
+        await supabase.auth.signOut();
+        clearUserData();
+        return;
+      }
+
+      setProfile(loadedProfile);
+      setRoles((rls ?? []).map((r: { role: Role }) => r.role));
+      loadedUserRef.current = uid;
+    })();
+
+    loadingPromiseRef.current = promise;
+
+    try {
+      await promise;
+    } finally {
+      if (loadingUserRef.current === uid) loadingUserRef.current = null;
+      if (loadingPromiseRef.current === promise) loadingPromiseRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
@@ -67,6 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
         setRoles([]);
+        loadedUserRef.current = null;
+        loadingUserRef.current = null;
+        loadingPromiseRef.current = null;
       }
     });
 
@@ -78,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [loadUserData]);
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -107,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refresh = async () => {
-    if (user) await loadUserData(user.id);
+    if (user) await loadUserData(user.id, true);
   };
 
   return (
