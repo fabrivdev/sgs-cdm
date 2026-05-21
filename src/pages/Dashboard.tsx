@@ -415,18 +415,18 @@ export default function Dashboard() {
   const cantNoDisponibles = tecnicosEstado.length - cantDisponibles;
 
   return (
-    <div className="container max-w-[1400px] py-4 space-y-4">
+    <div className="container max-w-[1400px] px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-xl font-bold sm:text-2xl">Dashboard</h1>
         <p className="text-xs text-muted-foreground">
           {vista === "resumen" ? "Resumen del período seleccionado" : "Estado de técnicos hoy"}
         </p>
       </div>
 
       <Tabs value={vista} onValueChange={(v) => setVista(v as "resumen" | "tecnicos")}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <TabsList>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <TabsList className="grid w-full grid-cols-2 sm:w-auto">
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
             <TabsTrigger value="tecnicos">Técnicos</TabsTrigger>
           </TabsList>
@@ -471,7 +471,7 @@ export default function Dashboard() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
         <KPI
           label="Total servicios"
           value={total}
@@ -522,9 +522,9 @@ export default function Dashboard() {
       </div>
 
       {/* Charts grid */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
         {/* Sucursal apilado */}
-        <Card className="p-4">
+        <Card className="overflow-hidden p-3 sm:p-4">
           <h3 className="text-sm font-semibold mb-3">Servicios por sucursal</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
@@ -560,7 +560,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Estado + Marca unificada */}
-        <Card className="p-4">
+        <Card className="overflow-hidden p-3 sm:p-4">
           <h3 className="text-sm font-semibold mb-3">Distribución por estado y marca</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
             <div>
@@ -635,14 +635,14 @@ export default function Dashboard() {
         </Card>
 
         {/* Top 5 técnicos */}
-        <Card className="p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2">
+        <Card className="overflow-hidden p-3 sm:p-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Top 5 técnicos</h3>
             {porTecnico.length > 5 && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs"
+                className="h-7 shrink-0 text-xs"
                 onClick={() => setShowAllTecnicos(true)}
               >
                 Ver todos <ArrowRight className="h-3 w-3 ml-1" />
@@ -650,7 +650,15 @@ export default function Dashboard() {
             )}
           </div>
 
-          <Table>
+          <div className="space-y-2 sm:hidden">
+            {topTecnicos.length === 0 ? (
+              <div className="py-6 text-center text-xs text-muted-foreground">Sin datos en el período</div>
+            ) : (
+              topTecnicos.map((t) => <TecnicoMobileRow key={t.id} t={t} maxHoras={maxHoras} />)
+            )}
+          </div>
+
+          <Table className="hidden sm:table">
             <TableHeader>
               <TableRow>
                 <TableHead className="h-8 text-[11px]">Técnico</TableHead>
@@ -683,20 +691,50 @@ export default function Dashboard() {
         </Card>
 
         {/* Últimos contactos registrados */}
-        <Card className="p-3 sm:p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
+        <Card className="flex flex-col overflow-hidden p-3 sm:p-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Últimos contactos registrados</h3>
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs"
+              className="hidden h-7 shrink-0 text-xs sm:inline-flex"
               onClick={() => navigate("/parque-clientes")}
             >
               Ver parque completo <ArrowRight className="h-3 w-3 ml-1" />
             </Button>
           </div>
 
-          <Table>
+          <div className="space-y-2 sm:hidden">
+            {ultimosSeguimientos.length === 0 ? (
+              <div className="py-6 text-center text-xs text-muted-foreground">Sin seguimientos registrados</div>
+            ) : (
+              ultimosSeguimientos.map((s) => (
+                <div key={s.id} className="rounded-md border bg-background px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{s.clienteNombre}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{s.usuarioNombre ?? "—"}</div>
+                    </div>
+                    <div className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {s.fecha ? format(s.fecha, "dd/MM/yy") : "—"}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-col gap-1">
+                    {s.estado && (
+                      <Badge variant="outline" className="w-fit px-1.5 py-0 text-[9px]">
+                        {s.estado}
+                      </Badge>
+                    )}
+                    <div className="line-clamp-2 text-xs text-muted-foreground">
+                      {s.observaciones || "Sin observaciones"}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <Table className="hidden sm:table">
             <TableHeader>
               <TableRow>
                 <TableHead className="h-8 text-[11px]">Cliente</TableHead>
@@ -823,6 +861,41 @@ function TecnicoRow({
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+function TecnicoMobileRow({
+  t,
+  maxHoras,
+}: {
+  t: { id: string; name: string; total: number; horas: number };
+  maxHoras: number;
+}) {
+  const pct = maxHoras > 0 ? (t.horas / maxHoras) * 100 : 0;
+
+  return (
+    <div className="rounded-md border bg-background px-3 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{t.name}</div>
+          <div className="text-[11px] text-muted-foreground">
+            {t.total} servicio{t.total === 1 ? "" : "s"}
+          </div>
+        </div>
+        {t.horas === 0 ? (
+          <Badge variant="destructive" className="shrink-0 px-1.5 py-0 text-[9px]">
+            sin horas
+          </Badge>
+        ) : (
+          <span className="shrink-0 text-sm font-semibold tabular-nums">{t.horas.toFixed(1)}h</span>
+        )}
+      </div>
+      {t.horas > 0 && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
   );
 }
 
