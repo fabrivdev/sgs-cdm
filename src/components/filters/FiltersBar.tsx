@@ -10,7 +10,7 @@ const labelCls = "text-[10px] uppercase tracking-wide text-muted-foreground font
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col gap-1", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-1 max-sm:!w-full", className)}>
       {label ? <span className={labelCls}>{label}</span> : <span className="h-[14px]" aria-hidden />}
       {children}
     </div>
@@ -21,7 +21,7 @@ function Field({ label, children, className }: { label?: string; children: React
  * Barra de filtros global. Diseño unificado para Trabajos / Planificador /
  * Calendario / Dashboard / Parque. Siempre inline, nunca modal.
  *
- * Cada filtro lleva un pequeño título arriba para que se entienda qué hace
+ * Cada filtro lleva un pequeño titulo arriba para que se entienda que hace
  * antes de seleccionar nada.
  */
 export function FiltersBar({
@@ -49,7 +49,7 @@ export function FiltersBar({
 }) {
   return (
     <Card className={cn("p-2.5", className)}>
-      <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
         {search && (
           <Field label={search.label ?? "Buscar"} className={search.width ?? "w-full sm:w-[240px]"}>
             <div className="relative">
@@ -57,14 +57,14 @@ export function FiltersBar({
               <Input
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
-                placeholder={search.placeholder ?? "Buscar…"}
+                placeholder={search.placeholder ?? "Buscar..."}
                 className="h-9 pl-7 pr-7 text-sm"
               />
               {search.value && (
                 <button
                   onClick={() => search.onChange("")}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
-                  aria-label="Limpiar búsqueda"
+                  aria-label="Limpiar busqueda"
                   type="button"
                 >
                   <X className="h-3 w-3" />
@@ -84,11 +84,11 @@ export function FiltersBar({
           </Field>
         )}
 
-        <div className="ml-auto flex items-end gap-2">
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-end">
           {meta && (
-            <div className="text-[11px] text-muted-foreground pb-2">{meta}</div>
+            <div className="pb-0 text-[11px] text-muted-foreground sm:pb-2">{meta}</div>
           )}
-          {actions}
+          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
       </div>
     </Card>
@@ -114,12 +114,14 @@ export function FilterSelect({
   return (
     <Field label={label} className={width}>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 text-xs w-full">
+        <SelectTrigger className="h-9 w-full overflow-hidden text-xs">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-[320px] min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]">
           {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            <SelectItem key={o.value} value={o.value} className="max-w-[calc(100vw-3rem)] truncate">
+              {o.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
