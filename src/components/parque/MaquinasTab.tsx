@@ -231,7 +231,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         onClear={limpiar}
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
         actions={
-          <Button variant="outline" size="sm" onClick={exportar} className="h-9">
+          <Button variant="outline" size="sm" onClick={exportar} className="hidden h-9 sm:inline-flex">
             <Download className="mr-1 h-4 w-4" /> Exportar
           </Button>
         }
