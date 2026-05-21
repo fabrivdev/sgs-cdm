@@ -269,7 +269,7 @@ export default function Planificador() {
   const onChangeEstado = async (s: Servicio, estado: Estado) => {
     if (estado === "Completado" && !s.horas_trabajadas) {
       setDetalle(s);
-      toast.warning("Carga las horas trabajadas para registrar la intervencion como realizada.");
+      toast.warning("Cargá las horas trabajadas para registrar la intervención como realizada.");
       return;
     }
 
@@ -296,10 +296,10 @@ export default function Planificador() {
   const exportExcel = () => {
     const rows = displayed.map((s) => ({
       Fecha: s.fecha_programada,
-      Dia: s.dia_semana,
+      Día: s.dia_semana,
       Semana: s.semana,
       Tipo: s.tipo_trabajo,
-      "Tecnico Responsable": s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "",
+      "Técnico Responsable": s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "",
       Auxiliares: s.auxiliares.map((a) => profById[a]?.nombre).filter(Boolean).join(", "),
       Sucursal: s.sucursal,
       Cliente: s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "",
@@ -336,7 +336,7 @@ export default function Planificador() {
   const activeChips: { label: string; clear: () => void }[] = [];
   if (fSemana !== "all") activeChips.push({ label: `Semana ${fSemana}`, clear: () => setFSemana("all") });
   if (fSucursal !== "all") activeChips.push({ label: fSucursal, clear: () => setFSucursal("all") });
-  if (fTecnico !== "all") activeChips.push({ label: profById[fTecnico]?.nombre ?? "Tecnico", clear: () => setFTecnico("all") });
+  if (fTecnico !== "all") activeChips.push({ label: profById[fTecnico]?.nombre ?? "Técnico", clear: () => setFTecnico("all") });
   if (fMarca !== "all") activeChips.push({ label: fMarca, clear: () => setFMarca("all") });
   if (fEstado !== "all") activeChips.push({ label: fEstado, clear: () => setFEstado("all") });
 
@@ -346,7 +346,7 @@ export default function Planificador() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
           <p className="text-xs text-muted-foreground">
-            {displayed.length} jornadas visibles - Plan diario y semanal de trabajo.
+            {displayed.length} jornadas visibles · Plan diario y semanal de trabajo.
           </p>
         </div>
 
@@ -358,11 +358,11 @@ export default function Planificador() {
             size="sm"
             variant="outline"
           >
-            <ToggleGroupItem value="dia" className="h-9 px-3 text-xs">Por dia</ToggleGroupItem>
+            <ToggleGroupItem value="dia" className="h-9 px-3 text-xs">Por día</ToggleGroupItem>
             <ToggleGroupItem value="semana" className="h-9 px-3 text-xs">Por semana</ToggleGroupItem>
           </ToggleGroup>
 
-          <Button variant="outline" size="sm" onClick={exportExcel}>
+          <Button variant="outline" size="sm" onClick={exportExcel} className="hidden sm:inline-flex">
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
           </Button>
 
@@ -375,7 +375,7 @@ export default function Planificador() {
       </div>
 
       <FiltersBar
-        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar TR-000123 o cliente..." }}
+        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar TR-000123 o cliente…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
@@ -385,8 +385,8 @@ export default function Planificador() {
           options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          label="Tecnico" value={fTecnico} onChange={setFTecnico} placeholder="Tecnico" width="w-[160px]"
-          options={[{ value: "all", label: "Todos los tecnicos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
+          label="Técnico" value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
+          options={[{ value: "all", label: "Todos los técnicos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
         />
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
@@ -401,6 +401,8 @@ export default function Planificador() {
           options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
         />
       </FiltersBar>
+
+
 
       {/* Desktop table */}
       <Card className="hidden md:block overflow-hidden">
@@ -422,7 +424,7 @@ export default function Planificador() {
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando…</TableCell>
                 </TableRow>
               )}
 
@@ -436,12 +438,12 @@ export default function Planificador() {
                 const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
                 const tipo = s.tipo_trabajo ?? "Visita de campo";
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
-                const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "-";
-                const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "-" : "-";
+                const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
+                const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
                 const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
                 const multi = vista === "semana" && fechasSrv.length > 1;
                 const fechaLabel = multi
-                  ? `${format(parseISO(fechasSrv[0]), "dd/MM")} - ${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM/yy")}`
+                  ? `${format(parseISO(fechasSrv[0]), "dd/MM")} – ${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM/yy")}`
                   : format(parseISO(s.fecha_programada), "dd/MM/yy");
 
                 return (
@@ -459,7 +461,7 @@ export default function Planificador() {
                           </Badge>
                         )}
                       </div>
-                      <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} - S{s.semana}</div>
+                      <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
@@ -521,7 +523,7 @@ export default function Planificador() {
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top text-right tabular-nums">
-                      {s.horas_trabajadas ?? "-"}
+                      {s.horas_trabajadas ?? "—"}
                     </TableCell>
                   </TableRow>
                 );
@@ -533,19 +535,19 @@ export default function Planificador() {
 
       {/* Mobile list */}
       <div className="md:hidden space-y-2">
-        {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando...</p>}
+        {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
         {!loading && displayed.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin intervenciones.</p>}
 
         {displayed.map((s) => {
           const tipo = s.tipo_trabajo ?? "Visita de campo";
           const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
           const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
-          const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "-";
+          const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
           const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
           const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
           const multi = vista === "semana" && fechasSrv.length > 1;
           const fechaLabel = multi
-            ? `${format(parseISO(fechasSrv[0]), "dd/MM")}-${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM")}`
+            ? `${format(parseISO(fechasSrv[0]), "dd/MM")}–${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM")}`
             : format(parseISO(s.fecha_programada), "dd/MM");
 
           return (
@@ -559,7 +561,7 @@ export default function Planificador() {
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span className="font-semibold tabular-nums text-foreground">{fechaLabel}</span>
                     {multi && <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">{fechasSrv.length}d</Badge>}
-                    <span>-</span>
+                    <span>·</span>
                     <span>{s.dia_semana.slice(0, 3)}</span>
                     <TipoIcon className="h-3 w-3" />
                   </div>
@@ -576,7 +578,7 @@ export default function Planificador() {
 
                   <div className="text-[10px] text-muted-foreground pt-0.5">
                     {responsableNombre}
-                    <span className="mx-1">-</span>
+                    <span className="mx-1">·</span>
                     {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                   </div>
                 </div>
