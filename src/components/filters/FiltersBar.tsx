@@ -21,7 +21,7 @@ function Field({ label, children, className }: { label?: string; children: React
  * Barra de filtros global. Diseño unificado para Trabajos / Planificador /
  * Calendario / Dashboard / Parque. Siempre inline, nunca modal.
  *
- * Cada filtro lleva un pequeño titulo arriba para que se entienda que hace
+ * Cada filtro lleva un pequeño título arriba para que se entienda qué hace
  * antes de seleccionar nada.
  */
 export function FiltersBar({
@@ -57,14 +57,14 @@ export function FiltersBar({
               <Input
                 value={search.value}
                 onChange={(e) => search.onChange(e.target.value)}
-                placeholder={search.placeholder ?? "Buscar..."}
+                placeholder={search.placeholder ?? "Buscar…"}
                 className="h-9 pl-7 pr-7 text-sm"
               />
               {search.value && (
                 <button
                   onClick={() => search.onChange("")}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
-                  aria-label="Limpiar busqueda"
+                  aria-label="Limpiar búsqueda"
                   type="button"
                 >
                   <X className="h-3 w-3" />
@@ -88,7 +88,7 @@ export function FiltersBar({
           {meta && (
             <div className="pb-0 text-[11px] text-muted-foreground sm:pb-2">{meta}</div>
           )}
-          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+          {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
         </div>
       </div>
     </Card>
