@@ -34,12 +34,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const clearUserData = () => {
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setRoles([]);
+  };
+
   const loadUserData = async (uid: string) => {
     const [{ data: prof }, { data: rls }] = await Promise.all([
       supabase.from("profiles").select("id, nombre, sucursal, activo").eq("id", uid).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", uid),
     ]);
-    setProfile(prof as Profile | null);
+
+    const loadedProfile = prof as Profile | null;
+    if (loadedProfile && !loadedProfile.activo) {
+      await supabase.auth.signOut();
+      clearUserData();
+      return;
+    }
+
+    setProfile(loadedProfile);
     setRoles((rls ?? []).map((r: { role: Role }) => r.role));
   };
 
@@ -66,12 +81,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error };
+
+    if (data.user) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("activo")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      if (prof && prof.activo === false) {
+        await supabase.auth.signOut();
+        clearUserData();
+        return { error: new Error("Usuario inactivo. Contactá al administrador.") };
+      }
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    clearUserData();
   };
 
   const refresh = async () => {
