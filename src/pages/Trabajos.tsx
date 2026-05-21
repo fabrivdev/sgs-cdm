@@ -176,10 +176,7 @@ export default function Trabajos() {
       {loading ? (
         <Card className="p-8 text-center text-muted-foreground">Cargando...</Card>
       ) : (
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
-        >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {ESTADOS_TRABAJO.map(col => {
             const items = filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === col.key);
             const expandida = expandidas.has(col.key);
