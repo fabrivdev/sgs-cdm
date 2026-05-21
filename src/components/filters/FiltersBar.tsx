@@ -97,7 +97,6 @@ export function FiltersBar({
             </Button>
           )}
           {meta && <div className="text-[11px] text-muted-foreground">{meta}</div>}
-          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
       )}
 
