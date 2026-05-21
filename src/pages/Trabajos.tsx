@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CalendarDays } from "lucide-react";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, normalizarEstadoTrabajo } from "@/lib/trabajos";
+import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
@@ -40,7 +40,7 @@ export default function Trabajos() {
   const [loading, setLoading] = useState(true);
 
   const [q, setQ] = useState("");
-  const [fSucursal, setFSucursal] = useState<string>("all"); // admin ve todo por defecto
+  const [fSucursal, setFSucursal] = useState<string>("all");
   const [fPrio, setFPrio] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fFecha, setFFecha] = useState<string>("");
@@ -61,7 +61,6 @@ export default function Trabajos() {
       ]);
       setTrabajos(t);
 
-      // Mapear servicio_jornadas → trabajo via legacy_servicio_id
       const servToTrabajo = new Map<string, string>();
       for (const tr of t) {
         if (tr.legacy_servicio_id) servToTrabajo.set(tr.legacy_servicio_id, tr.id);
@@ -101,7 +100,8 @@ export default function Trabajos() {
     return trabajos.filter(t => {
       if (fSucursal !== "all" && t.sucursal !== fSucursal) return false;
       if (fPrio !== "all" && t.prioridad !== fPrio) return false;
-      if (fEstado !== "all" && normalizarEstadoTrabajo(t.estado_general) !== fEstado) return false;
+      const estadoVisible = estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general);
+      if (fEstado !== "all" && estadoVisible !== fEstado) return false;
       if (query) {
         const cli = t.cliente_id ? clienteMap.get(t.cliente_id)?.nombre ?? "" : "";
         if (!cli.toLowerCase().includes(query)
@@ -149,7 +149,7 @@ export default function Trabajos() {
       </div>
 
       <FiltersBar
-        search={{ value: q, onChange: setQ, placeholder: "Buscar TR-000123, cliente o problema…" }}
+        search={{ value: q, onChange: setQ, placeholder: "Buscar TR-000123, cliente o problema..." }}
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
@@ -166,24 +166,22 @@ export default function Trabajos() {
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
         />
-        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programación" />
+        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programacion" />
         <FilterSelect
           label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
           options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
         />
       </FiltersBar>
 
-
-
       {loading ? (
-        <Card className="p-8 text-center text-muted-foreground">Cargando…</Card>
+        <Card className="p-8 text-center text-muted-foreground">Cargando...</Card>
       ) : (
         <div
           className="grid gap-3"
           style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
         >
           {ESTADOS_TRABAJO.map(col => {
-            const items = filtered.filter(t => normalizarEstadoTrabajo(t.estado_general) === col.key);
+            const items = filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === col.key);
             const expandida = expandidas.has(col.key);
             const visibles = expandida ? items : items.slice(0, MAX_VISIBLES);
             const restantes = items.length - visibles.length;
@@ -198,21 +196,30 @@ export default function Trabajos() {
 
                   <div className="space-y-1.5">
                     {items.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">—</p>
+                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">-</p>
                     )}
 
                     {visibles.map(t => {
                       const cli = t.cliente_id ? clienteMap.get(t.cliente_id) : null;
                       const progs = agendasByTrabajo.get(t.id) ?? [];
                       const hoy = new Date(new Date().toDateString());
-                      // Agendas sin resultado cargado (pendientes)
                       const agendasPendientes = progs.filter(p => p.estado === "Pendiente");
                       const agendasFuturas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) >= hoy);
                       const agendasVencidas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) < hoy);
+                      const agendasVencidasVigentes = agendasVencidas.filter(p => {
+                        const dias = Math.floor((hoy.getTime() - new Date(`${p.fecha_programada}T00:00:00`).getTime()) / 86400000);
+                        return dias <= 7;
+                      });
+                      const agendasVencidasViejas = agendasVencidas.filter(p => {
+                        const dias = Math.floor((hoy.getTime() - new Date(`${p.fecha_programada}T00:00:00`).getTime()) / 86400000);
+                        return dias > 7;
+                      });
                       const proxima = agendasFuturas[0];
                       const prioLabel = PRIORIDADES.find(p => p.key === t.prioridad)?.label ?? "";
                       const pendCount = agendasFuturas.length;
                       const vencidasCount = agendasVencidas.length;
+                      const vencidasVigentesCount = agendasVencidasVigentes.length;
+                      const vencidasViejasCount = agendasVencidasViejas.length;
 
                       return (
                         <button
@@ -225,7 +232,7 @@ export default function Trabajos() {
                         >
                           <div className="flex items-center gap-1.5">
                             <span className="rounded bg-muted px-1 py-0 text-[9px] font-mono font-semibold text-muted-foreground tabular-nums">
-                              {t.codigo ?? "TR-—"}
+                              {t.codigo ?? "TR--"}
                             </span>
                             <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium ml-auto", prioridadBadge(t.prioridad))}>
                               {prioLabel.charAt(0)}
@@ -249,19 +256,19 @@ export default function Trabajos() {
                                       {format(parseISO(proxima.fecha_programada), "dd/MM")}
                                     </span>
                                   </span>
-                                  {pendCount > 1 && <span>· {pendCount} pend.</span>}
-                                  {vencidasCount > 0 && col.key === "iniciado" && (
-                                    <span className="text-amber-600">· {vencidasCount} pend. de cierre</span>
+                                  {pendCount > 1 && <span>- {pendCount} pend.</span>}
+                                  {vencidasCount > 0 && (col.key === "iniciado" || col.key === "programado") && (
+                                    <span className="text-amber-600">- {vencidasCount} pend. de cierre</span>
                                   )}
                                 </>
                               ) : vencidasCount > 0 ? (
-                                col.key === "iniciado" ? (
+                                col.key === "iniciado" || col.key === "programado" ? (
                                   <span className="text-amber-600">
-                                    {vencidasCount} fecha{vencidasCount > 1 ? "s" : ""} pendiente{vencidasCount > 1 ? "s" : ""} de cierre
+                                    {vencidasVigentesCount || vencidasCount} fecha{(vencidasVigentesCount || vencidasCount) > 1 ? "s" : ""} pendiente{(vencidasVigentesCount || vencidasCount) > 1 ? "s" : ""} de cierre
                                   </span>
-                                ) : col.key === "pendiente" ? (
+                                ) : col.key === "pendiente" && vencidasViejasCount > 0 ? (
                                   <span className="text-amber-600">
-                                    Sin agenda vigente · {vencidasCount} fecha{vencidasCount > 1 ? "s" : ""} vencida{vencidasCount > 1 ? "s" : ""}
+                                    Sin cierre +7d - {vencidasViejasCount} fecha{vencidasViejasCount > 1 ? "s" : ""}
                                   </span>
                                 ) : null
                               ) : null}
@@ -271,13 +278,12 @@ export default function Trabajos() {
                       );
                     })}
 
-
                     {restantes > 0 && (
                       <button
                         onClick={() => setExpandidas(s => new Set(s).add(col.key))}
                         className="w-full rounded-md border border-dashed py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
-                        +{restantes} más
+                        +{restantes} mas
                       </button>
                     )}
 
