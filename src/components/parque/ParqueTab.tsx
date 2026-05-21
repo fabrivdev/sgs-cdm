@@ -595,11 +595,11 @@ export function ParqueTab({
         onClear={() => { setQ(""); limpiarFiltros(); }}
         
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9">
               <Plus className="mr-1 h-4 w-4" /> Nueva máquina
             </Button>
-            <Button variant="outline" size="sm" onClick={exportar} className="h-9">
+            <Button variant="outline" size="sm" onClick={exportar} className="hidden h-9 sm:inline-flex">
               <Download className="mr-1 h-4 w-4" /> Exportar
             </Button>
           </div>
