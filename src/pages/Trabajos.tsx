@@ -12,6 +12,7 @@ import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
 import { getISOWeek, parseISO, format } from "date-fns";
+import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
@@ -40,7 +41,7 @@ export default function Trabajos() {
   const [loading, setLoading] = useState(true);
 
   const [q, setQ] = useState("");
-  const [fSucursal, setFSucursal] = useState<string>("all");
+  const [fSucursal, setFSucursal] = useState<string>("all"); // admin ve todo por defecto
   const [fPrio, setFPrio] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fFecha, setFFecha] = useState<string>("");
@@ -61,6 +62,7 @@ export default function Trabajos() {
       ]);
       setTrabajos(t);
 
+      // Mapear servicio_jornadas → trabajo via legacy_servicio_id
       const servToTrabajo = new Map<string, string>();
       for (const tr of t) {
         if (tr.legacy_servicio_id) servToTrabajo.set(tr.legacy_servicio_id, tr.id);
@@ -135,11 +137,11 @@ export default function Trabajos() {
     (fSemana !== "all" ? 1 : 0);
 
   return (
-    <div className="container max-w-[1800px] py-4 space-y-3">
+    <div className={pageShellWide}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Trabajos</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className={pageTitle}>Trabajos</h1>
+          <p className={pageDescription}>
             Vista macro de casos. Lo operativo se maneja desde Planificador / Calendario.
           </p>
         </div>
@@ -149,7 +151,7 @@ export default function Trabajos() {
       </div>
 
       <FiltersBar
-        search={{ value: q, onChange: setQ, placeholder: "Buscar TR-000123, cliente o problema..." }}
+        search={{ value: q, onChange: setQ, placeholder: "Buscar TR-000123, cliente o problema…" }}
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
@@ -166,15 +168,17 @@ export default function Trabajos() {
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
         />
-        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programacion" />
+        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programación" />
         <FilterSelect
           label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
           options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
         />
       </FiltersBar>
 
+
+
       {loading ? (
-        <Card className="p-8 text-center text-muted-foreground">Cargando...</Card>
+        <Card className="p-8 text-center text-muted-foreground">Cargando…</Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {ESTADOS_TRABAJO.map(col => {
@@ -193,13 +197,14 @@ export default function Trabajos() {
 
                   <div className="space-y-1.5">
                     {items.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">-</p>
+                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">—</p>
                     )}
 
                     {visibles.map(t => {
                       const cli = t.cliente_id ? clienteMap.get(t.cliente_id) : null;
                       const progs = agendasByTrabajo.get(t.id) ?? [];
                       const hoy = new Date(new Date().toDateString());
+                      // Agendas sin resultado cargado (pendientes)
                       const agendasPendientes = progs.filter(p => p.estado === "Pendiente");
                       const agendasFuturas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) >= hoy);
                       const agendasVencidas = agendasPendientes.filter(p => new Date(`${p.fecha_programada}T00:00:00`) < hoy);
@@ -229,7 +234,7 @@ export default function Trabajos() {
                         >
                           <div className="flex items-center gap-1.5">
                             <span className="rounded bg-muted px-1 py-0 text-[9px] font-mono font-semibold text-muted-foreground tabular-nums">
-                              {t.codigo ?? "TR--"}
+                              {t.codigo ?? "TR-—"}
                             </span>
                             <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium ml-auto", prioridadBadge(t.prioridad))}>
                               {prioLabel.charAt(0)}
@@ -275,12 +280,13 @@ export default function Trabajos() {
                       );
                     })}
 
+
                     {restantes > 0 && (
                       <button
                         onClick={() => setExpandidas(s => new Set(s).add(col.key))}
                         className="w-full rounded-md border border-dashed py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
-                        +{restantes} mas
+                        +{restantes} más
                       </button>
                     )}
 
