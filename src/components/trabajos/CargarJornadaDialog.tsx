@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import type { Estado, Sucursal } from "@/lib/constants";
+import { TecnicosPicker } from "./TecnicosPicker";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 interface JornadaLegacy {
@@ -25,6 +26,7 @@ interface Props {
   legacyServicioId: string | null;
   tecnicos: Profile[];
   jornadas: JornadaLegacy[];
+  initialJornadaId?: string | null;
   onSaved: () => void;
 }
 
@@ -37,12 +39,14 @@ export function CargarJornadaDialog({
   legacyServicioId,
   tecnicos,
   jornadas,
+  initialJornadaId,
   onSaved,
 }: Props) {
   const { user } = useAuth();
 
   const [form, setForm] = useState({
     tecnico_id: "",
+    auxiliares: [] as string[],
     jornada_id: "",
     resultado: "realizada" as Resultado,
     observaciones: "",
@@ -51,14 +55,15 @@ export function CargarJornadaDialog({
 
   useEffect(() => {
     if (!open) return;
-    const pendiente = jornadas.find((j) => j.estado === "Pendiente") ?? jornadas[0];
+    const pendiente = jornadas.find((j) => j.id === initialJornadaId) ?? jornadas.find((j) => j.estado === "Pendiente") ?? jornadas[0];
     setForm({
       tecnico_id: pendiente?.tecnico_responsable_id ?? user?.id ?? "",
+      auxiliares: pendiente?.auxiliares ?? [],
       jornada_id: pendiente?.id ?? "",
       resultado: "realizada",
       observaciones: "",
     });
-  }, [open, user?.id, jornadas]);
+  }, [open, user?.id, jornadas, initialJornadaId]);
 
   const guardar = async () => {
     if (!form.tecnico_id) {
@@ -79,6 +84,7 @@ export function CargarJornadaDialog({
         .update({
           estado: form.resultado === "realizada" ? "Completado" : "Cancelada",
           tecnico_responsable_id: form.tecnico_id,
+          auxiliares: form.auxiliares,
           observaciones: form.observaciones.trim() || null,
         })
         .eq("id", form.jornada_id)
@@ -136,6 +142,7 @@ export function CargarJornadaDialog({
                   ...f,
                   jornada_id: v,
                   tecnico_id: j?.tecnico_responsable_id ?? f.tecnico_id,
+                  auxiliares: j?.auxiliares ?? f.auxiliares,
                 }));
               }}
             >
@@ -152,21 +159,14 @@ export function CargarJornadaDialog({
             </Select>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Tecnico</Label>
-            <Select value={form.tecnico_id} onValueChange={(v) => setForm(f => ({ ...f, tecnico_id: v }))}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[320px] w-[--radix-select-trigger-width]">
-                {tecnicos.map(t => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.nombre}{t.sucursal ? ` - ${t.sucursal}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <TecnicosPicker
+            tecnicos={tecnicos}
+            principalId={form.tecnico_id}
+            auxiliares={form.auxiliares}
+            onChange={({ principalId, auxiliares }) => setForm(f => ({ ...f, tecnico_id: principalId ?? "", auxiliares }))}
+            label="Cuadrilla"
+            helperText="Estrella = principal. El resto, auxiliares."
+          />
 
           <div className="space-y-1.5">
             <Label>Observacion</Label>
