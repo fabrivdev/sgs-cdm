@@ -10,6 +10,7 @@ import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
 import { Tractor, CheckCircle2, PhoneCall, AlertTriangle, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { pageShell, pageTitle } from "@/lib/ui-classes";
 
 interface Metricas {
   totalMaquinas: number;
@@ -110,9 +111,9 @@ export default function ParqueClientes() {
   );
 
   return (
-    <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
+    <div className={pageShell}>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold sm:text-2xl">Parque &amp; Clientes</h1>
+        <h1 className={pageTitle}>Parque &amp; Clientes</h1>
       </div>
 
       {/* Métricas */}
@@ -168,13 +169,13 @@ export default function ParqueClientes() {
           </div>
 
           {vistaParque === "clientes" ? (
-            <ParqueTab key={`p-${refreshKey}`} onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
+            <ParqueTab onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
           ) : (
-            <MaquinasTab key={`m-${refreshKey}`} onOpenCliente={handleOpenCliente} />
+            <MaquinasTab onOpenCliente={handleOpenCliente} />
           )}
         </TabsContent>
         <TabsContent value="agenda" className="mt-4">
-          <AgendaTab key={`a-${refreshKey}`} onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
+          <AgendaTab onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
         </TabsContent>
         <TabsContent value="importar" className="mt-4">
           <ImportarTab onChanged={handleChanged} />
