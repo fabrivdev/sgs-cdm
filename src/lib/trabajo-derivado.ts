@@ -1,4 +1,4 @@
-import { parseISO, isAfter, isBefore, isSameDay, format } from "date-fns";
+import { parseISO, isBefore, format } from "date-fns";
 
 export type EstadoFila =
   | "fecha_pendiente"        // futura sin jornada
@@ -94,6 +94,7 @@ export function unificarFechas(progs: ProgramacionRow[], jornadas: JornadaRow[])
 }
 
 export interface ResumenDerivado {
+  totalIntervenciones: number;
   totalProgramaciones: number;
   totalJornadas: number;
   pendientes: FilaUnificada[];
@@ -117,6 +118,7 @@ export function resumenTrabajo(filas: FilaUnificada[], jornadas: JornadaRow[]): 
   const totalProgramaciones = filas.filter((f) => f.programacion).length;
 
   return {
+    totalIntervenciones: filas.length,
     totalProgramaciones,
     totalJornadas: jornadas.length,
     pendientes,
@@ -150,66 +152,66 @@ export function calcularProximaAccion(estadoTrabajo: string, r: ResumenDerivado)
     return {
       tipo: "completado",
       titulo: "Trabajo completado",
-      descripcion: "Todas las fechas tienen jornada cargada y no quedan pendientes.",
-      primaria: { label: "Programar nueva fecha", action: "programar" },
-      secundaria: { label: "Ver jornadas", action: "ver_jornadas" },
+      descripcion: "Todas las intervenciones tienen resultado y no quedan pendientes.",
+      primaria: { label: "Programar intervención", action: "programar" },
+      secundaria: { label: "Ver intervenciones", action: "ver_jornadas" },
     };
   }
 
   if (r.totalProgramaciones === 0 && r.totalJornadas === 0) {
     return {
       tipo: "sin_programaciones",
-      titulo: "Programá la primera fecha",
-      descripcion: "Este trabajo todavía no tiene fechas previstas. Programá una visita para empezar.",
-      primaria: { label: "Programar fecha", action: "programar" },
+      titulo: "Programá la primera intervención",
+      descripcion: "Este trabajo todavía no tiene visitas previstas. Programá una intervención para empezar.",
+      primaria: { label: "Programar intervención", action: "programar" },
     };
   }
 
   if (r.vencidas.length > 0) {
     return {
       tipo: "tiene_vencida",
-      titulo: `Hay ${r.vencidas.length} fecha${r.vencidas.length > 1 ? "s" : ""} sin jornada cargada`,
+      titulo: `Hay ${r.vencidas.length} intervención${r.vencidas.length > 1 ? "es" : ""} pendiente${r.vencidas.length > 1 ? "s" : ""} de resultado`,
       descripcion:
-        "Una fecha programada ya pasó y todavía no tiene resultado. Cargá la jornada para que el trabajo siga avanzando.",
-      primaria: { label: "Cargar jornada", action: "cargar_jornada" },
-      secundaria: { label: "Programar otra fecha", action: "programar" },
+        "Una visita programada ya pasó y todavía no tiene resultado. Cargá el resultado para que el trabajo siga avanzando.",
+      primaria: { label: "Cargar resultado", action: "cargar_jornada" },
+      secundaria: { label: "Programar otra intervención", action: "programar" },
     };
   }
 
   if (r.futuras.length > 0 && r.proxima) {
     return {
       tipo: "tiene_futura",
-      titulo: `Próxima visita: ${format(parseISO(r.proxima.fecha), "dd/MM/yyyy")}`,
-      descripcion: "Hay una fecha programada esperando ejecutarse. Podés cargar la jornada cuando se realice.",
-      primaria: { label: "Cargar jornada", action: "cargar_jornada" },
-      secundaria: { label: "Programar otra fecha", action: "programar" },
+      titulo: `Próxima intervención: ${format(parseISO(r.proxima.fecha), "dd/MM/yyyy")}`,
+      descripcion: "Hay una visita programada esperando ejecutarse. Podés cargar el resultado cuando se realice.",
+      primaria: { label: "Cargar resultado", action: "cargar_jornada" },
+      secundaria: { label: "Programar otra intervención", action: "programar" },
     };
   }
 
   if (r.pendientes.length === 0 && r.totalJornadas > 0) {
     return {
       tipo: "sin_pendientes_con_jornadas",
-      titulo: "No hay fechas pendientes para continuar",
-      descripcion: `Las ${r.totalJornadas} fechas programadas ya tienen una jornada cargada. Si el trabajo debe seguir otro día, programá una nueva fecha.`,
-      primaria: { label: "Programar nueva fecha", action: "programar" },
-      secundaria: { label: "Ver jornadas cargadas", action: "ver_jornadas" },
+      titulo: "No hay intervenciones pendientes",
+      descripcion: `Las ${r.totalJornadas} intervenciones ya tienen resultado. Si el trabajo debe seguir otro día, programá una nueva intervención.`,
+      primaria: { label: "Programar intervención", action: "programar" },
+      secundaria: { label: "Ver intervenciones", action: "ver_jornadas" },
     };
   }
 
   return {
     tipo: "sin_actividad",
     titulo: "Sin acción pendiente",
-    descripcion: "Programá una nueva fecha cuando corresponda.",
-    primaria: { label: "Programar fecha", action: "programar" },
+    descripcion: "Programá una nueva intervención cuando corresponda.",
+    primaria: { label: "Programar intervención", action: "programar" },
   };
 }
 
 export const ESTADO_FILA_LABEL: Record<EstadoFila, string> = {
-  fecha_pendiente: "Fecha pendiente",
-  pendiente_cargar: "Pendiente de cargar jornada",
-  jornada_completada: "Jornada completada",
-  jornada_incompleta: "Jornada incompleta",
-  fecha_cancelada: "Fecha cancelada",
+  fecha_pendiente: "Programada",
+  pendiente_cargar: "Pendiente de resultado",
+  jornada_completada: "Realizada",
+  jornada_incompleta: "No realizada",
+  fecha_cancelada: "Cancelada",
 };
 
 export function estadoFilaBadge(e: EstadoFila): string {
@@ -243,8 +245,8 @@ export function estadoFilaBorde(e: EstadoFila): string {
 }
 
 export const ESTADO_TRABAJO_HINT: Record<string, string> = {
-  pendiente: "Aún no tiene fechas programadas.",
-  programado: "Tiene fechas previstas, todavía sin jornadas cargadas.",
-  iniciado: "El trabajo está activo y puede recibir nuevas jornadas.",
-  completado: "Todas las fechas tienen jornada y no quedan pendientes.",
+  pendiente: "Aún no tiene intervenciones programadas.",
+  programado: "Tiene intervenciones previstas, todavía sin resultado.",
+  iniciado: "El trabajo está activo: ya tuvo actividad y todavía puede requerir nuevas intervenciones.",
+  completado: "Todas las intervenciones tienen resultado y no quedan pendientes.",
 };
