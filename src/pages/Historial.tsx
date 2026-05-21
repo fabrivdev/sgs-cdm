@@ -8,6 +8,7 @@ import { Search, MapPin, Wrench } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
+import { pageDescription, pageShell, pageTitle } from "@/lib/ui-classes";
 
 interface Servicio {
   id: string;
@@ -129,10 +130,10 @@ export default function Historial() {
   }, [selected, servicios]);
 
   return (
-    <div className="container max-w-4xl py-4 space-y-4">
+    <div className={pageShell}>
       <div>
-        <h1 className="text-2xl font-bold">Historial por cliente</h1>
-        <p className="text-xs text-muted-foreground">
+        <h1 className={pageTitle}>Historial por cliente</h1>
+        <p className={pageDescription}>
           Buscá un cliente del parque para ver todos sus servicios.
         </p>
       </div>
