@@ -64,12 +64,14 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
     if (!trabajo?.legacy_servicio_id) return;
 
     const estadoLegacy = form.resultado === "realizada" ? "Completado" : "Cancelada";
+    const programacionSeleccionada = programaciones.find((p) => p.id === form.programacion_id);
+    const fechaLegacy = programacionSeleccionada?.fecha_programada ?? form.fecha_real;
 
     const { data: legacyJornada } = await supabase
       .from("servicio_jornadas")
       .select("id")
       .eq("servicio_id", trabajo.legacy_servicio_id)
-      .eq("fecha", form.fecha_real)
+      .eq("fecha", fechaLegacy)
       .maybeSingle();
 
     if (legacyJornada?.id) {
@@ -85,7 +87,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
         .from("servicio_jornadas")
         .insert({
           servicio_id: trabajo.legacy_servicio_id,
-          fecha: form.fecha_real,
+          fecha: fechaLegacy,
           estado: estadoLegacy,
           observaciones: form.observaciones.trim() || null,
         });
