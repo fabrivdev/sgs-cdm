@@ -1,9 +1,9 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const labelCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
@@ -47,9 +47,61 @@ export function FiltersBar({
   actions?: ReactNode;
   className?: string;
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const hasControls = !!children || (activeCount > 0 && !!onClear);
+
   return (
     <Card className={cn("p-2.5", className)}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="flex gap-2 sm:hidden">
+        {search && (
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search.value}
+              onChange={(e) => search.onChange(e.target.value)}
+              placeholder={search.placeholder ?? "Buscar…"}
+              className="h-9 pl-7 pr-7 text-sm"
+            />
+            {search.value && (
+              <button
+                onClick={() => search.onChange("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
+                aria-label="Limpiar búsqueda"
+                type="button"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
+        {hasControls && (
+          <Button
+            type="button"
+            variant={mobileOpen || activeCount > 0 ? "default" : "outline"}
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label="Filtros"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {hasControls && mobileOpen && (
+        <div className="mt-2 flex flex-col gap-2 sm:hidden">
+          {children}
+          {activeCount > 0 && onClear && (
+            <Button variant="ghost" size="sm" onClick={onClear} className="h-9 justify-start text-xs">
+              <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
+            </Button>
+          )}
+          {meta && <div className="text-[11px] text-muted-foreground">{meta}</div>}
+          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+        </div>
+      )}
+
+      <div className="hidden gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end">
         {search && (
           <Field label={search.label ?? "Buscar"} className={search.width ?? "w-full sm:w-[240px]"}>
             <div className="relative">
