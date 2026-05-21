@@ -241,20 +241,21 @@ export default function Trabajos() {
 
                           {(proxima || pendCount > 0 || vencidasCount > 0) && (
                             <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground flex-wrap">
-                              {proxima && (
-                                <span className="flex items-center gap-0.5">
-                                  <CalendarDays className="h-3 w-3" />
-                                  <span className="tabular-nums">
-                                    {format(parseISO(proxima.fecha_programada), "dd/MM")}
+                              {proxima ? (
+                                <>
+                                  <span className="flex items-center gap-0.5">
+                                    <CalendarDays className="h-3 w-3" />
+                                    <span className="tabular-nums">
+                                      {format(parseISO(proxima.fecha_programada), "dd/MM")}
+                                    </span>
                                   </span>
+                                  {pendCount > 1 && <span>· {pendCount} pend.</span>}
+                                </>
+                              ) : vencidasCount > 0 ? (
+                                <span className="text-amber-600">
+                                  Sin agenda vigente · {vencidasCount} fecha{vencidasCount > 1 ? "s" : ""} vencida{vencidasCount > 1 ? "s" : ""}
                                 </span>
-                              )}
-                              {pendCount > 0 && (
-                                <span>· {pendCount} pend.</span>
-                              )}
-                              {vencidasCount > 0 && (
-                                <span className="text-amber-600">· {vencidasCount} sin cargar</span>
-                              )}
+                              ) : null}
                             </div>
                           )}
                         </button>
