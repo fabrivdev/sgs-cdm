@@ -339,8 +339,8 @@ export function AgendaTab({
       </TabsContent>
 
       <TabsContent value="historial" className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <div className="relative min-w-[180px] flex-1">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative w-full min-w-0 sm:min-w-[220px] sm:flex-1">
             <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar cliente..."
@@ -351,13 +351,13 @@ export function AgendaTab({
           </div>
 
           <Select value={hResultado} onValueChange={setHResultado}>
-            <SelectTrigger className="w-[170px]">
+            <SelectTrigger className="w-full sm:w-[170px]">
               <SelectValue placeholder="Resultado" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[calc(100vw-2rem)]">
               <SelectItem value="all">Todos los resultados</SelectItem>
               {RESULTADOS.map((r) => (
-                <SelectItem key={r} value={r}>
+                <SelectItem key={r} value={r} className="max-w-[calc(100vw-3rem)] truncate">
                   {r}
                 </SelectItem>
               ))}
@@ -365,10 +365,10 @@ export function AgendaTab({
           </Select>
 
           <Select value={hRango} onValueChange={setHRango}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full sm:w-[150px]">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[calc(100vw-2rem)]">
               <SelectItem value="7">Últimos 7 días</SelectItem>
               <SelectItem value="30">Últimos 30 días</SelectItem>
               <SelectItem value="90">Últimos 90 días</SelectItem>
