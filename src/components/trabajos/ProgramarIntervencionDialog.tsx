@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { getISOWeek } from "date-fns";
 import type { Sucursal } from "@/lib/constants";
 import { TecnicosPicker } from "./TecnicosPicker";
+import { estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
@@ -24,6 +25,7 @@ interface TrabajoLite {
   tipo_trabajo: string;
   estado_general: string;
   legacy_servicio_id?: string | null;
+  jornadas?: Array<{ fecha?: string | null; fecha_programada?: string | null; estado?: string | null }>;
 }
 
 interface Props {
@@ -77,7 +79,7 @@ export function ProgramarIntervencionDialog({
 
   const clienteMap = useMemo(() => new Map((clientes ?? []).map((c) => [c.id, c.nombre])), [clientes]);
   const disponibles = useMemo(
-    () => (trabajos ?? []).filter((t) => !trabajoId && t.estado_general === "pendiente"),
+    () => (trabajos ?? []).filter((t) => !trabajoId && estadoTrabajoDesdeJornadas(t.jornadas ?? [], t.estado_general) === "pendiente"),
     [trabajos, trabajoId],
   );
 
