@@ -234,7 +234,7 @@ export function ProgramarIntervencionDialog({
     <>
       <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">
         <ResponsiveDrawerHeader>
-          <h2 className="text-base font-semibold">Programar nueva fecha</h2>
+          <h2 className="text-base font-semibold">Programar intervención</h2>
           {trabajoActivo && (
             <p className="text-xs text-muted-foreground mt-1">
               {trabajoActivo.codigo ? `${trabajoActivo.codigo} · ` : ""}{trabajoActivo.nombre_cliente}

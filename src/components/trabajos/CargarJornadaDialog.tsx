@@ -121,12 +121,12 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
       await syncLegacy();
       await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajoId });
 
-      toast.success(form.resultado === "realizada" ? "Jornada Realizada" : "Marcada como No realizada");
+      toast.success(form.resultado === "realizada" ? "Resultado cargado: Realizada" : "Resultado cargado: No realizada");
       onSaved();
       onOpenChange(false);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.message ?? "No se pudo guardar la jornada");
+      toast.error(e?.message ?? "No se pudo guardar el resultado");
     } finally {
       setBusy(false);
     }
@@ -135,7 +135,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">
       <ResponsiveDrawerHeader>
-        <h2 className="text-base font-semibold">Cargar jornada</h2>
+        <h2 className="text-base font-semibold">Cargar resultado</h2>
         <p className="text-xs text-muted-foreground mt-1">
           Registrá el resultado real de una visita.
         </p>
@@ -177,7 +177,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
 
           {programaciones.length > 0 && (
             <div className="space-y-1.5">
-              <Label>Agenda que se trabajó</Label>
+              <Label>Intervención programada</Label>
               <Select
                 value={form.programacion_id || "none"}
                 onValueChange={(v) => setForm(f => ({ ...f, programacion_id: v === "none" ? "" : v }))}
@@ -221,7 +221,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Si el trabajo necesita continuar otro día, guardá esta jornada como Realizada y programá una nueva fecha.
+            Si el trabajo necesita continuar otro día, guardá este resultado como Realizada y programá otra intervención.
           </p>
         </div>
       </ResponsiveDrawerBody>
@@ -231,7 +231,7 @@ export function CargarJornadaDialog({ open, onOpenChange, trabajoId, tecnicos, p
           Cancelar
         </Button>
         <Button onClick={guardar} disabled={busy}>
-          {busy ? "Guardando…" : "Guardar jornada"}
+          {busy ? "Guardando…" : "Guardar resultado"}
         </Button>
       </ResponsiveDrawerFooter>
     </ResponsiveDrawer>
