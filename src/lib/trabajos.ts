@@ -34,6 +34,46 @@ export function estadoTrabajoLabel(estado: string | null | undefined) {
   return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
 }
 
+interface JornadaEstadoTrabajo {
+  fecha?: string | null;
+  fecha_programada?: string | null;
+  estado?: string | null;
+}
+
+function startOfLocalDay(value: Date) {
+  const d = new Date(value);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function fechaJornada(j: JornadaEstadoTrabajo) {
+  return j.fecha ?? j.fecha_programada ?? null;
+}
+
+export function estadoTrabajoDesdeJornadas(
+  jornadas: JornadaEstadoTrabajo[],
+  fallback?: string | null,
+  hoy = new Date(),
+): EstadoTrabajo {
+  if (jornadas.length === 0) return normalizarEstadoTrabajo(fallback);
+
+  const hoyLocal = startOfLocalDay(hoy);
+  const realizadas = jornadas.filter((j) => j.estado === "Completado").length;
+  const pendientes = jornadas.filter((j) => j.estado === "Pendiente");
+  const pendientesVigentes = pendientes.filter((j) => {
+    const fecha = fechaJornada(j);
+    if (!fecha) return false;
+    const d = startOfLocalDay(new Date(`${fecha}T00:00:00`));
+    const diasVencida = Math.floor((hoyLocal.getTime() - d.getTime()) / 86400000);
+    return diasVencida <= 7;
+  }).length;
+
+  if (realizadas > 0 && pendientes.length === 0) return "completado";
+  if (realizadas > 0 && pendientes.length > 0) return "iniciado";
+  if (pendientesVigentes > 0) return "programado";
+  return "pendiente";
+}
+
 export const PRIORIDADES = [
   { key: "baja", label: "Baja" },
   { key: "media", label: "Media" },
