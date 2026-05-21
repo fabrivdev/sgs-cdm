@@ -230,11 +230,11 @@ export function TrabajoDetalleDrawer({
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : (
             <>
-              {/* Resumen operativo */}
+              {/* Resumen del trabajo */}
 
               <section className="rounded-xl border bg-card p-4 space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Resumen operativo
+                  Resumen del trabajo
                 </h3>
                 <div>
                   <div className="text-[11px] text-muted-foreground">Problema reportado</div>
@@ -242,9 +242,10 @@ export function TrabajoDetalleDrawer({
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                   <Stat k="Tipo" v={trabajo.tipo_trabajo} />
-                  <Stat k="Fechas programadas" v={String(resumen.totalProgramaciones)} />
-                  <Stat k="Fechas pendientes" v={String(resumen.pendientes.length)} accent={resumen.vencidas.length > 0 ? "warn" : undefined} />
-                  <Stat k="Jornadas cargadas" v={String(resumen.totalJornadas)} />
+                  <Stat k="Intervenciones" v={String(resumen.totalIntervenciones)} />
+                  <Stat k="Pendientes de resultado" v={String(resumen.pendientes.length)} accent={resumen.vencidas.length > 0 ? "warn" : undefined} />
+                  <Stat k="Realizadas" v={String(resumen.jornadasCompletadas)} />
+                  <Stat k="No realizadas" v={String(resumen.jornadasIncompletas)} />
                   <Stat k="Horas acumuladas" v={`${resumen.horasAcumuladas} hs`} />
                   <Stat
                     k="Última actividad"
@@ -253,18 +254,18 @@ export function TrabajoDetalleDrawer({
                 </div>
               </section>
 
-              {/* Fechas y jornadas */}
+              {/* Intervenciones */}
               <section id="seccion-fechas" className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Fechas y jornadas
+                    Intervenciones
                   </h3>
                 </div>
 
 
                 {filas.length === 0 && (
                   <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-                    Todavía no hay fechas ni jornadas.
+                    Todavía no hay intervenciones.
                   </div>
                 )}
 
@@ -328,7 +329,7 @@ export function TrabajoDetalleDrawer({
                           <div className="flex items-center gap-1 shrink-0">
                             {puedeCargar && (
                               <Button size="sm" variant="outline" onClick={irACargarJornada}>
-                                Cargar jornada
+                                Cargar resultado
                               </Button>
                             )}
                             {f.programacion && puedeAdmin && (
@@ -337,7 +338,7 @@ export function TrabajoDetalleDrawer({
                                 variant="ghost"
                                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                 onClick={() => eliminarProgramacion(f.programacion!)}
-                                title="Eliminar fecha"
+                                title="Eliminar intervención"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -348,7 +349,7 @@ export function TrabajoDetalleDrawer({
                                 variant="ghost"
                                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                 onClick={() => eliminarJornada(f.jornada!.id)}
-                                title="Eliminar jornada"
+                                title="Eliminar resultado"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
