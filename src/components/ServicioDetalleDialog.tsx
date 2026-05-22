@@ -351,7 +351,9 @@ export function ServicioDetalleDialog({
     const nuevaLista = jornadas.filter((j) => j.id !== id);
     await syncTrabajoMadre(servicio.id, nuevaLista);
     toast.success("Jornada eliminada");
-    await loadJornadas(servicio.id);
+    const fresh = await loadJornadas(servicio.id);
+    const siguientePend = fresh.find((j) => j.estado === "Pendiente");
+    if (siguientePend) setActiveJornadaId(siguientePend.id);
     onChanged();
   };
 
