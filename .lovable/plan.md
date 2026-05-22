@@ -1,7 +1,12 @@
-Plan para corregirlo:
+## Resumen
+Eliminar el botón duplicado "Continuar otro día" del bloque de jornada pendiente en el detalle de servicio, ya que realiza exactamente la misma acción que "Nueva jornada" en el historial. Dejar una sola vía para programar una nueva fecha.
 
-1. Cambiar la regla de jornada activa en `ServicioDetalleDialog` para que no preserve una jornada que ya dejó de estar `Pendiente` cuando existen otras pendientes.
-2. Después de guardar un resultado, seleccionar explícitamente la próxima jornada pendiente posterior a la fecha cerrada; si no hay posterior, usar la primera pendiente disponible.
-3. Evitar que `fechaContexto` vuelva a forzar la fecha original del planificador después de cerrar una jornada.
-4. Ajustar también el borrado/programación de jornadas para aplicar la misma regla consistente.
-5. Verificar el comportamiento con el caso del ejemplo: 18/05 cerrada y 19/05 pendiente debe quedar arriba como “Jornada a cerrar”.
+## Cambios
+
+### 1. ServicioDetalleDialog.tsx
+- **Eliminar** el botón "Continuar otro día" (líneas ~499-508) del bloque de jornada pendiente.
+- Dejar solo "Cargar resultado" en esa sección.
+- Mantener "Nueva jornada" en el header del Historial como única forma de agregar una nueva fecha.
+
+## Nota sobre selectores de cuadrilla
+El componente `TecnicosPicker` ya tiene implementado el comportamiento de mostrar la lista solo al hacer foco en el buscador. Este comportamiento aplica automáticamente en todos los lugares donde se usa (CargarJornadaDialog, ProgramarIntervencionDialog y ServicioDetalleDialog).

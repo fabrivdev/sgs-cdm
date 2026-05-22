@@ -486,28 +486,14 @@ export function ServicioDetalleDialog({
                 </div>
 
                 {canEdit && activeIsPending ? (
-                  <>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <Button
-                        type="button"
-                        className="h-11 justify-start gap-2"
-                        onClick={() => setCargarOpen(true)}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        Cargar resultado
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-11 justify-start gap-2 bg-card"
-                        onClick={() => setProgramarOpen(true)}
-                        disabled={!trabajoMadre}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Continuar otro dia
-                      </Button>
-                    </div>
-                  </>
+                  <Button
+                    type="button"
+                    className="h-11 w-full justify-start gap-2"
+                    onClick={() => setCargarOpen(true)}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Cargar resultado
+                  </Button>
                 ) : activeIsPending ? (
                   <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
                     No tenes permisos para editar esta jornada.
