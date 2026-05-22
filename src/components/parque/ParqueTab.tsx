@@ -153,7 +153,7 @@ const antiguedadColor = (a: number | null) => {
 
 export interface ParqueMetricas {
   totalMaquinas: number;
-  pctConServicioUltimoAnio: number;
+  pctConServicioUltimoAño: number;
   pctContactadosEsteMes: number;
   sinContacto60d: number;
 }
@@ -488,15 +488,15 @@ export function ParqueTab({
       totalMaquinas += r.cantTotal;
       if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
       if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) contactadosRango++;
-      const sinServicioUltimoAnio = r.diasUltServicio == null || r.diasUltServicio > 365;
+      const sinServicioUltimoAño = r.diasUltServicio == null || r.diasUltServicio > 365;
       const sinSeg60 =
         !r.ultSeg ||
         (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
-      if (sinServicioUltimoAnio && sinSeg60) sinContacto++;
+      if (sinServicioUltimoAño && sinSeg60) sinContacto++;
     }
     onMetricasChange({
       totalMaquinas,
-      pctConServicioUltimoAnio:
+      pctConServicioUltimoAño:
         totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0,
       pctContactadosEsteMes:
         totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,
