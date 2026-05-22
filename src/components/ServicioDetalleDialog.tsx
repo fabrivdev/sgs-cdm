@@ -170,7 +170,7 @@ export function ServicioDetalleDialog({
     loadClientes();
   }, [servicio?.id]);
 
-  const loadJornadas = async (servicioId: string) => {
+  const loadJornadas = async (servicioId: string): Promise<Jornada[]> => {
     setLoadingJornadas(true);
     const { data, error } = await supabase
       .from("servicio_jornadas")
@@ -182,11 +182,13 @@ export function ServicioDetalleDialog({
 
     if (error) {
       toast.error("No se pudieron cargar las jornadas");
-      return;
+      return [];
     }
 
-    setJornadas((data ?? []) as Jornada[]);
+    const list = (data ?? []) as Jornada[];
+    setJornadas(list);
     setEdits({});
+    return list;
   };
 
   useEffect(() => {
