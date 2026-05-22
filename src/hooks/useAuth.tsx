@@ -48,6 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadingPromiseRef.current = null;
   };
 
+  const clearInvalidLocalSession = useCallback(async () => {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      await supabase.auth.signOut().catch(() => undefined);
+    } finally {
+      clearUserData();
+    }
+  }, []);
+
   const loadProfileByUserId = useCallback(async (uid: string) => {
     const legacyResult = await supabase
       .from("profiles")
@@ -123,21 +133,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        setTimeout(() => loadUserData(sess.user.id), 0);
+        setTimeout(() => {
+          loadUserData(sess.user.id)
+            .catch(async (error) => {
+              console.error("Auth state sync failed", error);
+              await clearInvalidLocalSession();
+            })
+            .finally(() => setLoading(false));
+        }, 0);
       } else {
         clearUserData();
+        setLoading(false);
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: sess } }) => {
-      setSession(sess);
-      setUser(sess?.user ?? null);
-      if (sess?.user) loadUserData(sess.user.id).finally(() => setLoading(false));
-      else setLoading(false);
-    });
+    (async () => {
+      try {
+        const { data: { session: sess } } = await supabase.auth.getSession();
+        setSession(sess);
+        setUser(sess?.user ?? null);
+        if (sess?.user) await loadUserData(sess.user.id);
+      } catch (error) {
+        console.error("Initial session restore failed", error);
+        await clearInvalidLocalSession();
+      } finally {
+        setLoading(false);
+      }
+    })();
 
     return () => sub.subscription.unsubscribe();
-  }, [loadUserData]);
+  }, [clearInvalidLocalSession, loadUserData]);
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
