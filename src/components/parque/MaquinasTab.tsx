@@ -75,8 +75,8 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
   const [fMarca, setFMarca] = useState("all");
   const [fSubgrupo, setFSubgrupo] = useState("all");
   const [fEstado, setFEstado] = useState("activa");
-  const [añoDesde, setAnioDesde] = useState("");
-  const [añoHasta, setAnioHasta] = useState("");
+  const [añoDesde, setAñoDesde] = useState("");
+  const [añoHasta, setAñoHasta] = useState("");
 
   const [sortKey, setSortKey] = useState<SortKey>("cliente");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -216,7 +216,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
   const limpiar = () => {
     setQ(""); setFSucursal("all"); setFMarca("all"); setFSubgrupo("all");
-    setFEstado("activa"); setAnioDesde(""); setAnioHasta("");
+    setFEstado("activa"); setAñoDesde(""); setAñoHasta("");
   };
   const activos =
     (q ? 1 : 0) + (fSucursal !== "all" ? 1 : 0) + (fMarca !== "all" ? 1 : 0) +
@@ -249,10 +249,10 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           options={[{ value: "all", label: "Todos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
         />
         <FilterCustom label="Año desde" width="w-[100px]">
-          <Input type="number" value={añoDesde} onChange={(e) => setAnioDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
+          <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
         </FilterCustom>
         <FilterCustom label="Año hasta" width="w-[100px]">
-          <Input type="number" value={añoHasta} onChange={(e) => setAnioHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
+          <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
         </FilterCustom>
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
