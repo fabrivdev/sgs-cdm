@@ -5,7 +5,7 @@ import type { Role, Sucursal } from "@/lib/constants";
 
 interface Profile {
   id: string;
-  auth_user_id: string | null;
+  auth_user_id?: string | null;
   nombre: string;
   sucursal: Sucursal | null;
   activo: boolean;
@@ -48,6 +48,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadingPromiseRef.current = null;
   };
 
+  const loadProfileByUserId = useCallback(async (uid: string) => {
+    const legacyResult = await supabase
+      .from("profiles")
+      .select("id, nombre, sucursal, activo")
+      .eq("id", uid)
+      .maybeSingle();
+
+    if (legacyResult.error) throw legacyResult.error;
+    if (legacyResult.data) return legacyResult.data as Profile;
+
+    try {
+      const linkedResult = await supabase
+        .from("profiles")
+        .select("id, auth_user_id, nombre, sucursal, activo")
+        .eq("auth_user_id", uid)
+        .maybeSingle();
+
+      if (linkedResult.error) {
+        const message = linkedResult.error.message ?? "";
+        if (/auth_user_id/i.test(message) && /does not exist/i.test(message)) {
+          return null;
+        }
+        throw linkedResult.error;
+      }
+
+      return (linkedResult.data as Profile | null) ?? null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/auth_user_id/i.test(message) && /does not exist/i.test(message)) {
+        return null;
+      }
+      throw error;
+    }
+  }, []);
+
   const loadUserData = useCallback(async (uid: string, force = false) => {
     if (!force && loadedUserRef.current === uid) return;
     if (!force && loadingUserRef.current === uid && loadingPromiseRef.current) {
@@ -58,13 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadingUserRef.current = uid;
 
     const promise = (async () => {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("id, auth_user_id, nombre, sucursal, activo")
-        .or(`auth_user_id.eq.${uid},id.eq.${uid}`)
-        .maybeSingle();
-
-      const loadedProfile = prof as Profile | null;
+      const loadedProfile = await loadProfileByUserId(uid);
       if (loadedProfile && !loadedProfile.activo) {
         await supabase.auth.signOut();
         clearUserData();
@@ -87,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (loadingUserRef.current === uid) loadingUserRef.current = null;
       if (loadingPromiseRef.current === promise) loadingPromiseRef.current = null;
     }
-  }, []);
+  }, [loadProfileByUserId]);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
@@ -115,11 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error };
 
     if (data.user) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("activo")
-        .or(`auth_user_id.eq.${data.user.id},id.eq.${data.user.id}`)
-        .maybeSingle();
+      const prof = await loadProfileByUserId(data.user.id);
 
       if (prof && prof.activo === false) {
         await supabase.auth.signOut();

@@ -26,7 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface Profile {
   id: string;
-  auth_user_id: string | null;
+  auth_user_id?: string | null;
   nombre: string;
   sucursal: Sucursal | null;
   activo: boolean;
@@ -77,20 +77,44 @@ export default function Admin() {
     [roles],
   );
 
+  const hasLinkedSchema = profiles.some((profile) => typeof profile.auth_user_id !== "undefined");
+
   const emailByProfile = (profile: Profile) => {
-    if (!profile.auth_user_id) return "";
-    return emails[profile.auth_user_id] ?? "";
+    const linkedUserId = profile.auth_user_id || profile.id;
+    return emails[linkedUserId] ?? "";
   };
 
   const load = async () => {
-    const [{ data: prof }, { data: roleRows }, { data: cli }] = await Promise.all([
+    const [profileResult, roleResult, clientResult] = await Promise.all([
       supabase.from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("clientes").select("id, nombre, sucursal").order("nombre"),
     ]);
-    setProfiles((prof ?? []) as Profile[]);
-    setRoles((roleRows ?? []) as UserRole[]);
-    setClientes((cli ?? []) as Cliente[]);
+
+    let loadedProfiles = (profileResult.data ?? []) as Profile[];
+    if (profileResult.error) {
+      const message = profileResult.error.message ?? "";
+      if (/auth_user_id/i.test(message) && /does not exist/i.test(message)) {
+        const { data: legacyProfiles, error: legacyError } = await supabase
+          .from("profiles")
+          .select("id, nombre, sucursal, activo")
+          .order("nombre");
+
+        if (legacyError) {
+          toast.error(legacyError.message);
+          return;
+        }
+
+        loadedProfiles = (legacyProfiles ?? []) as Profile[];
+      } else {
+        toast.error(profileResult.error.message);
+        return;
+      }
+    }
+
+    setProfiles(loadedProfiles);
+    setRoles((roleResult.data ?? []) as UserRole[]);
+    setClientes((clientResult.data ?? []) as Cliente[]);
 
     const { data: emailData, error: emailErr } = await supabase.functions.invoke("admin-list-users");
     if (!emailErr && emailData?.users) {
@@ -184,16 +208,27 @@ export default function Admin() {
 
     setCredBusy(true);
 
-    const runner = credUser.auth_user_id
+    const profileHasAccess = !!emailByProfile(credUser);
+
+    const runner = hasLinkedSchema
+      ? profileHasAccess
+        ? supabase.functions.invoke("admin-update-user", {
+            body: { profile_id: credUser.id, email: credEmail.trim(), password: credPassword || undefined },
+          })
+        : supabase.functions.invoke("admin-create-user", {
+            body: {
+              profile_id: credUser.id,
+              email: credEmail.trim(),
+              password: credPassword,
+            },
+          })
+      : profileHasAccess
       ? supabase.functions.invoke("admin-update-user", {
-          body: { profile_id: credUser.id, email: credEmail.trim(), password: credPassword || undefined },
+          body: { user_id: credUser.id, email: credEmail.trim(), password: credPassword || undefined },
         })
-      : supabase.functions.invoke("admin-create-user", {
-          body: {
-            profile_id: credUser.id,
-            email: credEmail.trim(),
-            password: credPassword,
-          },
+      : Promise.resolve({
+          data: { error: "Este entorno todavía no tiene habilitada la asociación de acceso a técnicos existentes." },
+          error: null,
         });
 
     const { data, error } = await runner;
@@ -204,7 +239,7 @@ export default function Admin() {
       return;
     }
 
-    toast.success(credUser.auth_user_id ? "Credenciales actualizadas" : "Acceso asociado al técnico");
+    toast.success(profileHasAccess ? "Credenciales actualizadas" : "Acceso asociado al técnico");
     setCredUser(null);
     load();
   };
@@ -212,15 +247,14 @@ export default function Admin() {
   const eliminarUsuario = async () => {
     if (!delUser) return;
     setDelBusy(true);
-    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
-      body: { profile_id: delUser.id },
-    });
+    const payload = hasLinkedSchema ? { profile_id: delUser.id } : { user_id: delUser.id };
+    const { data, error } = await supabase.functions.invoke("admin-delete-user", { body: payload });
     setDelBusy(false);
     if (error || data?.error) {
       toast.error(error?.message || data?.error);
       return;
     }
-    toast.success("Acceso eliminado. El técnico sigue existiendo.");
+    toast.success(hasLinkedSchema ? "Acceso eliminado. El técnico sigue existiendo." : "Usuario eliminado");
     setDelUser(null);
     load();
   };
@@ -314,7 +348,7 @@ export default function Admin() {
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">{profile.nombre}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {profile.auth_user_id ? emailByProfile(profile) || "Cuenta asociada" : "Sin acceso"}
+                      {emailByProfile(profile) || "Sin acceso"}
                     </TableCell>
                     <TableCell>
                       {isSuperAdmin ? (
@@ -351,7 +385,7 @@ export default function Admin() {
                           <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Credenciales">
                             <KeyRound className="h-3.5 w-3.5" />
                           </Button>
-                          {profile.auth_user_id && (
+                          {emailByProfile(profile) && (
                             <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} title="Quitar acceso" className="text-destructive hover:text-destructive">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -372,7 +406,7 @@ export default function Admin() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold">{profile.nombre}</div>
                     <div className="truncate text-[11px] text-muted-foreground">
-                      {profile.auth_user_id ? emailByProfile(profile) || "Cuenta asociada" : "Sin acceso"}
+                      {emailByProfile(profile) || "Sin acceso"}
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-1.5">
@@ -381,7 +415,7 @@ export default function Admin() {
                         <Button variant="outline" size="sm" onClick={() => openCred(profile)} className="h-7 px-2">
                           <KeyRound className="h-3.5 w-3.5" />
                         </Button>
-                        {profile.auth_user_id && (
+                        {emailByProfile(profile) && (
                           <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} className="h-7 px-2 text-destructive hover:text-destructive">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -471,7 +505,7 @@ export default function Admin() {
       <Dialog open={!!credUser} onOpenChange={(open) => !open && setCredUser(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{credUser?.auth_user_id ? "Editar acceso" : "Agregar acceso"} — {credUser?.nombre}</DialogTitle>
+            <DialogTitle>{credUser && emailByProfile(credUser) ? "Editar acceso" : "Agregar acceso"} — {credUser?.nombre}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
@@ -479,15 +513,20 @@ export default function Admin() {
               <Input type="email" value={credEmail} onChange={(e) => setCredEmail(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{credUser?.auth_user_id ? "Nueva contraseña" : "Contraseña inicial"}</Label>
+              <Label className="text-xs">{credUser && emailByProfile(credUser) ? "Nueva contraseña" : "Contraseña inicial"}</Label>
               <Input
                 type="text"
                 value={credPassword}
                 onChange={(e) => setCredPassword(e.target.value)}
-                placeholder={credUser?.auth_user_id ? "Dejar vacío para no cambiar" : "Obligatoria para crear el acceso"}
+                placeholder={credUser && emailByProfile(credUser) ? "Dejar vacío para no cambiar" : "Obligatoria para crear el acceso"}
               />
               <p className="text-[11px] text-muted-foreground">Mínimo 6 caracteres.</p>
             </div>
+            {!hasLinkedSchema && !(credUser && emailByProfile(credUser)) && (
+              <p className="text-[11px] text-amber-700">
+                Este proyecto publicado todavía no tiene desplegada la migración que permite vincular una cuenta nueva a un técnico ya existente.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCredUser(null)}>Cancelar</Button>
