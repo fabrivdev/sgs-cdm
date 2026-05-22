@@ -14,7 +14,7 @@ import { pageShell, pageTitle } from "@/lib/ui-classes";
 
 interface Metricas {
   totalMaquinas: number;
-  pctConServicioUltimoAnio: number;
+  pctConServicioUltimoAño: number;
   pctContactadosEsteMes: number;
   sinContacto60d: number;
 }
@@ -40,7 +40,7 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 export default function ParqueClientes() {
   const [metricas, setMetricas] = useState<Metricas>({
     totalMaquinas: 0,
-    pctConServicioUltimoAnio: 0,
+    pctConServicioUltimoAño: 0,
     pctContactadosEsteMes: 0,
     sinContacto60d: 0,
   });
@@ -141,7 +141,7 @@ export default function ParqueClientes() {
       },
       {
         label: "% con servicio último año",
-        value: `${metricasMostradas.pctConServicioUltimoAnio}%`,
+        value: `${metricasMostradas.pctConServicioUltimoAño}%`,
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
