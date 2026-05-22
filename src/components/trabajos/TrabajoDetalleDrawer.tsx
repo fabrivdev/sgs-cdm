@@ -27,6 +27,11 @@ interface Jornada {
   auxiliares: string[] | null;
 }
 
+interface ServicioBaseCrew {
+  tecnico_responsable_id: string | null;
+  auxiliares: string[] | null;
+}
+
 interface Props {
   trabajoId: string | null;
   onOpenChange: (o: boolean) => void;
@@ -69,6 +74,7 @@ export function TrabajoDetalleDrawer({
   const { isAdmin, isCabecilla } = useAuth();
   const [trabajo, setTrabajo] = useState<any | null>(null);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
+  const [servicioBaseCrew, setServicioBaseCrew] = useState<ServicioBaseCrew | null>(null);
   const [rolesTecnico, setRolesTecnico] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [programarOpen, setProgramarOpen] = useState(false);
@@ -89,8 +95,17 @@ export function TrabajoDetalleDrawer({
 
       if (!t.legacy_servicio_id) {
         setJornadas([]);
+        setServicioBaseCrew(null);
         return;
       }
+      const { data: servicioBase, error: sError } = await supabase
+        .from("servicios")
+        .select("tecnico_responsable_id, auxiliares")
+        .eq("id", t.legacy_servicio_id)
+        .maybeSingle();
+      if (sError) throw sError;
+      setServicioBaseCrew((servicioBase as ServicioBaseCrew) ?? null);
+
       const { data, error: jError } = await supabase
         .from("servicio_jornadas")
         .select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares")
@@ -110,6 +125,7 @@ export function TrabajoDetalleDrawer({
     else {
       setTrabajo(null);
       setJornadas([]);
+      setServicioBaseCrew(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trabajoId]);
@@ -131,12 +147,12 @@ export function TrabajoDetalleDrawer({
     const fromSelected = selected && (selected.tecnico_responsable_id || (selected.auxiliares?.length ?? 0) > 0) ? selected : null;
     const fromPending = jornadas.find((j) => j.estado === "Pendiente" && (j.tecnico_responsable_id || (j.auxiliares?.length ?? 0) > 0));
     const fromLatest = jornadas.find((j) => j.tecnico_responsable_id || (j.auxiliares?.length ?? 0) > 0);
-    const source = fromSelected ?? fromPending ?? fromLatest ?? null;
+    const source = fromSelected ?? fromPending ?? fromLatest ?? servicioBaseCrew ?? null;
     return {
       tecnico_id: source?.tecnico_responsable_id ?? null,
       auxiliares: source?.auxiliares ?? [],
     };
-  }, [jornadas, selectedJornadaId]);
+  }, [jornadas, selectedJornadaId, servicioBaseCrew]);
 
   if (!trabajoId) return null;
 
