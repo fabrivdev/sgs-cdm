@@ -436,20 +436,6 @@ export default function Planificador() {
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
         />
         <FilterSelect
-          label="Vencimiento" value={fVencidas} onChange={setFVencidas} placeholder="Vencimiento" width="w-[150px]"
-          options={[
-            { value: "all", label: "Todo vencimiento" },
-            { value: "7", label: "+7 días sin cierre" },
-          ]}
-        />
-        <FilterSelect
-          label="Datos" value={fDatos} onChange={setFDatos} placeholder="Datos" width="w-[130px]"
-          options={[
-            { value: "all", label: "Todos los datos" },
-            { value: "sin_horas", label: "Realizadas sin horas" },
-          ]}
-        />
-        <FilterSelect
           label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
           options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
         />
