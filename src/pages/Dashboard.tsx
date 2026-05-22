@@ -34,6 +34,7 @@ import {
   subMonths,
 } from "date-fns";
 import { SUCURSALES, type Estado, type Marca, type Sucursal } from "@/lib/constants";
+import { estadoTrabajoDesdeJornadas, type EstadoTrabajo } from "@/lib/trabajos";
 import { cn } from "@/lib/utils";
 
 interface Servicio {
@@ -57,6 +58,15 @@ interface Jornada {
   horas_trabajadas: number | null;
   tecnico_responsable_id: string | null;
   auxiliares: string[];
+}
+
+interface Trabajo {
+  id: string;
+  estado_general: EstadoTrabajo | string | null;
+  legacy_servicio_id: string | null;
+  sucursal: Sucursal;
+  cliente_id: string | null;
+  descripcion_problema: string;
 }
 
 interface Cliente {
@@ -122,6 +132,7 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [parqueKpi, setParqueKpi] = useState<ParqueKpi | null>(null);
@@ -139,13 +150,18 @@ export default function Dashboard() {
     (async () => {
       setLoading(true);
       try {
-        const [serviciosRows, jornadasRows, clientesRows, parqueRes, factRes] = await Promise.all([
+        const [serviciosRows, trabajosRows, jornadasRows, clientesRows, parqueRes, factRes] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
               .from("servicios")
               .select(
                 "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas, cliente_id, trabajo_descripcion",
               ),
+          ),
+          cargarTodo<Trabajo>(
+            supabase
+              .from("trabajos")
+              .select("id, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema"),
           ),
           cargarTodo<Jornada>(
             supabase
@@ -165,6 +181,7 @@ export default function Dashboard() {
 
         if (!alive) return;
         setServicios(serviciosRows);
+        setTrabajos(trabajosRows);
         setJornadas(jornadasRows);
         setClientes(clientesRows);
         setParqueKpi(((parqueRes.data ?? [])[0] as ParqueKpi | undefined) ?? null);
@@ -183,6 +200,31 @@ export default function Dashboard() {
 
   const servicioById = useMemo(() => new Map(servicios.map((servicio) => [servicio.id, servicio])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((cliente) => [cliente.id, cliente])), [clientes]);
+  const jornadasByTrabajo = useMemo(() => {
+    const servicioATrabajo = new Map<string, string>();
+    for (const trabajo of trabajos) {
+      if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
+    }
+
+    const map = new Map<string, Jornada[]>();
+    for (const jornada of jornadas) {
+      const trabajoId = servicioATrabajo.get(jornada.servicio_id);
+      if (!trabajoId) continue;
+      const current = map.get(trabajoId) ?? [];
+      current.push(jornada);
+      map.set(trabajoId, current);
+    }
+
+    return map;
+  }, [jornadas, trabajos]);
+
+  const estadoPorTrabajo = useMemo(() => {
+    const map = new Map<string, EstadoTrabajo>();
+    for (const trabajo of trabajos) {
+      map.set(trabajo.id, estadoTrabajoDesdeJornadas(jornadasByTrabajo.get(trabajo.id) ?? [], trabajo.estado_general));
+    }
+    return map;
+  }, [jornadasByTrabajo, trabajos]);
 
   const serviciosMes = servicios.filter((servicio) =>
     isWithinInterval(parseISO(servicio.fecha_programada), { start: monthStart, end: monthEnd }),
@@ -190,9 +232,15 @@ export default function Dashboard() {
   const serviciosPrev = servicios.filter((servicio) =>
     isWithinInterval(parseISO(servicio.fecha_programada), { start: prevMonthStart, end: prevMonthEnd }),
   );
-  const abiertos = servicios.filter((servicio) => servicio.estado !== "Completado");
-  const abiertasMes = serviciosMes.filter((servicio) => servicio.estado !== "Completado").length;
-  const abiertasPrev = serviciosPrev.filter((servicio) => servicio.estado !== "Completado").length;
+  const abiertos = trabajos.filter((trabajo) => estadoPorTrabajo.get(trabajo.id) !== "completado");
+  const serviciosMesIds = new Set(serviciosMes.map((servicio) => servicio.id));
+  const serviciosPrevIds = new Set(serviciosPrev.map((servicio) => servicio.id));
+  const abiertasMes = trabajos.filter(
+    (trabajo) => trabajo.legacy_servicio_id && serviciosMesIds.has(trabajo.legacy_servicio_id) && estadoPorTrabajo.get(trabajo.id) !== "completado",
+  ).length;
+  const abiertasPrev = trabajos.filter(
+    (trabajo) => trabajo.legacy_servicio_id && serviciosPrevIds.has(trabajo.legacy_servicio_id) && estadoPorTrabajo.get(trabajo.id) !== "completado",
+  ).length;
   const abiertosTrend = abiertasPrev > 0 ? Math.round(((abiertasMes - abiertasPrev) / abiertasPrev) * 100) : null;
 
   const jornadasMes = jornadas.filter((jornada) =>
@@ -214,17 +262,23 @@ export default function Dashboard() {
   const factTrend = factPrev > 0 ? Math.round(((factActual - factPrev) / factPrev) * 100) : null;
 
   const funnel = useMemo(() => {
-    const order = ["Pendiente", "Programado", "Iniciado", "Completado"];
+    const order: Array<{ key: EstadoTrabajo; label: string }> = [
+      { key: "pendiente", label: "Pendiente" },
+      { key: "programado", label: "Programado" },
+      { key: "iniciado", label: "Iniciado" },
+      { key: "completado", label: "Completado" },
+    ];
     const counts = new Map<string, number>();
-    for (const servicio of servicios) {
-      counts.set(servicio.estado, (counts.get(servicio.estado) ?? 0) + 1);
+    for (const trabajo of trabajos) {
+      const estado = estadoPorTrabajo.get(trabajo.id) ?? "pendiente";
+      counts.set(estado, (counts.get(estado) ?? 0) + 1);
     }
-    return order.map((estado) => ({
-      estado,
-      cantidad: counts.get(estado) ?? 0,
-      fill: statusColor[estado],
+    return order.map((item) => ({
+      estado: item.label,
+      cantidad: counts.get(item.key) ?? 0,
+      fill: statusColor[item.label],
     }));
-  }, [servicios]);
+  }, [estadoPorTrabajo, trabajos]);
 
   const sucursales = useMemo(() => {
     const factBySucursal = new Map<Sucursal, number>();
@@ -235,8 +289,8 @@ export default function Dashboard() {
     }
 
     return SUCURSALES.map((sucursal) => {
-      const serviciosSucursal = servicios.filter((servicio) => servicio.sucursal === sucursal);
-      const abiertosSucursal = serviciosSucursal.filter((servicio) => servicio.estado !== "Completado").length;
+      const trabajosSucursal = trabajos.filter((trabajo) => trabajo.sucursal === sucursal);
+      const abiertosSucursal = trabajosSucursal.filter((trabajo) => estadoPorTrabajo.get(trabajo.id) !== "completado").length;
       const jornadasSucursal = jornadasMes.filter((jornada) => servicioById.get(jornada.servicio_id)?.sucursal === sucursal);
       const cerradasSucursal = jornadasSucursal.filter((jornada) => jornada.estado === "Completado").length;
       const vencidasSucursal = fueraTolerancia.filter((jornada) => servicioById.get(jornada.servicio_id)?.sucursal === sucursal).length;
@@ -249,7 +303,7 @@ export default function Dashboard() {
         facturacion: factBySucursal.get(sucursal) ?? 0,
       };
     }).sort((a, b) => b.vencidos - a.vencidos || b.abiertos - a.abiertos || b.facturacion - a.facturacion);
-  }, [clienteById, facturacion, fueraTolerancia, jornadasMes, servicioById, servicios]);
+  }, [clienteById, estadoPorTrabajo, facturacion, fueraTolerancia, jornadasMes, servicioById, trabajos]);
 
   const alertas = useMemo(() => {
     const items: Array<{ id: string; titulo: string; detalle: string; tono: "bad" | "warn"; to: string }> = [];
