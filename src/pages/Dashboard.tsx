@@ -333,7 +333,7 @@ export default function Dashboard() {
       }
     }
 
-    let conServicioAnio = 0;
+    let conServicioAño = 0;
     let paraContactar = 0;
     let contactadosPeriodo = 0;
 
@@ -345,7 +345,7 @@ export default function Dashboard() {
       const conServicio = diasServicio != null && diasServicio <= 365;
       const sinContacto60 = diasSeguimiento == null || diasSeguimiento > 60;
 
-      if (conServicio) conServicioAnio++;
+      if (conServicio) conServicioAño++;
       if (!conServicio && sinContacto60) paraContactar++;
       if (ultSeguimiento && isWithinInterval(parseISO(ultSeguimiento), { start: rangeStart, end: rangeEnd })) contactadosPeriodo++;
     }
@@ -353,7 +353,7 @@ export default function Dashboard() {
     return {
       totalMaquinas: maquinasParque.length,
       totalClientes: clienteIds.size,
-      conServicioAnio,
+      conServicioAño,
       paraContactar,
       contactadosPeriodo,
     };
