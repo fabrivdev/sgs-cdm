@@ -507,9 +507,6 @@ export function ServicioDetalleDialog({
                         Continuar otro dia
                       </Button>
                     </div>
-                    <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
-                      Usa la misma carga de resultado que en Trabajos para guardar estado, horas, observacion y cuadrilla en una sola accion.
-                    </div>
                   </>
                 ) : activeIsPending ? (
                   <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
