@@ -393,6 +393,7 @@ export type Database = {
         Row: {
           activo: boolean
           actualizado_en: string
+          auth_user_id: string | null
           creado_en: string
           id: string
           nombre: string
@@ -401,6 +402,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           actualizado_en?: string
+          auth_user_id?: string | null
           creado_en?: string
           id: string
           nombre: string
@@ -409,12 +411,21 @@ export type Database = {
         Update: {
           activo?: boolean
           actualizado_en?: string
+          auth_user_id?: string | null
           creado_en?: string
           id?: string
           nombre?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_auth_user_id_fkey"
+            columns: ["auth_user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       programaciones: {
         Row: {

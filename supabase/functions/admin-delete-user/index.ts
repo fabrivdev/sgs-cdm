@@ -35,21 +35,40 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { user_id } = body ?? {};
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: "Falta user_id" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (user_id === user.id) {
-      return new Response(JSON.stringify({ error: "No podés eliminar tu propio usuario" }), {
+    const { profile_id } = body ?? {};
+    if (!profile_id) {
+      return new Response(JSON.stringify({ error: "Falta profile_id" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    await admin.from("user_roles").delete().eq("user_id", user_id);
-    await admin.from("profiles").delete().eq("id", user_id);
-    const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
+    const { data: profileData } = await admin
+      .from("profiles")
+      .select("id, auth_user_id, nombre")
+      .eq("id", profile_id)
+      .maybeSingle();
+
+    if (!profileData) {
+      return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!profileData.auth_user_id) {
+      return new Response(JSON.stringify({ error: "Ese técnico no tiene cuenta asociada" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (profileData.auth_user_id === user.id) {
+      return new Response(JSON.stringify({ error: "No podés eliminar tu propio acceso" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    await admin.from("profiles").update({ auth_user_id: null }).eq("id", profileData.id);
+
+    const { error: delErr } = await admin.auth.admin.deleteUser(profileData.auth_user_id);
     if (delErr && !/not.?found/i.test(delErr.message)) {
       return new Response(JSON.stringify({ error: delErr.message }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

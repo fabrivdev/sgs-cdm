@@ -1,10 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role, Sucursal } from "@/lib/constants";
 
 interface Profile {
   id: string;
+  auth_user_id: string | null;
   nombre: string;
   sucursal: Sucursal | null;
   activo: boolean;
@@ -57,10 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadingUserRef.current = uid;
 
     const promise = (async () => {
-      const [{ data: prof }, { data: rls }] = await Promise.all([
-        supabase.from("profiles").select("id, nombre, sucursal, activo").eq("id", uid).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", uid),
-      ]);
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id, auth_user_id, nombre, sucursal, activo")
+        .or(`auth_user_id.eq.${uid},id.eq.${uid}`)
+        .maybeSingle();
 
       const loadedProfile = prof as Profile | null;
       if (loadedProfile && !loadedProfile.activo) {
@@ -69,8 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const roleOwnerId = loadedProfile?.id ?? uid;
+      const { data: roleRows } = await supabase.from("user_roles").select("role").eq("user_id", roleOwnerId);
+
       setProfile(loadedProfile);
-      setRoles((rls ?? []).map((r: { role: Role }) => r.role));
+      setRoles((roleRows ?? []).map((row: { role: Role }) => row.role));
       loadedUserRef.current = uid;
     })();
 
@@ -91,11 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sess?.user) {
         setTimeout(() => loadUserData(sess.user.id), 0);
       } else {
-        setProfile(null);
-        setRoles([]);
-        loadedUserRef.current = null;
-        loadingUserRef.current = null;
-        loadingPromiseRef.current = null;
+        clearUserData();
       }
     });
 
@@ -117,13 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: prof } = await supabase
         .from("profiles")
         .select("activo")
-        .eq("id", data.user.id)
+        .or(`auth_user_id.eq.${data.user.id},id.eq.${data.user.id}`)
         .maybeSingle();
 
       if (prof && prof.activo === false) {
         await supabase.auth.signOut();
         clearUserData();
-        return { error: new Error("Usuario inactivo. Contactá al administrador.") };
+        return { error: new Error("Usuario inactivo. Contacta al administrador.") };
       }
     }
 

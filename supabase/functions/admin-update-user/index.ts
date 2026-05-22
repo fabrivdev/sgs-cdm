@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { user_id, email, password } = body ?? {};
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: "Falta user_id" }), {
+    const { profile_id, email, password } = body ?? {};
+    if (!profile_id) {
+      return new Response(JSON.stringify({ error: "Falta profile_id" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -52,18 +52,36 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: profileData } = await admin
+      .from("profiles")
+      .select("id, auth_user_id")
+      .eq("id", profile_id)
+      .maybeSingle();
+
+    if (!profileData) {
+      return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!profileData.auth_user_id) {
+      return new Response(JSON.stringify({ error: "Ese técnico todavía no tiene una cuenta asociada" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const attrs: { email?: string; password?: string } = {};
-    if (email) attrs.email = String(email);
+    if (email) attrs.email = String(email).trim().toLowerCase();
     if (password) attrs.password = String(password);
 
-    const { error: updErr } = await admin.auth.admin.updateUserById(user_id, attrs);
+    const { error: updErr } = await admin.auth.admin.updateUserById(profileData.auth_user_id, attrs);
     if (updErr) {
       return new Response(JSON.stringify({ error: updErr.message }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, auth_user_id: profileData.auth_user_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
