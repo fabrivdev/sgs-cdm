@@ -153,7 +153,7 @@ const antiguedadColor = (a: number | null) => {
 
 export interface ParqueMetricas {
   totalMaquinas: number;
-  pctConServicioUltimoAnio: number;
+  pctConServicioUltimoAño: number;
   pctContactadosEsteMes: number;
   sinContacto60d: number;
 }
@@ -418,10 +418,10 @@ export function ParqueTab({
       const sucursales = Array.from(
         new Set(mqs.map((m) => m.sucursal).filter((s): s is Sucursal => !!s)),
       ).sort();
-      const anios = mqs.map((m) => m.anio).filter((a): a is number => !!a);
+      const años = mqs.map((m) => m.anio).filter((a): a is number => !!a);
       const antiguedadProm =
-        anios.length > 0
-          ? Math.round((anios.reduce((s, a) => s + (hoy.getFullYear() - a), 0) / anios.length) * 10) / 10
+        años.length > 0
+          ? Math.round((años.reduce((s, a) => s + (hoy.getFullYear() - a), 0) / años.length) * 10) / 10
           : null;
 
       const agg = factAgregados.get(cli.id);
@@ -488,15 +488,15 @@ export function ParqueTab({
       totalMaquinas += r.cantTotal;
       if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
       if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) contactadosRango++;
-      const sinServicioUltimoAnio = r.diasUltServicio == null || r.diasUltServicio > 365;
+      const sinServicioUltimoAño = r.diasUltServicio == null || r.diasUltServicio > 365;
       const sinSeg60 =
         !r.ultSeg ||
         (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
-      if (sinServicioUltimoAnio && sinSeg60) sinContacto++;
+      if (sinServicioUltimoAño && sinSeg60) sinContacto++;
     }
     onMetricasChange({
       totalMaquinas,
-      pctConServicioUltimoAnio:
+      pctConServicioUltimoAño:
         totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0,
       pctContactadosEsteMes:
         totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,

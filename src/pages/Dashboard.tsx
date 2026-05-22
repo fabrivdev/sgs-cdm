@@ -333,7 +333,7 @@ export default function Dashboard() {
       }
     }
 
-    let conServicioAnio = 0;
+    let conServicioAño = 0;
     let paraContactar = 0;
     let contactadosPeriodo = 0;
 
@@ -345,7 +345,7 @@ export default function Dashboard() {
       const conServicio = diasServicio != null && diasServicio <= 365;
       const sinContacto60 = diasSeguimiento == null || diasSeguimiento > 60;
 
-      if (conServicio) conServicioAnio++;
+      if (conServicio) conServicioAño++;
       if (!conServicio && sinContacto60) paraContactar++;
       if (ultSeguimiento && isWithinInterval(parseISO(ultSeguimiento), { start: rangeStart, end: rangeEnd })) contactadosPeriodo++;
     }
@@ -353,15 +353,15 @@ export default function Dashboard() {
     return {
       totalMaquinas: maquinasParque.length,
       totalClientes: clienteIds.size,
-      conServicioAnio,
+      conServicioAño,
       paraContactar,
       contactadosPeriodo,
     };
   }, [maquinasParque, rangeEnd, rangeStart, seguimientos, ultimasFacturas]);
 
   const totalClientesParque = parqueMetricas.totalClientes;
-  const pctServicioAnio =
-    totalClientesParque > 0 ? Math.round((parqueMetricas.conServicioAnio / totalClientesParque) * 100) : 0;
+  const pctServicioAño =
+    totalClientesParque > 0 ? Math.round((parqueMetricas.conServicioAño / totalClientesParque) * 100) : 0;
 
   const facturacionFiltrada = facturacion.filter((row) => {
     if (fSucursal === "all") return true;
@@ -435,7 +435,7 @@ export default function Dashboard() {
       items.push({
         id: "contacto",
         titulo: `${parqueMetricas.paraContactar} clientes para contactar`,
-        detalle: "Sin servicio ultimo ano ni contacto en 60 dias",
+        detalle: "Sin servicio último año ni contacto en 60 días",
         tono: "warn",
         to: "/parque-clientes",
       });
@@ -544,9 +544,9 @@ export default function Dashboard() {
         <KpiCard
           icon={Wrench}
           label="Cobertura parque"
-          value={`${pctServicioAnio}%`}
-          detail={`${parqueMetricas.totalMaquinas} maquinas activas`}
-          tone={pctServicioAnio >= 70 ? "good" : pctServicioAnio >= 50 ? "warn" : "bad"}
+          value={`${pctServicioAño}%`}
+          detail={`${parqueMetricas.totalMaquinas} máquinas activas`}
+          tone={pctServicioAño >= 70 ? "good" : pctServicioAño >= 50 ? "warn" : "bad"}
           loading={loading}
         />
         <KpiCard
@@ -665,10 +665,10 @@ export default function Dashboard() {
         <InsightCard
           icon={Wrench}
           title="Oportunidad parque"
-          value={`${totalClientesParque - parqueMetricas.conServicioAnio}`}
-          label="clientes sin servicio ultimo anio"
-          detail={`${pctServicioAnio}% de cobertura actual`}
-          tone={pctServicioAnio >= 70 ? "good" : "warn"}
+          value={`${totalClientesParque - parqueMetricas.conServicioAño}`}
+          label="clientes sin servicio último año"
+          detail={`${pctServicioAño}% de cobertura actual`}
+          tone={pctServicioAño >= 70 ? "good" : "warn"}
           onClick={() => navigate("/parque-clientes")}
         />
       </div>
