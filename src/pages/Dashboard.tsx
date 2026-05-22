@@ -2,57 +2,36 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertTriangle,
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+  PhoneCall,
+  TrendingDown,
+  TrendingUp,
+  UserCheck,
+  Wrench,
+} from "lucide-react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  CartesianGrid,
-  LabelList,
-} from "recharts";
-import {
-  ESTADOS,
-  MARCAS,
-  SUCURSALES,
-  type Estado,
-  type Marca,
-  type Sucursal,
-} from "@/lib/constants";
-import {
-  parseISO,
-  isWithinInterval,
-  startOfMonth,
+  addDays,
+  differenceInCalendarDays,
   endOfMonth,
-  subMonths,
+  endOfWeek,
   format,
+  isWithinInterval,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
 } from "date-fns";
-import { AlertTriangle, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { type Estado, type Marca, type Sucursal } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 interface Servicio {
   id: string;
@@ -63,6 +42,18 @@ interface Servicio {
   marca: Marca;
   estado: Estado;
   horas_trabajadas: number | null;
+  cliente_id: string | null;
+  trabajo_descripcion: string;
+}
+
+interface Jornada {
+  id: string;
+  servicio_id: string;
+  fecha: string;
+  estado: "Pendiente" | "Completado" | "Cancelada";
+  horas_trabajadas: number | null;
+  tecnico_responsable_id: string | null;
+  auxiliares: string[];
 }
 
 interface Profile {
@@ -72,38 +63,37 @@ interface Profile {
   activo: boolean;
 }
 
-interface JornadaHoy {
-  servicio_id: string;
-  tecnico_responsable_id: string | null;
-  auxiliares: string[];
-  sucursal: Sucursal;
-}
-
-interface UltimoSeguimiento {
+interface Cliente {
   id: string;
-  clienteId: string | null;
-  clienteNombre: string;
-  fecha: Date | null;
-  estado: string | null;
-  observaciones: string | null;
-  usuarioNombre: string | null;
+  nombre: string;
+  sucursal: Sucursal | null;
 }
 
-const COLORS_ESTADO: Record<Estado, string> = {
-  Pendiente: "#EF9F27",
-  Completado: "#639922",
-  Cancelada: "#9CA3AF",
-};
+interface ParqueKpi {
+  total_maquinas: number;
+  total_clientes: number;
+  con_servicio_anio: number;
+  contactados_mes: number;
+  sin_contacto_60d: number;
+}
 
-const COLORS_MARCA: Record<Marca, string> = {
-  CLAAS: "hsl(var(--marca-claas))",
-  HORSCH: "hsl(var(--marca-horsch))",
-  OTROS: "hsl(var(--muted-foreground))",
-};
-
-const shortName = (n: string) => n.trim().split(/\s+/).slice(0, 2).join(" ");
+interface FactResumen {
+  cliente_id: string;
+  fact_actual: number | string;
+  fact_prev: number | string;
+}
 
 const PAGE = 1000;
+const today = new Date();
+const todayStr = format(today, "yyyy-MM-dd");
+
+const money = (value: number) =>
+  new Intl.NumberFormat("es-PY", {
+    maximumFractionDigits: 0,
+    notation: value >= 1_000_000_000 ? "compact" : "standard",
+  }).format(value);
+
+const shortName = (name: string) => name.trim().split(/\s+/).slice(0, 2).join(" ");
 
 async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
   let from = 0;
@@ -111,12 +101,9 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 
   while (true) {
     const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
-
     if (error) throw error;
     if (!data || data.length === 0) break;
-
     all.push(...(data as T[]));
-
     if (data.length < PAGE) break;
     from += PAGE;
   }
@@ -126,885 +113,563 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-
   const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
-  const [ultimosSeguimientos, setUltimosSeguimientos] = useState<UltimoSeguimiento[]>([]);
-  const [from, setFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
-  const [to, setTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
-  const [showAllTecnicos, setShowAllTecnicos] = useState(false);
-  const [vista, setVista] = useState<"resumen" | "tecnicos">("resumen");
-  const [jornadasHoy, setJornadasHoy] = useState<JornadaHoy[]>([]);
-  const hoyStr = format(new Date(), "yyyy-MM-dd");
+  const [parqueKpi, setParqueKpi] = useState<ParqueKpi | null>(null);
+  const [facturacion, setFacturacion] = useState<FactResumen[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), []);
+  const weekEnd = useMemo(() => endOfWeek(today, { weekStartsOn: 1 }), []);
+  const monthStart = useMemo(() => startOfMonth(today), []);
+  const monthEnd = useMemo(() => endOfMonth(today), []);
+  const prevMonthStart = useMemo(() => startOfMonth(subMonths(today, 1)), []);
+  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(today, 1)), []);
 
   useEffect(() => {
-    Promise.all([
-      supabase
-        .from("servicios")
-        .select(
-          "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas",
-        ),
-      supabase.from("profiles").select("id, nombre, sucursal, activo"),
-      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "cabecilla"]),
-    ]).then(([s, p, r]) => {
-      setServicios((s.data ?? []) as Servicio[]);
-      setProfiles((p.data ?? []) as Profile[]);
-      setAdminIds(new Set((r.data ?? []).map((x: { user_id: string }) => x.user_id)));
-    });
-  }, []);
+    let alive = true;
 
-  // Jornadas iniciadas hoy (para "Estado de técnicos hoy")
-  useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from("servicio_jornadas")
-        .select("servicio_id, estado, fecha, servicios!inner(tecnico_responsable_id, auxiliares, sucursal)")
-        .eq("fecha", hoyStr)
-        .eq("estado", "Iniciado");
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      const items: JornadaHoy[] = ((data ?? []) as any[]).map((j) => ({
-        servicio_id: j.servicio_id,
-        tecnico_responsable_id: j.servicios?.tecnico_responsable_id ?? null,
-        auxiliares: j.servicios?.auxiliares ?? [],
-        sucursal: j.servicios?.sucursal,
-      }));
-
-      setJornadasHoy(items);
-    })();
-  }, [hoyStr]);
-
-  // Últimos seguimientos:
-  // Reemplaza la tarjeta de "clientes a contactar" por los últimos mensajes registrados.
-  // Se muestra 1 fila por seguimiento, ordenado del más reciente al más antiguo.
-  useEffect(() => {
-    (async () => {
+      setLoading(true);
       try {
-        const [segRes, clientesAll, profilesAll] = await Promise.all([
-          supabase
-            .from("seguimiento_comercial")
-            .select("*")
-            .order("fecha", { ascending: false })
-            .limit(10),
-          cargarTodo<{ id: string; nombre: string }>(
-            supabase.from("clientes").select("id, nombre"),
-          ),
-          cargarTodo<{ id: string; nombre: string }>(
-            supabase.from("profiles").select("id, nombre"),
-          ),
-        ]);
+        const [serviciosRows, jornadasRows, profilesRows, clientesRows, rolesRes, parqueRes, factRes] =
+          await Promise.all([
+            cargarTodo<Servicio>(
+              supabase
+                .from("servicios")
+                .select(
+                  "id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, estado, horas_trabajadas, cliente_id, trabajo_descripcion",
+                ),
+            ),
+            cargarTodo<Jornada>(
+              supabase
+                .from("servicio_jornadas")
+                .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
+                .order("fecha", { ascending: true }),
+            ),
+            cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
+            cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
+            supabase.from("user_roles").select("user_id, role").in("role", ["admin", "cabecilla"]),
+            supabase.rpc("parque_kpis"),
+            supabase.rpc("parque_resumen_facturacion", {
+              p_desde: format(monthStart, "yyyy-MM-dd"),
+              p_hasta: format(monthEnd, "yyyy-MM-dd"),
+              p_prev_desde: format(prevMonthStart, "yyyy-MM-dd"),
+              p_prev_hasta: format(prevMonthEnd, "yyyy-MM-dd"),
+            }),
+          ]);
 
-        if (segRes.error) throw segRes.error;
+        if (!alive) return;
+        setServicios(serviciosRows);
+        setJornadas(jornadasRows);
+        setProfiles(profilesRows);
+        setClientes(clientesRows);
+        setAdminIds(new Set((rolesRes.data ?? []).map((row: { user_id: string }) => row.user_id)));
+        setParqueKpi(((parqueRes.data ?? [])[0] as ParqueKpi | undefined) ?? null);
+        setFacturacion((factRes.data ?? []) as FactResumen[]);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
 
-        const clienteNombre = new Map<string, string>(
-          clientesAll.map((c) => [c.id, c.nombre]),
-        );
+    return () => {
+      alive = false;
+    };
+  }, [monthEnd, monthStart, prevMonthEnd, prevMonthStart]);
 
-        const usuarioNombre = new Map<string, string>(
-          profilesAll.map((p) => [p.id, p.nombre]),
-        );
+  const servicioById = useMemo(() => new Map(servicios.map((s) => [s.id, s])), [servicios]);
+  const clienteById = useMemo(() => new Map(clientes.map((c) => [c.id, c])), [clientes]);
+  const profileById = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
-        const lista: UltimoSeguimiento[] = ((segRes.data ?? []) as any[]).map((s) => {
-          const clienteId = s.cliente_id ?? null;
-          const userId = s.usuario_id ?? s.creado_por ?? s.user_id ?? null;
+  const tecnicos = useMemo(
+    () => profiles.filter((profile) => profile.activo && !adminIds.has(profile.id)),
+    [profiles, adminIds],
+  );
 
-          const nombreDesdeRegistro =
-            s.cliente_nombre ??
-            s.nombre_cliente ??
-            s.entidad_nombre ??
-            s.cliente ??
-            null;
+  const jornadasSemana = useMemo(
+    () =>
+      jornadas.filter((jornada) =>
+        isWithinInterval(parseISO(jornada.fecha), { start: weekStart, end: weekEnd }),
+      ),
+    [jornadas, weekEnd, weekStart],
+  );
 
-          return {
-            id: s.id,
-            clienteId,
-            clienteNombre: clienteId
-              ? clienteNombre.get(clienteId) ?? nombreDesdeRegistro ?? "Cliente no encontrado"
-              : nombreDesdeRegistro ?? "Sin cliente",
-            fecha: s.fecha ? new Date(s.fecha) : null,
-            estado: s.estado ?? s.tipo ?? null,
-            observaciones: s.observaciones ?? s.comentario ?? s.notas ?? null,
-            usuarioNombre: userId ? usuarioNombre.get(userId) ?? null : null,
-          };
+  const jornadasMes = useMemo(
+    () =>
+      jornadas.filter((jornada) =>
+        isWithinInterval(parseISO(jornada.fecha), { start: monthStart, end: monthEnd }),
+      ),
+    [jornadas, monthEnd, monthStart],
+  );
+
+  const trabajosAbiertos = servicios.filter((servicio) => servicio.estado !== "Completado");
+  const jornadasPendientes = jornadas.filter((jornada) => jornada.estado === "Pendiente");
+  const vencidasCierre = jornadasPendientes.filter((jornada) => jornada.fecha < todayStr);
+  const vencidasCriticas = vencidasCierre.filter(
+    (jornada) => differenceInCalendarDays(today, parseISO(jornada.fecha)) > 7,
+  );
+  const realizadasMes = jornadasMes.filter((jornada) => jornada.estado === "Completado").length;
+  const cierreMes = jornadasMes.length ? Math.round((realizadasMes / jornadasMes.length) * 100) : 0;
+  const programadasSemana = jornadasSemana.filter((jornada) => jornada.estado === "Pendiente").length;
+  const realizadasSemana = jornadasSemana.filter((jornada) => jornada.estado === "Completado").length;
+  const horasMes = jornadasMes.reduce((acc, jornada) => acc + (Number(jornada.horas_trabajadas) || 0), 0);
+
+  const factActual = facturacion.reduce((acc, row) => acc + Number(row.fact_actual || 0), 0);
+  const factPrev = facturacion.reduce((acc, row) => acc + Number(row.fact_prev || 0), 0);
+  const factVar = factPrev > 0 ? Math.round(((factActual - factPrev) / factPrev) * 100) : null;
+
+  const totalClientesParque = parqueKpi?.total_clientes ?? 0;
+  const pctServicioAnio =
+    totalClientesParque > 0 ? Math.round(((parqueKpi?.con_servicio_anio ?? 0) / totalClientesParque) * 100) : 0;
+  const pctContactadosMes =
+    totalClientesParque > 0 ? Math.round(((parqueKpi?.contactados_mes ?? 0) / totalClientesParque) * 100) : 0;
+
+  const agendaTecnicos = useMemo(() => {
+    return tecnicos
+      .map((tecnico) => {
+        const semana = jornadasSemana.filter((jornada) => {
+          const servicio = servicioById.get(jornada.servicio_id);
+          const responsable = jornada.tecnico_responsable_id ?? servicio?.tecnico_responsable_id;
+          const auxiliares = jornada.auxiliares?.length ? jornada.auxiliares : servicio?.auxiliares ?? [];
+          return responsable === tecnico.id || auxiliares.includes(tecnico.id);
         });
 
-        setUltimosSeguimientos(lista);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, []);
-
-  const profById = useMemo(
-    () => Object.fromEntries(profiles.map((p) => [p.id, p.nombre])),
-    [profiles],
-  );
-
-  const filtered = useMemo(
-    () =>
-      servicios.filter((s) => {
-        const d = parseISO(s.fecha_programada);
-        return isWithinInterval(d, { start: parseISO(from), end: parseISO(to) });
-      }),
-    [servicios, from, to],
-  );
-
-  const prevPeriod = useMemo(() => {
-    const fromDate = parseISO(from);
-    const toDate = parseISO(to);
-    const prevFrom = subMonths(fromDate, 1);
-    const prevTo = subMonths(toDate, 1);
-
-    return servicios.filter((s) => {
-      const d = parseISO(s.fecha_programada);
-      return isWithinInterval(d, { start: prevFrom, end: prevTo });
-    });
-  }, [servicios, from, to]);
-
-  const total = filtered.length;
-  const completados = filtered.filter((s) => s.estado === "Completado").length;
-  const pendientes = filtered.filter((s) => s.estado === "Pendiente").length;
-  const totalHoras = filtered.reduce((acc, s) => acc + (s.horas_trabajadas ?? 0), 0);
-
-  const totalPrev = prevPeriod.length;
-  const trendTotal = total - totalPrev;
-
-  const pctCompletados = total ? Math.round((completados / total) * 100) : 0;
-  const pctPendientes = total ? Math.round((pendientes / total) * 100) : 0;
-
-  const tecnicosActivosIds = useMemo(() => {
-    const set = new Set<string>();
-
-    for (const s of filtered) {
-      if (s.tecnico_responsable_id && !adminIds.has(s.tecnico_responsable_id)) {
-        set.add(s.tecnico_responsable_id);
-      }
-
-      for (const a of s.auxiliares ?? []) {
-        if (a && !adminIds.has(a)) set.add(a);
-      }
-    }
-
-    return set;
-  }, [filtered, adminIds]);
-
-  const horasPorTecnicoActivo = tecnicosActivosIds.size
-    ? totalHoras / tecnicosActivosIds.size
-    : 0;
-
-  const porSucursal = useMemo(
-    () =>
-      SUCURSALES.map((suc) => {
-        const items = filtered.filter((x) => x.sucursal === suc);
+        const pendientes = semana.filter((jornada) => jornada.estado === "Pendiente");
+        const realizadas = semana.filter((jornada) => jornada.estado === "Completado");
+        const proxima =
+          pendientes.find((jornada) => jornada.fecha >= todayStr) ??
+          pendientes[0] ??
+          semana.find((jornada) => jornada.fecha >= todayStr) ??
+          semana[0] ??
+          null;
+        const servicio = proxima ? servicioById.get(proxima.servicio_id) : null;
+        const cliente = servicio?.cliente_id ? clienteById.get(servicio.cliente_id)?.nombre : null;
+        const vencidas = pendientes.filter((jornada) => jornada.fecha < todayStr).length;
 
         return {
-          name: suc,
-          Pendiente: items.filter((x) => x.estado === "Pendiente").length,
-          Completado: items.filter((x) => x.estado === "Completado").length,
-          Cancelada: items.filter((x) => x.estado === "Cancelada").length,
-          total: items.length,
-        };
-      }),
-    [filtered],
-  );
-
-  const porTecnico = useMemo(() => {
-    const base = new Map<string, { id: string; name: string; total: number; horas: number }>();
-
-    for (const p of profiles) {
-      if (adminIds.has(p.id)) continue;
-      base.set(p.id, { id: p.id, name: shortName(p.nombre), total: 0, horas: 0 });
-    }
-
-    for (const s of filtered) {
-      const participantes = new Set<string>();
-
-      if (s.tecnico_responsable_id) participantes.add(s.tecnico_responsable_id);
-      for (const aux of s.auxiliares ?? []) if (aux) participantes.add(aux);
-
-      for (const id of participantes) {
-        if (adminIds.has(id)) continue;
-
-        const actual =
-          base.get(id) ??
-          { id, name: shortName(profById[id] ?? "Sin nombre"), total: 0, horas: 0 };
-
-        actual.total += 1;
-        actual.horas += s.horas_trabajadas ?? 0;
-
-        base.set(id, actual);
-      }
-    }
-
-    return [...base.values()]
-      .filter((t) => t.total > 0)
-      .sort((a, b) => b.total - a.total || b.horas - a.horas);
-  }, [profiles, adminIds, filtered, profById]);
-
-  const topTecnicos = porTecnico.slice(0, 5);
-  const maxHoras = Math.max(1, ...porTecnico.map((t) => t.horas));
-  const tecnicosSinHoras = porTecnico.filter((t) => t.horas === 0);
-
-  const porMarca = MARCAS.map((m) => ({
-    name: m,
-    value: filtered.filter((x) => x.marca === m).length,
-  }));
-
-  const porEstado = ESTADOS.map((e) => ({
-    name: e,
-    value: filtered.filter((x) => x.estado === e).length,
-  }));
-
-  const showAlert = total > 0 && pctPendientes > 50;
-
-  const irAPendientes = () => {
-    // En App.tsx el Planificador está en "/", no en "/planificador".
-    navigate("/");
-  };
-
-  // Estado de técnicos hoy
-  const tecnicosEstado = useMemo(() => {
-    const tecnicos = profiles.filter((p) => !adminIds.has(p.id) && p.activo);
-
-    // Map técnico -> primer servicio activo hoy
-    const ocupados = new Map<string, JornadaHoy>();
-    for (const j of jornadasHoy) {
-      const ids = new Set<string>();
-      if (j.tecnico_responsable_id) ids.add(j.tecnico_responsable_id);
-      for (const a of j.auxiliares ?? []) if (a) ids.add(a);
-      for (const id of ids) {
-        if (!ocupados.has(id)) ocupados.set(id, j);
-      }
-    }
-
-    // Servicios del período por técnico (para "X servicios este mes")
-    const conteoPeriodo = new Map<string, number>();
-    for (const s of filtered) {
-      const ids = new Set<string>();
-      if (s.tecnico_responsable_id) ids.add(s.tecnico_responsable_id);
-      for (const a of s.auxiliares ?? []) if (a) ids.add(a);
-      for (const id of ids) {
-        conteoPeriodo.set(id, (conteoPeriodo.get(id) ?? 0) + 1);
-      }
-    }
-
-    return tecnicos
-      .map((p) => {
-        const activo = ocupados.get(p.id);
-        return {
-          id: p.id,
-          nombre: p.nombre,
-          sucursalProfile: p.sucursal,
-          disponible: !activo,
-          sucursalActiva: activo?.sucursal ?? null,
-          serviciosPeriodo: conteoPeriodo.get(p.id) ?? 0,
+          id: tecnico.id,
+          nombre: tecnico.nombre,
+          sucursal: tecnico.sucursal,
+          total: semana.length,
+          pendientes: pendientes.length,
+          realizadas: realizadas.length,
+          vencidas,
+          proxima,
+          cliente,
+          descripcion: servicio?.trabajo_descripcion ?? null,
         };
       })
-      .sort((a, b) => {
-        if (a.disponible !== b.disponible) return a.disponible ? 1 : -1;
-        return a.nombre.localeCompare(b.nombre);
-      });
-  }, [profiles, adminIds, jornadasHoy, filtered]);
+      .filter((tecnico) => tecnico.total > 0 || tecnico.pendientes > 0)
+      .sort((a, b) => b.vencidas - a.vencidas || b.pendientes - a.pendientes || a.nombre.localeCompare(b.nombre))
+      .slice(0, 8);
+  }, [clienteById, jornadasSemana, servicioById, tecnicos]);
 
-  const cantDisponibles = tecnicosEstado.filter((t) => t.disponible).length;
-  const cantNoDisponibles = tecnicosEstado.length - cantDisponibles;
+  const sucursales = useMemo(() => {
+    const map = new Map<Sucursal, { sucursal: Sucursal; abiertas: number; semana: number; vencidas: number }>();
+    for (const servicio of servicios) {
+      const current = map.get(servicio.sucursal) ?? { sucursal: servicio.sucursal, abiertas: 0, semana: 0, vencidas: 0 };
+      if (servicio.estado !== "Completado") current.abiertas += 1;
+      map.set(servicio.sucursal, current);
+    }
+
+    for (const jornada of jornadasSemana) {
+      const servicio = servicioById.get(jornada.servicio_id);
+      if (!servicio) continue;
+      const current = map.get(servicio.sucursal) ?? { sucursal: servicio.sucursal, abiertas: 0, semana: 0, vencidas: 0 };
+      current.semana += 1;
+      if (jornada.estado === "Pendiente" && jornada.fecha < todayStr) current.vencidas += 1;
+      map.set(servicio.sucursal, current);
+    }
+
+    return [...map.values()].sort((a, b) => b.vencidas - a.vencidas || b.abiertas - a.abiertas).slice(0, 6);
+  }, [jornadasSemana, servicioById, servicios]);
+
+  const riesgos = useMemo(() => {
+    const items = vencidasCriticas
+      .slice()
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .slice(0, 5)
+      .map((jornada) => {
+        const servicio = servicioById.get(jornada.servicio_id);
+        const cliente = servicio?.cliente_id ? clienteById.get(servicio.cliente_id)?.nombre : null;
+        const responsableId = jornada.tecnico_responsable_id ?? servicio?.tecnico_responsable_id ?? null;
+        return {
+          id: jornada.id,
+          fecha: jornada.fecha,
+          dias: differenceInCalendarDays(today, parseISO(jornada.fecha)),
+          cliente: cliente ?? "Sin cliente",
+          responsable: responsableId ? profileById.get(responsableId)?.nombre ?? "Sin asignar" : "Sin asignar",
+          descripcion: servicio?.trabajo_descripcion ?? "Jornada pendiente de cierre",
+        };
+      });
+
+    return items;
+  }, [clienteById, profileById, servicioById, vencidasCriticas]);
 
   return (
-    <div className="container max-w-[1400px] px-3 py-3 sm:px-4 sm:py-4 space-y-3 sm:space-y-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold sm:text-2xl">Dashboard</h1>
-        <p className="text-xs text-muted-foreground">
-          {vista === "resumen" ? "Resumen del período seleccionado" : "Estado de técnicos hoy"}
-        </p>
+    <div className="container max-w-[1440px] space-y-4 px-3 py-3 sm:px-4 sm:py-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-xl font-bold sm:text-2xl">Dashboard ejecutivo</h1>
+          <p className="text-xs text-muted-foreground">
+            Semana {format(weekStart, "dd/MM")} al {format(weekEnd, "dd/MM")} · Operación, equipo y parque.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate("/")}>
+            <CalendarDays className="mr-1.5 h-4 w-4" />
+            Planificador
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/trabajos")}>
+            <ClipboardList className="mr-1.5 h-4 w-4" />
+            Trabajos
+          </Button>
+          <Button size="sm" onClick={() => navigate("/parque-clientes")}>
+            <Wrench className="mr-1.5 h-4 w-4" />
+            Parque
+          </Button>
+        </div>
       </div>
 
-      <Tabs value={vista} onValueChange={(v) => setVista(v as "resumen" | "tecnicos")}>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <TabsList className="grid w-full grid-cols-2 sm:w-auto">
-            <TabsTrigger value="resumen">Resumen</TabsTrigger>
-            <TabsTrigger value="tecnicos">Técnicos</TabsTrigger>
-          </TabsList>
-
-          {vista === "resumen" && (
-            <FiltersBar className="w-full sm:w-auto">
-              <FilterDate label="Desde" value={from} onChange={setFrom} />
-              <FilterDate label="Hasta" value={to} onChange={setTo} />
-            </FiltersBar>
-          )}
-        </div>
-
-
-        <TabsContent value="resumen" className="space-y-4 mt-4">
-
-      {/* Banner alerta */}
-      {showAlert && (
-        <div
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border px-4 py-3"
-          style={{
-            backgroundColor: "rgba(239, 159, 39, 0.12)",
-            borderColor: "#EF9F27",
-          }}
-        >
-          <div className="flex items-start gap-2 text-sm">
-            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#EF9F27" }} />
+      {vencidasCriticas.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <span>
-              <span className="font-semibold">{pctPendientes}%</span> de servicios están pendientes
-              este período — <span className="font-semibold">{pendientes}</span> de{" "}
-              <span className="font-semibold">{total}</span> sin resolver
+              <span className="font-semibold">{vencidasCriticas.length}</span> jornada
+              {vencidasCriticas.length === 1 ? "" : "s"} superan los 7 dias sin cierre.
             </span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={irAPendientes}
-            className="gap-1 self-start sm:self-auto border-[#EF9F27] hover:bg-[#EF9F27]/10"
-          >
-            Ver pendientes <ArrowRight className="h-3.5 w-3.5" />
+          <Button size="sm" variant="outline" onClick={() => navigate("/")}>
+            Revisar pendientes <ArrowRight className="ml-1 h-3.5 w-3.5" />
           </Button>
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
-        <KPI
-          label="Total servicios"
-          value={total}
-          context={
-            totalPrev > 0 || trendTotal !== 0 ? (
-              <TrendBadge value={trendTotal} suffix=" vs mes anterior" />
-            ) : (
-              <span className="text-[11px] text-muted-foreground">sin datos previos</span>
-            )
-          }
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ExecutiveKpi
+          icon={ClipboardList}
+          label="Trabajos abiertos"
+          value={trabajosAbiertos.length}
+          detail={`${programadasSemana} jornadas pendientes esta semana`}
+          loading={loading}
         />
-        <KPI
-          label="Completados"
-          value={`${completados}`}
-          accent="completado"
-          context={
-            <Badge
-              variant="outline"
-              className="text-[10px] border-estado-completado text-estado-completado bg-estado-completado/10"
-            >
-              {pctCompletados}% de cierre
-            </Badge>
-          }
+        <ExecutiveKpi
+          icon={CheckCircle2}
+          label="Cierre del mes"
+          value={`${cierreMes}%`}
+          detail={`${realizadasMes}/${jornadasMes.length} jornadas cerradas · ${horasMes.toFixed(1)} hs`}
+          tone={cierreMes >= 70 ? "good" : cierreMes >= 40 ? "warn" : "bad"}
+          loading={loading}
         />
-        <KPI
-          label="Pendientes"
-          value={pendientes}
-          accent="pendiente"
-          context={
-            pctPendientes > 50 ? (
-              <Badge variant="destructive" className="text-[10px]">
-                {pctPendientes}% del total
-              </Badge>
-            ) : (
-              <span className="text-[11px] text-muted-foreground">{pctPendientes}% del total</span>
-            )
-          }
+        <ExecutiveKpi
+          icon={Clock3}
+          label="Pendientes de cierre"
+          value={vencidasCierre.length}
+          detail={`${vencidasCriticas.length} fuera de tolerancia +7d`}
+          tone={vencidasCriticas.length > 0 ? "bad" : vencidasCierre.length > 0 ? "warn" : "good"}
+          loading={loading}
         />
-        <KPI
-          label="Horas trabajadas"
-          value={totalHoras.toFixed(1)}
-          context={
-            <span className="text-[11px] text-muted-foreground">
-              ~{horasPorTecnicoActivo.toFixed(1)}h por técnico activo
-            </span>
-          }
+        <ExecutiveKpi
+          icon={PhoneCall}
+          label="Clientes sin contacto +60d"
+          value={parqueKpi?.sin_contacto_60d ?? 0}
+          detail={`${pctContactadosMes}% contactados este mes`}
+          tone={(parqueKpi?.sin_contacto_60d ?? 0) > 0 ? "warn" : "good"}
+          loading={loading}
         />
       </div>
 
-      {/* Charts grid */}
-      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
-        {/* Sucursal apilado */}
-        <Card className="overflow-hidden p-3 sm:p-4">
-          <h3 className="text-sm font-semibold mb-3">Servicios por sucursal</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              data={porSucursal}
-              layout="vertical"
-              margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-              <XAxis type="number" fontSize={11} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" fontSize={11} width={80} />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  fontSize: 12,
-                }}
-                cursor={{ fill: "hsl(var(--accent))", opacity: 0.3 }}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Pendiente" stackId="a" fill={COLORS_ESTADO.Pendiente} />
-              <Bar dataKey="Cancelada" stackId="a" fill={COLORS_ESTADO.Cancelada} />
-              <Bar dataKey="Completado" stackId="a" fill={COLORS_ESTADO.Completado}>
-                <LabelList
-                  dataKey="total"
-                  position="right"
-                  fontSize={11}
-                  fill="hsl(var(--foreground))"
-                  formatter={(v: number) => (v > 0 ? v : "")}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* Estado + Marca unificada */}
-        <Card className="overflow-hidden p-3 sm:p-4">
-          <h3 className="text-sm font-semibold mb-3">Distribución por estado y marca</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
+        <Card className="p-3 sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={porEstado}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={45}
-                    outerRadius={75}
-                    label={({ value, percent }) =>
-                      value > 0 ? `${Math.round((percent ?? 0) * 100)}%` : ""
-                    }
-                    labelLine={false}
-                  >
-                    {porEstado.map((e) => (
-                      <Cell key={e.name} fill={COLORS_ESTADO[e.name as Estado]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
-                {porEstado.map((e) => (
-                  <div key={e.name} className="flex items-center gap-1.5 text-[11px]">
-                    <span
-                      className="h-2.5 w-2.5 rounded-sm"
-                      style={{ background: COLORS_ESTADO[e.name as Estado] }}
-                    />
-                    <span className="text-muted-foreground">{e.name}</span>
-                    <span className="font-semibold tabular-nums">{e.value}</span>
-                  </div>
-                ))}
-              </div>
+              <h2 className="text-sm font-semibold">Que hara cada tecnico esta semana</h2>
+              <p className="text-xs text-muted-foreground">
+                Prioriza pendientes, vencidas y siguiente visita visible.
+              </p>
             </div>
-
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                Por marca
-              </div>
-              {porMarca.map((m) => {
-                const pct = total ? Math.round((m.value / total) * 100) : 0;
-                return (
-                  <div key={m.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-sm"
-                          style={{ background: COLORS_MARCA[m.name as Marca] }}
-                        />
-                        <span className="font-medium">{m.name}</span>
-                      </div>
-                      <div className="tabular-nums text-muted-foreground">
-                        <span className="font-semibold text-foreground">{m.value}</span> · {pct}%
-                      </div>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${pct}%`,
-                          background: COLORS_MARCA[m.name as Marca],
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </Card>
-
-        {/* Top 5 técnicos */}
-        <Card className="overflow-hidden p-3 sm:p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">Top 5 técnicos</h3>
-            {porTecnico.length > 5 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 shrink-0 text-xs"
-                onClick={() => setShowAllTecnicos(true)}
-              >
-                Ver todos <ArrowRight className="h-3 w-3 ml-1" />
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-2 sm:hidden">
-            {topTecnicos.length === 0 ? (
-              <div className="py-6 text-center text-xs text-muted-foreground">Sin datos en el período</div>
-            ) : (
-              topTecnicos.map((t) => <TecnicoMobileRow key={t.id} t={t} maxHoras={maxHoras} />)
-            )}
-          </div>
-
-          <Table className="hidden sm:table">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="h-8 text-[11px]">Técnico</TableHead>
-                <TableHead className="h-8 text-[11px] text-right w-14">Serv.</TableHead>
-                <TableHead className="h-8 text-[11px]">Horas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {topTecnicos.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">
-                    Sin datos en el período
-                  </TableCell>
-                </TableRow>
-              ) : (
-                topTecnicos.map((t) => (
-                  <TecnicoRow key={t.id} t={t} maxHoras={maxHoras} />
-                ))
-              )}
-            </TableBody>
-          </Table>
-
-          {tecnicosSinHoras.length > 0 && (
-            <div className="mt-3 text-[11px] text-muted-foreground border-t pt-2">
-              <span className="font-semibold text-destructive">{tecnicosSinHoras.length}</span>{" "}
-              técnico{tecnicosSinHoras.length !== 1 && "s"} con servicios asignados pero{" "}
-              <span className="font-semibold">0h</span> registradas
-            </div>
-          )}
-        </Card>
-
-        {/* Últimos contactos registrados */}
-        <Card className="flex flex-col overflow-hidden p-3 sm:p-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">Últimos contactos registrados</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden h-7 shrink-0 text-xs sm:inline-flex"
-              onClick={() => navigate("/parque-clientes")}
-            >
-              Ver parque completo <ArrowRight className="h-3 w-3 ml-1" />
+            <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/calendario")}>
+              Calendario <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           </div>
 
-          <div className="space-y-2 sm:hidden">
-            {ultimosSeguimientos.length === 0 ? (
-              <div className="py-6 text-center text-xs text-muted-foreground">Sin seguimientos registrados</div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, index) => <SkeletonCard key={index} />)
+            ) : agendaTecnicos.length === 0 ? (
+              <div className="col-span-full rounded-md border bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
+                No hay jornadas asignadas para esta semana.
+              </div>
             ) : (
-              ultimosSeguimientos.map((s) => (
-                <div key={s.id} className="rounded-md border bg-background px-3 py-2">
-                  <div className="flex items-start justify-between gap-2">
+              agendaTecnicos.map((tecnico) => <TecnicoSemanaCard key={tecnico.id} tecnico={tecnico} />)
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-3 sm:p-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold">Parque y facturacion</h2>
+            <p className="text-xs text-muted-foreground">Senales comerciales sin abrir el detalle.</p>
+          </div>
+
+          <div className="space-y-3">
+            <MetricLine label="Maquinas activas" value={(parqueKpi?.total_maquinas ?? 0).toLocaleString()} />
+            <MetricLine label="Clientes con servicio ultimo anio" value={`${pctServicioAnio}%`} />
+            <MetricLine
+              label="Facturacion mes actual"
+              value={`$${money(factActual)}`}
+              helper={factVar == null ? "sin base previa" : `${factVar > 0 ? "+" : ""}${factVar}% vs mes anterior`}
+              trend={factVar}
+            />
+
+            <div className="rounded-md border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Cobertura del parque</span>
+                <span className="font-semibold">{pctServicioAnio}%</span>
+              </div>
+              <Progress value={pctServicioAnio} className="h-2" />
+              <div className="mt-2 text-[11px] text-muted-foreground">
+                {parqueKpi?.con_servicio_anio ?? 0} de {totalClientesParque} clientes del parque tuvieron servicio en el ultimo anio.
+              </div>
+            </div>
+
+            <Button variant="outline" size="sm" className="w-full justify-between" onClick={() => navigate("/parque-clientes")}>
+              Ver analisis de clientes
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card className="p-3 sm:p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">Estado por sucursal</h2>
+              <p className="text-xs text-muted-foreground">Carga abierta y jornadas de la semana.</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, index) => <SkeletonLine key={index} />)
+            ) : sucursales.length === 0 ? (
+              <div className="rounded-md border bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
+                Sin datos por sucursal.
+              </div>
+            ) : (
+              sucursales.map((sucursal) => (
+                <div key={sucursal.sucursal} className="rounded-md border bg-background px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{s.clienteNombre}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">{s.usuarioNombre ?? "—"}</div>
+                      <div className="truncate text-sm font-medium">{sucursal.sucursal}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {sucursal.semana} jornadas esta semana
+                      </div>
                     </div>
-                    <div className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                      {s.fecha ? format(s.fecha, "dd/MM/yy") : "—"}
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-col gap-1">
-                    {s.estado && (
-                      <Badge variant="outline" className="w-fit px-1.5 py-0 text-[9px]">
-                        {s.estado}
-                      </Badge>
-                    )}
-                    <div className="line-clamp-2 text-xs text-muted-foreground">
-                      {s.observaciones || "Sin observaciones"}
+                    <div className="flex shrink-0 gap-1.5">
+                      <Badge variant="outline">{sucursal.abiertas} abiertas</Badge>
+                      {sucursal.vencidas > 0 && <Badge variant="destructive">{sucursal.vencidas} venc.</Badge>}
                     </div>
                   </div>
                 </div>
               ))
             )}
           </div>
-
-          <Table className="hidden sm:table">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="h-8 text-[11px]">Cliente</TableHead>
-                <TableHead className="h-8 text-[11px]">Mensaje</TableHead>
-                <TableHead className="h-8 text-[11px] text-right whitespace-nowrap">Fecha</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ultimosSeguimientos.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-6">
-                    Sin seguimientos registrados
-                  </TableCell>
-                </TableRow>
-              ) : (
-                ultimosSeguimientos.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="py-1.5 text-xs align-top">
-                      <div className="font-medium truncate max-w-[180px]">{s.clienteNombre}</div>
-                      <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
-                        {s.usuarioNombre ?? "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5 text-xs align-top">
-                      <div className="flex flex-col gap-1">
-                        {s.estado && (
-                          <Badge variant="outline" className="w-fit text-[9px] px-1.5 py-0 h-4">
-                            {s.estado}
-                          </Badge>
-                        )}
-                        <div className="line-clamp-2 text-muted-foreground">
-                          {s.observaciones || "Sin observaciones"}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5 text-xs text-right tabular-nums whitespace-nowrap align-top">
-                      {s.fecha ? format(s.fecha, "dd/MM/yy") : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
         </Card>
-      </div>
-        </TabsContent>
 
-        <TabsContent value="tecnicos" className="space-y-4 mt-4">
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {tecnicosEstado.length === 0 ? (
-              <p className="text-xs text-muted-foreground col-span-full">Sin técnicos cargados.</p>
+        <Card className="p-3 sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">Riesgos que requieren mirada</h2>
+              <p className="text-xs text-muted-foreground">Jornadas sin cierre fuera de tolerancia.</p>
+            </div>
+            <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/trabajos")}>
+              Trabajos <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {loading ? (
+              Array.from({ length: 4 }).map((_, index) => <SkeletonLine key={index} />)
+            ) : riesgos.length === 0 ? (
+              <div className="rounded-md border bg-emerald-500/5 px-3 py-6 text-center text-xs text-emerald-700">
+                No hay jornadas fuera de tolerancia.
+              </div>
             ) : (
-              tecnicosEstado.map((t) => <TecnicoEstadoCard key={t.id} t={t} />)
+              riesgos.map((riesgo) => (
+                <div key={riesgo.id} className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{riesgo.cliente}</div>
+                      <div className="line-clamp-1 text-xs text-muted-foreground">{riesgo.descripcion}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {riesgo.responsable} · {format(parseISO(riesgo.fecha), "dd/MM/yyyy")}
+                      </div>
+                    </div>
+                    <Badge variant="destructive" className="shrink-0">
+                      {riesgo.dias}d
+                    </Badge>
+                  </div>
+                </div>
+              ))
             )}
           </div>
-
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Badge variant="secondary" className="px-3 py-1 text-xs">
-              {cantDisponibles} disponible{cantDisponibles === 1 ? "" : "s"}
-            </Badge>
-            <Badge
-              className="px-3 py-1 text-xs border-transparent text-white"
-              style={{ backgroundColor: "#639922" }}
-            >
-              {cantNoDisponibles} no disponible{cantNoDisponibles === 1 ? "" : "s"}
-            </Badge>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Modal todos los técnicos */}
-      <Dialog open={showAllTecnicos} onOpenChange={setShowAllTecnicos}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Todos los técnicos</DialogTitle>
-          </DialogHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Técnico</TableHead>
-                <TableHead className="text-right">Servicios</TableHead>
-                <TableHead>Horas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {porTecnico.map((t) => (
-                <TecnicoRow key={t.id} t={t} maxHoras={maxHoras} />
-              ))}
-            </TableBody>
-          </Table>
-        </DialogContent>
-      </Dialog>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function TecnicoRow({
-  t,
-  maxHoras,
+function ExecutiveKpi({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  tone = "neutral",
+  loading,
 }: {
-  t: { id: string; name: string; total: number; horas: number };
-  maxHoras: number;
+  icon: React.ElementType;
+  label: string;
+  value: React.ReactNode;
+  detail: string;
+  tone?: "neutral" | "good" | "warn" | "bad";
+  loading?: boolean;
 }) {
-  const pct = maxHoras > 0 ? (t.horas / maxHoras) * 100 : 0;
+  const toneClass =
+    tone === "good"
+      ? "text-emerald-700 bg-emerald-500/10"
+      : tone === "warn"
+        ? "text-amber-700 bg-amber-500/10"
+        : tone === "bad"
+          ? "text-destructive bg-destructive/10"
+          : "text-primary bg-primary/10";
+
   return (
-    <TableRow>
-      <TableCell className="py-1.5 text-xs font-medium">{t.name}</TableCell>
-      <TableCell className="py-1.5 text-xs text-right tabular-nums">{t.total}</TableCell>
-      <TableCell className="py-1.5 text-xs">
-        {t.horas === 0 ? (
-          <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
-            sin horas
-          </Badge>
-        ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden min-w-[40px]">
-              <div
-                className="h-full bg-primary rounded-full"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="tabular-nums text-[11px] w-8 text-right">{t.horas.toFixed(1)}</span>
+    <Card className="p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="mt-1 text-2xl font-bold tabular-nums">
+            {loading ? <span className="inline-block h-7 w-16 animate-pulse rounded bg-muted" /> : value}
           </div>
-        )}
-      </TableCell>
-    </TableRow>
+          <div className="mt-1 text-[11px] text-muted-foreground">{detail}</div>
+        </div>
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md", toneClass)}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+    </Card>
   );
 }
 
-function TecnicoMobileRow({
-  t,
-  maxHoras,
+function TecnicoSemanaCard({
+  tecnico,
 }: {
-  t: { id: string; name: string; total: number; horas: number };
-  maxHoras: number;
+  tecnico: {
+    nombre: string;
+    sucursal: Sucursal | null;
+    total: number;
+    pendientes: number;
+    realizadas: number;
+    vencidas: number;
+    proxima: Jornada | null;
+    cliente: string | null;
+    descripcion: string | null;
+  };
 }) {
-  const pct = maxHoras > 0 ? (t.horas / maxHoras) * 100 : 0;
+  const pct = tecnico.total ? Math.round((tecnico.realizadas / tecnico.total) * 100) : 0;
+  const nextDate = tecnico.proxima ? parseISO(tecnico.proxima.fecha) : null;
+
+  return (
+    <div className="rounded-md border bg-background px-3 py-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">{shortName(tecnico.nombre)}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{tecnico.sucursal ?? "Sin sucursal"}</div>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          {tecnico.vencidas > 0 && <Badge variant="destructive">{tecnico.vencidas} venc.</Badge>}
+          <Badge variant="outline">{tecnico.total} jorn.</Badge>
+        </div>
+      </div>
+
+      <div className="mt-2 rounded-md bg-muted/40 px-2 py-2">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="min-w-0 truncate font-medium">{tecnico.cliente ?? "Sin trabajo asignado"}</span>
+          <span className="shrink-0 tabular-nums text-muted-foreground">
+            {nextDate ? format(nextDate, "dd/MM") : "--"}
+          </span>
+        </div>
+        <div className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
+          {tecnico.descripcion ?? "Sin detalle operativo"}
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <Progress value={pct} className="h-1.5" />
+        <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{pct}%</span>
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>{tecnico.realizadas} realizadas</span>
+        <span>{tecnico.pendientes} pendientes</span>
+      </div>
+    </div>
+  );
+}
+
+function MetricLine({
+  label,
+  value,
+  helper,
+  trend,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  trend?: number | null;
+}) {
+  const TrendIcon = trend == null ? null : trend >= 0 ? TrendingUp : TrendingDown;
 
   return (
     <div className="rounded-md border bg-background px-3 py-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium">{t.name}</div>
-          <div className="text-[11px] text-muted-foreground">
-            {t.total} servicio{t.total === 1 ? "" : "s"}
-          </div>
+          <div className="text-xs text-muted-foreground">{label}</div>
+          {helper && (
+            <div className={cn("mt-1 flex items-center gap-1 text-[11px]", trend != null && trend < 0 ? "text-destructive" : "text-emerald-700")}>
+              {TrendIcon && <TrendIcon className="h-3 w-3" />}
+              {helper}
+            </div>
+          )}
         </div>
-        {t.horas === 0 ? (
-          <Badge variant="destructive" className="shrink-0 px-1.5 py-0 text-[9px]">
-            sin horas
-          </Badge>
-        ) : (
-          <span className="shrink-0 text-sm font-semibold tabular-nums">{t.horas.toFixed(1)}h</span>
-        )}
+        <div className="shrink-0 text-right text-lg font-semibold tabular-nums">{value}</div>
       </div>
-      {t.horas > 0 && (
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
-        </div>
-      )}
     </div>
   );
 }
 
-function TrendBadge({ value, suffix }: { value: number; suffix: string }) {
-  const Icon = value > 0 ? TrendingUp : value < 0 ? TrendingDown : Minus;
-  const cls =
-    value > 0
-      ? "text-estado-completado"
-      : value < 0
-      ? "text-destructive"
-      : "text-muted-foreground";
-  const sign = value > 0 ? "+" : "";
+function SkeletonCard() {
   return (
-    <span className={`text-[11px] inline-flex items-center gap-1 ${cls}`}>
-      <Icon className="h-3 w-3" />
-      {sign}
-      {value}
-      <span className="text-muted-foreground">{suffix}</span>
-    </span>
+    <div className="rounded-md border bg-background px-3 py-3">
+      <div className="h-4 w-2/5 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-12 animate-pulse rounded bg-muted" />
+      <div className="mt-3 h-2 animate-pulse rounded bg-muted" />
+    </div>
   );
 }
 
-function KPI({
-  label,
-  value,
-  accent,
-  context,
-}: {
-  label: string;
-  value: React.ReactNode;
-  accent?: "completado" | "pendiente";
-  context?: React.ReactNode;
-}) {
-  const accentClass =
-    accent === "completado"
-      ? "text-estado-completado"
-      : accent === "pendiente"
-      ? "text-estado-pendiente"
-      : "";
-
+function SkeletonLine() {
   return (
-    <Card className="p-4 flex flex-col gap-1">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-2xl font-bold tabular-nums ${accentClass}`}>{value}</div>
-      {context && <div className="mt-auto pt-1">{context}</div>}
-    </Card>
-  );
-}
-
-function TecnicoEstadoCard({
-  t,
-}: {
-  t: {
-    id: string;
-    nombre: string;
-    sucursalProfile: Sucursal | null;
-    disponible: boolean;
-    sucursalActiva: Sucursal | null;
-    serviciosPeriodo: number;
-  };
-}) {
-  const iniciales = t.nombre
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p.charAt(0).toUpperCase())
-    .join("");
-
-  const verde = "#639922";
-  const borderColor = t.disponible ? "hsl(var(--muted-foreground) / 0.4)" : verde;
-  const circleStyle = t.disponible
-    ? { backgroundColor: "hsl(var(--muted-foreground) / 0.4)" }
-    : { backgroundColor: verde };
-
-  return (
-    <Card
-      className="p-3 flex items-center gap-3 border-l-4"
-      style={{ borderLeftColor: borderColor }}
-    >
-      <div
-        className="h-10 w-10 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-        style={circleStyle}
-      >
-        {iniciales || "?"}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium truncate">{t.nombre}</span>
-          {t.disponible ? (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-              Disponible
-            </Badge>
-          ) : (
-            <Badge
-              className="text-[10px] px-1.5 py-0 h-4 border-transparent text-white"
-              style={{ backgroundColor: verde }}
-            >
-              No disponible
-            </Badge>
-          )}
-        </div>
-        <div className="text-[11px] text-muted-foreground truncate">
-          {t.disponible
-            ? `${t.serviciosPeriodo} servicio${t.serviciosPeriodo === 1 ? "" : "s"} este período`
-            : t.sucursalActiva
-            ? `En ${t.sucursalActiva}`
-            : "Servicio activo"}
-        </div>
-      </div>
-    </Card>
+    <div className="rounded-md border bg-background px-3 py-3">
+      <div className="h-4 w-3/5 animate-pulse rounded bg-muted" />
+      <div className="mt-2 h-3 w-2/5 animate-pulse rounded bg-muted" />
+    </div>
   );
 }
