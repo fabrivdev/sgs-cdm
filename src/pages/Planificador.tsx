@@ -18,6 +18,7 @@ import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { pageDescription, pageShellWide, pageTitle, tableText } from "@/lib/ui-classes";
 
 interface Servicio {
   id: string;
@@ -341,11 +342,11 @@ export default function Planificador() {
   if (fEstado !== "all") activeChips.push({ label: fEstado, clear: () => setFEstado("all") });
 
   return (
-    <div className="container max-w-[1600px] py-3 px-3 sm:py-4 space-y-3">
+    <div className={pageShellWide}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Planificador</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className={pageTitle}>Planificador</h1>
+          <p className={pageDescription}>
             {displayed.length} jornadas visibles · Plan diario y semanal de trabajo.
           </p>
         </div>
@@ -407,7 +408,7 @@ export default function Planificador() {
       {/* Desktop table */}
       <Card className="hidden md:block overflow-hidden">
         <div className="overflow-x-auto">
-          <Table className="text-[13px]">
+          <Table className={tableText}>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="h-9 px-3 py-2 w-[92px]">Fecha</TableHead>
@@ -534,7 +535,7 @@ export default function Planificador() {
       </Card>
 
       {/* Mobile list */}
-      <div className="md:hidden space-y-2">
+      <div className="space-y-2 md:hidden">
         {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
         {!loading && displayed.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin intervenciones.</p>}
 
@@ -553,37 +554,58 @@ export default function Planificador() {
           return (
             <Card
               key={`${s.id}-${s.fecha_programada}`}
-              className={cn("p-2.5 cursor-pointer", rowClassByEstado(s.estado), unseen && "ring-2 ring-primary/40")}
+              className={cn(
+                "cursor-pointer overflow-hidden rounded-[18px] border bg-card p-3 shadow-sm transition-colors",
+                "min-h-[132px]",
+                rowClassByEstado(s.estado),
+                unseen && "ring-2 ring-primary/40",
+              )}
               onClick={() => openDetalle(s)}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span className="font-semibold tabular-nums text-foreground">{fechaLabel}</span>
-                    {multi && <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">{fechasSrv.length}d</Badge>}
-                    <span>·</span>
-                    <span>{s.dia_semana.slice(0, 3)}</span>
-                    <TipoIcon className="h-3 w-3" />
+              <div className="flex min-h-[108px] flex-col justify-between gap-2">
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+                        <span className="font-semibold tabular-nums text-foreground">{fechaLabel}</span>
+                        <span>·</span>
+                        <span>{s.dia_semana.slice(0, 3)}</span>
+                        <TipoIcon className="h-3 w-3 shrink-0" />
+                        {multi && (
+                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">
+                            {fechasSrv.length}d
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="space-y-1">
                     {codigoByServicio.get(s.id) && (
-                      <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
-                        {codigoByServicio.get(s.id)}
-                      </span>
+                      <div className="flex">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
+                          {codigoByServicio.get(s.id)}
+                        </span>
+                      </div>
                     )}
-                    <div className="text-sm font-semibold truncate">{clienteNombre}</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground line-clamp-2 leading-snug">{s.trabajo_descripcion}</div>
 
-                  <div className="text-[10px] text-muted-foreground pt-0.5">
-                    {responsableNombre}
-                    <span className="mx-1">·</span>
-                    {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
+                    <div className="line-clamp-1 text-[15px] font-semibold leading-tight">
+                      {clienteNombre}
+                    </div>
+
+                    <div className="line-clamp-2 min-h-[36px] text-[13px] leading-[1.35] text-muted-foreground">
+                      {s.trabajo_descripcion}
+                    </div>
                   </div>
                 </div>
 
-                <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
+                <div className="truncate pt-0.5 text-[11px] text-muted-foreground">
+                  {responsableNombre}
+                  <span className="mx-1">·</span>
+                  {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
+                </div>
               </div>
             </Card>
           );
