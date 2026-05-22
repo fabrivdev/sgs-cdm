@@ -81,7 +81,7 @@ export default function ParqueClientes() {
         }
       }
 
-      let conServicioAnio = 0;
+      let conServicioAño = 0;
       let contactadosMes = 0;
       let paraContactar = 0;
 
@@ -94,19 +94,19 @@ export default function ParqueClientes() {
         const diasSeguimiento = ultSeguimiento
           ? Math.floor((hoy.getTime() - new Date(`${ultSeguimiento}T00:00:00`).getTime()) / 86400000)
           : null;
-        const tieneServicioAnio = diasServicio != null && diasServicio <= 365;
+        const tieneServicioAño = diasServicio != null && diasServicio <= 365;
 
-        if (tieneServicioAnio) conServicioAnio++;
+        if (tieneServicioAño) conServicioAño++;
         if (ultSeguimiento && new Date(`${ultSeguimiento}T00:00:00`) >= inicioMes) contactadosMes++;
-        if (!tieneServicioAnio && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
+        if (!tieneServicioAño && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
       }
 
       const totalClientes = clienteIds.size;
 
       setMetricas({
         totalMaquinas: maquinas.length,
-        pctConServicioUltimoAnio:
-          totalClientes > 0 ? Math.round((conServicioAnio / totalClientes) * 100) : 0,
+        pctConServicioUltimoAño:
+          totalClientes > 0 ? Math.round((conServicioAño / totalClientes) * 100) : 0,
         pctContactadosEsteMes:
           totalClientes > 0 ? Math.round((contactadosMes / totalClientes) * 100) : 0,
         sinContacto60d: paraContactar,
