@@ -1,6 +1,8 @@
-import { Star } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import type { Sucursal } from "@/lib/constants";
 
 export interface TecnicoOption {
@@ -37,6 +39,8 @@ export function TecnicosPicker({
   className,
   emptyText = "No hay técnicos disponibles.",
 }: Props) {
+  const [query, setQuery] = useState("");
+
   const toggleAux = (id: string) => {
     if (id === principalId) {
       onChange({ principalId: null, auxiliares });
@@ -60,6 +64,26 @@ export function TecnicosPicker({
     });
   };
 
+  const visibles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = [...tecnicos].sort((a, b) => {
+      const aSelected = a.id === principalId || auxiliares.includes(a.id) ? 1 : 0;
+      const bSelected = b.id === principalId || auxiliares.includes(b.id) ? 1 : 0;
+      if (a.id === principalId && b.id !== principalId) return -1;
+      if (b.id === principalId && a.id !== principalId) return 1;
+      if (aSelected !== bSelected) return bSelected - aSelected;
+      return a.nombre.localeCompare(b.nombre);
+    });
+
+    if (!q) return base;
+
+    return base.filter((t) => {
+      const nombre = t.nombre.toLowerCase();
+      const sucursal = String(t.sucursal ?? "").toLowerCase();
+      return nombre.includes(q) || sucursal.includes(q);
+    });
+  }, [tecnicos, query, principalId, auxiliares]);
+
   return (
     <div className={cn("space-y-1.5 min-w-0", className)}>
       {label && (
@@ -69,14 +93,32 @@ export function TecnicosPicker({
       )}
 
       <div className="rounded-md border bg-card overflow-hidden">
-        <div className="max-h-56 overflow-y-auto overflow-x-hidden divide-y divide-border">
+        <div className="border-b bg-background px-3 py-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar técnico o sucursal…"
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="max-h-48 overflow-y-auto overflow-x-hidden divide-y divide-border sm:max-h-56">
           {tecnicos.length === 0 && (
             <div className="px-3 py-6 text-center text-xs text-muted-foreground">
               {emptyText}
             </div>
           )}
 
-          {tecnicos.map((t) => {
+          {tecnicos.length > 0 && visibles.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              No hay coincidencias para tu búsqueda.
+            </div>
+          )}
+
+          {visibles.map((t) => {
             const esPrincipal = principalId === t.id;
             const esAux = auxiliares.includes(t.id);
             const activo = esPrincipal || esAux;
