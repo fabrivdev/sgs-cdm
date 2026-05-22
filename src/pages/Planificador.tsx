@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ async function cargarTodosLosClientes() {
 
 export default function Planificador() {
   const { user, profile, isAdmin, isCabecilla } = useAuth();
+  const [searchParams] = useSearchParams();
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -106,16 +108,40 @@ export default function Planificador() {
   const [fMarca, setFMarca] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fCliente, setFCliente] = useState<string>("");
+  const [fVencidas, setFVencidas] = useState<string>("all");
+  const [fDatos, setFDatos] = useState<string>("all");
   const [vista, setVista] = useState<"dia" | "semana">("dia");
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
     if (!defaultsApplied && profile) {
-      if (profile.sucursal && !isAdmin) setFSucursal(profile.sucursal);
+      if (profile.sucursal && !isAdmin && !searchParams.get("sucursal")) setFSucursal(profile.sucursal);
       // Para admins no filtrar por sucursal (dejar "all" para ver todas)
       setDefaultsApplied(true);
     }
-  }, [profile, isAdmin, defaultsApplied]);
+  }, [profile, isAdmin, defaultsApplied, searchParams]);
+
+  useEffect(() => {
+    const estado = searchParams.get("estado");
+    const sucursal = searchParams.get("sucursal");
+    const overdue = searchParams.get("overdue");
+    const sinHoras = searchParams.get("sin_horas");
+    const semana = searchParams.get("semana");
+
+    if (estado && ESTADOS.includes(estado as Estado)) setFEstado(estado);
+    if (sucursal && SUCURSALES.includes(sucursal as Sucursal)) setFSucursal(sucursal);
+    if (overdue === "7") {
+      setFVencidas("7");
+      setFEstado("Pendiente");
+      setFSemana("all");
+    }
+    if (sinHoras === "1") {
+      setFDatos("sin_horas");
+      setFEstado("Completado");
+      setFSemana("all");
+    }
+    if (semana) setFSemana(semana);
+  }, [searchParams]);
 
   const load = async () => {
     setLoading(true);
@@ -231,6 +257,14 @@ export default function Planificador() {
       if (fTecnico !== "all" && s.tecnico_responsable_id !== fTecnico && !s.auxiliares.includes(fTecnico)) return false;
       if (fMarca !== "all" && s.marca !== fMarca) return false;
       if (fEstado !== "all" && s.estado !== fEstado) return false;
+      if (fDatos === "sin_horas" && !(s.estado === "Completado" && !Number(s.horas_trabajadas))) return false;
+      if (fVencidas === "7") {
+        if (s.estado !== "Pendiente") return false;
+        const fecha = new Date(`${s.fecha_programada}T00:00:00`);
+        const hoy = new Date(new Date().toDateString());
+        const dias = Math.floor((hoy.getTime() - fecha.getTime()) / 86400000);
+        if (dias <= 7) return false;
+      }
       if (q) {
         const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
         const codigo = codigoByServicio.get(s.id) ?? "";
@@ -238,7 +272,7 @@ export default function Planificador() {
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fCliente, cliById, codigoByServicio]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, codigoByServicio]);
 
   // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
   const fechasPorServicio = useMemo(() => {
@@ -331,6 +365,8 @@ export default function Planificador() {
     setFTecnico("all");
     setFMarca("all");
     setFEstado("all");
+    setFVencidas("all");
+    setFDatos("all");
     setFCliente("");
   };
 
@@ -340,6 +376,8 @@ export default function Planificador() {
   if (fTecnico !== "all") activeChips.push({ label: profById[fTecnico]?.nombre ?? "Técnico", clear: () => setFTecnico("all") });
   if (fMarca !== "all") activeChips.push({ label: fMarca, clear: () => setFMarca("all") });
   if (fEstado !== "all") activeChips.push({ label: fEstado, clear: () => setFEstado("all") });
+  if (fVencidas === "7") activeChips.push({ label: "+7d sin cierre", clear: () => setFVencidas("all") });
+  if (fDatos === "sin_horas") activeChips.push({ label: "Sin horas", clear: () => setFDatos("all") });
 
   return (
     <div className={pageShellWide}>
@@ -396,6 +434,20 @@ export default function Planificador() {
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
+        />
+        <FilterSelect
+          label="Vencimiento" value={fVencidas} onChange={setFVencidas} placeholder="Vencimiento" width="w-[150px]"
+          options={[
+            { value: "all", label: "Todo vencimiento" },
+            { value: "7", label: "+7 días sin cierre" },
+          ]}
+        />
+        <FilterSelect
+          label="Datos" value={fDatos} onChange={setFDatos} placeholder="Datos" width="w-[130px]"
+          options={[
+            { value: "all", label: "Todos los datos" },
+            { value: "sin_horas", label: "Realizadas sin horas" },
+          ]}
         />
         <FilterSelect
           label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"

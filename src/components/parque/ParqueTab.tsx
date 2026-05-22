@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -180,6 +181,8 @@ export function ParqueTab({
   const [fMarca, setFMarca] = useState<string>("all");
   const [fSubgrupo, setFSubgrupo] = useState<string>("all");
   const [fSeguimiento, setFSeguimiento] = useState<string>("all");
+  const [fRiesgo, setFRiesgo] = useState<string>("all");
+  const [searchParams] = useSearchParams();
 
   const [rango, setRango] = useState<RangoPreset>("365d");
   const [customDesde, setCustomDesde] = useState<Date | undefined>();
@@ -196,6 +199,7 @@ export function ParqueTab({
     (fMarca !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) +
     (fSeguimiento !== "all" ? 1 : 0) +
+    (fRiesgo !== "all" ? 1 : 0) +
     (rango !== "365d" ? 1 : 0) +
     (incluirPlataformas ? 1 : 0);
 
@@ -204,6 +208,7 @@ export function ParqueTab({
     setFMarca("all");
     setFSubgrupo("all");
     setFSeguimiento("all");
+    setFRiesgo("all");
     setRango("365d");
     setCustomDesde(undefined);
     setCustomHasta(undefined);
@@ -276,6 +281,13 @@ export function ParqueTab({
   useEffect(() => {
     cargar();
   }, []);
+
+  useEffect(() => {
+    const riesgo = searchParams.get("riesgo");
+    if (riesgo && ["sin_contacto_60d", "sin_ultimo_anio", "facturacion_caida"].includes(riesgo)) {
+      setFRiesgo(riesgo);
+    }
+  }, [searchParams]);
 
   const { desdeDate, hastaDate, prevDesdeDate, prevHastaDate } = useMemo(() => {
     const hoy = new Date();
@@ -471,9 +483,19 @@ export function ParqueTab({
         if (fSeguimiento !== "sin_seguimiento" && r.ultSeg?.resultado !== fSeguimiento) return false;
       }
 
+      if (fRiesgo === "sin_contacto_60d") {
+        const sinServicio60 = r.diasUltServicio == null || r.diasUltServicio > 60;
+        const sinSeguimiento60 =
+          !r.ultSeg ||
+          (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
+        if (!sinServicio60 || !sinSeguimiento60) return false;
+      }
+      if (fRiesgo === "sin_ultimo_anio" && !(r.diasUltServicio == null || r.diasUltServicio > 365)) return false;
+      if (fRiesgo === "facturacion_caida" && !(r.varPct != null && r.varPct <= -30)) return false;
+
       return true;
     });
-  }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento]);
+  }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento, fRiesgo]);
 
   // Métricas calculadas a partir de los clientes filtrados (para las cards superiores)
   useEffect(() => {
@@ -623,6 +645,15 @@ export function ParqueTab({
             { value: "all", label: "Cualquier seguimiento" },
             { value: "sin_seguimiento", label: "Sin seguimiento" },
             ...RESULTADOS.map(r => ({ value: r, label: r })),
+          ]}
+        />
+        <FilterSelect
+          label="Alerta" value={fRiesgo} onChange={setFRiesgo} placeholder="Alerta" width="w-[180px]"
+          options={[
+            { value: "all", label: "Todas las alertas" },
+            { value: "sin_contacto_60d", label: "Sin contacto +60d" },
+            { value: "sin_ultimo_anio", label: "Sin servicio último año" },
+            { value: "facturacion_caida", label: "Facturación en caída" },
           ]}
         />
         <FilterSelect
