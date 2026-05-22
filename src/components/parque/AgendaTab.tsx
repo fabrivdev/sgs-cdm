@@ -23,6 +23,7 @@ const RESULTADOS = [
 
 type Cliente = { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean | null };
 type Maquina = { cliente_id: string | null; sucursal: Sucursal | null };
+type UltimaFactura = { cliente_id: string; ult_servicio: string | null };
 type Seguimiento = {
   id?: string;
   cliente_id: string;
@@ -82,6 +83,7 @@ export function AgendaTab({
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
+  const [ultimasFacturas, setUltimasFacturas] = useState<UltimaFactura[]>([]);
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
   const [openForm, setOpenForm] = useState<string | null>(null);
   const [resultado, setResultado] = useState<string>("Contactado");
@@ -96,7 +98,7 @@ export function AgendaTab({
     setLoading(true);
 
     try {
-      const [c, m, s] = await Promise.all([
+      const [c, m, s, uf] = await Promise.all([
         // Cargar TODOS los clientes con paginación.
         // Sin paginación, Supabase trae solo los primeros 1000 y varios seguimientos quedan como "—".
         cargarTodo<Cliente>(
@@ -106,7 +108,7 @@ export function AgendaTab({
         // No filtramos por activo aquí porque en parque_maquinas algunos importados pueden tener activo NULL.
         // La vista de parque los muestra igual, así que agenda debe partir del mismo universo.
         cargarTodo<Maquina>(
-          supabase.from("parque_maquinas").select("cliente_id, sucursal"),
+          supabase.from("parque_maquinas").select("cliente_id, sucursal").eq("activo", true),
         ),
 
         cargarTodo<Seguimiento>(
@@ -115,11 +117,14 @@ export function AgendaTab({
             .select("id, cliente_id, fecha, resultado, observaciones, usuario_id")
             .order("fecha", { ascending: false }),
         ),
+
+        supabase.rpc("parque_ultimas_facturas"),
       ]);
 
       setClientes(c);
       setMaquinas(m);
       setSeguimientos(s);
+      setUltimasFacturas((uf.data ?? []) as UltimaFactura[]);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudo cargar la agenda comercial");
@@ -160,6 +165,11 @@ export function AgendaTab({
     }
 
     const ultPorCliente = new Map<string, Seguimiento>();
+    const ultServicioPorCliente = new Map<string, string | null>();
+
+    for (const uf of ultimasFacturas) {
+      ultServicioPorCliente.set(uf.cliente_id, uf.ult_servicio);
+    }
 
     for (const sg of seguimientos) {
       const cur = ultPorCliente.get(sg.cliente_id);
@@ -173,22 +183,28 @@ export function AgendaTab({
         const cli = cliById.get(clienteId);
         const ult = ultPorCliente.get(clienteId);
         const dias = ult ? Math.floor((hoy - new Date(ult.fecha).getTime()) / 86400000) : null;
+        const ultServicio = ultServicioPorCliente.get(clienteId) ?? null;
+        const diasUltServicio = ultServicio
+          ? Math.floor((hoy - new Date(`${ultServicio}T00:00:00`).getTime()) / 86400000)
+          : null;
 
         return {
           clienteId,
           cliente: cli ?? null,
           cantMaquinas,
           dias,
+          diasUltServicio,
           ultResultado: ult?.resultado ?? null,
         };
       })
       .filter((f) => !!f.cliente)
+      .filter((f) => (f.diasUltServicio == null || f.diasUltServicio > 365) && (f.dias == null || f.dias > 60))
       .sort((a, b) => {
         const da = a.dias ?? Number.MAX_SAFE_INTEGER;
         const db = b.dias ?? Number.MAX_SAFE_INTEGER;
         return db - da;
       });
-  }, [maquinas, seguimientos, cliById]);
+  }, [maquinas, seguimientos, ultimasFacturas, cliById]);
 
   const historial = useMemo(() => {
     const ql = hQ.trim().toLowerCase();
@@ -247,7 +263,7 @@ export function AgendaTab({
 
       <TabsContent value="pendientes" className="space-y-2">
         <div className="text-xs text-muted-foreground">
-          {filas.length} clientes — ordenados por días sin contacto
+          {filas.length} clientes para contactar — sin servicio último año ni contacto en 60 días
         </div>
 
         <div className="rounded-md border bg-card divide-y">

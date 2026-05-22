@@ -76,12 +76,18 @@ interface Cliente {
   sucursal: Sucursal | null;
 }
 
-interface ParqueKpi {
-  total_maquinas: number;
-  total_clientes: number;
-  con_servicio_anio: number;
-  contactados_mes: number;
-  sin_contacto_60d: number;
+interface MaquinaParque {
+  cliente_id: string | null;
+}
+
+interface SeguimientoComercial {
+  cliente_id: string;
+  fecha: string;
+}
+
+interface UltimaFactura {
+  cliente_id: string;
+  ult_servicio: string | null;
 }
 
 interface FactResumen {
@@ -138,7 +144,9 @@ export default function Dashboard() {
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [parqueKpi, setParqueKpi] = useState<ParqueKpi | null>(null);
+  const [maquinasParque, setMaquinasParque] = useState<MaquinaParque[]>([]);
+  const [seguimientos, setSeguimientos] = useState<SeguimientoComercial[]>([]);
+  const [ultimasFacturas, setUltimasFacturas] = useState<UltimaFactura[]>([]);
   const [facturacion, setFacturacion] = useState<FactResumen[]>([]);
   const [loading, setLoading] = useState(true);
   const [fSucursal, setFSucursal] = useState<string>("all");
@@ -158,7 +166,7 @@ export default function Dashboard() {
     (async () => {
       setLoading(true);
       try {
-        const [serviciosRows, trabajosRows, jornadasRows, clientesRows, parqueRes, factRes] = await Promise.all([
+        const [serviciosRows, trabajosRows, jornadasRows, clientesRows, factRes, maquinasRows, seguimientosRows, ultimasRes] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
               .from("servicios")
@@ -178,13 +186,17 @@ export default function Dashboard() {
               .order("fecha", { ascending: true }),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
-          supabase.rpc("parque_kpis"),
           supabase.rpc("parque_resumen_facturacion", {
             p_desde: format(rangeStart, "yyyy-MM-dd"),
             p_hasta: format(rangeEnd, "yyyy-MM-dd"),
             p_prev_desde: format(prevRangeStart, "yyyy-MM-dd"),
             p_prev_hasta: format(prevRangeEnd, "yyyy-MM-dd"),
           }),
+          cargarTodo<MaquinaParque>(supabase.from("parque_maquinas").select("cliente_id").eq("activo", true)),
+          cargarTodo<SeguimientoComercial>(
+            supabase.from("seguimiento_comercial").select("cliente_id, fecha").order("fecha", { ascending: false }),
+          ),
+          supabase.rpc("parque_ultimas_facturas"),
         ]);
 
         if (!alive) return;
@@ -192,7 +204,9 @@ export default function Dashboard() {
         setTrabajos(trabajosRows);
         setJornadas(jornadasRows);
         setClientes(clientesRows);
-        setParqueKpi(((parqueRes.data ?? [])[0] as ParqueKpi | undefined) ?? null);
+        setMaquinasParque(maquinasRows);
+        setSeguimientos(seguimientosRows);
+        setUltimasFacturas((ultimasRes.data ?? []) as UltimaFactura[]);
         setFacturacion((factRes.data ?? []) as FactResumen[]);
       } catch (error) {
         console.error(error);
@@ -307,9 +321,47 @@ export default function Dashboard() {
     (jornada) => differenceInCalendarDays(today, parseISO(jornada.fecha)) > 7,
   );
 
-  const totalClientesParque = parqueKpi?.total_clientes ?? 0;
+  const parqueMetricas = useMemo(() => {
+    const clienteIds = new Set(maquinasParque.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id));
+    const ultimoServicioByCliente = new Map(ultimasFacturas.map((row) => [row.cliente_id, row.ult_servicio]));
+    const ultimoSeguimientoByCliente = new Map<string, string>();
+
+    for (const seguimiento of seguimientos) {
+      const current = ultimoSeguimientoByCliente.get(seguimiento.cliente_id);
+      if (!current || new Date(current) < new Date(seguimiento.fecha)) {
+        ultimoSeguimientoByCliente.set(seguimiento.cliente_id, seguimiento.fecha);
+      }
+    }
+
+    let conServicioAnio = 0;
+    let paraContactar = 0;
+    let contactadosPeriodo = 0;
+
+    for (const clienteId of clienteIds) {
+      const ultServicio = ultimoServicioByCliente.get(clienteId) ?? null;
+      const ultSeguimiento = ultimoSeguimientoByCliente.get(clienteId) ?? null;
+      const diasServicio = ultServicio ? differenceInCalendarDays(today, parseISO(ultServicio)) : null;
+      const diasSeguimiento = ultSeguimiento ? differenceInCalendarDays(today, parseISO(ultSeguimiento)) : null;
+      const conServicio = diasServicio != null && diasServicio <= 365;
+      const sinContacto60 = diasSeguimiento == null || diasSeguimiento > 60;
+
+      if (conServicio) conServicioAnio++;
+      if (!conServicio && sinContacto60) paraContactar++;
+      if (ultSeguimiento && isWithinInterval(parseISO(ultSeguimiento), { start: rangeStart, end: rangeEnd })) contactadosPeriodo++;
+    }
+
+    return {
+      totalMaquinas: maquinasParque.length,
+      totalClientes: clienteIds.size,
+      conServicioAnio,
+      paraContactar,
+      contactadosPeriodo,
+    };
+  }, [maquinasParque, rangeEnd, rangeStart, seguimientos, ultimasFacturas]);
+
+  const totalClientesParque = parqueMetricas.totalClientes;
   const pctServicioAnio =
-    totalClientesParque > 0 ? Math.round(((parqueKpi?.con_servicio_anio ?? 0) / totalClientesParque) * 100) : 0;
+    totalClientesParque > 0 ? Math.round((parqueMetricas.conServicioAnio / totalClientesParque) * 100) : 0;
 
   const facturacionFiltrada = facturacion.filter((row) => {
     if (fSucursal === "all") return true;
@@ -379,11 +431,11 @@ export default function Dashboard() {
       });
     }
 
-    if ((parqueKpi?.sin_contacto_60d ?? 0) > 0) {
+    if (parqueMetricas.paraContactar > 0) {
       items.push({
         id: "contacto",
-        titulo: `${parqueKpi?.sin_contacto_60d ?? 0} clientes sin contacto +60d`,
-        detalle: "Riesgo de enfriamiento de base instalada",
+        titulo: `${parqueMetricas.paraContactar} clientes para contactar`,
+        detalle: "Sin servicio ultimo ano ni contacto en 60 dias",
         tono: "warn",
         to: "/parque-clientes",
       });
@@ -411,7 +463,7 @@ export default function Dashboard() {
     }
 
     return items.slice(0, 5);
-  }, [clienteById, factActual, factPrev, factTrend, fueraTolerancia, jornadasFiltradas, parqueKpi?.sin_contacto_60d, servicioById]);
+  }, [clienteById, factActual, factPrev, factTrend, fueraTolerancia, jornadasFiltradas, parqueMetricas.paraContactar, servicioById]);
 
   const limpiarFiltros = () => {
     setFSucursal("all");
@@ -493,7 +545,7 @@ export default function Dashboard() {
           icon={Wrench}
           label="Cobertura parque"
           value={`${pctServicioAnio}%`}
-          detail={`${parqueKpi?.total_maquinas ?? 0} maquinas activas`}
+          detail={`${parqueMetricas.totalMaquinas} maquinas activas`}
           tone={pctServicioAnio >= 70 ? "good" : pctServicioAnio >= 50 ? "warn" : "bad"}
           loading={loading}
         />
@@ -595,10 +647,10 @@ export default function Dashboard() {
         <InsightCard
           icon={PhoneCall}
           title="Base instalada"
-          value={`${parqueKpi?.sin_contacto_60d ?? 0}`}
-          label="clientes sin contacto +60d"
-          detail={`${parqueKpi?.contactados_mes ?? 0} contactados este mes`}
-          tone={(parqueKpi?.sin_contacto_60d ?? 0) > 0 ? "warn" : "good"}
+          value={`${parqueMetricas.paraContactar}`}
+          label="clientes para contactar"
+          detail={`${parqueMetricas.contactadosPeriodo} contactados en periodo`}
+          tone={parqueMetricas.paraContactar > 0 ? "warn" : "good"}
           onClick={() => navigate("/parque-clientes")}
         />
         <InsightCard
@@ -613,7 +665,7 @@ export default function Dashboard() {
         <InsightCard
           icon={Wrench}
           title="Oportunidad parque"
-          value={`${totalClientesParque - (parqueKpi?.con_servicio_anio ?? 0)}`}
+          value={`${totalClientesParque - parqueMetricas.conServicioAnio}`}
           label="clientes sin servicio ultimo anio"
           detail={`${pctServicioAnio}% de cobertura actual`}
           tone={pctServicioAnio >= 70 ? "good" : "warn"}

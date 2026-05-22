@@ -19,6 +19,24 @@ interface Metricas {
   sinContacto60d: number;
 }
 
+const PAGE = 1000;
+
+async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
+  let from = 0;
+  const all: T[] = [];
+
+  while (true) {
+    const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
+
 export default function ParqueClientes() {
   const [metricas, setMetricas] = useState<Metricas>({
     totalMaquinas: 0,
@@ -34,34 +52,68 @@ export default function ParqueClientes() {
   const [parqueMetricas, setParqueMetricas] = useState<ParqueMetricas | null>(null);
 
   const cargarMetricas = async () => {
-    const { data, error } = await supabase.rpc("parque_kpis");
-    if (error) {
-      console.error(error);
-      return;
-    }
-    const row = (data ?? [])[0] as
-      | {
-          total_maquinas: number;
-          total_clientes: number;
-          con_servicio_anio: number;
-          contactados_mes: number;
-          sin_contacto_60d: number;
+    try {
+      const [maquinas, seguimientos, ultimas] = await Promise.all([
+        cargarTodo<{ cliente_id: string | null }>(
+          supabase.from("parque_maquinas").select("cliente_id").eq("activo", true),
+        ),
+        cargarTodo<{ cliente_id: string; fecha: string }>(
+          supabase.from("seguimiento_comercial").select("cliente_id, fecha").order("fecha", { ascending: false }),
+        ),
+        supabase.rpc("parque_ultimas_facturas"),
+      ]);
+
+      const hoy = new Date();
+      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      const clienteIds = new Set(maquinas.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id));
+      const ultServicioByCliente = new Map(
+        ((ultimas.data ?? []) as Array<{ cliente_id: string; ult_servicio: string | null }>).map((row) => [
+          row.cliente_id,
+          row.ult_servicio,
+        ]),
+      );
+      const ultSeguimientoByCliente = new Map<string, string>();
+
+      for (const seguimiento of seguimientos) {
+        const current = ultSeguimientoByCliente.get(seguimiento.cliente_id);
+        if (!current || new Date(current) < new Date(seguimiento.fecha)) {
+          ultSeguimientoByCliente.set(seguimiento.cliente_id, seguimiento.fecha);
         }
-      | undefined;
-    if (!row) return;
+      }
 
-    const totalClientes = row.total_clientes || 0;
-    const pctConServicioUltimoAnio =
-      totalClientes > 0 ? Math.round((row.con_servicio_anio / totalClientes) * 100) : 0;
-    const pctContactadosEsteMes =
-      totalClientes > 0 ? Math.round((row.contactados_mes / totalClientes) * 100) : 0;
+      let conServicioAnio = 0;
+      let contactadosMes = 0;
+      let paraContactar = 0;
 
-    setMetricas({
-      totalMaquinas: row.total_maquinas || 0,
-      pctConServicioUltimoAnio,
-      pctContactadosEsteMes,
-      sinContacto60d: row.sin_contacto_60d || 0,
-    });
+      for (const clienteId of clienteIds) {
+        const ultServicio = ultServicioByCliente.get(clienteId) ?? null;
+        const ultSeguimiento = ultSeguimientoByCliente.get(clienteId) ?? null;
+        const diasServicio = ultServicio
+          ? Math.floor((hoy.getTime() - new Date(`${ultServicio}T00:00:00`).getTime()) / 86400000)
+          : null;
+        const diasSeguimiento = ultSeguimiento
+          ? Math.floor((hoy.getTime() - new Date(`${ultSeguimiento}T00:00:00`).getTime()) / 86400000)
+          : null;
+        const tieneServicioAnio = diasServicio != null && diasServicio <= 365;
+
+        if (tieneServicioAnio) conServicioAnio++;
+        if (ultSeguimiento && new Date(`${ultSeguimiento}T00:00:00`) >= inicioMes) contactadosMes++;
+        if (!tieneServicioAnio && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
+      }
+
+      const totalClientes = clienteIds.size;
+
+      setMetricas({
+        totalMaquinas: maquinas.length,
+        pctConServicioUltimoAnio:
+          totalClientes > 0 ? Math.round((conServicioAnio / totalClientes) * 100) : 0,
+        pctContactadosEsteMes:
+          totalClientes > 0 ? Math.round((contactadosMes / totalClientes) * 100) : 0,
+        sinContacto60d: paraContactar,
+      });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   useEffect(() => {
@@ -100,7 +152,7 @@ export default function ParqueClientes() {
         accent: "text-blue-600",
       },
       {
-        label: "Sin contacto +60 días",
+        label: "Para contactar",
         value: metricasMostradas.sinContacto60d.toLocaleString(),
         icon: AlertTriangle,
         accent: metricasMostradas.sinContacto60d > 0 ? "text-destructive" : "text-muted-foreground",

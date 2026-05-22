@@ -488,11 +488,11 @@ export function ParqueTab({
       totalMaquinas += r.cantTotal;
       if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
       if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) contactadosRango++;
-      const sinServ60 = r.diasUltServicio == null || r.diasUltServicio > 60;
+      const sinServicioUltimoAnio = r.diasUltServicio == null || r.diasUltServicio > 365;
       const sinSeg60 =
         !r.ultSeg ||
         (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
-      if (sinServ60 && sinSeg60) sinContacto++;
+      if (sinServicioUltimoAnio && sinSeg60) sinContacto++;
     }
     onMetricasChange({
       totalMaquinas,
