@@ -738,7 +738,13 @@ export function ServicioDetalleDialog({
           defaultTecnicoId={activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id}
           defaultAuxiliares={activeMerged?.auxiliares ?? servicio.auxiliares}
           onSaved={async () => {
-            await loadJornadas(servicio.id);
+            const fresh = await loadJornadas(servicio.id);
+            const siguientePend = fresh.find((j) => j.estado === "Pendiente");
+            if (siguientePend) {
+              setActiveJornadaId(siguientePend.id);
+            } else {
+              toast.success("Todas las jornadas fueron cerradas");
+            }
             onChanged();
           }}
         />
