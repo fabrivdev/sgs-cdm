@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import {
   Bar,
   BarChart,
@@ -28,6 +28,7 @@ import {
   differenceInCalendarDays,
   endOfMonth,
   format,
+  getISOWeek,
   isWithinInterval,
   parseISO,
   startOfMonth,
@@ -92,6 +93,8 @@ interface FactResumen {
 const PAGE = 1000;
 const today = new Date();
 const todayStr = format(today, "yyyy-MM-dd");
+const defaultDesde = format(startOfMonth(today), "yyyy-MM-dd");
+const defaultHasta = format(endOfMonth(today), "yyyy-MM-dd");
 
 const statusColor: Record<string, string> = {
   Pendiente: "#EF9F27",
@@ -140,11 +143,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [fSucursal, setFSucursal] = useState<string>("all");
   const [fMarca, setFMarca] = useState<string>("all");
+  const [fDesde, setFDesde] = useState<string>(defaultDesde);
+  const [fHasta, setFHasta] = useState<string>(defaultHasta);
+  const [fSemana, setFSemana] = useState<string>("all");
 
-  const monthStart = useMemo(() => startOfMonth(today), []);
-  const monthEnd = useMemo(() => endOfMonth(today), []);
-  const prevMonthStart = useMemo(() => startOfMonth(subMonths(today, 1)), []);
-  const prevMonthEnd = useMemo(() => endOfMonth(subMonths(today, 1)), []);
+  const rangeStart = useMemo(() => parseISO(fDesde), [fDesde]);
+  const rangeEnd = useMemo(() => parseISO(fHasta), [fHasta]);
+  const prevRangeStart = useMemo(() => subMonths(rangeStart, 1), [rangeStart]);
+  const prevRangeEnd = useMemo(() => subMonths(rangeEnd, 1), [rangeEnd]);
 
   useEffect(() => {
     let alive = true;
@@ -174,10 +180,10 @@ export default function Dashboard() {
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
           supabase.rpc("parque_kpis"),
           supabase.rpc("parque_resumen_facturacion", {
-            p_desde: format(monthStart, "yyyy-MM-dd"),
-            p_hasta: format(monthEnd, "yyyy-MM-dd"),
-            p_prev_desde: format(prevMonthStart, "yyyy-MM-dd"),
-            p_prev_hasta: format(prevMonthEnd, "yyyy-MM-dd"),
+            p_desde: format(rangeStart, "yyyy-MM-dd"),
+            p_hasta: format(rangeEnd, "yyyy-MM-dd"),
+            p_prev_desde: format(prevRangeStart, "yyyy-MM-dd"),
+            p_prev_hasta: format(prevRangeEnd, "yyyy-MM-dd"),
           }),
         ]);
 
@@ -198,31 +204,49 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [monthEnd, monthStart, prevMonthEnd, prevMonthStart]);
+  }, [rangeEnd, rangeStart, prevRangeEnd, prevRangeStart]);
 
   const serviciosFiltrados = useMemo(
     () =>
       servicios.filter((servicio) => {
         if (fSucursal !== "all" && servicio.sucursal !== fSucursal) return false;
         if (fMarca !== "all" && servicio.marca !== fMarca) return false;
+        const fecha = parseISO(servicio.fecha_programada);
+        if (!isWithinInterval(fecha, { start: rangeStart, end: rangeEnd })) return false;
+        if (fSemana !== "all" && getISOWeek(fecha) !== Number(fSemana)) return false;
         return true;
       }),
-    [servicios, fMarca, fSucursal],
+    [servicios, fMarca, fSemana, fSucursal, rangeEnd, rangeStart],
   );
+
+  const semanasDisponibles = useMemo(() => {
+    const semanas = new Set<number>();
+    for (const servicio of servicios) {
+      const fecha = parseISO(servicio.fecha_programada);
+      if (isWithinInterval(fecha, { start: rangeStart, end: rangeEnd })) semanas.add(getISOWeek(fecha));
+    }
+    return Array.from(semanas).sort((a, b) => a - b);
+  }, [servicios, rangeEnd, rangeStart]);
 
   const trabajosFiltrados = useMemo(
     () =>
       trabajos.filter((trabajo) => {
         if (fSucursal !== "all" && trabajo.sucursal !== fSucursal) return false;
-        if (fMarca !== "all") {
+        if (trabajo.legacy_servicio_id) {
           const servicio = trabajo.legacy_servicio_id
             ? servicios.find((item) => item.id === trabajo.legacy_servicio_id)
             : null;
-          if (servicio?.marca !== fMarca) return false;
+          if (!servicio) return false;
+          if (fMarca !== "all" && servicio.marca !== fMarca) return false;
+          const fecha = parseISO(servicio.fecha_programada);
+          if (!isWithinInterval(fecha, { start: rangeStart, end: rangeEnd })) return false;
+          if (fSemana !== "all" && getISOWeek(fecha) !== Number(fSemana)) return false;
+        } else if (fMarca !== "all" || fSemana !== "all") {
+          return false;
         }
         return true;
       }),
-    [fMarca, fSucursal, servicios, trabajos],
+    [fMarca, fSemana, fSucursal, rangeEnd, rangeStart, servicios, trabajos],
   );
 
   const servicioById = useMemo(() => new Map(serviciosFiltrados.map((servicio) => [servicio.id, servicio])), [serviciosFiltrados]);
@@ -254,12 +278,15 @@ export default function Dashboard() {
     return map;
   }, [jornadasByTrabajo, trabajosFiltrados]);
 
-  const serviciosMes = serviciosFiltrados.filter((servicio) =>
-    isWithinInterval(parseISO(servicio.fecha_programada), { start: monthStart, end: monthEnd }),
-  );
-  const serviciosPrev = serviciosFiltrados.filter((servicio) =>
-    isWithinInterval(parseISO(servicio.fecha_programada), { start: prevMonthStart, end: prevMonthEnd }),
-  );
+  const serviciosMes = serviciosFiltrados;
+  const serviciosPrev = servicios.filter((servicio) => {
+    if (fSucursal !== "all" && servicio.sucursal !== fSucursal) return false;
+    if (fMarca !== "all" && servicio.marca !== fMarca) return false;
+    const fecha = parseISO(servicio.fecha_programada);
+    if (!isWithinInterval(fecha, { start: prevRangeStart, end: prevRangeEnd })) return false;
+    if (fSemana !== "all" && getISOWeek(fecha) !== Number(fSemana)) return false;
+    return true;
+  });
   const abiertos = trabajosFiltrados.filter((trabajo) => estadoPorTrabajo.get(trabajo.id) !== "completado");
   const serviciosMesIds = new Set(serviciosMes.map((servicio) => servicio.id));
   const serviciosPrevIds = new Set(serviciosPrev.map((servicio) => servicio.id));
@@ -272,9 +299,7 @@ export default function Dashboard() {
   const abiertosTrend = abiertasPrev > 0 ? Math.round(((abiertasMes - abiertasPrev) / abiertasPrev) * 100) : null;
 
   const jornadasFiltradas = jornadas.filter((jornada) => servicioIdsFiltrados.has(jornada.servicio_id));
-  const jornadasMes = jornadasFiltradas.filter((jornada) =>
-    isWithinInterval(parseISO(jornada.fecha), { start: monthStart, end: monthEnd }),
-  );
+  const jornadasMes = jornadasFiltradas;
   const realizadasMes = jornadasMes.filter((jornada) => jornada.estado === "Completado").length;
   const cierreMes = jornadasMes.length ? Math.round((realizadasMes / jornadasMes.length) * 100) : 0;
   const pendientesCierre = jornadasFiltradas.filter((jornada) => jornada.estado === "Pendiente" && jornada.fecha < todayStr);
@@ -360,7 +385,7 @@ export default function Dashboard() {
         titulo: `${parqueKpi?.sin_contacto_60d ?? 0} clientes sin contacto +60d`,
         detalle: "Riesgo de enfriamiento de base instalada",
         tono: "warn",
-        to: "/parque-clientes?riesgo=sin_contacto_60d",
+        to: "/parque-clientes",
       });
     }
 
@@ -370,7 +395,7 @@ export default function Dashboard() {
         titulo: `Facturacion cae ${Math.abs(factTrend)}%`,
         detalle: `$${money(factActual)} este mes vs $${money(factPrev)} anterior`,
         tono: "bad",
-        to: "/parque-clientes?riesgo=facturacion_caida",
+        to: "/parque-clientes",
       });
     }
 
@@ -391,9 +416,17 @@ export default function Dashboard() {
   const limpiarFiltros = () => {
     setFSucursal("all");
     setFMarca("all");
+    setFDesde(defaultDesde);
+    setFHasta(defaultHasta);
+    setFSemana("all");
   };
 
-  const filtrosActivos = (fSucursal !== "all" ? 1 : 0) + (fMarca !== "all" ? 1 : 0);
+  const filtrosActivos =
+    (fSucursal !== "all" ? 1 : 0) +
+    (fMarca !== "all" ? 1 : 0) +
+    (fDesde !== defaultDesde ? 1 : 0) +
+    (fHasta !== defaultHasta ? 1 : 0) +
+    (fSemana !== "all" ? 1 : 0);
 
   return (
     <div className="container max-w-[1320px] space-y-3 px-3 py-3 sm:px-4 sm:py-4">
@@ -401,7 +434,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-xl font-bold sm:text-2xl">Dashboard</h1>
           <p className="text-xs text-muted-foreground">
-            Vision ejecutiva · {format(monthStart, "dd/MM")} al {format(monthEnd, "dd/MM")}
+            Vision ejecutiva · {format(rangeStart, "dd/MM")} al {format(rangeEnd, "dd/MM")}
           </p>
         </div>
       </div>
@@ -426,6 +459,16 @@ export default function Dashboard() {
           placeholder="Marca"
           width="w-[130px]"
           options={[{ value: "all", label: "Todas las marcas" }, ...MARCAS.map((m) => ({ value: m, label: m }))]}
+        />
+        <FilterDate label="Desde" value={fDesde} onChange={setFDesde} width="w-[145px]" />
+        <FilterDate label="Hasta" value={fHasta} onChange={setFHasta} width="w-[145px]" />
+        <FilterSelect
+          label="Semana"
+          value={fSemana}
+          onChange={setFSemana}
+          placeholder="Semana"
+          width="w-[130px]"
+          options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map((s) => ({ value: String(s), label: `Semana ${s}` }))]}
         />
       </FiltersBar>
 
@@ -556,7 +599,7 @@ export default function Dashboard() {
           label="clientes sin contacto +60d"
           detail={`${parqueKpi?.contactados_mes ?? 0} contactados este mes`}
           tone={(parqueKpi?.sin_contacto_60d ?? 0) > 0 ? "warn" : "good"}
-          onClick={() => navigate("/parque-clientes?riesgo=sin_contacto_60d")}
+          onClick={() => navigate("/parque-clientes")}
         />
         <InsightCard
           icon={AlertTriangle}
@@ -574,7 +617,7 @@ export default function Dashboard() {
           label="clientes sin servicio ultimo anio"
           detail={`${pctServicioAnio}% de cobertura actual`}
           tone={pctServicioAnio >= 70 ? "good" : "warn"}
-          onClick={() => navigate("/parque-clientes?riesgo=sin_ultimo_anio")}
+          onClick={() => navigate("/parque-clientes")}
         />
       </div>
     </div>
