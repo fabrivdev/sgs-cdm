@@ -244,6 +244,7 @@ export function ServicioDetalleDialog({
 
   const activeJornada = jornadas.find((j) => j.id === activeJornadaId) ?? null;
   const activeMerged = activeJornada ? { ...activeJornada, ...edits[activeJornada.id] } : null;
+  const activeIsPending = activeMerged?.estado === "Pendiente";
   const historial = jornadas.filter((j) => j.id !== activeJornadaId);
   const dirty = Object.values(edits).some((p) => p && Object.keys(p).length > 0);
 
@@ -361,7 +362,7 @@ export function ServicioDetalleDialog({
                 )}
                 <MarcaBadge marca={servicio.marca} />
                 <Badge variant="outline" className="gap-1 text-[10px]">
-                  {tipo === "Maquina en taller" || tipo === "Máquina en taller" ? (
+                  {tipo === "Maquina en taller" || tipo === "MÃ¡quina en taller" ? (
                     <Wrench className="h-3 w-3" />
                   ) : (
                     <MapPin className="h-3 w-3" />
@@ -427,7 +428,9 @@ export function ServicioDetalleDialog({
               <section className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Jornada a cerrar</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {activeIsPending ? "Jornada a cerrar" : "Jornada registrada"}
+                    </div>
                     <div className="text-base font-semibold capitalize">
                       {format(parseISO(activeJornada.fecha), "EEEE d 'de' MMMM yyyy", { locale: es })}
                     </div>
@@ -435,7 +438,7 @@ export function ServicioDetalleDialog({
                   <EstadoBadge estado={activeMerged.estado} className="text-[10px]" />
                 </div>
 
-                {canEdit ? (
+                {canEdit && activeIsPending ? (
                   <>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       <ResultButton
@@ -493,9 +496,25 @@ export function ServicioDetalleDialog({
                       </div>
                     </div>
                   </>
-                ) : (
+                ) : activeIsPending ? (
                   <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
                     No tenes permisos para editar esta jornada.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
+                    <div className="space-y-1.5">
+                      <Label>Horas trabajadas</Label>
+                      <div className="flex h-11 items-center rounded-md border bg-card px-3 text-sm">
+                        {activeMerged.horas_trabajadas ?? 0}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Observacion</Label>
+                      <div className="min-h-[92px] rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
+                        {activeMerged.observaciones?.trim() || "Sin observaciones cargadas."}
+                      </div>
+                    </div>
                   </div>
                 )}
               </section>
