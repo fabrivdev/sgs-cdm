@@ -126,6 +126,17 @@ export function TrabajoDetalleDrawer({
     () => tecnicos.filter((t) => rolesTecnico.size === 0 || rolesTecnico.has(t.id)),
     [tecnicos, rolesTecnico],
   );
+  const defaultCrew = useMemo(() => {
+    const selected = selectedJornadaId ? jornadas.find((j) => j.id === selectedJornadaId) : null;
+    const fromSelected = selected && (selected.tecnico_responsable_id || (selected.auxiliares?.length ?? 0) > 0) ? selected : null;
+    const fromPending = jornadas.find((j) => j.estado === "Pendiente" && (j.tecnico_responsable_id || (j.auxiliares?.length ?? 0) > 0));
+    const fromLatest = jornadas.find((j) => j.tecnico_responsable_id || (j.auxiliares?.length ?? 0) > 0);
+    const source = fromSelected ?? fromPending ?? fromLatest ?? null;
+    return {
+      tecnico_id: source?.tecnico_responsable_id ?? null,
+      auxiliares: source?.auxiliares ?? [],
+    };
+  }, [jornadas, selectedJornadaId]);
 
   if (!trabajoId) return null;
 
@@ -280,6 +291,8 @@ export function TrabajoDetalleDrawer({
           tecnicos={tecnicosOnly}
           jornadas={jornadas.filter((j) => j.estado === "Pendiente")}
           initialJornadaId={selectedJornadaId}
+          defaultTecnicoId={defaultCrew.tecnico_id}
+          defaultAuxiliares={defaultCrew.auxiliares}
           onSaved={() => { cargar(); onChanged(); }}
         />
       )}
