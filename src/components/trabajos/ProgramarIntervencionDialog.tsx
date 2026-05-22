@@ -36,6 +36,8 @@ interface Props {
   clientes?: Cliente[];
   tecnicos: Profile[];
   fechaInicial?: string | null;
+  initialTecnicoId?: string | null;
+  initialAuxiliares?: string[];
   onSaved: () => void;
 }
 
@@ -49,6 +51,8 @@ export function ProgramarIntervencionDialog({
   clientes,
   tecnicos,
   fechaInicial,
+  initialTecnicoId,
+  initialAuxiliares,
   onSaved,
 }: Props) {
   const { user } = useAuth();
@@ -66,11 +70,11 @@ export function ProgramarIntervencionDialog({
     setSelectedTrabajoId(trabajoId ?? "");
     setForm({
       fecha: fechaInicial ?? new Date().toISOString().slice(0, 10),
-      tecnico_id: null,
-      auxiliares: [],
+      tecnico_id: initialTecnicoId ?? null,
+      auxiliares: initialAuxiliares ?? [],
       observacion: "",
     });
-  }, [open, trabajoId, fechaInicial]);
+  }, [open, trabajoId, fechaInicial, initialTecnicoId, initialAuxiliares]);
 
   const trabajoActivo = useMemo(() => {
     const id = selectedTrabajoId || trabajoId;
