@@ -27,6 +27,8 @@ interface Props {
   tecnicos: Profile[];
   jornadas: JornadaLegacy[];
   initialJornadaId?: string | null;
+  defaultTecnicoId?: string | null;
+  defaultAuxiliares?: string[];
   onSaved: () => void;
 }
 
@@ -40,6 +42,8 @@ export function CargarJornadaDialog({
   tecnicos,
   jornadas,
   initialJornadaId,
+  defaultTecnicoId,
+  defaultAuxiliares,
   onSaved,
 }: Props) {
   const { user } = useAuth();
@@ -57,13 +61,13 @@ export function CargarJornadaDialog({
     if (!open) return;
     const pendiente = jornadas.find((j) => j.id === initialJornadaId) ?? jornadas.find((j) => j.estado === "Pendiente") ?? jornadas[0];
     setForm({
-      tecnico_id: pendiente?.tecnico_responsable_id ?? user?.id ?? "",
-      auxiliares: pendiente?.auxiliares ?? [],
+      tecnico_id: pendiente?.tecnico_responsable_id ?? defaultTecnicoId ?? user?.id ?? "",
+      auxiliares: (pendiente?.auxiliares && pendiente.auxiliares.length > 0) ? pendiente.auxiliares : (defaultAuxiliares ?? []),
       jornada_id: pendiente?.id ?? "",
       resultado: "realizada",
       observaciones: "",
     });
-  }, [open, user?.id, jornadas, initialJornadaId]);
+  }, [open, user?.id, jornadas, initialJornadaId, defaultTecnicoId, defaultAuxiliares]);
 
   const guardar = async () => {
     if (!form.tecnico_id) {
