@@ -394,7 +394,7 @@ export function ServicioDetalleDialog({
                 )}
                 <MarcaBadge marca={servicio.marca} />
                 <Badge variant="outline" className="gap-1 text-[10px]">
-                  {tipo === "Maquina en taller" || tipo === "MÃ¡quina en taller" ? (
+                  {tipo === "Máquina en taller" ? (
                     <Wrench className="h-3 w-3" />
                   ) : (
                     <MapPin className="h-3 w-3" />

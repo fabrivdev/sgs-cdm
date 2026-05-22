@@ -86,7 +86,7 @@ export default function Admin() {
 
   const load = async () => {
     const [profileResult, roleResult, clientResult] = await Promise.all([
-      supabase.from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
+      (supabase as any).from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("clientes").select("id, nombre, sucursal").order("nombre"),
     ]);
