@@ -170,7 +170,7 @@ export function ServicioDetalleDialog({
     loadClientes();
   }, [servicio?.id]);
 
-  const loadJornadas = async (servicioId: string) => {
+  const loadJornadas = async (servicioId: string): Promise<Jornada[]> => {
     setLoadingJornadas(true);
     const { data, error } = await supabase
       .from("servicio_jornadas")
@@ -182,11 +182,13 @@ export function ServicioDetalleDialog({
 
     if (error) {
       toast.error("No se pudieron cargar las jornadas");
-      return;
+      return [];
     }
 
-    setJornadas((data ?? []) as Jornada[]);
+    const list = (data ?? []) as Jornada[];
+    setJornadas(list);
     setEdits({});
+    return list;
   };
 
   useEffect(() => {
@@ -349,7 +351,9 @@ export function ServicioDetalleDialog({
     const nuevaLista = jornadas.filter((j) => j.id !== id);
     await syncTrabajoMadre(servicio.id, nuevaLista);
     toast.success("Jornada eliminada");
-    await loadJornadas(servicio.id);
+    const fresh = await loadJornadas(servicio.id);
+    const siguientePend = fresh.find((j) => j.estado === "Pendiente");
+    if (siguientePend) setActiveJornadaId(siguientePend.id);
     onChanged();
   };
 
@@ -734,7 +738,13 @@ export function ServicioDetalleDialog({
           defaultTecnicoId={activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id}
           defaultAuxiliares={activeMerged?.auxiliares ?? servicio.auxiliares}
           onSaved={async () => {
-            await loadJornadas(servicio.id);
+            const fresh = await loadJornadas(servicio.id);
+            const siguientePend = fresh.find((j) => j.estado === "Pendiente");
+            if (siguientePend) {
+              setActiveJornadaId(siguientePend.id);
+            } else {
+              toast.success("Todas las jornadas fueron cerradas");
+            }
             onChanged();
           }}
         />
