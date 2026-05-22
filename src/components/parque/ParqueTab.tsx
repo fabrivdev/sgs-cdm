@@ -418,10 +418,10 @@ export function ParqueTab({
       const sucursales = Array.from(
         new Set(mqs.map((m) => m.sucursal).filter((s): s is Sucursal => !!s)),
       ).sort();
-      const anios = mqs.map((m) => m.anio).filter((a): a is number => !!a);
+      const años = mqs.map((m) => m.anio).filter((a): a is number => !!a);
       const antiguedadProm =
-        anios.length > 0
-          ? Math.round((anios.reduce((s, a) => s + (hoy.getFullYear() - a), 0) / anios.length) * 10) / 10
+        años.length > 0
+          ? Math.round((años.reduce((s, a) => s + (hoy.getFullYear() - a), 0) / años.length) * 10) / 10
           : null;
 
       const agg = factAgregados.get(cli.id);

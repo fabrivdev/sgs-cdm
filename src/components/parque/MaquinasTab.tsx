@@ -42,7 +42,7 @@ type Cliente = {
   sucursal: Sucursal | null;
 };
 
-type SortKey = "cliente" | "marca" | "subgrupo" | "anio" | "serie" | "sucursal";
+type SortKey = "cliente" | "marca" | "subgrupo" | "año" | "serie" | "sucursal";
 
 const PAGE = 1000;
 
@@ -75,8 +75,8 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
   const [fMarca, setFMarca] = useState("all");
   const [fSubgrupo, setFSubgrupo] = useState("all");
   const [fEstado, setFEstado] = useState("activa");
-  const [anioDesde, setAnioDesde] = useState("");
-  const [anioHasta, setAnioHasta] = useState("");
+  const [añoDesde, setAnioDesde] = useState("");
+  const [añoHasta, setAnioHasta] = useState("");
 
   const [sortKey, setSortKey] = useState<SortKey>("cliente");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -118,8 +118,8 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
-    const ad = anioDesde ? Number(anioDesde) : null;
-    const ah = anioHasta ? Number(anioHasta) : null;
+    const ad = añoDesde ? Number(añoDesde) : null;
+    const ah = añoHasta ? Number(añoHasta) : null;
 
     return maquinas.filter((m) => {
       const activa = m.activo !== false;
@@ -144,7 +144,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
       return true;
     });
-  }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, anioDesde, anioHasta]);
+  }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, añoDesde, añoHasta]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
@@ -160,7 +160,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           return a.marca.localeCompare(b.marca) * dir;
         case "subgrupo":
           return (a.subgrupo ?? "").localeCompare(b.subgrupo ?? "") * dir;
-        case "anio":
+        case "año":
           return ((a.anio ?? 0) - (b.anio ?? 0)) * dir;
         case "serie":
           return (a.serie ?? "").localeCompare(b.serie ?? "") * dir;
@@ -221,7 +221,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
   const activos =
     (q ? 1 : 0) + (fSucursal !== "all" ? 1 : 0) + (fMarca !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) + (fEstado !== "activa" ? 1 : 0) +
-    (anioDesde ? 1 : 0) + (anioHasta ? 1 : 0);
+    (añoDesde ? 1 : 0) + (añoHasta ? 1 : 0);
 
   return (
     <div className="space-y-3">
@@ -249,10 +249,10 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           options={[{ value: "all", label: "Todos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
         />
         <FilterCustom label="Año desde" width="w-[100px]">
-          <Input type="number" value={anioDesde} onChange={(e) => setAnioDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
+          <Input type="number" value={añoDesde} onChange={(e) => setAnioDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
         </FilterCustom>
         <FilterCustom label="Año hasta" width="w-[100px]">
-          <Input type="number" value={anioHasta} onChange={(e) => setAnioHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
+          <Input type="number" value={añoHasta} onChange={(e) => setAnioHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
         </FilterCustom>
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
@@ -283,8 +283,8 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
                 <div className="flex items-center gap-1">Subgrupo {sortIcon("subgrupo")}</div>
               </TableHead>
               <TableHead>Modelo/Tipo</TableHead>
-              <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("anio")}>
-                <div className="flex items-center justify-center gap-1">Año {sortIcon("anio")}</div>
+              <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("año")}>
+                <div className="flex items-center justify-center gap-1">Año {sortIcon("año")}</div>
               </TableHead>
               <TableHead className="text-center">Antig.</TableHead>
               <TableHead className="cursor-pointer" onClick={() => toggleSort("serie")}>

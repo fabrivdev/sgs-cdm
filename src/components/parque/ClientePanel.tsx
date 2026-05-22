@@ -363,7 +363,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   // ===== Facturación stats =====
   const factStats = useMemo(() => {
     const hoy = new Date();
-    const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
+    const inicioAño = new Date(hoy.getFullYear(), 0, 1);
     const inicioPrev = new Date(hoy.getFullYear() - 1, 0, 1);
     const finPrev = new Date(hoy.getFullYear(), 0, 1);
     const calc = (tipo: "Repuesto" | "Servicio") => {
@@ -385,7 +385,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
     const d = new Date(f.fecha);
 
-    if (d >= inicioAnio) ytd += f.total_venta;
+    if (d >= inicioAño) ytd += f.total_venta;
     else if (d >= inicioPrev && d < finPrev) prev += f.total_venta;
 
     lista.push(f);
