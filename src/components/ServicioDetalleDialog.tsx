@@ -219,14 +219,22 @@ export function ServicioDetalleDialog({
       return;
     }
 
-    const byContext = fechaContexto ? jornadas.find((j) => j.fecha === fechaContexto) : null;
     const pending = jornadas.find((j) => j.estado === "Pendiente");
+    const byContext = fechaContexto ? jornadas.find((j) => j.fecha === fechaContexto) : null;
     const fallback = jornadas[jornadas.length - 1];
-    const next = byContext ?? pending ?? fallback;
 
-    setActiveJornadaId((current) =>
-      current && jornadas.some((j) => j.id === current) ? current : next.id,
-    );
+    setActiveJornadaId((current) => {
+      const currentJ = current ? jornadas.find((j) => j.id === current) : null;
+      // Si la jornada actual sigue pendiente, mantenerla
+      if (currentJ && currentJ.estado === "Pendiente") return current!;
+      // Si hay alguna pendiente, saltar siempre a esa (la mas proxima por fecha)
+      if (pending) return pending.id;
+      // Sin pendientes: respetar contexto del planificador si existe
+      if (byContext) return byContext.id;
+      // Mantener la actual si todavia existe (usuario navegando historial)
+      if (currentJ) return current!;
+      return fallback.id;
+    });
   }, [jornadas, fechaContexto]);
 
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p.nombre])), [profiles]);
