@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import type { Role } from "@/lib/constants";
 
@@ -8,7 +8,8 @@ interface Props {
 }
 
 export function ProtectedRoute({ children, requireRoles }: Props) {
-  const { user, roles, loading } = useAuth();
+  const { user, roles, loading, mustChangePassword } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -19,6 +20,14 @@ export function ProtectedRoute({ children, requireRoles }: Props) {
   }
 
   if (!user) return <Navigate to="/auth" replace />;
+
+  if (mustChangePassword && location.pathname !== "/primer-acceso") {
+    return <Navigate to="/primer-acceso" replace />;
+  }
+
+  if (!mustChangePassword && location.pathname === "/primer-acceso") {
+    return <Navigate to="/" replace />;
+  }
 
   if (requireRoles && !requireRoles.some((r) => roles.includes(r))) {
     return <Navigate to="/" replace />;

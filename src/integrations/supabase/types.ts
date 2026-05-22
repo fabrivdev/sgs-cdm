@@ -394,25 +394,37 @@ export type Database = {
           activo: boolean
           actualizado_en: string
           creado_en: string
+          has_login_access: boolean
           id: string
+          login_mode: string
+          must_change_password: boolean
           nombre: string
           sucursal: Database["public"]["Enums"]["sucursal"] | null
+          username: string | null
         }
         Insert: {
           activo?: boolean
           actualizado_en?: string
           creado_en?: string
+          has_login_access?: boolean
           id: string
+          login_mode?: string
+          must_change_password?: boolean
           nombre: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          username?: string | null
         }
         Update: {
           activo?: boolean
           actualizado_en?: string
           creado_en?: string
+          has_login_access?: boolean
           id?: string
+          login_mode?: string
+          must_change_password?: boolean
           nombre?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          username?: string | null
         }
         Relationships: []
       }

@@ -14,6 +14,7 @@ import Historial from "./pages/Historial";
 import ParqueClientes from "./pages/ParqueClientes";
 import Trabajos from "./pages/Trabajos";
 import Admin from "./pages/Admin";
+import PrimerAcceso from "./pages/PrimerAcceso";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
+              <Route path="/primer-acceso" element={<PrimerAcceso />} />
               <Route path="/" element={<Planificador />} />
               <Route path="/trabajos" element={<Trabajos />} />
               <Route path="/calendario" element={<Calendario />} />

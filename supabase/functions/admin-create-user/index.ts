@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const normalizeUsername = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9._-]/g, ".");
+
+const buildInternalEmail = (username: string) =>
+  `${username}.${crypto.randomUUID().slice(0, 8)}@users.cdm.local`;
+
+const buildInternalOnlyEmail = () => `no-access.${crypto.randomUUID()}@users.cdm.local`;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -36,16 +49,59 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, password, nombre, sucursal, role } = await req.json();
-    if (!email || !password || !nombre || !role) {
+    const {
+      email,
+      username,
+      password,
+      nombre,
+      sucursal,
+      role,
+      login_mode,
+      has_login_access,
+      must_change_password,
+    } = await req.json();
+
+    const hasLoginAccess = has_login_access !== false;
+    const loginMode = login_mode === "username" ? "username" : "email";
+    const normalizedUsername = loginMode === "username" ? normalizeUsername(String(username ?? "")) : null;
+    const authEmail = !hasLoginAccess
+      ? buildInternalOnlyEmail()
+      : loginMode === "email"
+        ? String(email ?? "").trim().toLowerCase()
+        : normalizedUsername
+          ? buildInternalEmail(normalizedUsername)
+          : "";
+    const initialPassword = hasLoginAccess ? String(password ?? "") : crypto.randomUUID() + crypto.randomUUID().slice(0, 8);
+
+    if (!nombre || !role || !authEmail || (hasLoginAccess && loginMode === "username" && !normalizedUsername)) {
       return new Response(JSON.stringify({ error: "Faltan campos requeridos" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    if (hasLoginAccess && initialPassword.length < 6) {
+      return new Response(JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (normalizedUsername) {
+      const { data: existingUsername } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("username", normalizedUsername)
+        .maybeSingle();
+
+      if (existingUsername) {
+        return new Response(JSON.stringify({ error: "Ese usuario ya existe" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
-      email,
-      password,
+      email: authEmail,
+      password: initialPassword,
       email_confirm: true,
       user_metadata: { nombre, sucursal },
     });
@@ -56,10 +112,17 @@ Deno.serve(async (req) => {
     }
 
     // Profile is auto-created by handle_new_user trigger.
-    // Update sucursal if necessary.
-    if (sucursal) {
-      await admin.from("profiles").update({ sucursal, nombre }).eq("id", created.user.id);
-    }
+    await admin
+      .from("profiles")
+      .update({
+        sucursal,
+        nombre,
+        username: hasLoginAccess ? normalizedUsername : null,
+        login_mode: loginMode,
+        has_login_access: hasLoginAccess,
+        must_change_password: hasLoginAccess ? must_change_password !== false : false,
+      })
+      .eq("id", created.user.id);
 
     // Assign role
     await admin.from("user_roles").insert({ user_id: created.user.id, role });
