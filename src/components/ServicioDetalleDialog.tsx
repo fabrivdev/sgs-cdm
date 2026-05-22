@@ -37,6 +37,7 @@ import { es } from "date-fns/locale";
 import { CalendarPlus, CheckCircle2, MapPin, MoreVertical, Pencil, RotateCcw, Trash2, Wrench, X, XCircle } from "lucide-react";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
+import { TecnicosPicker } from "@/components/trabajos/TecnicosPicker";
 import { cn } from "@/lib/utils";
 import { estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 
@@ -76,6 +77,8 @@ interface Jornada {
   horas_trabajadas: number | null;
   estado: Estado;
   observaciones: string | null;
+  tecnico_responsable_id: string | null;
+  auxiliares: string[];
 }
 
 interface TrabajoMadre {
@@ -118,6 +121,7 @@ export function ServicioDetalleDialog({
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
   const [trabajoMadre, setTrabajoMadre] = useState<TrabajoMadre | null>(null);
   const [programarOpen, setProgramarOpen] = useState(false);
+  const [editClosedOpen, setEditClosedOpen] = useState(false);
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
   const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
@@ -168,7 +172,7 @@ export function ServicioDetalleDialog({
     setLoadingJornadas(true);
     const { data, error } = await supabase
       .from("servicio_jornadas")
-      .select("id, servicio_id, fecha, horas_trabajadas, estado, observaciones")
+      .select("id, servicio_id, fecha, horas_trabajadas, estado, observaciones, tecnico_responsable_id, auxiliares")
       .eq("servicio_id", servicioId)
       .order("fecha", { ascending: true });
 
@@ -202,6 +206,10 @@ export function ServicioDetalleDialog({
   }, [servicio?.id]);
 
   useEffect(() => {
+    setEditClosedOpen(false);
+  }, [activeJornadaId]);
+
+  useEffect(() => {
     if (jornadas.length === 0) {
       setActiveJornadaId(null);
       return;
@@ -225,13 +233,21 @@ export function ServicioDetalleDialog({
 
   if (!servicio) return null;
 
-  const isAssigned =
-    user &&
-    (servicio.tecnico_responsable_id === user.id || servicio.auxiliares.includes(user.id));
-  const canEdit = isAdmin || isCabecilla || isAssigned;
+  const activeJornada = jornadas.find((j) => j.id === activeJornadaId) ?? null;
+  const activeMerged = activeJornada ? { ...activeJornada, ...edits[activeJornada.id] } : null;
+  const jornadaResponsableId = activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id;
+  const canEdit = isAdmin || isCabecilla || (!!user && jornadaResponsableId === user.id);
   const canManage = isAdmin || isCabecilla;
   const tipo = servicio.tipo_trabajo ?? "Visita de campo";
   const clienteNombre = servicio.cliente_id ? cliById[servicio.cliente_id] ?? "Cliente no encontrado" : "-";
+  const jornadaResponsableNombre =
+    (activeMerged?.tecnico_responsable_id && profById[activeMerged.tecnico_responsable_id]) ||
+    (servicio.tecnico_responsable_id && profById[servicio.tecnico_responsable_id]) ||
+    "-";
+  const jornadaAuxiliares = ((activeMerged?.auxiliares?.length ? activeMerged.auxiliares : servicio.auxiliares) ?? [])
+    .map((id) => profById[id])
+    .filter(Boolean)
+    .join(", ") || "-";
 
   const totalHoras = jornadas.reduce((acc, j) => {
     const v = edits[j.id]?.horas_trabajadas ?? j.horas_trabajadas;
@@ -242,8 +258,6 @@ export function ServicioDetalleDialog({
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   };
 
-  const activeJornada = jornadas.find((j) => j.id === activeJornadaId) ?? null;
-  const activeMerged = activeJornada ? { ...activeJornada, ...edits[activeJornada.id] } : null;
   const activeIsPending = activeMerged?.estado === "Pendiente";
   const historial = jornadas.filter((j) => j.id !== activeJornadaId);
   const dirty = Object.values(edits).some((p) => p && Object.keys(p).length > 0);
@@ -282,6 +296,8 @@ export function ServicioDetalleDialog({
       if ("estado" in patch) payload.estado = patch.estado;
       if ("horas_trabajadas" in patch) payload.horas_trabajadas = patch.horas_trabajadas;
       if ("observaciones" in patch) payload.observaciones = patch.observaciones;
+      if ("tecnico_responsable_id" in patch) payload.tecnico_responsable_id = patch.tecnico_responsable_id;
+      if ("auxiliares" in patch) payload.auxiliares = patch.auxiliares;
 
       const { error } = await supabase.from("servicio_jornadas").update(payload).eq("id", id);
       if (error) {
@@ -303,6 +319,8 @@ export function ServicioDetalleDialog({
           estado: ultima.estado,
           horas_trabajadas: totalHoras > 0 ? totalHoras : null,
           observaciones: ultima.observaciones,
+          tecnico_responsable_id: ultima.tecnico_responsable_id,
+          auxiliares: ultima.auxiliares ?? [],
         })
         .eq("id", servicio.id);
     }
@@ -441,6 +459,14 @@ export function ServicioDetalleDialog({
                     <div className="text-base font-semibold capitalize">
                       {format(parseISO(activeJornada.fecha), "EEEE d 'de' MMMM yyyy", { locale: es })}
                     </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>
+                        Responsable: <span className="text-foreground">{jornadaResponsableNombre}</span>
+                      </span>
+                      <span>
+                        Auxiliares: <span className="text-foreground">{jornadaAuxiliares}</span>
+                      </span>
+                    </div>
                   </div>
                   <EstadoBadge estado={activeMerged.estado} className="text-[10px]" />
                 </div>
@@ -502,6 +528,19 @@ export function ServicioDetalleDialog({
                         />
                       </div>
                     </div>
+                    <TecnicosPicker
+                      tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+                      principalId={activeMerged.tecnico_responsable_id}
+                      auxiliares={activeMerged.auxiliares ?? []}
+                      onChange={({ principalId, auxiliares }) =>
+                        jornadaPatch(activeJornada.id, {
+                          tecnico_responsable_id: principalId,
+                          auxiliares,
+                        })
+                      }
+                      label="Cuadrilla de esta jornada"
+                      helperText="Se deja preseleccionada la cuadrilla actual. Solo cambiala si ese dia participo otra combinacion."
+                    />
                   </>
                 ) : activeIsPending ? (
                   <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
@@ -526,6 +565,83 @@ export function ServicioDetalleDialog({
                         <div className="rounded-md bg-muted/40 px-3 py-2.5 text-sm leading-relaxed">
                           {activeMerged.observaciones}
                         </div>
+                      </div>
+                    )}
+
+                    {canEdit && (
+                      <div className="flex justify-start">
+                        <Button
+                          type="button"
+                          variant={editClosedOpen ? "secondary" : "outline"}
+                          size="sm"
+                          onClick={() => setEditClosedOpen((v) => !v)}
+                        >
+                          {editClosedOpen ? "Ocultar edicion" : "Editar resultado"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {canEdit && editClosedOpen && (
+                      <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <ResultButton
+                            active={activeMerged.estado === "Completado"}
+                            icon={<CheckCircle2 className="h-4 w-4" />}
+                            label="Realizada"
+                            onClick={() => jornadaPatch(activeJornada.id, { estado: "Completado" })}
+                          />
+                          <ResultButton
+                            active={activeMerged.estado === "Cancelada"}
+                            icon={<XCircle className="h-4 w-4" />}
+                            label="No realizada"
+                            onClick={() => jornadaPatch(activeJornada.id, { estado: "Cancelada" })}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
+                          <div className="space-y-1.5">
+                            <Label>Horas trabajadas</Label>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              inputMode="decimal"
+                              className="h-11 text-base"
+                              value={activeMerged.horas_trabajadas ?? ""}
+                              onChange={(e) =>
+                                jornadaPatch(activeJornada.id, {
+                                  horas_trabajadas: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label>Observacion</Label>
+                            <Textarea
+                              rows={3}
+                              className="text-sm"
+                              value={activeMerged.observaciones ?? ""}
+                              onChange={(e) => jornadaPatch(activeJornada.id, { observaciones: e.target.value || null })}
+                              placeholder="Completa o corrige lo que se hizo ese dia..."
+                            />
+                          </div>
+                        </div>
+
+                        <TecnicosPicker
+                          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+                          principalId={activeMerged.tecnico_responsable_id}
+                          auxiliares={activeMerged.auxiliares ?? []}
+                          onChange={({ principalId, auxiliares }) =>
+                            jornadaPatch(activeJornada.id, {
+                              tecnico_responsable_id: principalId,
+                              auxiliares,
+                            })
+                          }
+                          label="Cuadrilla que participo"
+                          helperText="Normalmente queda igual. Si ese dia trabajo otra combinacion, corregila aca."
+                        />
                       </div>
                     )}
                   </div>
@@ -610,7 +726,7 @@ export function ServicioDetalleDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>
-          {canEdit && activeIsPending && (
+          {canEdit && (activeIsPending || editClosedOpen) && (
             <Button onClick={save} disabled={busy || !dirty}>
               {busy ? "Guardando..." : "Guardar resultado"}
             </Button>
@@ -640,6 +756,8 @@ export function ServicioDetalleDialog({
           trabajos={[trabajoMadre as any]}
           clientes={clientesAll.length > 0 ? clientesAll : clientes}
           tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+          initialTecnicoId={activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id}
+          initialAuxiliares={activeMerged?.auxiliares ?? servicio.auxiliares}
           onSaved={() => {
             loadJornadas(servicio.id);
             onChanged();
