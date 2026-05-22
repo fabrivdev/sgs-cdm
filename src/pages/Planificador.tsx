@@ -23,6 +23,7 @@ import { pageDescription, pageShellWide, pageTitle, tableText } from "@/lib/ui-c
 
 interface Servicio {
   id: string;
+  jornada_id?: string | null;
   fecha_programada: string;
   dia_semana: string;
   semana: number;
@@ -150,7 +151,7 @@ export default function Planificador() {
       const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }, { data: rls }] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
-        supabase.from("servicio_jornadas").select("servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
+        supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
         supabase.from("trabajos").select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
@@ -163,6 +164,7 @@ export default function Planificador() {
 
       const serviciosBase = (srv ?? []) as Servicio[];
       const jornadas = (jor ?? []) as Array<{
+        id: string;
         servicio_id: string;
         fecha: string;
         estado: Estado;
@@ -194,6 +196,7 @@ export default function Planificador() {
           const d = parseISO(j.fecha);
           expandidos.push({
             ...s,
+            jornada_id: j.id,
             fecha_programada: j.fecha,
             dia_semana: dias[d.getDay()],
             semana: getISOWeek(d),
@@ -308,21 +311,21 @@ export default function Planificador() {
       return;
     }
 
-    // Actualizar la jornada de esa fecha (si existe), no el servicio padre
-    const { data: j } = await supabase
-      .from("servicio_jornadas")
-      .select("id")
-      .eq("servicio_id", s.id)
-      .eq("fecha", s.fecha_programada)
-      .maybeSingle();
-
-    const error = j?.id
-      ? (await supabase.from("servicio_jornadas").update({ estado }).eq("id", j.id)).error
+    const error = s.jornada_id
+      ? (await supabase
+          .from("servicio_jornadas")
+          .update({ estado })
+          .eq("id", s.jornada_id)
+          .eq("servicio_id", s.id)).error
       : (await supabase.from("servicios").update({ estado }).eq("id", s.id)).error;
 
     if (error) {
       toast.error(error.message);
     } else {
+      const trabajo = trabajosLite.find((t) => t.legacy_servicio_id === s.id);
+      if (trabajo?.id) {
+        await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajo.id });
+      }
       toast.success(`Estado: ${estado}`);
       load();
     }
