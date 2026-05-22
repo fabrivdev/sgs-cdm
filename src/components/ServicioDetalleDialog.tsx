@@ -38,6 +38,7 @@ import { CalendarPlus, CheckCircle2, MapPin, MoreVertical, Pencil, RotateCcw, Tr
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
 import { TecnicosPicker } from "@/components/trabajos/TecnicosPicker";
+import { CargarJornadaDialog } from "@/components/trabajos/CargarJornadaDialog";
 import { cn } from "@/lib/utils";
 import { estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 
@@ -121,6 +122,7 @@ export function ServicioDetalleDialog({
   const [confirmDeleteJornadaId, setConfirmDeleteJornadaId] = useState<string | null>(null);
   const [trabajoMadre, setTrabajoMadre] = useState<TrabajoMadre | null>(null);
   const [programarOpen, setProgramarOpen] = useState(false);
+  const [cargarOpen, setCargarOpen] = useState(false);
   const [editClosedOpen, setEditClosedOpen] = useState(false);
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
@@ -473,19 +475,15 @@ export function ServicioDetalleDialog({
 
                 {canEdit && activeIsPending ? (
                   <>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <ResultButton
-                        active={activeMerged.estado === "Completado"}
-                        icon={<CheckCircle2 className="h-4 w-4" />}
-                        label="Realizada"
-                        onClick={() => jornadaPatch(activeJornada.id, { estado: "Completado" })}
-                      />
-                      <ResultButton
-                        active={activeMerged.estado === "Cancelada"}
-                        icon={<XCircle className="h-4 w-4" />}
-                        label="No realizada"
-                        onClick={() => jornadaPatch(activeJornada.id, { estado: "Cancelada" })}
-                      />
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        className="h-11 justify-start gap-2"
+                        onClick={() => setCargarOpen(true)}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Cargar resultado
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -497,50 +495,9 @@ export function ServicioDetalleDialog({
                         Continuar otro dia
                       </Button>
                     </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
-                      <div className="space-y-1.5">
-                        <Label>Horas trabajadas</Label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          inputMode="decimal"
-                          className="h-11 text-base"
-                          value={activeMerged.horas_trabajadas ?? ""}
-                          onChange={(e) =>
-                            jornadaPatch(activeJornada.id, {
-                              horas_trabajadas: e.target.value === "" ? null : Number(e.target.value),
-                            })
-                          }
-                          placeholder="0"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label>Observacion</Label>
-                        <Textarea
-                          rows={3}
-                          className="text-sm"
-                          value={activeMerged.observaciones ?? ""}
-                          onChange={(e) => jornadaPatch(activeJornada.id, { observaciones: e.target.value || null })}
-                          placeholder="Que se hizo, que quedo pendiente o por que no se pudo realizar..."
-                        />
-                      </div>
+                    <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
+                      Usa la misma carga de resultado que en Trabajos para guardar estado, horas, observacion y cuadrilla en una sola accion.
                     </div>
-                    <TecnicosPicker
-                      tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
-                      principalId={activeMerged.tecnico_responsable_id}
-                      auxiliares={activeMerged.auxiliares ?? []}
-                      onChange={({ principalId, auxiliares }) =>
-                        jornadaPatch(activeJornada.id, {
-                          tecnico_responsable_id: principalId,
-                          auxiliares,
-                        })
-                      }
-                      label="Cuadrilla de esta jornada"
-                      helperText="Se deja preseleccionada la cuadrilla actual. Solo cambiala si ese dia participo otra combinacion."
-                    />
                   </>
                 ) : activeIsPending ? (
                   <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
@@ -726,7 +683,7 @@ export function ServicioDetalleDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>
-          {canEdit && (activeIsPending || editClosedOpen) && (
+          {canEdit && editClosedOpen && (
             <Button onClick={save} disabled={busy || !dirty}>
               {busy ? "Guardando..." : "Guardar resultado"}
             </Button>
@@ -760,6 +717,24 @@ export function ServicioDetalleDialog({
           initialAuxiliares={activeMerged?.auxiliares ?? servicio.auxiliares}
           onSaved={() => {
             loadJornadas(servicio.id);
+            onChanged();
+          }}
+        />
+      )}
+
+      {trabajoMadre && (
+        <CargarJornadaDialog
+          open={cargarOpen}
+          onOpenChange={setCargarOpen}
+          trabajoId={trabajoMadre.id}
+          legacyServicioId={servicio.id}
+          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+          jornadas={jornadas.filter((j) => j.estado === "Pendiente")}
+          initialJornadaId={activeJornadaId}
+          defaultTecnicoId={activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id}
+          defaultAuxiliares={activeMerged?.auxiliares ?? servicio.auxiliares}
+          onSaved={async () => {
+            await loadJornadas(servicio.id);
             onChanged();
           }}
         />

@@ -15,6 +15,8 @@ interface JornadaLegacy {
   id: string;
   fecha: string;
   estado: Estado;
+  horas_trabajadas?: number | null;
+  observaciones?: string | null;
   tecnico_responsable_id: string | null;
   auxiliares: string[] | null;
 }
@@ -53,6 +55,7 @@ export function CargarJornadaDialog({
     auxiliares: [] as string[],
     jornada_id: "",
     resultado: "realizada" as Resultado,
+    horas_trabajadas: "" as string,
     observaciones: "",
   });
   const [busy, setBusy] = useState(false);
@@ -65,7 +68,8 @@ export function CargarJornadaDialog({
       auxiliares: (pendiente?.auxiliares && pendiente.auxiliares.length > 0) ? pendiente.auxiliares : (defaultAuxiliares ?? []),
       jornada_id: pendiente?.id ?? "",
       resultado: "realizada",
-      observaciones: "",
+      horas_trabajadas: pendiente?.horas_trabajadas != null ? String(pendiente.horas_trabajadas) : "",
+      observaciones: pendiente?.observaciones ?? "",
     });
   }, [open, user?.id, jornadas, initialJornadaId, defaultTecnicoId, defaultAuxiliares]);
 
@@ -87,6 +91,7 @@ export function CargarJornadaDialog({
         .from("servicio_jornadas")
         .update({
           estado: form.resultado === "realizada" ? "Completado" : "Cancelada",
+          horas_trabajadas: form.horas_trabajadas === "" ? null : Number(form.horas_trabajadas),
           tecnico_responsable_id: form.tecnico_id,
           auxiliares: form.auxiliares,
           observaciones: form.observaciones.trim() || null,
@@ -147,6 +152,8 @@ export function CargarJornadaDialog({
                   jornada_id: v,
                   tecnico_id: j?.tecnico_responsable_id ?? f.tecnico_id,
                   auxiliares: j?.auxiliares ?? f.auxiliares,
+                  horas_trabajadas: j?.horas_trabajadas != null ? String(j.horas_trabajadas) : "",
+                  observaciones: j?.observaciones ?? "",
                 }));
               }}
             >
@@ -171,6 +178,20 @@ export function CargarJornadaDialog({
             label="Cuadrilla"
             helperText="Estrella = principal. El resto, auxiliares."
           />
+
+          <div className="space-y-1.5">
+            <Label>Horas trabajadas</Label>
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              inputMode="decimal"
+              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={form.horas_trabajadas}
+              onChange={(e) => setForm(f => ({ ...f, horas_trabajadas: e.target.value }))}
+              placeholder="0"
+            />
+          </div>
 
           <div className="space-y-1.5">
             <Label>Observacion</Label>
