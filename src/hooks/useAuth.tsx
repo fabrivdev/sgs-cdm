@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role, Sucursal } from "@/lib/constants";
@@ -8,10 +8,6 @@ interface Profile {
   nombre: string;
   sucursal: Sucursal | null;
   activo: boolean;
-  username: string | null;
-  login_mode: "email" | "username";
-  has_login_access: boolean;
-  must_change_password: boolean;
 }
 
 interface AuthCtx {
@@ -24,9 +20,7 @@ interface AuthCtx {
   isSuperAdmin: boolean;
   isCabecilla: boolean;
   isTecnico: boolean;
-  mustChangePassword: boolean;
-  signIn: (identifier: string, password: string) => Promise<{ error: Error | null }>;
-  changePassword: (password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -63,24 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadingUserRef.current = uid;
 
     const promise = (async () => {
-      const [{ data: prof }, { data: roleRows }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, nombre, sucursal, activo, username, login_mode, has_login_access, must_change_password")
-          .eq("id", uid)
-          .maybeSingle(),
+      const [{ data: prof }, { data: rls }] = await Promise.all([
+        supabase.from("profiles").select("id, nombre, sucursal, activo").eq("id", uid).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", uid),
       ]);
 
       const loadedProfile = prof as Profile | null;
-      if (loadedProfile && (!loadedProfile.activo || !loadedProfile.has_login_access)) {
+      if (loadedProfile && !loadedProfile.activo) {
         await supabase.auth.signOut();
         clearUserData();
         return;
       }
 
       setProfile(loadedProfile);
-      setRoles((roleRows ?? []).map((row: { role: Role }) => row.role));
+      setRoles((rls ?? []).map((r: { role: Role }) => r.role));
       loadedUserRef.current = uid;
     })();
 
@@ -101,7 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sess?.user) {
         setTimeout(() => loadUserData(sess.user.id), 0);
       } else {
-        clearUserData();
+        setProfile(null);
+        setRoles([]);
+        loadedUserRef.current = null;
+        loadingUserRef.current = null;
+        loadingPromiseRef.current = null;
       }
     });
 
@@ -115,65 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [loadUserData]);
 
-  const resolveIdentifierToEmail = async (identifier: string) => {
-    const value = identifier.trim();
-    if (!value) return { email: "", error: new Error("Ingresa tu correo o usuario") };
-
-    if (value.includes("@")) {
-      return { email: value.toLowerCase(), error: null };
-    }
-
-    const { data, error } = await supabase.functions.invoke("auth-resolve-login", {
-      body: { identifier: value },
-    });
-
-    if (error || !data?.email) {
-      return { email: "", error: new Error("Credenciales invalidas") };
-    }
-
-    return { email: String(data.email).toLowerCase(), error: null };
-  };
-
-  const signIn = async (identifier: string, password: string) => {
-    const resolved = await resolveIdentifierToEmail(identifier);
-    if (resolved.error) return { error: resolved.error };
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email: resolved.email, password });
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error };
 
     if (data.user) {
       const { data: prof } = await supabase
         .from("profiles")
-        .select("activo, has_login_access")
+        .select("activo")
         .eq("id", data.user.id)
         .maybeSingle();
 
-      if (prof && (prof.activo === false || prof.has_login_access === false)) {
+      if (prof && prof.activo === false) {
         await supabase.auth.signOut();
         clearUserData();
-        return { error: new Error("Tu acceso esta deshabilitado. Contacta al administrador.") };
+        return { error: new Error("Usuario inactivo. Contactá al administrador.") };
       }
-    }
-
-    return { error: null };
-  };
-
-  const changePassword = async (password: string) => {
-    if (!password || password.length < 6) {
-      return { error: new Error("La contrasena debe tener al menos 6 caracteres") };
-    }
-
-    const { error: authError } = await supabase.auth.updateUser({ password });
-    if (authError) return { error: authError };
-
-    if (user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ must_change_password: false })
-        .eq("id", user.id);
-
-      if (profileError) return { error: profileError };
-      await loadUserData(user.id, true);
     }
 
     return { error: null };
@@ -200,9 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin: (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py",
         isCabecilla: roles.includes("cabecilla"),
         isTecnico: roles.includes("tecnico"),
-        mustChangePassword: profile?.must_change_password ?? false,
         signIn,
-        changePassword,
         signOut,
         refresh,
       }}

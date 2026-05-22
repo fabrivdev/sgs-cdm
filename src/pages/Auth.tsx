@@ -9,17 +9,17 @@ import { toast } from "sonner";
 import { Wrench } from "lucide-react";
 
 export default function Auth() {
-  const { user, signIn, loading, mustChangePassword } = useAuth();
-  const [identifier, setIdentifier] = useState("");
+  const { user, signIn, loading } = useAuth();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (!loading && user) return <Navigate to={mustChangePassword ? "/primer-acceso" : "/"} replace />;
+  if (!loading && user) return <Navigate to="/" replace />;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await signIn(identifier, password);
+    const { error } = await signIn(email, password);
     setBusy(false);
     if (error) toast.error(error.message);
     else toast.success("Bienvenido");
@@ -38,15 +38,8 @@ export default function Auth() {
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Correo o usuario</Label>
-              <Input
-                id="identifier"
-                required
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                autoComplete="username"
-                placeholder="tu.correo@empresa.com o usuario"
-              />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
