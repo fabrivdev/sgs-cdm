@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   CalendarDays,
@@ -33,7 +33,7 @@ const baseItems = [
   { to: "/historial", label: "Historial", icon: History },
 ];
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ children }: { children?: React.ReactNode }) {
   const { profile, isAdmin, isCabecilla, signOut, roles } = useAuth();
   const unseen = useUnseen();
   const location = useLocation();
@@ -139,7 +139,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="pb-20 md:pb-6">{children}</main>
+      <main className="pb-20 md:pb-6">{children ?? <Outlet />}</main>
 
       {/* Bottom nav (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t bg-card md:hidden">
