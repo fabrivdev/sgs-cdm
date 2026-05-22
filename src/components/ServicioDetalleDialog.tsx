@@ -394,7 +394,7 @@ export function ServicioDetalleDialog({
                 )}
                 <MarcaBadge marca={servicio.marca} />
                 <Badge variant="outline" className="gap-1 text-[10px]">
-                  {tipo === "Maquina en taller" || tipo === "MÃ¡quina en taller" ? (
+                  {tipo === "Máquina en taller" ? (
                     <Wrench className="h-3 w-3" />
                   ) : (
                     <MapPin className="h-3 w-3" />
@@ -506,9 +506,6 @@ export function ServicioDetalleDialog({
                         <RotateCcw className="h-4 w-4" />
                         Continuar otro dia
                       </Button>
-                    </div>
-                    <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
-                      Usa la misma carga de resultado que en Trabajos para guardar estado, horas, observacion y cuadrilla en una sola accion.
                     </div>
                   </>
                 ) : activeIsPending ? (

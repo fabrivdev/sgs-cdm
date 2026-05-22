@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (legacyResult.data) return legacyResult.data as Profile;
 
     try {
-      const linkedResult = await supabase
+      const linkedResult = await (supabase as any)
         .from("profiles")
         .select("id, auth_user_id, nombre, sucursal, activo")
         .eq("auth_user_id", uid)
