@@ -28,62 +28,41 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route
-              path="/"
               element={
                 <ProtectedRoute>
-                  <AppLayout><Planificador /></AppLayout>
+                  <AppLayout />
                 </ProtectedRoute>
               }
-            />
-
-            <Route
-              path="/trabajos"
-              element={
-                <ProtectedRoute>
-                  <AppLayout><Trabajos /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/calendario"
-              element={
-                <ProtectedRoute>
-                  <AppLayout><Calendario /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute requireRoles={["admin", "tecnico"]}>
-                  <AppLayout><Dashboard /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/historial"
-              element={
-                <ProtectedRoute>
-                  <AppLayout><Historial /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/parque-clientes"
-              element={
-                <ProtectedRoute requireRoles={["admin"]}>
-                  <AppLayout><ParqueClientes /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute requireRoles={["admin"]}>
-                  <AppLayout><Admin /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
+            >
+              <Route path="/" element={<Planificador />} />
+              <Route path="/trabajos" element={<Trabajos />} />
+              <Route path="/calendario" element={<Calendario />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute requireRoles={["admin", "tecnico"]}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/historial" element={<Historial />} />
+              <Route
+                path="/parque-clientes"
+                element={
+                  <ProtectedRoute requireRoles={["admin"]}>
+                    <ParqueClientes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requireRoles={["admin"]}>
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
