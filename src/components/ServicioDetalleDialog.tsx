@@ -425,7 +425,14 @@ export function ServicioDetalleDialog({
             )}
 
             {activeJornada && activeMerged && (
-              <section className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3 space-y-3">
+              <section
+                className={cn(
+                  "rounded-lg p-4 space-y-3",
+                  activeIsPending
+                    ? "border-2 border-primary/30 bg-primary/5"
+                    : "border bg-card shadow-sm",
+                )}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -501,20 +508,26 @@ export function ServicioDetalleDialog({
                     No tenes permisos para editar esta jornada.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
-                    <div className="space-y-1.5">
-                      <Label>Horas trabajadas</Label>
-                      <div className="flex h-11 items-center rounded-md border bg-card px-3 text-sm">
-                        {activeMerged.horas_trabajadas ?? 0}
-                      </div>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="rounded-md px-2 py-1 text-xs font-medium">
+                        {activeMerged.horas_trabajadas ?? 0} hs trabajadas
+                      </Badge>
+                      {!activeMerged.observaciones?.trim() && (
+                        <Badge variant="outline" className="rounded-md px-2 py-1 text-xs text-muted-foreground">
+                          Sin observaciones
+                        </Badge>
+                      )}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <Label>Observacion</Label>
-                      <div className="min-h-[92px] rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
-                        {activeMerged.observaciones?.trim() || "Sin observaciones cargadas."}
+                    {activeMerged.observaciones?.trim() && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Observacion</Label>
+                        <div className="rounded-md bg-muted/40 px-3 py-2.5 text-sm leading-relaxed">
+                          {activeMerged.observaciones}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -597,7 +610,7 @@ export function ServicioDetalleDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>
-          {canEdit && (
+          {canEdit && activeIsPending && (
             <Button onClick={save} disabled={busy || !dirty}>
               {busy ? "Guardando..." : "Guardar resultado"}
             </Button>
