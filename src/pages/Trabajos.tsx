@@ -112,6 +112,9 @@ export default function Trabajos() {
       }
       if (fFecha || fSemana !== "all") {
         const progs = agendasByTrabajo.get(t.id) ?? [];
+        // En vista semanal, mantener visibles los casos todavia pendientes aunque aun
+        // no tengan jornada programada, para leer backlog + plan de la semana.
+        if (!fFecha && fSemana !== "all" && estadoVisible === "pendiente") return true;
         const matchProg = progs.some(p => {
           if (fFecha && p.fecha_programada !== fFecha) return false;
           if (fSemana !== "all" && getISOWeek(parseISO(p.fecha_programada)) !== Number(fSemana)) return false;
