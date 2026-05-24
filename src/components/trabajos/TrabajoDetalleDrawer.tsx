@@ -1,18 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody, ResponsiveDrawerFooter } from "@/components/ui/responsive-drawer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarPlus, ClipboardList, Clock, User, Users } from "lucide-react";
+import { CalendarPlus, ClipboardList, Clock, MoreVertical, Pencil, Trash2, User, Users } from "lucide-react";
 import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
 import { ESTADO_LABELS, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { ProgramarIntervencionDialog } from "./ProgramarIntervencionDialog";
 import { CargarJornadaDialog } from "./CargarJornadaDialog";
+import { NuevoTrabajoDialog } from "./NuevoTrabajoDialog";
 
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
@@ -79,6 +97,8 @@ export function TrabajoDetalleDrawer({
   const [loading, setLoading] = useState(false);
   const [programarOpen, setProgramarOpen] = useState(false);
   const [cargarOpen, setCargarOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedJornadaId, setSelectedJornadaId] = useState<string | null>(null);
 
   const cargar = async () => {
@@ -156,7 +176,7 @@ export function TrabajoDetalleDrawer({
 
   if (!trabajoId) return null;
 
-  const open = !!trabajoId && !programarOpen && !cargarOpen;
+  const open = !!trabajoId && !programarOpen && !cargarOpen && !editOpen;
   const estado = trabajo ? estadoTrabajoDesdeJornadas(jornadas, trabajo.estado_general) : "pendiente";
   const cliente = trabajo ? clienteMap.get(trabajo.cliente_id) : null;
   const hint = jornadas.length === 0
@@ -164,6 +184,39 @@ export function TrabajoDetalleDrawer({
     : resumen.pendientes.length > 0
       ? "Tiene jornadas pendientes de cierre."
       : "Todas las jornadas tienen resultado.";
+  const canManage = isAdmin || isCabecilla;
+
+  const handleDelete = async () => {
+    if (!trabajo) return;
+    setLoading(true);
+    try {
+      if (trabajo.legacy_servicio_id) {
+        const { error: jError } = await supabase
+          .from("servicio_jornadas")
+          .delete()
+          .eq("servicio_id", trabajo.legacy_servicio_id);
+        if (jError) throw jError;
+
+        const { error: sError } = await supabase
+          .from("servicios")
+          .delete()
+          .eq("id", trabajo.legacy_servicio_id);
+        if (sError) throw sError;
+      }
+
+      const { error } = await supabase.from("trabajos").delete().eq("id", trabajo.id);
+      if (error) throw error;
+
+      toast.success("Trabajo eliminado");
+      setConfirmDelete(false);
+      onChanged();
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo eliminar el trabajo");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -172,20 +225,44 @@ export function TrabajoDetalleDrawer({
           {!trabajo ? (
             <div className="text-sm text-muted-foreground">Cargando...</div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground">
-                  {trabajo.codigo}
-                </span>
-                <Badge variant="outline" className="text-[10px]">{trabajo.sucursal}</Badge>
-                <Badge variant="outline" className="text-[10px]">{trabajo.marca}</Badge>
-                <Badge className={cn("text-[10px]", prioridadBadge(trabajo.prioridad))}>
-                  {PRIORIDADES.find((p) => p.key === trabajo.prioridad)?.label}
-                </Badge>
-                <Badge variant="secondary" className="text-[10px]">{estadoTrabajoLabel(estado)}</Badge>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-2 pr-8">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground">
+                    {trabajo.codigo}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">{trabajo.sucursal}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{trabajo.marca}</Badge>
+                  <Badge className={cn("text-[10px]", prioridadBadge(trabajo.prioridad))}>
+                    {PRIORIDADES.find((p) => p.key === trabajo.prioridad)?.label}
+                  </Badge>
+                  <Badge variant="secondary" className="text-[10px]">{estadoTrabajoLabel(estado)}</Badge>
+                </div>
+                <h2 className="text-lg font-semibold leading-tight">{cliente?.nombre ?? "Sin cliente"}</h2>
+                <p className="text-xs text-muted-foreground">{hint}</p>
               </div>
-              <h2 className="text-lg font-semibold leading-tight">{cliente?.nombre ?? "Sin cliente"}</h2>
-              <p className="text-xs text-muted-foreground">{hint}</p>
+
+              {canManage && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 shrink-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                      <Pencil className="mr-2 h-4 w-4" /> Editar trabajo
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setConfirmDelete(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar trabajo
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )}
         </ResponsiveDrawerHeader>
@@ -312,6 +389,40 @@ export function TrabajoDetalleDrawer({
           onSaved={() => { cargar(); onChanged(); }}
         />
       )}
+
+      {trabajo && (
+        <NuevoTrabajoDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          clientes={clientes}
+          trabajo={trabajo}
+          onSaved={() => {
+            cargar();
+            onChanged();
+          }}
+        />
+      )}
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar este trabajo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta accion no se puede deshacer. Se eliminara el caso, sus jornadas y los datos ligados a su planificacion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
