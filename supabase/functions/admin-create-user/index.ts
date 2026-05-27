@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: uErr } = await userClient.auth.getUser();
     if (uErr || !user) {
       return new Response(JSON.stringify({ error: "No autenticado" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -31,20 +31,20 @@ Deno.serve(async (req) => {
     const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin puede crear usuarios" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { email, password, nombre, sucursal, role, profile_id } = await req.json();
     if (!email || !password || (!nombre && !profile_id)) {
       return new Response(JSON.stringify({ error: "Faltan campos requeridos" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (String(password).length < 6) {
       return new Response(JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -59,13 +59,13 @@ Deno.serve(async (req) => {
       linkedProfile = profileData;
       if (!linkedProfile) {
         return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
-          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (linkedProfile.auth_user_id) {
         return new Response(JSON.stringify({ error: "Ese técnico ya tiene acceso asociado" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     });
     if (cErr || !created.user) {
       return new Response(JSON.stringify({ error: cErr?.message ?? "Error creando usuario" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
