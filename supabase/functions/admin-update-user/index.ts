@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: uErr } = await userClient.auth.getUser();
     if (uErr || !user) {
       return new Response(JSON.stringify({ error: "No autenticado" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin puede modificar usuarios" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -38,17 +38,17 @@ Deno.serve(async (req) => {
     const { profile_id, email, password } = body ?? {};
     if (!profile_id) {
       return new Response(JSON.stringify({ error: "Falta profile_id" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (!email && !password) {
       return new Response(JSON.stringify({ error: "Nada para actualizar" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (password && String(password).length < 6) {
       return new Response(JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -60,13 +60,13 @@ Deno.serve(async (req) => {
 
     if (!profileData) {
       return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (!profileData.auth_user_id) {
       return new Response(JSON.stringify({ error: "Ese técnico todavía no tiene una cuenta asociada" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     const { error: updErr } = await admin.auth.admin.updateUserById(profileData.auth_user_id, attrs);
     if (updErr) {
       return new Response(JSON.stringify({ error: updErr.message }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

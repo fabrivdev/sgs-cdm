@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: uErr } = await userClient.auth.getUser();
     if (uErr || !user) {
       return new Response(JSON.stringify({ error: "No autenticado" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin puede eliminar usuarios" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const { profile_id } = body ?? {};
     if (!profile_id) {
       return new Response(JSON.stringify({ error: "Falta profile_id" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -50,19 +50,19 @@ Deno.serve(async (req) => {
 
     if (!profileData) {
       return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (!profileData.auth_user_id) {
       return new Response(JSON.stringify({ error: "Ese técnico no tiene cuenta asociada" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (profileData.auth_user_id === user.id) {
       return new Response(JSON.stringify({ error: "No podés eliminar tu propio acceso" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const { error: delErr } = await admin.auth.admin.deleteUser(profileData.auth_user_id);
     if (delErr && !/not.?found/i.test(delErr.message)) {
       return new Response(JSON.stringify({ error: delErr.message }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
