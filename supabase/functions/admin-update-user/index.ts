@@ -91,16 +91,17 @@ Deno.serve(async (req) => {
     if (email) attrs.email = String(email).trim().toLowerCase();
     if (password) attrs.password = String(password);
 
-    const { error: updErr } = await admin.auth.admin.updateUserById(profileData.auth_user_id, attrs);
+    const { error: updErr } = await admin.auth.admin.updateUserById(authUserId!, attrs);
     if (updErr) {
       return new Response(JSON.stringify({ error: updErr.message }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, auth_user_id: profileData.auth_user_id }), {
+    return new Response(JSON.stringify({ ok: true, auth_user_id: authUserId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
