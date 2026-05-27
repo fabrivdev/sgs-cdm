@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { profile_id, email, password } = body ?? {};
-    if (!profile_id) {
-      return new Response(JSON.stringify({ error: "Falta profile_id" }), {
+    const { profile_id, user_id, email, password } = body ?? {};
+    if (!profile_id && !user_id) {
+      return new Response(JSON.stringify({ error: "Falta profile_id o user_id" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -52,38 +52,56 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profileData } = await admin
-      .from("profiles")
-      .select("id, auth_user_id")
-      .eq("id", profile_id)
-      .maybeSingle();
+    let authUserId: string | null = null;
 
-    if (!profileData) {
-      return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (profile_id) {
+      // Try linked schema first; fall back to legacy where profile.id == auth.users.id
+      try {
+        const { data: profileData } = await (admin as any)
+          .from("profiles")
+          .select("id, auth_user_id")
+          .eq("id", profile_id)
+          .maybeSingle();
+        if (profileData) {
+          authUserId = profileData.auth_user_id ?? profileData.id;
+        }
+      } catch {
+        // auth_user_id column may not exist
+      }
+      if (!authUserId) {
+        const { data: legacyProfile } = await admin
+          .from("profiles")
+          .select("id")
+          .eq("id", profile_id)
+          .maybeSingle();
+        if (!legacyProfile) {
+          return new Response(JSON.stringify({ error: "No se encontró el técnico seleccionado" }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        authUserId = legacyProfile.id;
+      }
+    } else {
+      // Legacy path: user_id is the auth.users.id directly (also equals profile.id)
+      authUserId = String(user_id);
     }
 
-    if (!profileData.auth_user_id) {
-      return new Response(JSON.stringify({ error: "Ese técnico todavía no tiene una cuenta asociada" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const attrs: { email?: string; password?: string } = {};
     if (email) attrs.email = String(email).trim().toLowerCase();
     if (password) attrs.password = String(password);
 
-    const { error: updErr } = await admin.auth.admin.updateUserById(profileData.auth_user_id, attrs);
+    const { error: updErr } = await admin.auth.admin.updateUserById(authUserId!, attrs);
     if (updErr) {
       return new Response(JSON.stringify({ error: updErr.message }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, auth_user_id: profileData.auth_user_id }), {
+    return new Response(JSON.stringify({ ok: true, auth_user_id: authUserId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
