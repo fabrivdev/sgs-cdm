@@ -26,6 +26,12 @@ interface Props {
   onSaved: (trabajoId?: string) => void;
 }
 
+const isMissingOsColumnError = (error: unknown) => {
+  const message = String((error as any)?.message ?? "");
+  const code = String((error as any)?.code ?? "");
+  return code === "PGRST204" && message.includes("os_numero");
+};
+
 /**
  * Caso madre = solo registra el problema. NO se asignan fechas ni técnicos acá.
  * Toda la programación se hace después desde el Planificador / Calendario.
@@ -97,17 +103,30 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         prioridad: form.prioridad,
         os_numero: form.os_numero.trim() || null,
       };
+      const savePayload = async (includeOs: boolean) => {
+        const data = includeOs ? payload : { ...payload };
+        if (!includeOs) delete data.os_numero;
+
+        if (editing) {
+          const { error } = await supabase.from("trabajos").update(data).eq("id", trabajo.id);
+          if (error) throw error;
+          return trabajo.id as string;
+        }
+
+        data.creado_por = user?.id;
+        data.estado_general = "pendiente";
+        const { data: created, error } = await supabase.from("trabajos").insert(data).select("id").single();
+        if (error) throw error;
+        return created.id as string;
+      };
+
       let trabajoId: string | undefined;
-      if (editing) {
-        const { error } = await supabase.from("trabajos").update(payload).eq("id", trabajo.id);
-        if (error) throw error;
-        trabajoId = trabajo.id;
-      } else {
-        payload.creado_por = user?.id;
-        payload.estado_general = "pendiente";
-        const { data, error } = await supabase.from("trabajos").insert(payload).select("id").single();
-        if (error) throw error;
-        trabajoId = data.id;
+      try {
+        trabajoId = await savePayload(true);
+      } catch (error) {
+        if (!isMissingOsColumnError(error)) throw error;
+        trabajoId = await savePayload(false);
+        toast.warning("Trabajo guardado. La OS se podrá guardar cuando Lovable aplique la migración de base de datos.");
       }
       toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
       onSaved(trabajoId);
