@@ -187,7 +187,19 @@ export default function Trabajos() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {ESTADOS_TRABAJO.map(col => {
-            const items = filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === col.key);
+            let items = filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === col.key);
+            if (col.key === "completado") {
+              const ultimaFecha = (id: string) => {
+                const arr = agendasByTrabajo.get(id) ?? [];
+                let max = "";
+                for (const j of arr) {
+                  const f = j.fecha ?? j.fecha_programada ?? "";
+                  if (f > max) max = f;
+                }
+                return max;
+              };
+              items = [...items].sort((a, b) => ultimaFecha(b.id).localeCompare(ultimaFecha(a.id)));
+            }
             const expandida = expandidas.has(col.key);
             const visibles = expandida ? items : items.slice(0, MAX_VISIBLES);
             const restantes = items.length - visibles.length;
