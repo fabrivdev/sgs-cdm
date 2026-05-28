@@ -95,59 +95,14 @@ export function ProgramarIntervencionDialog({
 
     setBusy(true);
     try {
-      const { data: trabajo, error } = await supabase.from("trabajos").select("*").eq("id", tId).single();
+      const { error } = await supabase.rpc("programar_jornada" as any, {
+        p_trabajo_id: tId,
+        p_fecha: form.fecha,
+        p_tecnico_id: form.tecnico_id,
+        p_auxiliares: form.auxiliares,
+        p_observacion: form.observacion.trim() || null,
+      });
       if (error) throw error;
-
-      let servicioId = trabajo.legacy_servicio_id as string | null;
-      const fechaDate = new Date(`${form.fecha}T00:00:00`);
-      const servicioPayload = {
-        fecha_programada: form.fecha,
-        dia_semana: dias[fechaDate.getDay()],
-        semana: getISOWeek(fechaDate),
-        sucursal: trabajo.sucursal,
-        marca: trabajo.marca,
-        tipo_trabajo: trabajo.tipo_trabajo,
-        tecnico_responsable_id: form.tecnico_id,
-        auxiliares: form.auxiliares,
-        cliente_id: trabajo.cliente_id,
-        trabajo_descripcion: trabajo.descripcion_problema,
-        observaciones: form.observacion.trim() || null,
-        creado_por: user?.id,
-        estado: "Pendiente" as const,
-      };
-
-      if (servicioId) {
-        const { error: updateError } = await supabase.from("servicios").update(servicioPayload).eq("id", servicioId);
-        if (updateError) throw updateError;
-      } else {
-        const { data, error: insertError } = await supabase.from("servicios").insert(servicioPayload).select("id").single();
-        if (insertError) throw insertError;
-        servicioId = data.id;
-        await supabase.from("trabajos").update({ legacy_servicio_id: servicioId }).eq("id", tId);
-      }
-
-      const { data: existente } = await supabase
-        .from("servicio_jornadas")
-        .select("id")
-        .eq("servicio_id", servicioId)
-        .eq("fecha", form.fecha)
-        .maybeSingle();
-
-      const jornadaPayload = {
-        servicio_id: servicioId,
-        fecha: form.fecha,
-        estado: "Pendiente" as const,
-        tecnico_responsable_id: form.tecnico_id,
-        auxiliares: form.auxiliares,
-        observaciones: form.observacion.trim() || null,
-      };
-
-      const jornadaError = existente?.id
-        ? (await supabase.from("servicio_jornadas").update(jornadaPayload).eq("id", existente.id)).error
-        : (await supabase.from("servicio_jornadas").insert(jornadaPayload)).error;
-      if (jornadaError) throw jornadaError;
-
-      await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: tId });
 
       toast.success("Jornada programada");
       onSaved();
@@ -158,6 +113,7 @@ export function ProgramarIntervencionDialog({
       setBusy(false);
     }
   };
+
 
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">

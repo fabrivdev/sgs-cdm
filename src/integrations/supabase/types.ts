@@ -988,6 +988,16 @@ export type Database = {
           ult_servicio: string
         }[]
       }
+      programar_jornada: {
+        Args: {
+          p_auxiliares: string[]
+          p_fecha: string
+          p_observacion: string
+          p_tecnico_id: string
+          p_trabajo_id: string
+        }
+        Returns: string
+      }
       recalcular_estado_trabajo: {
         Args: { p_trabajo_id: string }
         Returns: undefined
