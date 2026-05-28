@@ -247,16 +247,31 @@ export function ServicioDetalleDialog({
 
   const activeJornada = jornadas.find((j) => j.id === activeJornadaId) ?? null;
   const activeMerged = activeJornada ? { ...activeJornada, ...edits[activeJornada.id] } : null;
-  const jornadaResponsableId = activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id;
+  const activeCrew = useMemo(() => {
+    const jornadaAuxiliares = activeMerged?.auxiliares ?? [];
+    const jornadaTieneCuadrilla = Boolean(activeMerged?.tecnico_responsable_id) || jornadaAuxiliares.length > 0;
+    if (jornadaTieneCuadrilla) {
+      return {
+        tecnico_responsable_id: activeMerged?.tecnico_responsable_id ?? null,
+        auxiliares: jornadaAuxiliares,
+      };
+    }
+
+    return {
+      tecnico_responsable_id: servicio.tecnico_responsable_id ?? null,
+      auxiliares: servicio.auxiliares ?? [],
+    };
+  }, [activeMerged, servicio.auxiliares, servicio.tecnico_responsable_id]);
+
+  const jornadaResponsableId = activeCrew.tecnico_responsable_id;
   const canEdit = isAdmin || isCabecilla || (!!user && jornadaResponsableId === user.id);
   const canManage = isAdmin || isCabecilla;
   const tipo = servicio.tipo_trabajo ?? "Visita de campo";
   const clienteNombre = servicio.cliente_id ? cliById[servicio.cliente_id] ?? "Cliente no encontrado" : "-";
   const jornadaResponsableNombre =
-    (activeMerged?.tecnico_responsable_id && profById[activeMerged.tecnico_responsable_id]) ||
-    (servicio.tecnico_responsable_id && profById[servicio.tecnico_responsable_id]) ||
+    (activeCrew.tecnico_responsable_id && profById[activeCrew.tecnico_responsable_id]) ||
     "-";
-  const jornadaAuxiliares = ((activeMerged?.auxiliares?.length ? activeMerged.auxiliares : servicio.auxiliares) ?? [])
+  const jornadaAuxiliares = (activeCrew.auxiliares ?? [])
     .map((id) => profById[id])
     .filter(Boolean)
     .join(", ") || "-";
@@ -583,8 +598,8 @@ export function ServicioDetalleDialog({
 
                         <TecnicosPicker
                           tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
-                          principalId={activeMerged.tecnico_responsable_id}
-                          auxiliares={activeMerged.auxiliares ?? []}
+                          principalId={activeCrew.tecnico_responsable_id}
+                          auxiliares={activeCrew.auxiliares ?? []}
                           onChange={({ principalId, auxiliares }) =>
                             jornadaPatch(activeJornada.id, {
                               tecnico_responsable_id: principalId,

@@ -36,6 +36,35 @@ interface Props {
 
 type Resultado = "realizada" | "no_realizada";
 
+function resolveCrew(
+  jornada: JornadaLegacy | undefined,
+  fallbackPrincipalId: string | null | undefined,
+  fallbackAuxiliares: string[] | undefined,
+  userId: string | null | undefined,
+) {
+  const jornadaAuxiliares = jornada?.auxiliares ?? [];
+  const jornadaTieneCuadrilla = Boolean(jornada?.tecnico_responsable_id) || jornadaAuxiliares.length > 0;
+  if (jornadaTieneCuadrilla) {
+    return {
+      tecnico_id: jornada?.tecnico_responsable_id ?? "",
+      auxiliares: jornadaAuxiliares,
+    };
+  }
+
+  const fallbackTieneCuadrilla = Boolean(fallbackPrincipalId) || (fallbackAuxiliares?.length ?? 0) > 0;
+  if (fallbackTieneCuadrilla) {
+    return {
+      tecnico_id: fallbackPrincipalId ?? "",
+      auxiliares: fallbackAuxiliares ?? [],
+    };
+  }
+
+  return {
+    tecnico_id: userId ?? "",
+    auxiliares: [] as string[],
+  };
+}
+
 export function CargarJornadaDialog({
   open,
   onOpenChange,
@@ -63,9 +92,10 @@ export function CargarJornadaDialog({
   useEffect(() => {
     if (!open) return;
     const pendiente = jornadas.find((j) => j.id === initialJornadaId) ?? jornadas.find((j) => j.estado === "Pendiente") ?? jornadas[0];
+    const crew = resolveCrew(pendiente, defaultTecnicoId, defaultAuxiliares, user?.id);
     setForm({
-      tecnico_id: pendiente?.tecnico_responsable_id ?? defaultTecnicoId ?? user?.id ?? "",
-      auxiliares: (pendiente?.auxiliares && pendiente.auxiliares.length > 0) ? pendiente.auxiliares : (defaultAuxiliares ?? []),
+      tecnico_id: crew.tecnico_id,
+      auxiliares: crew.auxiliares,
       jornada_id: pendiente?.id ?? "",
       resultado: "realizada",
       horas_trabajadas: pendiente?.horas_trabajadas != null ? String(pendiente.horas_trabajadas) : "",
@@ -147,11 +177,12 @@ export function CargarJornadaDialog({
               value={form.jornada_id}
               onValueChange={(v) => {
                 const j = jornadas.find((item) => item.id === v);
+                const crew = resolveCrew(j, defaultTecnicoId, defaultAuxiliares, user?.id);
                 setForm(f => ({
                   ...f,
                   jornada_id: v,
-                  tecnico_id: j?.tecnico_responsable_id ?? f.tecnico_id,
-                  auxiliares: j?.auxiliares ?? f.auxiliares,
+                  tecnico_id: crew.tecnico_id,
+                  auxiliares: crew.auxiliares,
                   horas_trabajadas: j?.horas_trabajadas != null ? String(j.horas_trabajadas) : "",
                   observaciones: j?.observaciones ?? "",
                 }));
