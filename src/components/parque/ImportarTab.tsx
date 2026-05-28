@@ -459,8 +459,33 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
             if (updateError) throw updateError;
           }
 
+          const historial = vinculadas.map((r) => ({
+            trabajo_id: r.trabajo_id!,
+            tipo_evento: "observacion" as const,
+            usuario_id: user.id,
+            payload: {
+              tipo: "orden_servicio_importada",
+              os_numero: r.os_numero,
+              tipo_tiempo: r.tipo_tiempo,
+              servicios_cantidad: r.servicios_cantidad,
+              terceros_valor: r.terceros_valor,
+              kilometro_valor: r.kilometro_valor,
+              servicios_valor: r.servicios_valor,
+              repuesto_valor: r.repuesto_valor,
+              factura: r.factura,
+              situacion_os: r.situacion_os,
+              situacion_facturacion: r.situacion_facturacion,
+              problema: r.problema,
+              actualizado_en: new Date().toISOString(),
+            },
+          }));
+          if (historial.length > 0) {
+            const { error: histError } = await supabase.from("trabajo_historial").insert(historial as any);
+            if (histError) throw histError;
+          }
+
           toast.warning(
-            `La tabla de detalle OS todavía no está disponible. Se mantuvieron ${vinculadas.length} asociaciones con trabajos; el detalle económico queda pendiente.`,
+            `La tabla de detalle OS todavía no está disponible. Guardé ${vinculadas.length} detalles de OS en el historial del trabajo.`,
           );
           setOsRows(null);
           setOsFile("");

@@ -95,6 +95,24 @@ function badgeTone(j: Jornada) {
   return "bg-blue-100 text-blue-800 border-blue-200";
 }
 
+function osDesdeHistorial(payload: any): OrdenServicioImportada | null {
+  if (!payload || payload.tipo !== "orden_servicio_importada") return null;
+  return {
+    os_numero: String(payload.os_numero ?? ""),
+    tipo_tiempo: payload.tipo_tiempo ?? null,
+    servicios_cantidad: Number(payload.servicios_cantidad ?? 0),
+    terceros_valor: Number(payload.terceros_valor ?? 0),
+    kilometro_valor: Number(payload.kilometro_valor ?? 0),
+    servicios_valor: Number(payload.servicios_valor ?? 0),
+    repuesto_valor: Number(payload.repuesto_valor ?? 0),
+    factura: payload.factura ?? null,
+    situacion_os: payload.situacion_os ?? null,
+    situacion_facturacion: payload.situacion_facturacion ?? null,
+    problema: payload.problema ?? null,
+    actualizado_en: payload.actualizado_en ?? null,
+  };
+}
+
 export function TrabajoDetalleDrawer({
   trabajoId,
   onOpenChange,
@@ -122,6 +140,22 @@ export function TrabajoDetalleDrawer({
     if (!trabajoId) return;
     setLoading(true);
     try {
+      const cargarOsHistorial = async (osNumero: string) => {
+        const { data, error } = await supabase
+          .from("trabajo_historial")
+          .select("payload, creado_en")
+          .eq("trabajo_id", trabajoId)
+          .eq("tipo_evento", "observacion")
+          .order("creado_en", { ascending: false })
+          .limit(25);
+        if (error) throw error;
+
+        const found = ((data as any[]) ?? [])
+          .map((row) => osDesdeHistorial({ ...row.payload, actualizado_en: row.payload?.actualizado_en ?? row.creado_en }))
+          .find((item) => item && item.os_numero === osNumero);
+        return found ?? null;
+      };
+
       const [{ data: t, error }, { data: roles }] = await Promise.all([
         supabase.from("trabajos").select("*").eq("id", trabajoId).single(),
         supabase.from("user_roles").select("user_id, role").eq("role", "tecnico"),
@@ -142,13 +176,13 @@ export function TrabajoDetalleDrawer({
           const code = String(osError.code ?? "");
           if ((code === "PGRST205" || code === "42P01") && message.includes("ordenes_servicio_importadas")) {
             setOsImportDisponible(false);
-            setOrdenServicio(null);
+            setOrdenServicio(await cargarOsHistorial(osNumero));
           } else {
             throw osError;
           }
         } else {
           setOsImportDisponible(true);
-          setOrdenServicio((osData as OrdenServicioImportada) ?? null);
+          setOrdenServicio(((osData as OrdenServicioImportada) ?? null) || await cargarOsHistorial(osNumero));
         }
       } else {
         setOrdenServicio(null);
