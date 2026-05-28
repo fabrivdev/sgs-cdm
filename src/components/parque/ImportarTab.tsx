@@ -150,6 +150,15 @@ const normPhone = (s: unknown) => norm(s).replace(/[^\d]/g, "");
 const normCode = (s: unknown) => norm(s).replace(/\s+/g, "").toLowerCase();
 const normOs = (s: unknown) => norm(s).replace(/[^\d]/g, "");
 
+const isMissingOsImportTableError = (error: unknown) => {
+  const message = String((error as any)?.message ?? "");
+  const code = String((error as any)?.code ?? "");
+  return (
+    (code === "PGRST205" || code === "PGRST204" || code === "42P01") &&
+    message.includes("ordenes_servicio_importadas")
+  );
+};
+
 const parseMoney = (v: unknown): number => {
   if (v == null || v === "") return 0;
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
@@ -438,7 +447,27 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk, {
           onConflict: "os_numero",
         }) as any);
-        if (error) throw error;
+        if (error) {
+          if (!isMissingOsImportTableError(error)) throw error;
+
+          const vinculadas = osRows.filter((r) => r.trabajo_id);
+          for (const r of vinculadas) {
+            const { error: updateError } = await supabase
+              .from("trabajos")
+              .update({ os_numero: r.os_numero } as any)
+              .eq("id", r.trabajo_id!);
+            if (updateError) throw updateError;
+          }
+
+          toast.warning(
+            `La tabla de detalle OS todavía no está disponible. Se mantuvieron ${vinculadas.length} asociaciones con trabajos; el detalle económico queda pendiente.`,
+          );
+          setOsRows(null);
+          setOsFile("");
+          await cargarHistorial();
+          onChanged();
+          return;
+        }
       }
 
       const nuevas = osRows.filter((r) => r._isNew).length;
