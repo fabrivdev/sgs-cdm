@@ -561,10 +561,11 @@ function Stat({ k, v, warn }: { k: string; v: string; warn?: boolean }) {
 
 function formatCurrency(value: number | string | null | undefined) {
   const amount = Number(value ?? 0);
-  if (!Number.isFinite(amount) || amount === 0) return "$0";
+  if (!Number.isFinite(amount) || amount === 0) return "USD 0";
   return new Intl.NumberFormat("es-PY", {
     style: "currency",
-    currency: "PYG",
-    maximumFractionDigits: 0,
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
