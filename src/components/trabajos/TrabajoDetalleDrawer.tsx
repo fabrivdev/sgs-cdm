@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, ClipboardList, Clock, MoreVertical, Pencil, Trash2, User, Users } from "lucide-react";
-import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas, trabajoReferencia } from "@/lib/trabajos";
+import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoReferencia } from "@/lib/trabajos";
 import { ESTADO_LABELS, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +48,21 @@ interface Jornada {
 interface ServicioBaseCrew {
   tecnico_responsable_id: string | null;
   auxiliares: string[] | null;
+}
+
+interface OrdenServicioImportada {
+  os_numero: string;
+  tipo_tiempo: string | null;
+  servicios_cantidad: number | null;
+  terceros_valor: number | null;
+  kilometro_valor: number | null;
+  servicios_valor: number | null;
+  repuesto_valor: number | null;
+  factura: string | null;
+  situacion_os: string | null;
+  situacion_facturacion: string | null;
+  problema: string | null;
+  actualizado_en: string | null;
 }
 
 interface Props {
@@ -93,6 +108,8 @@ export function TrabajoDetalleDrawer({
   const [trabajo, setTrabajo] = useState<any | null>(null);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [servicioBaseCrew, setServicioBaseCrew] = useState<ServicioBaseCrew | null>(null);
+  const [ordenServicio, setOrdenServicio] = useState<OrdenServicioImportada | null>(null);
+  const [osImportDisponible, setOsImportDisponible] = useState(true);
   const [rolesTecnico, setRolesTecnico] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [programarOpen, setProgramarOpen] = useState(false);
@@ -112,6 +129,31 @@ export function TrabajoDetalleDrawer({
       if (error) throw error;
       setTrabajo(t);
       setRolesTecnico(new Set(((roles as any[]) ?? []).map((r) => r.user_id)));
+
+      const osNumero = trabajoOsNumero(t);
+      if (osNumero) {
+        const { data: osData, error: osError } = await (supabase
+          .from("ordenes_servicio_importadas" as any)
+          .select("os_numero, tipo_tiempo, servicios_cantidad, terceros_valor, kilometro_valor, servicios_valor, repuesto_valor, factura, situacion_os, situacion_facturacion, problema, actualizado_en")
+          .eq("os_numero", osNumero)
+          .maybeSingle() as any);
+        if (osError) {
+          const message = String(osError.message ?? "");
+          const code = String(osError.code ?? "");
+          if ((code === "PGRST205" || code === "42P01") && message.includes("ordenes_servicio_importadas")) {
+            setOsImportDisponible(false);
+            setOrdenServicio(null);
+          } else {
+            throw osError;
+          }
+        } else {
+          setOsImportDisponible(true);
+          setOrdenServicio((osData as OrdenServicioImportada) ?? null);
+        }
+      } else {
+        setOrdenServicio(null);
+        setOsImportDisponible(true);
+      }
 
       if (!t.legacy_servicio_id) {
         setJornadas([]);
@@ -146,6 +188,8 @@ export function TrabajoDetalleDrawer({
       setTrabajo(null);
       setJornadas([]);
       setServicioBaseCrew(null);
+      setOrdenServicio(null);
+      setOsImportDisponible(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trabajoId]);
@@ -287,6 +331,51 @@ export function TrabajoDetalleDrawer({
                   <Stat k="Horas acumuladas" v={`${resumen.horas} hs`} />
                 </div>
               </section>
+
+              {(ordenServicio || trabajoOsNumero(trabajo)) && (
+                <section className="rounded-xl border bg-card p-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Orden de servicio importada
+                      </h3>
+                      <div className="mt-1 text-sm font-semibold">{trabajoReferencia(trabajo)}</div>
+                    </div>
+                    {ordenServicio?.actualizado_en && (
+                      <Badge variant="outline" className="text-[10px]">
+                        Actualizado {format(parseISO(ordenServicio.actualizado_en), "dd/MM/yyyy")}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {!ordenServicio ? (
+                    <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                      {osImportDisponible
+                        ? "Esta OS esta asociada al trabajo, pero todavia no tiene datos importados del Excel."
+                        : "La tabla de detalle OS todavia no esta disponible en la base. Cuando Lovable aplique la migracion, aca se vera el detalle importado."}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                        <Stat k="Tipo de tiempo" v={ordenServicio.tipo_tiempo ?? "—"} />
+                        <Stat k="Horas OS" v={`${Number(ordenServicio.servicios_cantidad ?? 0)} hs`} />
+                        <Stat k="Factura" v={ordenServicio.factura ?? "—"} />
+                        <Stat k="Situacion OS" v={ordenServicio.situacion_os ?? "—"} />
+                        <Stat k="Terceros" v={formatCurrency(ordenServicio.terceros_valor)} />
+                        <Stat k="Kilometro" v={formatCurrency(ordenServicio.kilometro_valor)} />
+                        <Stat k="Servicios" v={formatCurrency(ordenServicio.servicios_valor)} />
+                        <Stat k="Repuesto" v={formatCurrency(ordenServicio.repuesto_valor)} />
+                      </div>
+                      {ordenServicio.problema && ordenServicio.problema !== trabajo.descripcion_problema && (
+                        <div>
+                          <div className="text-[11px] text-muted-foreground">Problema segun OS</div>
+                          <div className="text-sm">{ordenServicio.problema}</div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
 
               <section className="space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Jornadas</h3>
@@ -434,4 +523,14 @@ function Stat({ k, v, warn }: { k: string; v: string; warn?: boolean }) {
       <div className={cn("text-sm font-medium", warn && "text-amber-700")}>{v}</div>
     </div>
   );
+}
+
+function formatCurrency(value: number | string | null | undefined) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount) || amount === 0) return "$0";
+  return new Intl.NumberFormat("es-PY", {
+    style: "currency",
+    currency: "PYG",
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
