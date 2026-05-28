@@ -1,21 +1,29 @@
 ## Problema
 
-Al intentar cambiar el email/contraseña de un técnico desde `/admin`, aparece el toast genérico **"Edge Function returned a non-2xx status code"** y no se ve el motivo real. En los logs de auth se ve un `422` desde el endpoint `admin/users/...` (lo devuelve Supabase Auth, no nuestro código). Las causas típicas de un 422 son: email ya usado por otra cuenta, formato inválido, o política de contraseña no cumplida.
+Al programar una jornada sobre TR-000022 (y otros trabajos con `legacy_servicio_id` antiguo), aparece:
 
-El motivo real **sí lo devuelve** la edge function `admin-update-user` en el body (`{ error: "..." }`), pero como la respuesta usa `status: 400`, el SDK de Supabase lo trata como error genérico y descarta el body. Por eso el usuario nunca ve la razón.
+> new row violates row-level security policy for table "servicio_jornadas"
 
-## Solución
+Causa raíz: el `servicio` legacy vinculado tiene `sucursal = NULL`. La política RLS de `servicio_jornadas` (insert/update) exige que `servicios.sucursal = get_user_sucursal(auth.uid())` para el rol `cabecilla`. Con NULL nunca matchea. Además, el `UPDATE` que hace `ProgramarIntervencionDialog` sobre `servicios` también está bloqueado por la política de `servicios` (que usa la sucursal **actual**, NULL), así que el intento de "rellenar" la sucursal nunca llega a aplicarse.
 
-Pequeño cambio en las edge functions de administración para que los errores controlados se devuelvan con `status: 200` y `{ error: "..." }`. Así el cliente puede leer `data.error` y mostrarlo en el toast (el código del front ya hace `toast.error(error?.message || data?.error)`).
+## Plan
 
-### Archivos a tocar
+1. **Migración de datos**: rellenar `servicios.sucursal` desde `trabajos.sucursal` para todas las filas donde `servicios.sucursal IS NULL` y exista un trabajo vinculado por `legacy_servicio_id`. Esto desbloquea los trabajos existentes.
 
-1. **`supabase/functions/admin-update-user/index.ts`** — cambiar los `status: 400/401/403/404` (errores de validación o de Supabase Auth) por `status: 200` manteniendo el body `{ error }`. Dejar `500` solo para excepciones inesperadas.
-2. **`supabase/functions/admin-create-user/index.ts`** — mismo ajuste, por consistencia (mismo síntoma posible al crear).
-3. **`supabase/functions/admin-delete-user/index.ts`** — mismo ajuste.
+2. **Backend defensivo (RPC con SECURITY DEFINER)**: crear una función `public.programar_jornada(p_trabajo_id, p_fecha, p_tecnico_id, p_auxiliares, p_observacion)` que:
+   - Verifique permisos (admin o cabecilla de la sucursal del trabajo) con `has_role` / `get_user_sucursal`.
+   - Cree el `servicio` si no existe o actualice el existente forzando `sucursal = trabajo.sucursal`.
+   - Inserte/actualice la `servicio_jornada` correspondiente.
+   - Llame a `recalcular_estado_trabajo`.
+   
+   Esto evita los problemas de RLS encadenados (servicio NULL → no actualizable → jornada no insertable) y centraliza la lógica.
 
-No cambia ninguna lógica de negocio ni el front; solo se desbloquea ver el mensaje real (por ejemplo *"A user with this email address has already been registered"*), para que sepas si el email ya está en uso por otra cuenta o si la contraseña no cumple la política.
+3. **Frontend**: en `src/components/trabajos/ProgramarIntervencionDialog.tsx`, reemplazar el bloque de inserts/updates manuales por una sola llamada `supabase.rpc('programar_jornada', {...})`. Mantener manejo de errores y `toast`.
 
-## Siguiente paso
+4. **Verificación**: reintentar programar jornada en TR-000022 como cabecilla y como admin.
 
-Tras aplicar esto y reintentar, el toast mostrará el motivo exacto del 422 y podremos resolverlo (lo más probable: ese email ya pertenece a otro usuario auth, o la contraseña es muy corta para la política del proyecto).
+## Detalles técnicos
+
+- La política de `servicios.UPDATE` para cabecilla usa `sucursal = get_user_sucursal(...)` en `USING`, por eso un NULL bloquea cualquier update desde el cliente — la RPC `SECURITY DEFINER` lo resuelve.
+- No se modifica ninguna política RLS existente (siguen siendo correctas en su intención).
+- `CargarJornadaDialog.tsx` no necesita cambios porque opera sobre jornadas ya creadas con servicio ya saneado por la migración del paso 1.
