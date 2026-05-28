@@ -243,9 +243,7 @@ export function ServicioDetalleDialog({
     return Object.fromEntries(fuente.map((c) => [c.id, c.nombre]));
   }, [clientesAll, clientes]);
 
-  if (!servicio) return null;
-
-  const activeJornada = jornadas.find((j) => j.id === activeJornadaId) ?? null;
+  const activeJornada = servicio ? jornadas.find((j) => j.id === activeJornadaId) ?? null : null;
   const activeMerged = activeJornada ? { ...activeJornada, ...edits[activeJornada.id] } : null;
   const activeCrew = useMemo(() => {
     const jornadaAuxiliares = activeMerged?.auxiliares ?? [];
@@ -258,10 +256,12 @@ export function ServicioDetalleDialog({
     }
 
     return {
-      tecnico_responsable_id: servicio.tecnico_responsable_id ?? null,
-      auxiliares: servicio.auxiliares ?? [],
+      tecnico_responsable_id: servicio?.tecnico_responsable_id ?? null,
+      auxiliares: servicio?.auxiliares ?? [],
     };
-  }, [activeMerged, servicio.auxiliares, servicio.tecnico_responsable_id]);
+  }, [activeMerged, servicio?.auxiliares, servicio?.tecnico_responsable_id]);
+
+  if (!servicio) return null;
 
   const jornadaResponsableId = activeCrew.tecnico_responsable_id;
   const canEdit = isAdmin || isCabecilla || (!!user && jornadaResponsableId === user.id);
