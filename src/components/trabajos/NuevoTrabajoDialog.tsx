@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
-import { PRIORIDADES, type Prioridad } from "@/lib/trabajos";
+import { PRIORIDADES, trabajoOsNumero, type Prioridad } from "@/lib/trabajos";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -59,7 +59,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
       setForm({
         cliente_id: trabajo.cliente_id ?? "",
         cliente_text: cli?.nombre ?? "",
-        os_numero: trabajo.os_numero ?? "",
+        os_numero: trabajoOsNumero(trabajo),
         marca: trabajo.marca,
         sucursal: trabajo.sucursal,
         tipo_trabajo: trabajo.tipo_trabajo,
@@ -103,8 +103,8 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         descripcion_problema: form.descripcion_problema.trim(),
         prioridad: form.prioridad,
         os_numero: osNumero || null,
+        proxima_accion: osNumero ? `OS:${osNumero}` : null,
       };
-      if (osNumero) payload.codigo = `OS-${osNumero}`;
       const savePayload = async (includeOs: boolean) => {
         const data = includeOs ? payload : { ...payload };
         if (!includeOs) delete data.os_numero;

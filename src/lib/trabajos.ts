@@ -34,8 +34,27 @@ export function estadoTrabajoLabel(estado: string | null | undefined) {
   return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
 }
 
-export function trabajoReferencia(trabajo: { codigo?: string | null; os_numero?: string | number | null } | null | undefined) {
+export function trabajoOsNumero(trabajo: {
+  codigo?: string | null;
+  os_numero?: string | number | null;
+  proxima_accion?: string | null;
+} | null | undefined) {
   const os = trabajo?.os_numero != null ? String(trabajo.os_numero).trim() : "";
+  if (os) return os;
+
+  const respaldo = String(trabajo?.proxima_accion ?? "");
+  const matchRespaldo = respaldo.match(/\bOS[:#\s-]*(\d+)\b/i);
+  if (matchRespaldo) return matchRespaldo[1];
+
+  const codigo = String(trabajo?.codigo ?? "");
+  const matchCodigo = codigo.match(/\bOS[:#\s-]*(\d+)\b/i);
+  if (matchCodigo) return matchCodigo[1];
+
+  return "";
+}
+
+export function trabajoReferencia(trabajo: { codigo?: string | null; os_numero?: string | number | null } | null | undefined) {
+  const os = trabajoOsNumero(trabajo);
   if (os) return `OS-${os}`;
   return trabajo?.codigo ?? "TR-—";
 }

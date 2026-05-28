@@ -338,13 +338,13 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
       const [{ data: importadas }, { data: trabajos }] = await Promise.all([
         (supabase.from("ordenes_servicio_importadas" as any).select("os_numero") as any),
-        supabase.from("trabajos").select("id, codigo, os_numero"),
+        supabase.from("trabajos").select("id, codigo, proxima_accion"),
       ]);
 
       const osImportadas = new Set<string>((importadas ?? []).map((r: any) => normOs(r.os_numero)));
       const trabajosPorOs = new Map<string, { id: string; codigo: string | null }>();
       for (const t of trabajos ?? []) {
-        const os = normOs((t as any).os_numero) || normOs((t as any).codigo);
+        const os = normOs((t as any).proxima_accion) || normOs((t as any).codigo);
         if (os) trabajosPorOs.set(os, { id: t.id, codigo: t.codigo });
       }
 
@@ -454,7 +454,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           for (const r of vinculadas) {
             const { error: updateError } = await supabase
               .from("trabajos")
-              .update({ os_numero: r.os_numero } as any)
+              .update({ proxima_accion: `OS:${r.os_numero}` } as any)
               .eq("id", r.trabajo_id!);
             if (updateError) throw updateError;
           }

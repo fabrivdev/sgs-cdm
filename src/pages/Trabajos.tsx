@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CalendarDays } from "lucide-react";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas, trabajoReferencia } from "@/lib/trabajos";
+import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoReferencia } from "@/lib/trabajos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
@@ -110,7 +110,7 @@ export default function Trabajos() {
           && !t.descripcion_problema.toLowerCase().includes(query)
           && !trabajoReferencia(t).toLowerCase().includes(query)
           && !(t.codigo ?? "").toLowerCase().includes(query)
-          && !String(t.os_numero ?? "").toLowerCase().includes(query)) return false;
+          && !trabajoOsNumero(t).toLowerCase().includes(query)) return false;
       }
       if (fFecha || fSemana !== "all") {
         const progs = agendasByTrabajo.get(t.id) ?? [];
@@ -239,7 +239,7 @@ export default function Trabajos() {
                         >
                           <div className="flex items-center gap-1.5">
                             <span className="rounded bg-muted px-1 py-0 text-[9px] font-mono font-semibold text-muted-foreground tabular-nums">
-                              {t.codigo ?? "TR-—"}
+                              {trabajoReferencia(t)}
                             </span>
                             <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium ml-auto", prioridadBadge(t.prioridad))}>
                               {prioLabel.charAt(0)}
@@ -248,12 +248,6 @@ export default function Trabajos() {
                           <div className="mt-0.5 truncate text-[12px] font-semibold leading-tight">
                             {cli?.nombre ?? "Sin cliente"}
                           </div>
-                          {t.os_numero && (
-                            <div className="mt-0.5 text-[10px] font-mono font-semibold text-primary">
-                              OS-{t.os_numero}
-                            </div>
-                          )}
-
                           <div className="mt-0.5 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
                             {t.descripcion_problema}
                           </div>
