@@ -37,6 +37,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
   const [form, setForm] = useState({
     cliente_id: "",
     cliente_text: "",
+    os_numero: "",
     marca: "CLAAS" as Marca,
     sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
     tipo_trabajo: "Visita de campo" as TipoTrabajo,
@@ -52,6 +53,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
       setForm({
         cliente_id: trabajo.cliente_id ?? "",
         cliente_text: cli?.nombre ?? "",
+        os_numero: trabajo.os_numero ?? "",
         marca: trabajo.marca,
         sucursal: trabajo.sucursal,
         tipo_trabajo: trabajo.tipo_trabajo,
@@ -60,7 +62,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
       });
     } else {
       setForm({
-        cliente_id: "", cliente_text: "", marca: "CLAAS",
+        cliente_id: "", cliente_text: "", os_numero: "", marca: "CLAAS",
         sucursal: (profile?.sucursal ?? "Santa Rita") as Sucursal,
         tipo_trabajo: "Visita de campo", descripcion_problema: "", prioridad: "media",
       });
@@ -93,6 +95,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         tipo_trabajo: form.tipo_trabajo,
         descripcion_problema: form.descripcion_problema.trim(),
         prioridad: form.prioridad,
+        os_numero: form.os_numero.trim() || null,
       };
       let trabajoId: string | undefined;
       if (editing) {
@@ -148,6 +151,14 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nro OS interna">
+              <Input
+                value={form.os_numero}
+                onChange={(e) => setForm(f => ({ ...f, os_numero: e.target.value.replace(/[^\d]/g, "") }))}
+                placeholder="Ej: 6166"
+                inputMode="numeric"
+              />
+            </Field>
             <Field label="Sucursal">
               <Select value={form.sucursal} onValueChange={(v) => setForm(f => ({ ...f, sucursal: v as Sucursal }))}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>

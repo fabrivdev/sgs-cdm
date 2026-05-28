@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, ClipboardList, Clock, MoreVertical, Pencil, Trash2, User, Users } from "lucide-react";
-import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
+import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas, trabajoReferencia } from "@/lib/trabajos";
 import { ESTADO_LABELS, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -229,7 +229,7 @@ export function TrabajoDetalleDrawer({
               <div className="min-w-0 space-y-2 pr-8">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground">
-                    {trabajo.codigo}
+                    {trabajoReferencia(trabajo)}
                   </span>
                   <Badge variant="outline" className="text-[10px]">{trabajo.sucursal}</Badge>
                   <Badge variant="outline" className="text-[10px]">{trabajo.marca}</Badge>

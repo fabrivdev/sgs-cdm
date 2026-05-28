@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CalendarDays } from "lucide-react";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
+import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas, trabajoReferencia } from "@/lib/trabajos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
@@ -108,7 +108,9 @@ export default function Trabajos() {
         const cli = t.cliente_id ? clienteMap.get(t.cliente_id)?.nombre ?? "" : "";
         if (!cli.toLowerCase().includes(query)
           && !t.descripcion_problema.toLowerCase().includes(query)
-          && !(t.codigo ?? "").toLowerCase().includes(query)) return false;
+          && !trabajoReferencia(t).toLowerCase().includes(query)
+          && !(t.codigo ?? "").toLowerCase().includes(query)
+          && !String(t.os_numero ?? "").toLowerCase().includes(query)) return false;
       }
       if (fFecha || fSemana !== "all") {
         const progs = agendasByTrabajo.get(t.id) ?? [];
@@ -154,7 +156,7 @@ export default function Trabajos() {
       </div>
 
       <FiltersBar
-        search={{ value: q, onChange: setQ, placeholder: "Buscar TR-000123, cliente o problema…" }}
+        search={{ value: q, onChange: setQ, placeholder: "Buscar OS, TR, cliente o problema..." }}
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
@@ -246,6 +248,11 @@ export default function Trabajos() {
                           <div className="mt-0.5 truncate text-[12px] font-semibold leading-tight">
                             {cli?.nombre ?? "Sin cliente"}
                           </div>
+                          {t.os_numero && (
+                            <div className="mt-0.5 text-[10px] font-mono font-semibold text-primary">
+                              OS-{t.os_numero}
+                            </div>
+                          )}
 
                           <div className="mt-0.5 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
                             {t.descripcion_problema}

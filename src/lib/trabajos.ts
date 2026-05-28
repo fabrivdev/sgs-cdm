@@ -34,6 +34,12 @@ export function estadoTrabajoLabel(estado: string | null | undefined) {
   return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
 }
 
+export function trabajoReferencia(trabajo: { codigo?: string | null; os_numero?: string | number | null } | null | undefined) {
+  const os = trabajo?.os_numero != null ? String(trabajo.os_numero).trim() : "";
+  if (os) return `OS-${os}`;
+  return trabajo?.codigo ?? "TR-—";
+}
+
 interface JornadaEstadoTrabajo {
   fecha?: string | null;
   fecha_programada?: string | null;
