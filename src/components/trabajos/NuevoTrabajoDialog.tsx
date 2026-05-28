@@ -151,7 +151,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nro OS interna">
+            <Field label="Nro OS interna para importar Excel">
               <Input
                 value={form.os_numero}
                 onChange={(e) => setForm(f => ({ ...f, os_numero: e.target.value.replace(/[^\d]/g, "") }))}

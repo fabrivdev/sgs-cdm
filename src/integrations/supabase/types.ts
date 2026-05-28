@@ -947,7 +947,7 @@ export type Database = {
         | "cierre"
         | "observacion"
       tipo_facturacion: "Repuesto" | "Servicio"
-      tipo_importacion: "parque" | "facturacion"
+      tipo_importacion: "parque" | "facturacion" | "ordenes_servicio"
       tipo_trabajo: "Visita de campo" | "Máquina en taller"
     }
     CompositeTypes: {
@@ -1140,7 +1140,7 @@ export const Constants = {
         "observacion",
       ],
       tipo_facturacion: ["Repuesto", "Servicio"],
-      tipo_importacion: ["parque", "facturacion"],
+      tipo_importacion: ["parque", "facturacion", "ordenes_servicio"],
       tipo_trabajo: ["Visita de campo", "Máquina en taller"],
     },
   },

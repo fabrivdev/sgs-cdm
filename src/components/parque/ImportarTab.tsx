@@ -102,9 +102,38 @@ interface ContactoRow {
   _status: "ok" | "sin-cliente" | "duplicado";
 }
 
+interface OrdenServicioRow {
+  os_numero: string;
+  trabajo_id: string | null;
+  trabajo_codigo: string | null;
+  cliente_nombre: string | null;
+  situacion_os: string | null;
+  situacion_facturacion: string | null;
+  responsable: string | null;
+  cod_mecanico: string | null;
+  factura: string | null;
+  cod_interno: string | null;
+  fecha_abierta_os: string | null;
+  fecha_emision_factura: string | null;
+  nro_chasis: string | null;
+  marca: string | null;
+  tipo_tiempo: string | null;
+  problema: string | null;
+  km_cantidad: number;
+  km_valor_unitario: number;
+  servicios_cantidad: number;
+  servicios_valor_unitario: number;
+  terceros_valor: number;
+  kilometro_valor: number;
+  servicios_valor: number;
+  repuesto_valor: number;
+  raw_data: Record<string, unknown>;
+  _isNew: boolean;
+}
+
 interface Imp {
   id: string;
-  tipo: "parque" | "facturacion";
+  tipo: "parque" | "facturacion" | "ordenes_servicio";
   total_filas: number;
   insertados: number;
   duplicados: number;
@@ -119,6 +148,7 @@ const normText = (s: unknown) => lower(s).replace(/\s+/g, " ");
 const normRuc = (s: unknown) => norm(s).replace(/[.\s-]/g, "").toLowerCase();
 const normPhone = (s: unknown) => norm(s).replace(/[^\d]/g, "");
 const normCode = (s: unknown) => norm(s).replace(/\s+/g, "").toLowerCase();
+const normOs = (s: unknown) => norm(s).replace(/[^\d]/g, "");
 
 const parseMoney = (v: unknown): number => {
   if (v == null || v === "") return 0;
@@ -229,6 +259,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const [cliFile, setCliFile] = useState<string>("");
   const [conRows, setConRows] = useState<ContactoRow[] | null>(null);
   const [conFile, setConFile] = useState<string>("");
+  const [osRows, setOsRows] = useState<OrdenServicioRow[] | null>(null);
+  const [osFile, setOsFile] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [historial, setHistorial] = useState<Imp[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
@@ -280,6 +312,156 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
 
     return all;
+  };
+
+  const procesarOrdenesServicio = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheetName =
+        wb.SheetNames.find((x) => x.trim().toLowerCase() === "ordenes de servicios - cdm") ??
+        wb.SheetNames[0];
+
+      if (!sheetName) return toast.error("No se encontró una hoja válida");
+
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName], { defval: null });
+      if (json.length === 0) return toast.error("Excel vacío");
+
+      const [{ data: importadas }, { data: trabajos }] = await Promise.all([
+        (supabase.from("ordenes_servicio_importadas" as any).select("os_numero") as any),
+        supabase.from("trabajos").select("id, codigo, os_numero"),
+      ]);
+
+      const osImportadas = new Set<string>((importadas ?? []).map((r: any) => normOs(r.os_numero)));
+      const trabajosPorOs = new Map<string, { id: string; codigo: string | null }>();
+      for (const t of trabajos ?? []) {
+        const os = normOs((t as any).os_numero);
+        if (os) trabajosPorOs.set(os, { id: t.id, codigo: t.codigo });
+      }
+
+      const rowsByOs = new Map<string, OrdenServicioRow>();
+      for (const r of json) {
+        const os = normOs(pick(r, ["Nº OS", "Nro OS", "Nro. OS", "Numero OS", "Número OS", "OS"]));
+        if (!os) continue;
+
+        const trabajo = trabajosPorOs.get(os) ?? null;
+        const prev = rowsByOs.get(os);
+        const row: OrdenServicioRow = prev ?? {
+          os_numero: os,
+          trabajo_id: trabajo?.id ?? null,
+          trabajo_codigo: trabajo?.codigo ?? null,
+          cliente_nombre: norm(pick(r, ["Nombre", "Cliente"])) || null,
+          situacion_os: norm(pick(r, ["Situación O.S", "Situacion O.S", "Situacion OS"])) || null,
+          situacion_facturacion: norm(pick(r, ["Situación", "Situacion"])) || null,
+          responsable: norm(pick(r, ["Responsable"])) || null,
+          cod_mecanico: norm(pick(r, ["Cod. Mecanico", "Cod Mecanico"])) || null,
+          factura: norm(pick(r, ["Factura"])) || null,
+          cod_interno: norm(pick(r, ["Cod. Interno", "Cod Interno"])) || null,
+          fecha_abierta_os: parseExcelDate(pick(r, ["Fc Abierta OS", "Fecha Abierta OS"])),
+          fecha_emision_factura: parseExcelDate(pick(r, ["Emisión Fact.", "Emision Fact.", "Fecha Factura"])),
+          nro_chasis: norm(pick(r, ["Nro Chasis", "Nº Chasis"])) || null,
+          marca: norm(pick(r, ["Marca"])) || null,
+          tipo_tiempo: norm(pick(r, ["Tipo de Tiempo"])) || null,
+          problema: norm(pick(r, ["Problema"])) || null,
+          km_cantidad: 0,
+          km_valor_unitario: 0,
+          servicios_cantidad: 0,
+          servicios_valor_unitario: 0,
+          terceros_valor: 0,
+          kilometro_valor: 0,
+          servicios_valor: 0,
+          repuesto_valor: 0,
+          raw_data: {},
+          _isNew: !osImportadas.has(os),
+        };
+
+        row.km_cantidad += parseMoney(pick(r, ["Km Cnt. Utilizada", "Km Cnt Utilizada"]));
+        row.km_valor_unitario = row.km_valor_unitario || parseMoney(pick(r, ["Km Vlr. Unitario", "Km Vlr Unitario"]));
+        row.servicios_cantidad += parseMoney(pick(r, ["Servicios Cnt. Utilizada", "Servicios Cnt Utilizada"]));
+        row.servicios_valor_unitario = row.servicios_valor_unitario || parseMoney(pick(r, ["Servicios Vlr. Unitario", "Servicios Vlr Unitario"]));
+        row.terceros_valor += parseMoney(pick(r, ["Terceros"]));
+        row.kilometro_valor += parseMoney(pick(r, ["Kilometro", "Kilómetro"]));
+        row.servicios_valor += parseMoney(pick(r, ["Servicios"]));
+        row.repuesto_valor += parseMoney(pick(r, ["Repuesto"]));
+        row.raw_data = { ...row.raw_data, ...r };
+
+        rowsByOs.set(os, row);
+      }
+
+      const rows = [...rowsByOs.values()].sort((a, b) => Number(b.os_numero) - Number(a.os_numero));
+      if (rows.length === 0) return toast.error("No encontré filas con Nº OS");
+
+      setOsRows(rows);
+      setOsFile(file.name);
+      const vinculadas = rows.filter((r) => r.trabajo_id).length;
+      toast.success(`Leídas ${rows.length} OS. ${vinculadas} ya coinciden con trabajos.`);
+    } catch (e) {
+      toast.error("Error leyendo archivo: " + (e as Error).message);
+    }
+  };
+
+  const confirmarOrdenesServicio = async () => {
+    if (!osRows || !user) return;
+
+    setBusy(true);
+    try {
+      const payload = osRows.map((r) => ({
+        os_numero: r.os_numero,
+        trabajo_id: r.trabajo_id,
+        cliente_nombre: r.cliente_nombre,
+        situacion_os: r.situacion_os,
+        situacion_facturacion: r.situacion_facturacion,
+        responsable: r.responsable,
+        cod_mecanico: r.cod_mecanico,
+        factura: r.factura,
+        cod_interno: r.cod_interno,
+        fecha_abierta_os: r.fecha_abierta_os,
+        fecha_emision_factura: r.fecha_emision_factura,
+        nro_chasis: r.nro_chasis,
+        marca: r.marca,
+        tipo_tiempo: r.tipo_tiempo,
+        problema: r.problema,
+        km_cantidad: r.km_cantidad,
+        km_valor_unitario: r.km_valor_unitario,
+        servicios_cantidad: r.servicios_cantidad,
+        servicios_valor_unitario: r.servicios_valor_unitario,
+        terceros_valor: r.terceros_valor,
+        kilometro_valor: r.kilometro_valor,
+        servicios_valor: r.servicios_valor,
+        repuesto_valor: r.repuesto_valor,
+        raw_data: r.raw_data,
+        actualizado_en: new Date().toISOString(),
+      }));
+
+      for (let i = 0; i < payload.length; i += 500) {
+        const chunk = payload.slice(i, i + 500);
+        const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk, {
+          onConflict: "os_numero",
+        }) as any);
+        if (error) throw error;
+      }
+
+      const nuevas = osRows.filter((r) => r._isNew).length;
+      const vinculadas = osRows.filter((r) => r.trabajo_id).length;
+      await supabase.from("importaciones").insert({
+        usuario_id: user.id,
+        tipo: "ordenes_servicio" as any,
+        total_filas: osRows.length,
+        insertados: nuevas,
+        duplicados: osRows.length - nuevas,
+        archivo_nombre: osFile,
+      });
+
+      toast.success(`Importadas ${osRows.length} OS. ${vinculadas} vinculadas a trabajos.`);
+      setOsRows(null);
+      setOsFile("");
+      await cargarHistorial();
+      onChanged();
+    } catch (e) {
+      toast.error("Error: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const procesarParque = async (file: File) => {
@@ -1001,6 +1183,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           help="MATRIZ CLIENTES.xlsx — toma contactos solo desde BD CLIENTES y los vincula por NRO ENTIDAD."
           onFile={procesarContactos}
         />
+        <DropZone
+          title="Importar ordenes de servicio"
+          help="Ordenes de Servicios - CDM.xlsx - usa Nro OS para vincular con trabajos que tengan cargada la OS interna."
+          onFile={procesarOrdenesServicio}
+        />
       </div>
 
       {parqueRows && (
@@ -1106,6 +1293,27 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           rows={conRows}
           onConfirm={confirmarContactos}
           onCancel={() => setConRows(null)}
+          busy={busy}
+        />
+      )}
+
+      {osRows && (
+        <Preview
+          title={`Ordenes de servicio - ${osFile}`}
+          rows={osRows}
+          columns={[
+            "os_numero",
+            "trabajo_codigo",
+            "cliente_nombre",
+            "tipo_tiempo",
+            "servicios_cantidad",
+            "terceros_valor",
+            "kilometro_valor",
+            "servicios_valor",
+            "repuesto_valor",
+          ]}
+          onConfirm={confirmarOrdenesServicio}
+          onCancel={() => setOsRows(null)}
           busy={busy}
         />
       )}
