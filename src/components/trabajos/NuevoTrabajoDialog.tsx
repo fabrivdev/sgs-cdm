@@ -94,6 +94,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
           clienteId = data.id;
         }
       }
+      const osNumero = form.os_numero.trim();
       const payload: any = {
         cliente_id: clienteId,
         marca: form.marca,
@@ -101,8 +102,9 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         tipo_trabajo: form.tipo_trabajo,
         descripcion_problema: form.descripcion_problema.trim(),
         prioridad: form.prioridad,
-        os_numero: form.os_numero.trim() || null,
+        os_numero: osNumero || null,
       };
+      if (osNumero) payload.codigo = `OS-${osNumero}`;
       const savePayload = async (includeOs: boolean) => {
         const data = includeOs ? payload : { ...payload };
         if (!includeOs) delete data.os_numero;

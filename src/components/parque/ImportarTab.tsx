@@ -344,7 +344,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       const osImportadas = new Set<string>((importadas ?? []).map((r: any) => normOs(r.os_numero)));
       const trabajosPorOs = new Map<string, { id: string; codigo: string | null }>();
       for (const t of trabajos ?? []) {
-        const os = normOs((t as any).os_numero);
+        const os = normOs((t as any).os_numero) || normOs((t as any).codigo);
         if (os) trabajosPorOs.set(os, { id: t.id, codigo: t.codigo });
       }
 
