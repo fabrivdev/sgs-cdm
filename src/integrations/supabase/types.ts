@@ -320,6 +320,108 @@ export type Database = {
           },
         ]
       }
+      ordenes_servicio_importadas: {
+        Row: {
+          actualizado_en: string
+          cliente_nombre: string | null
+          cod_interno: string | null
+          cod_mecanico: string | null
+          factura: string | null
+          fecha_abierta_os: string | null
+          fecha_emision_factura: string | null
+          importado_en: string
+          kilometro_valor: number | null
+          km_cantidad: number | null
+          km_valor_unitario: number | null
+          marca: string | null
+          nro_chasis: string | null
+          os_numero: string
+          problema: string | null
+          raw_data: Json
+          repuesto_valor: number | null
+          responsable: string | null
+          servicios_cantidad: number | null
+          servicios_valor: number | null
+          servicios_valor_unitario: number | null
+          situacion_facturacion: string | null
+          situacion_os: string | null
+          terceros_valor: number | null
+          tipo_tiempo: string | null
+          trabajo_id: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          cliente_nombre?: string | null
+          cod_interno?: string | null
+          cod_mecanico?: string | null
+          factura?: string | null
+          fecha_abierta_os?: string | null
+          fecha_emision_factura?: string | null
+          importado_en?: string
+          kilometro_valor?: number | null
+          km_cantidad?: number | null
+          km_valor_unitario?: number | null
+          marca?: string | null
+          nro_chasis?: string | null
+          os_numero: string
+          problema?: string | null
+          raw_data?: Json
+          repuesto_valor?: number | null
+          responsable?: string | null
+          servicios_cantidad?: number | null
+          servicios_valor?: number | null
+          servicios_valor_unitario?: number | null
+          situacion_facturacion?: string | null
+          situacion_os?: string | null
+          terceros_valor?: number | null
+          tipo_tiempo?: string | null
+          trabajo_id?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          cliente_nombre?: string | null
+          cod_interno?: string | null
+          cod_mecanico?: string | null
+          factura?: string | null
+          fecha_abierta_os?: string | null
+          fecha_emision_factura?: string | null
+          importado_en?: string
+          kilometro_valor?: number | null
+          km_cantidad?: number | null
+          km_valor_unitario?: number | null
+          marca?: string | null
+          nro_chasis?: string | null
+          os_numero?: string
+          problema?: string | null
+          raw_data?: Json
+          repuesto_valor?: number | null
+          responsable?: string | null
+          servicios_cantidad?: number | null
+          servicios_valor?: number | null
+          servicios_valor_unitario?: number | null
+          situacion_facturacion?: string | null
+          situacion_os?: string | null
+          terceros_valor?: number | null
+          tipo_tiempo?: string | null
+          trabajo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordenes_servicio_importadas_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordenes_servicio_importadas_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "trabajos_horas"
+            referencedColumns: ["trabajo_id"]
+          },
+        ]
+      }
       parque_maquinas: {
         Row: {
           activo: boolean
@@ -740,6 +842,7 @@ export type Database = {
           marca: Database["public"]["Enums"]["marca"]
           motivo_bloqueo: string | null
           numero: number
+          os_numero: string | null
           prioridad: Database["public"]["Enums"]["prioridad_trabajo"]
           proxima_accion: string | null
           responsable_principal_id: string | null
@@ -763,6 +866,7 @@ export type Database = {
           marca: Database["public"]["Enums"]["marca"]
           motivo_bloqueo?: string | null
           numero?: number
+          os_numero?: string | null
           prioridad?: Database["public"]["Enums"]["prioridad_trabajo"]
           proxima_accion?: string | null
           responsable_principal_id?: string | null
@@ -786,6 +890,7 @@ export type Database = {
           marca?: Database["public"]["Enums"]["marca"]
           motivo_bloqueo?: string | null
           numero?: number
+          os_numero?: string | null
           prioridad?: Database["public"]["Enums"]["prioridad_trabajo"]
           proxima_accion?: string | null
           responsable_principal_id?: string | null
@@ -947,7 +1052,7 @@ export type Database = {
         | "cierre"
         | "observacion"
       tipo_facturacion: "Repuesto" | "Servicio"
-      tipo_importacion: "parque" | "facturacion" | "ordenes_servicio"
+      tipo_importacion: "parque" | "facturacion"
       tipo_trabajo: "Visita de campo" | "Máquina en taller"
     }
     CompositeTypes: {
@@ -1140,7 +1245,7 @@ export const Constants = {
         "observacion",
       ],
       tipo_facturacion: ["Repuesto", "Servicio"],
-      tipo_importacion: ["parque", "facturacion", "ordenes_servicio"],
+      tipo_importacion: ["parque", "facturacion"],
       tipo_trabajo: ["Visita de campo", "Máquina en taller"],
     },
   },
