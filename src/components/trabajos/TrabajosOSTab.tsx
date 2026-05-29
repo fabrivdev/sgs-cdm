@@ -63,7 +63,7 @@ interface TrabajoLite {
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 
-const fmtMoney = (n: number) => new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(n);
+const fmtMoney = (n: number) => "USD " + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtNum = (n: number | null | undefined) => n == null ? "—" : new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(n);
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return "—";
@@ -220,7 +220,7 @@ export function TrabajosOSTab({
         search={{ value: q, onChange: setQ, placeholder: "Buscar OS, factura, cliente, chasis, mecánico…" }}
         activeCount={activosCount}
         onClear={limpiar}
-        meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} Gs · ${fmtNum(totales.horas)} h`}
+        meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} · ${fmtNum(totales.horas)} h`}
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
