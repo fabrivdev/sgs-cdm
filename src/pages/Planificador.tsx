@@ -20,6 +20,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { pageDescription, pageShellWide, pageTitle, tableText } from "@/lib/ui-classes";
+import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
 
 interface Servicio {
   id: string;
