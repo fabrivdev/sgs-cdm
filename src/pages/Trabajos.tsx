@@ -346,6 +346,10 @@ export default function Trabajos() {
           })}
         </div>
       )}
+        </>
+      )}
+
+
 
       <NuevoTrabajoDialog
         open={openNuevo}
