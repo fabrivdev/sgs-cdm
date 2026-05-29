@@ -638,10 +638,10 @@ export default function Planificador() {
                   </div>
 
                   <div className="space-y-1">
-                    {codigoByServicio.get(s.id) && (
+                    {refByServicio.get(s.id)?.ref && (
                       <div className="flex">
                         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
-                          {codigoByServicio.get(s.id)}
+                          {refByServicio.get(s.id)?.ref}
                         </span>
                       </div>
                     )}
