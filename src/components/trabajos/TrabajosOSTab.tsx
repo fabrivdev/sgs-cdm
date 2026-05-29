@@ -63,7 +63,7 @@ interface TrabajoLite {
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 
-const fmtMoney = (n: number) => "USD " + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const fmtMoney = (n: number | null | undefined) => n == null ? "—" : "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtNum = (n: number | null | undefined) => n == null ? "—" : new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(n);
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return "—";
@@ -71,6 +71,25 @@ const fmtDate = (s: string | null | undefined) => {
 };
 
 type SortKey = "fecha" | "total" | "horas" | "os";
+
+function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={cn("tabular-nums font-semibold", highlight ? "text-base text-primary" : "text-sm")}>{value}</div>
+    </div>
+  );
+}
+
+function Cell({ label, value, sub }: { label: string; value: string; sub?: string | null }) {
+  return (
+    <div className="rounded bg-muted/40 px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="tabular-nums font-medium">{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground/80 tabular-nums truncate" title={sub}>{sub}</div>}
+    </div>
+  );
+}
 
 export function TrabajosOSTab({
   clientes,
@@ -243,100 +262,95 @@ export function TrabajosOSTab({
       ) : sorted.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">No hay OS vinculadas con los filtros seleccionados.</Card>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1600px] text-[11px] tabular-nums">
-              <thead className="bg-muted/50 text-muted-foreground">
-                <tr className="border-b">
-                  <SortHeader k="os">OS</SortHeader>
-                  <th className="px-2 py-1.5 text-left font-medium whitespace-nowrap">Ref. Trabajo</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Cliente</th>
-                  <SortHeader k="fecha">Fecha OS</SortHeader>
-                  <th className="px-2 py-1.5 text-left font-medium whitespace-nowrap">Factura</th>
-                  <th className="px-2 py-1.5 text-left font-medium whitespace-nowrap">Fecha Fact.</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Marca</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Chasis</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Mecánico</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Problema</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Tipo tiempo</th>
-                  <SortHeader k="horas" className="text-right">Horas</SortHeader>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Serv. unit.</th>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Servicios $</th>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Repuestos $</th>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Km cant.</th>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Km unit.</th>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Km $</th>
-                  <th className="px-2 py-1.5 text-right font-medium whitespace-nowrap">Terceros $</th>
-                  <SortHeader k="total" className="text-right">TOTAL $</SortHeader>
-                  <th className="px-2 py-1.5 text-left font-medium whitespace-nowrap">Sit. OS</th>
-                  <th className="px-2 py-1.5 text-left font-medium whitespace-nowrap">Sit. Fact.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map(o => {
-                  const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null;
-                  const cli = t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre;
-                  const total = totalOf(o);
-                  return (
-                    <tr
-                      key={`${o.os_numero}-${o.trabajo_id}`}
-                      onClick={() => t && setDetalleId(t.id)}
-                      className={cn(
-                        "border-b border-border/40 hover:bg-accent/40",
-                        t && "cursor-pointer",
-                      )}
-                    >
-                      <td className="px-2 py-1.5 font-mono font-semibold whitespace-nowrap">OS-{o.os_numero}</td>
-                      <td className="px-2 py-1.5 font-mono whitespace-nowrap">{t ? trabajoReferencia(t) : "—"}</td>
-                      <td className="px-2 py-1.5 max-w-[200px] truncate" title={cli ?? ""}>{cli ?? "—"}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(o.fecha_abierta_os)}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{o.factura ?? "—"}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(o.fecha_emision_factura)}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{o.marca ?? "—"}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap font-mono">{o.nro_chasis ?? "—"}</td>
-                      <td className="px-2 py-1.5 max-w-[160px] truncate" title={o.responsable ?? ""}>
-                        {o.responsable ?? o.cod_mecanico ?? "—"}
-                      </td>
-                      <td className="px-2 py-1.5 max-w-[240px] truncate" title={o.problema ?? ""}>{o.problema ?? "—"}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{o.tipo_tiempo ?? "—"}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtNum(o.servicios_cantidad)}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtNum(o.servicios_valor_unitario)}</td>
-                      <td className="px-2 py-1.5 text-right">{o.servicios_valor != null ? fmtMoney(o.servicios_valor) : "—"}</td>
-                      <td className="px-2 py-1.5 text-right">{o.repuesto_valor != null ? fmtMoney(o.repuesto_valor) : "—"}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtNum(o.km_cantidad)}</td>
-                      <td className="px-2 py-1.5 text-right">{fmtNum(o.km_valor_unitario)}</td>
-                      <td className="px-2 py-1.5 text-right">{o.kilometro_valor != null ? fmtMoney(o.kilometro_valor) : "—"}</td>
-                      <td className="px-2 py-1.5 text-right">{o.terceros_valor != null ? fmtMoney(o.terceros_valor) : "—"}</td>
-                      <td className="px-2 py-1.5 text-right font-semibold">{fmtMoney(total)}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">
-                        {o.situacion_os ? <Badge variant="outline" className="text-[10px]">{o.situacion_os}</Badge> : "—"}
-                      </td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">
-                        {o.situacion_facturacion ? <Badge variant="outline" className="text-[10px]">{o.situacion_facturacion}</Badge> : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot className="bg-muted/60 font-semibold">
-                <tr>
-                  <td colSpan={11} className="px-2 py-1.5 text-right">Totales ({filtered.length})</td>
-                  <td className="px-2 py-1.5 text-right">{fmtNum(totales.horas)}</td>
-                  <td />
-                  <td className="px-2 py-1.5 text-right">{fmtMoney(totales.serv)}</td>
-                  <td className="px-2 py-1.5 text-right">{fmtMoney(totales.rep)}</td>
-                  <td />
-                  <td />
-                  <td className="px-2 py-1.5 text-right">{fmtMoney(totales.km)}</td>
-                  <td className="px-2 py-1.5 text-right">{fmtMoney(totales.terc)}</td>
-                  <td className="px-2 py-1.5 text-right">{fmtMoney(totales.total)}</td>
-                  <td colSpan={2} />
-                </tr>
-              </tfoot>
-            </table>
+        <>
+          <Card className="p-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <Metric label="OS" value={filtered.length.toString()} />
+              <Metric label="Horas" value={fmtNum(totales.horas)} />
+              <Metric label="Servicios" value={fmtMoney(totales.serv)} />
+              <Metric label="Repuestos" value={fmtMoney(totales.rep)} />
+              <Metric label="Km + Terc." value={fmtMoney(totales.km + totales.terc)} />
+              <Metric label="Total" value={fmtMoney(totales.total)} highlight />
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {sorted.map(o => {
+              const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null;
+              const cli = t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre;
+              const total = totalOf(o);
+              return (
+                <Card
+                  key={`${o.os_numero}-${o.trabajo_id}`}
+                  onClick={() => t && setDetalleId(t.id)}
+                  className={cn(
+                    "p-3 transition-all hover:shadow-md hover:border-primary/40",
+                    t && "cursor-pointer",
+                  )}
+                >
+                  {/* Header */}
+                  <div className="flex flex-wrap items-start justify-between gap-2 border-b pb-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-mono font-bold text-primary tabular-nums">
+                          OS-{o.os_numero}
+                        </span>
+                        {t && (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground tabular-nums">
+                            {trabajoReferencia(t)}
+                          </span>
+                        )}
+                        {o.marca && (
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{o.marca}</span>
+                        )}
+                      </div>
+                      <div className="mt-1 truncate text-sm font-semibold" title={cli ?? ""}>
+                        {cli ?? "—"}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-base font-bold tabular-nums">{fmtMoney(total)}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {fmtNum(o.servicios_cantidad)} h · {fmtDate(o.fecha_abierta_os)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Breakdown */}
+                  <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+                    <Cell label="Servicios" value={fmtMoney(o.servicios_valor)} sub={o.servicios_cantidad != null ? `${fmtNum(o.servicios_cantidad)} h × ${fmtMoney(o.servicios_valor_unitario)}` : null} />
+                    <Cell label="Repuestos" value={fmtMoney(o.repuesto_valor)} />
+                    <Cell label="Kilometraje" value={fmtMoney(o.kilometro_valor)} sub={o.km_cantidad != null ? `${fmtNum(o.km_cantidad)} × ${fmtMoney(o.km_valor_unitario)}` : null} />
+                    <Cell label="Terceros" value={fmtMoney(o.terceros_valor)} />
+                  </div>
+
+                  {/* Meta */}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                    {o.factura && <span><span className="text-muted-foreground/60">Fact.</span> {o.factura} · {fmtDate(o.fecha_emision_factura)}</span>}
+                    {(o.responsable || o.cod_mecanico) && <span><span className="text-muted-foreground/60">Mec.</span> {o.responsable ?? o.cod_mecanico}</span>}
+                    {o.nro_chasis && <span className="font-mono"><span className="text-muted-foreground/60 font-sans">Chasis</span> {o.nro_chasis}</span>}
+                    {o.tipo_tiempo && <span>{o.tipo_tiempo}</span>}
+                  </div>
+
+                  {o.problema && (
+                    <div className="mt-1.5 line-clamp-2 text-xs text-foreground/80" title={o.problema}>
+                      {o.problema}
+                    </div>
+                  )}
+
+                  {(o.situacion_os || o.situacion_facturacion) && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {o.situacion_os && <Badge variant="outline" className="text-[10px]">OS: {o.situacion_os}</Badge>}
+                      {o.situacion_facturacion && <Badge variant="outline" className="text-[10px]">Fact: {o.situacion_facturacion}</Badge>}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
-        </Card>
+        </>
       )}
+
 
       <TrabajoDetalleDrawer
         trabajoId={detalleId}
