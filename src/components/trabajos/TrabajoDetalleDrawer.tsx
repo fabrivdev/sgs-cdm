@@ -556,9 +556,21 @@ export function TrabajoDetalleDrawer({
             </Button>
           )}
           {trabajo && (isAdmin || isCabecilla) && !pausado && (
-            <Button size="sm" onClick={() => setProgramarOpen(true)}>
-              <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Programar jornada
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setPauseReason(trabajo.motivo_bloqueo ?? "");
+                  setPauseOpen(true);
+                }}
+              >
+                <PauseCircle className="mr-1.5 h-3.5 w-3.5" /> Pausar
+              </Button>
+              <Button size="sm" onClick={() => setProgramarOpen(true)}>
+                <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Programar jornada
+              </Button>
+            </>
           )}
           {trabajo && (isAdmin || isCabecilla) && pausado && (
             <Button size="sm" onClick={reactivarTrabajo}>
