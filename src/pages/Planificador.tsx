@@ -20,6 +20,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { pageDescription, pageShellWide, pageTitle, tableText } from "@/lib/ui-classes";
+import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
 
 interface Servicio {
   id: string;
@@ -153,7 +154,7 @@ export default function Planificador() {
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
-        supabase.from("trabajos").select("id, codigo, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
+        supabase.from("trabajos").select("id, codigo, os_numero, proxima_accion, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       const adminCab = new Set<string>();
@@ -239,10 +240,15 @@ export default function Planificador() {
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c])), [clientes]);
   const tecnicosSolo = useMemo(() => profiles.filter(p => !adminCabIds.has(p.id)), [profiles, adminCabIds]);
-  const codigoByServicio = useMemo(() => {
-    const m = new Map<string, string>();
+  const refByServicio = useMemo(() => {
+    const m = new Map<string, { ref: string; os: string; codigo: string }>();
     for (const t of trabajosLite) {
-      if (t.legacy_servicio_id && t.codigo) m.set(t.legacy_servicio_id, t.codigo);
+      if (!t.legacy_servicio_id) continue;
+      m.set(t.legacy_servicio_id, {
+        ref: trabajoReferencia(t),
+        os: trabajoOsNumero(t),
+        codigo: t.codigo ?? "",
+      });
     }
     return m;
   }, [trabajosLite]);
@@ -270,12 +276,20 @@ export default function Planificador() {
       }
       if (q) {
         const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
-        const codigo = codigoByServicio.get(s.id) ?? "";
-        if (!nombre.toLowerCase().includes(q) && !codigo.toLowerCase().includes(q)) return false;
+        const r = refByServicio.get(s.id);
+        const codigo = r?.codigo ?? "";
+        const os = r?.os ?? "";
+        const ref = r?.ref ?? "";
+        if (
+          !nombre.toLowerCase().includes(q) &&
+          !codigo.toLowerCase().includes(q) &&
+          !os.toLowerCase().includes(q) &&
+          !ref.toLowerCase().includes(q)
+        ) return false;
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, codigoByServicio]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
   // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
   const fechasPorServicio = useMemo(() => {
@@ -417,7 +431,7 @@ export default function Planificador() {
       </div>
 
       <FiltersBar
-        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar TR-000123 o cliente…" }}
+        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar OS, TR-000123 o cliente…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
@@ -512,9 +526,9 @@ export default function Planificador() {
 
                     <TableCell className="px-3 py-2 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
                       <div className="flex items-center gap-1.5">
-                        {codigoByServicio.get(s.id) && (
+                        {refByServicio.get(s.id)?.ref && (
                           <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
-                            {codigoByServicio.get(s.id)}
+                            {refByServicio.get(s.id)?.ref}
                           </span>
                         )}
                         <span className="truncate">{s.trabajo_descripcion}</span>
@@ -624,10 +638,10 @@ export default function Planificador() {
                   </div>
 
                   <div className="space-y-1">
-                    {codigoByServicio.get(s.id) && (
+                    {refByServicio.get(s.id)?.ref && (
                       <div className="flex">
                         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
-                          {codigoByServicio.get(s.id)}
+                          {refByServicio.get(s.id)?.ref}
                         </span>
                       </div>
                     )}
