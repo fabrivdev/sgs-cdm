@@ -276,12 +276,20 @@ export default function Planificador() {
       }
       if (q) {
         const nombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "";
-        const codigo = codigoByServicio.get(s.id) ?? "";
-        if (!nombre.toLowerCase().includes(q) && !codigo.toLowerCase().includes(q)) return false;
+        const r = refByServicio.get(s.id);
+        const codigo = r?.codigo ?? "";
+        const os = r?.os ?? "";
+        const ref = r?.ref ?? "";
+        if (
+          !nombre.toLowerCase().includes(q) &&
+          !codigo.toLowerCase().includes(q) &&
+          !os.toLowerCase().includes(q) &&
+          !ref.toLowerCase().includes(q)
+        ) return false;
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, codigoByServicio]);
+  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
   // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
   const fechasPorServicio = useMemo(() => {
