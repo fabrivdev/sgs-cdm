@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
+import { TrabajosOSTab } from "@/components/trabajos/TrabajosOSTab";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getISOWeek, parseISO, format } from "date-fns";
 import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 
@@ -50,6 +52,7 @@ export default function Trabajos() {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+  const [vista, setVista] = useState<"kanban" | "os">("kanban");
 
   const load = async () => {
     setLoading(true);
@@ -150,11 +153,23 @@ export default function Trabajos() {
             Vista macro de casos. Lo operativo se maneja desde Planificador / Calendario.
           </p>
         </div>
-        <Button size="sm" onClick={() => setOpenNuevo(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> Nuevo trabajo
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={vista} onValueChange={(v) => setVista(v as "kanban" | "os")}>
+            <TabsList className="h-9">
+              <TabsTrigger value="kanban" className="text-xs">Kanban</TabsTrigger>
+              <TabsTrigger value="os" className="text-xs">Órdenes de servicio</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button size="sm" onClick={() => setOpenNuevo(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Nuevo trabajo
+          </Button>
+        </div>
       </div>
 
+      {vista === "os" ? (
+        <TrabajosOSTab clientes={clientes} profiles={profiles} onChanged={load} />
+      ) : (
+        <>
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: "Buscar OS, TR, cliente o problema..." }}
         activeCount={activosCount}
@@ -331,6 +346,10 @@ export default function Trabajos() {
           })}
         </div>
       )}
+        </>
+      )}
+
+
 
       <NuevoTrabajoDialog
         open={openNuevo}
