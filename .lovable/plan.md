@@ -1,53 +1,32 @@
-# Listado de OS ancladas a trabajos
+# Vista lista compacta para OS ancladas
 
-Agregar un toggle/pestaña en la página **Trabajos** para alternar entre la vista actual (kanban) y una nueva vista de tabla con todas las **OS** que están vinculadas a un trabajo (`ordenes_servicio_importadas` con `trabajo_id IS NOT NULL`).
+Reemplazar el grid de tarjetas actual en `src/components/trabajos/TrabajosOSTab.tsx` por una tabla legible y arreglar la duplicación "OS y OS".
 
-## Cambios en `src/pages/Trabajos.tsx`
+## Cambios
 
-1. **Estado de vista**: agregar `const [vista, setVista] = useState<"kanban" | "os">("kanban")`.
-2. **Toggle** al lado del título (Tabs o botones): "Kanban" / "Órdenes de servicio".
-3. Cuando `vista === "os"` se oculta el kanban y se renderiza el nuevo componente `<TrabajosOSTab />`.
+### `src/components/trabajos/TrabajosOSTab.tsx`
 
-## Nuevo componente `src/components/trabajos/TrabajosOSTab.tsx`
-
-Carga en paralelo:
-- `ordenes_servicio_importadas` donde `trabajo_id is not null` (todas, paginado 1000).
-- `trabajos` (id, codigo, os_numero, sucursal, cliente_id, descripcion_problema) para enriquecer.
-- `clientes` (id, nombre) para mostrar nombre.
-
-Calcula por fila:
-- **Total facturado** = `servicios_valor + repuesto_valor + kilometro_valor + terceros_valor` (sumando solo no nulos).
-- **Horas** = `servicios_cantidad`.
-- **Ref. trabajo** = `trabajoReferencia(trabajo)` (OS-#### o TR-######).
-
-### Filtros (reutilizando `FiltersBar`)
-- Búsqueda libre: nro OS, factura, cliente, TR/OS-ref, problema, chasis, mecánico.
-- Select sucursal (del trabajo).
-- Select situación OS (`situacion_os` distinct).
-- Select situación facturación (`situacion_facturacion` distinct).
-- Rango de fecha (por `fecha_abierta_os`).
-
-### Tabla (scroll horizontal en mobile)
-Columnas:
-
-```text
-OS  |  TR/OS-ref  |  Cliente  |  Fecha OS  |  Factura  |  Fecha fact.
-Marca | Chasis | Mecánico/Responsable | Problema | Tipo tiempo
-Horas (serv. cant.) | Serv. unit. | Servicios $ | Repuestos $
-Km cant. | Km unit. | Km $ | Terceros $ | TOTAL $
-Situación OS | Situación facturación
-```
-
-- Totales al pie: suma de horas, servicios, repuestos, km, terceros, total.
-- Click en la fila abre `TrabajoDetalleDrawer` con el `trabajo_id` correspondiente (mismo drawer que ya usa Trabajos).
-- Ordenamiento por header (al menos por fecha OS, total, horas).
-- Formateo: moneda con `Intl.NumberFormat('es-PY')` sin decimales; fechas `dd/MM/yyyy`.
-
-## Notas técnicas
-- Tabla puede crecer (hoy 19 vinculadas, pero el universo es 416 y subirá); se usa el mismo helper `cargarTodo` con paginación de 1000.
-- Sin cambios de schema ni RLS (la tabla ya tiene policy de SELECT para authenticated).
-- Reutilizar tokens del design system; no introducir colores nuevos.
+1. **Eliminar** el componente helper `Cell` y el render de tarjetas por OS.
+2. **Mantener** el componente `Metric` y la `Card` resumen superior con totales (count, horas, servicios, repuestos, km+terc., total).
+3. **Nueva tabla** dentro de `<Card className="overflow-hidden">` + `<div className="overflow-x-auto">`:
+   - `min-w-[1100px]`, `text-[12px] tabular-nums`.
+   - Header `<thead>` con fondo `bg-muted/50`, sticky opcional, padding `px-3 py-2`.
+   - Columnas en orden:
+     1. **OS** (sortable) — `OS-####` en mono.
+     2. **TR** — `t?.codigo ?? "—"` en mono, **sin** usar `trabajoReferencia` (evita la duplicación OS/OS).
+     3. **Cliente** — nombre en `font-medium` + sub-línea `text-[10px] text-muted-foreground` con `mec. · Fact N° · fecha fact.` (solo se renderiza lo que existe).
+     4. **Fecha OS** (sortable) — `dd/MM/yyyy`.
+     5. **Horas** (sortable, right) — `servicios_cantidad`.
+     6. **Servicios** (right) — `$`.
+     7. **Repuestos** (right) — `$`.
+     8. **Km+Terc.** (right) — suma `kilometro_valor + terceros_valor`.
+     9. **TOTAL** (sortable, right, `font-semibold`).
+     10. **Situación** — apila `situacion_os` y `situacion_facturacion` como dos `Badge` pequeños (`text-[10px]`) uno arriba del otro.
+   - Filas: `border-b border-border/40`, `hover:bg-accent/40`, `cursor-pointer` cuando hay `trabajo_id`. Click → `setDetalleId(t.id)`.
+   - Padding por celda `px-3 py-2.5`.
+4. **Footer** `<tfoot>` con totales alineados a sus columnas: Horas, Servicios, Repuestos, Km+Terc., TOTAL.
+5. **Texto del resumen** del filtros bar: mantener `${filtered.length} OS · Total ${fmtMoney(totales.total)} · ${fmtNum(totales.horas)} h`.
 
 ## Fuera de alcance
-- No se modifica el kanban actual.
-- No se agrega edición de OS desde esta vista (solo lectura + abrir detalle del trabajo).
+- No cambian filtros, carga de datos, ordenamiento ni el drawer de detalle.
+- No se modifica el kanban ni `Trabajos.tsx`.

@@ -81,15 +81,6 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
   );
 }
 
-function Cell({ label, value, sub }: { label: string; value: string; sub?: string | null }) {
-  return (
-    <div className="rounded bg-muted/40 px-2 py-1.5">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="tabular-nums font-medium">{value}</div>
-      {sub && <div className="text-[10px] text-muted-foreground/80 tabular-nums truncate" title={sub}>{sub}</div>}
-    </div>
-  );
-}
 
 export function TrabajosOSTab({
   clientes,
@@ -274,80 +265,82 @@ export function TrabajosOSTab({
             </div>
           </Card>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {sorted.map(o => {
-              const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null;
-              const cli = t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre;
-              const total = totalOf(o);
-              return (
-                <Card
-                  key={`${o.os_numero}-${o.trabajo_id}`}
-                  onClick={() => t && setDetalleId(t.id)}
-                  className={cn(
-                    "p-3 transition-all hover:shadow-md hover:border-primary/40",
-                    t && "cursor-pointer",
-                  )}
-                >
-                  {/* Header */}
-                  <div className="flex flex-wrap items-start justify-between gap-2 border-b pb-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-mono font-bold text-primary tabular-nums">
-                          OS-{o.os_numero}
-                        </span>
-                        {t && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground tabular-nums">
-                            {trabajoReferencia(t)}
-                          </span>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] text-[12px] tabular-nums">
+                <thead className="bg-muted/50 text-muted-foreground sticky top-0">
+                  <tr className="border-b">
+                    <SortHeader k="os">OS</SortHeader>
+                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">TR</th>
+                    <th className="px-3 py-2 text-left font-medium">Cliente</th>
+                    <SortHeader k="fecha">Fecha OS</SortHeader>
+                    <SortHeader k="horas" className="text-right">Horas</SortHeader>
+                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Servicios</th>
+                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Repuestos</th>
+                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Km + Terc.</th>
+                    <SortHeader k="total" className="text-right">TOTAL</SortHeader>
+                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Situación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map(o => {
+                    const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null;
+                    const cli = t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre;
+                    const total = totalOf(o);
+                    const kmTerc = (o.kilometro_valor ?? 0) + (o.terceros_valor ?? 0);
+                    const mec = o.responsable ?? o.cod_mecanico;
+                    const subParts: string[] = [];
+                    if (mec) subParts.push(mec);
+                    if (o.factura) subParts.push(`Fact. ${o.factura}${o.fecha_emision_factura ? " · " + fmtDate(o.fecha_emision_factura) : ""}`);
+                    return (
+                      <tr
+                        key={`${o.os_numero}-${o.trabajo_id}`}
+                        onClick={() => t && setDetalleId(t.id)}
+                        className={cn(
+                          "border-b border-border/40 hover:bg-accent/40 align-top",
+                          t && "cursor-pointer",
                         )}
-                        {o.marca && (
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{o.marca}</span>
-                        )}
-                      </div>
-                      <div className="mt-1 truncate text-sm font-semibold" title={cli ?? ""}>
-                        {cli ?? "—"}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-base font-bold tabular-nums">{fmtMoney(total)}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {fmtNum(o.servicios_cantidad)} h · {fmtDate(o.fecha_abierta_os)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Breakdown */}
-                  <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
-                    <Cell label="Servicios" value={fmtMoney(o.servicios_valor)} sub={o.servicios_cantidad != null ? `${fmtNum(o.servicios_cantidad)} h × ${fmtMoney(o.servicios_valor_unitario)}` : null} />
-                    <Cell label="Repuestos" value={fmtMoney(o.repuesto_valor)} />
-                    <Cell label="Kilometraje" value={fmtMoney(o.kilometro_valor)} sub={o.km_cantidad != null ? `${fmtNum(o.km_cantidad)} × ${fmtMoney(o.km_valor_unitario)}` : null} />
-                    <Cell label="Terceros" value={fmtMoney(o.terceros_valor)} />
-                  </div>
-
-                  {/* Meta */}
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                    {o.factura && <span><span className="text-muted-foreground/60">Fact.</span> {o.factura} · {fmtDate(o.fecha_emision_factura)}</span>}
-                    {(o.responsable || o.cod_mecanico) && <span><span className="text-muted-foreground/60">Mec.</span> {o.responsable ?? o.cod_mecanico}</span>}
-                    {o.nro_chasis && <span className="font-mono"><span className="text-muted-foreground/60 font-sans">Chasis</span> {o.nro_chasis}</span>}
-                    {o.tipo_tiempo && <span>{o.tipo_tiempo}</span>}
-                  </div>
-
-                  {o.problema && (
-                    <div className="mt-1.5 line-clamp-2 text-xs text-foreground/80" title={o.problema}>
-                      {o.problema}
-                    </div>
-                  )}
-
-                  {(o.situacion_os || o.situacion_facturacion) && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {o.situacion_os && <Badge variant="outline" className="text-[10px]">OS: {o.situacion_os}</Badge>}
-                      {o.situacion_facturacion && <Badge variant="outline" className="text-[10px]">Fact: {o.situacion_facturacion}</Badge>}
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                      >
+                        <td className="px-3 py-2.5 font-mono font-semibold whitespace-nowrap">OS-{o.os_numero}</td>
+                        <td className="px-3 py-2.5 font-mono whitespace-nowrap text-muted-foreground">{t?.codigo ?? "—"}</td>
+                        <td className="px-3 py-2.5 max-w-[280px]">
+                          <div className="truncate font-medium" title={cli ?? ""}>{cli ?? "—"}</div>
+                          {subParts.length > 0 && (
+                            <div className="truncate text-[10px] text-muted-foreground" title={subParts.join(" · ")}>
+                              {subParts.join(" · ")}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(o.fecha_abierta_os)}</td>
+                        <td className="px-3 py-2.5 text-right">{fmtNum(o.servicios_cantidad)}</td>
+                        <td className="px-3 py-2.5 text-right">{fmtMoney(o.servicios_valor)}</td>
+                        <td className="px-3 py-2.5 text-right">{fmtMoney(o.repuesto_valor)}</td>
+                        <td className="px-3 py-2.5 text-right">{kmTerc > 0 ? fmtMoney(kmTerc) : "—"}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold">{fmtMoney(total)}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <div className="flex flex-col gap-0.5 items-start">
+                            {o.situacion_os && <Badge variant="outline" className="text-[10px]">{o.situacion_os}</Badge>}
+                            {o.situacion_facturacion && <Badge variant="secondary" className="text-[10px]">{o.situacion_facturacion}</Badge>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-muted/60 font-semibold">
+                  <tr>
+                    <td colSpan={4} className="px-3 py-2 text-right">Totales ({filtered.length})</td>
+                    <td className="px-3 py-2 text-right">{fmtNum(totales.horas)}</td>
+                    <td className="px-3 py-2 text-right">{fmtMoney(totales.serv)}</td>
+                    <td className="px-3 py-2 text-right">{fmtMoney(totales.rep)}</td>
+                    <td className="px-3 py-2 text-right">{fmtMoney(totales.km + totales.terc)}</td>
+                    <td className="px-3 py-2 text-right">{fmtMoney(totales.total)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </Card>
         </>
       )}
 
