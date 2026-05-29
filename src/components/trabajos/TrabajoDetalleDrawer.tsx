@@ -366,8 +366,12 @@ export function TrabajoDetalleDrawer({
                   <Badge className={cn("text-[10px]", prioridadBadge(trabajo.prioridad))}>
                     {PRIORIDADES.find((p) => p.key === trabajo.prioridad)?.label}
                   </Badge>
-                  <Badge variant="secondary" className="text-[10px]">{estadoTrabajoLabel(estado)}</Badge>
-                  {pausado && <Badge className="bg-amber-600 text-white text-[10px]">Pausado</Badge>}
+                  <Badge
+                    variant={pausado ? "default" : "secondary"}
+                    className={cn("text-[10px]", pausado && "bg-amber-600 text-white")}
+                  >
+                    {estadoTrabajoLabel(estado)}
+                  </Badge>
                 </div>
                 <h2 className="text-lg font-semibold leading-tight">{cliente?.nombre ?? "Sin cliente"}</h2>
                 <p className="text-xs text-muted-foreground">{hint}</p>

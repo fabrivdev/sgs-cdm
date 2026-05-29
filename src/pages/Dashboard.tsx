@@ -106,6 +106,7 @@ const statusColor: Record<string, string> = {
   Pendiente: "#EF9F27",
   Programado: "#3B82F6",
   Iniciado: "#14B8A6",
+  Pausado: "#F97316",
   Completado: "#639922",
   Cancelada: "#9CA3AF",
 };
@@ -376,6 +377,7 @@ export default function Dashboard() {
       { key: "pendiente", label: "Pendiente" },
       { key: "programado", label: "Programado" },
       { key: "iniciado", label: "Iniciado" },
+      { key: "pausado", label: "Pausado" },
       { key: "completado", label: "Completado" },
     ];
     const counts = new Map<string, number>();

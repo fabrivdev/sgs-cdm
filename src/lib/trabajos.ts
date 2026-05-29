@@ -2,6 +2,7 @@ export const ESTADOS_TRABAJO = [
   { key: "pendiente", label: "Pendiente", color: "bg-amber-50 border-amber-200" },
   { key: "programado", label: "Programado", color: "bg-blue-50 border-blue-200" },
   { key: "iniciado", label: "Iniciado", color: "bg-emerald-50 border-emerald-200" },
+  { key: "pausado", label: "Pausado", color: "bg-orange-50 border-orange-200" },
   { key: "completado", label: "Completado", color: "bg-green-50 border-green-200" },
 ] as const;
 
@@ -11,10 +12,11 @@ export function normalizarEstadoTrabajo(estado: string | null | undefined): Esta
   switch (estado) {
     case "programado":
       return "programado";
-    case "iniciado":
-    case "en_ejecucion":
     case "en_pausa":
     case "bloqueado":
+      return "pausado";
+    case "iniciado":
+    case "en_ejecucion":
       return "iniciado";
     case "completado":
     case "cerrado":
@@ -34,7 +36,6 @@ export function trabajoPausado(trabajo: { estado_general?: string | null; motivo
 }
 
 export function estadoTrabajoLabel(estado: string | null | undefined) {
-  if (estado === "bloqueado" || estado === "en_pausa") return "Pausado";
   const key = normalizarEstadoTrabajo(estado);
   return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
 }
@@ -85,6 +86,8 @@ export function estadoTrabajoDesdeJornadas(
   fallback?: string | null,
   hoy = new Date(),
 ): EstadoTrabajo {
+  const fallbackNormalizado = normalizarEstadoTrabajo(fallback);
+  if (fallbackNormalizado === "pausado") return "pausado";
   if (jornadas.length === 0) return normalizarEstadoTrabajo(fallback);
 
   const hoyLocal = startOfLocalDay(hoy);

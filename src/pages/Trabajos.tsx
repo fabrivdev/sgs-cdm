@@ -185,7 +185,7 @@ export default function Trabajos() {
       {loading ? (
         <Card className="p-8 text-center text-muted-foreground">Cargando…</Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {ESTADOS_TRABAJO.map(col => {
             let items = filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === col.key);
             if (col.key === "completado") {
