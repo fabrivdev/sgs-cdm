@@ -1,29 +1,21 @@
+# Mostrar OS en el Planificador
+
 ## Problema
+En la página **Trabajos** la referencia del trabajo se muestra como `OS-####` cuando el trabajo tiene `os_numero` cargado (usa `trabajoReferencia()`), y como `TR-####` cuando no. En el **Planificador** sólo se muestra `t.codigo` (siempre `TR-####`), por lo que la OS no aparece nunca.
 
-Al programar una jornada sobre TR-000022 (y otros trabajos con `legacy_servicio_id` antiguo), aparece:
+## Cambios en `src/pages/Planificador.tsx`
 
-> new row violates row-level security policy for table "servicio_jornadas"
+1. **Cargar `os_numero`** en el `select` de `trabajos` (línea 156): añadir `os_numero, proxima_accion` al listado de columnas de `trabajosLite`.
 
-Causa raíz: el `servicio` legacy vinculado tiene `sucursal = NULL`. La política RLS de `servicio_jornadas` (insert/update) exige que `servicios.sucursal = get_user_sucursal(auth.uid())` para el rol `cabecilla`. Con NULL nunca matchea. Además, el `UPDATE` que hace `ProgramarIntervencionDialog` sobre `servicios` también está bloqueado por la política de `servicios` (que usa la sucursal **actual**, NULL), así que el intento de "rellenar" la sucursal nunca llega a aplicarse.
+2. **Reemplazar `codigoByServicio: Map<string,string>` por `refByServicio: Map<string,string>`** (líneas 242-248):
+   - Para cada trabajo con `legacy_servicio_id`, calcular la referencia usando `trabajoReferencia(t)` de `@/lib/trabajos` (devuelve `OS-####` si hay `os_numero`, si no `TR-####`).
+   - Importar `trabajoReferencia` y `trabajoOsNumero` desde `@/lib/trabajos`.
 
-## Plan
+3. **Usar `refByServicio`** en lugar de `codigoByServicio` en:
+   - Filtro de búsqueda (línea 273-274) — además de buscar por nombre y código, también por número de OS.
+   - Renders de chips/badges en las líneas 515-517 y 627-630 (las dos vistas del planificador).
 
-1. **Migración de datos**: rellenar `servicios.sucursal` desde `trabajos.sucursal` para todas las filas donde `servicios.sucursal IS NULL` y exista un trabajo vinculado por `legacy_servicio_id`. Esto desbloquea los trabajos existentes.
+4. **Placeholder de búsqueda** (línea 420): actualizar a `"Buscar OS, TR-000123 o cliente…"` para reflejar que ahora se puede buscar por OS.
 
-2. **Backend defensivo (RPC con SECURITY DEFINER)**: crear una función `public.programar_jornada(p_trabajo_id, p_fecha, p_tecnico_id, p_auxiliares, p_observacion)` que:
-   - Verifique permisos (admin o cabecilla de la sucursal del trabajo) con `has_role` / `get_user_sucursal`.
-   - Cree el `servicio` si no existe o actualice el existente forzando `sucursal = trabajo.sucursal`.
-   - Inserte/actualice la `servicio_jornada` correspondiente.
-   - Llame a `recalcular_estado_trabajo`.
-   
-   Esto evita los problemas de RLS encadenados (servicio NULL → no actualizable → jornada no insertable) y centraliza la lógica.
-
-3. **Frontend**: en `src/components/trabajos/ProgramarIntervencionDialog.tsx`, reemplazar el bloque de inserts/updates manuales por una sola llamada `supabase.rpc('programar_jornada', {...})`. Mantener manejo de errores y `toast`.
-
-4. **Verificación**: reintentar programar jornada en TR-000022 como cabecilla y como admin.
-
-## Detalles técnicos
-
-- La política de `servicios.UPDATE` para cabecilla usa `sucursal = get_user_sucursal(...)` en `USING`, por eso un NULL bloquea cualquier update desde el cliente — la RPC `SECURITY DEFINER` lo resuelve.
-- No se modifica ninguna política RLS existente (siguen siendo correctas en su intención).
-- `CargarJornadaDialog.tsx` no necesita cambios porque opera sobre jornadas ya creadas con servicio ya saneado por la migración del paso 1.
+## Resultado
+En el Planificador, las tarjetas/filas de servicios mostrarán `OS-1234` cuando el trabajo asociado tenga número de OS cargado, y seguirán mostrando `TR-000123` cuando no. La búsqueda también encontrará trabajos por número de OS.
