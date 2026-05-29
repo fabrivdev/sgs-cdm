@@ -81,15 +81,6 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
   );
 }
 
-function Cell({ label, value, sub }: { label: string; value: string; sub?: string | null }) {
-  return (
-    <div className="rounded bg-muted/40 px-2 py-1.5">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="tabular-nums font-medium">{value}</div>
-      {sub && <div className="text-[10px] text-muted-foreground/80 tabular-nums truncate" title={sub}>{sub}</div>}
-    </div>
-  );
-}
 
 export function TrabajosOSTab({
   clientes,
