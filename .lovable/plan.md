@@ -1,21 +1,53 @@
-# Mostrar OS en el Planificador
+# Listado de OS ancladas a trabajos
 
-## Problema
-En la página **Trabajos** la referencia del trabajo se muestra como `OS-####` cuando el trabajo tiene `os_numero` cargado (usa `trabajoReferencia()`), y como `TR-####` cuando no. En el **Planificador** sólo se muestra `t.codigo` (siempre `TR-####`), por lo que la OS no aparece nunca.
+Agregar un toggle/pestaña en la página **Trabajos** para alternar entre la vista actual (kanban) y una nueva vista de tabla con todas las **OS** que están vinculadas a un trabajo (`ordenes_servicio_importadas` con `trabajo_id IS NOT NULL`).
 
-## Cambios en `src/pages/Planificador.tsx`
+## Cambios en `src/pages/Trabajos.tsx`
 
-1. **Cargar `os_numero`** en el `select` de `trabajos` (línea 156): añadir `os_numero, proxima_accion` al listado de columnas de `trabajosLite`.
+1. **Estado de vista**: agregar `const [vista, setVista] = useState<"kanban" | "os">("kanban")`.
+2. **Toggle** al lado del título (Tabs o botones): "Kanban" / "Órdenes de servicio".
+3. Cuando `vista === "os"` se oculta el kanban y se renderiza el nuevo componente `<TrabajosOSTab />`.
 
-2. **Reemplazar `codigoByServicio: Map<string,string>` por `refByServicio: Map<string,string>`** (líneas 242-248):
-   - Para cada trabajo con `legacy_servicio_id`, calcular la referencia usando `trabajoReferencia(t)` de `@/lib/trabajos` (devuelve `OS-####` si hay `os_numero`, si no `TR-####`).
-   - Importar `trabajoReferencia` y `trabajoOsNumero` desde `@/lib/trabajos`.
+## Nuevo componente `src/components/trabajos/TrabajosOSTab.tsx`
 
-3. **Usar `refByServicio`** en lugar de `codigoByServicio` en:
-   - Filtro de búsqueda (línea 273-274) — además de buscar por nombre y código, también por número de OS.
-   - Renders de chips/badges en las líneas 515-517 y 627-630 (las dos vistas del planificador).
+Carga en paralelo:
+- `ordenes_servicio_importadas` donde `trabajo_id is not null` (todas, paginado 1000).
+- `trabajos` (id, codigo, os_numero, sucursal, cliente_id, descripcion_problema) para enriquecer.
+- `clientes` (id, nombre) para mostrar nombre.
 
-4. **Placeholder de búsqueda** (línea 420): actualizar a `"Buscar OS, TR-000123 o cliente…"` para reflejar que ahora se puede buscar por OS.
+Calcula por fila:
+- **Total facturado** = `servicios_valor + repuesto_valor + kilometro_valor + terceros_valor` (sumando solo no nulos).
+- **Horas** = `servicios_cantidad`.
+- **Ref. trabajo** = `trabajoReferencia(trabajo)` (OS-#### o TR-######).
 
-## Resultado
-En el Planificador, las tarjetas/filas de servicios mostrarán `OS-1234` cuando el trabajo asociado tenga número de OS cargado, y seguirán mostrando `TR-000123` cuando no. La búsqueda también encontrará trabajos por número de OS.
+### Filtros (reutilizando `FiltersBar`)
+- Búsqueda libre: nro OS, factura, cliente, TR/OS-ref, problema, chasis, mecánico.
+- Select sucursal (del trabajo).
+- Select situación OS (`situacion_os` distinct).
+- Select situación facturación (`situacion_facturacion` distinct).
+- Rango de fecha (por `fecha_abierta_os`).
+
+### Tabla (scroll horizontal en mobile)
+Columnas:
+
+```text
+OS  |  TR/OS-ref  |  Cliente  |  Fecha OS  |  Factura  |  Fecha fact.
+Marca | Chasis | Mecánico/Responsable | Problema | Tipo tiempo
+Horas (serv. cant.) | Serv. unit. | Servicios $ | Repuestos $
+Km cant. | Km unit. | Km $ | Terceros $ | TOTAL $
+Situación OS | Situación facturación
+```
+
+- Totales al pie: suma de horas, servicios, repuestos, km, terceros, total.
+- Click en la fila abre `TrabajoDetalleDrawer` con el `trabajo_id` correspondiente (mismo drawer que ya usa Trabajos).
+- Ordenamiento por header (al menos por fecha OS, total, horas).
+- Formateo: moneda con `Intl.NumberFormat('es-PY')` sin decimales; fechas `dd/MM/yyyy`.
+
+## Notas técnicas
+- Tabla puede crecer (hoy 19 vinculadas, pero el universo es 416 y subirá); se usa el mismo helper `cargarTodo` con paginación de 1000.
+- Sin cambios de schema ni RLS (la tabla ya tiene policy de SELECT para authenticated).
+- Reutilizar tokens del design system; no introducir colores nuevos.
+
+## Fuera de alcance
+- No se modifica el kanban actual.
+- No se agrega edición de OS desde esta vista (solo lectura + abrir detalle del trabajo).
