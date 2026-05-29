@@ -240,10 +240,15 @@ export default function Planificador() {
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c])), [clientes]);
   const tecnicosSolo = useMemo(() => profiles.filter(p => !adminCabIds.has(p.id)), [profiles, adminCabIds]);
-  const codigoByServicio = useMemo(() => {
-    const m = new Map<string, string>();
+  const refByServicio = useMemo(() => {
+    const m = new Map<string, { ref: string; os: string; codigo: string }>();
     for (const t of trabajosLite) {
-      if (t.legacy_servicio_id && t.codigo) m.set(t.legacy_servicio_id, t.codigo);
+      if (!t.legacy_servicio_id) continue;
+      m.set(t.legacy_servicio_id, {
+        ref: trabajoReferencia(t),
+        os: trabajoOsNumero(t),
+        codigo: t.codigo ?? "",
+      });
     }
     return m;
   }, [trabajosLite]);
