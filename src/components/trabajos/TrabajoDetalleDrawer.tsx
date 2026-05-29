@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,8 +24,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarPlus, ClipboardList, Clock, MoreVertical, Pencil, Trash2, User, Users } from "lucide-react";
-import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoReferencia } from "@/lib/trabajos";
+import { CalendarPlus, ClipboardList, Clock, MoreVertical, PauseCircle, Pencil, PlayCircle, Trash2, User, Users } from "lucide-react";
+import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoPausado, trabajoReferencia } from "@/lib/trabajos";
 import { ESTADO_LABELS, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -134,6 +135,8 @@ export function TrabajoDetalleDrawer({
   const [cargarOpen, setCargarOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
   const [selectedJornadaId, setSelectedJornadaId] = useState<string | null>(null);
 
   const cargar = async () => {
@@ -257,12 +260,61 @@ export function TrabajoDetalleDrawer({
   const open = !!trabajoId && !programarOpen && !cargarOpen && !editOpen;
   const estado = trabajo ? estadoTrabajoDesdeJornadas(jornadas, trabajo.estado_general) : "pendiente";
   const cliente = trabajo ? clienteMap.get(trabajo.cliente_id) : null;
+  const pausado = trabajoPausado(trabajo);
   const hint = jornadas.length === 0
     ? "Aun no tiene jornadas programadas."
+    : pausado
+      ? "Trabajo pausado por un impedimento operativo."
     : resumen.pendientes.length > 0
       ? "Tiene jornadas pendientes de cierre."
       : "Todas las jornadas tienen resultado.";
   const canManage = isAdmin || isCabecilla;
+
+  const pausarTrabajo = async () => {
+    if (!trabajo) return;
+    const motivo = pauseReason.trim();
+    if (!motivo) {
+      toast.error("Carga el motivo de la pausa");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("trabajos")
+        .update({ estado_general: "bloqueado" as any, motivo_bloqueo: motivo })
+        .eq("id", trabajo.id);
+      if (error) throw error;
+      toast.success("Trabajo pausado");
+      setPauseOpen(false);
+      setPauseReason("");
+      await cargar();
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo pausar el trabajo");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reactivarTrabajo = async () => {
+    if (!trabajo) return;
+    setLoading(true);
+    try {
+      const estadoBase = estadoTrabajoDesdeJornadas(jornadas, "pendiente");
+      const { error } = await supabase
+        .from("trabajos")
+        .update({ estado_general: estadoBase as any, motivo_bloqueo: null })
+        .eq("id", trabajo.id);
+      if (error) throw error;
+      toast.success("Trabajo reactivado");
+      await cargar();
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo reactivar el trabajo");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!trabajo) return;
@@ -315,6 +367,7 @@ export function TrabajoDetalleDrawer({
                     {PRIORIDADES.find((p) => p.key === trabajo.prioridad)?.label}
                   </Badge>
                   <Badge variant="secondary" className="text-[10px]">{estadoTrabajoLabel(estado)}</Badge>
+                  {pausado && <Badge className="bg-amber-600 text-white text-[10px]">Pausado</Badge>}
                 </div>
                 <h2 className="text-lg font-semibold leading-tight">{cliente?.nombre ?? "Sin cliente"}</h2>
                 <p className="text-xs text-muted-foreground">{hint}</p>
@@ -331,6 +384,20 @@ export function TrabajoDetalleDrawer({
                     <DropdownMenuItem onClick={() => setEditOpen(true)}>
                       <Pencil className="mr-2 h-4 w-4" /> Editar trabajo
                     </DropdownMenuItem>
+                    {pausado ? (
+                      <DropdownMenuItem onClick={reactivarTrabajo}>
+                        <PlayCircle className="mr-2 h-4 w-4" /> Reactivar
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setPauseReason(trabajo.motivo_bloqueo ?? "");
+                          setPauseOpen(true);
+                        }}
+                      >
+                        <PauseCircle className="mr-2 h-4 w-4" /> Pausar
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => setConfirmDelete(true)}
@@ -352,6 +419,12 @@ export function TrabajoDetalleDrawer({
             <>
               <section className="rounded-xl border bg-card p-4 space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resumen del trabajo</h3>
+                {pausado && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">Trabajo pausado</div>
+                    <div className="mt-1 text-sm text-amber-950">{trabajo.motivo_bloqueo || "Sin motivo cargado"}</div>
+                  </div>
+                )}
                 <div>
                   <div className="text-[11px] text-muted-foreground">Problema reportado</div>
                   <div className="text-sm">{trabajo.descripcion_problema}</div>
@@ -478,9 +551,14 @@ export function TrabajoDetalleDrawer({
               <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Cargar resultado
             </Button>
           )}
-          {trabajo && (isAdmin || isCabecilla) && (
+          {trabajo && (isAdmin || isCabecilla) && !pausado && (
             <Button size="sm" onClick={() => setProgramarOpen(true)}>
               <CalendarPlus className="mr-1.5 h-3.5 w-3.5" /> Programar jornada
+            </Button>
+          )}
+          {trabajo && (isAdmin || isCabecilla) && pausado && (
+            <Button size="sm" onClick={reactivarTrabajo}>
+              <PlayCircle className="mr-1.5 h-3.5 w-3.5" /> Reactivar
             </Button>
           )}
         </ResponsiveDrawerFooter>
@@ -542,6 +620,31 @@ export function TrabajoDetalleDrawer({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {loading ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={pauseOpen} onOpenChange={setPauseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pausar trabajo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Usa esta pausa cuando no se puede continuar por repuestos, aprobacion, espera del cliente u otro impedimento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              rows={4}
+              value={pauseReason}
+              onChange={(e) => setPauseReason(e.target.value)}
+              placeholder="Ej: En espera de repuestos para continuar la reparacion..."
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={pausarTrabajo} disabled={loading || !pauseReason.trim()}>
+              {loading ? "Guardando..." : "Pausar trabajo"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

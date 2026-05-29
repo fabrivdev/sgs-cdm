@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CalendarDays } from "lucide-react";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoReferencia } from "@/lib/trabajos";
+import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoPausado, trabajoReferencia } from "@/lib/trabajos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
@@ -239,6 +239,7 @@ export default function Trabajos() {
                       const vencidasCount = agendasVencidas.length;
                       const vencidasVigentesCount = agendasVencidasVigentes.length;
                       const vencidasViejasCount = agendasVencidasViejas.length;
+                      const pausado = trabajoPausado(t);
 
                       return (
                         <button
@@ -260,6 +261,11 @@ export default function Trabajos() {
                           <div className="mt-0.5 truncate text-[12px] font-semibold leading-tight">
                             {cli?.nombre ?? "Sin cliente"}
                           </div>
+                          {pausado && (
+                            <div className="mt-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 text-[10px] font-medium leading-tight text-amber-800">
+                              Pausado: {t.motivo_bloqueo ?? "sin motivo cargado"}
+                            </div>
+                          )}
                           <div className="mt-0.5 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
                             {t.descripcion_problema}
                           </div>

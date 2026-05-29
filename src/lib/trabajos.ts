@@ -29,7 +29,12 @@ export function normalizarEstadoTrabajo(estado: string | null | undefined): Esta
   }
 }
 
+export function trabajoPausado(trabajo: { estado_general?: string | null; motivo_bloqueo?: string | null } | null | undefined) {
+  return trabajo?.estado_general === "bloqueado" || trabajo?.estado_general === "en_pausa" || !!trabajo?.motivo_bloqueo?.trim();
+}
+
 export function estadoTrabajoLabel(estado: string | null | undefined) {
+  if (estado === "bloqueado" || estado === "en_pausa") return "Pausado";
   const key = normalizarEstadoTrabajo(estado);
   return ESTADOS_TRABAJO.find((e) => e.key === key)?.label ?? key;
 }
