@@ -63,7 +63,7 @@ interface TrabajoLite {
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 
-const fmtMoney = (n: number) => "USD " + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const fmtMoney = (n: number | null | undefined) => n == null ? "—" : "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtNum = (n: number | null | undefined) => n == null ? "—" : new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(n);
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return "—";
