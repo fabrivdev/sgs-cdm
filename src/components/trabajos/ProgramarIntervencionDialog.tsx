@@ -6,9 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { getISOWeek } from "date-fns";
 import type { Sucursal } from "@/lib/constants";
 import { TecnicosPicker } from "./TecnicosPicker";
 import { estadoTrabajoDesdeJornadas } from "@/lib/trabajos";
@@ -41,8 +39,6 @@ interface Props {
   onSaved: () => void;
 }
 
-const dias = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
-
 export function ProgramarIntervencionDialog({
   open,
   onOpenChange,
@@ -55,7 +51,6 @@ export function ProgramarIntervencionDialog({
   initialAuxiliares,
   onSaved,
 }: Props) {
-  const { user } = useAuth();
   const [selectedTrabajoId, setSelectedTrabajoId] = useState("");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
