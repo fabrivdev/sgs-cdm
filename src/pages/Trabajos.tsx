@@ -52,6 +52,7 @@ export default function Trabajos() {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+  const [vista, setVista] = useState<"kanban" | "os">("kanban");
 
   const load = async () => {
     setLoading(true);
