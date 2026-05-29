@@ -220,7 +220,7 @@ export function TrabajosOSTab({
         search={{ value: q, onChange: setQ, placeholder: "Buscar OS, factura, cliente, chasis, mecánico…" }}
         activeCount={activosCount}
         onClear={limpiar}
-        meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} Gs · ${fmtNum(totales.horas)} h`}
+        meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} · ${fmtNum(totales.horas)} h`}
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
