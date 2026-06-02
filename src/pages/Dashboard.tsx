@@ -439,18 +439,18 @@ export default function Dashboard() {
     () =>
       jornadas.filter((jornada) => {
         const servicio = servicioById.get(jornada.servicio_id);
-        return jornada.estado === "Completado" && inRange(jornada.fecha, previousWeekStart, previousWeekEnd) && scopedServicio(servicio);
+        return jornada.estado === "Completado" && inRange(jornada.fecha, previousPeriodStart, previousPeriodEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursales, jornadas, previousWeekEnd, previousWeekStart, query, servicioById],
+    [clienteById, fSucursales, jornadas, previousPeriodEnd, previousPeriodStart, query, servicioById],
   );
 
   const jornadasProgramadas = useMemo(
     () =>
       jornadas.filter((jornada) => {
         const servicio = servicioById.get(jornada.servicio_id);
-        return jornada.estado === "Pendiente" && inRange(jornada.fecha, weekStart, weekEnd) && scopedServicio(servicio);
+        return jornada.estado === "Pendiente" && inRange(jornada.fecha, periodStart, periodEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursales, jornadas, query, servicioById, weekEnd, weekStart],
+    [clienteById, fSucursales, jornadas, query, servicioById, periodEnd, periodStart],
   );
 
   const jornadasPendientesCierre = useMemo(
