@@ -748,24 +748,6 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-3">
-          <Card className="border-primary/20 bg-primary/5 p-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <BarChart3 className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold">Resumen gerencial</h2>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Facturacion {periodoLabel} <strong className="text-foreground">{money(currentWeekRow?.total ?? 0)}</strong>, con{" "}
-                  <strong className="text-foreground">{clientesAtendidosSemana}</strong> clientes atendidos y{" "}
-                  <strong className="text-foreground">{sucursalesConMovimiento}</strong> sucursales con movimiento. En operacion hay{" "}
-                  <strong className="text-foreground">{trabajosActivos.length}</strong> trabajos activos,{" "}
-                  <strong className="text-foreground">{trabajosPausados.length}</strong> pausados y{" "}
-                  <strong className="text-foreground">{jornadasProgramadas.length}</strong> jornadas planificadas para la semana.
-                </p>
-              </div>
-            </div>
-          </Card>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-[1.2fr_1fr]">
             <Card className="flex h-full flex-col p-3">
