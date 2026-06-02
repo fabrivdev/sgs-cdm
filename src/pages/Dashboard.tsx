@@ -698,7 +698,7 @@ export default function Dashboard() {
           icon={Users}
           title="Clientes atendidos"
           value={clientesAtendidosSemana}
-          detail="Distintos en la semana seleccionada"
+          detail={`Distintos en ${T.seleccionado}`}
           tone="neutral"
           onClick={() => setSection("facturacion")}
         />
@@ -714,7 +714,7 @@ export default function Dashboard() {
           icon={BarChart3}
           title="Servicios / Repuestos"
           value={`${pctServicio}% / ${pctRepuesto}%`}
-          detail="Mix sobre rubros principales"
+          detail=""
           tone="neutral"
           onClick={() => setSection("facturacion")}
         />
@@ -722,10 +722,11 @@ export default function Dashboard() {
           icon={ClipboardList}
           title="Actividad operativa"
           value={trabajosActivos.length}
-          detail={`${jornadasRealizadasPrev.length} cerradas ant. - ${jornadasProgramadas.length} planificadas`}
+          detail={`${jornadasRealizadasPrev.length} jornadas cerradas · ${jornadasProgramadas.length} planificadas`}
           tone={trabajosPausados.length ? "warn" : "neutral"}
           onClick={() => setSection("trabajos")}
         />
+
       </section>
 
       <Tabs value={section} onValueChange={setSection} className="space-y-3">
