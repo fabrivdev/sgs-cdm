@@ -201,6 +201,14 @@ export default function Dashboard() {
   const monthEnd = useMemo(() => endOfMonth(weekStart), [weekStart]);
   const previousMonthStart = useMemo(() => startOfMonth(subMonths(weekStart, 1)), [weekStart]);
   const previousMonthEnd = useMemo(() => endOfMonth(subMonths(weekStart, 1)), [weekStart]);
+  const yearStart = useMemo(() => startOfYear(weekStart), [weekStart]);
+  const yearEnd = useMemo(() => endOfYear(weekStart), [weekStart]);
+  const previousYearStart = useMemo(() => startOfYear(subYears(weekStart, 1)), [weekStart]);
+  const previousYearEnd = useMemo(() => endOfYear(subYears(weekStart, 1)), [weekStart]);
+  const periodStart = periodMode === "anio" ? yearStart : periodMode === "mes" ? monthStart : weekStart;
+  const periodEnd = periodMode === "anio" ? yearEnd : periodMode === "mes" ? monthEnd : weekEnd;
+  const previousPeriodStart = periodMode === "anio" ? previousYearStart : periodMode === "mes" ? previousMonthStart : previousWeekStart;
+  const previousPeriodEnd = periodMode === "anio" ? previousYearEnd : periodMode === "mes" ? previousMonthEnd : previousWeekEnd;
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
   const queryStart = useMemo(() => {
     const min = Math.min(
