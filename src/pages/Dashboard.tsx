@@ -19,13 +19,16 @@ import {
   differenceInCalendarDays,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   format,
   isWithinInterval,
   parseISO,
   startOfMonth,
   startOfWeek,
+  startOfYear,
   subMonths,
   subWeeks,
+  subYears,
 } from "date-fns";
 import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, type EstadoTrabajo } from "@/lib/trabajos";
