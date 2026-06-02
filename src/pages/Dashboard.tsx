@@ -1751,7 +1751,7 @@ function CargaTecnicaMatriz({
             onClick={() => setMetrica("horas")}
             className={cn("px-2 py-1 border-l", metrica === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
           >
-            Horas
+            Horas trabajadas
           </button>
         </div>
         <div className="text-[11px] text-muted-foreground tabular-nums">
