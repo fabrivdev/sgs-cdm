@@ -1665,48 +1665,120 @@ function CargaSucursalTabla({
   );
 }
 
-function CargaTecnicaTabla({
-  rows, onClick,
+function CargaTecnicaMatriz({
+  data, onClick,
 }: {
-  rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }>;
+  data: {
+    buckets: string[];
+    rows: Array<{ id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: number }>;
+    totalesPorBucket: Record<string, { jornadas: number; horas: number }>;
+    bucketLabel: (k: string) => string;
+    bucketMode: "semana" | "mes";
+  };
   onClick?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>;
-  }
+  const [metrica, setMetrica] = useState<"servicios" | "horas">("servicios");
+  const { buckets, rows, totalesPorBucket, bucketLabel, bucketMode } = data;
+
+  const fmt = (v: number) => metrica === "horas" ? (v ? v.toFixed(1) : "-") : (v ? String(v) : "-");
+  const getVal = (cell: { jornadas: number; horas: number } | undefined) =>
+    cell ? (metrica === "horas" ? cell.horas : cell.jornadas) : 0;
+
   const COLLAPSED = 6;
   const visible = expanded ? rows : rows.slice(0, COLLAPSED);
+
+  const totalGeneral = rows.reduce((acc, r) => acc + (metrica === "horas" ? r.totalHoras : r.totalJornadas), 0);
+
+  // Grid: nombre flexible | columnas semana/mes | total
+  const colWidth = 56;
+  const gridCols = `minmax(120px,1fr) repeat(${buckets.length}, ${colWidth}px) 64px`;
+
   return (
-    <div>
-      <div className={cn("overflow-y-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
-        <div className="sticky top-0 grid grid-cols-[1fr_70px_70px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-          <div>Tecnico</div>
-          <div className="text-right">Jornadas</div>
-          <div className="text-right">Trabajos</div>
-          <div className="text-right">Horas</div>
-        </div>
-        {visible.map((r) => (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex overflow-hidden rounded-md border text-[11px]">
           <button
-            key={r.id}
-            onClick={onClick}
-            className="grid w-full grid-cols-[1fr_70px_70px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+            type="button"
+            onClick={() => setMetrica("servicios")}
+            className={cn("px-2 py-1", metrica === "servicios" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
           >
-            <div className="truncate font-medium">{r.nombre}</div>
-            <div className="text-right tabular-nums">{r.jornadas}</div>
-            <div className="text-right tabular-nums">{r.trabajos}</div>
-            <div className="text-right tabular-nums">{r.horas.toFixed(1)} hs</div>
+            Servicios
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => setMetrica("horas")}
+            className={cn("px-2 py-1 border-l", metrica === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
+          >
+            Horas
+          </button>
+        </div>
+        <div className="text-[11px] text-muted-foreground tabular-nums">
+          Total: {metrica === "horas" ? `${totalGeneral.toFixed(1)} hs` : `${totalGeneral} serv.`}
+        </div>
       </div>
-      {rows.length > COLLAPSED && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-          className="mt-2 w-full rounded-md border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent"
-        >
-          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
-        </button>
+
+      {rows.length === 0 || buckets.length === 0 ? (
+        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>
+      ) : (
+        <>
+          <div className={cn("overflow-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[280px]")}>
+            <div
+              className="sticky top-0 z-10 grid bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"
+              style={{ gridTemplateColumns: gridCols }}
+            >
+              <div>Tecnico</div>
+              {buckets.map((k) => (
+                <div key={k} className="text-right tabular-nums">{bucketLabel(k)}</div>
+              ))}
+              <div className="text-right">Total</div>
+            </div>
+            {visible.map((r) => (
+              <button
+                key={r.id}
+                onClick={onClick}
+                className="grid w-full items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+                style={{ gridTemplateColumns: gridCols }}
+              >
+                <div className="truncate font-medium">{r.nombre}</div>
+                {buckets.map((k) => (
+                  <div key={k} className="text-right tabular-nums text-foreground/80">
+                    {fmt(getVal(r.porBucket[k]))}
+                  </div>
+                ))}
+                <div className="text-right font-semibold tabular-nums">
+                  {metrica === "horas" ? r.totalHoras.toFixed(1) : r.totalJornadas}
+                </div>
+              </button>
+            ))}
+            <div
+              className="grid border-t bg-muted/40 px-3 py-2 text-[11px] font-semibold"
+              style={{ gridTemplateColumns: gridCols }}
+            >
+              <div className="text-muted-foreground">Total</div>
+              {buckets.map((k) => (
+                <div key={k} className="text-right tabular-nums">
+                  {metrica === "horas" ? (totalesPorBucket[k]?.horas ?? 0).toFixed(1) : (totalesPorBucket[k]?.jornadas ?? 0)}
+                </div>
+              ))}
+              <div className="text-right tabular-nums">
+                {metrica === "horas" ? totalGeneral.toFixed(1) : totalGeneral}
+              </div>
+            </div>
+          </div>
+          {rows.length > COLLAPSED && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+              className="w-full rounded-md border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent"
+            >
+              {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
+            </button>
+          )}
+          <div className="text-[10px] text-muted-foreground">
+            Agrupado por {bucketMode === "mes" ? "mes" : "semana ISO"} · solo jornadas completadas
+          </div>
+        </>
       )}
     </div>
   );
