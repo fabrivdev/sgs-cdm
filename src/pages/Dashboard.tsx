@@ -630,26 +630,80 @@ export default function Dashboard() {
   }, [trabajosBase]);
 
 
-  const productividadTecnica = useMemo(() => {
-    const map = new Map<string, { id: string; nombre: string; jornadas: number; horas: number; trabajos: Set<string> }>();
+  const productividadMatriz = useMemo(() => {
+    const bucketMode: "semana" | "mes" = periodMode === "anio" ? "mes" : "semana";
+    const bucketKey = (iso: string) => {
+      const d = parseISO(iso);
+      if (bucketMode === "mes") return format(d, "yyyy-MM");
+      return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, "0")}`;
+    };
+    const bucketLabel = (key: string) => {
+      if (bucketMode === "mes") {
+        const [y, m] = key.split("-");
+        return format(new Date(Number(y), Number(m) - 1, 1), "MMM yy");
+      }
+      const w = key.split("-W")[1];
+      return `Sem ${Number(w)}`;
+    };
+
+    const bucketsSet = new Set<string>();
+    const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
+
     for (const trabajo of trabajosResumen) {
       const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
       for (const jornada of trabajoJornadas) {
+        if (jornada.estado !== "Completado") continue;
         if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
+        const key = bucketKey(jornada.fecha);
+        bucketsSet.add(key);
+        const horasJ = Number(jornada.horas_trabajadas || 0);
         for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
-          const current = map.get(id) ?? { id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", jornadas: 0, horas: 0, trabajos: new Set<string>() };
-          current.jornadas += 1;
-          current.horas += Number(jornada.horas_trabajadas || 0);
+          const current = map.get(id) ?? {
+            id,
+            nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
+            porBucket: {},
+            totalJornadas: 0,
+            totalHoras: 0,
+            trabajos: new Set<string>(),
+          };
+          const cell = current.porBucket[key] ?? { jornadas: 0, horas: 0 };
+          cell.jornadas += 1;
+          cell.horas += horasJ;
+          current.porBucket[key] = cell;
+          current.totalJornadas += 1;
+          current.totalHoras += horasJ;
           current.trabajos.add(trabajo.id);
           map.set(id, current);
         }
       }
     }
-    return Array.from(map.values())
-      .map((row) => ({ ...row, trabajos: row.trabajos.size }))
-      .sort((a, b) => b.jornadas - a.jornadas || b.horas - a.horas)
-      .slice(0, 20);
-  }, [activeTechnicianIds, jornadasByTrabajo, periodStart, periodEnd, profileById, trabajosResumen]);
+
+    const buckets = Array.from(bucketsSet).sort();
+    const rows = Array.from(map.values())
+      .map((row) => ({
+        id: row.id,
+        nombre: row.nombre,
+        porBucket: row.porBucket,
+        totalJornadas: row.totalJornadas,
+        totalHoras: row.totalHoras,
+        trabajos: row.trabajos.size,
+      }))
+      .sort((a, b) => b.totalJornadas - a.totalJornadas || b.totalHoras - a.totalHoras);
+
+    const totalesPorBucket: Record<string, { jornadas: number; horas: number }> = {};
+    for (const k of buckets) totalesPorBucket[k] = { jornadas: 0, horas: 0 };
+    for (const r of rows) {
+      for (const k of buckets) {
+        const cell = r.porBucket[k];
+        if (cell) {
+          totalesPorBucket[k].jornadas += cell.jornadas;
+          totalesPorBucket[k].horas += cell.horas;
+        }
+      }
+    }
+
+    return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
+  }, [jornadasByTrabajo, periodMode, periodStart, periodEnd, profileById, trabajosResumen]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
