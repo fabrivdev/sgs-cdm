@@ -10,10 +10,8 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
-  ChevronRight,
   ClipboardList,
   DollarSign,
-  PauseCircle as PauseCircleIcon,
   Users,
 } from "lucide-react";
 import {
@@ -412,7 +410,7 @@ export default function Dashboard() {
       current.facturas = new Set(current.rows.map((item) => item.cod_factura)).size;
       map.set(nombre, current);
     }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 6);
+    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30);
   }, [clienteById, selectedFacts]);
 
   const jornadasRealizadasPrev = useMemo(
@@ -623,7 +621,7 @@ export default function Dashboard() {
     return Array.from(map.values())
       .map((row) => ({ ...row, trabajos: row.trabajos.size }))
       .sort((a, b) => b.jornadas - a.jornadas || b.horas - a.horas)
-      .slice(0, 6);
+      .slice(0, 20);
   }, [activeTechnicianIds, jornadasByTrabajo, previousWeekStart, profileById, trabajosResumen, weekEnd]);
 
   const limpiar = () => {
@@ -756,15 +754,16 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <section className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
+          <section className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
             <Card className="p-3">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
+              <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
             </Card>
 
             <div className="grid gap-3">
               <Card className="p-3">
-                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion de la semana base." />
+                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
                 <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("facturacion"); }} />
               </Card>
               <Card className="p-3">
@@ -775,7 +774,26 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
+          <section className="grid gap-3 xl:grid-cols-2">
+            <Card className="p-3">
+              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
+              <EstadoCompacto
+                flujo={flujo}
+                onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }}
+                planificados={jornadasProgramadas.length}
+                tecnicosActivos={tecnicosConActividad.size}
+                jornadasPrev={jornadasRealizadasPrev.length}
+                horasPrev={horasPrev}
+                planLabel={T.plan}
+              />
+            </Card>
+            <Card className="p-3">
+              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
+              <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
+            </Card>
+          </section>
+
+          <section className="grid gap-3 xl:grid-cols-2">
             <Card className="p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
@@ -786,33 +804,9 @@ export default function Dashboard() {
                 onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }}
               />
             </Card>
-
             <Card className="p-3">
-              <PanelTitle icon={ClipboardList} title="Flujo operativo de trabajos" subtitle="" />
-              <FlujoOperativo
-                flujo={flujo}
-                jornadasProgramadas={jornadasProgramadas.length}
-                tecnicosActivos={tecnicosConActividad.size}
-                jornadasPrev={jornadasRealizadasPrev.length}
-                horasPrev={horasPrev}
-                planLabel={T.plan}
-              />
-              <button onClick={() => setSection("trabajos")} className="mt-3 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover:bg-accent">
-                <span>Ver detalle de trabajos</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </Card>
-          </section>
-
-
-          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
-            <Card className="p-3">
-              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
-              <EstadoCompacto flujo={flujo} onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }} />
-            </Card>
-            <Card className="p-3">
-              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
-              <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("trabajos"); }} />
             </Card>
           </section>
 
@@ -982,7 +976,16 @@ export default function Dashboard() {
               setFEstadoTrabajo("all");
               setFTecnico("all");
             }}
-            meta={`${trabajosResumen.length} trabajos segun filtros operativos`}
+            meta={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadoTrabajo("completado")} />
+                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
+                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadoTrabajo("all")} />
+                <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
+              </div>
+            }
           >
             <FilterSelect
               label="Estado"
@@ -1008,14 +1011,6 @@ export default function Dashboard() {
               options={[{ value: "all", label: "Todos" }, ...technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))]}
             />
           </FiltersBar>
-
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <SummaryCard icon={ClipboardList} title="Trabajos activos" value={trabajosActivos.length} detail="No completados" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-            <SummaryCard icon={CheckCircle2} title="Cerrados del periodo" value={trabajosConCierre} detail="Estado completado" tone="good" onClick={() => setFEstadoTrabajo("completado")} />
-            <SummaryCard icon={PauseCircleIcon} title="Pausados" value={trabajosPausados.length} detail="Pendientes de gestion" tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
-            <SummaryCard icon={CalendarDays} title="Jornadas realizadas" value={jornadasRealizadasPrev.length} detail={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-            <SummaryCard icon={Users} title="Tecnicos con actividad" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} detail="" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-          </section>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="p-3">
@@ -1247,22 +1242,22 @@ function SucursalBars({
   totalValue: number;
   onSelect: (sucursal: Sucursal) => void;
 }) {
-  const visibleRows = rows.filter((row) => row.total > 0);
-  const max = Math.max(1, ...visibleRows.map((row) => row.total));
+  const max = Math.max(1, ...rows.map((row) => row.total));
 
-  if (visibleRows.length === 0) {
+  if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin movimiento por sucursal.</div>;
   }
 
   return (
     <div className="space-y-2">
-      {visibleRows.map((row) => {
-        const width = Math.max(4, Math.round((row.total / max) * 100));
+      {rows.map((row) => {
+        const isZero = row.total <= 0;
+        const width = isZero ? 0 : Math.max(4, Math.round((row.total / max) * 100));
         const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
         return (
-          <button key={row.sucursal} onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
+          <button key={row.sucursal} onClick={() => !isZero && onSelect(row.sucursal)} className={cn("w-full rounded-md px-2 py-1.5 text-left", !isZero && "hover:bg-accent", isZero && "opacity-60 cursor-default")}>
             <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-              <span className="font-medium">{row.sucursal}</span>
+              <span className={cn("font-medium", isZero && "text-muted-foreground")}>{row.sucursal}</span>
               <span className="tabular-nums text-muted-foreground">{money(row.total)} - {participation}%</span>
             </div>
             <div className="h-2 rounded-full bg-muted">
@@ -1474,46 +1469,16 @@ function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro
   );
 }
 
-function FlujoOperativo({
-  flujo, jornadasProgramadas, tecnicosActivos, jornadasPrev, horasPrev, planLabel,
-}: {
-  flujo: { total: number; culminados: number; abiertos: number; pausados: number };
-  jornadasProgramadas: number;
-  tecnicosActivos: number;
-  jornadasPrev: number;
-  horasPrev: number;
-  planLabel: string;
-}) {
-  const items = [
-    { label: "Gestionados", value: flujo.total },
-    { label: "Culminados", value: flujo.culminados },
-    { label: "Abiertos", value: flujo.abiertos },
-    { label: "Pausados", value: flujo.pausados, warn: flujo.pausados > 0 },
-    { label: planLabel, value: `${jornadasProgramadas} planificados` },
-    { label: "Tecnicos activos", value: tecnicosActivos },
-  ];
-  return (
-    <div>
-      <div className="grid grid-cols-3 gap-2">
-        {items.map((it) => (
-          <div key={it.label} className={cn("rounded-md border px-2.5 py-2", it.warn && "border-amber-300 bg-amber-50/60")}>
-            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{it.label}</div>
-            <div className="mt-0.5 text-base font-bold tabular-nums">{it.value}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 text-[11px] text-muted-foreground">
-        Cierre anterior: {jornadasPrev} jornadas · {horasPrev.toFixed(1)} hs
-      </div>
-    </div>
-  );
-}
-
 function EstadoCompacto({
-  flujo, onSelect,
+  flujo, onSelect, planificados, tecnicosActivos, jornadasPrev, horasPrev, planLabel,
 }: {
   flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
   onSelect: (estado: string) => void;
+  planificados?: number;
+  tecnicosActivos?: number;
+  jornadasPrev?: number;
+  horasPrev?: number;
+  planLabel?: string;
 }) {
   if (flujo.total === 0) {
     return (
@@ -1574,6 +1539,22 @@ function EstadoCompacto({
         <span>·</span>
         <button className="hover:text-foreground" onClick={() => onSelect("iniciado")}>Iniciado <span className="tabular-nums font-semibold">{flujo.iniciado}</span></button>
       </div>
+
+      {(planificados != null || tecnicosActivos != null || jornadasPrev != null) && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          {planificados != null && (
+            <span><span className="font-medium text-foreground/80">{planLabel ?? "Planificados"}:</span> <span className="tabular-nums font-semibold">{planificados}</span></span>
+          )}
+          {tecnicosActivos != null && (<>
+            <span>·</span>
+            <span><span className="font-medium text-foreground/80">Tecnicos activos:</span> <span className="tabular-nums font-semibold">{tecnicosActivos}</span></span>
+          </>)}
+          {jornadasPrev != null && (<>
+            <span>·</span>
+            <span><span className="font-medium text-foreground/80">Cierre anterior:</span> <span className="tabular-nums font-semibold">{jornadasPrev}</span> jornadas{horasPrev != null ? ` / ${horasPrev.toFixed(1)} hs` : ""}</span>
+          </>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -1622,29 +1603,43 @@ function CargaTecnicaTabla({
   rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }>;
   onClick?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>;
   }
+  const COLLAPSED = 6;
+  const visible = expanded ? rows : rows.slice(0, COLLAPSED);
   return (
-    <div className="max-h-[260px] overflow-y-auto rounded-md border">
-      <div className="sticky top-0 grid grid-cols-[1fr_70px_70px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-        <div>Tecnico</div>
-        <div className="text-right">Jornadas</div>
-        <div className="text-right">Trabajos</div>
-        <div className="text-right">Horas</div>
+    <div>
+      <div className={cn("overflow-y-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
+        <div className="sticky top-0 grid grid-cols-[1fr_70px_70px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+          <div>Tecnico</div>
+          <div className="text-right">Jornadas</div>
+          <div className="text-right">Trabajos</div>
+          <div className="text-right">Horas</div>
+        </div>
+        {visible.map((r) => (
+          <button
+            key={r.id}
+            onClick={onClick}
+            className="grid w-full grid-cols-[1fr_70px_70px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+          >
+            <div className="truncate font-medium">{r.nombre}</div>
+            <div className="text-right tabular-nums">{r.jornadas}</div>
+            <div className="text-right tabular-nums">{r.trabajos}</div>
+            <div className="text-right tabular-nums">{r.horas.toFixed(1)} hs</div>
+          </button>
+        ))}
       </div>
-      {rows.map((r) => (
+      {rows.length > COLLAPSED && (
         <button
-          key={r.id}
-          onClick={onClick}
-          className="grid w-full grid-cols-[1fr_70px_70px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+          className="mt-2 w-full rounded-md border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent"
         >
-          <div className="truncate font-medium">{r.nombre}</div>
-          <div className="text-right tabular-nums">{r.jornadas}</div>
-          <div className="text-right tabular-nums">{r.trabajos}</div>
-          <div className="text-right tabular-nums">{r.horas.toFixed(1)} hs</div>
+          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
         </button>
-      ))}
+      )}
     </div>
   );
 }
@@ -1658,24 +1653,27 @@ function ClientesCompacto({
   totalClientes: number;
   onSelect: (nombre: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>;
   }
   const top5 = rows.slice(0, 5).reduce((a, r) => a + r.total, 0);
   const pctTop5 = totalValue > 0 ? Math.round((top5 / totalValue) * 100) : 0;
+  const COLLAPSED = 5;
+  const visible = expanded ? rows : rows.slice(0, COLLAPSED);
   return (
     <div>
       <div className="mb-2 text-[11px] text-muted-foreground">
         {totalClientes} clientes · {totalFacturas} facturas · Top 5 concentra {pctTop5}%
       </div>
-      <div className="max-h-[260px] overflow-y-auto rounded-md border">
+      <div className={cn("overflow-y-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
         <div className="sticky top-0 grid grid-cols-[1fr_60px_96px_48px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
           <div>Cliente</div>
           <div className="text-right">Fact.</div>
           <div className="text-right">Facturacion</div>
           <div className="text-right">%</div>
         </div>
-        {rows.slice(0, 8).map((r) => {
+        {visible.map((r) => {
           const pct = totalValue > 0 ? Math.round((r.total / totalValue) * 100) : 0;
           return (
             <button
@@ -1691,7 +1689,71 @@ function ClientesCompacto({
           );
         })}
       </div>
+      {rows.length > COLLAPSED && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 w-full rounded-md border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent"
+        >
+          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
+        </button>
+      )}
     </div>
   );
 }
+
+function TrabajoChip({
+  label, value, tone = "neutral", onClick,
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: "neutral" | "good" | "warn";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] hover:bg-accent",
+        tone === "good" && "border-primary/30 bg-primary/5 text-primary",
+        tone === "warn" && "border-amber-300 bg-amber-50 text-amber-900",
+      )}
+    >
+      <span className="font-medium">{label}</span>
+      <span className="tabular-nums font-semibold">{value}</span>
+    </button>
+  );
+}
+
+function EvolucionKpis({ rows, currentKey }: { rows: WeekRow[]; currentKey?: string }) {
+  if (!rows.length) return null;
+  const totals = rows.map((r) => r.total);
+  const sum = totals.reduce((a, b) => a + b, 0);
+  const promedio = sum / rows.length;
+  const currentIdx = currentKey ? rows.findIndex((r) => r.key === currentKey) : rows.length - 1;
+  const idx = currentIdx >= 0 ? currentIdx : rows.length - 1;
+  const actual = rows[idx]?.total ?? 0;
+  const prev = idx > 0 ? rows[idx - 1].total : 0;
+  const variacion = pct(actual, prev);
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total acumulado</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{money(sum)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Promedio por periodo</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{money(promedio)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs anterior</div>
+        <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
+          {variacion == null ? "—" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
