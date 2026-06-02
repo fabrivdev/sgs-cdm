@@ -68,6 +68,7 @@ interface Trabajo {
   estado_general: EstadoTrabajo | string | null;
   legacy_servicio_id: string | null;
   sucursal: Sucursal;
+  marca: Marca | null;
   cliente_id: string | null;
   descripcion_problema: string;
   motivo_bloqueo: string | null;
