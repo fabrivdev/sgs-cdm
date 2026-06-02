@@ -911,9 +911,9 @@ export default function Dashboard() {
         <Card className="p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold">Facturas de la semana</h2>
-              <p className="text-xs text-muted-foreground">Detalle que explica la composicion del total seleccionado.</p>
+              <h2 className="text-base font-semibold">{T.facturas}</h2>
             </div>
+
             <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
           </div>
           <div className="max-h-[360px] overflow-auto rounded-md border">
