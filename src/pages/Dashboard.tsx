@@ -542,6 +542,7 @@ export default function Dashboard() {
       const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
+      const fechaCierre = realizadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
       const pendientesVencidas = pendientes.filter((row) => row.fecha < todayStr).length;
       const pendientesSemana = pendientes.filter((row) => inRange(row.fecha, weekStart, weekEnd)).length;
       return {
@@ -558,6 +559,7 @@ export default function Dashboard() {
         tecnicoIds,
         horas,
         ultimaFecha,
+        fechaCierre,
         pendientesVencidas,
         pendientesSemana,
         tipo: servicio?.marca ?? "",
@@ -616,28 +618,46 @@ export default function Dashboard() {
     }));
   }, [trabajosResumen]);
 
-  // Carga por sucursal: filtra trabajos con actividad dentro del período seleccionado.
+  // Carga por sucursal: clasifica trabajos según lo que ocurrió DENTRO del período.
+  // - cerrados: trabajos hoy completados cuya fecha de cierre cae en el período
+  // - pausados: trabajos hoy pausados con actividad (jornada/actualizacion) en el período
+  // - abiertos: trabajos con actividad en el período que no son cerrados-en-período ni pausados
   const cargaSucursal = useMemo(() => {
-    const enPeriodo = (r: typeof trabajosBase[number]) => {
+    const tieneActividad = (r: typeof trabajosBase[number]) => {
       if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
       if (r.actualizadoEn && inRange(r.actualizadoEn, periodStart, periodEnd)) return true;
       if (r.jornadaFechas.some((f) => inRange(f, periodStart, periodEnd))) return true;
       return false;
     };
-    const enRango = trabajosBase.filter(enPeriodo);
-    const totalGral = enRango.length;
-    return SUCURSALES.map((sucursal) => {
-      const rows = enRango.filter((r) => r.sucursal === sucursal);
-      const cerrados = rows.filter((r) => r.estado === "completado").length;
-      const pausados = rows.filter((r) => r.estado === "pausado").length;
-      const total = rows.length;
-      const abiertos = total - cerrados - pausados;
+    const cerradoEnPeriodo = (r: typeof trabajosBase[number]) =>
+      r.estado === "completado" && !!r.fechaCierre && inRange(r.fechaCierre, periodStart, periodEnd);
+
+    type Row = { sucursal: Sucursal; cerrados: number; abiertos: number; pausados: number; total: number; pct: number };
+    const totalGral = trabajosBase.reduce((acc, r) => {
+      const c = cerradoEnPeriodo(r);
+      const enP = tieneActividad(r);
+      return acc + (c || enP ? 1 : 0);
+    }, 0);
+
+    return SUCURSALES.map<Row>((sucursal) => {
+      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      let cerrados = 0, pausados = 0, abiertos = 0;
+      for (const r of rows) {
+        const cerrEnP = cerradoEnPeriodo(r);
+        const actEnP = tieneActividad(r);
+        if (cerrEnP) { cerrados++; continue; }
+        if (!actEnP) continue;
+        if (r.estado === "pausado") pausados++;
+        else abiertos++;
+      }
+      const total = cerrados + pausados + abiertos;
       const pct = totalGral > 0 ? Math.round((total / totalGral) * 100) : 0;
       return { sucursal, cerrados, abiertos, pausados, total, pct };
     })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
   }, [trabajosBase, periodStart, periodEnd]);
+
 
 
   const productividadMatriz = useMemo(() => {
@@ -659,32 +679,42 @@ export default function Dashboard() {
     const bucketsSet = new Set<string>();
     const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
 
-    for (const trabajo of trabajosResumen) {
-      const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
-      for (const jornada of trabajoJornadas) {
-        if (jornada.estado !== "Completado") continue;
-        if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
-        const key = bucketKey(jornada.fecha);
-        bucketsSet.add(key);
-        const horasJ = Number(jornada.horas_trabajadas || 0);
-        for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
-          const current = map.get(id) ?? {
-            id,
-            nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
-            porBucket: {},
-            totalJornadas: 0,
-            totalHoras: 0,
-            trabajos: new Set<string>(),
-          };
-          const cell = current.porBucket[key] ?? { jornadas: 0, horas: 0 };
-          cell.jornadas += 1;
-          cell.horas += horasJ;
-          current.porBucket[key] = cell;
-          current.totalJornadas += 1;
-          current.totalHoras += horasJ;
-          current.trabajos.add(trabajo.id);
-          map.set(id, current);
-        }
+    // Scope por sucursal/búsqueda (no por filtros de estado/técnico de la pestaña Trabajos).
+    const trabajoIdsEnScope = new Set(trabajosScope.map((t) => t.id));
+    // Mapa inverso: servicio_id -> trabajo_id (mismo criterio que jornadasByTrabajo)
+    const servicioATrabajo = new Map<string, string>();
+    for (const trabajo of trabajos) {
+      if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
+    }
+
+    for (const jornada of jornadas) {
+      // Cancelada no cuenta; Pendiente y Completado sí (jornadas asignadas)
+      if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado") continue;
+      if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
+      const trabajoId = servicioATrabajo.get(jornada.servicio_id);
+      if (!trabajoId || !trabajoIdsEnScope.has(trabajoId)) continue;
+
+      const key = bucketKey(jornada.fecha);
+      bucketsSet.add(key);
+      // Solo Completado aporta horas reales
+      const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
+      for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+        const current = map.get(id) ?? {
+          id,
+          nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
+          porBucket: {},
+          totalJornadas: 0,
+          totalHoras: 0,
+          trabajos: new Set<string>(),
+        };
+        const cell = current.porBucket[key] ?? { jornadas: 0, horas: 0 };
+        cell.jornadas += 1;
+        cell.horas += horasJ;
+        current.porBucket[key] = cell;
+        current.totalJornadas += 1;
+        current.totalHoras += horasJ;
+        current.trabajos.add(trabajoId);
+        map.set(id, current);
       }
     }
 
@@ -713,7 +743,7 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadasByTrabajo, periodMode, periodStart, periodEnd, profileById, trabajosResumen]);
+  }, [jornadas, trabajos, trabajosScope, activeTechnicianIds, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
@@ -877,7 +907,8 @@ export default function Dashboard() {
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Cerrados, abiertos y pausados dentro del período." />
+
               <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("trabajos"); }} />
             </Card>
           </section>
@@ -1713,14 +1744,15 @@ function CargaTecnicaMatriz({
             onClick={() => setMetrica("servicios")}
             className={cn("px-2 py-1", metrica === "servicios" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
           >
-            Servicios
+            Servicios asignados
+
           </button>
           <button
             type="button"
             onClick={() => setMetrica("horas")}
             className={cn("px-2 py-1 border-l", metrica === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
           >
-            Horas
+            Horas trabajadas
           </button>
         </div>
         <div className="text-[11px] text-muted-foreground tabular-nums">
@@ -1786,7 +1818,7 @@ function CargaTecnicaMatriz({
             </button>
           )}
           <div className="text-[10px] text-muted-foreground">
-            Agrupado por {bucketMode === "mes" ? "mes" : "semana ISO"} · solo jornadas completadas
+            Agrupado por {bucketMode === "mes" ? "mes" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
           </div>
         </>
       )}
