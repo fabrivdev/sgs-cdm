@@ -7,12 +7,15 @@ import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/Filte
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle,
+  BarChart3,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
   DollarSign,
   PauseCircle,
+  Users,
 } from "lucide-react";
 import {
   differenceInCalendarDays,
@@ -77,6 +80,12 @@ interface Profile {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  activo: boolean | null;
+}
+
+interface UserRole {
+  user_id: string;
+  role: "admin" | "cabecilla" | "tecnico";
 }
 
 interface Facturacion {
@@ -170,6 +179,7 @@ export default function Dashboard() {
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [facturacion, setFacturacion] = useState<Facturacion[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -215,7 +225,7 @@ export default function Dashboard() {
           .order("fecha", { ascending: false });
         if (fSucursal !== "all") factQuery = factQuery.eq("sucursal", fSucursal as Sucursal);
 
-        const [serviciosRows, jornadasRows, trabajosRows, clientesRows, profilesRows, factRows] = await Promise.all([
+        const [serviciosRows, jornadasRows, trabajosRows, clientesRows, profilesRows, roleRows, factRows] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
               .from("servicios")
@@ -235,7 +245,8 @@ export default function Dashboard() {
               .select("id, codigo, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema, motivo_bloqueo"),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
-          cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal")),
+          cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
+          cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
           cargarTodo<Facturacion>(factQuery),
         ]);
 
@@ -245,6 +256,7 @@ export default function Dashboard() {
         setTrabajos(trabajosRows);
         setClientes(clientesRows);
         setProfiles(profilesRows);
+        setUserRoles(roleRows);
         setFacturacion(factRows);
       } catch (error) {
         console.error(error);
@@ -261,6 +273,20 @@ export default function Dashboard() {
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
   const profileById = useMemo(() => new Map(profiles.map((item) => [item.id, item])), [profiles]);
+  const activeTechnicianIds = useMemo(() => {
+    const roleIds = new Set(userRoles.filter((row) => row.role === "tecnico").map((row) => row.user_id));
+    return new Set(
+      profiles
+        .filter((profile) => {
+          const name = profile.nombre.toLowerCase();
+          return profile.activo !== false && roleIds.has(profile.id) && !name.includes("pasante");
+        })
+        .map((profile) => profile.id),
+    );
+  }, [profiles, userRoles]);
+
+  const validTechnicianIds = (ids: Array<string | null | undefined>) =>
+    Array.from(new Set(ids.filter((id): id is string => !!id && activeTechnicianIds.has(id))));
 
   const query = q.trim().toLowerCase();
   const factFiltered = useMemo(
@@ -416,23 +442,25 @@ export default function Dashboard() {
   const cargaTecnicos = useMemo(() => {
     const map = new Map<string, number>();
     for (const jornada of jornadasProgramadas) {
-      const ids = [jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])].filter((id): id is string => !!id);
+      const ids = validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])]);
       for (const id of ids) map.set(id, (map.get(id) ?? 0) + 1);
     }
     return Array.from(map.entries())
       .map(([id, count]) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-  }, [jornadasProgramadas, profileById]);
+  }, [activeTechnicianIds, jornadasProgramadas, profileById]);
 
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
   const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
-  const previousWeekRow = weeklyRows[weeklyRows.length - 2] ?? null;
-  const selectedWeekConceptTotal =
-    (selectedWeek?.servicio ?? 0) + (selectedWeek?.kilometraje ?? 0) + (selectedWeek?.repuestos ?? 0) + (selectedWeek?.otros ?? 0);
+  const clientesAtendidosSemana = currentWeekRow?.clientes ?? 0;
+  const sucursalesConMovimiento = new Set((currentWeekRow?.rows ?? []).map((row) => row.sucursal).filter(Boolean)).size;
+  const mixServicioRepuestoTotal = (currentWeekRow?.servicio ?? 0) + (currentWeekRow?.repuestos ?? 0);
+  const pctServicio = mixServicioRepuestoTotal > 0 ? Math.round(((currentWeekRow?.servicio ?? 0) / mixServicioRepuestoTotal) * 100) : 0;
+  const pctRepuesto = mixServicioRepuestoTotal > 0 ? 100 - pctServicio : 0;
 
   const trabajosResumen = useMemo(() => {
     return trabajosScope.map((trabajo) => {
@@ -443,13 +471,15 @@ export default function Dashboard() {
       const pendientes = trabajoJornadas.filter((j) => j.estado === "Pendiente");
       const participantes = new Set<string>();
       for (const jornada of trabajoJornadas) {
-        if (jornada.tecnico_responsable_id) participantes.add(jornada.tecnico_responsable_id);
-        for (const aux of jornada.auxiliares ?? []) participantes.add(aux);
+        for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+          participantes.add(id);
+        }
       }
       const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
-      const avance = trabajoJornadas.length ? Math.round((realizadas.length / trabajoJornadas.length) * 100) : 0;
+      const pendientesVencidas = pendientes.filter((row) => row.fecha < todayStr).length;
+      const pendientesSemana = pendientes.filter((row) => inRange(row.fecha, weekStart, weekEnd)).length;
       return {
         id: trabajo.id,
         ref: trabajo.codigo ?? "TR",
@@ -463,22 +493,22 @@ export default function Dashboard() {
         participantes: participantes.size,
         horas,
         ultimaFecha,
-        avance,
+        pendientesVencidas,
+        pendientesSemana,
         tipo: servicio?.marca ?? "",
       };
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [clienteById, jornadasByTrabajo, servicioById, trabajosScope]);
+  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
-  const tecnicosConActividad = new Set([
-    ...jornadasRealizadasPrev.flatMap((j) => [j.tecnico_responsable_id, ...(j.auxiliares ?? [])].filter(Boolean) as string[]),
-    ...jornadasProgramadas.flatMap((j) => [j.tecnico_responsable_id, ...(j.auxiliares ?? [])].filter(Boolean) as string[]),
-  ]);
-  const tecnicosTotales = profiles.length;
+  const tecnicosConActividad = new Set(
+    [...jornadasRealizadasPrev, ...jornadasProgramadas].flatMap((j) => validTechnicianIds([j.tecnico_responsable_id, ...(j.auxiliares ?? [])])),
+  );
+  const tecnicosTotales = activeTechnicianIds.size;
 
   const alertas = [
     fueraTolerancia.length > 0
@@ -513,7 +543,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard ejecutivo</h1>
           <p className="text-xs text-muted-foreground">
-            Comparativo semanal, detalle de facturas y resumen operativo para reunion de direccion.
+            Desempeno comercial y operativo con lectura rapida para direccion.
           </p>
         </div>
         <Badge variant="outline" className="w-fit text-[11px]">
@@ -538,49 +568,76 @@ export default function Dashboard() {
         />
       </FiltersBar>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
-          title="Facturacion semana"
+          title="Facturacion del periodo"
           value={money(currentWeekRow?.total ?? 0)}
-          detail={`${currentWeekRow?.facturas ?? 0} facturas · ${currentWeekRow?.clientes ?? 0} clientes`}
+          detail={`${currentWeekRow?.facturas ?? 0} facturas - ${currentWeekRow?.clientes ?? 0} clientes`}
           tone={(currentWeekRow?.variacion ?? 0) < -20 ? "bad" : "neutral"}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
-          icon={ClipboardList}
-          title="Trabajos activos"
-          value={trabajosActivos.length}
-          detail={`${trabajosConCierre} cerrados · ${trabajosPausados.length} pausados`}
-          tone={trabajosPausados.length ? "warn" : "neutral"}
-          onClick={() => setSection("trabajos")}
-        />
-        <SummaryCard
-          icon={CheckCircle2}
-          title="Horas / jornadas"
-          value={`${horasPrev.toFixed(1)} hs`}
-          detail={`${jornadasRealizadasPrev.length} realizadas · ${jornadasProgramadas.length} pendientes`}
-          tone={sinHorasPrev ? "warn" : "good"}
-          onClick={() => setSection("trabajos")}
-        />
-        <SummaryCard
-          icon={CalendarDays}
-          title="Tecnicos involucrados"
-          value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`}
-          detail="Con actividad realizada o pendiente"
+          icon={Users}
+          title="Clientes atendidos"
+          value={clientesAtendidosSemana}
+          detail="Distintos en la semana seleccionada"
           tone="neutral"
+          onClick={() => setSection("facturacion")}
+        />
+        <SummaryCard
+          icon={Building2}
+          title="Sucursales con movimiento"
+          value={sucursalesConMovimiento}
+          detail={`de ${SUCURSALES.length} sucursales`}
+          tone="neutral"
+          onClick={() => setSection("facturacion")}
+        />
+        <SummaryCard
+          icon={BarChart3}
+          title="Servicios / Repuestos"
+          value={`${pctServicio}% / ${pctRepuesto}%`}
+          detail="Mix sobre rubros principales"
+          tone="neutral"
+          onClick={() => setSection("facturacion")}
+        />
+        <SummaryCard
+          icon={ClipboardList}
+          title="Actividad operativa"
+          value={trabajosActivos.length}
+          detail={`${jornadasRealizadasPrev.length} cerradas ant. - ${jornadasProgramadas.length} planificadas`}
+          tone={trabajosPausados.length ? "warn" : "neutral"}
           onClick={() => setSection("trabajos")}
         />
       </section>
 
       <Tabs value={section} onValueChange={setSection} className="space-y-3">
         <TabsList className="grid h-auto w-full grid-cols-3 sm:w-fit">
-          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="resumen">Vista general</TabsTrigger>
           <TabsTrigger value="facturacion">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos">Trabajos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-3">
+          <Card className="p-3">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold">Resumen gerencial</h2>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  En la semana seleccionada se facturo <strong className="text-foreground">{money(currentWeekRow?.total ?? 0)}</strong>,
+                  con <strong className="text-foreground">{clientesAtendidosSemana}</strong> clientes atendidos y movimiento en{" "}
+                  <strong className="text-foreground">{sucursalesConMovimiento}</strong> sucursales. La operacion muestra{" "}
+                  <strong className="text-foreground">{trabajosActivos.length}</strong> trabajos activos,{" "}
+                  <strong className="text-foreground">{trabajosPausados.length}</strong> pausados y{" "}
+                  <strong className="text-foreground">{jornadasProgramadas.length}</strong> jornadas programadas para la semana base.
+                </p>
+              </div>
+            </div>
+          </Card>
+
           <section className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
             <Card className="p-3">
               <PanelTitle icon={DollarSign} title="Lectura rapida financiera" subtitle="Ultimas semanas y composicion de la semana actual." />
@@ -723,7 +780,7 @@ export default function Dashboard() {
         <Card className="p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">Semana seleccionada</h2>
-            <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"} · detalle financiero.</p>
+            <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"} - detalle financiero.</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Kpi label="Total" value={money(selectedWeek?.total ?? 0)} loading={loading} tone={selectedTrend != null && selectedTrend < -20 ? "bad" : "neutral"} />
@@ -822,20 +879,21 @@ export default function Dashboard() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">Trabajos por OS/TR</h2>
-                <p className="text-xs text-muted-foreground">Avance, tecnicos, horas, estado y cierre en una sola lectura.</p>
+              <p className="text-xs text-muted-foreground">Jornadas, tecnicos activos, horas, ultima fecha y cierre en una sola lectura.</p>
               </div>
               <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
             </div>
             <div className="overflow-x-auto rounded-md border">
               <div className="min-w-[980px]">
-                <div className="grid grid-cols-[96px_1.2fr_0.8fr_90px_90px_86px_86px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                <div className="grid grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                   <div>OS/TR</div>
                   <div>Cliente / trabajo</div>
                   <div>Sucursal</div>
                   <div className="text-right">Jornadas</div>
                   <div className="text-right">Tecnicos</div>
                   <div className="text-right">Horas</div>
-                  <div className="text-right">Avance</div>
+                  <div className="text-right">Ultima fecha</div>
+                  <div className="text-right">Cierre</div>
                   <div className="text-right">Estado</div>
                 </div>
                 {trabajosResumen.length === 0 ? (
@@ -845,7 +903,7 @@ export default function Dashboard() {
                     <button
                       key={row.id}
                       onClick={() => navigate(`/trabajos?q=${encodeURIComponent(row.ref)}`)}
-                      className="grid w-full grid-cols-[96px_1.2fr_0.8fr_90px_90px_86px_86px_110px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+                      className="grid w-full grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
                     >
                       <div className="font-mono text-[11px] font-semibold">{row.ref}</div>
                       <div className="min-w-0">
@@ -856,7 +914,16 @@ export default function Dashboard() {
                       <div className="text-right tabular-nums">{row.realizadas}/{row.totalJornadas}</div>
                       <div className="text-right tabular-nums">{row.participantes}</div>
                       <div className="text-right tabular-nums">{row.horas.toFixed(1)}</div>
-                      <div className="text-right tabular-nums">{row.avance}%</div>
+                      <div className="text-right tabular-nums">{row.ultimaFecha ? format(parseISO(row.ultimaFecha), "dd/MM") : "-"}</div>
+                      <div className="text-right text-[11px] text-muted-foreground">
+                        {row.pendientesVencidas > 0
+                          ? `${row.pendientesVencidas} vencida${row.pendientesVencidas !== 1 ? "s" : ""}`
+                          : row.pendientesSemana > 0
+                            ? `${row.pendientesSemana} esta semana`
+                            : row.pendientes > 0
+                              ? `${row.pendientes} pendiente${row.pendientes !== 1 ? "s" : ""}`
+                              : "Sin pendientes"}
+                      </div>
                       <div className="text-right">
                         <Badge variant={row.estado === "pausado" ? "default" : "secondary"} className={cn("text-[10px]", row.estado === "pausado" && "bg-amber-600 text-white")}>
                           {estadoLabel(row.estado)}
