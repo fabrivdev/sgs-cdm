@@ -292,24 +292,39 @@ export default function Dashboard() {
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
   const profileById = useMemo(() => new Map(profiles.map((item) => [item.id, item])), [profiles]);
+  // Resuelve la cuadrilla efectiva de una jornada con herencia desde el servicio padre,
+  // igual que Planificador: si la jornada no tiene principal/auxiliares propios, hereda
+  // los del servicio.
+  const jornadaCrewIds = (jornada: Jornada): string[] => {
+    const servicio = servicioById.get(jornada.servicio_id);
+    const principal = jornada.tecnico_responsable_id ?? servicio?.tecnico_responsable_id ?? null;
+    const aux = (jornada.auxiliares && jornada.auxiliares.length > 0)
+      ? jornada.auxiliares
+      : (servicio?.auxiliares ?? []);
+    return [principal, ...aux].filter(Boolean) as string[];
+  };
+
   const activeTechnicianIds = useMemo(() => {
     const roleIds = new Set(userRoles.filter((row) => row.role === "tecnico").map((row) => row.user_id));
-    const referencedTechIds = new Set(
-      jornadas.flatMap((jornada) => [jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])].filter(Boolean) as string[]),
-    );
+    const referencedTechIds = new Set<string>();
+    for (const jornada of jornadas) {
+      for (const id of jornadaCrewIds(jornada)) referencedTechIds.add(id);
+    }
+    for (const servicio of servicios) {
+      if (servicio.tecnico_responsable_id) referencedTechIds.add(servicio.tecnico_responsable_id);
+      for (const id of servicio.auxiliares ?? []) referencedTechIds.add(id);
+    }
     return new Set(
       profiles
         .filter((profile) => {
           const name = profile.nombre.toLowerCase();
           const hasTecnicoRole = roleIds.has(profile.id);
-          // Aceptamos también perfiles sin rol pero referenciados como técnicos en jornadas
-          // (técnicos de campo sin cuenta de usuario).
           const referenced = referencedTechIds.has(profile.id);
           return profile.activo !== false && (hasTecnicoRole || referenced) && !name.includes("pasante");
         })
         .map((profile) => profile.id),
     );
-  }, [jornadas, profiles, userRoles]);
+  }, [jornadas, profiles, servicios, userRoles, servicioById]);
 
 
   const technicianOptions = useMemo(
@@ -322,6 +337,8 @@ export default function Dashboard() {
 
   const validTechnicianIds = (ids: Array<string | null | undefined>) =>
     Array.from(new Set(ids.filter((id): id is string => !!id && activeTechnicianIds.has(id))));
+
+  const validJornadaCrew = (jornada: Jornada) => validTechnicianIds(jornadaCrewIds(jornada));
 
   const query = q.trim().toLowerCase();
   const factFiltered = useMemo(
@@ -492,14 +509,14 @@ export default function Dashboard() {
   const cargaTecnicos = useMemo(() => {
     const map = new Map<string, number>();
     for (const jornada of jornadasProgramadas) {
-      const ids = validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])]);
+      const ids = validJornadaCrew(jornada);
       for (const id of ids) map.set(id, (map.get(id) ?? 0) + 1);
     }
     return Array.from(map.entries())
       .map(([id, count]) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-  }, [activeTechnicianIds, jornadasProgramadas, profileById]);
+  }, [activeTechnicianIds, jornadasProgramadas, profileById, servicioById]);
 
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
@@ -534,7 +551,7 @@ export default function Dashboard() {
       const pendientes = trabajoJornadas.filter((j) => j.estado === "Pendiente");
       const participantes = new Set<string>();
       for (const jornada of trabajoJornadas) {
-        for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+        for (const id of validJornadaCrew(jornada)) {
           participantes.add(id);
         }
       }
@@ -585,7 +602,7 @@ export default function Dashboard() {
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
   const tecnicosConActividad = new Set(
-    [...jornadasRealizadasPrev, ...jornadasProgramadas].flatMap((j) => validTechnicianIds([j.tecnico_responsable_id, ...(j.auxiliares ?? [])])),
+    [...jornadasRealizadasPrev, ...jornadasProgramadas].flatMap((j) => validJornadaCrew(j)),
   );
   const tecnicosTotales = activeTechnicianIds.size;
 
@@ -698,7 +715,7 @@ export default function Dashboard() {
       bucketsSet.add(key);
       // Solo Completado aporta horas reales
       const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
-      for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+      for (const id of validJornadaCrew(jornada)) {
         const current = map.get(id) ?? {
           id,
           nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
