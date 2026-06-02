@@ -1817,7 +1817,7 @@ function CargaTecnicaMatriz({
             </button>
           )}
           <div className="text-[10px] text-muted-foreground">
-            Agrupado por {bucketMode === "mes" ? "mes" : "semana ISO"} · solo jornadas completadas
+            Agrupado por {bucketMode === "mes" ? "mes" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
           </div>
         </>
       )}
