@@ -610,19 +610,18 @@ export default function Dashboard() {
   );
   const tecnicosTotales = activeTechnicianIds.size;
 
-  // Estadísticas de "flujo operativo" basadas en trabajosBase (no se ven afectadas
-  // por los filtros de estado/técnico de la pestaña Trabajos).
+  // Estadísticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestaña Trabajos).
   const flujo = useMemo(() => {
-    const total = trabajosBase.length;
-    const culminados = trabajosBase.filter((r) => r.estado === "completado").length;
-    const pausados = trabajosBase.filter((r) => r.estado === "pausado").length;
-    const pendiente = trabajosBase.filter((r) => r.estado === "pendiente").length;
-    const programado = trabajosBase.filter((r) => r.estado === "programado").length;
-    const iniciado = trabajosBase.filter((r) => r.estado === "iniciado").length;
+    const total = trabajosResumen.length;
+    const culminados = trabajosResumen.filter((r) => r.estado === "completado").length;
+    const pausados = trabajosResumen.filter((r) => r.estado === "pausado").length;
+    const pendiente = trabajosResumen.filter((r) => r.estado === "pendiente").length;
+    const programado = trabajosResumen.filter((r) => r.estado === "programado").length;
+    const iniciado = trabajosResumen.filter((r) => r.estado === "iniciado").length;
     const abiertos = total - culminados - pausados;
     const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
     return { total, culminados, abiertos, pausados, pendiente, programado, iniciado, pct };
-  }, [trabajosBase]);
+  }, [trabajosResumen]);
 
   const trabajosPorEstado = useMemo(() => {
     const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
