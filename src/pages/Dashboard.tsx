@@ -272,7 +272,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [fSucursal, previousWeekStart, queryEnd, queryStart, weekEnd]);
+  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd]);
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
@@ -422,7 +422,7 @@ export default function Dashboard() {
         const servicio = servicioById.get(jornada.servicio_id);
         return jornada.estado === "Completado" && inRange(jornada.fecha, previousWeekStart, previousWeekEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursal, jornadas, previousWeekEnd, previousWeekStart, query, servicioById],
+    [clienteById, fSucursales, jornadas, previousWeekEnd, previousWeekStart, query, servicioById],
   );
 
   const jornadasProgramadas = useMemo(
@@ -431,7 +431,7 @@ export default function Dashboard() {
         const servicio = servicioById.get(jornada.servicio_id);
         return jornada.estado === "Pendiente" && inRange(jornada.fecha, weekStart, weekEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursal, jornadas, query, servicioById, weekEnd, weekStart],
+    [clienteById, fSucursales, jornadas, query, servicioById, weekEnd, weekStart],
   );
 
   const jornadasPendientesCierre = useMemo(
@@ -440,10 +440,10 @@ export default function Dashboard() {
         const servicio = servicioById.get(jornada.servicio_id);
         return jornada.estado === "Pendiente" && jornada.fecha < todayStr && scopedServicio(servicio);
       }),
-    [clienteById, fSucursal, jornadas, query, servicioById],
+    [clienteById, fSucursales, jornadas, query, servicioById],
   );
 
-  const trabajosScope = useMemo(() => trabajos.filter(scopedTrabajo), [clienteById, fSucursal, query, trabajos]);
+  const trabajosScope = useMemo(() => trabajos.filter(scopedTrabajo), [clienteById, fSucursales, query, trabajos]);
   const jornadasByTrabajo = useMemo(() => {
     const servicioATrabajo = new Map<string, string>();
     for (const trabajo of trabajos) {
@@ -630,10 +630,10 @@ export default function Dashboard() {
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
     setSelectedWeekKey(initialWeekStart);
-    setFSucursal("all");
-    setFRubro("all");
-    setFEstadoTrabajo("all");
-    setFTecnico("all");
+    setFSucursales([]);
+    setFRubros([]);
+    setFEstadosTrabajo([]);
+    setFTecnicos([]);
     setPeriodMode("semana");
     setQ("");
   };
@@ -976,16 +976,16 @@ export default function Dashboard() {
           <FiltersBar
             activeCount={(fEstadoTrabajo !== "all" ? 1 : 0) + (fTecnico !== "all" ? 1 : 0)}
             onClear={() => {
-              setFEstadoTrabajo("all");
-              setFTecnico("all");
+              setFEstadosTrabajo([]);
+              setFTecnicos([]);
             }}
             meta={
               <div className="flex flex-wrap items-center gap-1.5">
-                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
                 <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadoTrabajo("completado")} />
                 <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
-                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadoTrabajo("all")} />
-                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadosTrabajo([])} />
+                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
                 <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
               </div>
             }
