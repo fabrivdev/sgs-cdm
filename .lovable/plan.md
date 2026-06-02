@@ -1,8 +1,12 @@
-Ajustaré la pestaña de facturación para que el recuadro superior derecho quede alineado visualmente con el recuadro inferior.
+Corregir alineación de bordes en la pestaña Facturación y altura de la tabla de semanas.
 
-Plan:
-1. En la fila superior de facturación, quitaré el comportamiento que deja al recuadro derecho con altura independiente.
-2. Haré que ambos recuadros superiores compartan la misma altura dentro de la grilla.
-3. Mantendré el recuadro inferior inmediatamente debajo, con el mismo ancho del contenedor, para que los bordes y separaciones se vean consistentes.
-4. Para evitar que la tabla de “Facturación por semana” haga crecer demasiado la fila, limitaré su alto interno con scroll vertical solo dentro de la tabla si hay muchas semanas.
-5. Conservaré la tabla sin scroll horizontal, usando columnas más flexibles y compactas si hace falta.
+Cambios:
+
+1. Asegurar que la fila superior (Facturación por semana + Periodo seleccionado) y el bloque inferior (Facturas del periodo) compartan exactamente el mismo ancho y los mismos márgenes laterales:
+   - Envolver ambos en el mismo contenedor con el mismo padding/horizontal.
+   - Verificar que el `<section>` superior no tenga estilos que reduzcan su ancho respecto al `Card` inferior.
+   - Quitar cualquier `overflow-x-auto` o `min-w-*` interno del card izquierdo que pueda inducir un ancho extra y romper la alineación visual del borde derecho.
+
+2. En la tabla de “Facturación por semana/mes”, fijar altura para mostrar 12 filas completas antes de activar scroll vertical interno (aprox. header ~32px + 12 filas ~32px = ~416px). Mantener scroll solo cuando hay más de 12 semanas.
+
+3. No cambiar diseño, estilos, bordes redondeados, paddings ni colores. Solo alineación y altura visible.
