@@ -816,7 +816,7 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-3">
-          <section className="grid gap-3 lg:grid-cols-[1.5fr_0.9fr]">
+          <section className="grid items-start gap-3 lg:grid-cols-[1.5fr_0.9fr]">
         <Card className="flex h-full flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
