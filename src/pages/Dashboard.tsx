@@ -775,7 +775,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr_0.9fr]">
+          <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
             <Card className="p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
@@ -802,17 +802,8 @@ export default function Dashboard() {
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             </Card>
-
-            <Card className="p-3">
-              <PanelTitle icon={ChevronRight} title="Drill de analisis" subtitle="" />
-              <div className="space-y-2">
-                <DrillButton label="Ver facturacion" onClick={() => setSection("facturacion")} />
-                <DrillButton label="Ver clientes" onClick={() => setSection("facturacion")} />
-                <DrillButton label="Ver trabajos" onClick={() => setSection("trabajos")} />
-                <DrillButton label="Ver tecnicos" onClick={() => setSection("trabajos")} />
-              </div>
-            </Card>
           </section>
+
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="p-3">
