@@ -559,6 +559,9 @@ export default function Dashboard() {
       }
       const tecnicoIds = Array.from(participantes);
       const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
+      const horasPeriodo = realizadas
+        .filter((row) => inRange(row.fecha, periodStart, periodEnd))
+        .reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
       const fechaCierre = realizadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
@@ -578,6 +581,7 @@ export default function Dashboard() {
         participantes: participantes.size,
         tecnicoIds,
         horas,
+        horasPeriodo,
         ultimaFecha,
         fechaCierre,
         pendientesVencidas,
@@ -588,7 +592,7 @@ export default function Dashboard() {
         jornadaFechas: trabajoJornadas.map((j) => j.fecha).filter(Boolean) as string[],
       };
     });
-  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
+  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, periodEnd, periodStart, servicioById, trabajosScope, weekEnd, weekStart]);
 
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
