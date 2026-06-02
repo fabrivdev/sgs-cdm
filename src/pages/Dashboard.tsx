@@ -1134,10 +1134,10 @@ function SummaryCard({
   onClick: () => void;
 }) {
   return (
-    <button className="rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+    <button className="h-full rounded-lg text-left" onClick={onClick}>
+      <Card className={cn("flex h-full min-h-[112px] flex-col p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
             <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
             <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
