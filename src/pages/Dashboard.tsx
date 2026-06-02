@@ -768,18 +768,18 @@ export default function Dashboard() {
           </Card>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-[1.2fr_1fr]">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
               <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
             </Card>
 
-            <div className="grid gap-3">
-              <Card className="p-3">
+            <div className="grid auto-rows-fr gap-3">
+              <Card className="flex h-full flex-col p-3">
                 <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
                 <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
               </Card>
-              <Card className="p-3">
+              <Card className="flex h-full flex-col p-3">
                 <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
                 <MixRubros row={currentWeekRow} rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"} />
               </Card>
@@ -788,7 +788,7 @@ export default function Dashboard() {
           </section>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto
                 flujo={flujo}
@@ -800,14 +800,14 @@ export default function Dashboard() {
                 planLabel={T.plan}
               />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
               <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
             </Card>
           </section>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
                 rows={topClientes}
@@ -817,7 +817,7 @@ export default function Dashboard() {
                 onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }}
               />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
               <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("trabajos"); }} />
             </Card>
@@ -827,7 +827,7 @@ export default function Dashboard() {
 
         <TabsContent value="facturacion" className="space-y-3">
           <section className="grid gap-3 lg:grid-cols-[1.5fr_0.9fr]">
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Facturacion por semana</h2>
@@ -884,7 +884,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">{periodMode === "semana" ? "Semana seleccionada" : "Periodo seleccionado"}</h2>
             <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"}</p>
@@ -906,7 +906,7 @@ export default function Dashboard() {
           </section>
 
           <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">{T.facturas}</h2>
@@ -943,7 +943,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">Clientes y sucursales</h2>
           </div>
@@ -1025,17 +1025,17 @@ export default function Dashboard() {
           </FiltersBar>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto flujo={flujo} onSelect={(estado) => setFEstadosTrabajo([estado])} />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
               <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursales([sucursal])} />
             </Card>
           </section>
 
-          <Card className="p-3">
+          <Card className="flex h-full flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">Seguimiento por OS/TR</h2>
@@ -1096,11 +1096,11 @@ export default function Dashboard() {
           </Card>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Productividad tecnica" subtitle="" />
               <CargaTecnicaTabla rows={productividadTecnica} />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={T.lectura} subtitle="" />
               <div className="grid grid-cols-2 gap-2">
                 <Kpi label="Cierre anterior" value={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} loading={loading} />
