@@ -319,7 +319,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fRubro, facturacion, query],
+    [clienteById, fRubros, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
