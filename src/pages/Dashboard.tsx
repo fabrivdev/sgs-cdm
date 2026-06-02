@@ -816,82 +816,60 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-3">
-          <section className="grid auto-rows-fr gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <Card className="flex h-full min-w-0 flex-col p-3">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Facturacion por semana</h2>
-              <p className="text-xs text-muted-foreground">Selecciona una semana para ver facturas, clientes y composicion.</p>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] uppercase text-muted-foreground">Mes seleccionado</div>
-              <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(totalMes)}</div>
-              <div className={cn("text-[11px]", trendMes != null && trendMes < 0 ? "text-destructive" : "text-muted-foreground")}>
-                {trendMes == null ? "sin base previa" : `${trendMes > 0 ? "+" : ""}${trendMes}% vs mes anterior`}
+          <Card className="flex flex-col p-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Facturacion por semana</h2>
+                <p className="text-xs text-muted-foreground">Selecciona una semana para ver facturas, clientes y composicion.</p>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase text-muted-foreground">Mes seleccionado</div>
+                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(totalMes)}</div>
+                <div className={cn("text-[11px]", trendMes != null && trendMes < 0 ? "text-destructive" : "text-muted-foreground")}>
+                  {trendMes == null ? "sin base previa" : `${trendMes > 0 ? "+" : ""}${trendMes}% vs mes anterior`}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-md border">
-            <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-              <div>Semana</div>
-              <div className="text-right">Total</div>
-              <div className="text-right">Repuestos</div>
-              <div className="text-right">Servicio</div>
-              <div className="text-right">Km</div>
-              <div className="text-right">Otros</div>
-              <div className="text-right">Fact.</div>
-              <div className="text-right">Clientes</div>
-              <div className="text-right">Var.</div>
+            <div className="rounded-md border">
+              <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                <div>Semana</div>
+                <div className="text-right">Total</div>
+                <div className="text-right">Repuestos</div>
+                <div className="text-right">Servicio</div>
+                <div className="text-right">Km</div>
+                <div className="text-right">Otros</div>
+                <div className="text-right">Fact.</div>
+                <div className="text-right">Clientes</div>
+                <div className="text-right">Var.</div>
+              </div>
+              {weeklyRows.map((row) => {
+                const active = row.key === selectedWeek?.key;
+                return (
+                  <button
+                    key={row.key}
+                    onClick={() => setSelectedWeekKey(row.key)}
+                    className={cn(
+                      "grid w-full grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent",
+                      active && "bg-primary/5 outline outline-1 outline-primary/20",
+                    )}
+                  >
+                    <div className="font-medium">{row.label}</div>
+                    <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
+                    <div className="text-right tabular-nums">{money(row.repuestos)}</div>
+                    <div className="text-right tabular-nums">{money(row.servicio)}</div>
+                    <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
+                    <div className="text-right tabular-nums">{money(row.otros)}</div>
+                    <div className="text-right tabular-nums">{row.facturas}</div>
+                    <div className="text-right tabular-nums">{row.clientes}</div>
+                    <div className={cn("text-right tabular-nums", row.variacion != null && row.variacion < 0 && "text-destructive")}>
+                      {row.variacion == null ? "-" : `${row.variacion > 0 ? "+" : ""}${row.variacion}%`}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            {weeklyRows.map((row) => {
-              const active = row.key === selectedWeek?.key;
-              return (
-                <button
-                  key={row.key}
-                  onClick={() => setSelectedWeekKey(row.key)}
-                  className={cn(
-                    "grid w-full grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent",
-                    active && "bg-primary/5 outline outline-1 outline-primary/20",
-                  )}
-                >
-                  <div className="font-medium">{row.label}</div>
-                  <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
-                  <div className="text-right tabular-nums">{money(row.repuestos)}</div>
-                  <div className="text-right tabular-nums">{money(row.servicio)}</div>
-                  <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
-                  <div className="text-right tabular-nums">{money(row.otros)}</div>
-                  <div className="text-right tabular-nums">{row.facturas}</div>
-                  <div className="text-right tabular-nums">{row.clientes}</div>
-                  <div className={cn("text-right tabular-nums", row.variacion != null && row.variacion < 0 && "text-destructive")}>
-                    {row.variacion == null ? "-" : `${row.variacion > 0 ? "+" : ""}${row.variacion}%`}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-
-        <Card className="flex h-full min-w-0 flex-col p-3">
-          <div className="mb-3">
-            <h2 className="text-base font-semibold">{periodMode === "semana" ? "Semana seleccionada" : "Periodo seleccionado"}</h2>
-            <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Kpi label="Total" value={money(selectedWeek?.total ?? 0)} loading={loading} tone={selectedTrend != null && selectedTrend < -20 ? "bad" : "neutral"} />
-            <Kpi label="Variacion" value={selectedTrend == null ? "-" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}%`} loading={loading} />
-            <Kpi label="Facturas" value={selectedWeek?.facturas ?? 0} loading={loading} />
-            <Kpi label="Clientes" value={selectedWeek?.clientes ?? 0} loading={loading} />
-          </div>
-          <div className="mt-3 space-y-1.5">
-            <ConceptLine label="Repuestos" value={selectedWeek?.repuestos ?? 0} total={selectedWeek?.total ?? 0} />
-            <ConceptLine label="Servicio" value={selectedWeek?.servicio ?? 0} total={selectedWeek?.total ?? 0} />
-            <ConceptLine label="Kilometraje" value={selectedWeek?.kilometraje ?? 0} total={selectedWeek?.total ?? 0} />
-            <ConceptLine label="Otros" value={selectedWeek?.otros ?? 0} total={selectedWeek?.total ?? 0} />
-          </div>
-        </Card>
-          </section>
+          </Card>
 
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
