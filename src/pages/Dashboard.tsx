@@ -1529,41 +1529,79 @@ function EstadoCompacto({
     { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), bar: "bg-amber-500/80", dot: "bg-amber-500" },
   ];
 
+  // Donut SVG geometry
+  const size = 132;
+  const stroke = 20;
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  const activeSegs = segs.filter((s) => s.value > 0);
+  const segColors: Record<string, string> = {
+    completado: "hsl(var(--primary))",
+    iniciado: "hsl(199 89% 48%)",
+    pausado: "hsl(38 92% 50%)",
+  };
+  let offsetAcc = 0;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs text-muted-foreground">Total gestionados</span>
-        <button onClick={() => onSelect("all")} className="text-lg font-bold tabular-nums hover:text-primary">
-          {flujo.total}
-        </button>
-      </div>
-
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-        {segs.map((s) => s.value > 0 && (
+      <div className="flex items-center gap-4">
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="-rotate-90">
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
+            {activeSegs.map((s) => {
+              const frac = s.value / flujo.total;
+              const dash = circumference * frac;
+              const gap = circumference - dash;
+              const el = (
+                <circle
+                  key={s.key}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  stroke={segColors[s.key]}
+                  strokeWidth={stroke}
+                  strokeDasharray={`${dash} ${gap}`}
+                  strokeDashoffset={-offsetAcc}
+                  className="cursor-pointer transition-opacity hover:opacity-80"
+                  onClick={() => onSelect(s.key)}
+                >
+                  <title>{`${s.label}: ${s.value} (${s.pct}%)`}</title>
+                </circle>
+              );
+              offsetAcc += dash;
+              return el;
+            })}
+          </svg>
           <button
-            key={s.key}
-            onClick={() => onSelect(s.key)}
-            className={cn("h-full transition-opacity hover:opacity-80", s.bar)}
-            style={{ width: `${s.pct}%` }}
-            title={`${s.label}: ${s.value} (${s.pct}%)`}
-            aria-label={`${s.label} ${s.value}`}
-          />
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-        {segs.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => onSelect(s.key)}
-            className="flex items-center gap-1.5 text-xs hover:text-primary"
+            onClick={() => onSelect("all")}
+            className="absolute inset-0 flex flex-col items-center justify-center hover:text-primary"
           >
-            <span className={cn("h-2 w-2 rounded-full", s.dot)} />
-            <span className="font-medium">{s.label}</span>
-            <span className="tabular-nums font-semibold">{s.value}</span>
-            <span className="text-[11px] text-muted-foreground">({s.pct}%)</span>
+            <span className="text-2xl font-bold tabular-nums leading-none">{flujo.total}</span>
+            <span className="mt-0.5 text-[10px] uppercase text-muted-foreground">gestionados</span>
           </button>
-        ))}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {segs.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => onSelect(s.key)}
+              className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-muted/60"
+            >
+              <span className="flex items-center gap-1.5">
+                <span className={cn("h-2.5 w-2.5 rounded-full", s.dot)} />
+                <span className="font-medium">{s.label}</span>
+              </span>
+              <span className="flex items-center gap-2 tabular-nums">
+                <span className="font-semibold">{s.value}</span>
+                <span className="w-9 text-right text-[11px] text-muted-foreground">{s.pct}%</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
