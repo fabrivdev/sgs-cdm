@@ -1452,3 +1452,240 @@ const toneClasses: Record<Tone, string> = {
   warn: "bg-amber-500/10 text-amber-700",
   bad: "bg-destructive/10 text-destructive",
 };
+
+/* --------- Nuevos componentes compactos --------- */
+
+function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro: string }) {
+  if (!row) return <div className="text-xs text-muted-foreground">Sin datos.</div>;
+  if (rubroFiltro !== "all") {
+    const valor = rubroFiltro === "Repuestos" ? row.repuestos
+      : rubroFiltro === "Servicio" ? row.servicio
+      : rubroFiltro === "Kilometraje" ? row.kilometraje
+      : row.otros;
+    return (
+      <div className="rounded-md border bg-muted/30 px-3 py-3">
+        <div className="text-[10px] uppercase text-muted-foreground">Rubro seleccionado</div>
+        <div className="mt-0.5 text-sm font-semibold">{rubroFiltro}</div>
+        <div className="mt-1 text-lg font-bold tabular-nums">{money(valor)}</div>
+      </div>
+    );
+  }
+  const items: Array<{ label: string; value: number }> = [
+    { label: "Repuestos", value: row.repuestos },
+    { label: "Servicios", value: row.servicio },
+    { label: "Kilometraje", value: row.kilometraje },
+    { label: "Otros", value: row.otros },
+  ];
+  const total = row.total || 1;
+  return (
+    <div className="space-y-1.5">
+      {items.map((it) => {
+        const pct = Math.round((it.value / total) * 100);
+        return (
+          <div key={it.label} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs">
+            <span className="font-medium">{it.label}</span>
+            <span className="flex items-center gap-3 tabular-nums">
+              <span>{money(it.value)}</span>
+              <span className="w-10 text-right text-muted-foreground">{pct}%</span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FlujoOperativo({
+  flujo, jornadasProgramadas, tecnicosActivos, jornadasPrev, horasPrev, planLabel,
+}: {
+  flujo: { total: number; culminados: number; abiertos: number; pausados: number };
+  jornadasProgramadas: number;
+  tecnicosActivos: number;
+  jornadasPrev: number;
+  horasPrev: number;
+  planLabel: string;
+}) {
+  const items = [
+    { label: "Gestionados", value: flujo.total },
+    { label: "Culminados", value: flujo.culminados },
+    { label: "Abiertos", value: flujo.abiertos },
+    { label: "Pausados", value: flujo.pausados, warn: flujo.pausados > 0 },
+    { label: planLabel, value: `${jornadasProgramadas} planificados` },
+    { label: "Tecnicos activos", value: tecnicosActivos },
+  ];
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        {items.map((it) => (
+          <div key={it.label} className={cn("rounded-md border px-2.5 py-2", it.warn && "border-amber-300 bg-amber-50/60")}>
+            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{it.label}</div>
+            <div className="mt-0.5 text-base font-bold tabular-nums">{it.value}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 text-[11px] text-muted-foreground">
+        Cierre anterior: {jornadasPrev} jornadas · {horasPrev.toFixed(1)} hs
+      </div>
+    </div>
+  );
+}
+
+function EstadoCompacto({
+  flujo, onSelect,
+}: {
+  flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
+  onSelect: (estado: string) => void;
+}) {
+  const principales = [
+    { key: "all", label: "Total gestionados", value: flujo.total, pct: 100 },
+    { key: "completado", label: "Culminados", value: flujo.culminados, pct: flujo.pct(flujo.culminados) },
+    { key: "iniciado", label: "Abiertos", value: flujo.abiertos, pct: flujo.pct(flujo.abiertos) },
+    { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), warn: flujo.pausados > 0 },
+  ];
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        {principales.map((it) => (
+          <button
+            key={it.key}
+            onClick={() => onSelect(it.key)}
+            className={cn(
+              "flex items-baseline justify-between rounded-md border px-3 py-2 text-left hover:bg-accent",
+              it.warn && "border-amber-300 bg-amber-50/60",
+            )}
+          >
+            <span className="truncate text-xs font-medium">{it.label}</span>
+            <span className="shrink-0 text-sm font-bold tabular-nums">
+              {it.value}
+              {it.key !== "all" && <span className="ml-1 text-[11px] font-normal text-muted-foreground">/ {it.pct}%</span>}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] text-muted-foreground">
+        <button className="hover:text-foreground" onClick={() => onSelect("pendiente")}>Pendiente: <span className="tabular-nums">{flujo.pendiente}</span></button>
+        <span>·</span>
+        <button className="hover:text-foreground" onClick={() => onSelect("programado")}>Programado: <span className="tabular-nums">{flujo.programado}</span></button>
+        <span>·</span>
+        <button className="hover:text-foreground" onClick={() => onSelect("iniciado")}>Iniciado: <span className="tabular-nums">{flujo.iniciado}</span></button>
+      </div>
+    </div>
+  );
+}
+
+function CargaSucursalTabla({
+  rows, onSelect,
+}: {
+  rows: Array<{ sucursal: Sucursal; cerrados: number; abiertos: number; pausados: number; total: number; pct: number }>;
+  onSelect: (sucursal: Sucursal) => void;
+}) {
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
+  }
+  return (
+    <div className="rounded-md border">
+      <div className="grid grid-cols-[1fr_70px_70px_70px_60px_56px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+        <div>Sucursal</div>
+        <div className="text-right">Cerrados</div>
+        <div className="text-right">Abiertos</div>
+        <div className="text-right">Pausados</div>
+        <div className="text-right">Total</div>
+        <div className="text-right">%</div>
+      </div>
+      {rows.map((r) => (
+        <button
+          key={r.sucursal}
+          onClick={() => onSelect(r.sucursal)}
+          className="grid w-full grid-cols-[1fr_70px_70px_70px_60px_56px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+        >
+          <div className="truncate font-medium">{r.sucursal}</div>
+          <div className="text-right tabular-nums">{r.cerrados}</div>
+          <div className="text-right tabular-nums">{r.abiertos}</div>
+          <div className="text-right tabular-nums">{r.pausados}</div>
+          <div className="text-right font-semibold tabular-nums">{r.total}</div>
+          <div className="text-right tabular-nums text-muted-foreground">{r.pct}%</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CargaTecnicaTabla({
+  rows, onClick,
+}: {
+  rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }>;
+  onClick?: () => void;
+}) {
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>;
+  }
+  return (
+    <div className="max-h-[260px] overflow-y-auto rounded-md border">
+      <div className="sticky top-0 grid grid-cols-[1fr_70px_70px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+        <div>Tecnico</div>
+        <div className="text-right">Jornadas</div>
+        <div className="text-right">Trabajos</div>
+        <div className="text-right">Horas</div>
+      </div>
+      {rows.map((r) => (
+        <button
+          key={r.id}
+          onClick={onClick}
+          className="grid w-full grid-cols-[1fr_70px_70px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+        >
+          <div className="truncate font-medium">{r.nombre}</div>
+          <div className="text-right tabular-nums">{r.jornadas}</div>
+          <div className="text-right tabular-nums">{r.trabajos}</div>
+          <div className="text-right tabular-nums">{r.horas.toFixed(1)} hs</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ClientesCompacto({
+  rows, totalValue, totalFacturas, totalClientes, onSelect,
+}: {
+  rows: Array<{ nombre: string; total: number; facturas: number }>;
+  totalValue: number;
+  totalFacturas: number;
+  totalClientes: number;
+  onSelect: (nombre: string) => void;
+}) {
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>;
+  }
+  const top5 = rows.slice(0, 5).reduce((a, r) => a + r.total, 0);
+  const pctTop5 = totalValue > 0 ? Math.round((top5 / totalValue) * 100) : 0;
+  return (
+    <div>
+      <div className="mb-2 text-[11px] text-muted-foreground">
+        {totalClientes} clientes · {totalFacturas} facturas · Top 5 concentra {pctTop5}%
+      </div>
+      <div className="max-h-[260px] overflow-y-auto rounded-md border">
+        <div className="sticky top-0 grid grid-cols-[1fr_60px_96px_48px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+          <div>Cliente</div>
+          <div className="text-right">Fact.</div>
+          <div className="text-right">Facturacion</div>
+          <div className="text-right">%</div>
+        </div>
+        {rows.slice(0, 8).map((r) => {
+          const pct = totalValue > 0 ? Math.round((r.total / totalValue) * 100) : 0;
+          return (
+            <button
+              key={r.nombre}
+              onClick={() => onSelect(r.nombre)}
+              className="grid w-full grid-cols-[1fr_60px_96px_48px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+            >
+              <div className="truncate font-medium">{r.nombre}</div>
+              <div className="text-right tabular-nums">{r.facturas}</div>
+              <div className="text-right font-semibold tabular-nums">{money(r.total)}</div>
+              <div className="text-right tabular-nums text-muted-foreground">{pct}%</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
