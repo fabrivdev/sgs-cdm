@@ -559,6 +559,9 @@ export default function Dashboard() {
       }
       const tecnicoIds = Array.from(participantes);
       const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
+      const horasPeriodo = realizadas
+        .filter((row) => inRange(row.fecha, periodStart, periodEnd))
+        .reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
       const fechaCierre = realizadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
@@ -578,6 +581,7 @@ export default function Dashboard() {
         participantes: participantes.size,
         tecnicoIds,
         horas,
+        horasPeriodo,
         ultimaFecha,
         fechaCierre,
         pendientesVencidas,
@@ -588,7 +592,7 @@ export default function Dashboard() {
         jornadaFechas: trabajoJornadas.map((j) => j.fecha).filter(Boolean) as string[],
       };
     });
-  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
+  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, periodEnd, periodStart, servicioById, trabajosScope, weekEnd, weekStart]);
 
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
@@ -698,7 +702,7 @@ export default function Dashboard() {
         const cerrEnP = cerradoEnPeriodo(r);
         const actEnP = tieneActividad(r);
         if (!cerrEnP && !actEnP) continue;
-        horas += r.horas;
+        horas += r.horasPeriodo;
         if (cerrEnP) { cerrados++; continue; }
         if (r.estado === "pausado") pausados++;
         else abiertos++;
@@ -1794,6 +1798,11 @@ function DistribucionMarca({
   if (totales.total === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin actividad por marca en el periodo.</div>;
   }
+  const PALETAS: Record<Marca, { abiertos: string; pausados: string; cerrados: string; dot: string }> = {
+    CLAAS: { abiertos: "#7BC58A", pausados: "#2E9F4F", cerrados: "#00853E", dot: "#00853E" },
+    HORSCH: { abiertos: "#F4A6A6", pausados: "#E64545", cerrados: "#E2001A", dot: "#E2001A" },
+    OTROS: { abiertos: "#9CA3AF", pausados: "#6B7280", cerrados: "#374151", dot: "#6B7280" },
+  };
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-2">
@@ -1802,6 +1811,7 @@ function DistribucionMarca({
           const widthAbiertos = d.total > 0 ? (d.abiertos / max) * 100 : 0;
           const widthPausados = d.total > 0 ? (d.pausados / max) * 100 : 0;
           const widthCerrados = d.total > 0 ? (d.cerrados / max) * 100 : 0;
+          const pal = PALETAS[d.marca] ?? PALETAS.OTROS;
           return (
             <button
               key={d.marca}
@@ -1813,6 +1823,7 @@ function DistribucionMarca({
             >
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: pal.dot }} />
                   <span className="font-semibold">{d.marca}</span>
                   <span className="text-[11px] text-muted-foreground">{d.pct}%</span>
                 </div>
@@ -1822,14 +1833,14 @@ function DistribucionMarca({
                 </div>
               </div>
               <div className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full bg-sky-500" style={{ width: `${widthAbiertos}%` }} title={`Abiertos: ${d.abiertos}`} />
-                <div className="h-full bg-amber-500" style={{ width: `${widthPausados}%` }} title={`Pausados: ${d.pausados}`} />
-                <div className="h-full bg-emerald-500" style={{ width: `${widthCerrados}%` }} title={`Cerrados: ${d.cerrados}`} />
+                <div className="h-full" style={{ width: `${widthAbiertos}%`, backgroundColor: pal.abiertos }} title={`Abiertos: ${d.abiertos}`} />
+                <div className="h-full" style={{ width: `${widthPausados}%`, backgroundColor: pal.pausados }} title={`Pausados: ${d.pausados}`} />
+                <div className="h-full" style={{ width: `${widthCerrados}%`, backgroundColor: pal.cerrados }} title={`Cerrados: ${d.cerrados}`} />
               </div>
               <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-muted-foreground tabular-nums">
-                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />Abiertos {d.abiertos}</span>
-                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />Pausados {d.pausados}</span>
-                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />Cerrados {d.cerrados}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ backgroundColor: pal.abiertos }} />Abiertos {d.abiertos}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ backgroundColor: pal.pausados }} />Pausados {d.pausados}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ backgroundColor: pal.cerrados }} />Cerrados {d.cerrados}</span>
               </div>
             </button>
           );
