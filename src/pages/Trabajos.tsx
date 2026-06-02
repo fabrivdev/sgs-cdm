@@ -192,11 +192,7 @@ export default function Trabajos() {
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
         />
-        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por fecha de programación" />
-        <FilterSelect
-          label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
-          options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
-        />
+        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" />
       </FiltersBar>
 
 
