@@ -702,7 +702,7 @@ export default function Dashboard() {
         const cerrEnP = cerradoEnPeriodo(r);
         const actEnP = tieneActividad(r);
         if (!cerrEnP && !actEnP) continue;
-        horas += r.horas;
+        horas += r.horasPeriodo;
         if (cerrEnP) { cerrados++; continue; }
         if (r.estado === "pausado") pausados++;
         else abiertos++;
