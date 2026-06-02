@@ -616,11 +616,18 @@ export default function Dashboard() {
     }));
   }, [trabajosResumen]);
 
-  // Carga por sucursal: tabla con cerrados/abiertos/pausados/total/% usando trabajosBase.
+  // Carga por sucursal: filtra trabajos con actividad dentro del período seleccionado.
   const cargaSucursal = useMemo(() => {
-    const totalGral = trabajosBase.length;
+    const enPeriodo = (r: typeof trabajosBase[number]) => {
+      if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
+      if (r.actualizadoEn && inRange(r.actualizadoEn, periodStart, periodEnd)) return true;
+      if (r.jornadaFechas.some((f) => inRange(f, periodStart, periodEnd))) return true;
+      return false;
+    };
+    const enRango = trabajosBase.filter(enPeriodo);
+    const totalGral = enRango.length;
     return SUCURSALES.map((sucursal) => {
-      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      const rows = enRango.filter((r) => r.sucursal === sucursal);
       const cerrados = rows.filter((r) => r.estado === "completado").length;
       const pausados = rows.filter((r) => r.estado === "pausado").length;
       const total = rows.length;
@@ -630,7 +637,7 @@ export default function Dashboard() {
     })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [trabajosBase]);
+  }, [trabajosBase, periodStart, periodEnd]);
 
 
   const productividadMatriz = useMemo(() => {
