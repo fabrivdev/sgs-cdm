@@ -1191,13 +1191,14 @@ export default function Dashboard() {
               <CargaTecnicaMatriz data={productividadMatriz} />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={CalendarDays} title={T.lectura} subtitle="" />
-              <div className="grid grid-cols-2 gap-2">
-                <Kpi label="Cierre anterior" value={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} loading={loading} />
-                <Kpi label={T.plan} value={`${format(weekStart, "dd/MM")} - ${format(weekEnd, "dd/MM")}`} loading={loading} />
-                <Kpi label="Sin horas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
-                <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
-              </div>
+              <PanelTitle icon={BarChart3} title="Distribucion por marca" subtitle="Trabajos con actividad en el periodo" />
+              <DistribucionMarca
+                data={cargaMarca}
+                onSelect={(marca) =>
+                  setFMarcasTrabajo((prev) => (prev.length === 1 && prev[0] === marca ? [] : [marca]))
+                }
+                selected={fMarcasTrabajo}
+              />
             </Card>
 
           </section>
