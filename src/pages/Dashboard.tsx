@@ -1431,7 +1431,15 @@ const toneClasses: Record<Tone, string> = {
 
 /* --------- Nuevos componentes compactos --------- */
 
-function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro: string }) {
+function MixRubros({
+  row,
+  rubroFiltro,
+  onSelect,
+}: {
+  row: WeekRow | undefined;
+  rubroFiltro: string;
+  onSelect?: (rubro: string) => void;
+}) {
   if (!row) return <div className="text-xs text-muted-foreground">Sin datos.</div>;
   if (rubroFiltro !== "all") {
     const valor = rubroFiltro === "Repuestos" ? row.repuestos
@@ -1439,34 +1447,59 @@ function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro
       : rubroFiltro === "Kilometraje" ? row.kilometraje
       : row.otros;
     return (
-      <div className="rounded-md border bg-muted/30 px-3 py-3">
-        <div className="text-[10px] uppercase text-muted-foreground">Rubro seleccionado</div>
-        <div className="mt-0.5 text-sm font-semibold">{rubroFiltro}</div>
-        <div className="mt-1 text-lg font-bold tabular-nums">{money(valor)}</div>
+      <div className="rounded-md border bg-muted/30 px-3 py-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase text-muted-foreground">Rubro</div>
+            <div className="text-sm font-semibold">{rubroFiltro}</div>
+          </div>
+          <div className="text-base font-bold tabular-nums">{money(valor)}</div>
+        </div>
       </div>
     );
   }
-  const items: Array<{ label: string; value: number }> = [
-    { label: "Repuestos", value: row.repuestos },
-    { label: "Servicios", value: row.servicio },
-    { label: "Kilometraje", value: row.kilometraje },
-    { label: "Otros", value: row.otros },
+  const items: Array<{ label: string; value: number; bar: string; dot: string }> = [
+    { label: "Repuestos", value: row.repuestos, bar: "bg-primary", dot: "bg-primary" },
+    { label: "Servicios", value: row.servicio, bar: "bg-sky-500/80", dot: "bg-sky-500" },
+    { label: "Kilometraje", value: row.kilometraje, bar: "bg-amber-500/80", dot: "bg-amber-500" },
+    { label: "Otros", value: row.otros, bar: "bg-slate-400/80", dot: "bg-slate-400" },
   ];
   const total = row.total || 1;
   return (
     <div className="space-y-1.5">
-      {items.map((it) => {
-        const pct = Math.round((it.value / total) * 100);
-        return (
-          <div key={it.label} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs">
-            <span className="font-medium">{it.label}</span>
-            <span className="flex items-center gap-3 tabular-nums">
-              <span>{money(it.value)}</span>
-              <span className="w-10 text-right text-muted-foreground">{pct}%</span>
-            </span>
-          </div>
-        );
-      })}
+      <div className="flex items-center justify-between text-[10px] uppercase text-muted-foreground">
+        <span>Mix del periodo</span>
+        <span className="tabular-nums normal-case text-foreground/70">{money(row.total)}</span>
+      </div>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+        {items.map((it) => it.value > 0 && (
+          <button
+            key={it.label}
+            onClick={() => onSelect?.(it.label === "Servicios" ? "Servicio" : it.label)}
+            className={cn("h-full transition-opacity hover:opacity-80", it.bar)}
+            style={{ width: `${(it.value / total) * 100}%` }}
+            title={`${it.label}: ${money(it.value)} (${Math.round((it.value / total) * 100)}%)`}
+            aria-label={`${it.label} ${it.value}`}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {items.map((it) => {
+          const pct = Math.round((it.value / total) * 100);
+          return (
+            <button
+              key={it.label}
+              onClick={() => onSelect?.(it.label === "Servicios" ? "Servicio" : it.label)}
+              className="flex items-center gap-1.5 text-[11px] hover:text-primary"
+            >
+              <span className={cn("h-2 w-2 rounded-full", it.dot)} />
+              <span className="font-medium">{it.label}</span>
+              <span className="tabular-nums text-muted-foreground">{money(it.value)}</span>
+              <span className="tabular-nums text-muted-foreground">({pct}%)</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
