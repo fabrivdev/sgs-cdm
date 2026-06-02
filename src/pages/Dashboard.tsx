@@ -776,7 +776,26 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
+          <section className="grid gap-3 xl:grid-cols-2">
+            <Card className="p-3">
+              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
+              <EstadoCompacto
+                flujo={flujo}
+                onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }}
+                planificados={jornadasProgramadas.length}
+                tecnicosActivos={tecnicosConActividad.size}
+                jornadasPrev={jornadasRealizadasPrev.length}
+                horasPrev={horasPrev}
+                planLabel={T.plan}
+              />
+            </Card>
+            <Card className="p-3">
+              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
+              <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
+            </Card>
+          </section>
+
+          <section className="grid gap-3 xl:grid-cols-2">
             <Card className="p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
@@ -787,33 +806,9 @@ export default function Dashboard() {
                 onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }}
               />
             </Card>
-
             <Card className="p-3">
-              <PanelTitle icon={ClipboardList} title="Flujo operativo de trabajos" subtitle="" />
-              <FlujoOperativo
-                flujo={flujo}
-                jornadasProgramadas={jornadasProgramadas.length}
-                tecnicosActivos={tecnicosConActividad.size}
-                jornadasPrev={jornadasRealizadasPrev.length}
-                horasPrev={horasPrev}
-                planLabel={T.plan}
-              />
-              <button onClick={() => setSection("trabajos")} className="mt-3 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover:bg-accent">
-                <span>Ver detalle de trabajos</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </Card>
-          </section>
-
-
-          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
-            <Card className="p-3">
-              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
-              <EstadoCompacto flujo={flujo} onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }} />
-            </Card>
-            <Card className="p-3">
-              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
-              <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("trabajos"); }} />
             </Card>
           </section>
 
