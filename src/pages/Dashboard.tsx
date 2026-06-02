@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  AlertTriangle,
   BarChart3,
   Building2,
   CalendarDays,
@@ -14,7 +13,7 @@ import {
   ChevronRight,
   ClipboardList,
   DollarSign,
-  PauseCircle,
+  PauseCircle as PauseCircleIcon,
   Users,
 } from "lucide-react";
 import {
@@ -186,6 +185,10 @@ export default function Dashboard() {
   const [weekStartInput, setWeekStartInput] = useState(initialWeekStart);
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
   const [fSucursal, setFSucursal] = useState("all");
+  const [fRubro, setFRubro] = useState("all");
+  const [fEstadoTrabajo, setFEstadoTrabajo] = useState("all");
+  const [fTecnico, setFTecnico] = useState("all");
+  const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("semana");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
 
@@ -199,17 +202,17 @@ export default function Dashboard() {
   const previousMonthEnd = useMemo(() => endOfMonth(subMonths(weekStart, 1)), [weekStart]);
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
   const queryStart = useMemo(() => {
-    const min = Math.min(firstComparisonWeek.getTime(), previousMonthStart.getTime());
+    const min = Math.min(firstComparisonWeek.getTime(), previousMonthStart.getTime(), subMonths(monthStart, 11).getTime());
     return new Date(min);
-  }, [firstComparisonWeek, previousMonthStart]);
+  }, [firstComparisonWeek, monthStart, previousMonthStart]);
   const queryEnd = useMemo(() => {
     const max = Math.max(weekEnd.getTime(), monthEnd.getTime());
     return new Date(max);
   }, [monthEnd, weekEnd]);
 
   useEffect(() => {
-    setSelectedWeekKey(dateKey(weekStart));
-  }, [weekStart]);
+    setSelectedWeekKey(dateKey(periodMode === "semana" ? weekStart : monthStart));
+  }, [monthStart, periodMode, weekStart]);
 
   useEffect(() => {
     let alive = true;
@@ -275,15 +278,28 @@ export default function Dashboard() {
   const profileById = useMemo(() => new Map(profiles.map((item) => [item.id, item])), [profiles]);
   const activeTechnicianIds = useMemo(() => {
     const roleIds = new Set(userRoles.filter((row) => row.role === "tecnico").map((row) => row.user_id));
+    const referencedTechIds = new Set(
+      jornadas.flatMap((jornada) => [jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])].filter(Boolean) as string[]),
+    );
     return new Set(
       profiles
         .filter((profile) => {
           const name = profile.nombre.toLowerCase();
-          return profile.activo !== false && roleIds.has(profile.id) && !name.includes("pasante");
+          const hasTecnicoRole = roleIds.has(profile.id);
+          const fallbackReferenced = roleIds.size === 0 && referencedTechIds.has(profile.id);
+          return profile.activo !== false && (hasTecnicoRole || fallbackReferenced) && !name.includes("pasante");
         })
         .map((profile) => profile.id),
     );
-  }, [profiles, userRoles]);
+  }, [jornadas, profiles, userRoles]);
+
+  const technicianOptions = useMemo(
+    () =>
+      Array.from(activeTechnicianIds)
+        .map((id) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico" }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [activeTechnicianIds, profileById],
+  );
 
   const validTechnicianIds = (ids: Array<string | null | undefined>) =>
     Array.from(new Set(ids.filter((id): id is string => !!id && activeTechnicianIds.has(id))));
@@ -292,6 +308,7 @@ export default function Dashboard() {
   const factFiltered = useMemo(
     () =>
       facturacion.filter((row) => {
+        if (fRubro !== "all" && concept(row) !== fRubro) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
@@ -301,7 +318,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, facturacion, query],
+    [clienteById, fRubro, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
@@ -324,9 +341,17 @@ export default function Dashboard() {
   };
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
-    const weeks = Array.from({ length: 8 }, (_, index) => subWeeks(weekStart, 7 - index));
-    const rows = weeks.map((start) => {
-      const end = endOfWeek(start, { weekStartsOn: 1 });
+    const periods = periodMode === "semana"
+      ? Array.from({ length: 8 }, (_, index) => {
+          const start = subWeeks(weekStart, 7 - index);
+          return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
+        })
+      : Array.from({ length: periodMode === "mes" ? 8 : 12 }, (_, index) => {
+          const start = startOfMonth(subMonths(monthStart, (periodMode === "mes" ? 7 : 11) - index));
+          return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
+        });
+
+    const rows = periods.map(({ start, end, label }) => {
       const weekFacts = factFiltered.filter((row) => inRange(row.fecha, start, end));
       const byConcept = {
         Repuestos: 0,
@@ -341,7 +366,7 @@ export default function Dashboard() {
       const invoices = new Set(weekFacts.map((row) => row.cod_factura));
       return {
         key: dateKey(start),
-        label: `${format(start, "dd/MM")} - ${format(end, "dd/MM")}`,
+        label,
         start,
         end,
         total: total(weekFacts),
@@ -360,7 +385,7 @@ export default function Dashboard() {
       ...row,
       variacion: index === 0 ? null : pct(row.total, rows[index - 1].total),
     }));
-  }, [factFiltered, weekStart]);
+  }, [factFiltered, monthStart, periodMode, weekStart]);
 
   const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
   const selectedFacts = selectedWeek?.rows ?? [];
@@ -461,6 +486,7 @@ export default function Dashboard() {
   const mixServicioRepuestoTotal = (currentWeekRow?.servicio ?? 0) + (currentWeekRow?.repuestos ?? 0);
   const pctServicio = mixServicioRepuestoTotal > 0 ? Math.round(((currentWeekRow?.servicio ?? 0) / mixServicioRepuestoTotal) * 100) : 0;
   const pctRepuesto = mixServicioRepuestoTotal > 0 ? 100 - pctServicio : 0;
+  const periodoLabel = periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
 
   const trabajosResumen = useMemo(() => {
     return trabajosScope.map((trabajo) => {
@@ -475,6 +501,7 @@ export default function Dashboard() {
           participantes.add(id);
         }
       }
+      const tecnicoIds = Array.from(participantes);
       const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
@@ -491,17 +518,22 @@ export default function Dashboard() {
         pendientes: pendientes.length,
         totalJornadas: trabajoJornadas.length,
         participantes: participantes.size,
+        tecnicoIds,
         horas,
         ultimaFecha,
         pendientesVencidas,
         pendientesSemana,
         tipo: servicio?.marca ?? "",
       };
+    }).filter((row) => {
+      if (fEstadoTrabajo !== "all" && row.estado !== fEstadoTrabajo) return false;
+      if (fTecnico !== "all" && !row.tecnicoIds.includes(fTecnico)) return false;
+      return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
+  }, [activeTechnicianIds, clienteById, fEstadoTrabajo, fTecnico, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
@@ -510,31 +542,70 @@ export default function Dashboard() {
   );
   const tecnicosTotales = activeTechnicianIds.size;
 
-  const alertas = [
-    fueraTolerancia.length > 0
-      ? { tone: "bad" as Tone, title: `${fueraTolerancia.length} jornadas +7d sin cierre`, detail: "Afecta estados y productividad.", to: "/?overdue=7" }
-      : null,
-    trabajosPausados.length > 0
-      ? { tone: "warn" as Tone, title: `${trabajosPausados.length} trabajos pausados`, detail: "Revisar repuestos, cliente o aprobacion.", to: "/trabajos?estado=pausado" }
-      : null,
-    sinHorasPrev > 0
-      ? { tone: "warn" as Tone, title: `${sinHorasPrev} jornadas realizadas sin horas`, detail: "Reporte semanal incompleto.", to: "/?estado=Completado&sin_horas=1" }
-      : null,
-    selectedTrend != null && selectedTrend < -20
-      ? { tone: "bad" as Tone, title: `Facturacion cae ${Math.abs(selectedTrend)}%`, detail: `${money(selectedWeek.total)} en la semana seleccionada.`, to: "/parque-clientes" }
-      : null,
-  ].filter(Boolean) as Array<{ tone: Tone; title: string; detail: string; to: string }>;
+  const trabajosPorEstado = useMemo(() => {
+    const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
+      "pendiente",
+      "programado",
+      "iniciado",
+      "pausado",
+      "completado",
+    ];
+    return estados.map((estado) => ({
+      estado,
+      label: estadoLabel(estado),
+      count: trabajosResumen.filter((row) => row.estado === estado).length,
+    }));
+  }, [trabajosResumen]);
+
+  const trabajosPorSucursal = useMemo(
+    () =>
+      SUCURSALES.map((sucursal) => ({
+        sucursal,
+        activos: trabajosResumen.filter((row) => row.sucursal === sucursal && row.estado !== "completado").length,
+        cerrados: trabajosResumen.filter((row) => row.sucursal === sucursal && row.estado === "completado").length,
+      })).sort((a, b) => b.activos + b.cerrados - (a.activos + a.cerrados)),
+    [trabajosResumen],
+  );
+
+  const productividadTecnica = useMemo(() => {
+    const map = new Map<string, { id: string; nombre: string; jornadas: number; horas: number; trabajos: Set<string> }>();
+    for (const trabajo of trabajosResumen) {
+      const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
+      for (const jornada of trabajoJornadas) {
+        if (!inRange(jornada.fecha, previousWeekStart, weekEnd)) continue;
+        for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+          const current = map.get(id) ?? { id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", jornadas: 0, horas: 0, trabajos: new Set<string>() };
+          current.jornadas += 1;
+          current.horas += Number(jornada.horas_trabajadas || 0);
+          current.trabajos.add(trabajo.id);
+          map.set(id, current);
+        }
+      }
+    }
+    return Array.from(map.values())
+      .map((row) => ({ ...row, trabajos: row.trabajos.size }))
+      .sort((a, b) => b.jornadas - a.jornadas || b.horas - a.horas)
+      .slice(0, 6);
+  }, [activeTechnicianIds, jornadasByTrabajo, previousWeekStart, profileById, trabajosResumen, weekEnd]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
     setSelectedWeekKey(initialWeekStart);
     setFSucursal("all");
+    setFRubro("all");
+    setFEstadoTrabajo("all");
+    setFTecnico("all");
+    setPeriodMode("semana");
     setQ("");
   };
 
   const filtrosActivos =
     (weekStartInput !== initialWeekStart ? 1 : 0) +
     (fSucursal !== "all" ? 1 : 0) +
+    (fRubro !== "all" ? 1 : 0) +
+    (fEstadoTrabajo !== "all" ? 1 : 0) +
+    (fTecnico !== "all" ? 1 : 0) +
+    (periodMode !== "semana" ? 1 : 0) +
     (q.trim() ? 1 : 0);
 
   return (
@@ -555,8 +626,9 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        meta={`${factFiltered.length} lineas facturacion cargadas en el rango`}
+        meta={`${factFiltered.length} lineas facturacion - ${trabajosResumen.length} trabajos`}
       >
+        <PeriodSelector value={periodMode} onChange={setPeriodMode} />
         <FilterDate label="Semana base" value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
         <FilterSelect
           label="Sucursal"
@@ -565,6 +637,20 @@ export default function Dashboard() {
           placeholder="Sucursal"
           width="w-[150px]"
           options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map((s) => ({ value: s, label: s }))]}
+        />
+        <FilterSelect
+          label="Rubro"
+          value={fRubro}
+          onChange={setFRubro}
+          placeholder="Rubro"
+          width="w-[150px]"
+          options={[
+            { value: "all", label: "Todos" },
+            { value: "Servicio", label: "Servicios" },
+            { value: "Repuestos", label: "Repuestos" },
+            { value: "Kilometraje", label: "Kilometraje" },
+            { value: "Otros", label: "Otros" },
+          ]}
         />
       </FiltersBar>
 
@@ -627,7 +713,7 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold">Resumen gerencial</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Facturacion semanal <strong className="text-foreground">{money(currentWeekRow?.total ?? 0)}</strong>, con{" "}
+                  Facturacion {periodoLabel} <strong className="text-foreground">{money(currentWeekRow?.total ?? 0)}</strong>, con{" "}
                   <strong className="text-foreground">{clientesAtendidosSemana}</strong> clientes atendidos y{" "}
                   <strong className="text-foreground">{sucursalesConMovimiento}</strong> sucursales con movimiento. En operacion hay{" "}
                   <strong className="text-foreground">{trabajosActivos.length}</strong> trabajos activos,{" "}
@@ -640,7 +726,7 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
             <Card className="p-3">
-              <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle="Comparativo semanal con seleccion directa." />
+              <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
             </Card>
 
@@ -664,25 +750,15 @@ export default function Dashboard() {
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr_0.9fr]">
             <Card className="p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="Mayores importes de la semana seleccionada." />
-              <div className="space-y-1.5">
-                {topClientes.length === 0 ? (
-                  <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>
-                ) : (
-                  topClientes.slice(0, 5).map((row, index) => (
-                    <button key={row.nombre} onClick={() => { setQ(row.nombre); setSection("facturacion"); }} className="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left hover:bg-accent">
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-semibold">{index + 1}. {row.nombre}</span>
-                        <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
-                      </span>
-                      <span className="text-xs font-semibold tabular-nums">{money(row.total)}</span>
-                    </button>
-                  ))
-                )}
-              </div>
+              <ClientesRanking rows={topClientes} totalValue={currentWeekRow?.total ?? 0} onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }} />
             </Card>
 
             <Card className="p-3">
-              <PanelTitle icon={ClipboardList} title="Trabajos operativos" subtitle="Semana anterior cerrada y semana actual a ejecutar." />
+              <PanelTitle
+                icon={ClipboardList}
+                title="Trabajos operativos"
+                subtitle={`Cierre ${format(previousWeekStart, "dd/MM")}-${format(previousWeekEnd, "dd/MM")} / Plan ${format(weekStart, "dd/MM")}-${format(weekEnd, "dd/MM")}`}
+              />
               <div className="grid grid-cols-2 gap-2">
                 <Kpi label="Realizadas ant." value={jornadasRealizadasPrev.length} loading={loading} />
                 <Kpi label="Horas ant." value={`${horasPrev.toFixed(1)} hs`} loading={loading} />
@@ -701,13 +777,16 @@ export default function Dashboard() {
                 <DrillButton label="Ver facturacion por semana" onClick={() => setSection("facturacion")} />
                 <DrillButton label="Ver clientes atendidos" onClick={() => setSection("facturacion")} />
                 <DrillButton label="Ver trabajos por OS/TR" onClick={() => setSection("trabajos")} />
-                <DrillButton label="Ver alertas operativas" onClick={() => setSection("trabajos")} />
+                <DrillButton label="Ver productividad tecnica" onClick={() => setSection("trabajos")} />
               </div>
             </Card>
           </section>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
-            <AlertasCard alertas={alertas} navigate={navigate} />
+            <Card className="p-3">
+              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="Distribucion operativa actual por OS/TR." />
+              <EstadoBars rows={trabajosPorEstado} totalValue={trabajosResumen.length} onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }} />
+            </Card>
             <Card className="p-3">
               <PanelTitle icon={CalendarDays} title="Carga semanal por tecnico" subtitle="Solo tecnicos activos, sin pasantes." />
               <div className="rounded-md border">
@@ -883,11 +962,63 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="trabajos" className="space-y-3">
+          <FiltersBar
+            activeCount={(fEstadoTrabajo !== "all" ? 1 : 0) + (fTecnico !== "all" ? 1 : 0)}
+            onClear={() => {
+              setFEstadoTrabajo("all");
+              setFTecnico("all");
+            }}
+            meta={`${trabajosResumen.length} trabajos segun filtros operativos`}
+          >
+            <FilterSelect
+              label="Estado"
+              value={fEstadoTrabajo}
+              onChange={setFEstadoTrabajo}
+              placeholder="Estado"
+              width="w-[150px]"
+              options={[
+                { value: "all", label: "Todos" },
+                { value: "pendiente", label: "Pendiente" },
+                { value: "programado", label: "Programado" },
+                { value: "iniciado", label: "Iniciado" },
+                { value: "pausado", label: "Pausado" },
+                { value: "completado", label: "Completado" },
+              ]}
+            />
+            <FilterSelect
+              label="Tecnico o cuadrilla"
+              value={fTecnico}
+              onChange={setFTecnico}
+              placeholder="Tecnico"
+              width="w-[220px]"
+              options={[{ value: "all", label: "Todos" }, ...technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))]}
+            />
+          </FiltersBar>
+
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <SummaryCard icon={ClipboardList} title="Trabajos activos" value={trabajosActivos.length} detail="No completados" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
+            <SummaryCard icon={CheckCircle2} title="Cerrados del periodo" value={trabajosConCierre} detail="Estado completado" tone="good" onClick={() => setFEstadoTrabajo("completado")} />
+            <SummaryCard icon={PauseCircleIcon} title="Pausados" value={trabajosPausados.length} detail="Pendientes de gestion" tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
+            <SummaryCard icon={CalendarDays} title="Jornadas realizadas" value={jornadasRealizadasPrev.length} detail={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
+            <SummaryCard icon={Users} title="Tecnicos con actividad" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} detail="Solo activos, sin pasantes" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
+          </section>
+
+          <section className="grid gap-3 xl:grid-cols-[1.25fr_0.95fr]">
+            <Card className="p-3">
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="Cantidad y participacion sobre trabajos filtrados." />
+              <EstadoBars rows={trabajosPorEstado} totalValue={trabajosResumen.length} onSelect={setFEstadoTrabajo} />
+            </Card>
+            <Card className="p-3">
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Activos y cerrados segun filtros." />
+              <TrabajoSucursalBars rows={trabajosPorSucursal} onSelect={(sucursal) => setFSucursal(sucursal)} />
+            </Card>
+          </section>
+
           <Card className="p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Trabajos por OS/TR</h2>
-              <p className="text-xs text-muted-foreground">Jornadas, tecnicos activos, horas, ultima fecha y cierre en una sola lectura.</p>
+                <h2 className="text-base font-semibold">Seguimiento por OS/TR</h2>
+                <p className="text-xs text-muted-foreground">Jornadas, tecnicos activos, horas, ultima fecha y cierre en una sola lectura.</p>
               </div>
               <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
             </div>
@@ -944,39 +1075,20 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <section className="grid gap-3 xl:grid-cols-[1fr_1fr_0.9fr]">
-        <Card className="p-3">
-          <PanelTitle icon={CheckCircle2} title="Realizado semana anterior" subtitle={`${format(previousWeekStart, "dd/MM")} al ${format(previousWeekEnd, "dd/MM")}`} />
-          <div className="grid grid-cols-2 gap-2">
-            <Kpi label="Jornadas" value={jornadasRealizadasPrev.length} loading={loading} />
-            <Kpi label="Horas" value={`${horasPrev.toFixed(1)} hs`} loading={loading} />
-          </div>
-          <div className="mt-2">
-            <Kpi label="Sin horas cargadas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
-          </div>
-        </Card>
-
-        <Card className="p-3">
-          <PanelTitle icon={CalendarDays} title="Programado esta semana" subtitle={`${format(weekStart, "dd/MM")} al ${format(weekEnd, "dd/MM")}`} />
-          <div className="grid grid-cols-2 gap-2">
-            <Kpi label="Jornadas" value={jornadasProgramadas.length} loading={loading} />
-            <Kpi label="Pausados" value={trabajosPausados.length} loading={loading} tone={trabajosPausados.length ? "warn" : "good"} />
-          </div>
-          <div className="mt-3 rounded-md border">
-            {cargaTecnicos.length === 0 ? (
-              <div className="px-3 py-5 text-center text-xs text-muted-foreground">Sin carga por tecnico.</div>
-            ) : (
-              cargaTecnicos.map((row) => (
-                <div key={row.id} className="flex items-center justify-between border-b px-3 py-2 text-xs last:border-b-0">
-                  <span className="truncate font-medium">{row.nombre}</span>
-                  <Badge variant="secondary">{row.count}</Badge>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-            <AlertasCard alertas={alertas} navigate={navigate} />
+          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
+            <Card className="p-3">
+              <PanelTitle icon={Users} title="Productividad tecnica" subtitle="Jornadas entre cierre anterior y semana base." />
+              <TecnicoProductividad rows={productividadTecnica} />
+            </Card>
+            <Card className="p-3">
+              <PanelTitle icon={CalendarDays} title="Lectura semanal" subtitle="Fechas usadas por la operacion." />
+              <div className="grid grid-cols-2 gap-2">
+                <Kpi label="Cierre anterior" value={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} loading={loading} />
+                <Kpi label="Plan semana" value={`${format(weekStart, "dd/MM")} - ${format(weekEnd, "dd/MM")}`} loading={loading} />
+                <Kpi label="Sin horas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
+                <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
+              </div>
+            </Card>
           </section>
         </TabsContent>
       </Tabs>
@@ -1055,15 +1167,26 @@ function ConceptLine({ label, value, total }: { label: string; value: number; to
   );
 }
 
-function ConceptMini({ label, value, total }: { label: string; value: number; total: number }) {
-  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio"; onChange: (value: "semana" | "mes" | "anio") => void }) {
   return (
-    <div className="rounded-md border px-3 py-2">
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="truncate font-medium">{label}</span>
-        <span className="tabular-nums text-muted-foreground">{percent}%</span>
+    <div className="flex min-w-0 flex-col gap-1 max-sm:!w-full sm:w-[180px]">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Periodo</span>
+      <div className="grid h-9 grid-cols-3 overflow-hidden rounded-md border bg-background text-xs">
+        {[
+          { value: "semana", label: "Semana" },
+          { value: "mes", label: "Mes" },
+          { value: "anio", label: "Ano" },
+        ].map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value as "semana" | "mes" | "anio")}
+            className={cn("border-r px-2 last:border-r-0 hover:bg-accent", value === option.value && "bg-primary text-primary-foreground hover:bg-primary")}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
-      <div className="mt-1 text-sm font-semibold tabular-nums">{money(value)}</div>
     </div>
   );
 }
@@ -1137,44 +1260,146 @@ function SucursalBars({
   );
 }
 
+function ClientesRanking({
+  rows,
+  totalValue,
+  onSelect,
+}: {
+  rows: Array<{ nombre: string; total: number; facturas: number }>;
+  totalValue: number;
+  onSelect: (nombre: string) => void;
+}) {
+  const max = Math.max(1, ...rows.map((row) => row.total));
+
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {rows.slice(0, 6).map((row, index) => {
+        const width = Math.max(4, Math.round((row.total / max) * 100));
+        const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
+        return (
+          <button key={row.nombre} onClick={() => onSelect(row.nombre)} className="w-full rounded-md border px-3 py-2 text-left hover:bg-accent">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="min-w-0 font-semibold">
+                <span className="mr-2 text-muted-foreground">{index + 1}</span>
+                <span className="truncate">{row.nombre}</span>
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums">{money(row.total)}</span>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <div className="h-2 min-w-0 flex-1 rounded-full bg-muted">
+                <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
+              </div>
+              <span className="w-10 text-right text-[10px] tabular-nums text-muted-foreground">{participation}%</span>
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function EstadoBars({
+  rows,
+  totalValue,
+  onSelect,
+}: {
+  rows: Array<{ estado: string; label: string; count: number }>;
+  totalValue: number;
+  onSelect: (estado: string) => void;
+}) {
+  const max = Math.max(1, ...rows.map((row) => row.count));
+
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => {
+        const width = Math.max(row.count > 0 ? 4 : 0, Math.round((row.count / max) * 100));
+        const participation = totalValue > 0 ? Math.round((row.count / totalValue) * 100) : 0;
+        return (
+          <button key={row.estado} onClick={() => onSelect(row.estado)} className="grid w-full grid-cols-[96px_1fr_72px_52px] items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent">
+            <span className="font-medium">{row.label}</span>
+            <span className="h-2 rounded-full bg-muted">
+              <span className={cn("block h-full rounded-full", row.estado === "pausado" ? "bg-amber-500" : "bg-primary")} style={{ width: `${width}%` }} />
+            </span>
+            <span className="text-right tabular-nums">{row.count}</span>
+            <span className="text-right tabular-nums text-muted-foreground">{participation}%</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TrabajoSucursalBars({
+  rows,
+  onSelect,
+}: {
+  rows: Array<{ sucursal: Sucursal; activos: number; cerrados: number }>;
+  onSelect: (sucursal: Sucursal) => void;
+}) {
+  const max = Math.max(1, ...rows.map((row) => row.activos + row.cerrados));
+  const visibleRows = rows.filter((row) => row.activos + row.cerrados > 0);
+
+  if (visibleRows.length === 0) {
+    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {visibleRows.map((row) => {
+        const totalRow = row.activos + row.cerrados;
+        const width = Math.max(4, Math.round((totalRow / max) * 100));
+        return (
+          <button key={row.sucursal} onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
+            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+              <span className="font-medium">{row.sucursal}</span>
+              <span className="tabular-nums text-muted-foreground">{row.activos} activos - {row.cerrados} cerrados</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }> }) {
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin actividad tecnica en el periodo seleccionado.</div>;
+  }
+
+  return (
+    <div className="rounded-md border">
+      <div className="grid grid-cols-[1fr_74px_74px_74px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+        <div>Tecnico</div>
+        <div className="text-right">Jorn.</div>
+        <div className="text-right">Horas</div>
+        <div className="text-right">Trab.</div>
+      </div>
+      {rows.map((row) => (
+        <div key={row.id} className="grid grid-cols-[1fr_74px_74px_74px] items-center border-t px-3 py-2 text-xs">
+          <div className="truncate font-medium">{row.nombre}</div>
+          <div className="text-right tabular-nums">{row.jornadas}</div>
+          <div className="text-right tabular-nums">{row.horas.toFixed(1)}</div>
+          <div className="text-right tabular-nums">{row.trabajos}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DrillButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs font-medium hover:bg-accent">
       <span>{label}</span>
       <ChevronRight className="h-4 w-4 text-muted-foreground" />
     </button>
-  );
-}
-
-function AlertasCard({
-  alertas,
-  navigate,
-}: {
-  alertas: Array<{ tone: Tone; title: string; detail: string; to: string }>;
-  navigate: (to: string) => void;
-}) {
-  return (
-    <Card className="p-3">
-      <PanelTitle icon={AlertTriangle} title="Alertas ejecutivas" subtitle="Solo desvios accionables" />
-      <div className="space-y-2">
-        {alertas.length === 0 ? (
-          <div className="rounded-md border bg-emerald-500/5 px-3 py-6 text-center text-xs text-emerald-700">Sin alertas criticas.</div>
-        ) : (
-          alertas.map((alerta) => (
-            <button key={alerta.title} onClick={() => navigate(alerta.to)} className="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left hover:bg-accent">
-              <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", toneClasses[alerta.tone])}>
-                {alerta.tone === "bad" ? <AlertTriangle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-semibold">{alerta.title}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">{alerta.detail}</span>
-              </span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))
-        )}
-      </div>
-    </Card>
   );
 }
 
