@@ -227,7 +227,7 @@ export default function Dashboard() {
           .gte("fecha", dateKey(queryStart))
           .lte("fecha", dateKey(queryEnd))
           .order("fecha", { ascending: false });
-        if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales);
+        if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales as Sucursal[]);
 
         const [serviciosRows, jornadasRows, trabajosRows, clientesRows, profilesRows, roleRows, factRows] = await Promise.all([
           cargarTodo<Servicio>(
