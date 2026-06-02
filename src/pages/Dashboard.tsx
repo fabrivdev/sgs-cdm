@@ -767,7 +767,7 @@ export default function Dashboard() {
             <div className="grid gap-3">
               <Card className="p-3">
                 <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
-                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("facturacion"); }} />
+                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
               </Card>
               <Card className="p-3">
                 <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
@@ -782,7 +782,7 @@ export default function Dashboard() {
               <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto
                 flujo={flujo}
-                onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }}
+                onSelect={(estado) => { setFEstadosTrabajo([estado]); setSection("trabajos"); }}
                 planificados={jornadasProgramadas.length}
                 tecnicosActivos={tecnicosConActividad.size}
                 jornadasPrev={jornadasRealizadasPrev.length}
@@ -809,7 +809,7 @@ export default function Dashboard() {
             </Card>
             <Card className="p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
-              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("trabajos"); }} />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("trabajos"); }} />
             </Card>
           </section>
 
@@ -958,7 +958,7 @@ export default function Dashboard() {
             <div className="rounded-md border">
               <div className="border-b px-3 py-2 text-xs font-semibold">Por sucursal</div>
               {factBySucursal.map((row) => (
-                <button key={row.sucursal} onClick={() => setFSucursal(row.sucursal)} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-accent">
+                <button key={row.sucursal} onClick={() => setFSucursales([row.sucursal])} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-accent">
                   <span>
                     <span className="block font-semibold">{row.sucursal}</span>
                     <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
@@ -982,8 +982,8 @@ export default function Dashboard() {
             meta={
               <div className="flex flex-wrap items-center gap-1.5">
                 <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
-                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadoTrabajo("completado")} />
-                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
+                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
+                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
                 <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadosTrabajo([])} />
                 <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
                 <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
@@ -1022,7 +1022,7 @@ export default function Dashboard() {
             </Card>
             <Card className="p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
-              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursal(sucursal)} />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursales([sucursal])} />
             </Card>
           </section>
 
