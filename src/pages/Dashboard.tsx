@@ -645,7 +645,7 @@ export default function Dashboard() {
     setFRubros([]);
     setFEstadosTrabajo([]);
     setFTecnicos([]);
-    setPeriodMode("semana");
+    setPeriodMode("mes");
     setQ("");
   };
 
