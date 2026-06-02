@@ -1022,17 +1022,17 @@ export default function Dashboard() {
             <SummaryCard icon={CheckCircle2} title="Cerrados del periodo" value={trabajosConCierre} detail="Estado completado" tone="good" onClick={() => setFEstadoTrabajo("completado")} />
             <SummaryCard icon={PauseCircleIcon} title="Pausados" value={trabajosPausados.length} detail="Pendientes de gestion" tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
             <SummaryCard icon={CalendarDays} title="Jornadas realizadas" value={jornadasRealizadasPrev.length} detail={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-            <SummaryCard icon={Users} title="Tecnicos con actividad" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} detail="Solo activos, sin pasantes" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
+            <SummaryCard icon={Users} title="Tecnicos con actividad" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} detail="" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1.25fr_0.95fr]">
+          <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="Cantidad y participacion sobre trabajos filtrados." />
-              <EstadoBars rows={trabajosPorEstado} totalValue={trabajosResumen.length} onSelect={setFEstadoTrabajo} />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
+              <EstadoCompacto flujo={flujo} onSelect={setFEstadoTrabajo} />
             </Card>
             <Card className="p-3">
-              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Activos y cerrados segun filtros." />
-              <TrabajoSucursalBars rows={trabajosPorSucursal} onSelect={(sucursal) => setFSucursal(sucursal)} />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursal(sucursal)} />
             </Card>
           </section>
 
@@ -1040,13 +1040,12 @@ export default function Dashboard() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">Seguimiento por OS/TR</h2>
-                <p className="text-xs text-muted-foreground">Jornadas, tecnicos activos, horas, ultima fecha y cierre en una sola lectura.</p>
               </div>
               <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
             </div>
             <div className="overflow-x-auto rounded-md border">
-              <div className="min-w-[980px]">
-                <div className="grid grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+              <div className="min-w-[980px] max-h-[420px] overflow-y-auto">
+                <div className="sticky top-0 grid grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                   <div>OS/TR</div>
                   <div>Cliente / trabajo</div>
                   <div>Sucursal</div>
@@ -1099,19 +1098,25 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="p-3">
-              <PanelTitle icon={Users} title="Productividad tecnica" subtitle="Jornadas entre cierre anterior y semana base." />
-              <TecnicoProductividad rows={productividadTecnica} />
+              <PanelTitle icon={Users} title="Productividad tecnica" subtitle="" />
+              <CargaTecnicaTabla rows={productividadTecnica} />
             </Card>
             <Card className="p-3">
-              <PanelTitle icon={CalendarDays} title="Lectura semanal" subtitle="Fechas usadas por la operacion." />
+              <PanelTitle icon={CalendarDays} title={T.lectura} subtitle="" />
               <div className="grid grid-cols-2 gap-2">
                 <Kpi label="Cierre anterior" value={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} loading={loading} />
-                <Kpi label="Plan semana" value={`${format(weekStart, "dd/MM")} - ${format(weekEnd, "dd/MM")}`} loading={loading} />
+                <Kpi label={T.plan} value={`${format(weekStart, "dd/MM")} - ${format(weekEnd, "dd/MM")}`} loading={loading} />
                 <Kpi label="Sin horas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
                 <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
               </div>
+              <div className="mt-3 grid gap-2">
+                <DrillButton label="Ver trabajos abiertos" onClick={() => setFEstadoTrabajo("iniciado")} />
+                <DrillButton label="Ver trabajos pausados" onClick={() => setFEstadoTrabajo("pausado")} />
+                <DrillButton label="Ver planificacion" onClick={() => navigate("/planificador")} />
+              </div>
             </Card>
           </section>
+
         </TabsContent>
       </Tabs>
     </div>
