@@ -757,24 +757,24 @@ export default function Dashboard() {
 
         <TabsContent value="resumen" className="space-y-3">
 
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-[1.2fr_1fr]">
-            <Card className="flex h-full flex-col p-3">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
+            <Card className="flex h-full flex-col p-3 xl:col-span-2">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
+              <div className="mt-2 border-t pt-2">
+                <MixRubros
+                  row={currentWeekRow}
+                  rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"}
+                  onSelect={(rubro) => { setFRubros([rubro]); setSection("facturacion"); }}
+                />
+              </div>
               <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
             </Card>
 
-            <div className="grid auto-rows-fr gap-3">
-              <Card className="flex h-full flex-col p-3">
-                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
-                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
-              </Card>
-              <Card className="flex h-full flex-col p-3">
-                <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
-                <MixRubros row={currentWeekRow} rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"} />
-              </Card>
-
-            </div>
+            <Card className="flex h-full flex-col p-3">
+              <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
+              <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
+            </Card>
           </section>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
