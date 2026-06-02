@@ -817,7 +817,7 @@ export default function Dashboard() {
 
         <TabsContent value="facturacion" className="space-y-3">
           <section className="grid auto-rows-fr gap-3 lg:grid-cols-[1.5fr_0.9fr]">
-        <Card className="flex h-full flex-col p-3">
+        <Card className="flex h-full min-w-0 flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Facturacion por semana</h2>
@@ -832,7 +832,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="max-h-[420px] flex-1 overflow-y-auto overflow-x-auto rounded-md border">
+          <div className="max-h-[416px] flex-1 overflow-y-auto overflow-x-auto rounded-md border">
             <div className="min-w-[860px]">
               <div className="grid grid-cols-[112px_108px_108px_108px_108px_92px_72px_72px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                 <div>Semana</div>
@@ -874,7 +874,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card className="flex h-full flex-col p-3">
+        <Card className="flex h-full min-w-0 flex-col p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">{periodMode === "semana" ? "Semana seleccionada" : "Periodo seleccionado"}</h2>
             <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"}</p>
