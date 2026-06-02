@@ -261,7 +261,7 @@ export default function Dashboard() {
           cargarTodo<Trabajo>(
             supabase
               .from("trabajos")
-              .select("id, codigo, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema, motivo_bloqueo"),
+              .select("id, codigo, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema, motivo_bloqueo, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
           cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
