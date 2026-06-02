@@ -1101,11 +1101,8 @@ export default function Dashboard() {
                 <Kpi label="Sin horas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
                 <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
               </div>
-              <div className="mt-3 grid gap-2">
-                <DrillButton label="Ver trabajos abiertos" onClick={() => setFEstadoTrabajo("iniciado")} />
-                <DrillButton label="Ver trabajos pausados" onClick={() => setFEstadoTrabajo("pausado")} />
-                <DrillButton label="Ver planificacion" onClick={() => navigate("/planificador")} />
-              </div>
+            </Card>
+
             </Card>
           </section>
 
