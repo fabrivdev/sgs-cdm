@@ -907,7 +907,8 @@ export default function Dashboard() {
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Cerrados, abiertos y pausados dentro del período." />
+
               <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("trabajos"); }} />
             </Card>
           </section>
