@@ -1016,7 +1016,7 @@ export default function Dashboard() {
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
-              <EstadoCompacto flujo={flujo} onSelect={setFEstadoTrabajo} />
+              <EstadoCompacto flujo={flujo} onSelect={(estado) => setFEstadosTrabajo([estado])} />
             </Card>
             <Card className="p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
