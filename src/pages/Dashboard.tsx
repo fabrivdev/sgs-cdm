@@ -770,7 +770,8 @@ export default function Dashboard() {
     }
 
     const buckets = Array.from(bucketsSet).sort();
-    const rows = Array.from(map.values())
+    const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
+    const rowsAll = Array.from(map.values())
       .map((row) => ({
         id: row.id,
         nombre: row.nombre,
@@ -780,6 +781,7 @@ export default function Dashboard() {
         trabajos: row.trabajos.size,
       }))
       .sort((a, b) => b.totalJornadas - a.totalJornadas || b.totalHoras - a.totalHoras);
+    const rows = tecnicoFilterSet ? rowsAll.filter((r) => tecnicoFilterSet.has(r.id)) : rowsAll;
 
     const totalesPorBucket: Record<string, { jornadas: number; horas: number }> = {};
     for (const k of buckets) totalesPorBucket[k] = { jornadas: 0, horas: 0 };
@@ -794,7 +796,7 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadas, trabajos, trabajosScope, activeTechnicianIds, periodMode, periodStart, periodEnd, profileById]);
+  }, [jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
