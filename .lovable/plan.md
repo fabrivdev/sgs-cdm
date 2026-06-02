@@ -1,30 +1,38 @@
-## Cambios a `src/pages/Dashboard.tsx`
+## Ajustes al Dashboard ejecutivo (`src/pages/Dashboard.tsx`)
 
-### 1. Quitar "Drill de análisis"
-- Eliminar la `Card` "Drill de análisis" en Vista general (líneas 806-814) con sus 4 `DrillButton`.
-- En la pestaña Trabajos (líneas 1113-1117), quitar el bloque de 3 `DrillButton` ("Ver trabajos abiertos", "Ver trabajos pausados", "Ver planificación") dentro del Card de Lectura operativa. Esas acciones ya están disponibles desde los chips de estado y el menú de navegación.
-- Reajustar grid de la sección superior de Vista general: el Card "Flujo operativo" pasa a ocupar todo el ancho (`xl:grid-cols-1` o quitar el wrapper de 2 columnas).
-- Si `DrillButton` queda sin usos, eliminar también su definición (línea 1425).
+Cambios visuales y de layout únicamente, sin tocar lógica de datos.
 
-### 2. Rediseñar "Estado de trabajos"
-Reemplazar `EstadoCompacto` por una presentación tipo **barra apilada con leyenda**, más clara y menos "cuadriculada":
+### 1. Pestaña Trabajos — quitar segunda fila de KPIs
+La pestaña Trabajos repite arriba 5 `SummaryCard` (líneas 1012-1018: Trabajos activos, Cerrados, Pausados, Jornadas realizadas, Técnicos con actividad) que ya están en la fila superior global de Vista general.
 
-```text
-Estado de trabajos                          Total: 95
-█████████████░░░░░░░░░░░░░░░░░░░░░░░  (barra horizontal con 3 segmentos)
- Culminados 76 (80%)   Abiertos 17 (18%)   Pausados 2 (2%)
+- Eliminar por completo esa `<section>` de 5 SummaryCards.
+- Reubicar la información clave (Activos / Cerrados / Pausados / Jornadas / Técnicos) como **chips compactos** en la zona `meta` del `FiltersBar` de Trabajos (líneas 977-1010), junto a "X trabajos según filtros operativos". Cada chip clickeable aplica el filtro de estado correspondiente. Esto mantiene el contexto cerca de los filtros sin una banda extra de cards.
 
-Pipeline: Pendiente 5 · Programado 8 · Iniciado 4
-```
+### 2. Unificar "Flujo operativo" y "Estado de trabajos"
+Son casi lo mismo. Se deja únicamente **Estado de trabajos** (que ya muestra total + barra apilada + pipeline).
 
-Detalles:
-- Card con título "Estado de trabajos" y a la derecha "Total {n}".
-- Una barra horizontal de `h-3 rounded-full overflow-hidden bg-muted` con tres segmentos coloreados con tokens semánticos: `bg-primary` (culminados), `bg-accent` o `bg-blue-500/70` (abiertos), `bg-amber-500/70` (pausados). Sin colores hardcoded fuera de los tokens; preferir clases del design system existentes.
-- Debajo, una leyenda en fila con punto de color + label + valor + %. Cada item es `button` clickeable que llama `onSelect(estado)` (igual contrato actual).
-- Línea inferior pequeña (texto `text-[11px] text-muted-foreground`) tipo "Pipeline:" con los sub-estados Pendiente/Programado/Iniciado como botones inline.
-- Estado vacío: si `total === 0`, mostrar mensaje "Sin trabajos en el periodo seleccionado".
-- Mantener `props` y firma de `EstadoCompacto` para no tocar los 2 call-sites (líneas 820 y 1032).
+- En Vista general, quitar la `<section>` de líneas 778-805 (la card "Flujo operativo de trabajos" con `FlujoOperativo` + botón "Ver detalle de trabajos").
+- Mover la card "Estado de trabajos" (líneas 808-812) a ese hueco, y reusar el grid de 2 columnas con "Carga técnica" al lado (lo que antes era 808-817 colapsa en una sola `<section>` de 2 columnas: Estado | Carga técnica).
+- Añadir, debajo del bloque de leyenda dentro de `EstadoCompacto`, una línea compacta con los datos útiles que aportaba `FlujoOperativo` y no estaban en Estado: `Planificados {n} · Técnicos activos {n} · Cierre anterior {jornadas} jornadas / {horas} hs`. Se pasa esa info como props opcionales a `EstadoCompacto` (no se rompe el call-site de la pestaña Trabajos: allí esas props quedan undefined y la línea no se renderiza).
+- Eliminar la función `FlujoOperativo` (líneas 1477-1510) por quedar sin uso.
 
-### 3. Sin cambios fuera de esto
-- No tocar lógica de datos, memos ni filtros.
-- Mantener identidad visual: cards blancas, oliva, tokens existentes.
+### 3. Clientes atendidos y Carga técnica — permitir ampliar
+Ahora `ClientesCompacto` muestra solo top 8 (`rows.slice(0, 8)`) y `CargaTecnicaTabla` no tiene límite explícito pero ambos quedan limitados visualmente.
+
+- `ClientesCompacto`: agregar estado local `expanded`. Mostrar top 5 por defecto; botón al pie "Ver todos ({rows.length})" / "Ver menos" que cambia el slice a `rows.length`. Mantener `max-h-[260px] overflow-y-auto` cuando está colapsado; al expandir subir a `max-h-[440px]`.
+- Pre-requisito de datos: en `topClientes` (línea 415) cambiar `.slice(0, 6)` a `.slice(0, 30)` para que haya algo que ampliar. (Ajuste mínimo de cantidad, no de lógica.)
+- `CargaTecnicaTabla`: mismo patrón. Default top 6 con `max-h-[260px]`, botón "Ver todos ({rows.length})" que expande a `max-h-[440px]` mostrando todos.
+
+### 4. Facturación por sucursal — mostrar sucursales en 0
+- En `SucursalBars` (líneas 1241-1276) quitar el filtro `rows.filter((row) => row.total > 0)`. Renderizar todas las sucursales aunque tengan 0; las que tengan 0 muestran barra vacía y `$0 - 0%` en gris suave (`text-muted-foreground/70`). Esto mantiene altura constante de la card.
+
+### 5. Espacio vacío bajo "Evolución de facturación"
+La `<section>` de líneas 759-776 usa grid `xl:grid-cols-[1.45fr_0.95fr]`: izquierda Evolución de facturación (alta), derecha dos cards apiladas (Sucursal + Mix). Cuando "Mix" es corto queda hueco bajo Evolución.
+
+- Rebalancear: pasar el grid a `xl:grid-cols-[1.2fr_1fr]` para que Evolución sea más angosta y se acerque en altura a la columna derecha.
+- Añadir bajo `WeeklyBars` en la card "Evolución de facturación" una mini fila de KPIs (3 columnas, `text-xs`): Total del periodo, Promedio por semana, Variación vs periodo previo. Se calculan con los datos ya disponibles en `weeklyRows`/`currentWeekRow` (sin nuevos memos).
+
+### Sin cambios
+- Identidad visual (oliva, cards blancas, tokens existentes).
+- Filtros, memos, lógica de datos.
+- Pestaña Facturación.
