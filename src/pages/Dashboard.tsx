@@ -618,28 +618,46 @@ export default function Dashboard() {
     }));
   }, [trabajosResumen]);
 
-  // Carga por sucursal: filtra trabajos con actividad dentro del período seleccionado.
+  // Carga por sucursal: clasifica trabajos según lo que ocurrió DENTRO del período.
+  // - cerrados: trabajos hoy completados cuya fecha de cierre cae en el período
+  // - pausados: trabajos hoy pausados con actividad (jornada/actualizacion) en el período
+  // - abiertos: trabajos con actividad en el período que no son cerrados-en-período ni pausados
   const cargaSucursal = useMemo(() => {
-    const enPeriodo = (r: typeof trabajosBase[number]) => {
+    const tieneActividad = (r: typeof trabajosBase[number]) => {
       if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
       if (r.actualizadoEn && inRange(r.actualizadoEn, periodStart, periodEnd)) return true;
       if (r.jornadaFechas.some((f) => inRange(f, periodStart, periodEnd))) return true;
       return false;
     };
-    const enRango = trabajosBase.filter(enPeriodo);
-    const totalGral = enRango.length;
-    return SUCURSALES.map((sucursal) => {
-      const rows = enRango.filter((r) => r.sucursal === sucursal);
-      const cerrados = rows.filter((r) => r.estado === "completado").length;
-      const pausados = rows.filter((r) => r.estado === "pausado").length;
-      const total = rows.length;
-      const abiertos = total - cerrados - pausados;
+    const cerradoEnPeriodo = (r: typeof trabajosBase[number]) =>
+      r.estado === "completado" && !!r.fechaCierre && inRange(r.fechaCierre, periodStart, periodEnd);
+
+    type Row = { sucursal: Sucursal; cerrados: number; abiertos: number; pausados: number; total: number; pct: number };
+    const totalGral = trabajosBase.reduce((acc, r) => {
+      const c = cerradoEnPeriodo(r);
+      const enP = tieneActividad(r);
+      return acc + (c || enP ? 1 : 0);
+    }, 0);
+
+    return SUCURSALES.map<Row>((sucursal) => {
+      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      let cerrados = 0, pausados = 0, abiertos = 0;
+      for (const r of rows) {
+        const cerrEnP = cerradoEnPeriodo(r);
+        const actEnP = tieneActividad(r);
+        if (cerrEnP) { cerrados++; continue; }
+        if (!actEnP) continue;
+        if (r.estado === "pausado") pausados++;
+        else abiertos++;
+      }
+      const total = cerrados + pausados + abiertos;
       const pct = totalGral > 0 ? Math.round((total / totalGral) * 100) : 0;
       return { sucursal, cerrados, abiertos, pausados, total, pct };
     })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
   }, [trabajosBase, periodStart, periodEnd]);
+
 
 
   const productividadMatriz = useMemo(() => {
