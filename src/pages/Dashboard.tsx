@@ -948,8 +948,8 @@ export default function Dashboard() {
         <Card className="p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">Clientes y sucursales</h2>
-            <p className="text-xs text-muted-foreground">Ranking de la semana seleccionada.</p>
           </div>
+
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
             <div className="rounded-md border">
               <div className="border-b px-3 py-2 text-xs font-semibold">Top clientes</div>
