@@ -661,23 +661,22 @@ export default function Dashboard() {
         meta={`${factFiltered.length} lineas facturacion - ${trabajosResumen.length} trabajos`}
       >
         <PeriodSelector value={periodMode} onChange={setPeriodMode} />
-        <FilterDate label="Semana base" value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
-        <FilterSelect
+        <FilterDate label={periodMode === "anio" ? "Año base" : periodMode === "mes" ? "Mes base" : "Semana base"} value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
+        <FilterMultiSelect
           label="Sucursal"
-          value={fSucursal}
-          onChange={setFSucursal}
-          placeholder="Sucursal"
-          width="w-[150px]"
-          options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map((s) => ({ value: s, label: s }))]}
+          values={fSucursales}
+          onChange={setFSucursales}
+          placeholder="Todas"
+          width="w-[170px]"
+          options={SUCURSALES.map((s) => ({ value: s, label: s }))}
         />
-        <FilterSelect
+        <FilterMultiSelect
           label="Rubro"
-          value={fRubro}
-          onChange={setFRubro}
-          placeholder="Rubro"
-          width="w-[150px]"
+          values={fRubros}
+          onChange={setFRubros}
+          placeholder="Todos"
+          width="w-[170px]"
           options={[
-            { value: "all", label: "Todos" },
             { value: "Servicio", label: "Servicios" },
             { value: "Repuestos", label: "Repuestos" },
             { value: "Kilometraje", label: "Kilometraje" },
