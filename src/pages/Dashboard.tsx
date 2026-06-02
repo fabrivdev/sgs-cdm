@@ -930,63 +930,6 @@ export default function Dashboard() {
               )}
             </div>
           </Card>
-
-          <section className="grid gap-3 xl:grid-cols-2">
-            <Card className="flex flex-col p-3">
-              <div className="mb-3">
-                <h2 className="text-base font-semibold">Top clientes</h2>
-              </div>
-              {topClientes.length === 0 ? (
-                <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos.</div>
-              ) : (
-                <div className="grid max-h-[280px] gap-1.5 overflow-y-auto pr-1 md:grid-cols-2">
-                  {topClientes.map((row) => (
-                    <button
-                      key={row.nombre}
-                      onClick={() => setQ(row.nombre)}
-                      className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-xs hover:bg-accent"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold" title={row.nombre}>{compact(row.nombre)}</span>
-                        <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
-                      </span>
-                      <span className="shrink-0 font-semibold tabular-nums">{money(row.total)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card className="flex flex-col p-3">
-              <div className="mb-3">
-                <h2 className="text-base font-semibold">Facturacion por sucursal</h2>
-              </div>
-              <div className="space-y-2">
-                {(() => {
-                  const maxTotal = Math.max(1, ...factBySucursal.map((r) => r.total));
-                  return factBySucursal.map((row) => {
-                    const pct = Math.round((row.total / maxTotal) * 100);
-                    return (
-                      <button
-                        key={row.sucursal}
-                        onClick={() => setFSucursales([row.sucursal])}
-                        className="flex w-full flex-col gap-1 rounded-md border px-3 py-2 text-left text-xs hover:bg-accent"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-semibold">{row.sucursal}</span>
-                          <span className="font-semibold tabular-nums">{money(row.total)}</span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</div>
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            </Card>
-          </section>
         </TabsContent>
 
         <TabsContent value="trabajos" className="space-y-3">
