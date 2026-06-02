@@ -559,6 +559,20 @@ export default function Dashboard() {
   );
   const tecnicosTotales = activeTechnicianIds.size;
 
+  // Estadísticas de "flujo operativo" basadas en trabajosBase (no se ven afectadas
+  // por los filtros de estado/técnico de la pestaña Trabajos).
+  const flujo = useMemo(() => {
+    const total = trabajosBase.length;
+    const culminados = trabajosBase.filter((r) => r.estado === "completado").length;
+    const pausados = trabajosBase.filter((r) => r.estado === "pausado").length;
+    const pendiente = trabajosBase.filter((r) => r.estado === "pendiente").length;
+    const programado = trabajosBase.filter((r) => r.estado === "programado").length;
+    const iniciado = trabajosBase.filter((r) => r.estado === "iniciado").length;
+    const abiertos = total - culminados - pausados;
+    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+    return { total, culminados, abiertos, pausados, pendiente, programado, iniciado, pct };
+  }, [trabajosBase]);
+
   const trabajosPorEstado = useMemo(() => {
     const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
       "pendiente",
@@ -574,15 +588,22 @@ export default function Dashboard() {
     }));
   }, [trabajosResumen]);
 
-  const trabajosPorSucursal = useMemo(
-    () =>
-      SUCURSALES.map((sucursal) => ({
-        sucursal,
-        activos: trabajosResumen.filter((row) => row.sucursal === sucursal && row.estado !== "completado").length,
-        cerrados: trabajosResumen.filter((row) => row.sucursal === sucursal && row.estado === "completado").length,
-      })).sort((a, b) => b.activos + b.cerrados - (a.activos + a.cerrados)),
-    [trabajosResumen],
-  );
+  // Carga por sucursal: tabla con cerrados/abiertos/pausados/total/% usando trabajosBase.
+  const cargaSucursal = useMemo(() => {
+    const totalGral = trabajosBase.length;
+    return SUCURSALES.map((sucursal) => {
+      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      const cerrados = rows.filter((r) => r.estado === "completado").length;
+      const pausados = rows.filter((r) => r.estado === "pausado").length;
+      const total = rows.length;
+      const abiertos = total - cerrados - pausados;
+      const pct = totalGral > 0 ? Math.round((total / totalGral) * 100) : 0;
+      return { sucursal, cerrados, abiertos, pausados, total, pct };
+    })
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [trabajosBase]);
+
 
   const productividadTecnica = useMemo(() => {
     const map = new Map<string, { id: string; nombre: string; jornadas: number; horas: number; trabajos: Set<string> }>();
