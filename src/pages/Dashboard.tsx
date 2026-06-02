@@ -331,7 +331,7 @@ export default function Dashboard() {
   };
 
   const scopedTrabajo = (trabajo: Trabajo) => {
-    if (fSucursal !== "all" && trabajo.sucursal !== fSucursal) return false;
+    if (fSucursales.length > 0 && !fSucursales.includes(trabajo.sucursal)) return false;
     if (!query) return true;
     const cliente = trabajo.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre ?? "" : "";
     return (
