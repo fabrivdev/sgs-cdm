@@ -285,7 +285,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd]);
+  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
