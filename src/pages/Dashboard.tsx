@@ -888,9 +888,10 @@ export default function Dashboard() {
 
         <Card className="p-3">
           <div className="mb-3">
-            <h2 className="text-base font-semibold">Semana seleccionada</h2>
-            <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"} - detalle financiero.</p>
+            <h2 className="text-base font-semibold">{periodMode === "semana" ? "Semana seleccionada" : "Periodo seleccionado"}</h2>
+            <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"}</p>
           </div>
+
           <div className="grid grid-cols-2 gap-2">
             <Kpi label="Total" value={money(selectedWeek?.total ?? 0)} loading={loading} tone={selectedTrend != null && selectedTrend < -20 ? "bad" : "neutral"} />
             <Kpi label="Variacion" value={selectedTrend == null ? "-" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}%`} loading={loading} />
