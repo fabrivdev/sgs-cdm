@@ -653,14 +653,14 @@ export default function Dashboard() {
       r.estado === "completado" && !!r.fechaCierre && inRange(r.fechaCierre, periodStart, periodEnd);
 
     type Row = { sucursal: Sucursal; cerrados: number; abiertos: number; pausados: number; total: number; pct: number };
-    const totalGral = trabajosBase.reduce((acc, r) => {
+    const totalGral = trabajosResumen.reduce((acc, r) => {
       const c = cerradoEnPeriodo(r);
       const enP = tieneActividad(r);
       return acc + (c || enP ? 1 : 0);
     }, 0);
 
     return SUCURSALES.map<Row>((sucursal) => {
-      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      const rows = trabajosResumen.filter((r) => r.sucursal === sucursal);
       let cerrados = 0, pausados = 0, abiertos = 0;
       for (const r of rows) {
         const cerrEnP = cerradoEnPeriodo(r);
@@ -676,7 +676,38 @@ export default function Dashboard() {
     })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [trabajosBase, periodStart, periodEnd]);
+  }, [trabajosResumen, periodStart, periodEnd]);
+
+  // Distribución por marca en el período (reemplaza "Lectura operativa")
+  const cargaMarca = useMemo(() => {
+    const tieneActividad = (r: typeof trabajosBase[number]) => {
+      if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
+      if (r.actualizadoEn && inRange(r.actualizadoEn, periodStart, periodEnd)) return true;
+      if (r.jornadaFechas.some((f) => inRange(f, periodStart, periodEnd))) return true;
+      return false;
+    };
+    const cerradoEnPeriodo = (r: typeof trabajosBase[number]) =>
+      r.estado === "completado" && !!r.fechaCierre && inRange(r.fechaCierre, periodStart, periodEnd);
+
+    const totalGral = trabajosResumen.reduce((acc, r) => acc + (cerradoEnPeriodo(r) || tieneActividad(r) ? 1 : 0), 0);
+
+    return MARCAS.map((marca) => {
+      const rows = trabajosResumen.filter((r) => r.marca === marca);
+      let cerrados = 0, pausados = 0, abiertos = 0, horas = 0;
+      for (const r of rows) {
+        const cerrEnP = cerradoEnPeriodo(r);
+        const actEnP = tieneActividad(r);
+        if (!cerrEnP && !actEnP) continue;
+        horas += r.horas;
+        if (cerrEnP) { cerrados++; continue; }
+        if (r.estado === "pausado") pausados++;
+        else abiertos++;
+      }
+      const total = cerrados + pausados + abiertos;
+      const pct = totalGral > 0 ? Math.round((total / totalGral) * 100) : 0;
+      return { marca, cerrados, abiertos, pausados, total, horas, pct };
+    }).sort((a, b) => b.total - a.total);
+  }, [trabajosResumen, periodStart, periodEnd]);
 
 
 
