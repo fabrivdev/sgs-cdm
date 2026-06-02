@@ -696,7 +696,7 @@ export default function Dashboard() {
         />
       </FiltersBar>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
           title="Facturacion del periodo"
@@ -767,7 +767,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <section className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-[1.2fr_1fr]">
             <Card className="p-3">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
@@ -787,7 +787,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-2">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="p-3">
               <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto
@@ -806,7 +806,7 @@ export default function Dashboard() {
             </Card>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-2">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
