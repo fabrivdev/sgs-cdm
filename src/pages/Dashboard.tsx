@@ -619,7 +619,7 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-3">
-          <Card className="p-3">
+          <Card className="border-primary/20 bg-primary/5 p-3">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <BarChart3 className="h-5 w-5" />
@@ -627,94 +627,102 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold">Resumen gerencial</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  En la semana seleccionada se facturo <strong className="text-foreground">{money(currentWeekRow?.total ?? 0)}</strong>,
-                  con <strong className="text-foreground">{clientesAtendidosSemana}</strong> clientes atendidos y movimiento en{" "}
-                  <strong className="text-foreground">{sucursalesConMovimiento}</strong> sucursales. La operacion muestra{" "}
+                  Facturacion semanal <strong className="text-foreground">{money(currentWeekRow?.total ?? 0)}</strong>, con{" "}
+                  <strong className="text-foreground">{clientesAtendidosSemana}</strong> clientes atendidos y{" "}
+                  <strong className="text-foreground">{sucursalesConMovimiento}</strong> sucursales con movimiento. En operacion hay{" "}
                   <strong className="text-foreground">{trabajosActivos.length}</strong> trabajos activos,{" "}
                   <strong className="text-foreground">{trabajosPausados.length}</strong> pausados y{" "}
-                  <strong className="text-foreground">{jornadasProgramadas.length}</strong> jornadas programadas para la semana base.
+                  <strong className="text-foreground">{jornadasProgramadas.length}</strong> jornadas planificadas para la semana.
                 </p>
               </div>
             </div>
           </Card>
 
-          <section className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
+          <section className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
             <Card className="p-3">
-              <PanelTitle icon={DollarSign} title="Lectura rapida financiera" subtitle="Ultimas semanas y composicion de la semana actual." />
-              <div className="grid gap-2 sm:grid-cols-3">
-                {weeklyRows.slice(-3).map((row) => (
-                  <button
-                    key={row.key}
-                    onClick={() => {
-                      setSelectedWeekKey(row.key);
-                      setSection("facturacion");
-                    }}
-                    className={cn("rounded-md border p-3 text-left hover:bg-accent", row.key === currentWeekRow?.key && "border-primary/40 bg-primary/5")}
-                  >
-                    <div className="text-[11px] font-medium text-muted-foreground">{row.label}</div>
-                    <div className="mt-1 text-xl font-bold tabular-nums">{money(row.total)}</div>
-                    <div className={cn("mt-1 text-[11px]", row.variacion != null && row.variacion < 0 && "text-destructive")}>
-                      {row.variacion == null ? "sin base" : `${row.variacion > 0 ? "+" : ""}${row.variacion}% vs ant.`}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                <ConceptMini label="Repuestos" value={currentWeekRow?.repuestos ?? 0} total={currentWeekRow?.total ?? 0} />
-                <ConceptMini label="Servicio" value={currentWeekRow?.servicio ?? 0} total={currentWeekRow?.total ?? 0} />
-                <ConceptMini label="Km" value={currentWeekRow?.kilometraje ?? 0} total={currentWeekRow?.total ?? 0} />
-                <ConceptMini label="Otros" value={currentWeekRow?.otros ?? 0} total={currentWeekRow?.total ?? 0} />
-              </div>
+              <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle="Comparativo semanal con seleccion directa." />
+              <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
             </Card>
 
-            <Card className="p-3">
-              <PanelTitle icon={ClipboardList} title="Trabajos en general" subtitle="Situacion operativa sin separar pasado/futuro." />
-              <div className="grid grid-cols-2 gap-2">
-                <Kpi label="Activos" value={trabajosActivos.length} loading={loading} />
-                <Kpi label="Cerrados" value={trabajosConCierre} loading={loading} />
-                <Kpi label="Pausados" value={trabajosPausados.length} loading={loading} tone={trabajosPausados.length ? "warn" : "good"} />
-                <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
-              </div>
-              <button onClick={() => setSection("trabajos")} className="mt-3 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover:bg-accent">
-                <span>Ver detalle por OS/TR, horas, tecnicos y cierre</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </Card>
+            <div className="grid gap-3">
+              <Card className="p-3">
+                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion de la semana base." />
+                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("facturacion"); }} />
+              </Card>
+              <Card className="p-3">
+                <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="Composicion por rubro facturado." />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <ConceptLine label="Repuestos" value={currentWeekRow?.repuestos ?? 0} total={currentWeekRow?.total ?? 0} />
+                  <ConceptLine label="Servicio" value={currentWeekRow?.servicio ?? 0} total={currentWeekRow?.total ?? 0} />
+                  <ConceptLine label="Kilometraje" value={currentWeekRow?.kilometraje ?? 0} total={currentWeekRow?.total ?? 0} />
+                  <ConceptLine label="Otros" value={currentWeekRow?.otros ?? 0} total={currentWeekRow?.total ?? 0} />
+                </div>
+              </Card>
+            </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1fr_1fr_0.9fr]">
+          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr_0.9fr]">
             <Card className="p-3">
-              <PanelTitle icon={CheckCircle2} title="Realizado semana anterior" subtitle={`${format(previousWeekStart, "dd/MM")} al ${format(previousWeekEnd, "dd/MM")}`} />
-              <div className="grid grid-cols-2 gap-2">
-                <Kpi label="Jornadas" value={jornadasRealizadasPrev.length} loading={loading} />
-                <Kpi label="Horas" value={`${horasPrev.toFixed(1)} hs`} loading={loading} />
-              </div>
-              <div className="mt-2">
-                <Kpi label="Sin horas cargadas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
-              </div>
-            </Card>
-
-            <Card className="p-3">
-              <PanelTitle icon={CalendarDays} title="Programado esta semana" subtitle={`${format(weekStart, "dd/MM")} al ${format(weekEnd, "dd/MM")}`} />
-              <div className="grid grid-cols-2 gap-2">
-                <Kpi label="Jornadas" value={jornadasProgramadas.length} loading={loading} />
-                <Kpi label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} loading={loading} />
-              </div>
-              <div className="mt-3 rounded-md border">
-                {cargaTecnicos.length === 0 ? (
-                  <div className="px-3 py-5 text-center text-xs text-muted-foreground">Sin carga por tecnico.</div>
+              <PanelTitle icon={Users} title="Clientes atendidos" subtitle="Mayores importes de la semana seleccionada." />
+              <div className="space-y-1.5">
+                {topClientes.length === 0 ? (
+                  <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>
                 ) : (
-                  cargaTecnicos.map((row) => (
-                    <div key={row.id} className="flex items-center justify-between border-b px-3 py-2 text-xs last:border-b-0">
-                      <span className="truncate font-medium">{row.nombre}</span>
-                      <Badge variant="secondary">{row.count}</Badge>
-                    </div>
+                  topClientes.slice(0, 5).map((row, index) => (
+                    <button key={row.nombre} onClick={() => { setQ(row.nombre); setSection("facturacion"); }} className="flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left hover:bg-accent">
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold">{index + 1}. {row.nombre}</span>
+                        <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
+                      </span>
+                      <span className="text-xs font-semibold tabular-nums">{money(row.total)}</span>
+                    </button>
                   ))
                 )}
               </div>
             </Card>
 
+            <Card className="p-3">
+              <PanelTitle icon={ClipboardList} title="Trabajos operativos" subtitle="Semana anterior cerrada y semana actual a ejecutar." />
+              <div className="grid grid-cols-2 gap-2">
+                <Kpi label="Realizadas ant." value={jornadasRealizadasPrev.length} loading={loading} />
+                <Kpi label="Horas ant." value={`${horasPrev.toFixed(1)} hs`} loading={loading} />
+                <Kpi label="Planificadas" value={jornadasProgramadas.length} loading={loading} />
+                <Kpi label="Tecnicos activos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} loading={loading} />
+              </div>
+              <button onClick={() => setSection("trabajos")} className="mt-3 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover:bg-accent">
+                <span>Ver OS/TR, cierre, horas y tecnicos</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </Card>
+
+            <Card className="p-3">
+              <PanelTitle icon={ChevronRight} title="Drill de analisis" subtitle="Entradas rapidas al detalle." />
+              <div className="space-y-2">
+                <DrillButton label="Ver facturacion por semana" onClick={() => setSection("facturacion")} />
+                <DrillButton label="Ver clientes atendidos" onClick={() => setSection("facturacion")} />
+                <DrillButton label="Ver trabajos por OS/TR" onClick={() => setSection("trabajos")} />
+                <DrillButton label="Ver alertas operativas" onClick={() => setSection("trabajos")} />
+              </div>
+            </Card>
+          </section>
+
+          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <AlertasCard alertas={alertas} navigate={navigate} />
+            <Card className="p-3">
+              <PanelTitle icon={CalendarDays} title="Carga semanal por tecnico" subtitle="Solo tecnicos activos, sin pasantes." />
+              <div className="rounded-md border">
+                {cargaTecnicos.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">Sin carga por tecnico.</div>
+                ) : (
+                  cargaTecnicos.map((row) => (
+                    <button key={row.id} onClick={() => setSection("trabajos")} className="flex w-full items-center justify-between border-b px-3 py-2 text-xs last:border-b-0 hover:bg-accent">
+                      <span className="truncate font-medium">{row.nombre}</span>
+                      <Badge variant="secondary">{row.count}</Badge>
+                    </button>
+                  ))
+                )}
+              </div>
+            </Card>
           </section>
         </TabsContent>
 
@@ -1057,6 +1065,84 @@ function ConceptMini({ label, value, total }: { label: string; value: number; to
       </div>
       <div className="mt-1 text-sm font-semibold tabular-nums">{money(value)}</div>
     </div>
+  );
+}
+
+function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?: string; onSelect: (key: string) => void }) {
+  const max = Math.max(1, ...rows.map((row) => row.total));
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
+        {rows.map((row) => {
+          const height = Math.max(8, Math.round((row.total / max) * 180));
+          const active = row.key === activeKey;
+          return (
+            <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{row.total ? money(row.total).replace("USD", "").trim() : "0"}</span>
+              <span
+                className={cn(
+                  "w-full max-w-[42px] rounded-t-md bg-primary/80 transition-all hover:bg-primary",
+                  active && "bg-primary ring-2 ring-primary/20",
+                )}
+                style={{ height }}
+              />
+              <span className="min-h-8 text-[10px] leading-4 text-muted-foreground">{row.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+        <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
+        Facturacion semanal (USD)
+      </div>
+    </div>
+  );
+}
+
+function SucursalBars({
+  rows,
+  totalValue,
+  onSelect,
+}: {
+  rows: Array<{ sucursal: Sucursal; total: number; facturas: number }>;
+  totalValue: number;
+  onSelect: (sucursal: Sucursal) => void;
+}) {
+  const visibleRows = rows.filter((row) => row.total > 0);
+  const max = Math.max(1, ...visibleRows.map((row) => row.total));
+
+  if (visibleRows.length === 0) {
+    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin movimiento por sucursal.</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {visibleRows.map((row) => {
+        const width = Math.max(4, Math.round((row.total / max) * 100));
+        const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
+        return (
+          <button key={row.sucursal} onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
+            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+              <span className="font-medium">{row.sucursal}</span>
+              <span className="tabular-nums text-muted-foreground">{money(row.total)} - {participation}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DrillButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs font-medium hover:bg-accent">
+      <span>{label}</span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </button>
   );
 }
 
