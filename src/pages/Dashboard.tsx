@@ -640,11 +640,11 @@ export default function Dashboard() {
 
   const filtrosActivos =
     (weekStartInput !== initialWeekStart ? 1 : 0) +
-    (fSucursal !== "all" ? 1 : 0) +
-    (fRubro !== "all" ? 1 : 0) +
-    (fEstadoTrabajo !== "all" ? 1 : 0) +
-    (fTecnico !== "all" ? 1 : 0) +
-    (periodMode !== "semana" ? 1 : 0) +
+    (fSucursales.length > 0 ? 1 : 0) +
+    (fRubros.length > 0 ? 1 : 0) +
+    (fEstadosTrabajo.length > 0 ? 1 : 0) +
+    (fTecnicos.length > 0 ? 1 : 0) +
+    (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
 
   return (
