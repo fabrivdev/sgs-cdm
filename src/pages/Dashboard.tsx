@@ -203,9 +203,14 @@ export default function Dashboard() {
   const previousMonthEnd = useMemo(() => endOfMonth(subMonths(weekStart, 1)), [weekStart]);
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
   const queryStart = useMemo(() => {
-    const min = Math.min(firstComparisonWeek.getTime(), previousMonthStart.getTime(), subMonths(monthStart, 11).getTime());
+    const min = Math.min(
+      firstComparisonWeek.getTime(),
+      previousMonthStart.getTime(),
+      subMonths(monthStart, 11).getTime(),
+      subYears(startOfYear(weekStart), 4).getTime(),
+    );
     return new Date(min);
-  }, [firstComparisonWeek, monthStart, previousMonthStart]);
+  }, [firstComparisonWeek, monthStart, previousMonthStart, weekStart]);
   const queryEnd = useMemo(() => {
     const max = Math.max(weekEnd.getTime(), monthEnd.getTime());
     return new Date(max);
