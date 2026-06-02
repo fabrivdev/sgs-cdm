@@ -347,15 +347,21 @@ export default function Dashboard() {
   };
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
-    const periods = periodMode === "semana"
-      ? Array.from({ length: 8 }, (_, index) => {
-          const start = subWeeks(weekStart, 7 - index);
-          return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
-        })
-      : Array.from({ length: periodMode === "mes" ? 8 : 12 }, (_, index) => {
-          const start = startOfMonth(subMonths(monthStart, (periodMode === "mes" ? 7 : 11) - index));
-          return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
-        });
+    const periods =
+      periodMode === "semana"
+        ? Array.from({ length: 8 }, (_, index) => {
+            const start = subWeeks(weekStart, 7 - index);
+            return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
+          })
+        : periodMode === "mes"
+          ? Array.from({ length: 12 }, (_, index) => {
+              const start = startOfMonth(subMonths(monthStart, 11 - index));
+              return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
+            })
+          : Array.from({ length: 5 }, (_, index) => {
+              const start = startOfYear(subYears(weekStart, 4 - index));
+              return { start, end: endOfYear(start), label: format(start, "yyyy") };
+            });
 
     const rows = periods.map(({ start, end, label }) => {
       const weekFacts = factFiltered.filter((row) => inRange(row.fecha, start, end));
