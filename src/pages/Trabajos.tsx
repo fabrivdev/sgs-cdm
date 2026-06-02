@@ -15,6 +15,7 @@ import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/Filte
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getISOWeek, parseISO, format } from "date-fns";
 import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
@@ -36,6 +37,7 @@ async function cargarTodo<T>(qb: any): Promise<T[]> {
 const MAX_VISIBLES = 5;
 
 export default function Trabajos() {
+  const { isAdmin, isTecnico, profile } = useAuth();
   const [trabajos, setTrabajos] = useState<any[]>([]);
   const [agendasByTrabajo, setAgendasByTrabajo] = useState<Map<string, any[]>>(new Map());
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -43,7 +45,9 @@ export default function Trabajos() {
   const [loading, setLoading] = useState(true);
 
   const [q, setQ] = useState("");
-  const [fSucursal, setFSucursal] = useState<string>("all"); // admin ve todo por defecto
+  const [fSucursal, setFSucursal] = useState<string>(
+    isTecnico && !isAdmin && profile?.sucursal ? profile.sucursal : "all",
+  );
   const [fPrio, setFPrio] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fFecha, setFFecha] = useState<string>("");
@@ -53,6 +57,12 @@ export default function Trabajos() {
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [vista, setVista] = useState<"kanban" | "os">("kanban");
+
+  useEffect(() => {
+    if (isTecnico && !isAdmin && profile?.sucursal && fSucursal === "all") {
+      setFSucursal(profile.sucursal);
+    }
+  }, [isTecnico, isAdmin, profile?.sucursal]);
 
   const load = async () => {
     setLoading(true);
