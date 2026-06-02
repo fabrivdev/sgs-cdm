@@ -252,8 +252,8 @@ export default function Dashboard() {
             supabase
               .from("servicio_jornadas")
               .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
-              .gte("fecha", dateKey(subWeeks(previousWeekStart, 8)))
-              .lte("fecha", dateKey(weekEnd))
+              .gte("fecha", dateKey(new Date(Math.min(subWeeks(previousWeekStart, 8).getTime(), periodStart.getTime(), previousPeriodStart.getTime()))))
+              .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime()))))
               .order("fecha", { ascending: true }),
           ),
           cargarTodo<Trabajo>(
@@ -285,7 +285,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd]);
+  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
@@ -630,7 +630,7 @@ export default function Dashboard() {
     for (const trabajo of trabajosResumen) {
       const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
       for (const jornada of trabajoJornadas) {
-        if (!inRange(jornada.fecha, previousWeekStart, weekEnd)) continue;
+        if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
         for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
           const current = map.get(id) ?? { id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", jornadas: 0, horas: 0, trabajos: new Set<string>() };
           current.jornadas += 1;
@@ -644,7 +644,7 @@ export default function Dashboard() {
       .map((row) => ({ ...row, trabajos: row.trabajos.size }))
       .sort((a, b) => b.jornadas - a.jornadas || b.horas - a.horas)
       .slice(0, 20);
-  }, [activeTechnicianIds, jornadasByTrabajo, previousWeekStart, profileById, trabajosResumen, weekEnd]);
+  }, [activeTechnicianIds, jornadasByTrabajo, periodStart, periodEnd, profileById, trabajosResumen]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
