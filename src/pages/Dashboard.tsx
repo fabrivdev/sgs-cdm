@@ -1197,7 +1197,7 @@ function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio";
         {[
           { value: "semana", label: "Semana" },
           { value: "mes", label: "Mes" },
-          { value: "anio", label: "Ano" },
+          { value: "anio", label: "Año" },
         ].map((option) => (
           <button
             key={option.value}
