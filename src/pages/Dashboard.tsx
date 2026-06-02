@@ -679,32 +679,42 @@ export default function Dashboard() {
     const bucketsSet = new Set<string>();
     const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
 
-    for (const trabajo of trabajosResumen) {
-      const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
-      for (const jornada of trabajoJornadas) {
-        if (jornada.estado !== "Completado") continue;
-        if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
-        const key = bucketKey(jornada.fecha);
-        bucketsSet.add(key);
-        const horasJ = Number(jornada.horas_trabajadas || 0);
-        for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
-          const current = map.get(id) ?? {
-            id,
-            nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
-            porBucket: {},
-            totalJornadas: 0,
-            totalHoras: 0,
-            trabajos: new Set<string>(),
-          };
-          const cell = current.porBucket[key] ?? { jornadas: 0, horas: 0 };
-          cell.jornadas += 1;
-          cell.horas += horasJ;
-          current.porBucket[key] = cell;
-          current.totalJornadas += 1;
-          current.totalHoras += horasJ;
-          current.trabajos.add(trabajo.id);
-          map.set(id, current);
-        }
+    // Scope por sucursal/búsqueda (no por filtros de estado/técnico de la pestaña Trabajos).
+    const trabajoIdsEnScope = new Set(trabajosScope.map((t) => t.id));
+    // Mapa inverso: servicio_id -> trabajo_id (mismo criterio que jornadasByTrabajo)
+    const servicioATrabajo = new Map<string, string>();
+    for (const trabajo of trabajos) {
+      if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
+    }
+
+    for (const jornada of jornadas) {
+      // Cancelada no cuenta; Pendiente y Completado sí (jornadas asignadas)
+      if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado") continue;
+      if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
+      const trabajoId = servicioATrabajo.get(jornada.servicio_id);
+      if (!trabajoId || !trabajoIdsEnScope.has(trabajoId)) continue;
+
+      const key = bucketKey(jornada.fecha);
+      bucketsSet.add(key);
+      // Solo Completado aporta horas reales
+      const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
+      for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+        const current = map.get(id) ?? {
+          id,
+          nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
+          porBucket: {},
+          totalJornadas: 0,
+          totalHoras: 0,
+          trabajos: new Set<string>(),
+        };
+        const cell = current.porBucket[key] ?? { jornadas: 0, horas: 0 };
+        cell.jornadas += 1;
+        cell.horas += horasJ;
+        current.porBucket[key] = cell;
+        current.totalJornadas += 1;
+        current.totalHoras += horasJ;
+        current.trabajos.add(trabajoId);
+        map.set(id, current);
       }
     }
 
