@@ -743,7 +743,7 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadasByTrabajo, periodMode, periodStart, periodEnd, profileById, trabajosResumen]);
+  }, [jornadas, trabajos, trabajosScope, activeTechnicianIds, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
