@@ -1,18 +1,17 @@
-Reducir el ancho del card derecho “Periodo seleccionado” y ajustar la tabla izquierda para que entren todas las columnas y filas sin scroll.
+Causa raíz: la tabla `profiles` actual no tiene columna `auth_user_id`. La UI lo detecta y envía `{ user_id }` al edge function `admin-delete-user`, pero esa función solo acepta `{ profile_id }` y por eso responde "Falta profile_id".
+
+En este esquema el `profiles.id` es igual al `auth.users.id` (lo crea el trigger `handle_new_user`), por lo tanto se puede borrar el usuario de auth usando directamente ese id.
 
 Cambios:
 
-1. Cambiar el grid superior a columnas con ancho fijo a la derecha: `lg:grid-cols-[minmax(0,1fr)_300px]` (izquierda flexible toma todo el espacio restante, derecha fija ~300px).
+1. Actualizar `supabase/functions/admin-delete-user/index.ts`:
+   - Aceptar tanto `profile_id` como `user_id` en el body (uno u otro).
+   - Si `profile_id` viene presente, mantener el flujo actual (esquema con `auth_user_id`).
+   - Si solo viene `user_id`, tratar ese id como el id de `auth.users` y como el id del profile (esquema actual):
+     - Validar que no sea el mismo usuario autenticado.
+     - Eliminar el usuario con `admin.auth.admin.deleteUser(user_id)`.
+     - Eliminar la fila en `profiles` con `eq("id", user_id)` por si no hay cascade.
+     - Eliminar roles en `user_roles` con `eq("user_id", user_id)`.
+   - Mantener mensajes de error claros y CORS.
 
-2. En la tabla de “Facturación por semana”:
-   - Quitar `min-w-[860px]` y `overflow-x-auto` del wrapper para que no fuerce scroll horizontal.
-   - Compactar las definiciones de columnas usando `minmax` y unidades menores: aprox. `grid-cols-[96px_repeat(5,minmax(0,1fr))_56px_64px_64px]` o similar, manteniendo alineación a la derecha en numéricos.
-   - Quitar el `max-h` para que se muestren las 12 filas sin scroll vertical (típicamente hay ~12 semanas en el periodo).
-
-3. En el card derecho “Periodo seleccionado”:
-   - Mantener el grid de 2x2 KPIs y las ConceptLines.
-   - Reducir tamaño de tipografía solo si fuera necesario para caber en 300px sin desbordes; preferir mantener estilos actuales.
-
-4. Verificar que la suma `left + gap-3 + right (300px)` ocupe el mismo ancho que el card inferior “Facturas del periodo”, ya que ambos son hijos directos del mismo `TabsContent`. Asegurar `min-w-0` en cards para que la grilla respete las proporciones.
-
-No tocar colores, bordes, paddings ni el resto del diseño.
+2. No tocar la UI ni la base de datos. El cliente ya envía el payload correcto para cada esquema.

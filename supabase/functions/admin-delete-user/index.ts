@@ -35,17 +35,18 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { profile_id } = body ?? {};
-    if (!profile_id) {
-      return new Response(JSON.stringify({ error: "Falta profile_id" }), {
+    const { profile_id, user_id } = body ?? {};
+    const targetId = profile_id || user_id;
+    if (!targetId) {
+      return new Response(JSON.stringify({ error: "Falta profile_id o user_id" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { data: profileData } = await admin
       .from("profiles")
-      .select("id, auth_user_id, nombre")
-      .eq("id", profile_id)
+      .select("*")
+      .eq("id", targetId)
       .maybeSingle();
 
     if (!profileData) {
@@ -54,21 +55,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!profileData.auth_user_id) {
+    // auth_user_id si existe (esquema linked), sino el propio profile.id es el auth user id
+    const authUserId = (profileData as any).auth_user_id ?? profileData.id;
+    const hasLinkedColumn = Object.prototype.hasOwnProperty.call(profileData, "auth_user_id");
+
+    if (hasLinkedColumn && !(profileData as any).auth_user_id) {
       return new Response(JSON.stringify({ error: "Ese técnico no tiene cuenta asociada" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (profileData.auth_user_id === user.id) {
+    if (authUserId === user.id) {
       return new Response(JSON.stringify({ error: "No podés eliminar tu propio acceso" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    await admin.from("profiles").update({ auth_user_id: null }).eq("id", profileData.id);
+    if (hasLinkedColumn) {
+      // esquema linked: desvincular profile y borrar solo el auth user
+      await admin.from("profiles").update({ auth_user_id: null }).eq("id", profileData.id);
+    } else {
+      // esquema actual: profile.id = auth user id. Borrar roles y profile también.
+      await admin.from("user_roles").delete().eq("user_id", authUserId);
+      await admin.from("profiles").delete().eq("id", profileData.id);
+    }
 
-    const { error: delErr } = await admin.auth.admin.deleteUser(profileData.auth_user_id);
+    const { error: delErr } = await admin.auth.admin.deleteUser(authUserId);
     if (delErr && !/not.?found/i.test(delErr.message)) {
       return new Response(JSON.stringify({ error: delErr.message }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
