@@ -623,7 +623,7 @@ export default function Dashboard() {
     return Array.from(map.values())
       .map((row) => ({ ...row, trabajos: row.trabajos.size }))
       .sort((a, b) => b.jornadas - a.jornadas || b.horas - a.horas)
-      .slice(0, 6);
+      .slice(0, 20);
   }, [activeTechnicianIds, jornadasByTrabajo, previousWeekStart, profileById, trabajosResumen, weekEnd]);
 
   const limpiar = () => {
