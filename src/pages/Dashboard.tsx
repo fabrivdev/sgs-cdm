@@ -252,8 +252,8 @@ export default function Dashboard() {
             supabase
               .from("servicio_jornadas")
               .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
-              .gte("fecha", dateKey(subWeeks(previousWeekStart, 8)))
-              .lte("fecha", dateKey(weekEnd))
+              .gte("fecha", dateKey(new Date(Math.min(subWeeks(previousWeekStart, 8).getTime(), periodStart.getTime(), previousPeriodStart.getTime()))))
+              .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime()))))
               .order("fecha", { ascending: true }),
           ),
           cargarTodo<Trabajo>(
