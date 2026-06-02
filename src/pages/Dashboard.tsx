@@ -1083,7 +1083,7 @@ export default function Dashboard() {
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Productividad tecnica" subtitle="" />
-              <CargaTecnicaTabla rows={productividadTecnica} />
+              <CargaTecnicaMatriz data={productividadMatriz} />
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={T.lectura} subtitle="" />
