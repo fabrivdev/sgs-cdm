@@ -51,7 +51,6 @@ export default function Trabajos() {
   const [fPrio, setFPrio] = useState<string>("all");
   const [fEstado, setFEstado] = useState<string>("all");
   const [fFecha, setFFecha] = useState<string>("");
-  const [fSemana, setFSemana] = useState<string>("all");
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
 
   const [openNuevo, setOpenNuevo] = useState(false);
