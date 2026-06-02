@@ -1541,6 +1541,22 @@ function EstadoCompacto({
         <span>·</span>
         <button className="hover:text-foreground" onClick={() => onSelect("iniciado")}>Iniciado <span className="tabular-nums font-semibold">{flujo.iniciado}</span></button>
       </div>
+
+      {(planificados != null || tecnicosActivos != null || jornadasPrev != null) && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          {planificados != null && (
+            <span><span className="font-medium text-foreground/80">{planLabel ?? "Planificados"}:</span> <span className="tabular-nums font-semibold">{planificados}</span></span>
+          )}
+          {tecnicosActivos != null && (<>
+            <span>·</span>
+            <span><span className="font-medium text-foreground/80">Tecnicos activos:</span> <span className="tabular-nums font-semibold">{tecnicosActivos}</span></span>
+          </>)}
+          {jornadasPrev != null && (<>
+            <span>·</span>
+            <span><span className="font-medium text-foreground/80">Cierre anterior:</span> <span className="tabular-nums font-semibold">{jornadasPrev}</span> jornadas{horasPrev != null ? ` / ${horasPrev.toFixed(1)} hs` : ""}</span>
+          </>)}
+        </div>
+      )}
     </div>
   );
 }
