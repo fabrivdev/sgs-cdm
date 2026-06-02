@@ -300,12 +300,15 @@ export default function Dashboard() {
         .filter((profile) => {
           const name = profile.nombre.toLowerCase();
           const hasTecnicoRole = roleIds.has(profile.id);
-          const fallbackReferenced = roleIds.size === 0 && referencedTechIds.has(profile.id);
-          return profile.activo !== false && (hasTecnicoRole || fallbackReferenced) && !name.includes("pasante");
+          // Aceptamos también perfiles sin rol pero referenciados como técnicos en jornadas
+          // (técnicos de campo sin cuenta de usuario).
+          const referenced = referencedTechIds.has(profile.id);
+          return profile.activo !== false && (hasTecnicoRole || referenced) && !name.includes("pasante");
         })
         .map((profile) => profile.id),
     );
   }, [jornadas, profiles, userRoles]);
+
 
   const technicianOptions = useMemo(
     () =>
