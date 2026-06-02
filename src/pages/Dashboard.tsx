@@ -145,11 +145,10 @@ function inRange(date: string, start: Date, end: Date) {
 }
 
 function money(value: number) {
-  return new Intl.NumberFormat("es-PY", {
-    style: "currency",
-    currency: "USD",
+  const formatted = new Intl.NumberFormat("es-PY", {
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(value || 0);
+  return `$ ${formatted}`;
 }
 
 function pct(current: number, previous: number) {
