@@ -989,14 +989,13 @@ export default function Dashboard() {
               </div>
             }
           >
-            <FilterSelect
+            <FilterMultiSelect
               label="Estado"
-              value={fEstadoTrabajo}
-              onChange={setFEstadoTrabajo}
-              placeholder="Estado"
-              width="w-[150px]"
+              values={fEstadosTrabajo}
+              onChange={setFEstadosTrabajo}
+              placeholder="Todos"
+              width="w-[170px]"
               options={[
-                { value: "all", label: "Todos" },
                 { value: "pendiente", label: "Pendiente" },
                 { value: "programado", label: "Programado" },
                 { value: "iniciado", label: "Iniciado" },
@@ -1004,13 +1003,13 @@ export default function Dashboard() {
                 { value: "completado", label: "Completado" },
               ]}
             />
-            <FilterSelect
+            <FilterMultiSelect
               label="Tecnico o cuadrilla"
-              value={fTecnico}
-              onChange={setFTecnico}
-              placeholder="Tecnico"
-              width="w-[220px]"
-              options={[{ value: "all", label: "Todos" }, ...technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))]}
+              values={fTecnicos}
+              onChange={setFTecnicos}
+              placeholder="Todos"
+              width="w-[230px]"
+              options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
             />
           </FiltersBar>
 
