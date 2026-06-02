@@ -58,6 +58,12 @@ export default function Trabajos() {
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [vista, setVista] = useState<"kanban" | "os">("kanban");
 
+  useEffect(() => {
+    if (isTecnico && !isAdmin && profile?.sucursal && fSucursal === "all") {
+      setFSucursal(profile.sucursal);
+    }
+  }, [isTecnico, isAdmin, profile?.sucursal]);
+
   const load = async () => {
     setLoading(true);
     try {
