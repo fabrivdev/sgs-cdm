@@ -777,60 +777,54 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr_0.9fr]">
             <Card className="p-3">
-              <PanelTitle icon={Users} title="Clientes atendidos" subtitle="Mayores importes de la semana seleccionada." />
-              <ClientesRanking rows={topClientes} totalValue={currentWeekRow?.total ?? 0} onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }} />
+              <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
+              <ClientesCompacto
+                rows={topClientes}
+                totalValue={currentWeekRow?.total ?? 0}
+                totalFacturas={currentWeekRow?.facturas ?? 0}
+                totalClientes={currentWeekRow?.clientes ?? 0}
+                onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }}
+              />
             </Card>
 
             <Card className="p-3">
-              <PanelTitle
-                icon={ClipboardList}
-                title="Trabajos operativos"
-                subtitle={`Cierre ${format(previousWeekStart, "dd/MM")}-${format(previousWeekEnd, "dd/MM")} / Plan ${format(weekStart, "dd/MM")}-${format(weekEnd, "dd/MM")}`}
+              <PanelTitle icon={ClipboardList} title="Flujo operativo de trabajos" subtitle="" />
+              <FlujoOperativo
+                flujo={flujo}
+                jornadasProgramadas={jornadasProgramadas.length}
+                tecnicosActivos={tecnicosConActividad.size}
+                jornadasPrev={jornadasRealizadasPrev.length}
+                horasPrev={horasPrev}
+                planLabel={T.plan}
               />
-              <div className="grid grid-cols-2 gap-2">
-                <Kpi label="Realizadas ant." value={jornadasRealizadasPrev.length} loading={loading} />
-                <Kpi label="Horas ant." value={`${horasPrev.toFixed(1)} hs`} loading={loading} />
-                <Kpi label="Planificadas" value={jornadasProgramadas.length} loading={loading} />
-                <Kpi label="Tecnicos activos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} loading={loading} />
-              </div>
               <button onClick={() => setSection("trabajos")} className="mt-3 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover:bg-accent">
-                <span>Ver OS/TR, cierre, horas y tecnicos</span>
+                <span>Ver detalle de trabajos</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             </Card>
 
             <Card className="p-3">
-              <PanelTitle icon={ChevronRight} title="Drill de analisis" subtitle="Entradas rapidas al detalle." />
+              <PanelTitle icon={ChevronRight} title="Drill de analisis" subtitle="" />
               <div className="space-y-2">
-                <DrillButton label="Ver facturacion por semana" onClick={() => setSection("facturacion")} />
-                <DrillButton label="Ver clientes atendidos" onClick={() => setSection("facturacion")} />
-                <DrillButton label="Ver trabajos por OS/TR" onClick={() => setSection("trabajos")} />
-                <DrillButton label="Ver productividad tecnica" onClick={() => setSection("trabajos")} />
+                <DrillButton label="Ver facturacion" onClick={() => setSection("facturacion")} />
+                <DrillButton label="Ver clientes" onClick={() => setSection("facturacion")} />
+                <DrillButton label="Ver trabajos" onClick={() => setSection("trabajos")} />
+                <DrillButton label="Ver tecnicos" onClick={() => setSection("trabajos")} />
               </div>
             </Card>
           </section>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="p-3">
-              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="Distribucion operativa actual por OS/TR." />
-              <EstadoBars rows={trabajosPorEstado} totalValue={trabajosResumen.length} onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }} />
+              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
+              <EstadoCompacto flujo={flujo} onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }} />
             </Card>
             <Card className="p-3">
-              <PanelTitle icon={CalendarDays} title="Carga semanal por tecnico" subtitle="Solo tecnicos activos, sin pasantes." />
-              <div className="rounded-md border">
-                {cargaTecnicos.length === 0 ? (
-                  <div className="px-3 py-6 text-center text-xs text-muted-foreground">Sin carga por tecnico.</div>
-                ) : (
-                  cargaTecnicos.map((row) => (
-                    <button key={row.id} onClick={() => setSection("trabajos")} className="flex w-full items-center justify-between border-b px-3 py-2 text-xs last:border-b-0 hover:bg-accent">
-                      <span className="truncate font-medium">{row.nombre}</span>
-                      <Badge variant="secondary">{row.count}</Badge>
-                    </button>
-                  ))
-                )}
-              </div>
+              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
+              <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
             </Card>
           </section>
+
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-3">
