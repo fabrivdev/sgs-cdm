@@ -201,6 +201,14 @@ export default function Dashboard() {
   const monthEnd = useMemo(() => endOfMonth(weekStart), [weekStart]);
   const previousMonthStart = useMemo(() => startOfMonth(subMonths(weekStart, 1)), [weekStart]);
   const previousMonthEnd = useMemo(() => endOfMonth(subMonths(weekStart, 1)), [weekStart]);
+  const yearStart = useMemo(() => startOfYear(weekStart), [weekStart]);
+  const yearEnd = useMemo(() => endOfYear(weekStart), [weekStart]);
+  const previousYearStart = useMemo(() => startOfYear(subYears(weekStart, 1)), [weekStart]);
+  const previousYearEnd = useMemo(() => endOfYear(subYears(weekStart, 1)), [weekStart]);
+  const periodStart = periodMode === "anio" ? yearStart : periodMode === "mes" ? monthStart : weekStart;
+  const periodEnd = periodMode === "anio" ? yearEnd : periodMode === "mes" ? monthEnd : weekEnd;
+  const previousPeriodStart = periodMode === "anio" ? previousYearStart : periodMode === "mes" ? previousMonthStart : previousWeekStart;
+  const previousPeriodEnd = periodMode === "anio" ? previousYearEnd : periodMode === "mes" ? previousMonthEnd : previousWeekEnd;
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
   const queryStart = useMemo(() => {
     const min = Math.min(
@@ -431,18 +439,18 @@ export default function Dashboard() {
     () =>
       jornadas.filter((jornada) => {
         const servicio = servicioById.get(jornada.servicio_id);
-        return jornada.estado === "Completado" && inRange(jornada.fecha, previousWeekStart, previousWeekEnd) && scopedServicio(servicio);
+        return jornada.estado === "Completado" && inRange(jornada.fecha, previousPeriodStart, previousPeriodEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursales, jornadas, previousWeekEnd, previousWeekStart, query, servicioById],
+    [clienteById, fSucursales, jornadas, previousPeriodEnd, previousPeriodStart, query, servicioById],
   );
 
   const jornadasProgramadas = useMemo(
     () =>
       jornadas.filter((jornada) => {
         const servicio = servicioById.get(jornada.servicio_id);
-        return jornada.estado === "Pendiente" && inRange(jornada.fecha, weekStart, weekEnd) && scopedServicio(servicio);
+        return jornada.estado === "Pendiente" && inRange(jornada.fecha, periodStart, periodEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursales, jornadas, query, servicioById, weekEnd, weekStart],
+    [clienteById, fSucursales, jornadas, query, servicioById, periodEnd, periodStart],
   );
 
   const jornadasPendientesCierre = useMemo(
@@ -749,24 +757,24 @@ export default function Dashboard() {
 
         <TabsContent value="resumen" className="space-y-3">
 
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-[1.2fr_1fr]">
-            <Card className="flex h-full flex-col p-3">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
+            <Card className="flex h-full flex-col p-3 xl:col-span-2">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
+              <div className="mt-2 border-t pt-2">
+                <MixRubros
+                  row={currentWeekRow}
+                  rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"}
+                  onSelect={(rubro) => { setFRubros([rubro]); setSection("facturacion"); }}
+                />
+              </div>
               <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
             </Card>
 
-            <div className="grid auto-rows-fr gap-3">
-              <Card className="flex h-full flex-col p-3">
-                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
-                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
-              </Card>
-              <Card className="flex h-full flex-col p-3">
-                <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
-                <MixRubros row={currentWeekRow} rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"} />
-              </Card>
-
-            </div>
+            <Card className="flex h-full flex-col p-3">
+              <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
+              <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
+            </Card>
           </section>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
@@ -1423,7 +1431,15 @@ const toneClasses: Record<Tone, string> = {
 
 /* --------- Nuevos componentes compactos --------- */
 
-function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro: string }) {
+function MixRubros({
+  row,
+  rubroFiltro,
+  onSelect,
+}: {
+  row: WeekRow | undefined;
+  rubroFiltro: string;
+  onSelect?: (rubro: string) => void;
+}) {
   if (!row) return <div className="text-xs text-muted-foreground">Sin datos.</div>;
   if (rubroFiltro !== "all") {
     const valor = rubroFiltro === "Repuestos" ? row.repuestos
@@ -1431,34 +1447,59 @@ function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro
       : rubroFiltro === "Kilometraje" ? row.kilometraje
       : row.otros;
     return (
-      <div className="rounded-md border bg-muted/30 px-3 py-3">
-        <div className="text-[10px] uppercase text-muted-foreground">Rubro seleccionado</div>
-        <div className="mt-0.5 text-sm font-semibold">{rubroFiltro}</div>
-        <div className="mt-1 text-lg font-bold tabular-nums">{money(valor)}</div>
+      <div className="rounded-md border bg-muted/30 px-3 py-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase text-muted-foreground">Rubro</div>
+            <div className="text-sm font-semibold">{rubroFiltro}</div>
+          </div>
+          <div className="text-base font-bold tabular-nums">{money(valor)}</div>
+        </div>
       </div>
     );
   }
-  const items: Array<{ label: string; value: number }> = [
-    { label: "Repuestos", value: row.repuestos },
-    { label: "Servicios", value: row.servicio },
-    { label: "Kilometraje", value: row.kilometraje },
-    { label: "Otros", value: row.otros },
+  const items: Array<{ label: string; value: number; bar: string; dot: string }> = [
+    { label: "Repuestos", value: row.repuestos, bar: "bg-primary", dot: "bg-primary" },
+    { label: "Servicios", value: row.servicio, bar: "bg-sky-500/80", dot: "bg-sky-500" },
+    { label: "Kilometraje", value: row.kilometraje, bar: "bg-amber-500/80", dot: "bg-amber-500" },
+    { label: "Otros", value: row.otros, bar: "bg-slate-400/80", dot: "bg-slate-400" },
   ];
   const total = row.total || 1;
   return (
     <div className="space-y-1.5">
-      {items.map((it) => {
-        const pct = Math.round((it.value / total) * 100);
-        return (
-          <div key={it.label} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs">
-            <span className="font-medium">{it.label}</span>
-            <span className="flex items-center gap-3 tabular-nums">
-              <span>{money(it.value)}</span>
-              <span className="w-10 text-right text-muted-foreground">{pct}%</span>
-            </span>
-          </div>
-        );
-      })}
+      <div className="flex items-center justify-between text-[10px] uppercase text-muted-foreground">
+        <span>Mix del periodo</span>
+        <span className="tabular-nums normal-case text-foreground/70">{money(row.total)}</span>
+      </div>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+        {items.map((it) => it.value > 0 && (
+          <button
+            key={it.label}
+            onClick={() => onSelect?.(it.label === "Servicios" ? "Servicio" : it.label)}
+            className={cn("h-full transition-opacity hover:opacity-80", it.bar)}
+            style={{ width: `${(it.value / total) * 100}%` }}
+            title={`${it.label}: ${money(it.value)} (${Math.round((it.value / total) * 100)}%)`}
+            aria-label={`${it.label} ${it.value}`}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {items.map((it) => {
+          const pct = Math.round((it.value / total) * 100);
+          return (
+            <button
+              key={it.label}
+              onClick={() => onSelect?.(it.label === "Servicios" ? "Servicio" : it.label)}
+              className="flex items-center gap-1.5 text-[11px] hover:text-primary"
+            >
+              <span className={cn("h-2 w-2 rounded-full", it.dot)} />
+              <span className="font-medium">{it.label}</span>
+              <span className="tabular-nums text-muted-foreground">{money(it.value)}</span>
+              <span className="tabular-nums text-muted-foreground">({pct}%)</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1488,41 +1529,79 @@ function EstadoCompacto({
     { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), bar: "bg-amber-500/80", dot: "bg-amber-500" },
   ];
 
+  // Donut SVG geometry
+  const size = 132;
+  const stroke = 20;
+  const r = (size - stroke) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  const activeSegs = segs.filter((s) => s.value > 0);
+  const segColors: Record<string, string> = {
+    completado: "hsl(var(--primary))",
+    iniciado: "hsl(199 89% 48%)",
+    pausado: "hsl(38 92% 50%)",
+  };
+  let offsetAcc = 0;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs text-muted-foreground">Total gestionados</span>
-        <button onClick={() => onSelect("all")} className="text-lg font-bold tabular-nums hover:text-primary">
-          {flujo.total}
-        </button>
-      </div>
-
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-        {segs.map((s) => s.value > 0 && (
+      <div className="flex items-center gap-4">
+        <div className="relative shrink-0" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="-rotate-90">
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
+            {activeSegs.map((s) => {
+              const frac = s.value / flujo.total;
+              const dash = circumference * frac;
+              const gap = circumference - dash;
+              const el = (
+                <circle
+                  key={s.key}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  stroke={segColors[s.key]}
+                  strokeWidth={stroke}
+                  strokeDasharray={`${dash} ${gap}`}
+                  strokeDashoffset={-offsetAcc}
+                  className="cursor-pointer transition-opacity hover:opacity-80"
+                  onClick={() => onSelect(s.key)}
+                >
+                  <title>{`${s.label}: ${s.value} (${s.pct}%)`}</title>
+                </circle>
+              );
+              offsetAcc += dash;
+              return el;
+            })}
+          </svg>
           <button
-            key={s.key}
-            onClick={() => onSelect(s.key)}
-            className={cn("h-full transition-opacity hover:opacity-80", s.bar)}
-            style={{ width: `${s.pct}%` }}
-            title={`${s.label}: ${s.value} (${s.pct}%)`}
-            aria-label={`${s.label} ${s.value}`}
-          />
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-        {segs.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => onSelect(s.key)}
-            className="flex items-center gap-1.5 text-xs hover:text-primary"
+            onClick={() => onSelect("all")}
+            className="absolute inset-0 flex flex-col items-center justify-center hover:text-primary"
           >
-            <span className={cn("h-2 w-2 rounded-full", s.dot)} />
-            <span className="font-medium">{s.label}</span>
-            <span className="tabular-nums font-semibold">{s.value}</span>
-            <span className="text-[11px] text-muted-foreground">({s.pct}%)</span>
+            <span className="text-2xl font-bold tabular-nums leading-none">{flujo.total}</span>
+            <span className="mt-0.5 text-[10px] uppercase text-muted-foreground">gestionados</span>
           </button>
-        ))}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {segs.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => onSelect(s.key)}
+              className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-muted/60"
+            >
+              <span className="flex items-center gap-1.5">
+                <span className={cn("h-2.5 w-2.5 rounded-full", s.dot)} />
+                <span className="font-medium">{s.label}</span>
+              </span>
+              <span className="flex items-center gap-2 tabular-nums">
+                <span className="font-semibold">{s.value}</span>
+                <span className="w-9 text-right text-[11px] text-muted-foreground">{s.pct}%</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
