@@ -32,7 +32,7 @@ import {
   subWeeks,
   subYears,
 } from "date-fns";
-import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
+import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, type EstadoTrabajo } from "@/lib/trabajos";
 import { cn } from "@/lib/utils";
 
