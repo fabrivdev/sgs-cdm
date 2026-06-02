@@ -1771,6 +1771,84 @@ function CargaSucursalTabla({
   );
 }
 
+function DistribucionMarca({
+  data,
+  onSelect,
+  selected,
+}: {
+  data: Array<{ marca: Marca; cerrados: number; abiertos: number; pausados: number; total: number; horas: number; pct: number }>;
+  onSelect: (marca: Marca) => void;
+  selected: string[];
+}) {
+  const max = Math.max(1, ...data.map((d) => d.total));
+  const totales = data.reduce(
+    (acc, d) => ({
+      cerrados: acc.cerrados + d.cerrados,
+      abiertos: acc.abiertos + d.abiertos,
+      pausados: acc.pausados + d.pausados,
+      total: acc.total + d.total,
+      horas: acc.horas + d.horas,
+    }),
+    { cerrados: 0, abiertos: 0, pausados: 0, total: 0, horas: 0 },
+  );
+  if (totales.total === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin actividad por marca en el periodo.</div>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
+        {data.map((d) => {
+          const isActive = selected.length === 1 && selected[0] === d.marca;
+          const widthAbiertos = d.total > 0 ? (d.abiertos / max) * 100 : 0;
+          const widthPausados = d.total > 0 ? (d.pausados / max) * 100 : 0;
+          const widthCerrados = d.total > 0 ? (d.cerrados / max) * 100 : 0;
+          return (
+            <button
+              key={d.marca}
+              onClick={() => onSelect(d.marca)}
+              className={cn(
+                "rounded-md border px-3 py-2 text-left transition hover:bg-accent",
+                isActive && "border-primary bg-accent/40",
+              )}
+            >
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{d.marca}</span>
+                  <span className="text-[11px] text-muted-foreground">{d.pct}%</span>
+                </div>
+                <div className="flex items-center gap-3 tabular-nums text-[11px] text-muted-foreground">
+                  <span>{d.horas.toFixed(1)} h</span>
+                  <span className="font-semibold text-foreground">{d.total}</span>
+                </div>
+              </div>
+              <div className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-sky-500" style={{ width: `${widthAbiertos}%` }} title={`Abiertos: ${d.abiertos}`} />
+                <div className="h-full bg-amber-500" style={{ width: `${widthPausados}%` }} title={`Pausados: ${d.pausados}`} />
+                <div className="h-full bg-emerald-500" style={{ width: `${widthCerrados}%` }} title={`Cerrados: ${d.cerrados}`} />
+              </div>
+              <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-muted-foreground tabular-nums">
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />Abiertos {d.abiertos}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />Pausados {d.pausados}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />Cerrados {d.cerrados}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground tabular-nums">
+        <span className="font-medium text-foreground">Total periodo</span>
+        <div className="flex items-center gap-3">
+          <span>Abiertos {totales.abiertos}</span>
+          <span>Pausados {totales.pausados}</span>
+          <span>Cerrados {totales.cerrados}</span>
+          <span>{totales.horas.toFixed(1)} h</span>
+          <span className="font-semibold text-foreground">{totales.total}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CargaTecnicaMatriz({
   data, onClick,
 }: {
