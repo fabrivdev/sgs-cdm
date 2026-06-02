@@ -768,14 +768,10 @@ export default function Dashboard() {
                 <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("facturacion"); }} />
               </Card>
               <Card className="p-3">
-                <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="Composicion por rubro facturado." />
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <ConceptLine label="Repuestos" value={currentWeekRow?.repuestos ?? 0} total={currentWeekRow?.total ?? 0} />
-                  <ConceptLine label="Servicio" value={currentWeekRow?.servicio ?? 0} total={currentWeekRow?.total ?? 0} />
-                  <ConceptLine label="Kilometraje" value={currentWeekRow?.kilometraje ?? 0} total={currentWeekRow?.total ?? 0} />
-                  <ConceptLine label="Otros" value={currentWeekRow?.otros ?? 0} total={currentWeekRow?.total ?? 0} />
-                </div>
+                <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
+                <MixRubros row={currentWeekRow} rubroFiltro={fRubro} />
               </Card>
+
             </div>
           </section>
 
