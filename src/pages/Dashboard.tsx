@@ -1409,14 +1409,6 @@ function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombre: stri
   );
 }
 
-function DrillButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs font-medium hover:bg-accent">
-      <span>{label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-    </button>
-  );
-}
 
 function estadoLabel(estado: string) {
   switch (estado) {
