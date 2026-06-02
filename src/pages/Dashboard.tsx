@@ -805,6 +805,7 @@ export default function Dashboard() {
     setFRubros([]);
     setFEstadosTrabajo([]);
     setFTecnicos([]);
+    setFMarcasTrabajo([]);
     setPeriodMode("mes");
     setQ("");
   };
@@ -815,6 +816,7 @@ export default function Dashboard() {
     (fRubros.length > 0 ? 1 : 0) +
     (fEstadosTrabajo.length > 0 ? 1 : 0) +
     (fTecnicos.length > 0 ? 1 : 0) +
+    (fMarcasTrabajo.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
 
