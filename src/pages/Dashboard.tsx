@@ -487,6 +487,18 @@ export default function Dashboard() {
   const pctServicio = mixServicioRepuestoTotal > 0 ? Math.round(((currentWeekRow?.servicio ?? 0) / mixServicioRepuestoTotal) * 100) : 0;
   const pctRepuesto = mixServicioRepuestoTotal > 0 ? 100 - pctServicio : 0;
   const periodoLabel = periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
+  const T = useMemo(() => {
+    const isSemana = periodMode === "semana";
+    return {
+      seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
+      facturacion: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
+      facturas: isSemana ? "Facturas de la semana" : "Facturas del periodo",
+      carga: isSemana ? "Carga semanal" : "Carga tecnica",
+      lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
+      plan: isSemana ? "Plan semana" : "Proximo periodo",
+    };
+  }, [periodMode]);
+
 
   const trabajosResumen = useMemo(() => {
     return trabajosScope.map((trabajo) => {
