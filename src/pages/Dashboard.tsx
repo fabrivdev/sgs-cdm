@@ -543,14 +543,14 @@ export default function Dashboard() {
 
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
-      if (fEstadoTrabajo !== "all" && row.estado !== fEstadoTrabajo) return false;
-      if (fTecnico !== "all" && !row.tecnicoIds.includes(fTecnico)) return false;
+      if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
+      if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadoTrabajo, fTecnico]);
+  }, [trabajosBase, fEstadosTrabajo, fTecnicos]);
 
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
