@@ -1065,10 +1065,11 @@ export default function Dashboard() {
 
         <TabsContent value="trabajos" className="space-y-3">
           <FiltersBar
-            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0)}
+            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0) + (fMarcasTrabajo.length > 0 ? 1 : 0)}
             onClear={() => {
               setFEstadosTrabajo([]);
               setFTecnicos([]);
+              setFMarcasTrabajo([]);
             }}
             meta={
               <div className="flex flex-wrap items-center gap-1.5">
@@ -1094,6 +1095,14 @@ export default function Dashboard() {
                 { value: "pausado", label: "Pausado" },
                 { value: "completado", label: "Completado" },
               ]}
+            />
+            <FilterMultiSelect
+              label="Marca"
+              values={fMarcasTrabajo}
+              onChange={setFMarcasTrabajo}
+              placeholder="Todas"
+              width="w-[150px]"
+              options={MARCAS.map((m) => ({ value: m, label: m }))}
             />
             <FilterMultiSelect
               label="Tecnico o cuadrilla"
