@@ -978,7 +978,16 @@ export default function Dashboard() {
               setFEstadoTrabajo("all");
               setFTecnico("all");
             }}
-            meta={`${trabajosResumen.length} trabajos segun filtros operativos`}
+            meta={
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadoTrabajo("completado")} />
+                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
+                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadoTrabajo("all")} />
+                <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
+              </div>
+            }
           >
             <FilterSelect
               label="Estado"
