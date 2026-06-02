@@ -224,9 +224,9 @@ export default function Dashboard() {
     return new Date(min);
   }, [firstComparisonWeek, monthStart, previousMonthStart, weekStart]);
   const queryEnd = useMemo(() => {
-    const max = Math.max(weekEnd.getTime(), monthEnd.getTime());
+    const max = Math.max(weekEnd.getTime(), monthEnd.getTime(), periodEnd.getTime());
     return new Date(max);
-  }, [monthEnd, weekEnd]);
+  }, [monthEnd, periodEnd, weekEnd]);
 
   useEffect(() => {
     setSelectedWeekKey(dateKey(periodMode === "semana" ? weekStart : monthStart));
@@ -533,10 +533,16 @@ export default function Dashboard() {
   const periodoLabel = periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
+    const periodoNombre = periodMode === "anio" ? "año" : periodMode;
     return {
       seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
       facturacion: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
       facturas: isSemana ? "Facturas de la semana" : "Facturas del periodo",
+      comparativoFacturacion: `Facturacion por ${periodoNombre}`,
+      seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composicion.`,
+      periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
+      sinFacturacion: `Sin facturacion para este ${periodoNombre}.`,
+      columnaPeriodo: periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
       carga: isSemana ? "Carga semanal" : "Carga tecnica",
       lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
       plan: isSemana ? "Plan semana" : "Proximo periodo",
@@ -551,6 +557,9 @@ export default function Dashboard() {
       const cliente = trabajo.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre ?? "Sin cliente" : "Sin cliente";
       const realizadas = trabajoJornadas.filter((j) => j.estado === "Completado");
       const pendientes = trabajoJornadas.filter((j) => j.estado === "Pendiente");
+      const jornadasPeriodo = trabajoJornadas.filter((j) => inRange(j.fecha, periodStart, periodEnd));
+      const realizadasPeriodo = jornadasPeriodo.filter((j) => j.estado === "Completado");
+      const pendientesPeriodo = jornadasPeriodo.filter((j) => j.estado === "Pendiente");
       const participantes = new Set<string>();
       for (const jornada of trabajoJornadas) {
         for (const id of validJornadaCrew(jornada)) {
@@ -564,9 +573,11 @@ export default function Dashboard() {
         .reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
+      const ultimaFechaPeriodo = jornadasPeriodo.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
       const fechaCierre = realizadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
       const pendientesVencidas = pendientes.filter((row) => row.fecha < todayStr).length;
       const pendientesSemana = pendientes.filter((row) => inRange(row.fecha, weekStart, weekEnd)).length;
+      const pendientesPeriodoVencidas = pendientesPeriodo.filter((row) => row.fecha < todayStr).length;
       return {
         id: trabajo.id,
         ref: trabajo.codigo ?? "TR",
@@ -578,14 +589,19 @@ export default function Dashboard() {
         realizadas: realizadas.length,
         pendientes: pendientes.length,
         totalJornadas: trabajoJornadas.length,
+        realizadasPeriodo: realizadasPeriodo.length,
+        pendientesPeriodo: pendientesPeriodo.length,
+        totalJornadasPeriodo: jornadasPeriodo.length,
         participantes: participantes.size,
         tecnicoIds,
         horas,
         horasPeriodo,
         ultimaFecha,
+        ultimaFechaPeriodo,
         fechaCierre,
         pendientesVencidas,
         pendientesSemana,
+        pendientesPeriodoVencidas,
         tipo: servicio?.marca ?? "",
         creadoEn: (trabajo as any).creado_en ?? null,
         actualizadoEn: (trabajo as any).actualizado_en ?? null,
@@ -978,21 +994,21 @@ export default function Dashboard() {
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Facturacion por semana</h2>
-                <p className="text-xs text-muted-foreground">Selecciona una semana para ver facturas, clientes y composicion.</p>
+                <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
+                <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase text-muted-foreground">Mes seleccionado</div>
-                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(totalMes)}</div>
-                <div className={cn("text-[11px]", trendMes != null && trendMes < 0 ? "text-destructive" : "text-muted-foreground")}>
-                  {trendMes == null ? "sin base previa" : `${trendMes > 0 ? "+" : ""}${trendMes}% vs mes anterior`}
+                <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
+                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(selectedWeek?.total ?? 0)}</div>
+                <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
+                  {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}
                 </div>
               </div>
             </div>
 
             <div className="rounded-md border">
               <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-                <div>Semana</div>
+                <div>{T.columnaPeriodo}</div>
                 <div className="text-right">Total</div>
                 <div className="text-right">Repuestos</div>
                 <div className="text-right">Servicio</div>
@@ -1047,7 +1063,7 @@ export default function Dashboard() {
                 <div className="text-right">Importe</div>
               </div>
               {selectedFacts.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturacion para esta semana.</div>
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">{T.sinFacturacion}</div>
               ) : (
                 selectedFacts.map((row, index) => {
                   const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
@@ -1164,17 +1180,17 @@ export default function Dashboard() {
                         <div className="truncate text-[11px] text-muted-foreground">{row.descripcion}</div>
                       </div>
                       <div className="truncate">{row.sucursal}</div>
-                      <div className="text-right tabular-nums">{row.realizadas}/{row.totalJornadas}</div>
+                      <div className="text-right tabular-nums">{row.realizadasPeriodo}/{row.totalJornadasPeriodo}</div>
                       <div className="text-right tabular-nums">{row.participantes}</div>
-                      <div className="text-right tabular-nums">{row.horas.toFixed(1)}</div>
-                      <div className="text-right tabular-nums">{row.ultimaFecha ? format(parseISO(row.ultimaFecha), "dd/MM") : "-"}</div>
+                      <div className="text-right tabular-nums">{row.horasPeriodo.toFixed(1)}</div>
+                      <div className="text-right tabular-nums">{row.ultimaFechaPeriodo ? format(parseISO(row.ultimaFechaPeriodo), "dd/MM") : "-"}</div>
                       <div className="text-right text-[11px] text-muted-foreground">
-                        {row.pendientesVencidas > 0
-                          ? `${row.pendientesVencidas} vencida${row.pendientesVencidas !== 1 ? "s" : ""}`
-                          : row.pendientesSemana > 0
-                            ? `${row.pendientesSemana} esta semana`
-                            : row.pendientes > 0
-                              ? `${row.pendientes} pendiente${row.pendientes !== 1 ? "s" : ""}`
+                        {row.pendientesPeriodoVencidas > 0
+                          ? `${row.pendientesPeriodoVencidas} vencida${row.pendientesPeriodoVencidas !== 1 ? "s" : ""}`
+                          : row.pendientesPeriodo > 0
+                            ? `${row.pendientesPeriodo} pendiente${row.pendientesPeriodo !== 1 ? "s" : ""}`
+                            : row.totalJornadasPeriodo === 0
+                              ? "Sin jornadas"
                               : "Sin pendientes"}
                       </div>
                       <div className="text-right">
