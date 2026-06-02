@@ -261,7 +261,7 @@ export default function Dashboard() {
           cargarTodo<Trabajo>(
             supabase
               .from("trabajos")
-              .select("id, codigo, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema, motivo_bloqueo"),
+              .select("id, codigo, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema, motivo_bloqueo, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
           cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
@@ -561,6 +561,9 @@ export default function Dashboard() {
         pendientesVencidas,
         pendientesSemana,
         tipo: servicio?.marca ?? "",
+        creadoEn: (trabajo as any).creado_en ?? null,
+        actualizadoEn: (trabajo as any).actualizado_en ?? null,
+        jornadaFechas: trabajoJornadas.map((j) => j.fecha).filter(Boolean) as string[],
       };
     });
   }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
@@ -613,11 +616,18 @@ export default function Dashboard() {
     }));
   }, [trabajosResumen]);
 
-  // Carga por sucursal: tabla con cerrados/abiertos/pausados/total/% usando trabajosBase.
+  // Carga por sucursal: filtra trabajos con actividad dentro del período seleccionado.
   const cargaSucursal = useMemo(() => {
-    const totalGral = trabajosBase.length;
+    const enPeriodo = (r: typeof trabajosBase[number]) => {
+      if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
+      if (r.actualizadoEn && inRange(r.actualizadoEn, periodStart, periodEnd)) return true;
+      if (r.jornadaFechas.some((f) => inRange(f, periodStart, periodEnd))) return true;
+      return false;
+    };
+    const enRango = trabajosBase.filter(enPeriodo);
+    const totalGral = enRango.length;
     return SUCURSALES.map((sucursal) => {
-      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      const rows = enRango.filter((r) => r.sucursal === sucursal);
       const cerrados = rows.filter((r) => r.estado === "completado").length;
       const pausados = rows.filter((r) => r.estado === "pausado").length;
       const total = rows.length;
@@ -627,7 +637,7 @@ export default function Dashboard() {
     })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [trabajosBase]);
+  }, [trabajosBase, periodStart, periodEnd]);
 
 
   const productividadMatriz = useMemo(() => {
