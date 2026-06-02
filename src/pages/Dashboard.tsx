@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3,
@@ -18,13 +19,16 @@ import {
   differenceInCalendarDays,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   format,
   isWithinInterval,
   parseISO,
   startOfMonth,
   startOfWeek,
+  startOfYear,
   subMonths,
   subWeeks,
+  subYears,
 } from "date-fns";
 import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, type EstadoTrabajo } from "@/lib/trabajos";
@@ -141,11 +145,10 @@ function inRange(date: string, start: Date, end: Date) {
 }
 
 function money(value: number) {
-  return new Intl.NumberFormat("es-PY", {
-    style: "currency",
-    currency: "USD",
+  const formatted = new Intl.NumberFormat("es-PY", {
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(value || 0);
+  return `$ ${formatted}`;
 }
 
 function pct(current: number, previous: number) {
@@ -182,11 +185,11 @@ export default function Dashboard() {
 
   const [weekStartInput, setWeekStartInput] = useState(initialWeekStart);
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
-  const [fSucursal, setFSucursal] = useState("all");
-  const [fRubro, setFRubro] = useState("all");
-  const [fEstadoTrabajo, setFEstadoTrabajo] = useState("all");
-  const [fTecnico, setFTecnico] = useState("all");
-  const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("semana");
+  const [fSucursales, setFSucursales] = useState<string[]>([]);
+  const [fRubros, setFRubros] = useState<string[]>([]);
+  const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
+  const [fTecnicos, setFTecnicos] = useState<string[]>([]);
+  const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
 
@@ -200,9 +203,14 @@ export default function Dashboard() {
   const previousMonthEnd = useMemo(() => endOfMonth(subMonths(weekStart, 1)), [weekStart]);
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
   const queryStart = useMemo(() => {
-    const min = Math.min(firstComparisonWeek.getTime(), previousMonthStart.getTime(), subMonths(monthStart, 11).getTime());
+    const min = Math.min(
+      firstComparisonWeek.getTime(),
+      previousMonthStart.getTime(),
+      subMonths(monthStart, 11).getTime(),
+      subYears(startOfYear(weekStart), 4).getTime(),
+    );
     return new Date(min);
-  }, [firstComparisonWeek, monthStart, previousMonthStart]);
+  }, [firstComparisonWeek, monthStart, previousMonthStart, weekStart]);
   const queryEnd = useMemo(() => {
     const max = Math.max(weekEnd.getTime(), monthEnd.getTime());
     return new Date(max);
@@ -224,7 +232,7 @@ export default function Dashboard() {
           .gte("fecha", dateKey(queryStart))
           .lte("fecha", dateKey(queryEnd))
           .order("fecha", { ascending: false });
-        if (fSucursal !== "all") factQuery = factQuery.eq("sucursal", fSucursal as Sucursal);
+        if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales as Sucursal[]);
 
         const [serviciosRows, jornadasRows, trabajosRows, clientesRows, profilesRows, roleRows, factRows] = await Promise.all([
           cargarTodo<Servicio>(
@@ -269,7 +277,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [fSucursal, previousWeekStart, queryEnd, queryStart, weekEnd]);
+  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd]);
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
@@ -306,7 +314,7 @@ export default function Dashboard() {
   const factFiltered = useMemo(
     () =>
       facturacion.filter((row) => {
-        if (fRubro !== "all" && concept(row) !== fRubro) return false;
+        if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
@@ -316,19 +324,19 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fRubro, facturacion, query],
+    [clienteById, fRubros, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
     if (!servicio) return false;
-    if (fSucursal !== "all" && servicio.sucursal !== fSucursal) return false;
+    if (fSucursales.length > 0 && !fSucursales.includes(servicio.sucursal)) return false;
     if (!query) return true;
     const cliente = servicio.cliente_id ? clienteById.get(servicio.cliente_id)?.nombre ?? "" : "";
     return cliente.toLowerCase().includes(query) || servicio.trabajo_descripcion.toLowerCase().includes(query);
   };
 
   const scopedTrabajo = (trabajo: Trabajo) => {
-    if (fSucursal !== "all" && trabajo.sucursal !== fSucursal) return false;
+    if (fSucursales.length > 0 && !fSucursales.includes(trabajo.sucursal)) return false;
     if (!query) return true;
     const cliente = trabajo.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre ?? "" : "";
     return (
@@ -339,15 +347,21 @@ export default function Dashboard() {
   };
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
-    const periods = periodMode === "semana"
-      ? Array.from({ length: 8 }, (_, index) => {
-          const start = subWeeks(weekStart, 7 - index);
-          return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
-        })
-      : Array.from({ length: periodMode === "mes" ? 8 : 12 }, (_, index) => {
-          const start = startOfMonth(subMonths(monthStart, (periodMode === "mes" ? 7 : 11) - index));
-          return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
-        });
+    const periods =
+      periodMode === "semana"
+        ? Array.from({ length: 8 }, (_, index) => {
+            const start = subWeeks(weekStart, 7 - index);
+            return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
+          })
+        : periodMode === "mes"
+          ? Array.from({ length: 12 }, (_, index) => {
+              const start = startOfMonth(subMonths(monthStart, 11 - index));
+              return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
+            })
+          : Array.from({ length: 5 }, (_, index) => {
+              const start = startOfYear(subYears(weekStart, 4 - index));
+              return { start, end: endOfYear(start), label: format(start, "yyyy") };
+            });
 
     const rows = periods.map(({ start, end, label }) => {
       const weekFacts = factFiltered.filter((row) => inRange(row.fecha, start, end));
@@ -419,7 +433,7 @@ export default function Dashboard() {
         const servicio = servicioById.get(jornada.servicio_id);
         return jornada.estado === "Completado" && inRange(jornada.fecha, previousWeekStart, previousWeekEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursal, jornadas, previousWeekEnd, previousWeekStart, query, servicioById],
+    [clienteById, fSucursales, jornadas, previousWeekEnd, previousWeekStart, query, servicioById],
   );
 
   const jornadasProgramadas = useMemo(
@@ -428,7 +442,7 @@ export default function Dashboard() {
         const servicio = servicioById.get(jornada.servicio_id);
         return jornada.estado === "Pendiente" && inRange(jornada.fecha, weekStart, weekEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursal, jornadas, query, servicioById, weekEnd, weekStart],
+    [clienteById, fSucursales, jornadas, query, servicioById, weekEnd, weekStart],
   );
 
   const jornadasPendientesCierre = useMemo(
@@ -437,10 +451,10 @@ export default function Dashboard() {
         const servicio = servicioById.get(jornada.servicio_id);
         return jornada.estado === "Pendiente" && jornada.fecha < todayStr && scopedServicio(servicio);
       }),
-    [clienteById, fSucursal, jornadas, query, servicioById],
+    [clienteById, fSucursales, jornadas, query, servicioById],
   );
 
-  const trabajosScope = useMemo(() => trabajos.filter(scopedTrabajo), [clienteById, fSucursal, query, trabajos]);
+  const trabajosScope = useMemo(() => trabajos.filter(scopedTrabajo), [clienteById, fSucursales, query, trabajos]);
   const jornadasByTrabajo = useMemo(() => {
     const servicioATrabajo = new Map<string, string>();
     for (const trabajo of trabajos) {
@@ -540,14 +554,14 @@ export default function Dashboard() {
 
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
-      if (fEstadoTrabajo !== "all" && row.estado !== fEstadoTrabajo) return false;
-      if (fTecnico !== "all" && !row.tecnicoIds.includes(fTecnico)) return false;
+      if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
+      if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadoTrabajo, fTecnico]);
+  }, [trabajosBase, fEstadosTrabajo, fTecnicos]);
 
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
@@ -627,21 +641,21 @@ export default function Dashboard() {
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
     setSelectedWeekKey(initialWeekStart);
-    setFSucursal("all");
-    setFRubro("all");
-    setFEstadoTrabajo("all");
-    setFTecnico("all");
-    setPeriodMode("semana");
+    setFSucursales([]);
+    setFRubros([]);
+    setFEstadosTrabajo([]);
+    setFTecnicos([]);
+    setPeriodMode("mes");
     setQ("");
   };
 
   const filtrosActivos =
     (weekStartInput !== initialWeekStart ? 1 : 0) +
-    (fSucursal !== "all" ? 1 : 0) +
-    (fRubro !== "all" ? 1 : 0) +
-    (fEstadoTrabajo !== "all" ? 1 : 0) +
-    (fTecnico !== "all" ? 1 : 0) +
-    (periodMode !== "semana" ? 1 : 0) +
+    (fSucursales.length > 0 ? 1 : 0) +
+    (fRubros.length > 0 ? 1 : 0) +
+    (fEstadosTrabajo.length > 0 ? 1 : 0) +
+    (fTecnicos.length > 0 ? 1 : 0) +
+    (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
 
   return (
@@ -658,23 +672,22 @@ export default function Dashboard() {
         meta={`${factFiltered.length} lineas facturacion - ${trabajosResumen.length} trabajos`}
       >
         <PeriodSelector value={periodMode} onChange={setPeriodMode} />
-        <FilterDate label="Semana base" value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
-        <FilterSelect
+        <FilterDate label={periodMode === "anio" ? "Año base" : periodMode === "mes" ? "Mes base" : "Semana base"} value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
+        <FilterMultiSelect
           label="Sucursal"
-          value={fSucursal}
-          onChange={setFSucursal}
-          placeholder="Sucursal"
-          width="w-[150px]"
-          options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map((s) => ({ value: s, label: s }))]}
+          values={fSucursales}
+          onChange={setFSucursales}
+          placeholder="Todas"
+          width="w-[170px]"
+          options={SUCURSALES.map((s) => ({ value: s, label: s }))}
         />
-        <FilterSelect
+        <FilterMultiSelect
           label="Rubro"
-          value={fRubro}
-          onChange={setFRubro}
-          placeholder="Rubro"
-          width="w-[150px]"
+          values={fRubros}
+          onChange={setFRubros}
+          placeholder="Todos"
+          width="w-[170px]"
           options={[
-            { value: "all", label: "Todos" },
             { value: "Servicio", label: "Servicios" },
             { value: "Repuestos", label: "Repuestos" },
             { value: "Kilometraje", label: "Kilometraje" },
@@ -683,7 +696,7 @@ export default function Dashboard() {
         />
       </FiltersBar>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
           title="Facturacion del periodo"
@@ -754,32 +767,32 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <section className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
-            <Card className="p-3">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-[1.2fr_1fr]">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
               <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
             </Card>
 
-            <div className="grid gap-3">
-              <Card className="p-3">
+            <div className="grid auto-rows-fr gap-3">
+              <Card className="flex h-full flex-col p-3">
                 <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
-                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("facturacion"); }} />
+                <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
               </Card>
-              <Card className="p-3">
+              <Card className="flex h-full flex-col p-3">
                 <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
-                <MixRubros row={currentWeekRow} rubroFiltro={fRubro} />
+                <MixRubros row={currentWeekRow} rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"} />
               </Card>
 
             </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-2">
-            <Card className="p-3">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto
                 flujo={flujo}
-                onSelect={(estado) => { setFEstadoTrabajo(estado); setSection("trabajos"); }}
+                onSelect={(estado) => { setFEstadosTrabajo([estado]); setSection("trabajos"); }}
                 planificados={jornadasProgramadas.length}
                 tecnicosActivos={tecnicosConActividad.size}
                 jornadasPrev={jornadasRealizadasPrev.length}
@@ -787,14 +800,14 @@ export default function Dashboard() {
                 planLabel={T.plan}
               />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
               <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
             </Card>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-2">
-            <Card className="p-3">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
                 rows={topClientes}
@@ -804,9 +817,9 @@ export default function Dashboard() {
                 onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }}
               />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
-              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("trabajos"); }} />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("trabajos"); }} />
             </Card>
           </section>
 
@@ -814,7 +827,7 @@ export default function Dashboard() {
 
         <TabsContent value="facturacion" className="space-y-3">
           <section className="grid gap-3 lg:grid-cols-[1.5fr_0.9fr]">
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Facturacion por semana</h2>
@@ -871,7 +884,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">{periodMode === "semana" ? "Semana seleccionada" : "Periodo seleccionado"}</h2>
             <p className="text-xs text-muted-foreground">{selectedWeek?.label ?? "-"}</p>
@@ -893,7 +906,7 @@ export default function Dashboard() {
           </section>
 
           <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">{T.facturas}</h2>
@@ -930,7 +943,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card className="p-3">
+        <Card className="flex h-full flex-col p-3">
           <div className="mb-3">
             <h2 className="text-base font-semibold">Clientes y sucursales</h2>
           </div>
@@ -955,7 +968,7 @@ export default function Dashboard() {
             <div className="rounded-md border">
               <div className="border-b px-3 py-2 text-xs font-semibold">Por sucursal</div>
               {factBySucursal.map((row) => (
-                <button key={row.sucursal} onClick={() => setFSucursal(row.sucursal)} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-accent">
+                <button key={row.sucursal} onClick={() => setFSucursales([row.sucursal])} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-accent">
                   <span>
                     <span className="block font-semibold">{row.sucursal}</span>
                     <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
@@ -971,30 +984,29 @@ export default function Dashboard() {
 
         <TabsContent value="trabajos" className="space-y-3">
           <FiltersBar
-            activeCount={(fEstadoTrabajo !== "all" ? 1 : 0) + (fTecnico !== "all" ? 1 : 0)}
+            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0)}
             onClear={() => {
-              setFEstadoTrabajo("all");
-              setFTecnico("all");
+              setFEstadosTrabajo([]);
+              setFTecnicos([]);
             }}
             meta={
               <div className="flex flex-wrap items-center gap-1.5">
-                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadoTrabajo("all")} />
-                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadoTrabajo("completado")} />
-                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
-                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadoTrabajo("all")} />
-                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadoTrabajo("all")} />
+                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
+                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
+                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
+                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadosTrabajo([])} />
+                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
                 <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
               </div>
             }
           >
-            <FilterSelect
+            <FilterMultiSelect
               label="Estado"
-              value={fEstadoTrabajo}
-              onChange={setFEstadoTrabajo}
-              placeholder="Estado"
-              width="w-[150px]"
+              values={fEstadosTrabajo}
+              onChange={setFEstadosTrabajo}
+              placeholder="Todos"
+              width="w-[170px]"
               options={[
-                { value: "all", label: "Todos" },
                 { value: "pendiente", label: "Pendiente" },
                 { value: "programado", label: "Programado" },
                 { value: "iniciado", label: "Iniciado" },
@@ -1002,28 +1014,28 @@ export default function Dashboard() {
                 { value: "completado", label: "Completado" },
               ]}
             />
-            <FilterSelect
+            <FilterMultiSelect
               label="Tecnico o cuadrilla"
-              value={fTecnico}
-              onChange={setFTecnico}
-              placeholder="Tecnico"
-              width="w-[220px]"
-              options={[{ value: "all", label: "Todos" }, ...technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))]}
+              values={fTecnicos}
+              onChange={setFTecnicos}
+              placeholder="Todos"
+              width="w-[230px]"
+              options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
             />
           </FiltersBar>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
-              <EstadoCompacto flujo={flujo} onSelect={setFEstadoTrabajo} />
+              <EstadoCompacto flujo={flujo} onSelect={(estado) => setFEstadosTrabajo([estado])} />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
-              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursal(sucursal)} />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursales([sucursal])} />
             </Card>
           </section>
 
-          <Card className="p-3">
+          <Card className="flex h-full flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">Seguimiento por OS/TR</h2>
@@ -1084,11 +1096,11 @@ export default function Dashboard() {
           </Card>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Productividad tecnica" subtitle="" />
               <CargaTecnicaTabla rows={productividadTecnica} />
             </Card>
-            <Card className="p-3">
+            <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={T.lectura} subtitle="" />
               <div className="grid grid-cols-2 gap-2">
                 <Kpi label="Cierre anterior" value={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} loading={loading} />
@@ -1122,10 +1134,10 @@ function SummaryCard({
   onClick: () => void;
 }) {
   return (
-    <button className="rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+    <button className="h-full rounded-lg text-left" onClick={onClick}>
+      <Card className={cn("flex h-full min-h-[112px] flex-col p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
             <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
             <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
@@ -1185,7 +1197,7 @@ function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio";
         {[
           { value: "semana", label: "Semana" },
           { value: "mes", label: "Mes" },
-          { value: "anio", label: "Ano" },
+          { value: "anio", label: "Año" },
         ].map((option) => (
           <button
             key={option.value}
@@ -1212,7 +1224,7 @@ function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?
           const active = row.key === activeKey;
           return (
             <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
-              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{row.total ? money(row.total).replace("USD", "").trim() : "0"}</span>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{row.total ? money(row.total) : "$ 0"}</span>
               <span
                 className={cn(
                   "w-full max-w-[42px] rounded-t-md bg-primary/80 transition-all hover:bg-primary",
@@ -1227,7 +1239,7 @@ function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?
       </div>
       <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        Facturacion semanal (USD)
+        Facturacion ($)
       </div>
     </div>
   );
