@@ -816,7 +816,7 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-3">
-          <section className="grid auto-rows-fr gap-3 lg:grid-cols-[1.5fr_0.9fr]">
+          <section className="grid auto-rows-fr gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
         <Card className="flex h-full min-w-0 flex-col p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
@@ -832,45 +832,43 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="max-h-[416px] flex-1 overflow-y-auto overflow-x-auto rounded-md border">
-            <div className="min-w-[860px]">
-              <div className="grid grid-cols-[112px_108px_108px_108px_108px_92px_72px_72px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-                <div>Semana</div>
-                <div className="text-right">Total</div>
-                <div className="text-right">Repuestos</div>
-                <div className="text-right">Servicio</div>
-                <div className="text-right">Km</div>
-                <div className="text-right">Otros</div>
-                <div className="text-right">Fact.</div>
-                <div className="text-right">Clientes</div>
-                <div className="text-right">Var.</div>
-              </div>
-              {weeklyRows.map((row) => {
-                const active = row.key === selectedWeek?.key;
-                return (
-                  <button
-                    key={row.key}
-                    onClick={() => setSelectedWeekKey(row.key)}
-                    className={cn(
-                      "grid w-full grid-cols-[112px_108px_108px_108px_108px_92px_72px_72px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent",
-                      active && "bg-primary/5 outline outline-1 outline-primary/20",
-                    )}
-                  >
-                    <div className="font-medium">{row.label}</div>
-                    <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
-                    <div className="text-right tabular-nums">{money(row.repuestos)}</div>
-                    <div className="text-right tabular-nums">{money(row.servicio)}</div>
-                    <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
-                    <div className="text-right tabular-nums">{money(row.otros)}</div>
-                    <div className="text-right tabular-nums">{row.facturas}</div>
-                    <div className="text-right tabular-nums">{row.clientes}</div>
-                    <div className={cn("text-right tabular-nums", row.variacion != null && row.variacion < 0 && "text-destructive")}>
-                      {row.variacion == null ? "-" : `${row.variacion > 0 ? "+" : ""}${row.variacion}%`}
-                    </div>
-                  </button>
-                );
-              })}
+          <div className="rounded-md border">
+            <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+              <div>Semana</div>
+              <div className="text-right">Total</div>
+              <div className="text-right">Repuestos</div>
+              <div className="text-right">Servicio</div>
+              <div className="text-right">Km</div>
+              <div className="text-right">Otros</div>
+              <div className="text-right">Fact.</div>
+              <div className="text-right">Clientes</div>
+              <div className="text-right">Var.</div>
             </div>
+            {weeklyRows.map((row) => {
+              const active = row.key === selectedWeek?.key;
+              return (
+                <button
+                  key={row.key}
+                  onClick={() => setSelectedWeekKey(row.key)}
+                  className={cn(
+                    "grid w-full grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent",
+                    active && "bg-primary/5 outline outline-1 outline-primary/20",
+                  )}
+                >
+                  <div className="font-medium">{row.label}</div>
+                  <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
+                  <div className="text-right tabular-nums">{money(row.repuestos)}</div>
+                  <div className="text-right tabular-nums">{money(row.servicio)}</div>
+                  <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
+                  <div className="text-right tabular-nums">{money(row.otros)}</div>
+                  <div className="text-right tabular-nums">{row.facturas}</div>
+                  <div className="text-right tabular-nums">{row.clientes}</div>
+                  <div className={cn("text-right tabular-nums", row.variacion != null && row.variacion < 0 && "text-destructive")}>
+                    {row.variacion == null ? "-" : `${row.variacion > 0 ? "+" : ""}${row.variacion}%`}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </Card>
 
