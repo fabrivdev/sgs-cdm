@@ -10,10 +10,8 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
-  ChevronRight,
   ClipboardList,
   DollarSign,
-  PauseCircle as PauseCircleIcon,
   Users,
 } from "lucide-react";
 import {
