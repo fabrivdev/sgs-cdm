@@ -100,15 +100,6 @@ export default function Trabajos() {
   const profileMap = useMemo(() => new Map(profiles.map(p => [p.id, p])), [profiles]);
   const clienteMap = useMemo(() => new Map(clientes.map(c => [c.id, c])), [clientes]);
 
-  const semanasDisponibles = useMemo(() => {
-    const s = new Set<number>();
-    for (const arr of agendasByTrabajo.values()) {
-      for (const p of arr) s.add(getISOWeek(parseISO(p.fecha_programada)));
-    }
-    return Array.from(s).sort((a, b) => a - b);
-  }, [agendasByTrabajo]);
-
-
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return trabajos.filter(t => {
@@ -124,25 +115,30 @@ export default function Trabajos() {
           && !(t.codigo ?? "").toLowerCase().includes(query)
           && !trabajoOsNumero(t).toLowerCase().includes(query)) return false;
       }
-      if (fFecha || fSemana !== "all") {
+      if (fFecha) {
+        // Filtra por actividad del trabajo en esa fecha (local):
+        // creado_en, actualizado_en, o alguna jornada (programada o realizada).
+        const toLocalDate = (iso?: string | null) => {
+          if (!iso) return null;
+          try { return format(new Date(iso), "yyyy-MM-dd"); } catch { return null; }
+        };
+        const fechasTrabajo = new Set<string>();
+        const c = toLocalDate(t.creado_en); if (c) fechasTrabajo.add(c);
+        const a = toLocalDate(t.actualizado_en); if (a) fechasTrabajo.add(a);
         const progs = agendasByTrabajo.get(t.id) ?? [];
-        // En vista semanal, mantener visibles los casos todavia pendientes aunque aun
-        // no tengan jornada programada, para leer backlog + plan de la semana.
-        if (!fFecha && fSemana !== "all" && estadoVisible === "pendiente") return true;
-        const matchProg = progs.some(p => {
-          if (fFecha && p.fecha_programada !== fFecha) return false;
-          if (fSemana !== "all" && getISOWeek(parseISO(p.fecha_programada)) !== Number(fSemana)) return false;
-          return true;
-        });
-        if (!matchProg) return false;
+        for (const p of progs) {
+          if (p.fecha_programada) fechasTrabajo.add(p.fecha_programada);
+          if (p.fecha) fechasTrabajo.add(p.fecha);
+        }
+        if (!fechasTrabajo.has(fFecha)) return false;
       }
       return true;
     });
-  }, [trabajos, q, fSucursal, fPrio, fEstado, fFecha, fSemana, clienteMap, agendasByTrabajo]);
+  }, [trabajos, q, fSucursal, fPrio, fEstado, fFecha, clienteMap, agendasByTrabajo]);
 
   const limpiar = () => {
     setQ(""); setFSucursal("all"); setFPrio("all"); setFEstado("all");
-    setFFecha(""); setFSemana("all");
+    setFFecha("");
   };
 
   const activosCount =
@@ -150,8 +146,7 @@ export default function Trabajos() {
     (fSucursal !== "all" ? 1 : 0) +
     (fPrio !== "all" ? 1 : 0) +
     (fEstado !== "all" ? 1 : 0) +
-    (fFecha ? 1 : 0) +
-    (fSemana !== "all" ? 1 : 0);
+    (fFecha ? 1 : 0);
 
   return (
     <div className={pageShellWide}>
