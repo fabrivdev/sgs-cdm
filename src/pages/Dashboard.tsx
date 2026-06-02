@@ -184,7 +184,9 @@ export default function Dashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [facturacion, setFacturacion] = useState<Facturacion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [baseLoading, setBaseLoading] = useState(true);
+  const [jornadasLoading, setJornadasLoading] = useState(true);
+  const [facturacionLoading, setFacturacionLoading] = useState(true);
 
   const [weekStartInput, setWeekStartInput] = useState(initialWeekStart);
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
@@ -196,6 +198,7 @@ export default function Dashboard() {
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
+  const loading = baseLoading || jornadasLoading || facturacionLoading;
 
   const weekStart = useMemo(() => startOfWeek(parseISO(weekStartInput), { weekStartsOn: 1 }), [weekStartInput]);
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
@@ -215,50 +218,27 @@ export default function Dashboard() {
   const previousPeriodEnd = periodMode === "anio" ? previousYearEnd : periodMode === "mes" ? previousMonthEnd : previousWeekEnd;
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
   const queryStart = useMemo(() => {
-    const min = Math.min(
-      firstComparisonWeek.getTime(),
-      previousMonthStart.getTime(),
-      subMonths(monthStart, 11).getTime(),
-      subYears(startOfYear(weekStart), 4).getTime(),
-    );
-    return new Date(min);
-  }, [firstComparisonWeek, monthStart, previousMonthStart, weekStart]);
-  const queryEnd = useMemo(() => {
-    const max = Math.max(weekEnd.getTime(), monthEnd.getTime(), periodEnd.getTime());
-    return new Date(max);
-  }, [monthEnd, periodEnd, weekEnd]);
+    if (periodMode === "anio") return subYears(yearStart, 4);
+    if (periodMode === "mes") return subMonths(monthStart, 11);
+    return firstComparisonWeek;
+  }, [firstComparisonWeek, monthStart, periodMode, yearStart]);
+  const queryEnd = useMemo(() => periodEnd, [periodEnd]);
 
   useEffect(() => {
-    setSelectedWeekKey(dateKey(periodMode === "semana" ? weekStart : monthStart));
-  }, [monthStart, periodMode, weekStart]);
+    setSelectedWeekKey(dateKey(periodMode === "anio" ? yearStart : periodMode === "semana" ? weekStart : monthStart));
+  }, [monthStart, periodMode, weekStart, yearStart]);
 
   useEffect(() => {
     let alive = true;
 
     (async () => {
-      setLoading(true);
+      setBaseLoading(true);
       try {
-        let factQuery = supabase
-          .from("facturacion")
-          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura")
-          .gte("fecha", dateKey(queryStart))
-          .lte("fecha", dateKey(queryEnd))
-          .order("fecha", { ascending: false });
-        if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales as Sucursal[]);
-
-        const [serviciosRows, jornadasRows, trabajosRows, clientesRows, profilesRows, roleRows, factRows] = await Promise.all([
+        const [serviciosRows, trabajosRows, clientesRows, profilesRows, roleRows] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
               .from("servicios")
               .select("id, fecha_programada, tecnico_responsable_id, auxiliares, sucursal, marca, cliente_id, trabajo_descripcion"),
-          ),
-          cargarTodo<Jornada>(
-            supabase
-              .from("servicio_jornadas")
-              .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
-              .gte("fecha", dateKey(new Date(Math.min(subWeeks(previousWeekStart, 8).getTime(), periodStart.getTime(), previousPeriodStart.getTime()))))
-              .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime()))))
-              .order("fecha", { ascending: true }),
           ),
           cargarTodo<Trabajo>(
             supabase
@@ -268,28 +248,82 @@ export default function Dashboard() {
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
           cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
           cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
-          cargarTodo<Facturacion>(factQuery),
         ]);
 
         if (!alive) return;
         setServicios(serviciosRows);
-        setJornadas(jornadasRows);
         setTrabajos(trabajosRows);
         setClientes(clientesRows);
         setProfiles(profilesRows);
         setUserRoles(roleRows);
-        setFacturacion(factRows);
       } catch (error) {
         console.error(error);
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setBaseLoading(false);
       }
     })();
 
     return () => {
       alive = false;
     };
-  }, [fSucursales, previousWeekStart, queryEnd, queryStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      setJornadasLoading(true);
+      try {
+        const jornadasRows = await cargarTodo<Jornada>(
+          supabase
+            .from("servicio_jornadas")
+            .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
+            .gte("fecha", dateKey(new Date(Math.min(subWeeks(previousWeekStart, 8).getTime(), periodStart.getTime(), previousPeriodStart.getTime()))))
+            .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime()))))
+            .order("fecha", { ascending: true }),
+        );
+
+        if (alive) setJornadas(jornadasRows);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (alive) setJornadasLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [previousWeekStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      setFacturacionLoading(true);
+      try {
+        let factQuery = supabase
+          .from("facturacion")
+          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura")
+          .gte("fecha", dateKey(queryStart))
+          .lte("fecha", dateKey(queryEnd))
+          .order("fecha", { ascending: false });
+        if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales as Sucursal[]);
+
+        const factRows = await cargarTodo<Facturacion>(factQuery);
+
+        if (alive) setFacturacion(factRows);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (alive) setFacturacionLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [fSucursales, queryEnd, queryStart]);
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
