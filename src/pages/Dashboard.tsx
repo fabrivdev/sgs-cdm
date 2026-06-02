@@ -1743,7 +1743,8 @@ function CargaTecnicaMatriz({
             onClick={() => setMetrica("servicios")}
             className={cn("px-2 py-1", metrica === "servicios" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
           >
-            Servicios
+            Servicios asignados
+
           </button>
           <button
             type="button"
