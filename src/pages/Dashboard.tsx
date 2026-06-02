@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3,
