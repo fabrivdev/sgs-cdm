@@ -1244,22 +1244,22 @@ function SucursalBars({
   totalValue: number;
   onSelect: (sucursal: Sucursal) => void;
 }) {
-  const visibleRows = rows.filter((row) => row.total > 0);
-  const max = Math.max(1, ...visibleRows.map((row) => row.total));
+  const max = Math.max(1, ...rows.map((row) => row.total));
 
-  if (visibleRows.length === 0) {
+  if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin movimiento por sucursal.</div>;
   }
 
   return (
     <div className="space-y-2">
-      {visibleRows.map((row) => {
-        const width = Math.max(4, Math.round((row.total / max) * 100));
+      {rows.map((row) => {
+        const isZero = row.total <= 0;
+        const width = isZero ? 0 : Math.max(4, Math.round((row.total / max) * 100));
         const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
         return (
-          <button key={row.sucursal} onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
+          <button key={row.sucursal} onClick={() => !isZero && onSelect(row.sucursal)} className={cn("w-full rounded-md px-2 py-1.5 text-left", !isZero && "hover:bg-accent", isZero && "opacity-60 cursor-default")}>
             <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-              <span className="font-medium">{row.sucursal}</span>
+              <span className={cn("font-medium", isZero && "text-muted-foreground")}>{row.sucursal}</span>
               <span className="tabular-nums text-muted-foreground">{money(row.total)} - {participation}%</span>
             </div>
             <div className="h-2 rounded-full bg-muted">
