@@ -1,20 +1,21 @@
-## Causa raíz
-La matriz del Dashboard cuenta solo técnicos guardados directamente en `servicio_jornadas`. Planificador, en cambio, hereda la cuadrilla del servicio padre cuando la jornada no la define. Por eso Rubén aparece con muchas jornadas en Planificador pero casi vacío en la matriz: a esas jornadas les falta el `tecnico_responsable_id`/`auxiliares` propios y el Dashboard no aplica el fallback.
+## Cambios en la pestaña Trabajos del Dashboard
 
-Confirmado en datos: en mayo, la consulta actual encuentra 1 jornada para Rubén; el resto vienen vía herencia del servicio.
+### 1. Reemplazar "Lectura operativa"
+Quitar la tarjeta de KPIs textuales y poner en su lugar **"Distribución por marca"**: barras horizontales por marca (CLAAS, HORSCH, OTROS) mostrando trabajos abiertos / pausados / cerrados en el período, con totales y % de participación. Click en una marca filtra la pestaña por esa marca.
 
-## Cambios en `src/pages/Dashboard.tsx`
+### 2. Arreglar filtros que no filtran
+Hoy los filtros **Estado** y **Técnico/cuadrilla** de la pestaña Trabajos solo afectan a la tabla "Seguimiento por OS/TR". Los paneles superiores (Estado de trabajos, Carga por sucursal, Productividad técnica) usan `trabajosBase` o las jornadas crudas y no respetan esos filtros, por eso al cambiarlos no pasa "nada visible".
 
-1. Helper `jornadaCrewIds(jornada)` que devuelve la cuadrilla efectiva:
-   - principal = `jornada.tecnico_responsable_id` o, si es null, `servicio.tecnico_responsable_id`.
-   - auxiliares = `jornada.auxiliares` si tiene items, si no `servicio.auxiliares`.
-2. Aplicar ese helper en:
-   - `activeTechnicianIds` (incluir también referencias desde `servicios`).
-   - `productividadMatriz` (matriz Técnico × Semana/Mes).
-   - `cargaTecnicos` (top de carga próxima).
-   - `trabajosBase.tecnicoIds` (filtros por técnico en pestaña Trabajos).
-   - `tecnicosConActividad` (KPI).
-3. Mantener: Pendiente + Completado dentro del período; horas solo de Completado; Cancelada excluida.
+Voy a redefinir los datos derivados para que respeten los filtros activos de la pestaña:
+- `flujo` (donut Estado de trabajos): basado en `trabajosResumen` (ya filtrado).
+- `cargaSucursal`: filtrar por técnico y marca antes de clasificar.
+- `productividadMatriz`: aplicar filtro por técnico (mostrar solo filas seleccionadas) y por marca/estado (filtrar jornadas cuyo trabajo cumpla los filtros).
+- `trabajosPausados` y conteos de chips: usar `trabajosResumen`.
 
-## Fuera de alcance
-Sin cambios en base de datos, Planificador, ni textos de UI extra.
+### 3. Agregar filtro por Marca
+Nuevo `FilterMultiSelect` "Marca" en la pestaña Trabajos con opciones CLAAS / HORSCH / OTROS. Estado `fMarcasTrabajo`.
+
+Para que funcione, en la query de `trabajos` agregar el campo `marca` al select y propagarlo a `trabajosBase.marca` (hoy `tipo` proviene del servicio, lo que no es confiable). Actualizar la interfaz `Trabajo`.
+
+### Fuera de alcance
+No se tocan tablas/RLS, ni Planificador, ni el resto de las pestañas.

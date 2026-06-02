@@ -32,7 +32,7 @@ import {
   subWeeks,
   subYears,
 } from "date-fns";
-import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
+import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, type EstadoTrabajo } from "@/lib/trabajos";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,7 @@ interface Trabajo {
   estado_general: EstadoTrabajo | string | null;
   legacy_servicio_id: string | null;
   sucursal: Sucursal;
+  marca: Marca | null;
   cliente_id: string | null;
   descripcion_problema: string;
   motivo_bloqueo: string | null;
@@ -191,6 +192,7 @@ export default function Dashboard() {
   const [fRubros, setFRubros] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
+  const [fMarcasTrabajo, setFMarcasTrabajo] = useState<string[]>([]);
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
@@ -261,7 +263,7 @@ export default function Dashboard() {
           cargarTodo<Trabajo>(
             supabase
               .from("trabajos")
-              .select("id, codigo, estado_general, legacy_servicio_id, sucursal, cliente_id, descripcion_problema, motivo_bloqueo, creado_en, actualizado_en"),
+              .select("id, codigo, estado_general, legacy_servicio_id, sucursal, marca, cliente_id, descripcion_problema, motivo_bloqueo, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
           cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
@@ -568,6 +570,7 @@ export default function Dashboard() {
         cliente,
         descripcion: trabajo.descripcion_problema,
         sucursal: trabajo.sucursal,
+        marca: (trabajo.marca ?? servicio?.marca ?? "OTROS") as Marca,
         estado,
         realizadas: realizadas.length,
         pendientes: pendientes.length,
@@ -591,12 +594,13 @@ export default function Dashboard() {
     return trabajosBase.filter((row) => {
       if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
       if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
+      if (fMarcasTrabajo.length > 0 && !fMarcasTrabajo.includes(row.marca)) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadosTrabajo, fTecnicos]);
+  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcasTrabajo]);
 
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
@@ -606,19 +610,18 @@ export default function Dashboard() {
   );
   const tecnicosTotales = activeTechnicianIds.size;
 
-  // Estadísticas de "flujo operativo" basadas en trabajosBase (no se ven afectadas
-  // por los filtros de estado/técnico de la pestaña Trabajos).
+  // Estadísticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestaña Trabajos).
   const flujo = useMemo(() => {
-    const total = trabajosBase.length;
-    const culminados = trabajosBase.filter((r) => r.estado === "completado").length;
-    const pausados = trabajosBase.filter((r) => r.estado === "pausado").length;
-    const pendiente = trabajosBase.filter((r) => r.estado === "pendiente").length;
-    const programado = trabajosBase.filter((r) => r.estado === "programado").length;
-    const iniciado = trabajosBase.filter((r) => r.estado === "iniciado").length;
+    const total = trabajosResumen.length;
+    const culminados = trabajosResumen.filter((r) => r.estado === "completado").length;
+    const pausados = trabajosResumen.filter((r) => r.estado === "pausado").length;
+    const pendiente = trabajosResumen.filter((r) => r.estado === "pendiente").length;
+    const programado = trabajosResumen.filter((r) => r.estado === "programado").length;
+    const iniciado = trabajosResumen.filter((r) => r.estado === "iniciado").length;
     const abiertos = total - culminados - pausados;
     const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
     return { total, culminados, abiertos, pausados, pendiente, programado, iniciado, pct };
-  }, [trabajosBase]);
+  }, [trabajosResumen]);
 
   const trabajosPorEstado = useMemo(() => {
     const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
@@ -650,14 +653,14 @@ export default function Dashboard() {
       r.estado === "completado" && !!r.fechaCierre && inRange(r.fechaCierre, periodStart, periodEnd);
 
     type Row = { sucursal: Sucursal; cerrados: number; abiertos: number; pausados: number; total: number; pct: number };
-    const totalGral = trabajosBase.reduce((acc, r) => {
+    const totalGral = trabajosResumen.reduce((acc, r) => {
       const c = cerradoEnPeriodo(r);
       const enP = tieneActividad(r);
       return acc + (c || enP ? 1 : 0);
     }, 0);
 
     return SUCURSALES.map<Row>((sucursal) => {
-      const rows = trabajosBase.filter((r) => r.sucursal === sucursal);
+      const rows = trabajosResumen.filter((r) => r.sucursal === sucursal);
       let cerrados = 0, pausados = 0, abiertos = 0;
       for (const r of rows) {
         const cerrEnP = cerradoEnPeriodo(r);
@@ -673,7 +676,38 @@ export default function Dashboard() {
     })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [trabajosBase, periodStart, periodEnd]);
+  }, [trabajosResumen, periodStart, periodEnd]);
+
+  // Distribución por marca en el período (reemplaza "Lectura operativa")
+  const cargaMarca = useMemo(() => {
+    const tieneActividad = (r: typeof trabajosBase[number]) => {
+      if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
+      if (r.actualizadoEn && inRange(r.actualizadoEn, periodStart, periodEnd)) return true;
+      if (r.jornadaFechas.some((f) => inRange(f, periodStart, periodEnd))) return true;
+      return false;
+    };
+    const cerradoEnPeriodo = (r: typeof trabajosBase[number]) =>
+      r.estado === "completado" && !!r.fechaCierre && inRange(r.fechaCierre, periodStart, periodEnd);
+
+    const totalGral = trabajosResumen.reduce((acc, r) => acc + (cerradoEnPeriodo(r) || tieneActividad(r) ? 1 : 0), 0);
+
+    return MARCAS.map((marca) => {
+      const rows = trabajosResumen.filter((r) => r.marca === marca);
+      let cerrados = 0, pausados = 0, abiertos = 0, horas = 0;
+      for (const r of rows) {
+        const cerrEnP = cerradoEnPeriodo(r);
+        const actEnP = tieneActividad(r);
+        if (!cerrEnP && !actEnP) continue;
+        horas += r.horas;
+        if (cerrEnP) { cerrados++; continue; }
+        if (r.estado === "pausado") pausados++;
+        else abiertos++;
+      }
+      const total = cerrados + pausados + abiertos;
+      const pct = totalGral > 0 ? Math.round((total / totalGral) * 100) : 0;
+      return { marca, cerrados, abiertos, pausados, total, horas, pct };
+    }).sort((a, b) => b.total - a.total);
+  }, [trabajosResumen, periodStart, periodEnd]);
 
 
 
@@ -696,8 +730,8 @@ export default function Dashboard() {
     const bucketsSet = new Set<string>();
     const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
 
-    // Scope por sucursal/búsqueda (no por filtros de estado/técnico de la pestaña Trabajos).
-    const trabajoIdsEnScope = new Set(trabajosScope.map((t) => t.id));
+    // Scope: trabajos visibles tras aplicar filtros de la pestaña Trabajos (estado/técnico/marca).
+    const trabajoIdsEnScope = new Set(trabajosResumen.map((t) => t.id));
     // Mapa inverso: servicio_id -> trabajo_id (mismo criterio que jornadasByTrabajo)
     const servicioATrabajo = new Map<string, string>();
     for (const trabajo of trabajos) {
@@ -736,7 +770,8 @@ export default function Dashboard() {
     }
 
     const buckets = Array.from(bucketsSet).sort();
-    const rows = Array.from(map.values())
+    const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
+    const rowsAll = Array.from(map.values())
       .map((row) => ({
         id: row.id,
         nombre: row.nombre,
@@ -746,6 +781,7 @@ export default function Dashboard() {
         trabajos: row.trabajos.size,
       }))
       .sort((a, b) => b.totalJornadas - a.totalJornadas || b.totalHoras - a.totalHoras);
+    const rows = tecnicoFilterSet ? rowsAll.filter((r) => tecnicoFilterSet.has(r.id)) : rowsAll;
 
     const totalesPorBucket: Record<string, { jornadas: number; horas: number }> = {};
     for (const k of buckets) totalesPorBucket[k] = { jornadas: 0, horas: 0 };
@@ -760,7 +796,7 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadas, trabajos, trabajosScope, activeTechnicianIds, periodMode, periodStart, periodEnd, profileById]);
+  }, [jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
@@ -769,6 +805,7 @@ export default function Dashboard() {
     setFRubros([]);
     setFEstadosTrabajo([]);
     setFTecnicos([]);
+    setFMarcasTrabajo([]);
     setPeriodMode("mes");
     setQ("");
   };
@@ -779,6 +816,7 @@ export default function Dashboard() {
     (fRubros.length > 0 ? 1 : 0) +
     (fEstadosTrabajo.length > 0 ? 1 : 0) +
     (fTecnicos.length > 0 ? 1 : 0) +
+    (fMarcasTrabajo.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
 
@@ -1027,10 +1065,11 @@ export default function Dashboard() {
 
         <TabsContent value="trabajos" className="space-y-3">
           <FiltersBar
-            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0)}
+            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0) + (fMarcasTrabajo.length > 0 ? 1 : 0)}
             onClear={() => {
               setFEstadosTrabajo([]);
               setFTecnicos([]);
+              setFMarcasTrabajo([]);
             }}
             meta={
               <div className="flex flex-wrap items-center gap-1.5">
@@ -1056,6 +1095,14 @@ export default function Dashboard() {
                 { value: "pausado", label: "Pausado" },
                 { value: "completado", label: "Completado" },
               ]}
+            />
+            <FilterMultiSelect
+              label="Marca"
+              values={fMarcasTrabajo}
+              onChange={setFMarcasTrabajo}
+              placeholder="Todas"
+              width="w-[150px]"
+              options={MARCAS.map((m) => ({ value: m, label: m }))}
             />
             <FilterMultiSelect
               label="Tecnico o cuadrilla"
@@ -1144,13 +1191,14 @@ export default function Dashboard() {
               <CargaTecnicaMatriz data={productividadMatriz} />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={CalendarDays} title={T.lectura} subtitle="" />
-              <div className="grid grid-cols-2 gap-2">
-                <Kpi label="Cierre anterior" value={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} loading={loading} />
-                <Kpi label={T.plan} value={`${format(weekStart, "dd/MM")} - ${format(weekEnd, "dd/MM")}`} loading={loading} />
-                <Kpi label="Sin horas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
-                <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
-              </div>
+              <PanelTitle icon={BarChart3} title="Distribucion por marca" subtitle="Trabajos con actividad en el periodo" />
+              <DistribucionMarca
+                data={cargaMarca}
+                onSelect={(marca) =>
+                  setFMarcasTrabajo((prev) => (prev.length === 1 && prev[0] === marca ? [] : [marca]))
+                }
+                selected={fMarcasTrabajo}
+              />
             </Card>
 
           </section>
@@ -1719,6 +1767,84 @@ function CargaSucursalTabla({
           <div className="text-right tabular-nums text-muted-foreground">{r.pct}%</div>
         </button>
       ))}
+    </div>
+  );
+}
+
+function DistribucionMarca({
+  data,
+  onSelect,
+  selected,
+}: {
+  data: Array<{ marca: Marca; cerrados: number; abiertos: number; pausados: number; total: number; horas: number; pct: number }>;
+  onSelect: (marca: Marca) => void;
+  selected: string[];
+}) {
+  const max = Math.max(1, ...data.map((d) => d.total));
+  const totales = data.reduce(
+    (acc, d) => ({
+      cerrados: acc.cerrados + d.cerrados,
+      abiertos: acc.abiertos + d.abiertos,
+      pausados: acc.pausados + d.pausados,
+      total: acc.total + d.total,
+      horas: acc.horas + d.horas,
+    }),
+    { cerrados: 0, abiertos: 0, pausados: 0, total: 0, horas: 0 },
+  );
+  if (totales.total === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin actividad por marca en el periodo.</div>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
+        {data.map((d) => {
+          const isActive = selected.length === 1 && selected[0] === d.marca;
+          const widthAbiertos = d.total > 0 ? (d.abiertos / max) * 100 : 0;
+          const widthPausados = d.total > 0 ? (d.pausados / max) * 100 : 0;
+          const widthCerrados = d.total > 0 ? (d.cerrados / max) * 100 : 0;
+          return (
+            <button
+              key={d.marca}
+              onClick={() => onSelect(d.marca)}
+              className={cn(
+                "rounded-md border px-3 py-2 text-left transition hover:bg-accent",
+                isActive && "border-primary bg-accent/40",
+              )}
+            >
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{d.marca}</span>
+                  <span className="text-[11px] text-muted-foreground">{d.pct}%</span>
+                </div>
+                <div className="flex items-center gap-3 tabular-nums text-[11px] text-muted-foreground">
+                  <span>{d.horas.toFixed(1)} h</span>
+                  <span className="font-semibold text-foreground">{d.total}</span>
+                </div>
+              </div>
+              <div className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-sky-500" style={{ width: `${widthAbiertos}%` }} title={`Abiertos: ${d.abiertos}`} />
+                <div className="h-full bg-amber-500" style={{ width: `${widthPausados}%` }} title={`Pausados: ${d.pausados}`} />
+                <div className="h-full bg-emerald-500" style={{ width: `${widthCerrados}%` }} title={`Cerrados: ${d.cerrados}`} />
+              </div>
+              <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-muted-foreground tabular-nums">
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />Abiertos {d.abiertos}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-500" />Pausados {d.pausados}</span>
+                <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />Cerrados {d.cerrados}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground tabular-nums">
+        <span className="font-medium text-foreground">Total periodo</span>
+        <div className="flex items-center gap-3">
+          <span>Abiertos {totales.abiertos}</span>
+          <span>Pausados {totales.pausados}</span>
+          <span>Cerrados {totales.cerrados}</span>
+          <span>{totales.horas.toFixed(1)} h</span>
+          <span className="font-semibold text-foreground">{totales.total}</span>
+        </div>
+      </div>
     </div>
   );
 }
