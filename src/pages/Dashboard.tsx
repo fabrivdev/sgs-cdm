@@ -561,6 +561,9 @@ export default function Dashboard() {
         pendientesVencidas,
         pendientesSemana,
         tipo: servicio?.marca ?? "",
+        creadoEn: (trabajo as any).creado_en ?? null,
+        actualizadoEn: (trabajo as any).actualizado_en ?? null,
+        jornadaFechas: trabajoJornadas.map((j) => j.fecha).filter(Boolean) as string[],
       };
     });
   }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
