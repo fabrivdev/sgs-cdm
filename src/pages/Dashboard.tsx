@@ -770,7 +770,7 @@ export default function Dashboard() {
               </Card>
               <Card className="p-3">
                 <PanelTitle icon={DollarSign} title="Mix del negocio" subtitle="" />
-                <MixRubros row={currentWeekRow} rubroFiltro={fRubro} />
+                <MixRubros row={currentWeekRow} rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"} />
               </Card>
 
             </div>
