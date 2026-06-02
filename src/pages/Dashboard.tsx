@@ -542,6 +542,7 @@ export default function Dashboard() {
       const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
       const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
       const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
+      const fechaCierre = realizadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
       const pendientesVencidas = pendientes.filter((row) => row.fecha < todayStr).length;
       const pendientesSemana = pendientes.filter((row) => inRange(row.fecha, weekStart, weekEnd)).length;
       return {
@@ -558,6 +559,7 @@ export default function Dashboard() {
         tecnicoIds,
         horas,
         ultimaFecha,
+        fechaCierre,
         pendientesVencidas,
         pendientesSemana,
         tipo: servicio?.marca ?? "",
