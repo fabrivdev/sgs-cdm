@@ -13,7 +13,7 @@ import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer
 import { TrabajosOSTab } from "@/components/trabajos/TrabajosOSTab";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getISOWeek, parseISO, format } from "date-fns";
+import { parseISO, format } from "date-fns";
 import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { useAuth } from "@/hooks/useAuth";
 
