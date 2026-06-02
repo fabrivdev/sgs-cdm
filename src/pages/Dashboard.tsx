@@ -895,80 +895,97 @@ export default function Dashboard() {
         </Card>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="flex h-full flex-col p-3">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold">{T.facturas}</h2>
+          <Card className="flex flex-col p-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">{T.facturas}</h2>
+              </div>
+              <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
             </div>
-
-            <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
-          </div>
-          <div className="max-h-[360px] overflow-auto rounded-md border">
-            <div className="grid min-w-[860px] grid-cols-[96px_112px_1fr_120px_130px_112px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-              <div>Fecha</div>
-              <div>Factura</div>
-              <div>Cliente</div>
-              <div>Concepto</div>
-              <div>Sucursal</div>
-              <div className="text-right">Importe</div>
-            </div>
-            {selectedFacts.length === 0 ? (
-              <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturacion para esta semana.</div>
-            ) : (
-              selectedFacts.map((row, index) => {
-                const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
-                return (
-                  <div key={`${row.cod_factura}-${index}`} className="grid min-w-[860px] grid-cols-[96px_112px_1fr_120px_130px_112px] items-center border-t px-3 py-2 text-xs">
-                    <div className="tabular-nums">{format(parseISO(row.fecha), "dd/MM")}</div>
-                    <div className="font-mono text-[11px]">{row.cod_factura}</div>
-                    <div className="truncate font-medium">{cliente}</div>
-                    <div>{concept(row)}</div>
-                    <div>{row.sucursal ?? "-"}</div>
-                    <div className="text-right font-semibold tabular-nums">{money(Number(row.total_venta || 0))}</div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </Card>
-
-        <Card className="flex h-full flex-col p-3">
-          <div className="mb-3">
-            <h2 className="text-base font-semibold">Clientes y sucursales</h2>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-md border">
-              <div className="border-b px-3 py-2 text-xs font-semibold">Top clientes</div>
-              {topClientes.length === 0 ? (
-                <div className="px-3 py-6 text-center text-xs text-muted-foreground">Sin datos.</div>
+            <div className="max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border">
+              <div className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                <div>Fecha</div>
+                <div className="hidden md:block">Factura</div>
+                <div>Cliente</div>
+                <div>Concepto</div>
+                <div className="hidden md:block">Sucursal</div>
+                <div className="text-right">Importe</div>
+              </div>
+              {selectedFacts.length === 0 ? (
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturacion para esta semana.</div>
               ) : (
-                topClientes.map((row) => (
-                  <button key={row.nombre} onClick={() => setQ(row.nombre)} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-accent">
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold">{compact(row.nombre)}</span>
-                      <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
-                    </span>
-                    <span className="font-semibold tabular-nums">{money(row.total)}</span>
-                  </button>
-                ))
+                selectedFacts.map((row, index) => {
+                  const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
+                  return (
+                    <div key={`${row.cod_factura}-${index}`} className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] items-center border-t px-3 py-2 text-xs">
+                      <div className="tabular-nums">{format(parseISO(row.fecha), "dd/MM")}</div>
+                      <div className="hidden truncate font-mono text-[11px] md:block" title={row.cod_factura}>{row.cod_factura}</div>
+                      <div className="truncate font-medium" title={cliente ?? ""}>{cliente}</div>
+                      <div className="truncate" title={concept(row)}>{concept(row)}</div>
+                      <div className="hidden truncate md:block" title={row.sucursal ?? ""}>{row.sucursal ?? "-"}</div>
+                      <div className="text-right font-semibold tabular-nums">{money(Number(row.total_venta || 0))}</div>
+                    </div>
+                  );
+                })
               )}
             </div>
-            <div className="rounded-md border">
-              <div className="border-b px-3 py-2 text-xs font-semibold">Por sucursal</div>
-              {factBySucursal.map((row) => (
-                <button key={row.sucursal} onClick={() => setFSucursales([row.sucursal])} className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-b-0 hover:bg-accent">
-                  <span>
-                    <span className="block font-semibold">{row.sucursal}</span>
-                    <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
-                  </span>
-                  <span className="font-semibold tabular-nums">{money(row.total)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
+          </Card>
+
+          <section className="grid gap-3 xl:grid-cols-2">
+            <Card className="flex flex-col p-3">
+              <div className="mb-3">
+                <h2 className="text-base font-semibold">Top clientes</h2>
+              </div>
+              {topClientes.length === 0 ? (
+                <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos.</div>
+              ) : (
+                <div className="grid max-h-[280px] gap-1.5 overflow-y-auto pr-1 md:grid-cols-2">
+                  {topClientes.map((row) => (
+                    <button
+                      key={row.nombre}
+                      onClick={() => setQ(row.nombre)}
+                      className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-xs hover:bg-accent"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold" title={row.nombre}>{compact(row.nombre)}</span>
+                        <span className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</span>
+                      </span>
+                      <span className="shrink-0 font-semibold tabular-nums">{money(row.total)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card className="flex flex-col p-3">
+              <div className="mb-3">
+                <h2 className="text-base font-semibold">Facturacion por sucursal</h2>
+              </div>
+              <div className="space-y-2">
+                {(() => {
+                  const maxTotal = Math.max(1, ...factBySucursal.map((r) => r.total));
+                  return factBySucursal.map((row) => {
+                    const pct = Math.round((row.total / maxTotal) * 100);
+                    return (
+                      <button
+                        key={row.sucursal}
+                        onClick={() => setFSucursales([row.sucursal])}
+                        className="flex w-full flex-col gap-1 rounded-md border px-3 py-2 text-left text-xs hover:bg-accent"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">{row.sucursal}</span>
+                          <span className="font-semibold tabular-nums">{money(row.total)}</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">{row.facturas} factura{row.facturas !== 1 ? "s" : ""}</div>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </Card>
           </section>
         </TabsContent>
 
