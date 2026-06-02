@@ -185,11 +185,11 @@ export default function Dashboard() {
 
   const [weekStartInput, setWeekStartInput] = useState(initialWeekStart);
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
-  const [fSucursal, setFSucursal] = useState("all");
-  const [fRubro, setFRubro] = useState("all");
-  const [fEstadoTrabajo, setFEstadoTrabajo] = useState("all");
-  const [fTecnico, setFTecnico] = useState("all");
-  const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("semana");
+  const [fSucursales, setFSucursales] = useState<string[]>([]);
+  const [fRubros, setFRubros] = useState<string[]>([]);
+  const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
+  const [fTecnicos, setFTecnicos] = useState<string[]>([]);
+  const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
 
