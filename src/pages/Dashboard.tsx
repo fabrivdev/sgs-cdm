@@ -570,6 +570,7 @@ export default function Dashboard() {
         cliente,
         descripcion: trabajo.descripcion_problema,
         sucursal: trabajo.sucursal,
+        marca: (trabajo.marca ?? servicio?.marca ?? "OTROS") as Marca,
         estado,
         realizadas: realizadas.length,
         pendientes: pendientes.length,
@@ -593,12 +594,13 @@ export default function Dashboard() {
     return trabajosBase.filter((row) => {
       if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
       if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
+      if (fMarcasTrabajo.length > 0 && !fMarcasTrabajo.includes(row.marca)) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadosTrabajo, fTecnicos]);
+  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcasTrabajo]);
 
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
