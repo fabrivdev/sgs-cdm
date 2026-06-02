@@ -412,7 +412,7 @@ export default function Dashboard() {
       current.facturas = new Set(current.rows.map((item) => item.cod_factura)).size;
       map.set(nombre, current);
     }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 6);
+    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30);
   }, [clienteById, selectedFacts]);
 
   const jornadasRealizadasPrev = useMemo(
