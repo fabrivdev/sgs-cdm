@@ -1239,7 +1239,7 @@ function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?
       </div>
       <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        Facturacion semanal (USD)
+        Facturacion ($)
       </div>
     </div>
   );
