@@ -973,7 +973,7 @@ export default function Dashboard() {
 
         <TabsContent value="trabajos" className="space-y-3">
           <FiltersBar
-            activeCount={(fEstadoTrabajo !== "all" ? 1 : 0) + (fTecnico !== "all" ? 1 : 0)}
+            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0)}
             onClear={() => {
               setFEstadosTrabajo([]);
               setFTecnicos([]);
