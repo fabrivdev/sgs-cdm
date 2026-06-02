@@ -1471,46 +1471,16 @@ function MixRubros({ row, rubroFiltro }: { row: WeekRow | undefined; rubroFiltro
   );
 }
 
-function FlujoOperativo({
-  flujo, jornadasProgramadas, tecnicosActivos, jornadasPrev, horasPrev, planLabel,
-}: {
-  flujo: { total: number; culminados: number; abiertos: number; pausados: number };
-  jornadasProgramadas: number;
-  tecnicosActivos: number;
-  jornadasPrev: number;
-  horasPrev: number;
-  planLabel: string;
-}) {
-  const items = [
-    { label: "Gestionados", value: flujo.total },
-    { label: "Culminados", value: flujo.culminados },
-    { label: "Abiertos", value: flujo.abiertos },
-    { label: "Pausados", value: flujo.pausados, warn: flujo.pausados > 0 },
-    { label: planLabel, value: `${jornadasProgramadas} planificados` },
-    { label: "Tecnicos activos", value: tecnicosActivos },
-  ];
-  return (
-    <div>
-      <div className="grid grid-cols-3 gap-2">
-        {items.map((it) => (
-          <div key={it.label} className={cn("rounded-md border px-2.5 py-2", it.warn && "border-amber-300 bg-amber-50/60")}>
-            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{it.label}</div>
-            <div className="mt-0.5 text-base font-bold tabular-nums">{it.value}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 text-[11px] text-muted-foreground">
-        Cierre anterior: {jornadasPrev} jornadas · {horasPrev.toFixed(1)} hs
-      </div>
-    </div>
-  );
-}
-
 function EstadoCompacto({
-  flujo, onSelect,
+  flujo, onSelect, planificados, tecnicosActivos, jornadasPrev, horasPrev, planLabel,
 }: {
   flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
   onSelect: (estado: string) => void;
+  planificados?: number;
+  tecnicosActivos?: number;
+  jornadasPrev?: number;
+  horasPrev?: number;
+  planLabel?: string;
 }) {
   if (flujo.total === 0) {
     return (
