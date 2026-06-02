@@ -192,6 +192,7 @@ export default function Dashboard() {
   const [fRubros, setFRubros] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
+  const [fMarcasTrabajo, setFMarcasTrabajo] = useState<string[]>([]);
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
