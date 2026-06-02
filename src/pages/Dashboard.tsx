@@ -500,7 +500,7 @@ export default function Dashboard() {
   }, [periodMode]);
 
 
-  const trabajosResumen = useMemo(() => {
+  const trabajosBase = useMemo(() => {
     return trabajosScope.map((trabajo) => {
       const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
       const servicio = trabajo.legacy_servicio_id ? servicioById.get(trabajo.legacy_servicio_id) : null;
@@ -537,7 +537,11 @@ export default function Dashboard() {
         pendientesSemana,
         tipo: servicio?.marca ?? "",
       };
-    }).filter((row) => {
+    });
+  }, [activeTechnicianIds, clienteById, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
+
+  const trabajosResumen = useMemo(() => {
+    return trabajosBase.filter((row) => {
       if (fEstadoTrabajo !== "all" && row.estado !== fEstadoTrabajo) return false;
       if (fTecnico !== "all" && !row.tecnicoIds.includes(fTecnico)) return false;
       return true;
@@ -545,7 +549,8 @@ export default function Dashboard() {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [activeTechnicianIds, clienteById, fEstadoTrabajo, fTecnico, jornadasByTrabajo, servicioById, trabajosScope, weekEnd, weekStart]);
+  }, [trabajosBase, fEstadoTrabajo, fTecnico]);
+
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
