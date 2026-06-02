@@ -756,15 +756,16 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <section className="grid gap-3 xl:grid-cols-[1.45fr_0.95fr]">
+          <section className="grid gap-3 xl:grid-cols-[1.2fr_1fr]">
             <Card className="p-3">
               <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
               <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
+              <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
             </Card>
 
             <div className="grid gap-3">
               <Card className="p-3">
-                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion de la semana base." />
+                <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
                 <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursal(sucursal); setSection("facturacion"); }} />
               </Card>
               <Card className="p-3">
