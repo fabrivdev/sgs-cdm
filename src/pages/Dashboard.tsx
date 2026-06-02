@@ -309,7 +309,7 @@ export default function Dashboard() {
   const factFiltered = useMemo(
     () =>
       facturacion.filter((row) => {
-        if (fRubro !== "all" && concept(row) !== fRubro) return false;
+        if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
