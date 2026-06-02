@@ -509,14 +509,14 @@ export default function Dashboard() {
   const cargaTecnicos = useMemo(() => {
     const map = new Map<string, number>();
     for (const jornada of jornadasProgramadas) {
-      const ids = validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])]);
+      const ids = validJornadaCrew(jornada);
       for (const id of ids) map.set(id, (map.get(id) ?? 0) + 1);
     }
     return Array.from(map.entries())
       .map(([id, count]) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-  }, [activeTechnicianIds, jornadasProgramadas, profileById]);
+  }, [activeTechnicianIds, jornadasProgramadas, profileById, servicioById]);
 
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
@@ -551,7 +551,7 @@ export default function Dashboard() {
       const pendientes = trabajoJornadas.filter((j) => j.estado === "Pendiente");
       const participantes = new Set<string>();
       for (const jornada of trabajoJornadas) {
-        for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+        for (const id of validJornadaCrew(jornada)) {
           participantes.add(id);
         }
       }
@@ -602,7 +602,7 @@ export default function Dashboard() {
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
   const tecnicosConActividad = new Set(
-    [...jornadasRealizadasPrev, ...jornadasProgramadas].flatMap((j) => validTechnicianIds([j.tecnico_responsable_id, ...(j.auxiliares ?? [])])),
+    [...jornadasRealizadasPrev, ...jornadasProgramadas].flatMap((j) => validJornadaCrew(j)),
   );
   const tecnicosTotales = activeTechnicianIds.size;
 
@@ -715,7 +715,7 @@ export default function Dashboard() {
       bucketsSet.add(key);
       // Solo Completado aporta horas reales
       const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
-      for (const id of validTechnicianIds([jornada.tecnico_responsable_id, ...(jornada.auxiliares ?? [])])) {
+      for (const id of validJornadaCrew(jornada)) {
         const current = map.get(id) ?? {
           id,
           nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
