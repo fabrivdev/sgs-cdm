@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle,
   CalendarDays,
@@ -176,6 +177,7 @@ export default function Dashboard() {
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
   const [fSucursal, setFSucursal] = useState("all");
   const [q, setQ] = useState("");
+  const [section, setSection] = useState("resumen");
 
   const weekStart = useMemo(() => startOfWeek(parseISO(weekStartInput), { weekStartsOn: 1 }), [weekStartInput]);
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
@@ -427,6 +429,56 @@ export default function Dashboard() {
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
+  const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
+  const previousWeekRow = weeklyRows[weeklyRows.length - 2] ?? null;
+  const selectedWeekConceptTotal =
+    (selectedWeek?.servicio ?? 0) + (selectedWeek?.kilometraje ?? 0) + (selectedWeek?.repuestos ?? 0) + (selectedWeek?.otros ?? 0);
+
+  const trabajosResumen = useMemo(() => {
+    return trabajosScope.map((trabajo) => {
+      const trabajoJornadas = jornadasByTrabajo.get(trabajo.id) ?? [];
+      const servicio = trabajo.legacy_servicio_id ? servicioById.get(trabajo.legacy_servicio_id) : null;
+      const cliente = trabajo.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre ?? "Sin cliente" : "Sin cliente";
+      const realizadas = trabajoJornadas.filter((j) => j.estado === "Completado");
+      const pendientes = trabajoJornadas.filter((j) => j.estado === "Pendiente");
+      const participantes = new Set<string>();
+      for (const jornada of trabajoJornadas) {
+        if (jornada.tecnico_responsable_id) participantes.add(jornada.tecnico_responsable_id);
+        for (const aux of jornada.auxiliares ?? []) participantes.add(aux);
+      }
+      const horas = realizadas.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
+      const estado = estadoTrabajoDesdeJornadas(trabajoJornadas, trabajo.estado_general);
+      const ultimaFecha = trabajoJornadas.reduce((max, row) => (row.fecha > max ? row.fecha : max), "");
+      const avance = trabajoJornadas.length ? Math.round((realizadas.length / trabajoJornadas.length) * 100) : 0;
+      return {
+        id: trabajo.id,
+        ref: trabajo.codigo ?? "TR",
+        cliente,
+        descripcion: trabajo.descripcion_problema,
+        sucursal: trabajo.sucursal,
+        estado,
+        realizadas: realizadas.length,
+        pendientes: pendientes.length,
+        totalJornadas: trabajoJornadas.length,
+        participantes: participantes.size,
+        horas,
+        ultimaFecha,
+        avance,
+        tipo: servicio?.marca ?? "",
+      };
+    }).sort((a, b) => {
+      const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
+      return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
+    });
+  }, [clienteById, jornadasByTrabajo, servicioById, trabajosScope]);
+
+  const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
+  const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
+  const tecnicosConActividad = new Set([
+    ...jornadasRealizadasPrev.flatMap((j) => [j.tecnico_responsable_id, ...(j.auxiliares ?? [])].filter(Boolean) as string[]),
+    ...jornadasProgramadas.flatMap((j) => [j.tecnico_responsable_id, ...(j.auxiliares ?? [])].filter(Boolean) as string[]),
+  ]);
+  const tecnicosTotales = profiles.length;
 
   const alertas = [
     fueraTolerancia.length > 0
@@ -486,7 +538,131 @@ export default function Dashboard() {
         />
       </FiltersBar>
 
-      <section className="grid gap-3 lg:grid-cols-[1.5fr_0.9fr]">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          icon={DollarSign}
+          title="Facturacion semana"
+          value={money(currentWeekRow?.total ?? 0)}
+          detail={`${currentWeekRow?.facturas ?? 0} facturas · ${currentWeekRow?.clientes ?? 0} clientes`}
+          tone={(currentWeekRow?.variacion ?? 0) < -20 ? "bad" : "neutral"}
+          onClick={() => setSection("facturacion")}
+        />
+        <SummaryCard
+          icon={ClipboardList}
+          title="Trabajos activos"
+          value={trabajosActivos.length}
+          detail={`${trabajosConCierre} cerrados · ${trabajosPausados.length} pausados`}
+          tone={trabajosPausados.length ? "warn" : "neutral"}
+          onClick={() => setSection("trabajos")}
+        />
+        <SummaryCard
+          icon={CheckCircle2}
+          title="Horas / jornadas"
+          value={`${horasPrev.toFixed(1)} hs`}
+          detail={`${jornadasRealizadasPrev.length} realizadas · ${jornadasProgramadas.length} pendientes`}
+          tone={sinHorasPrev ? "warn" : "good"}
+          onClick={() => setSection("trabajos")}
+        />
+        <SummaryCard
+          icon={CalendarDays}
+          title="Tecnicos involucrados"
+          value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`}
+          detail="Con actividad realizada o pendiente"
+          tone="neutral"
+          onClick={() => setSection("trabajos")}
+        />
+      </section>
+
+      <Tabs value={section} onValueChange={setSection} className="space-y-3">
+        <TabsList className="grid h-auto w-full grid-cols-3 sm:w-fit">
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="facturacion">Facturacion</TabsTrigger>
+          <TabsTrigger value="trabajos">Trabajos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="space-y-3">
+          <section className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
+            <Card className="p-3">
+              <PanelTitle icon={DollarSign} title="Lectura rapida financiera" subtitle="Ultimas semanas y composicion de la semana actual." />
+              <div className="grid gap-2 sm:grid-cols-3">
+                {weeklyRows.slice(-3).map((row) => (
+                  <button
+                    key={row.key}
+                    onClick={() => {
+                      setSelectedWeekKey(row.key);
+                      setSection("facturacion");
+                    }}
+                    className={cn("rounded-md border p-3 text-left hover:bg-accent", row.key === currentWeekRow?.key && "border-primary/40 bg-primary/5")}
+                  >
+                    <div className="text-[11px] font-medium text-muted-foreground">{row.label}</div>
+                    <div className="mt-1 text-xl font-bold tabular-nums">{money(row.total)}</div>
+                    <div className={cn("mt-1 text-[11px]", row.variacion != null && row.variacion < 0 && "text-destructive")}>
+                      {row.variacion == null ? "sin base" : `${row.variacion > 0 ? "+" : ""}${row.variacion}% vs ant.`}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                <ConceptMini label="Repuestos" value={currentWeekRow?.repuestos ?? 0} total={currentWeekRow?.total ?? 0} />
+                <ConceptMini label="Servicio" value={currentWeekRow?.servicio ?? 0} total={currentWeekRow?.total ?? 0} />
+                <ConceptMini label="Km" value={currentWeekRow?.kilometraje ?? 0} total={currentWeekRow?.total ?? 0} />
+                <ConceptMini label="Otros" value={currentWeekRow?.otros ?? 0} total={currentWeekRow?.total ?? 0} />
+              </div>
+            </Card>
+
+            <Card className="p-3">
+              <PanelTitle icon={ClipboardList} title="Trabajos en general" subtitle="Situacion operativa sin separar pasado/futuro." />
+              <div className="grid grid-cols-2 gap-2">
+                <Kpi label="Activos" value={trabajosActivos.length} loading={loading} />
+                <Kpi label="Cerrados" value={trabajosConCierre} loading={loading} />
+                <Kpi label="Pausados" value={trabajosPausados.length} loading={loading} tone={trabajosPausados.length ? "warn" : "good"} />
+                <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
+              </div>
+              <button onClick={() => setSection("trabajos")} className="mt-3 flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover:bg-accent">
+                <span>Ver detalle por OS/TR, horas, tecnicos y cierre</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </Card>
+          </section>
+
+          <section className="grid gap-3 xl:grid-cols-[1fr_1fr_0.9fr]">
+            <Card className="p-3">
+              <PanelTitle icon={CheckCircle2} title="Realizado semana anterior" subtitle={`${format(previousWeekStart, "dd/MM")} al ${format(previousWeekEnd, "dd/MM")}`} />
+              <div className="grid grid-cols-2 gap-2">
+                <Kpi label="Jornadas" value={jornadasRealizadasPrev.length} loading={loading} />
+                <Kpi label="Horas" value={`${horasPrev.toFixed(1)} hs`} loading={loading} />
+              </div>
+              <div className="mt-2">
+                <Kpi label="Sin horas cargadas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
+              </div>
+            </Card>
+
+            <Card className="p-3">
+              <PanelTitle icon={CalendarDays} title="Programado esta semana" subtitle={`${format(weekStart, "dd/MM")} al ${format(weekEnd, "dd/MM")}`} />
+              <div className="grid grid-cols-2 gap-2">
+                <Kpi label="Jornadas" value={jornadasProgramadas.length} loading={loading} />
+                <Kpi label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} loading={loading} />
+              </div>
+              <div className="mt-3 rounded-md border">
+                {cargaTecnicos.length === 0 ? (
+                  <div className="px-3 py-5 text-center text-xs text-muted-foreground">Sin carga por tecnico.</div>
+                ) : (
+                  cargaTecnicos.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between border-b px-3 py-2 text-xs last:border-b-0">
+                      <span className="truncate font-medium">{row.nombre}</span>
+                      <Badge variant="secondary">{row.count}</Badge>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+
+            <AlertasCard alertas={alertas} navigate={navigate} />
+          </section>
+        </TabsContent>
+
+        <TabsContent value="facturacion" className="space-y-3">
+          <section className="grid gap-3 lg:grid-cols-[1.5fr_0.9fr]">
         <Card className="p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
@@ -562,9 +738,9 @@ export default function Dashboard() {
             <ConceptLine label="Otros" value={selectedWeek?.otros ?? 0} total={selectedWeek?.total ?? 0} />
           </div>
         </Card>
-      </section>
+          </section>
 
-      <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+          <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
@@ -638,9 +814,62 @@ export default function Dashboard() {
             </div>
           </div>
         </Card>
-      </section>
+          </section>
+        </TabsContent>
 
-      <section className="grid gap-3 xl:grid-cols-[1fr_1fr_0.9fr]">
+        <TabsContent value="trabajos" className="space-y-3">
+          <Card className="p-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Trabajos por OS/TR</h2>
+                <p className="text-xs text-muted-foreground">Avance, tecnicos, horas, estado y cierre en una sola lectura.</p>
+              </div>
+              <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
+            </div>
+            <div className="overflow-x-auto rounded-md border">
+              <div className="min-w-[980px]">
+                <div className="grid grid-cols-[96px_1.2fr_0.8fr_90px_90px_86px_86px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                  <div>OS/TR</div>
+                  <div>Cliente / trabajo</div>
+                  <div>Sucursal</div>
+                  <div className="text-right">Jornadas</div>
+                  <div className="text-right">Tecnicos</div>
+                  <div className="text-right">Horas</div>
+                  <div className="text-right">Avance</div>
+                  <div className="text-right">Estado</div>
+                </div>
+                {trabajosResumen.length === 0 ? (
+                  <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin trabajos para los filtros actuales.</div>
+                ) : (
+                  trabajosResumen.slice(0, 80).map((row) => (
+                    <button
+                      key={row.id}
+                      onClick={() => navigate(`/trabajos?q=${encodeURIComponent(row.ref)}`)}
+                      className="grid w-full grid-cols-[96px_1.2fr_0.8fr_90px_90px_86px_86px_110px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+                    >
+                      <div className="font-mono text-[11px] font-semibold">{row.ref}</div>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{row.cliente}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">{row.descripcion}</div>
+                      </div>
+                      <div className="truncate">{row.sucursal}</div>
+                      <div className="text-right tabular-nums">{row.realizadas}/{row.totalJornadas}</div>
+                      <div className="text-right tabular-nums">{row.participantes}</div>
+                      <div className="text-right tabular-nums">{row.horas.toFixed(1)}</div>
+                      <div className="text-right tabular-nums">{row.avance}%</div>
+                      <div className="text-right">
+                        <Badge variant={row.estado === "pausado" ? "default" : "secondary"} className={cn("text-[10px]", row.estado === "pausado" && "bg-amber-600 text-white")}>
+                          {estadoLabel(row.estado)}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <section className="grid gap-3 xl:grid-cols-[1fr_1fr_0.9fr]">
         <Card className="p-3">
           <PanelTitle icon={CheckCircle2} title="Realizado semana anterior" subtitle={`${format(previousWeekStart, "dd/MM")} al ${format(previousWeekEnd, "dd/MM")}`} />
           <div className="grid grid-cols-2 gap-2">
@@ -672,29 +901,44 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card className="p-3">
-          <PanelTitle icon={AlertTriangle} title="Alertas ejecutivas" subtitle="Solo desvios accionables" />
-          <div className="space-y-2">
-            {alertas.length === 0 ? (
-              <div className="rounded-md border bg-emerald-500/5 px-3 py-6 text-center text-xs text-emerald-700">Sin alertas criticas.</div>
-            ) : (
-              alertas.map((alerta) => (
-                <button key={alerta.title} onClick={() => navigate(alerta.to)} className="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left hover:bg-accent">
-                  <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", toneClasses[alerta.tone])}>
-                    {alerta.tone === "bad" ? <AlertTriangle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold">{alerta.title}</span>
-                    <span className="block truncate text-[11px] text-muted-foreground">{alerta.detail}</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))
-            )}
-          </div>
-        </Card>
-      </section>
+            <AlertasCard alertas={alertas} navigate={navigate} />
+          </section>
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  title,
+  value,
+  detail,
+  tone = "neutral",
+  onClick,
+}: {
+  icon: React.ElementType;
+  title: string;
+  value: React.ReactNode;
+  detail: string;
+  tone?: Tone;
+  onClick: () => void;
+}) {
+  return (
+    <button className="rounded-lg text-left" onClick={onClick}>
+      <Card className={cn("p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
+            <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
+            <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
+          </div>
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", toneClasses[tone])}>
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </Card>
+    </button>
   );
 }
 
@@ -734,6 +978,66 @@ function ConceptLine({ label, value, total }: { label: string; value: number; to
       </div>
     </div>
   );
+}
+
+function ConceptMini({ label, value, total }: { label: string; value: number; total: number }) {
+  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="rounded-md border px-3 py-2">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="truncate font-medium">{label}</span>
+        <span className="tabular-nums text-muted-foreground">{percent}%</span>
+      </div>
+      <div className="mt-1 text-sm font-semibold tabular-nums">{money(value)}</div>
+    </div>
+  );
+}
+
+function AlertasCard({
+  alertas,
+  navigate,
+}: {
+  alertas: Array<{ tone: Tone; title: string; detail: string; to: string }>;
+  navigate: (to: string) => void;
+}) {
+  return (
+    <Card className="p-3">
+      <PanelTitle icon={AlertTriangle} title="Alertas ejecutivas" subtitle="Solo desvios accionables" />
+      <div className="space-y-2">
+        {alertas.length === 0 ? (
+          <div className="rounded-md border bg-emerald-500/5 px-3 py-6 text-center text-xs text-emerald-700">Sin alertas criticas.</div>
+        ) : (
+          alertas.map((alerta) => (
+            <button key={alerta.title} onClick={() => navigate(alerta.to)} className="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left hover:bg-accent">
+              <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", toneClasses[alerta.tone])}>
+                {alerta.tone === "bad" ? <AlertTriangle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold">{alerta.title}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{alerta.detail}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function estadoLabel(estado: string) {
+  switch (estado) {
+    case "programado":
+      return "Programado";
+    case "iniciado":
+      return "Iniciado";
+    case "pausado":
+      return "Pausado";
+    case "completado":
+      return "Completado";
+    default:
+      return "Pendiente";
+  }
 }
 
 const toneClasses: Record<Tone, string> = {
