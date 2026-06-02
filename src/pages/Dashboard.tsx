@@ -611,16 +611,9 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-[1440px] space-y-3 px-3 py-3 sm:px-4 sm:py-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard ejecutivo</h1>
-          <p className="text-xs text-muted-foreground">
-            Desempeno comercial y operativo con lectura rapida para direccion.
-          </p>
-        </div>
-        <Badge variant="outline" className="w-fit text-[11px]">
-          Facturacion desde importacion general, no desde OS
-        </Badge>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard ejecutivo</h1>
       </div>
+
 
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: "Cliente, factura o concepto..." }}
