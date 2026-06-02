@@ -324,7 +324,7 @@ export default function Dashboard() {
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
     if (!servicio) return false;
-    if (fSucursal !== "all" && servicio.sucursal !== fSucursal) return false;
+    if (fSucursales.length > 0 && !fSucursales.includes(servicio.sucursal)) return false;
     if (!query) return true;
     const cliente = servicio.cliente_id ? clienteById.get(servicio.cliente_id)?.nombre ?? "" : "";
     return cliente.toLowerCase().includes(query) || servicio.trabajo_descripcion.toLowerCase().includes(query);
