@@ -677,7 +677,7 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        meta={`${factFiltered.length} lineas facturacion - ${trabajosResumen.length} trabajos`}
+        
       >
         <PeriodSelector value={periodMode} onChange={setPeriodMode} />
         <FilterDate label={periodMode === "anio" ? "Año base" : periodMode === "mes" ? "Mes base" : "Semana base"} value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
