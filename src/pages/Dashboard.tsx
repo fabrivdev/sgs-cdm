@@ -1014,14 +1014,6 @@ export default function Dashboard() {
             />
           </FiltersBar>
 
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <SummaryCard icon={ClipboardList} title="Trabajos activos" value={trabajosActivos.length} detail="No completados" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-            <SummaryCard icon={CheckCircle2} title="Cerrados del periodo" value={trabajosConCierre} detail="Estado completado" tone="good" onClick={() => setFEstadoTrabajo("completado")} />
-            <SummaryCard icon={PauseCircleIcon} title="Pausados" value={trabajosPausados.length} detail="Pendientes de gestion" tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadoTrabajo("pausado")} />
-            <SummaryCard icon={CalendarDays} title="Jornadas realizadas" value={jornadasRealizadasPrev.length} detail={`${format(previousWeekStart, "dd/MM")} - ${format(previousWeekEnd, "dd/MM")}`} tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-            <SummaryCard icon={Users} title="Tecnicos con actividad" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} detail="" tone="neutral" onClick={() => setFEstadoTrabajo("all")} />
-          </section>
-
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
