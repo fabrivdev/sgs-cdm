@@ -1103,7 +1103,6 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            </Card>
           </section>
 
         </TabsContent>
