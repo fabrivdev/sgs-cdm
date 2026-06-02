@@ -1224,7 +1224,7 @@ function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?
           const active = row.key === activeKey;
           return (
             <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
-              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{row.total ? money(row.total).replace("USD", "").trim() : "0"}</span>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{row.total ? money(row.total) : "$ 0"}</span>
               <span
                 className={cn(
                   "w-full max-w-[42px] rounded-t-md bg-primary/80 transition-all hover:bg-primary",
