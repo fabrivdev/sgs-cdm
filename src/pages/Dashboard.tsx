@@ -851,7 +851,7 @@ export default function Dashboard() {
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
-              <CargaTecnicaTabla rows={productividadTecnica} onClick={() => setSection("trabajos")} />
+              <CargaTecnicaMatriz data={productividadMatriz} onClick={() => setSection("trabajos")} />
             </Card>
           </section>
 
