@@ -775,7 +775,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr_0.9fr]">
+          <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
             <Card className="p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
@@ -802,17 +802,8 @@ export default function Dashboard() {
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
             </Card>
-
-            <Card className="p-3">
-              <PanelTitle icon={ChevronRight} title="Drill de analisis" subtitle="" />
-              <div className="space-y-2">
-                <DrillButton label="Ver facturacion" onClick={() => setSection("facturacion")} />
-                <DrillButton label="Ver clientes" onClick={() => setSection("facturacion")} />
-                <DrillButton label="Ver trabajos" onClick={() => setSection("trabajos")} />
-                <DrillButton label="Ver tecnicos" onClick={() => setSection("trabajos")} />
-              </div>
-            </Card>
           </section>
+
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="p-3">
@@ -1110,12 +1101,8 @@ export default function Dashboard() {
                 <Kpi label="Sin horas" value={sinHorasPrev} loading={loading} tone={sinHorasPrev ? "warn" : "good"} />
                 <Kpi label="+7d sin cierre" value={fueraTolerancia.length} loading={loading} tone={fueraTolerancia.length ? "bad" : "good"} />
               </div>
-              <div className="mt-3 grid gap-2">
-                <DrillButton label="Ver trabajos abiertos" onClick={() => setFEstadoTrabajo("iniciado")} />
-                <DrillButton label="Ver trabajos pausados" onClick={() => setFEstadoTrabajo("pausado")} />
-                <DrillButton label="Ver planificacion" onClick={() => navigate("/planificador")} />
-              </div>
             </Card>
+
           </section>
 
         </TabsContent>
@@ -1422,14 +1409,6 @@ function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombre: stri
   );
 }
 
-function DrillButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs font-medium hover:bg-accent">
-      <span>{label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-    </button>
-  );
-}
 
 function estadoLabel(estado: string) {
   switch (estado) {
@@ -1536,42 +1515,69 @@ function EstadoCompacto({
   flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
   onSelect: (estado: string) => void;
 }) {
-  const principales = [
-    { key: "all", label: "Total gestionados", value: flujo.total, pct: 100 },
-    { key: "completado", label: "Culminados", value: flujo.culminados, pct: flujo.pct(flujo.culminados) },
-    { key: "iniciado", label: "Abiertos", value: flujo.abiertos, pct: flujo.pct(flujo.abiertos) },
-    { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), warn: flujo.pausados > 0 },
+  if (flujo.total === 0) {
+    return (
+      <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">
+        Sin trabajos en el periodo seleccionado.
+      </div>
+    );
+  }
+
+  const segs = [
+    { key: "completado", label: "Culminados", value: flujo.culminados, pct: flujo.pct(flujo.culminados), bar: "bg-primary", dot: "bg-primary" },
+    { key: "iniciado", label: "Abiertos", value: flujo.abiertos, pct: flujo.pct(flujo.abiertos), bar: "bg-sky-500/80", dot: "bg-sky-500" },
+    { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), bar: "bg-amber-500/80", dot: "bg-amber-500" },
   ];
+
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        {principales.map((it) => (
+    <div className="space-y-3">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs text-muted-foreground">Total gestionados</span>
+        <button onClick={() => onSelect("all")} className="text-lg font-bold tabular-nums hover:text-primary">
+          {flujo.total}
+        </button>
+      </div>
+
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+        {segs.map((s) => s.value > 0 && (
           <button
-            key={it.key}
-            onClick={() => onSelect(it.key)}
-            className={cn(
-              "flex items-baseline justify-between rounded-md border px-3 py-2 text-left hover:bg-accent",
-              it.warn && "border-amber-300 bg-amber-50/60",
-            )}
+            key={s.key}
+            onClick={() => onSelect(s.key)}
+            className={cn("h-full transition-opacity hover:opacity-80", s.bar)}
+            style={{ width: `${s.pct}%` }}
+            title={`${s.label}: ${s.value} (${s.pct}%)`}
+            aria-label={`${s.label} ${s.value}`}
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+        {segs.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => onSelect(s.key)}
+            className="flex items-center gap-1.5 text-xs hover:text-primary"
           >
-            <span className="truncate text-xs font-medium">{it.label}</span>
-            <span className="shrink-0 text-sm font-bold tabular-nums">
-              {it.value}
-              {it.key !== "all" && <span className="ml-1 text-[11px] font-normal text-muted-foreground">/ {it.pct}%</span>}
-            </span>
+            <span className={cn("h-2 w-2 rounded-full", s.dot)} />
+            <span className="font-medium">{s.label}</span>
+            <span className="tabular-nums font-semibold">{s.value}</span>
+            <span className="text-[11px] text-muted-foreground">({s.pct}%)</span>
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] text-muted-foreground">
-        <button className="hover:text-foreground" onClick={() => onSelect("pendiente")}>Pendiente: <span className="tabular-nums">{flujo.pendiente}</span></button>
+
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
+        <span className="font-medium">Pipeline:</span>
+        <button className="hover:text-foreground" onClick={() => onSelect("pendiente")}>Pendiente <span className="tabular-nums font-semibold">{flujo.pendiente}</span></button>
         <span>·</span>
-        <button className="hover:text-foreground" onClick={() => onSelect("programado")}>Programado: <span className="tabular-nums">{flujo.programado}</span></button>
+        <button className="hover:text-foreground" onClick={() => onSelect("programado")}>Programado <span className="tabular-nums font-semibold">{flujo.programado}</span></button>
         <span>·</span>
-        <button className="hover:text-foreground" onClick={() => onSelect("iniciado")}>Iniciado: <span className="tabular-nums">{flujo.iniciado}</span></button>
+        <button className="hover:text-foreground" onClick={() => onSelect("iniciado")}>Iniciado <span className="tabular-nums font-semibold">{flujo.iniciado}</span></button>
       </div>
     </div>
   );
 }
+
 
 function CargaSucursalTabla({
   rows, onSelect,
