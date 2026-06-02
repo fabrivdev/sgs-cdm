@@ -29,7 +29,7 @@ const baseItems = [
   { to: "/", label: "Planificador", icon: ListChecks, end: true },
   { to: "/trabajos", label: "Trabajos", icon: Wrench },
   { to: "/calendario", label: "Calendario", icon: CalendarDays },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, hideForCabecilla: true },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: true },
   { to: "/historial", label: "Historial", icon: History },
 ];
 
@@ -40,7 +40,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   const navigate = useNavigate();
 
   const navItems = [
-    ...baseItems.filter((it) => !(it.hideForCabecilla && isCabecilla && !isAdmin)),
+    ...baseItems.filter((it) => !(it.adminOnly && !isAdmin)),
     ...(isAdmin
       ? [{ to: "/parque-clientes", label: "Parque", icon: Tractor, end: false }]
       : []),
