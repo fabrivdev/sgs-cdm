@@ -1605,29 +1605,43 @@ function CargaTecnicaTabla({
   rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }>;
   onClick?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>;
   }
+  const COLLAPSED = 6;
+  const visible = expanded ? rows : rows.slice(0, COLLAPSED);
   return (
-    <div className="max-h-[260px] overflow-y-auto rounded-md border">
-      <div className="sticky top-0 grid grid-cols-[1fr_70px_70px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-        <div>Tecnico</div>
-        <div className="text-right">Jornadas</div>
-        <div className="text-right">Trabajos</div>
-        <div className="text-right">Horas</div>
+    <div>
+      <div className={cn("overflow-y-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
+        <div className="sticky top-0 grid grid-cols-[1fr_70px_70px_72px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+          <div>Tecnico</div>
+          <div className="text-right">Jornadas</div>
+          <div className="text-right">Trabajos</div>
+          <div className="text-right">Horas</div>
+        </div>
+        {visible.map((r) => (
+          <button
+            key={r.id}
+            onClick={onClick}
+            className="grid w-full grid-cols-[1fr_70px_70px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+          >
+            <div className="truncate font-medium">{r.nombre}</div>
+            <div className="text-right tabular-nums">{r.jornadas}</div>
+            <div className="text-right tabular-nums">{r.trabajos}</div>
+            <div className="text-right tabular-nums">{r.horas.toFixed(1)} hs</div>
+          </button>
+        ))}
       </div>
-      {rows.map((r) => (
+      {rows.length > COLLAPSED && (
         <button
-          key={r.id}
-          onClick={onClick}
-          className="grid w-full grid-cols-[1fr_70px_70px_72px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+          className="mt-2 w-full rounded-md border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent"
         >
-          <div className="truncate font-medium">{r.nombre}</div>
-          <div className="text-right tabular-nums">{r.jornadas}</div>
-          <div className="text-right tabular-nums">{r.trabajos}</div>
-          <div className="text-right tabular-nums">{r.horas.toFixed(1)} hs</div>
+          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
         </button>
-      ))}
+      )}
     </div>
   );
 }
@@ -1641,24 +1655,27 @@ function ClientesCompacto({
   totalClientes: number;
   onSelect: (nombre: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>;
   }
   const top5 = rows.slice(0, 5).reduce((a, r) => a + r.total, 0);
   const pctTop5 = totalValue > 0 ? Math.round((top5 / totalValue) * 100) : 0;
+  const COLLAPSED = 5;
+  const visible = expanded ? rows : rows.slice(0, COLLAPSED);
   return (
     <div>
       <div className="mb-2 text-[11px] text-muted-foreground">
         {totalClientes} clientes · {totalFacturas} facturas · Top 5 concentra {pctTop5}%
       </div>
-      <div className="max-h-[260px] overflow-y-auto rounded-md border">
+      <div className={cn("overflow-y-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
         <div className="sticky top-0 grid grid-cols-[1fr_60px_96px_48px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
           <div>Cliente</div>
           <div className="text-right">Fact.</div>
           <div className="text-right">Facturacion</div>
           <div className="text-right">%</div>
         </div>
-        {rows.slice(0, 8).map((r) => {
+        {visible.map((r) => {
           const pct = totalValue > 0 ? Math.round((r.total / totalValue) * 100) : 0;
           return (
             <button
@@ -1674,7 +1691,71 @@ function ClientesCompacto({
           );
         })}
       </div>
+      {rows.length > COLLAPSED && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 w-full rounded-md border px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent"
+        >
+          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
+        </button>
+      )}
     </div>
   );
 }
+
+function TrabajoChip({
+  label, value, tone = "neutral", onClick,
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: "neutral" | "good" | "warn";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] hover:bg-accent",
+        tone === "good" && "border-primary/30 bg-primary/5 text-primary",
+        tone === "warn" && "border-amber-300 bg-amber-50 text-amber-900",
+      )}
+    >
+      <span className="font-medium">{label}</span>
+      <span className="tabular-nums font-semibold">{value}</span>
+    </button>
+  );
+}
+
+function EvolucionKpis({ rows, currentKey }: { rows: WeekRow[]; currentKey?: string }) {
+  if (!rows.length) return null;
+  const totals = rows.map((r) => r.total);
+  const sum = totals.reduce((a, b) => a + b, 0);
+  const promedio = sum / rows.length;
+  const currentIdx = currentKey ? rows.findIndex((r) => r.key === currentKey) : rows.length - 1;
+  const idx = currentIdx >= 0 ? currentIdx : rows.length - 1;
+  const actual = rows[idx]?.total ?? 0;
+  const prev = idx > 0 ? rows[idx - 1].total : 0;
+  const variacion = pct(actual, prev);
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total acumulado</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{money(sum)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Promedio por periodo</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{money(promedio)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs anterior</div>
+        <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
+          {variacion == null ? "—" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
