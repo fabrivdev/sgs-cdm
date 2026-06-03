@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -214,14 +214,14 @@ export default function Dashboard() {
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
-  const [fMarcasFacturacion, setFMarcasFacturacion] = useState<string[]>([]);
+  const [fMarcas, setFMarcas] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
-  const [fMarcasTrabajo, setFMarcasTrabajo] = useState<string[]>([]);
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
+  const filtrosTrabajoActivos = section === "trabajos";
 
   const weekStart = useMemo(() => startOfWeek(parseISO(weekStartInput), { weekStartsOn: 1 }), [weekStartInput]);
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
@@ -404,7 +404,7 @@ export default function Dashboard() {
     () =>
       facturacion.filter((row) => {
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
-        if (fMarcasFacturacion.length > 0 && !fMarcasFacturacion.includes(marcaFacturacion(row))) return false;
+        if (fMarcas.length > 0 && !fMarcas.includes(marcaFacturacion(row))) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
@@ -414,7 +414,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fMarcasFacturacion, fRubros, facturacion, query],
+    [clienteById, fMarcas, fRubros, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
@@ -670,15 +670,15 @@ export default function Dashboard() {
 
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
-      if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
-      if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
-      if (fMarcasTrabajo.length > 0 && !fMarcasTrabajo.includes(row.marca)) return false;
+      if (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
+      if (filtrosTrabajoActivos && fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
+      if (fMarcas.length > 0 && !fMarcas.includes(row.marca)) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcasTrabajo]);
+  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcas, filtrosTrabajoActivos]);
 
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
@@ -848,7 +848,7 @@ export default function Dashboard() {
     }
 
     const buckets = Array.from(bucketsSet).sort();
-    const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
+    const tecnicoFilterSet = filtrosTrabajoActivos && fTecnicos.length > 0 ? new Set(fTecnicos) : null;
     const rowsAll = Array.from(map.values())
       .map((row) => ({
         id: row.id,
@@ -874,17 +874,16 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
+  }, [jornadas, trabajos, trabajosResumen, fTecnicos, filtrosTrabajoActivos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
     setSelectedWeekKey(initialWeekStart);
     setFSucursales([]);
     setFRubros([]);
-    setFMarcasFacturacion([]);
+    setFMarcas([]);
     setFEstadosTrabajo([]);
     setFTecnicos([]);
-    setFMarcasTrabajo([]);
     setPeriodMode("mes");
     setQ("");
   };
@@ -893,10 +892,9 @@ export default function Dashboard() {
     (weekStartInput !== initialWeekStart ? 1 : 0) +
     (fSucursales.length > 0 ? 1 : 0) +
     (fRubros.length > 0 ? 1 : 0) +
-    (fMarcasFacturacion.length > 0 ? 1 : 0) +
-    (fEstadosTrabajo.length > 0 ? 1 : 0) +
-    (fTecnicos.length > 0 ? 1 : 0) +
-    (fMarcasTrabajo.length > 0 ? 1 : 0) +
+    (fMarcas.length > 0 ? 1 : 0) +
+    (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
+    (filtrosTrabajoActivos && fTecnicos.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
 
@@ -924,9 +922,9 @@ export default function Dashboard() {
           options={SUCURSALES.map((s) => ({ value: s, label: s }))}
         />
         <FilterMultiSelect
-          label="Marca facturacion"
-          values={fMarcasFacturacion}
-          onChange={setFMarcasFacturacion}
+          label="Marca"
+          values={fMarcas}
+          onChange={setFMarcas}
           placeholder="Todas"
           width="w-[170px]"
           options={MARCAS.map((m) => ({ value: m, label: m }))}
@@ -944,6 +942,32 @@ export default function Dashboard() {
             { value: "Otros", label: "Otros" },
           ]}
         />
+        {section === "trabajos" && (
+          <>
+            <FilterMultiSelect
+              label="Estado"
+              values={fEstadosTrabajo}
+              onChange={setFEstadosTrabajo}
+              placeholder="Todos"
+              width="w-[170px]"
+              options={[
+                { value: "pendiente", label: "Pendiente" },
+                { value: "programado", label: "Programado" },
+                { value: "iniciado", label: "Iniciado" },
+                { value: "pausado", label: "Pausado" },
+                { value: "completado", label: "Completado" },
+              ]}
+            />
+            <FilterMultiSelect
+              label="Tecnico o cuadrilla"
+              values={fTecnicos}
+              onChange={setFTecnicos}
+              placeholder="Todos"
+              width="w-[230px]"
+              options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
+            />
+          </>
+        )}
       </FiltersBar>
 
       <section className="grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -1152,55 +1176,14 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="trabajos" className="space-y-3">
-          <FiltersBar
-            activeCount={(fEstadosTrabajo.length > 0 ? 1 : 0) + (fTecnicos.length > 0 ? 1 : 0) + (fMarcasTrabajo.length > 0 ? 1 : 0)}
-            onClear={() => {
-              setFEstadosTrabajo([]);
-              setFTecnicos([]);
-              setFMarcasTrabajo([]);
-            }}
-            meta={
-              <div className="flex flex-wrap items-center gap-1.5">
-                <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
-                <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
-                <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
-                <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadosTrabajo([])} />
-                <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
-                <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
-              </div>
-            }
-          >
-            <FilterMultiSelect
-              label="Estado"
-              values={fEstadosTrabajo}
-              onChange={setFEstadosTrabajo}
-              placeholder="Todos"
-              width="w-[170px]"
-              options={[
-                { value: "pendiente", label: "Pendiente" },
-                { value: "programado", label: "Programado" },
-                { value: "iniciado", label: "Iniciado" },
-                { value: "pausado", label: "Pausado" },
-                { value: "completado", label: "Completado" },
-              ]}
-            />
-            <FilterMultiSelect
-              label="Marca trabajo"
-              values={fMarcasTrabajo}
-              onChange={setFMarcasTrabajo}
-              placeholder="Todas"
-              width="w-[150px]"
-              options={MARCAS.map((m) => ({ value: m, label: m }))}
-            />
-            <FilterMultiSelect
-              label="Tecnico o cuadrilla"
-              values={fTecnicos}
-              onChange={setFTecnicos}
-              placeholder="Todos"
-              width="w-[230px]"
-              options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
-            />
-          </FiltersBar>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
+            <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
+            <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
+            <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadosTrabajo([])} />
+            <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
+            <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
+          </div>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="flex h-full flex-col p-3">
@@ -1283,9 +1266,9 @@ export default function Dashboard() {
               <DistribucionMarca
                 data={cargaMarca}
                 onSelect={(marca) =>
-                  setFMarcasTrabajo((prev) => (prev.length === 1 && prev[0] === marca ? [] : [marca]))
+                  setFMarcas((prev) => (prev.length === 1 && prev[0] === marca ? [] : [marca]))
                 }
-                selected={fMarcasTrabajo}
+                selected={fMarcas}
               />
             </Card>
 
