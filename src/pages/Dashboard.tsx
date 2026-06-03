@@ -167,6 +167,28 @@ function concept(row: Facturacion): Concepto {
   return "Otros";
 }
 
+function marcaFacturacion(row: Facturacion): Marca {
+  const grupo = (row.grupo ?? "").trim().toUpperCase();
+  if (
+    grupo === "SERVICE - CLAAS" ||
+    grupo === "REPUESTOS - CLAAS" ||
+    grupo === "REPUESTOS CLAAS - PROMOCION" ||
+    grupo === "REPUESTOS - CABEZALES/PLATAFOR" ||
+    grupo === "REPUESTOS TRACTOR" ||
+    grupo === "REPUESTOS DIVERSOS --"
+  ) {
+    return "CLAAS";
+  }
+  if (
+    grupo === "SERVICE - HORSCH" ||
+    grupo === "REPUESTOS PLANTADORA" ||
+    grupo === "REPUESTOS PULVERIZADORAS"
+  ) {
+    return "HORSCH";
+  }
+  return "OTROS";
+}
+
 function total(rows: Facturacion[]) {
   return rows.reduce((acc, row) => acc + Number(row.total_venta || 0), 0);
 }
@@ -192,6 +214,7 @@ export default function Dashboard() {
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
+  const [fMarcasFacturacion, setFMarcasFacturacion] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
   const [fMarcasTrabajo, setFMarcasTrabajo] = useState<string[]>([]);
@@ -381,6 +404,7 @@ export default function Dashboard() {
     () =>
       facturacion.filter((row) => {
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
+        if (fMarcasFacturacion.length > 0 && !fMarcasFacturacion.includes(marcaFacturacion(row))) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
@@ -390,7 +414,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fRubros, facturacion, query],
+    [clienteById, fMarcasFacturacion, fRubros, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
@@ -857,6 +881,7 @@ export default function Dashboard() {
     setSelectedWeekKey(initialWeekStart);
     setFSucursales([]);
     setFRubros([]);
+    setFMarcasFacturacion([]);
     setFEstadosTrabajo([]);
     setFTecnicos([]);
     setFMarcasTrabajo([]);
@@ -868,6 +893,7 @@ export default function Dashboard() {
     (weekStartInput !== initialWeekStart ? 1 : 0) +
     (fSucursales.length > 0 ? 1 : 0) +
     (fRubros.length > 0 ? 1 : 0) +
+    (fMarcasFacturacion.length > 0 ? 1 : 0) +
     (fEstadosTrabajo.length > 0 ? 1 : 0) +
     (fTecnicos.length > 0 ? 1 : 0) +
     (fMarcasTrabajo.length > 0 ? 1 : 0) +
@@ -896,6 +922,14 @@ export default function Dashboard() {
           placeholder="Todas"
           width="w-[170px]"
           options={SUCURSALES.map((s) => ({ value: s, label: s }))}
+        />
+        <FilterMultiSelect
+          label="Marca facturacion"
+          values={fMarcasFacturacion}
+          onChange={setFMarcasFacturacion}
+          placeholder="Todas"
+          width="w-[170px]"
+          options={MARCAS.map((m) => ({ value: m, label: m }))}
         />
         <FilterMultiSelect
           label="Rubro"
@@ -1151,7 +1185,7 @@ export default function Dashboard() {
               ]}
             />
             <FilterMultiSelect
-              label="Marca"
+              label="Marca trabajo"
               values={fMarcasTrabajo}
               onChange={setFMarcasTrabajo}
               placeholder="Todas"
