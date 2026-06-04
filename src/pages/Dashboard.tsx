@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
 
 const PAGE = 1000;
+const MAX_FACTURAS_RENDER = 350;
 const today = new Date();
 const todayStr = format(today, "yyyy-MM-dd");
 const initialWeekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -209,6 +210,7 @@ export default function Dashboard() {
   const [rangoEvolucion, setRangoEvolucion] = useState<"6" | "12" | "24" | "all">("12");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
+  const goSection = (value: string) => startTransition(() => setSection(value));
 
   const weekStart = useMemo(() => startOfWeek(parseISO(weekStartInput), { weekStartsOn: 1 }), [weekStartInput]);
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
@@ -527,6 +529,7 @@ export default function Dashboard() {
 
   const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
   const selectedFacts = selectedWeek?.rows ?? [];
+  const visibleSelectedFacts = useMemo(() => selectedFacts.slice(0, MAX_FACTURAS_RENDER), [selectedFacts]);
 
   const factMes = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, monthStart, monthEnd)), [factFiltered, monthEnd, monthStart]);
   const factMesPrev = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, previousMonthStart, previousMonthEnd)), [factFiltered, previousMonthEnd, previousMonthStart]);
@@ -741,15 +744,15 @@ export default function Dashboard() {
 
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
-      if (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
-      if (filtrosTrabajoActivos && fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
+      if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
+      if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
       if (fMarcas.length > 0 && !fMarcas.includes(row.marca)) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcas, filtrosTrabajoActivos]);
+  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcas]);
 
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
@@ -919,7 +922,7 @@ export default function Dashboard() {
     }
 
     const buckets = Array.from(bucketsSet).sort();
-    const tecnicoFilterSet = filtrosTrabajoActivos && fTecnicos.length > 0 ? new Set(fTecnicos) : null;
+    const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
     const rowsAll = Array.from(map.values())
       .map((row) => ({
         id: row.id,
@@ -945,7 +948,7 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadas, trabajos, trabajosResumen, fTecnicos, filtrosTrabajoActivos, periodMode, periodStart, periodEnd, profileById]);
+  }, [jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
@@ -1063,7 +1066,7 @@ export default function Dashboard() {
           trend={{ value: variacionTotalPct }}
           footer={`${facturasPeriodo} facturas · ${clientesAtendidosSemana} clientes`}
           tone={(variacionTotalPct ?? 0) < -20 ? "bad" : "neutral"}
-          onClick={() => setSection("facturacion")}
+          onClick={() => goSection("facturacion")}
         />
         <SummaryCard
           icon={Users}
@@ -1071,7 +1074,7 @@ export default function Dashboard() {
           value={clientesAtendidosSemana}
           detail={`${facturasPorCliente.toFixed(1).replace(".", ",")} facturas por cliente`}
           footer={`Top 5 concentran ${top5ClientesPct}%`}
-          onClick={() => setSection("facturacion")}
+          onClick={() => goSection("facturacion")}
         />
         <SummaryCard
           icon={Receipt}
@@ -1080,7 +1083,7 @@ export default function Dashboard() {
           trend={{ value: variacionTicketPct }}
           footer="Promedio por factura"
           tone={(variacionTicketPct ?? 0) < -10 ? "bad" : "neutral"}
-          onClick={() => setSection("facturacion")}
+          onClick={() => goSection("facturacion")}
         />
         <SummaryCard
           icon={PieChart}
@@ -1093,7 +1096,7 @@ export default function Dashboard() {
               <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Interno {tipoFactBreakdown.pctInterno}%</span>
             </span>
           }
-          onClick={() => setSection("facturacion")}
+          onClick={() => goSection("facturacion")}
         >
           <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
@@ -1109,12 +1112,12 @@ export default function Dashboard() {
           detail="trabajos gestionados"
           footer={`${flujo.culminados} Culminados · ${flujo.abiertos} Abiertos · ${flujo.pausados} Pausados`}
           tone={flujo.pausados > 0 ? "warn" : "neutral"}
-          onClick={() => setSection("trabajos")}
+          onClick={() => goSection("trabajos")}
         />
       </section>
 
 
-      <Tabs value={section} onValueChange={setSection} className="space-y-3">
+      <Tabs value={section} onValueChange={goSection} className="space-y-3">
         <TabsList className="grid h-auto w-full grid-cols-3 sm:w-fit">
           <TabsTrigger value="resumen">Vista general</TabsTrigger>
           <TabsTrigger value="facturacion">Facturacion</TabsTrigger>
@@ -1150,13 +1153,13 @@ export default function Dashboard() {
               <WeeklyBars
                 rows={rangoEvolucion === "all" ? weeklyRows : weeklyRows.slice(-Number(rangoEvolucion))}
                 activeKey={selectedWeek?.key}
-                onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }}
+                onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
               />
               <div className="mt-2 border-t pt-2">
                 <MixRubros
                   row={currentWeekRow}
                   rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"}
-                  onSelect={(rubro) => { setFRubros([rubro]); setSection("facturacion"); }}
+                  onSelect={(rubro) => { setFRubros([rubro]); goSection("facturacion"); }}
                 />
               </div>
               <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
@@ -1164,7 +1167,7 @@ export default function Dashboard() {
 
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
-              <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
+              <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -1194,7 +1197,7 @@ export default function Dashboard() {
               <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto
                 flujo={flujo}
-                onSelect={(estado) => { setFEstadosTrabajo([estado]); setSection("trabajos"); }}
+                onSelect={(estado) => { setFEstadosTrabajo([estado]); goSection("trabajos"); }}
                 planificados={jornadasProgramadas.length}
                 tecnicosActivos={tecnicosConActividad.size}
                 jornadasPrev={jornadasRealizadasPrev.length}
@@ -1204,7 +1207,7 @@ export default function Dashboard() {
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
-              <CargaTecnicaMatriz data={productividadMatriz} onClick={() => setSection("trabajos")} />
+              <CargaTecnicaMatriz data={productividadMatriz} onClick={() => goSection("trabajos")} />
             </Card>
           </section>
 
@@ -1216,13 +1219,13 @@ export default function Dashboard() {
                 totalValue={currentWeekRow?.total ?? 0}
                 totalFacturas={currentWeekRow?.facturas ?? 0}
                 totalClientes={currentWeekRow?.clientes ?? 0}
-                onSelect={(nombre) => { setQ(nombre); setSection("facturacion"); }}
+                onSelect={(nombre) => { setQ(nombre); goSection("facturacion"); }}
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Cerrados, abiertos y pausados dentro del período." />
 
-              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("trabajos"); }} />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("trabajos"); }} />
             </Card>
           </section>
 
@@ -1288,6 +1291,11 @@ export default function Dashboard() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">{T.facturas}</h2>
+                {selectedFacts.length > MAX_FACTURAS_RENDER && (
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {MAX_FACTURAS_RENDER} de {selectedFacts.length} lineas para mantener fluida la vista.
+                  </p>
+                )}
               </div>
               <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
             </div>
@@ -1303,7 +1311,7 @@ export default function Dashboard() {
               {selectedFacts.length === 0 ? (
                 <div className="px-3 py-10 text-center text-xs text-muted-foreground">{T.sinFacturacion}</div>
               ) : (
-                selectedFacts.map((row, index) => {
+                visibleSelectedFacts.map((row, index) => {
                   const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
                   return (
                     <div key={`${row.cod_factura}-${index}`} className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] items-center border-t px-3 py-2 text-xs">
