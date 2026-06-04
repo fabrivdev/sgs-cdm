@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { Building2, KeyRound, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
+import { Building2, Database, KeyRound, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
+import { ImportarTab } from "@/components/parque/ImportarTab";
 
 interface Profile {
   id: string;
@@ -273,6 +274,10 @@ export default function Admin() {
             <Building2 className="mr-2 h-4 w-4" />
             Clientes
           </TabsTrigger>
+          <TabsTrigger value="importar">
+            <Database className="mr-2 h-4 w-4" />
+            Importar datos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios" className="space-y-4">
@@ -499,6 +504,10 @@ export default function Admin() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="importar" className="space-y-4">
+          <ImportarTab onChanged={load} />
         </TabsContent>
       </Tabs>
 
