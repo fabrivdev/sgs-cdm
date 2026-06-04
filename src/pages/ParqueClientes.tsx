@@ -52,7 +52,7 @@ export default function ParqueClientes() {
 
   const cargarMetricas = async () => {
     try {
-      const [maquinas, seguimientos, ultimas] = await Promise.all([
+      const [maquinas, seguimientos, ultimas, trabajos] = await Promise.all([
         cargarTodo<{ cliente_id: string | null }>(
           supabase.from("parque_maquinas").select("cliente_id").eq("activo", true),
         ),
@@ -60,6 +60,9 @@ export default function ParqueClientes() {
           supabase.from("seguimiento_comercial").select("cliente_id, fecha").order("fecha", { ascending: false }),
         ),
         supabase.rpc("parque_ultimas_facturas"),
+        cargarTodo<{ cliente_id: string | null; estado_general: string }>(
+          supabase.from("trabajos").select("cliente_id, estado_general"),
+        ),
       ]);
 
       const hoy = new Date();
@@ -72,6 +75,11 @@ export default function ParqueClientes() {
         ]),
       );
       const ultSeguimientoByCliente = new Map<string, string>();
+      const clientesConTrabajoAbierto = new Set(
+        trabajos
+          .filter((trabajo) => trabajo.cliente_id && !["cerrado", "completado"].includes(String(trabajo.estado_general)))
+          .map((trabajo) => trabajo.cliente_id as string),
+      );
 
       for (const seguimiento of seguimientos) {
         const current = ultSeguimientoByCliente.get(seguimiento.cliente_id);
@@ -97,7 +105,7 @@ export default function ParqueClientes() {
 
         if (tieneServicioAño) conServicioAño++;
         if (ultSeguimiento && new Date(`${ultSeguimiento}T00:00:00`) >= inicioMes) contactadosMes++;
-        if (!tieneServicioAño && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
+        if (!tieneServicioAño && !clientesConTrabajoAbierto.has(clienteId) && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
       }
 
       const totalClientes = clienteIds.size;
@@ -174,7 +182,8 @@ export default function ParqueClientes() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 mb-4">
+      {tab === "parque" && (
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
         {cards.map((c) => (
           <Card
             key={c.label}
@@ -199,6 +208,7 @@ export default function ParqueClientes() {
           </Card>
         ))}
       </div>
+      )}
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab}>

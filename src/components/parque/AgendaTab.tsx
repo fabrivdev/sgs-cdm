@@ -103,12 +103,10 @@ export function AgendaTab({
   const [obs, setObs] = useState("");
   const [pQ, setPQ] = useState("");
   const [pSucursal, setPSucursal] = useState<string>("all");
-  const [pRiesgo, setPRiesgo] = useState<string>("all");
 
   // Historial filtros
   const [hQ, setHQ] = useState("");
   const [hResultado, setHResultado] = useState<string>("all");
-  const [hRango, setHRango] = useState<string>("30");
 
   const cargar = async () => {
     setLoading(true);
@@ -127,12 +125,24 @@ export function AgendaTab({
           supabase.from("parque_maquinas").select("cliente_id, sucursal").eq("activo", true),
         ),
 
-        cargarTodo<Seguimiento>(
-          supabase
-            .from("seguimiento_comercial")
-            .select("id, cliente_id, fecha, resultado, observaciones, usuario_id")
-            .order("fecha", { ascending: false }),
-        ),
+        (async () => {
+          const base = (supabase as any).from("seguimiento_comercial");
+          try {
+            return await cargarTodo<Seguimiento>(
+              base
+                .select("id, cliente_id, fecha, resultado, observaciones, usuario_id, trabajo_id")
+                .order("fecha", { ascending: false }),
+            );
+          } catch (error: any) {
+            if (!/trabajo_id|schema cache|column/i.test(error?.message ?? "")) throw error;
+            return cargarTodo<Seguimiento>(
+              supabase
+                .from("seguimiento_comercial")
+                .select("id, cliente_id, fecha, resultado, observaciones, usuario_id")
+                .order("fecha", { ascending: false }),
+            );
+          }
+        })(),
 
         supabase.rpc("parque_ultimas_facturas"),
       ]);
@@ -279,7 +289,7 @@ export function AgendaTab({
 
     return {
       pendientes: filas.length,
-      nuncaContactados: filas.filter((fila) => fila.dias == null).length,
+      serviciosAsociados: agendadosPorTrabajo.size,
       contactados30: contactados30.size,
       agendados30: new Set([...agendados30, ...agendadosPorTrabajo]).size,
     };
@@ -293,29 +303,56 @@ export function AgendaTab({
       if (!cliente) return false;
       if (ql && !cliente.nombre.toLowerCase().includes(ql)) return false;
       if (pSucursal !== "all" && !sucursalesPorCliente.get(cliente.id)?.split(", ").includes(pSucursal)) return false;
-      if (pRiesgo === "nunca" && fila.dias != null) return false;
-      if (pRiesgo === "mayor365" && (fila.diasUltServicio == null || fila.diasUltServicio <= 365)) return false;
-      if (pRiesgo === "mayor180" && (fila.diasUltServicio == null || fila.diasUltServicio <= 180)) return false;
       return true;
     });
-  }, [filas, pQ, pRiesgo, pSucursal, sucursalesPorCliente]);
+  }, [filas, pQ, pSucursal, sucursalesPorCliente]);
 
   const historial = useMemo(() => {
     const ql = hQ.trim().toLowerCase();
-    const limite = hRango === "all" ? 0 : Date.now() - Number(hRango) * 86400000;
+    const seguimientoRefs = new Set(
+      seguimientos.flatMap((seguimiento) => [
+        seguimiento.trabajo_id ?? "",
+        ...(seguimiento.observaciones?.match(/(?:TR|OS)-\d+/g) ?? []),
+      ]).filter(Boolean),
+    );
 
-    return seguimientos.filter((s) => {
-      if (hResultado !== "all" && s.resultado !== hResultado) return false;
-      if (limite && new Date(s.fecha).getTime() < limite) return false;
+    const manuales = seguimientos.map((seguimiento) => ({
+      key: seguimiento.id ?? `${seguimiento.cliente_id}-${seguimiento.fecha}`,
+      cliente_id: seguimiento.cliente_id,
+      fecha: seguimiento.fecha,
+      resultado: seguimiento.resultado,
+      observaciones: seguimiento.observaciones,
+      derivadoDeTrabajo: false,
+    }));
 
-      if (ql) {
-        const nombre = cliById.get(s.cliente_id)?.nombre ?? "";
-        if (!nombre.toLowerCase().includes(ql)) return false;
-      }
+    const derivados = trabajos
+      .filter((trabajo) => trabajo.cliente_id)
+      .map((trabajo) => {
+        const ref = trabajoReferencia(trabajo);
+        return {
+          key: `trabajo-${trabajo.id}`,
+          cliente_id: trabajo.cliente_id as string,
+          fecha: trabajo.creado_en,
+          resultado: "Agendó servicio",
+          observaciones: `TR asociado: ${ref}\n${trabajo.descripcion_problema}`,
+          derivadoDeTrabajo: true,
+          trabajoId: trabajo.id,
+          ref,
+        };
+      })
+      .filter((item) => !seguimientoRefs.has(item.trabajoId) && !seguimientoRefs.has(item.ref));
 
-      return true;
-    });
-  }, [seguimientos, hQ, hResultado, hRango, cliById]);
+    return [...manuales, ...derivados]
+      .filter((item) => {
+        if (hResultado !== "all" && item.resultado !== hResultado) return false;
+        if (ql) {
+          const nombre = cliById.get(item.cliente_id)?.nombre ?? "";
+          if (!nombre.toLowerCase().includes(ql)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  }, [seguimientos, trabajos, hQ, hResultado, cliById]);
 
   const colorDias = (d: number | null) => {
     if (d == null) return "text-destructive font-bold";
@@ -373,14 +410,14 @@ export function AgendaTab({
           accent={agendaKpis.pendientes > 0 ? "text-destructive" : "text-muted-foreground"}
         />
         <AgendaMetricCard
-          title="Nunca contactados"
-          value={agendaKpis.nuncaContactados.toLocaleString()}
-          detail="Sin seguimiento registrado"
-          icon={Clock3}
-          accent="text-amber-600"
+          title="Con TR asociado"
+          value={agendaKpis.serviciosAsociados.toLocaleString()}
+          detail="Ya tienen trabajo abierto"
+          icon={CalendarCheck2}
+          accent="text-emerald-600"
         />
         <AgendaMetricCard
-          title="Contactados 30d"
+          title="Contactos 30d"
           value={agendaKpis.contactados30.toLocaleString()}
           detail="Clientes con gestión reciente"
           icon={PhoneCall}
@@ -389,8 +426,8 @@ export function AgendaTab({
         <AgendaMetricCard
           title="Agendaron servicio"
           value={agendaKpis.agendados30.toLocaleString()}
-          detail="Resultado últimos 30 días"
-          icon={CalendarCheck2}
+          detail="Contacto o TR asociado"
+          icon={Clock3}
           accent="text-emerald-600"
         />
       </div>
@@ -406,7 +443,7 @@ export function AgendaTab({
       </TabsList>
 
       <TabsContent value="pendientes" className="space-y-2">
-        <div className="grid gap-2 rounded-md border bg-card p-2 sm:grid-cols-[1fr_180px_170px]">
+        <div className="grid gap-2 rounded-md border bg-card p-2 sm:grid-cols-[1fr_180px]">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -428,18 +465,6 @@ export function AgendaTab({
                   {sucursal}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={pRiesgo} onValueChange={setPRiesgo}>
-            <SelectTrigger>
-              <SelectValue placeholder="Criticidad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toda criticidad</SelectItem>
-              <SelectItem value="nunca">Nunca contactados</SelectItem>
-              <SelectItem value="mayor365">Sin servicio +365d</SelectItem>
-              <SelectItem value="mayor180">Sin servicio +180d</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -558,18 +583,6 @@ export function AgendaTab({
                   {r}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={hRango} onValueChange={setHRango}>
-            <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="max-w-[calc(100vw-2rem)]">
-              <SelectItem value="7">Últimos 7 días</SelectItem>
-              <SelectItem value="30">Últimos 30 días</SelectItem>
-              <SelectItem value="90">Últimos 90 días</SelectItem>
-              <SelectItem value="all">Todo</SelectItem>
             </SelectContent>
           </Select>
         </div>
