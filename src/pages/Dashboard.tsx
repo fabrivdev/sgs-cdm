@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   ClipboardList,
   DollarSign,
+  PieChart,
+  Receipt,
   Users,
 } from "lucide-react";
 import {
