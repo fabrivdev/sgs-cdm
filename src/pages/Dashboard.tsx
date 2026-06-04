@@ -1121,7 +1121,6 @@ export default function Dashboard() {
           value={`${tipoFactDominante.label} ${tipoFactDominante.value}%`}
           detail={
             <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Cliente {tipoFactBreakdown.pctCliente}%</span>
               <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-500" />Garantía {tipoFactBreakdown.pctGarantia}%</span>
               <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Interno {tipoFactBreakdown.pctInterno}%</span>
             </span>
