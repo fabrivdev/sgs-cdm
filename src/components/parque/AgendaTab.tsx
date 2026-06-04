@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ElementType } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Save, X, MessageSquarePlus, Search } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, ChevronRight, Clock3, PhoneCall, Save, X, MessageSquarePlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import type { Sucursal } from "@/lib/constants";
+import { SUCURSALES, type Sucursal } from "@/lib/constants";
 
 const RESULTADOS = [
   "Contactado",
@@ -88,6 +89,9 @@ export function AgendaTab({
   const [openForm, setOpenForm] = useState<string | null>(null);
   const [resultado, setResultado] = useState<string>("Contactado");
   const [obs, setObs] = useState("");
+  const [pQ, setPQ] = useState("");
+  const [pSucursal, setPSucursal] = useState<string>("all");
+  const [pRiesgo, setPRiesgo] = useState<string>("all");
 
   // Historial filtros
   const [hQ, setHQ] = useState("");
@@ -206,6 +210,40 @@ export function AgendaTab({
       });
   }, [maquinas, seguimientos, ultimasFacturas, cliById]);
 
+  const agendaKpis = useMemo(() => {
+    const desde30 = Date.now() - 30 * 86400000;
+    const contactados30 = new Set<string>();
+    const agendados30 = new Set<string>();
+
+    for (const seguimiento of seguimientos) {
+      if (new Date(seguimiento.fecha).getTime() < desde30) continue;
+      contactados30.add(seguimiento.cliente_id);
+      if (seguimiento.resultado === "Agendó servicio") agendados30.add(seguimiento.cliente_id);
+    }
+
+    return {
+      pendientes: filas.length,
+      nuncaContactados: filas.filter((fila) => fila.dias == null).length,
+      contactados30: contactados30.size,
+      agendados30: agendados30.size,
+    };
+  }, [filas, seguimientos]);
+
+  const filasFiltradas = useMemo(() => {
+    const ql = pQ.trim().toLowerCase();
+
+    return filas.filter((fila) => {
+      const cliente = fila.cliente;
+      if (!cliente) return false;
+      if (ql && !cliente.nombre.toLowerCase().includes(ql)) return false;
+      if (pSucursal !== "all" && !sucursalesPorCliente.get(cliente.id)?.split(", ").includes(pSucursal)) return false;
+      if (pRiesgo === "nunca" && fila.dias != null) return false;
+      if (pRiesgo === "mayor365" && (fila.diasUltServicio == null || fila.diasUltServicio <= 365)) return false;
+      if (pRiesgo === "mayor180" && (fila.diasUltServicio == null || fila.diasUltServicio <= 180)) return false;
+      return true;
+    });
+  }, [filas, pQ, pRiesgo, pSucursal, sucursalesPorCliente]);
+
   const historial = useMemo(() => {
     const ql = hQ.trim().toLowerCase();
     const limite = hRango === "all" ? 0 : Date.now() - Number(hRango) * 86400000;
@@ -251,6 +289,38 @@ export function AgendaTab({
   };
 
   return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <AgendaMetricCard
+          title="Para contactar"
+          value={agendaKpis.pendientes.toLocaleString()}
+          detail="Sin servicio ni contacto vigente"
+          icon={AlertTriangle}
+          accent={agendaKpis.pendientes > 0 ? "text-destructive" : "text-muted-foreground"}
+        />
+        <AgendaMetricCard
+          title="Nunca contactados"
+          value={agendaKpis.nuncaContactados.toLocaleString()}
+          detail="Sin seguimiento registrado"
+          icon={Clock3}
+          accent="text-amber-600"
+        />
+        <AgendaMetricCard
+          title="Contactados 30d"
+          value={agendaKpis.contactados30.toLocaleString()}
+          detail="Clientes con gestión reciente"
+          icon={PhoneCall}
+          accent="text-blue-600"
+        />
+        <AgendaMetricCard
+          title="Agendaron servicio"
+          value={agendaKpis.agendados30.toLocaleString()}
+          detail="Resultado últimos 30 días"
+          icon={CalendarCheck2}
+          accent="text-emerald-600"
+        />
+      </div>
+
     <Tabs defaultValue="pendientes" className="space-y-3">
       <TabsList>
         <TabsTrigger value="pendientes" className="text-xs sm:text-sm">
@@ -262,19 +332,56 @@ export function AgendaTab({
       </TabsList>
 
       <TabsContent value="pendientes" className="space-y-2">
+        <div className="grid gap-2 rounded-md border bg-card p-2 sm:grid-cols-[1fr_180px_170px]">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cliente..."
+              value={pQ}
+              onChange={(e) => setPQ(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+
+          <Select value={pSucursal} onValueChange={setPSucursal}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sucursal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las sucursales</SelectItem>
+              {SUCURSALES.map((sucursal) => (
+                <SelectItem key={sucursal} value={sucursal}>
+                  {sucursal}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={pRiesgo} onValueChange={setPRiesgo}>
+            <SelectTrigger>
+              <SelectValue placeholder="Criticidad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toda criticidad</SelectItem>
+              <SelectItem value="nunca">Nunca contactados</SelectItem>
+              <SelectItem value="mayor365">Sin servicio +365d</SelectItem>
+              <SelectItem value="mayor180">Sin servicio +180d</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="text-xs text-muted-foreground">
-          {filas.length} clientes para contactar — sin servicio último año ni contacto en 60 días
+          {filasFiltradas.length} de {filas.length} clientes para contactar
         </div>
 
         <div className="rounded-md border bg-card divide-y">
           {loading && <div className="p-6 text-center text-muted-foreground">Cargando...</div>}
 
-          {!loading && filas.length === 0 && (
+          {!loading && filasFiltradas.length === 0 && (
             <div className="p-6 text-center text-muted-foreground">Sin clientes.</div>
           )}
 
           {!loading &&
-            filas.map((f) => {
+            filasFiltradas.map((f) => {
               const cli = f.cliente!;
               return (
                 <div key={cli.id}>
@@ -440,5 +547,39 @@ export function AgendaTab({
         </div>
       </TabsContent>
     </Tabs>
+    </div>
+  );
+}
+
+function AgendaMetricCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  accent,
+}: {
+  title: string;
+  value: string;
+  detail: string;
+  icon: ElementType;
+  accent: string;
+}) {
+  return (
+    <Card className="border">
+      <CardContent className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {title}
+            </div>
+            <div className={cn("mt-1 text-xl font-bold tabular-nums", accent)}>{value}</div>
+            <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
+          </div>
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted", accent)}>
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
