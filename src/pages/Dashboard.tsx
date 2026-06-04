@@ -1195,7 +1195,7 @@ export default function Dashboard() {
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
               <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <Building2 className="h-4 w-4" />
