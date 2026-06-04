@@ -142,20 +142,35 @@ CREATE TABLE IF NOT EXISTS public.facturacion_lineas_importadas (
   raw_data jsonb NOT NULL DEFAULT '{}'::jsonb,
   importado_en timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now(),
-  linea_hash text GENERATED ALWAYS AS (
-    md5(concat_ws('|',
-      coalesce(origen_sistema, ''),
-      coalesce(codigo_interno_factura, ''),
-      coalesce(factura, ''),
-      coalesce(cod_mercaderia, ''),
-      coalesce(codigo_fabricante, ''),
-      coalesce(observacion, ''),
-      coalesce(total_venta::text, '')
-    ))
-  ) STORED,
+  linea_hash text NOT NULL DEFAULT '',
   CONSTRAINT facturacion_lineas_tipo_tiempo_check
     CHECK (tipo_tiempo IN ('Cliente', 'Garantia', 'Interno'))
 );
+
+CREATE OR REPLACE FUNCTION public.set_facturacion_linea_hash()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.linea_hash := md5(
+    coalesce(NEW.origen_sistema, '') || '|' ||
+    coalesce(NEW.codigo_interno_factura, '') || '|' ||
+    coalesce(NEW.factura, '') || '|' ||
+    coalesce(NEW.cod_mercaderia, '') || '|' ||
+    coalesce(NEW.codigo_fabricante, '') || '|' ||
+    coalesce(NEW.observacion, '') || '|' ||
+    coalesce(NEW.total_venta::text, '')
+  );
+  NEW.actualizado_en := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS set_facturacion_linea_hash_trigger ON public.facturacion_lineas_importadas;
+CREATE TRIGGER set_facturacion_linea_hash_trigger
+BEFORE INSERT OR UPDATE ON public.facturacion_lineas_importadas
+FOR EACH ROW
+EXECUTE FUNCTION public.set_facturacion_linea_hash();
 
 CREATE UNIQUE INDEX IF NOT EXISTS facturacion_lineas_origen_hash_unique
   ON public.facturacion_lineas_importadas(origen_sistema, linea_hash);
