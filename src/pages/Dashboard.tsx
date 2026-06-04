@@ -14,11 +14,16 @@ import {
   CheckCircle2,
   ClipboardList,
   DollarSign,
+  FileText,
+  Activity,
   PieChart,
   Receipt,
   Users,
 } from "lucide-react";
 import {
+  addMonths,
+  addWeeks,
+  addYears,
   differenceInCalendarDays,
   endOfMonth,
   endOfWeek,
@@ -238,6 +243,16 @@ export default function Dashboard() {
   const periodEnd = periodMode === "anio" ? yearEnd : periodMode === "mes" ? monthEnd : weekEnd;
   const previousPeriodStart = periodMode === "anio" ? previousYearStart : periodMode === "mes" ? previousMonthStart : previousWeekStart;
   const previousPeriodEnd = periodMode === "anio" ? previousYearEnd : periodMode === "mes" ? previousMonthEnd : previousWeekEnd;
+  const nextPeriodStart = useMemo(() => {
+    if (periodMode === "anio") return startOfYear(addYears(weekStart, 1));
+    if (periodMode === "mes") return startOfMonth(addMonths(weekStart, 1));
+    return startOfWeek(addWeeks(weekStart, 1), { weekStartsOn: 1 });
+  }, [periodMode, weekStart]);
+  const nextPeriodEnd = useMemo(() => {
+    if (periodMode === "anio") return endOfYear(nextPeriodStart);
+    if (periodMode === "mes") return endOfMonth(nextPeriodStart);
+    return endOfWeek(nextPeriodStart, { weekStartsOn: 1 });
+  }, [nextPeriodStart, periodMode]);
   const evolutionPeriods = useMemo(() => {
     if (periodMode === "anio") return 5;
     if (rangoEvolucion === "all") return periodMode === "semana" ? 26 : 60;
@@ -315,7 +330,7 @@ export default function Dashboard() {
             .from("servicio_jornadas")
             .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
             .gte("fecha", dateKey(new Date(Math.min(subWeeks(previousWeekStart, 8).getTime(), periodStart.getTime(), previousPeriodStart.getTime()))))
-            .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime()))))
+            .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime(), nextPeriodEnd.getTime()))))
             .order("fecha", { ascending: true }),
         );
 
@@ -330,7 +345,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [previousWeekStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
+  }, [nextPeriodEnd, previousWeekStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
 
   useEffect(() => {
     let alive = true;
@@ -604,6 +619,23 @@ export default function Dashboard() {
     [clienteById, fSucursales, jornadas, query, servicioById, periodEnd, periodStart],
   );
 
+  const jornadasProximoPeriodo = useMemo(
+    () =>
+      jornadas.filter((jornada) => {
+        const servicio = servicioById.get(jornada.servicio_id);
+        return jornada.estado === "Pendiente" && inRange(jornada.fecha, nextPeriodStart, nextPeriodEnd) && scopedServicio(servicio);
+      }),
+    [clienteById, fSucursales, jornadas, nextPeriodEnd, nextPeriodStart, query, servicioById],
+  );
+
+  const trabajosPlanificadosProximoPeriodo = useMemo(() => {
+    const servicioATrabajo = new Map<string, string>();
+    for (const trabajo of trabajos) {
+      if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
+    }
+    return new Set(jornadasProximoPeriodo.map((j) => servicioATrabajo.get(j.servicio_id) ?? j.servicio_id)).size;
+  }, [jornadasProximoPeriodo, trabajos]);
+
   const jornadasPendientesCierre = useMemo(
     () =>
       jornadas.filter((jornada) => {
@@ -649,6 +681,9 @@ export default function Dashboard() {
 
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
+  const tecnicosProximoPeriodo = new Set(jornadasProximoPeriodo.flatMap((j) => validJornadaCrew(j))).size;
+  const tecnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
+  const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
   const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
@@ -1240,11 +1275,13 @@ export default function Dashboard() {
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo([estado]); goSection("trabajos"); }}
-                planificados={jornadasProgramadas.length}
-                tecnicosActivos={tecnicosConActividad.size}
+                planificados={trabajosPlanificadosProximoPeriodo}
+                tecnicosAsignados={tecnicosProximoPeriodo}
+                jornadasPlanificadas={jornadasProximoPeriodo.length}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                planLabel={T.plan}
+                tecnicosCierreAnterior={tecnicosCierreAnterior}
+                cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
@@ -1886,15 +1923,25 @@ function MixRubros({
 }
 
 function EstadoCompacto({
-  flujo, onSelect, planificados, tecnicosActivos, jornadasPrev, horasPrev, planLabel,
+  flujo,
+  onSelect,
+  planificados,
+  tecnicosAsignados,
+  jornadasPlanificadas,
+  jornadasPrev,
+  horasPrev,
+  tecnicosCierreAnterior,
+  cierreAnteriorRango,
 }: {
   flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
   onSelect: (estado: string) => void;
   planificados?: number;
-  tecnicosActivos?: number;
+  tecnicosAsignados?: number;
+  jornadasPlanificadas?: number;
   jornadasPrev?: number;
   horasPrev?: number;
-  planLabel?: string;
+  tecnicosCierreAnterior?: number;
+  cierreAnteriorRango?: string;
 }) {
   if (flujo.total === 0) {
     return (
@@ -1905,14 +1952,13 @@ function EstadoCompacto({
   }
 
   const segs = [
-    { key: "completado", label: "Culminados", value: flujo.culminados, pct: flujo.pct(flujo.culminados), bar: "bg-primary", dot: "bg-primary" },
-    { key: "iniciado", label: "Abiertos", value: flujo.abiertos, pct: flujo.pct(flujo.abiertos), bar: "bg-sky-500/80", dot: "bg-sky-500" },
-    { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), bar: "bg-amber-500/80", dot: "bg-amber-500" },
+    { key: "completado", label: "Culminados", value: flujo.culminados, pct: flujo.pct(flujo.culminados), dot: "bg-primary" },
+    { key: "iniciado", label: "Abiertos", value: flujo.abiertos, pct: flujo.pct(flujo.abiertos), dot: "bg-sky-500" },
+    { key: "pausado", label: "Pausados", value: flujo.pausados, pct: flujo.pct(flujo.pausados), dot: "bg-amber-500" },
   ];
 
-  // Donut SVG geometry
-  const size = 132;
-  const stroke = 20;
+  const size = 136;
+  const stroke = 19;
   const r = (size - stroke) / 2;
   const cx = size / 2;
   const cy = size / 2;
@@ -1927,7 +1973,7 @@ function EstadoCompacto({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-4">
+      <div className="grid items-center gap-4 sm:grid-cols-[148px_1fr]">
         <div className="relative shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} className="-rotate-90">
             <circle cx={cx} cy={cy} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} />
@@ -1965,54 +2011,98 @@ function EstadoCompacto({
           </button>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="min-w-0 rounded-md border">
           {segs.map((s) => (
             <button
               key={s.key}
               onClick={() => onSelect(s.key)}
-              className="flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-muted/60"
+              className="grid w-full grid-cols-[1fr_54px_48px] items-center gap-2 border-b px-3 py-2 text-xs last:border-b-0 hover:bg-muted/50"
             >
               <span className="flex items-center gap-1.5">
                 <span className={cn("h-2.5 w-2.5 rounded-full", s.dot)} />
                 <span className="font-medium">{s.label}</span>
               </span>
-              <span className="flex items-center gap-2 tabular-nums">
-                <span className="font-semibold">{s.value}</span>
-                <span className="w-9 text-right text-[11px] text-muted-foreground">{s.pct}%</span>
-              </span>
+              <span className="text-right font-semibold tabular-nums">{s.value}</span>
+              <span className="text-right text-muted-foreground tabular-nums">{s.pct}%</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
-        <span className="font-medium">Pipeline:</span>
-        <button className="hover:text-foreground" onClick={() => onSelect("pendiente")}>Pendiente <span className="tabular-nums font-semibold">{flujo.pendiente}</span></button>
-        <span>·</span>
-        <button className="hover:text-foreground" onClick={() => onSelect("programado")}>Programado <span className="tabular-nums font-semibold">{flujo.programado}</span></button>
-        <span>·</span>
-        <button className="hover:text-foreground" onClick={() => onSelect("iniciado")}>Iniciado <span className="tabular-nums font-semibold">{flujo.iniciado}</span></button>
-      </div>
-
-      {(planificados != null || tecnicosActivos != null || jornadasPrev != null) && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-          {planificados != null && (
-            <span><span className="font-medium text-foreground/80">{planLabel ?? "Planificados"}:</span> <span className="tabular-nums font-semibold">{planificados}</span></span>
-          )}
-          {tecnicosActivos != null && (<>
-            <span>·</span>
-            <span><span className="font-medium text-foreground/80">Tecnicos activos:</span> <span className="tabular-nums font-semibold">{tecnicosActivos}</span></span>
-          </>)}
-          {jornadasPrev != null && (<>
-            <span>·</span>
-            <span><span className="font-medium text-foreground/80">Cierre anterior:</span> <span className="tabular-nums font-semibold">{jornadasPrev}</span> jornadas{horasPrev != null ? ` / ${horasPrev.toFixed(1)} hs` : ""}</span>
-          </>)}
+      <div className="border-t pt-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <EstadoMiniCard
+            icon={FileText}
+            title="ABIERTOS"
+            titleClassName="text-sky-700"
+            iconClassName="bg-sky-500/10 text-sky-700"
+            value={`${flujo.abiertos} trabajos`}
+            detail={`${flujo.pendiente} pendientes · ${flujo.programado} programados · ${flujo.iniciado} iniciados`}
+            onClick={() => onSelect("iniciado")}
+          />
+          <EstadoMiniCard
+            icon={CalendarDays}
+            title="PRÓXIMO PERIODO"
+            value={`${planificados ?? 0} planificados`}
+            detail={[
+              tecnicosAsignados ? `${tecnicosAsignados} técnicos asignados` : null,
+              jornadasPlanificadas ? `${jornadasPlanificadas} jornadas` : null,
+            ].filter(Boolean).join(" · ")}
+          />
+          <EstadoMiniCard
+            icon={Activity}
+            title="CIERRE ANTERIOR"
+            subtitle={jornadasPrev ? cierreAnteriorRango : undefined}
+            value={jornadasPrev ? `${jornadasPrev} jornadas · ${(horasPrev ?? 0).toFixed(0)} hs` : "Sin cierre anterior disponible"}
+            detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} técnicos activos` : ""}
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
+function EstadoMiniCard({
+  icon: Icon,
+  title,
+  subtitle,
+  value,
+  detail,
+  titleClassName,
+  iconClassName,
+  onClick,
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+  value: string;
+  detail?: string;
+  titleClassName?: string;
+  iconClassName?: string;
+  onClick?: () => void;
+}) {
+  const content = (
+    <div className="flex h-full flex-col rounded-md border bg-background p-3 text-left shadow-sm">
+      <div className="mb-3 flex items-start gap-2">
+        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary", iconClassName)}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className={cn("text-[10px] font-bold uppercase tracking-wide text-primary", titleClassName)}>{title}</div>
+          {subtitle ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</div> : null}
+        </div>
+      </div>
+      <div className="text-lg font-bold tabular-nums">{value}</div>
+      {detail ? <div className="mt-2 text-xs text-muted-foreground">{detail}</div> : null}
+    </div>
+  );
+
+  return onClick ? (
+    <button type="button" onClick={onClick} className="h-full hover:opacity-90">
+      {content}
+    </button>
+  ) : content;
+}
 
 function CargaSucursalTabla({
   rows, onSelect,
