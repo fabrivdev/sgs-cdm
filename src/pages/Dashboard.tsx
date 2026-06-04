@@ -1049,46 +1049,61 @@ export default function Dashboard() {
       <section className="grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
-          title="Facturacion del periodo"
-          value={money(currentWeekRow?.total ?? 0)}
-          detail={`${currentWeekRow?.facturas ?? 0} facturas - ${currentWeekRow?.clientes ?? 0} clientes`}
-          tone={(currentWeekRow?.variacion ?? 0) < -20 ? "bad" : "neutral"}
+          title="Facturación del período"
+          value={money(totalPeriodo)}
+          trend={{ value: variacionTotalPct }}
+          footer={`${facturasPeriodo} facturas · ${clientesAtendidosSemana} clientes`}
+          tone={(variacionTotalPct ?? 0) < -20 ? "bad" : "neutral"}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
           icon={Users}
           title="Clientes atendidos"
           value={clientesAtendidosSemana}
-          detail={`Distintos en ${T.seleccionado}`}
-          tone="neutral"
+          detail={`${facturasPorCliente.toFixed(1).replace(".", ",")} facturas por cliente`}
+          footer={`Top 5 concentran ${top5ClientesPct}%`}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
-          icon={Building2}
-          title="Sucursales con movimiento"
-          value={sucursalesConMovimiento}
-          detail={`de ${SUCURSALES.length} sucursales`}
-          tone="neutral"
+          icon={Receipt}
+          title="Ticket promedio"
+          value={money(ticketPromedio)}
+          trend={{ value: variacionTicketPct }}
+          footer="Promedio por factura"
+          tone={(variacionTicketPct ?? 0) < -10 ? "bad" : "neutral"}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
-          icon={BarChart3}
-          title="Servicios / Repuestos"
-          value={`${pctServicio}% / ${pctRepuesto}%`}
-          detail=""
-          tone="neutral"
+          icon={PieChart}
+          title="Tipo de facturación"
+          value={`${tipoFactDominante.label} ${tipoFactDominante.value}%`}
+          detail={
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Garantía {tipoFactBreakdown.pctGarantia}%</span>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Interno {tipoFactBreakdown.pctInterno}%</span>
+            </span>
+          }
           onClick={() => setSection("facturacion")}
-        />
+        >
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
+            <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
+            <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
+          </div>
+          <div className="text-[11px] text-muted-foreground">Base: {money(tipoFactBreakdown.total)}</div>
+        </SummaryCard>
         <SummaryCard
-          icon={ClipboardList}
-          title="Actividad operativa"
-          value={trabajosActivos.length}
-          detail={`${jornadasRealizadasPrev.length} jornadas cerradas · ${jornadasProgramadas.length} planificadas`}
-          tone={trabajosPausados.length ? "warn" : "neutral"}
+          icon={CheckCircle2}
+          title="Flujo operativo"
+          value={flujo.total}
+          detail="trabajos gestionados"
+          footer={`${flujo.culminados} Culminados · ${flujo.abiertos} Abiertos · ${flujo.pausados} Pausados`}
+          tone={flujo.pausados > 0 ? "warn" : "neutral"}
           onClick={() => setSection("trabajos")}
         />
-
       </section>
+
 
       <Tabs value={section} onValueChange={setSection} className="space-y-3">
         <TabsList className="grid h-auto w-full grid-cols-3 sm:w-fit">
