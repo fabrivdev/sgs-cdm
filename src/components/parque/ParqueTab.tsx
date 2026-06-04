@@ -510,7 +510,14 @@ export function ParqueTab({
     for (const r of filtradas) {
       totalMaquinas += r.cantTotal;
       if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
-      if (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) contactadosRango++;
+      if (
+        (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) ||
+        clientesConTrabajoAbierto.has(r.cliente.id) ||
+        r.tieneRepEnRango ||
+        r.tieneSrvEnRango
+      ) {
+        contactadosRango++;
+      }
       const sinServicioUltimoAño = r.diasUltServicio == null || r.diasUltServicio > 365;
       const sinSeg60 =
         !r.ultSeg ||

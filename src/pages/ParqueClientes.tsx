@@ -69,10 +69,17 @@ export default function ParqueClientes() {
       const hoy = new Date();
       const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
       const clienteIds = new Set(maquinas.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id));
-      const ultServicioByCliente = new Map(
-        ((ultimas.data ?? []) as Array<{ cliente_id: string; ult_servicio: string | null }>).map((row) => [
+      const ultFacturacionByCliente = new Map(
+        ((ultimas.data ?? []) as Array<{
+          cliente_id: string;
+          ult_repuesto: string | null;
+          ult_servicio: string | null;
+        }>).map((row) => [
           row.cliente_id,
-          row.ult_servicio,
+          {
+            ultRepuesto: row.ult_repuesto,
+            ultServicio: row.ult_servicio,
+          },
         ]),
       );
       const ultSeguimientoByCliente = new Map<string, string>();
@@ -94,7 +101,9 @@ export default function ParqueClientes() {
       let paraContactar = 0;
 
       for (const clienteId of clienteIds) {
-        const ultServicio = ultServicioByCliente.get(clienteId) ?? null;
+        const ultFacturacion = ultFacturacionByCliente.get(clienteId);
+        const ultServicio = ultFacturacion?.ultServicio ?? null;
+        const ultRepuesto = ultFacturacion?.ultRepuesto ?? null;
         const ultSeguimiento = ultSeguimientoByCliente.get(clienteId) ?? null;
         const diasServicio = ultServicio
           ? Math.floor((hoy.getTime() - new Date(`${ultServicio}T00:00:00`).getTime()) / 86400000)
@@ -103,10 +112,20 @@ export default function ParqueClientes() {
           ? Math.floor((hoy.getTime() - new Date(`${ultSeguimiento}T00:00:00`).getTime()) / 86400000)
           : null;
         const tieneServicioAño = diasServicio != null && diasServicio <= 365;
+        const tuvoFacturacionPeriodo =
+          (!!ultServicio && new Date(`${ultServicio}T00:00:00`) >= inicioMes) ||
+          (!!ultRepuesto && new Date(`${ultRepuesto}T00:00:00`) >= inicioMes);
+        const tieneTrabajoAbierto = clientesConTrabajoAbierto.has(clienteId);
 
         if (tieneServicioAño) conServicioAño++;
-        if (ultSeguimiento && new Date(`${ultSeguimiento}T00:00:00`) >= inicioMes) contactadosMes++;
-        if (!tieneServicioAño && !clientesConTrabajoAbierto.has(clienteId) && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
+        if (
+          (ultSeguimiento && new Date(`${ultSeguimiento}T00:00:00`) >= inicioMes) ||
+          tieneTrabajoAbierto ||
+          tuvoFacturacionPeriodo
+        ) {
+          contactadosMes++;
+        }
+        if (!tieneServicioAño && !tieneTrabajoAbierto && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
       }
 
       const totalClientes = clienteIds.size;
