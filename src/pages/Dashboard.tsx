@@ -26,7 +26,6 @@ import {
   format,
   getISOWeek,
   getISOWeekYear,
-  isWithinInterval,
   parseISO,
   startOfMonth,
   startOfWeek,
@@ -150,7 +149,9 @@ function dateKey(date: Date) {
 }
 
 function inRange(date: string, start: Date, end: Date) {
-  return isWithinInterval(parseISO(date), { start, end });
+  if (!date) return false;
+  const key = date.slice(0, 10);
+  return key >= dateKey(start) && key <= dateKey(end);
 }
 
 function money(value: number) {
@@ -317,7 +318,6 @@ export default function Dashboard() {
           .gte("fecha", dateKey(queryStart))
           .lte("fecha", dateKey(queryEnd))
           .order("fecha", { ascending: false });
-        if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales as Sucursal[]);
 
         let gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
@@ -328,16 +328,23 @@ export default function Dashboard() {
           .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
           .eq("origen_sistema", "grid_campos")
           .order("fecha_factura", { ascending: false }) as any);
-        if (fSucursales.length > 0) gridQuery = gridQuery.in("sucursal", fSucursales as Sucursal[]);
 
         const [legacyRows, gridRowsRaw] = await Promise.all([
           cargarTodo<Facturacion>(factQuery),
           cargarTodo<any>(gridQuery),
         ]);
 
-        const hasGridCampos = gridRowsRaw.length > 0;
+        const gridCamposYears = new Set(
+          gridRowsRaw
+            .map((row) => String(row.fecha_factura ?? "").slice(0, 4))
+            .filter(Boolean),
+        );
         const legacyRowsNormalizados = legacyRows
-          .filter((row) => !hasGridCampos || !row.entidad_nombre.toUpperCase().includes("CAMPOS DEL MA"))
+          .filter((row) => {
+            const esCampos = row.entidad_nombre.toUpperCase().includes("CAMPOS DEL MA");
+            const year = row.fecha.slice(0, 4);
+            return !esCampos || !gridCamposYears.has(year);
+          })
           .map((row) => ({
             ...row,
             tipo_tiempo: "Cliente" as Facturacion["tipo_tiempo"],
@@ -373,7 +380,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [fSucursales, queryEnd, queryStart]);
+  }, [queryEnd, queryStart]);
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
@@ -430,6 +437,7 @@ export default function Dashboard() {
   const factFiltered = useMemo(
     () =>
       facturacion.filter((row) => {
+        if (fSucursales.length > 0 && (!row.sucursal || !fSucursales.includes(row.sucursal))) return false;
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (fMarcas.length > 0 && !fMarcas.includes(clasificarMarcaFacturacion(row.grupo))) return false;
         if (fTiposTiempo.length > 0 && !fTiposTiempo.includes(row.tipo_tiempo)) return false;
@@ -442,7 +450,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fMarcas, fRubros, fTiposTiempo, facturacion, query],
+    [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
