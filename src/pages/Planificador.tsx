@@ -357,16 +357,6 @@ export default function Planificador() {
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <ToggleGroup
-            type="single"
-            value={vista}
-            onValueChange={(v) => v && setVista(v as "dia" | "semana")}
-            size="sm"
-            variant="outline"
-          >
-            <ToggleGroupItem value="dia" className="h-9 px-3 text-xs">Por día</ToggleGroupItem>
-            <ToggleGroupItem value="semana" className="h-9 px-3 text-xs">Por semana</ToggleGroupItem>
-          </ToggleGroup>
 
           <Button variant="outline" size="sm" onClick={exportExcel} className="hidden sm:inline-flex">
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
