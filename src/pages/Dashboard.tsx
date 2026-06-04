@@ -34,6 +34,7 @@ import {
 } from "date-fns";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, type EstadoTrabajo } from "@/lib/trabajos";
+import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
 
 const PAGE = 1000;
@@ -165,28 +166,6 @@ function concept(row: Facturacion): Concepto {
   if (group.includes("kilomet")) return "Kilometraje";
   if (group.includes("mano de obra")) return "Servicio";
   return "Otros";
-}
-
-function marcaFacturacion(row: Facturacion): Marca {
-  const grupo = (row.grupo ?? "").trim().toUpperCase();
-  if (
-    grupo === "SERVICE - CLAAS" ||
-    grupo === "REPUESTOS - CLAAS" ||
-    grupo === "REPUESTOS CLAAS - PROMOCION" ||
-    grupo === "REPUESTOS - CABEZALES/PLATAFOR" ||
-    grupo === "REPUESTOS TRACTOR" ||
-    grupo === "REPUESTOS DIVERSOS --"
-  ) {
-    return "CLAAS";
-  }
-  if (
-    grupo === "SERVICE - HORSCH" ||
-    grupo === "REPUESTOS PLANTADORA" ||
-    grupo === "REPUESTOS PULVERIZADORAS"
-  ) {
-    return "HORSCH";
-  }
-  return "OTROS";
 }
 
 function total(rows: Facturacion[]) {
@@ -404,7 +383,7 @@ export default function Dashboard() {
     () =>
       facturacion.filter((row) => {
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
-        if (fMarcas.length > 0 && !fMarcas.includes(marcaFacturacion(row))) return false;
+        if (fMarcas.length > 0 && !fMarcas.includes(clasificarMarcaFacturacion(row.grupo))) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
