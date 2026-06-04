@@ -526,7 +526,10 @@ export default function Dashboard() {
 
       for (const row of weekFacts) byConcept[concept(row)] += Number(row.total_venta || 0);
 
-      const clients = new Set(weekFacts.map((row) => row.cliente_id ?? row.entidad_nombre));
+      const clients = new Set(weekFacts.map((row) => {
+        const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
+        return normalizeClienteKey(nombre);
+      }));
       const invoices = new Set(weekFacts.map((row) => row.cod_factura));
       return {
         key: dateKey(start),
