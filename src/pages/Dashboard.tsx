@@ -607,11 +607,46 @@ export default function Dashboard() {
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
   const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
+  const previousPeriodRow = weeklyRows[weeklyRows.length - 2];
   const clientesAtendidosSemana = currentWeekRow?.clientes ?? 0;
   const sucursalesConMovimiento = new Set((currentWeekRow?.rows ?? []).map((row) => row.sucursal).filter(Boolean)).size;
   const mixServicioRepuestoTotal = (currentWeekRow?.servicio ?? 0) + (currentWeekRow?.repuestos ?? 0);
   const pctServicio = mixServicioRepuestoTotal > 0 ? Math.round(((currentWeekRow?.servicio ?? 0) / mixServicioRepuestoTotal) * 100) : 0;
   const pctRepuesto = mixServicioRepuestoTotal > 0 ? 100 - pctServicio : 0;
+
+  // KPIs enriquecidos para las cards superiores
+  const facturasPeriodo = currentWeekRow?.facturas ?? 0;
+  const totalPeriodo = currentWeekRow?.total ?? 0;
+  const totalPrevPeriodo = previousPeriodRow?.total ?? 0;
+  const variacionTotalPct = pct(totalPeriodo, totalPrevPeriodo);
+  const ticketPromedio = facturasPeriodo > 0 ? Math.round(totalPeriodo / facturasPeriodo) : 0;
+  const ticketPromedioPrev = (previousPeriodRow?.facturas ?? 0) > 0 ? (previousPeriodRow!.total / previousPeriodRow!.facturas) : 0;
+  const variacionTicketPct = pct(ticketPromedio, ticketPromedioPrev);
+  const facturasPorCliente = clientesAtendidosSemana > 0 ? facturasPeriodo / clientesAtendidosSemana : 0;
+  const tipoFactBreakdown = (() => {
+    const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
+    for (const row of selectedFacts) {
+      const k = (row.tipo_tiempo ?? "Cliente") as keyof typeof groups;
+      groups[k] = (groups[k] ?? 0) + Number(row.total_venta || 0);
+    }
+    const totalTF = groups.Cliente + groups.Garantia + groups.Interno;
+    const p = (n: number) => (totalTF > 0 ? Math.round((n / totalTF) * 100) : 0);
+    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantia: p(groups.Garantia), pctInterno: p(groups.Interno) };
+  })();
+  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
+    ? { label: "Cliente", value: tipoFactBreakdown.pctCliente }
+    : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
+      ? { label: "Garantía", value: tipoFactBreakdown.pctGarantia }
+      : { label: "Interno", value: tipoFactBreakdown.pctInterno };
+  const top5ClientesPct = (() => {
+    const t = topClientes.slice(0, 5).reduce((a, r) => a + r.total, 0);
+    return totalPeriodo > 0 ? Math.round((t / totalPeriodo) * 100) : 0;
+  })();
+  const topSucursalesPct = (() => {
+    const top2 = [...factBySucursal].sort((a, b) => b.total - a.total).slice(0, 2).reduce((a, r) => a + r.total, 0);
+    return totalPeriodo > 0 ? Math.round((top2 / totalPeriodo) * 100) : 0;
+  })();
+
   const periodoLabel = periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
