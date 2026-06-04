@@ -200,6 +200,101 @@ export type Database = {
           },
         ]
       }
+      facturacion_lineas_importadas: {
+        Row: {
+          actualizado_en: string
+          cantidad: number | null
+          cod_mercaderia: string | null
+          codigo_fabricante: string | null
+          codigo_interno_factura: string | null
+          entidad_nombre: string
+          factura: string | null
+          fecha_factura: string | null
+          grupo_normalizado: string | null
+          id: string
+          importacion_id: string | null
+          importado_en: string
+          linea_hash: string
+          marca_normalizada: Database["public"]["Enums"]["marca"]
+          mercaderia: string | null
+          observacion: string | null
+          origen_sistema: string
+          raw_data: Json
+          subgrupo_original: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo_facturacion:
+            | Database["public"]["Enums"]["tipo_facturacion"]
+            | null
+          tipo_tiempo: string
+          total_venta: number
+          valor_unitario: number | null
+        }
+        Insert: {
+          actualizado_en?: string
+          cantidad?: number | null
+          cod_mercaderia?: string | null
+          codigo_fabricante?: string | null
+          codigo_interno_factura?: string | null
+          entidad_nombre: string
+          factura?: string | null
+          fecha_factura?: string | null
+          grupo_normalizado?: string | null
+          id?: string
+          importacion_id?: string | null
+          importado_en?: string
+          linea_hash?: string
+          marca_normalizada?: Database["public"]["Enums"]["marca"]
+          mercaderia?: string | null
+          observacion?: string | null
+          origen_sistema?: string
+          raw_data?: Json
+          subgrupo_original?: string | null
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          tipo_facturacion?:
+            | Database["public"]["Enums"]["tipo_facturacion"]
+            | null
+          tipo_tiempo?: string
+          total_venta?: number
+          valor_unitario?: number | null
+        }
+        Update: {
+          actualizado_en?: string
+          cantidad?: number | null
+          cod_mercaderia?: string | null
+          codigo_fabricante?: string | null
+          codigo_interno_factura?: string | null
+          entidad_nombre?: string
+          factura?: string | null
+          fecha_factura?: string | null
+          grupo_normalizado?: string | null
+          id?: string
+          importacion_id?: string | null
+          importado_en?: string
+          linea_hash?: string
+          marca_normalizada?: Database["public"]["Enums"]["marca"]
+          mercaderia?: string | null
+          observacion?: string | null
+          origen_sistema?: string
+          raw_data?: Json
+          subgrupo_original?: string | null
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          tipo_facturacion?:
+            | Database["public"]["Enums"]["tipo_facturacion"]
+            | null
+          tipo_tiempo?: string
+          total_venta?: number
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_lineas_importadas_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       importaciones: {
         Row: {
           archivo_nombre: string | null
@@ -207,6 +302,8 @@ export type Database = {
           duplicados: number
           id: string
           insertados: number
+          metadata: Json
+          origen_sistema: string | null
           tipo: Database["public"]["Enums"]["tipo_importacion"]
           total_filas: number
           usuario_id: string | null
@@ -217,6 +314,8 @@ export type Database = {
           duplicados?: number
           id?: string
           insertados?: number
+          metadata?: Json
+          origen_sistema?: string | null
           tipo: Database["public"]["Enums"]["tipo_importacion"]
           total_filas?: number
           usuario_id?: string | null
@@ -227,6 +326,8 @@ export type Database = {
           duplicados?: number
           id?: string
           insertados?: number
+          metadata?: Json
+          origen_sistema?: string | null
           tipo?: Database["public"]["Enums"]["tipo_importacion"]
           total_filas?: number
           usuario_id?: string | null
@@ -944,6 +1045,10 @@ export type Database = {
       }
     }
     Functions: {
+      facturacion_tipo_tiempo_campos: {
+        Args: { p_entidad: string; p_observacion: string }
+        Returns: string
+      }
       get_user_sucursal: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["sucursal"]
