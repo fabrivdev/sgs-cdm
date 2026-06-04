@@ -1117,8 +1117,33 @@ export default function Dashboard() {
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
             <Card className="flex h-full flex-col p-3 xl:col-span-2">
-              <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
-              <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
+                  <p className="truncate text-xs text-muted-foreground">Comparativo {periodoLabel} con selección directa.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
+                    <SelectTrigger className="h-8 w-[130px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="6">Últimos 6</SelectItem>
+                      <SelectItem value="12">Últimos 12</SelectItem>
+                      <SelectItem value="24">Últimos 24</SelectItem>
+                      <SelectItem value="all">Todo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <BarChart3 className="h-4 w-4" />
+                  </div>
+                </div>
+              </div>
+              <WeeklyBars
+                rows={rangoEvolucion === "all" ? weeklyRows : weeklyRows.slice(-Number(rangoEvolucion))}
+                activeKey={selectedWeek?.key}
+                onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }}
+              />
               <div className="mt-2 border-t pt-2">
                 <MixRubros
                   row={currentWeekRow}
@@ -1130,10 +1155,31 @@ export default function Dashboard() {
             </Card>
 
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
+              <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
               <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 rounded-md border p-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
+                    <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">sucursales con movimiento</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border p-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <BarChart3 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">Top 2</div>
+                    <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">concentran {topSucursalesPct}% del total</div>
+                  </div>
+                </div>
+              </div>
             </Card>
           </section>
+
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
