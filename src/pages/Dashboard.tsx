@@ -207,7 +207,7 @@ export default function Dashboard() {
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
-  const [rangoEvolucion, setRangoEvolucion] = useState<"6" | "12" | "24" | "all">("12");
+  const [rangoEvolucion, setRangoEvolucion] = useState<"4" | "6" | "8" | "12" | "24" | "all">("12");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const goSection = (value: string) => startTransition(() => setSection(value));
@@ -228,17 +228,31 @@ export default function Dashboard() {
   const periodEnd = periodMode === "anio" ? yearEnd : periodMode === "mes" ? monthEnd : weekEnd;
   const previousPeriodStart = periodMode === "anio" ? previousYearStart : periodMode === "mes" ? previousMonthStart : previousWeekStart;
   const previousPeriodEnd = periodMode === "anio" ? previousYearEnd : periodMode === "mes" ? previousMonthEnd : previousWeekEnd;
-  const firstComparisonWeek = useMemo(() => subWeeks(weekStart, 7), [weekStart]);
+  const evolutionPeriods = useMemo(() => {
+    if (periodMode === "anio") return 5;
+    if (rangoEvolucion === "all") return periodMode === "semana" ? 26 : 60;
+    return Number(rangoEvolucion);
+  }, [periodMode, rangoEvolucion]);
+  const firstComparisonWeek = useMemo(() => subWeeks(weekStart, Math.max(evolutionPeriods - 1, 0)), [evolutionPeriods, weekStart]);
   const queryStart = useMemo(() => {
     if (periodMode === "anio") return subYears(yearStart, 4);
-    if (periodMode === "mes") return subMonths(monthStart, 11);
+    if (periodMode === "mes") return subMonths(monthStart, Math.max(evolutionPeriods - 1, 0));
     return firstComparisonWeek;
-  }, [firstComparisonWeek, monthStart, periodMode, yearStart]);
+  }, [evolutionPeriods, firstComparisonWeek, monthStart, periodMode, yearStart]);
   const queryEnd = useMemo(() => periodEnd, [periodEnd]);
 
   useEffect(() => {
     setSelectedWeekKey(dateKey(periodMode === "anio" ? yearStart : periodMode === "semana" ? weekStart : monthStart));
   }, [monthStart, periodMode, weekStart, yearStart]);
+
+  useEffect(() => {
+    if (periodMode === "semana" && !["4", "8", "12", "all"].includes(rangoEvolucion)) {
+      setRangoEvolucion("8");
+    }
+    if (periodMode === "mes" && !["6", "12", "24", "all"].includes(rangoEvolucion)) {
+      setRangoEvolucion("12");
+    }
+  }, [periodMode, rangoEvolucion]);
 
   useEffect(() => {
     let alive = true;
@@ -477,13 +491,13 @@ export default function Dashboard() {
   const weeklyRows = useMemo<WeekRow[]>(() => {
     const periods =
       periodMode === "semana"
-        ? Array.from({ length: 8 }, (_, index) => {
-            const start = subWeeks(weekStart, 7 - index);
+        ? Array.from({ length: evolutionPeriods }, (_, index) => {
+            const start = subWeeks(weekStart, evolutionPeriods - 1 - index);
             return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
           })
         : periodMode === "mes"
-          ? Array.from({ length: 12 }, (_, index) => {
-              const start = startOfMonth(subMonths(monthStart, 11 - index));
+          ? Array.from({ length: evolutionPeriods }, (_, index) => {
+              const start = startOfMonth(subMonths(monthStart, evolutionPeriods - 1 - index));
               return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
             })
           : Array.from({ length: 5 }, (_, index) => {
@@ -525,7 +539,7 @@ export default function Dashboard() {
       ...row,
       variacion: index === 0 ? null : pct(row.total, rows[index - 1].total),
     }));
-  }, [factFiltered, monthStart, periodMode, weekStart]);
+  }, [evolutionPeriods, factFiltered, monthStart, periodMode, weekStart]);
 
   const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
   const selectedFacts = selectedWeek?.rows ?? [];
@@ -1134,24 +1148,37 @@ export default function Dashboard() {
                   <p className="truncate text-xs text-muted-foreground">Comparativo {periodoLabel} con selección directa.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
-                    <SelectTrigger className="h-8 w-[130px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="6">Últimos 6</SelectItem>
-                      <SelectItem value="12">Últimos 12</SelectItem>
-                      <SelectItem value="24">Últimos 24</SelectItem>
-                      <SelectItem value="all">Todo</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {periodMode !== "anio" && (
+                    <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
+                      <SelectTrigger className="h-8 w-[150px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {periodMode === "semana" ? (
+                          <>
+                            <SelectItem value="4">Ultimas 4 semanas</SelectItem>
+                            <SelectItem value="8">Ultimas 8 semanas</SelectItem>
+                            <SelectItem value="12">Ultimas 12 semanas</SelectItem>
+                            <SelectItem value="all">Todas las semanas</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="6">Ultimos 6 meses</SelectItem>
+                            <SelectItem value="12">Ultimos 12 meses</SelectItem>
+                            <SelectItem value="24">Ultimos 24 meses</SelectItem>
+                            <SelectItem value="all">Todos los meses</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <BarChart3 className="h-4 w-4" />
                   </div>
                 </div>
               </div>
               <WeeklyBars
-                rows={rangoEvolucion === "all" ? weeklyRows : weeklyRows.slice(-Number(rangoEvolucion))}
+                rows={weeklyRows}
                 activeKey={selectedWeek?.key}
                 onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
               />
