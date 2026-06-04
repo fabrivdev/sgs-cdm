@@ -202,6 +202,7 @@ export default function Dashboard() {
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
+  const [rangoEvolucion, setRangoEvolucion] = useState<"6" | "12" | "24" | "all">("12");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
 
