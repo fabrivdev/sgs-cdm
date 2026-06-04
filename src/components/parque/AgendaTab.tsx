@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
+import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
 
 const RESULTADOS = [
   "Contactado",
@@ -25,6 +26,15 @@ const RESULTADOS = [
 type Cliente = { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean | null };
 type Maquina = { cliente_id: string | null; sucursal: Sucursal | null };
 type UltimaFactura = { cliente_id: string; ult_servicio: string | null };
+type TrabajoAgenda = {
+  id: string;
+  cliente_id: string | null;
+  codigo: string | null;
+  os_numero: string | null;
+  creado_en: string;
+  estado_general: string;
+  descripcion_problema: string;
+};
 type Seguimiento = {
   id?: string;
   cliente_id: string;
@@ -32,6 +42,7 @@ type Seguimiento = {
   resultado: string;
   observaciones?: string | null;
   usuario_id?: string | null;
+  trabajo_id?: string | null;
 };
 
 const PAGE = 1000;
@@ -86,6 +97,7 @@ export function AgendaTab({
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [ultimasFacturas, setUltimasFacturas] = useState<UltimaFactura[]>([]);
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
+  const [trabajos, setTrabajos] = useState<TrabajoAgenda[]>([]);
   const [openForm, setOpenForm] = useState<string | null>(null);
   const [resultado, setResultado] = useState<string>("Contactado");
   const [obs, setObs] = useState("");
@@ -129,6 +141,20 @@ export function AgendaTab({
       setMaquinas(m);
       setSeguimientos(s);
       setUltimasFacturas((uf.data ?? []) as UltimaFactura[]);
+
+      const clienteIds = Array.from(new Set(m.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id)));
+      if (clienteIds.length > 0) {
+        const trabajosRows = await cargarTodo<TrabajoAgenda>(
+          supabase
+            .from("trabajos")
+            .select("id, cliente_id, codigo, os_numero, creado_en, estado_general, descripcion_problema")
+            .in("cliente_id", clienteIds)
+            .order("creado_en", { ascending: false }),
+        );
+        setTrabajos(trabajosRows);
+      } else {
+        setTrabajos([]);
+      }
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudo cargar la agenda comercial");
@@ -160,6 +186,30 @@ export function AgendaTab({
     return m;
   }, [maquinas]);
 
+  const trabajosAbiertosPorCliente = useMemo(() => {
+    const map = new Map<string, TrabajoAgenda[]>();
+    for (const trabajo of trabajos) {
+      if (!trabajo.cliente_id) continue;
+      const estado = normalizarEstadoTrabajo(trabajo.estado_general);
+      if (estado === "completado") continue;
+      const list = map.get(trabajo.cliente_id) ?? [];
+      list.push(trabajo);
+      map.set(trabajo.cliente_id, list);
+    }
+    return map;
+  }, [trabajos]);
+
+  const trabajosPorCliente = useMemo(() => {
+    const map = new Map<string, TrabajoAgenda[]>();
+    for (const trabajo of trabajos) {
+      if (!trabajo.cliente_id) continue;
+      const list = map.get(trabajo.cliente_id) ?? [];
+      list.push(trabajo);
+      map.set(trabajo.cliente_id, list);
+    }
+    return map;
+  }, [trabajos]);
+
   const filas = useMemo(() => {
     const cantPorCliente = new Map<string, number>();
 
@@ -188,6 +238,8 @@ export function AgendaTab({
         const ult = ultPorCliente.get(clienteId);
         const dias = ult ? Math.floor((hoy - new Date(ult.fecha).getTime()) / 86400000) : null;
         const ultServicio = ultServicioPorCliente.get(clienteId) ?? null;
+        const trabajosAbiertos = trabajosAbiertosPorCliente.get(clienteId) ?? [];
+        const trabajoActivo = trabajosAbiertos[0] ?? null;
         const diasUltServicio = ultServicio
           ? Math.floor((hoy - new Date(`${ultServicio}T00:00:00`).getTime()) / 86400000)
           : null;
@@ -199,21 +251,25 @@ export function AgendaTab({
           dias,
           diasUltServicio,
           ultResultado: ult?.resultado ?? null,
+          trabajoActivo,
+          trabajosAbiertosCount: trabajosAbiertos.length,
         };
       })
       .filter((f) => !!f.cliente)
+      .filter((f) => !f.trabajoActivo)
       .filter((f) => (f.diasUltServicio == null || f.diasUltServicio > 365) && (f.dias == null || f.dias > 60))
       .sort((a, b) => {
         const da = a.dias ?? Number.MAX_SAFE_INTEGER;
         const db = b.dias ?? Number.MAX_SAFE_INTEGER;
         return db - da;
       });
-  }, [maquinas, seguimientos, ultimasFacturas, cliById]);
+  }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajosAbiertosPorCliente]);
 
   const agendaKpis = useMemo(() => {
     const desde30 = Date.now() - 30 * 86400000;
     const contactados30 = new Set<string>();
     const agendados30 = new Set<string>();
+    const agendadosPorTrabajo = new Set(trabajosAbiertosPorCliente.keys());
 
     for (const seguimiento of seguimientos) {
       if (new Date(seguimiento.fecha).getTime() < desde30) continue;
@@ -225,9 +281,9 @@ export function AgendaTab({
       pendientes: filas.length,
       nuncaContactados: filas.filter((fila) => fila.dias == null).length,
       contactados30: contactados30.size,
-      agendados30: agendados30.size,
+      agendados30: new Set([...agendados30, ...agendadosPorTrabajo]).size,
     };
-  }, [filas, seguimientos]);
+  }, [filas, seguimientos, trabajosAbiertosPorCliente]);
 
   const filasFiltradas = useMemo(() => {
     const ql = pQ.trim().toLowerCase();
@@ -271,12 +327,30 @@ export function AgendaTab({
   const guardar = async (clienteId: string) => {
     if (!user) return;
 
-    const { error } = await supabase.from("seguimiento_comercial").insert({
+    const trabajoAsociado =
+      resultado === "Agendó servicio"
+        ? trabajosAbiertosPorCliente.get(clienteId)?.[0] ?? trabajosPorCliente.get(clienteId)?.[0] ?? null
+        : null;
+    const referenciaTrabajo = trabajoAsociado ? trabajoReferencia(trabajoAsociado) : "";
+    const observaciones = [
+      obs.trim() || null,
+      referenciaTrabajo ? `TR asociado: ${referenciaTrabajo}` : null,
+    ].filter(Boolean).join("\n");
+    const payload = {
       cliente_id: clienteId,
       usuario_id: user.id,
       resultado: resultado as never,
-      observaciones: obs || null,
-    });
+      observaciones: observaciones || null,
+      ...(trabajoAsociado ? { trabajo_id: trabajoAsociado.id } : {}),
+    };
+
+    let { error } = await (supabase as any).from("seguimiento_comercial").insert(payload);
+
+    if (error && trabajoAsociado && /trabajo_id|schema cache|column/i.test(error.message ?? "")) {
+      const { trabajo_id: _trabajoId, ...payloadSinTrabajo } = payload as typeof payload & { trabajo_id?: string };
+      const retry = await supabase.from("seguimiento_comercial").insert(payloadSinTrabajo);
+      error = retry.error;
+    }
 
     if (error) return toast.error(error.message);
 
