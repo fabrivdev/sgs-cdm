@@ -10,6 +10,7 @@ import { ClientePanel } from "@/components/parque/ClientePanel";
 import { Tractor, CheckCircle2, PhoneCall, AlertTriangle, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { pageShell, pageTitle } from "@/lib/ui-classes";
+import { normalizarEstadoTrabajo } from "@/lib/trabajos";
 
 interface Metricas {
   totalMaquinas: number;
@@ -77,7 +78,7 @@ export default function ParqueClientes() {
       const ultSeguimientoByCliente = new Map<string, string>();
       const clientesConTrabajoAbierto = new Set(
         trabajos
-          .filter((trabajo) => trabajo.cliente_id && !["cerrado", "completado"].includes(String(trabajo.estado_general)))
+          .filter((trabajo) => trabajo.cliente_id && normalizarEstadoTrabajo(trabajo.estado_general) !== "completado")
           .map((trabajo) => trabajo.cliente_id as string),
       );
 

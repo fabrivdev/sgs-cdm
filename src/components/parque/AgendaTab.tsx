@@ -276,22 +276,19 @@ export function AgendaTab({
   }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajosAbiertosPorCliente]);
 
   const agendaKpis = useMemo(() => {
-    const desde30 = Date.now() - 30 * 86400000;
-    const contactados30 = new Set<string>();
-    const agendados30 = new Set<string>();
-    const agendadosPorTrabajo = new Set(trabajosAbiertosPorCliente.keys());
+    const desde90 = Date.now() - 90 * 86400000;
+    const gestionados90 = new Set<string>();
 
     for (const seguimiento of seguimientos) {
-      if (new Date(seguimiento.fecha).getTime() < desde30) continue;
-      contactados30.add(seguimiento.cliente_id);
-      if (seguimiento.resultado === "Agendó servicio") agendados30.add(seguimiento.cliente_id);
+      if (new Date(seguimiento.fecha).getTime() < desde90) continue;
+      gestionados90.add(seguimiento.cliente_id);
     }
 
     return {
       pendientes: filas.length,
-      serviciosAsociados: agendadosPorTrabajo.size,
-      contactados30: contactados30.size,
-      agendados30: new Set([...agendados30, ...agendadosPorTrabajo]).size,
+      serviciosAsociados: trabajosAbiertosPorCliente.size,
+      gestionados90: gestionados90.size,
+      sinHistorial: filas.filter((fila) => fila.dias == null).length,
     };
   }, [filas, seguimientos, trabajosAbiertosPorCliente]);
 
@@ -353,6 +350,40 @@ export function AgendaTab({
       })
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [seguimientos, trabajos, hQ, hResultado, cliById]);
+
+  const historialPorCliente = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        cliente_id: string;
+        cliente: Cliente | null;
+        total: number;
+        ultimo: (typeof historial)[number];
+      }
+    >();
+
+    for (const item of historial) {
+      const actual = map.get(item.cliente_id);
+      if (!actual) {
+        map.set(item.cliente_id, {
+          cliente_id: item.cliente_id,
+          cliente: cliById.get(item.cliente_id) ?? null,
+          total: 1,
+          ultimo: item,
+        });
+        continue;
+      }
+
+      actual.total += 1;
+      if (new Date(item.fecha).getTime() > new Date(actual.ultimo.fecha).getTime()) {
+        actual.ultimo = item;
+      }
+    }
+
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.ultimo.fecha).getTime() - new Date(a.ultimo.fecha).getTime(),
+    );
+  }, [historial, cliById]);
 
   const colorDias = (d: number | null) => {
     if (d == null) return "text-destructive font-bold";
@@ -417,18 +448,18 @@ export function AgendaTab({
           accent="text-emerald-600"
         />
         <AgendaMetricCard
-          title="Contactos 30d"
-          value={agendaKpis.contactados30.toLocaleString()}
-          detail="Clientes con gestión reciente"
+          title="Gestiones 90d"
+          value={agendaKpis.gestionados90.toLocaleString()}
+          detail="Contactos recientes"
           icon={PhoneCall}
           accent="text-blue-600"
         />
         <AgendaMetricCard
-          title="Agendaron servicio"
-          value={agendaKpis.agendados30.toLocaleString()}
-          detail="Contacto o TR asociado"
+          title="Sin historial"
+          value={agendaKpis.sinHistorial.toLocaleString()}
+          detail="Nunca contactados"
           icon={Clock3}
-          accent="text-emerald-600"
+          accent="text-amber-600"
         />
       </div>
 
@@ -438,7 +469,7 @@ export function AgendaTab({
           Pendientes
         </TabsTrigger>
         <TabsTrigger value="historial" className="text-xs sm:text-sm">
-          Historial
+          Historial por cliente
         </TabsTrigger>
       </TabsList>
 
@@ -587,21 +618,24 @@ export function AgendaTab({
           </Select>
         </div>
 
-        <div className="text-xs text-muted-foreground">{historial.length} seguimientos</div>
+        <div className="text-xs text-muted-foreground">
+          {historialPorCliente.length} clientes con seguimiento
+        </div>
 
         <div className="rounded-md border bg-card divide-y">
           {loading && <div className="p-6 text-center text-muted-foreground">Cargando...</div>}
 
-          {!loading && historial.length === 0 && (
+          {!loading && historialPorCliente.length === 0 && (
             <div className="p-6 text-center text-muted-foreground">Sin seguimientos en este filtro.</div>
           )}
 
           {!loading &&
-            historial.map((s, i) => {
-              const cli = cliById.get(s.cliente_id);
+            historialPorCliente.map((grupo) => {
+              const cli = grupo.cliente;
+              const ultimo = grupo.ultimo;
 
               return (
-                <div key={s.id ?? `${s.cliente_id}-${s.fecha}-${i}`} className="p-3">
+                <div key={grupo.cliente_id} className="p-3">
                   <div className="flex items-start gap-2">
                     <button
                       onClick={() => cli && onOpenCliente(cli.id)}
@@ -614,18 +648,19 @@ export function AgendaTab({
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
                         {cli && sucursalesPorCliente.get(cli.id) && <span>{sucursalesPorCliente.get(cli.id)}</span>}
-                        <span>· {format(new Date(s.fecha), "dd/MM/yyyy HH:mm")}</span>
+                        <span>· {grupo.total} seguimientos</span>
+                        <span>· Último {format(new Date(ultimo.fecha), "dd/MM/yyyy HH:mm")}</span>
                       </div>
                     </button>
 
-                    <Badge className={cn("text-[10px] shrink-0", resultadoColor(s.resultado))}>
-                      {s.resultado}
+                    <Badge className={cn("text-[10px] shrink-0", resultadoColor(ultimo.resultado))}>
+                      {ultimo.resultado}
                     </Badge>
                   </div>
 
-                  {s.observaciones && (
+                  {ultimo.observaciones && (
                     <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap break-words">
-                      {s.observaciones}
+                      {ultimo.observaciones}
                     </div>
                   )}
                 </div>

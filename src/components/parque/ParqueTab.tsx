@@ -26,6 +26,7 @@ import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
+import { normalizarEstadoTrabajo } from "@/lib/trabajos";
 
 const SUBGRUPOS = [
   "COSECHADORAS",
@@ -84,6 +85,11 @@ type Seguimiento = {
   cliente_id: string;
   fecha: string;
   resultado: string;
+};
+
+type TrabajoParque = {
+  cliente_id: string | null;
+  estado_general: string;
 };
 
 interface Row {
@@ -174,6 +180,7 @@ export function ParqueTab({
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [factAgregados, setFactAgregados] = useState<Map<string, FactAgregado>>(new Map());
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
+  const [trabajos, setTrabajos] = useState<TrabajoParque[]>([]);
 
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState<string>("all");
@@ -232,13 +239,14 @@ export function ParqueTab({
         setContactos([]);
         setMaquinas(maquinasRows);
         setSeguimientos([]);
+        setTrabajos([]);
         setFactAgregados(new Map());
         setLoading(false);
         setFactLoading(false);
         return;
       }
 
-      const [c, ct, s] = await Promise.all([
+      const [c, ct, s, t] = await Promise.all([
         supabase
           .from("clientes")
           .select("id, nombre, sucursal, activo")
@@ -256,16 +264,23 @@ export function ParqueTab({
           .select("cliente_id, fecha, resultado")
           .in("cliente_id", clienteIds)
           .order("fecha", { ascending: false }),
+
+        supabase
+          .from("trabajos")
+          .select("cliente_id, estado_general")
+          .in("cliente_id", clienteIds),
       ]);
 
       if (c.error) throw c.error;
       if (ct.error) throw ct.error;
       if (s.error) throw s.error;
+      if (t.error) throw t.error;
 
       setClientes((c.data ?? []) as Cliente[]);
       setContactos((ct.data ?? []) as Contacto[]);
       setMaquinas(maquinasRows);
       setSeguimientos((s.data ?? []) as Seguimiento[]);
+      setTrabajos((t.data ?? []) as TrabajoParque[]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -475,6 +490,14 @@ export function ParqueTab({
     });
   }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento]);
 
+  const clientesConTrabajoAbierto = useMemo(() => {
+    return new Set(
+      trabajos
+        .filter((trabajo) => trabajo.cliente_id && normalizarEstadoTrabajo(trabajo.estado_general) !== "completado")
+        .map((trabajo) => trabajo.cliente_id as string),
+    );
+  }, [trabajos]);
+
   // Métricas calculadas a partir de los clientes filtrados (para las cards superiores)
   useEffect(() => {
     if (!onMetricasChange) return;
@@ -492,7 +515,7 @@ export function ParqueTab({
       const sinSeg60 =
         !r.ultSeg ||
         (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
-      if (sinServicioUltimoAño && sinSeg60) sinContacto++;
+      if (sinServicioUltimoAño && sinSeg60 && !clientesConTrabajoAbierto.has(r.cliente.id)) sinContacto++;
     }
     onMetricasChange({
       totalMaquinas,
@@ -502,7 +525,7 @@ export function ParqueTab({
         totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,
       sinContacto60d: sinContacto,
     });
-  }, [filtradas, onMetricasChange, desdeDate]);
+  }, [filtradas, onMetricasChange, desdeDate, clientesConTrabajoAbierto]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;

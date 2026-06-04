@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
 
 const SUBGRUPOS = [
   "COSECHADORAS",
@@ -97,6 +98,7 @@ type Seguimiento = {
   fecha: string;
   resultado: string;
   observaciones: string | null;
+  trabajo_id?: string | null;
 };
 type Factura = {
   id: string;
@@ -106,6 +108,15 @@ type Factura = {
   grupo: string | null;
   grupo_fx: string | null;
   cod_factura: string;
+};
+type TrabajoCliente = {
+  id: string;
+  cliente_id: string | null;
+  codigo: string | null;
+  os_numero: string | null;
+  creado_en: string;
+  estado_general: string;
+  descripcion_problema: string;
 };
 
 interface Props {
@@ -153,6 +164,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
   const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [trabajos, setTrabajos] = useState<TrabajoCliente[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
   // Editing states
@@ -172,7 +184,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
   const cargar = async (id: string) => {
     setLoading(true);
-    const [c, ct, m, s, f, p] = await Promise.all([
+    const [c, ct, m, s, f, t, p] = await Promise.all([
       supabase
         .from("clientes")
         .select("id, nombre, ruc, region, direccion, localidad, correo_principal, sucursal")
@@ -182,6 +194,11 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       supabase.from("parque_maquinas").select("*").eq("cliente_id", id),
       supabase.from("seguimiento_comercial").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
       supabase.from("facturacion").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
+      supabase
+        .from("trabajos")
+        .select("id, cliente_id, codigo, os_numero, creado_en, estado_general, descripcion_problema")
+        .eq("cliente_id", id)
+        .order("creado_en", { ascending: false }),
       supabase.from("profiles").select("id, nombre"),
     ]);
     setCliente((c.data ?? null) as Cliente | null);
@@ -191,6 +208,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     setFacturas(
       ((f.data ?? []) as Factura[]).map((x) => ({ ...x, total_venta: Number(x.total_venta) })),
     );
+    setTrabajos((t.data ?? []) as TrabajoCliente[]);
     setProfiles(
       Object.fromEntries(((p.data ?? []) as { id: string; nombre: string }[]).map((u) => [u.id, u.nombre])),
     );
@@ -344,15 +362,71 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     onChanged();
   };
 
+  const seguimientosCompletos = useMemo(() => {
+    if (!cliente) return [];
+
+    const refsRegistradas = new Set(
+      seguimientos
+        .flatMap((seguimiento) => [
+          seguimiento.trabajo_id ?? "",
+          ...(seguimiento.observaciones?.match(/(?:TR|OS)-\d+/g) ?? []),
+        ])
+        .filter(Boolean),
+    );
+
+    const manuales = seguimientos.map((seguimiento) => ({
+      ...seguimiento,
+      derivadoDeTrabajo: false,
+    }));
+
+    const derivados = trabajos
+      .map((trabajo) => {
+        const ref = trabajoReferencia(trabajo);
+        return {
+          id: `trabajo-${trabajo.id}`,
+          cliente_id: cliente.id,
+          usuario_id: null,
+          fecha: trabajo.creado_en,
+          resultado: "Agendó servicio",
+          observaciones: `TR asociado: ${ref}\n${trabajo.descripcion_problema}`,
+          trabajo_id: trabajo.id,
+          derivadoDeTrabajo: true,
+          ref,
+        };
+      })
+      .filter((item) => !refsRegistradas.has(item.trabajo_id) && !refsRegistradas.has(item.ref));
+
+    return [...manuales, ...derivados].sort(
+      (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
+    );
+  }, [cliente, seguimientos, trabajos]);
+
   // ===== Seguimientos =====
   const agregarSeguimiento = async () => {
     if (!cliente || !user) return;
-    const { error } = await supabase.from("seguimiento_comercial").insert({
+    const trabajoAsociado =
+      segResultado === "Agendó servicio"
+        ? trabajos.find((trabajo) => normalizarEstadoTrabajo(trabajo.estado_general) !== "completado") ?? trabajos[0] ?? null
+        : null;
+    const referenciaTrabajo = trabajoAsociado ? trabajoReferencia(trabajoAsociado) : "";
+    const observaciones = [
+      segObs.trim() || null,
+      referenciaTrabajo ? `TR asociado: ${referenciaTrabajo}` : null,
+    ].filter(Boolean).join("\n");
+    const payload = {
       cliente_id: cliente.id,
       usuario_id: user.id,
       resultado: segResultado as never,
-      observaciones: segObs || null,
-    });
+      observaciones: observaciones || null,
+      ...(trabajoAsociado ? { trabajo_id: trabajoAsociado.id } : {}),
+    };
+
+    let { error } = await (supabase as any).from("seguimiento_comercial").insert(payload);
+    if (error && trabajoAsociado && /trabajo_id|schema cache|column/i.test(error.message ?? "")) {
+      const { trabajo_id: _trabajoId, ...payloadSinTrabajo } = payload as typeof payload & { trabajo_id?: string };
+      const retry = await supabase.from("seguimiento_comercial").insert(payloadSinTrabajo);
+      error = retry.error;
+    }
     if (error) return toast.error(error.message);
     toast.success("Seguimiento registrado");
     setSegObs("");
@@ -607,14 +681,14 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         <section className="mb-5 rounded-lg border bg-card p-3">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
             <ClipboardList className="h-4 w-4 text-primary" /> Seguimientos
-            <Badge variant="secondary" className="text-[10px]">{seguimientos.length}</Badge>
+            <Badge variant="secondary" className="text-[10px]">{seguimientosCompletos.length}</Badge>
           </div>
           <div className="space-y-2">
-            {seguimientos.length === 0 && (
+            {seguimientosCompletos.length === 0 && (
               <div className="text-xs text-muted-foreground">Sin seguimientos.</div>
             )}
-            {seguimientos.map((s) => {
-              const nombre = s.usuario_id ? profiles[s.usuario_id] ?? "?" : "?";
+            {seguimientosCompletos.map((s) => {
+              const nombre = s.derivadoDeTrabajo ? "Sistema" : s.usuario_id ? profiles[s.usuario_id] ?? "?" : "?";
               return (
                 <div key={s.id} className="flex gap-2 rounded-md border p-2">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
@@ -627,6 +701,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                         {new Date(s.fecha).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })}
                       </span>
                       <Badge className={cn("text-[10px]", resultadoColor(s.resultado))}>{s.resultado}</Badge>
+                      {s.derivadoDeTrabajo && <Badge variant="outline" className="text-[10px]">TR asociado</Badge>}
                     </div>
                     {s.observaciones && <div className="mt-1 text-xs text-foreground/80">{s.observaciones}</div>}
                   </div>
