@@ -9,6 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, History } from "lucide-react";
 import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
+import {
+  clasificarGrupoFacturacion,
+  clasificarMarcaFacturacion,
+  clasificarTipoTiempoFacturacion,
+  type GrupoNormalizadoFacturacion,
+  type TipoTiempoFacturacion,
+} from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
 
 const SUBGRUPOS_VALIDOS = new Set([
@@ -131,6 +138,29 @@ interface OrdenServicioRow {
   _isNew: boolean;
 }
 
+interface FacturacionGridRow {
+  origen_sistema: string;
+  codigo_interno_factura: string | null;
+  factura: string | null;
+  entidad_nombre: string;
+  fecha_factura: string | null;
+  sucursal: Sucursal | null;
+  subgrupo_original: string | null;
+  grupo_normalizado: GrupoNormalizadoFacturacion;
+  marca_normalizada: Marca;
+  tipo_facturacion: "Repuesto" | "Servicio";
+  tipo_tiempo: TipoTiempoFacturacion;
+  observacion: string | null;
+  cod_mercaderia: string | null;
+  codigo_fabricante: string | null;
+  mercaderia: string | null;
+  cantidad: number;
+  valor_unitario: number;
+  total_venta: number;
+  raw_data: Record<string, unknown>;
+  _isNew: boolean;
+}
+
 interface Imp {
   id: string;
   tipo: "parque" | "facturacion" | "ordenes_servicio";
@@ -156,6 +186,15 @@ const isMissingOsImportTableError = (error: unknown) => {
   return (
     (code === "PGRST205" || code === "PGRST204" || code === "42P01") &&
     message.includes("ordenes_servicio_importadas")
+  );
+};
+
+const isMissingBillingLinesTableError = (error: unknown) => {
+  const message = String((error as any)?.message ?? "");
+  const code = String((error as any)?.code ?? "");
+  return (
+    (code === "PGRST205" || code === "PGRST204" || code === "42P01") &&
+    message.includes("facturacion_lineas_importadas")
   );
 };
 
@@ -228,7 +267,7 @@ const parseExcelDate = (v: unknown): string | null => {
     return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
   }
   const s = String(v).trim();
-  const m = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$/);
+  const m = s.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
   if (m) {
     let [, d, mo, y] = m;
     if (y.length === 2) y = "20" + y;
@@ -270,6 +309,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const [conFile, setConFile] = useState<string>("");
   const [osRows, setOsRows] = useState<OrdenServicioRow[] | null>(null);
   const [osFile, setOsFile] = useState<string>("");
+  const [gridRows, setGridRows] = useState<FacturacionGridRow[] | null>(null);
+  const [gridFile, setGridFile] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [historial, setHistorial] = useState<Imp[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
@@ -283,6 +324,18 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     servicioTotal: number;
     repuestoNuevos: number;
     servicioNuevos: number;
+  } | null>(null);
+  const [gridDiag, setGridDiag] = useState<{
+    total: number;
+    garantia: number;
+    interno: number;
+    cliente: number;
+    sinFecha: number;
+    sinFactura: number;
+    sinCodigoInterno: number;
+    sinCodMercaderia: number;
+    porMarca: Record<Marca, number>;
+    porSubgrupo: { subgrupo: string; total: number; lineas: number }[];
   } | null>(null);
 
   const cargarHistorial = async () => {
@@ -886,6 +939,254 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
+  const procesarFacturacionGridCampos = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheetName = wb.SheetNames[0];
+      if (!sheetName) return toast.error("No se encontro una hoja valida");
+
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName], { defval: null });
+      if (json.length === 0) return toast.error("Excel vacio");
+
+      const { data: existentes, error } = await (supabase
+        .from("facturacion_lineas_importadas" as any)
+        .select("codigo_interno_factura,factura,cod_mercaderia,codigo_fabricante,observacion,total_venta")
+        .eq("origen_sistema", "grid_campos") as any);
+
+      if (error) {
+        if (isMissingBillingLinesTableError(error)) {
+          return toast.error("Falta aplicar la migracion de facturacion detallada antes de importar el GRID.");
+        }
+        throw error;
+      }
+
+      const rowKey = (r: {
+        codigo_interno_factura?: unknown;
+        factura?: unknown;
+        cod_mercaderia?: unknown;
+        codigo_fabricante?: unknown;
+        observacion?: unknown;
+        total_venta?: unknown;
+      }) =>
+        [
+          normCode(r.codigo_interno_factura),
+          normCode(r.factura),
+          normCode(r.cod_mercaderia),
+          normCode(r.codigo_fabricante),
+          normText(r.observacion),
+          String(parseMoney(r.total_venta).toFixed(6)),
+        ].join("|");
+
+      const existentesKey = new Set<string>(
+        ((existentes ?? []) as any[]).map((r) =>
+          rowKey({
+            codigo_interno_factura: r.codigo_interno_factura,
+            factura: r.factura,
+            cod_mercaderia: r.cod_mercaderia,
+            codigo_fabricante: r.codigo_fabricante,
+            observacion: r.observacion,
+            total_venta: r.total_venta,
+          }),
+        ),
+      );
+
+      const diag = {
+        total: 0,
+        garantia: 0,
+        interno: 0,
+        cliente: 0,
+        sinFecha: 0,
+        sinFactura: 0,
+        sinCodigoInterno: 0,
+        sinCodMercaderia: 0,
+        porMarca: { CLAAS: 0, HORSCH: 0, OTROS: 0 } as Record<Marca, number>,
+        porSubgrupo: [] as { subgrupo: string; total: number; lineas: number }[],
+      };
+      const subgrupoMap = new Map<string, { subgrupo: string; total: number; lineas: number }>();
+
+      const rows: FacturacionGridRow[] = json.map((r) => {
+        const codigoInterno =
+          norm(pick(r, ["Código Interno", "CÃ³digo Interno", "Codigo Interno", "Cód. Interno", "CÃ³d. Interno", "Cod. Interno"])) ||
+          null;
+        const factura = norm(pick(r, ["Factura"])) || null;
+        const entidad = norm(pick(r, ["Entidad", "Cliente"])) || "Sin entidad";
+        const fecha = parseExcelDate(pick(r, ["Fecha Factura", "Fecha"]));
+        const sucursal =
+          matchSucursalFromRegion(pick(r, ["Sucursal", "Departamento", "Localidad"])) ??
+          matchSucursal(pick(r, ["Sucursal", "Departamento", "Localidad"]));
+        const subgrupo = norm(pick(r, ["Sub-Grupo", "Subgrupo", "Grupo"])) || null;
+        const observacion = norm(pick(r, ["ObservaciÃ³n", "Observacion", "Observación"])) || null;
+        const codMercaderia =
+          norm(pick(r, ["Cód. Mercadería", "CÃ³d. MercaderÃ­a", "Cod. Mercaderia", "CÃ³d. Mercaderia", "Cód. Mercaderia"])) ||
+          null;
+        const codigoFabricante = norm(pick(r, ["Código Fabricante", "CÃ³digo Fabricante", "Codigo Fabricante"])) || null;
+        const mercaderia = norm(pick(r, ["MercaderÃ­a", "Mercaderia", "Mercadería", "Nombre ImpresiÃ³n", "Nombre Impresión"])) || null;
+        const cantidad = parseMoney(pick(r, ["Cantidad"]));
+        const valorUnitario = parseMoney(pick(r, ["Valor Unitario"]));
+        const totalVenta = parseMoney(pick(r, ["Sub-total Items", "Sub-Total (Facturas)", "Sub-Total Facturas", "Total Venta"]));
+        const tipoTiempo = clasificarTipoTiempoFacturacion(entidad, observacion);
+        const marca = clasificarMarcaFacturacion(subgrupo);
+        const grupoNormalizado = clasificarGrupoFacturacion(subgrupo);
+        const tipoFacturacion: "Repuesto" | "Servicio" =
+          grupoNormalizado === "Servicio" || lower(subgrupo).includes("service") || lower(subgrupo).includes("servicio")
+            ? "Servicio"
+            : "Repuesto";
+        const key = rowKey({
+          codigo_interno_factura: codigoInterno,
+          factura,
+          cod_mercaderia: codMercaderia,
+          codigo_fabricante: codigoFabricante,
+          observacion,
+          total_venta: totalVenta,
+        });
+
+        diag.total++;
+        if (tipoTiempo === "Garantia") diag.garantia++;
+        if (tipoTiempo === "Interno") diag.interno++;
+        if (tipoTiempo === "Cliente") diag.cliente++;
+        if (!fecha) diag.sinFecha++;
+        if (!factura) diag.sinFactura++;
+        if (!codigoInterno) diag.sinCodigoInterno++;
+        if (!codMercaderia) diag.sinCodMercaderia++;
+        diag.porMarca[marca]++;
+
+        const subKey = subgrupo || "(sin subgrupo)";
+        const current = subgrupoMap.get(subKey) ?? { subgrupo: subKey, total: 0, lineas: 0 };
+        current.total += totalVenta;
+        current.lineas++;
+        subgrupoMap.set(subKey, current);
+
+        return {
+          origen_sistema: "grid_campos",
+          codigo_interno_factura: codigoInterno,
+          factura,
+          entidad_nombre: entidad,
+          fecha_factura: fecha,
+          sucursal,
+          subgrupo_original: subgrupo,
+          grupo_normalizado: grupoNormalizado,
+          marca_normalizada: marca,
+          tipo_facturacion: tipoFacturacion,
+          tipo_tiempo: tipoTiempo,
+          observacion,
+          cod_mercaderia: codMercaderia,
+          codigo_fabricante: codigoFabricante,
+          mercaderia,
+          cantidad,
+          valor_unitario: valorUnitario,
+          total_venta: totalVenta,
+          raw_data: r,
+          _isNew: !existentesKey.has(key),
+        };
+      });
+
+      diag.porSubgrupo = [...subgrupoMap.values()]
+        .map((row) => ({ ...row, total: Number(row.total.toFixed(2)) }))
+        .sort((a, b) => b.total - a.total);
+
+      setGridRows(rows);
+      setGridFile(file.name);
+      setGridDiag(diag);
+      toast.success(`Leidas ${rows.length} lineas GRID: ${diag.garantia} garantia y ${diag.interno} interno.`);
+    } catch (e) {
+      toast.error("Error leyendo archivo: " + (e as Error).message);
+    }
+  };
+
+  const confirmarFacturacionGridCampos = async () => {
+    if (!gridRows || !user) return;
+
+    const nuevos = gridRows.filter((r) => r._isNew);
+    if (nuevos.length === 0) return toast.info("No hay lineas nuevas");
+
+    setBusy(true);
+    try {
+      const { data: imp, error: impError } = await supabase
+        .from("importaciones")
+        .insert({
+          usuario_id: user.id,
+          tipo: "facturacion",
+          total_filas: gridRows.length,
+          insertados: 0,
+          duplicados: gridRows.length,
+          archivo_nombre: `grid_campos:${gridFile}`,
+          origen_sistema: "grid_campos",
+          metadata: {
+            tipo: "facturacion_grid_campos",
+            garantia: gridDiag?.garantia ?? 0,
+            interno: gridDiag?.interno ?? 0,
+            cliente: gridDiag?.cliente ?? 0,
+          },
+        } as any)
+        .select("id")
+        .single();
+      if (impError) throw impError;
+
+      const payload = nuevos.map((r) => ({
+        importacion_id: imp?.id ?? null,
+        origen_sistema: r.origen_sistema,
+        codigo_interno_factura: r.codigo_interno_factura,
+        factura: r.factura,
+        entidad_nombre: r.entidad_nombre,
+        fecha_factura: r.fecha_factura,
+        sucursal: r.sucursal,
+        subgrupo_original: r.subgrupo_original,
+        grupo_normalizado: r.grupo_normalizado,
+        marca_normalizada: r.marca_normalizada,
+        tipo_facturacion: r.tipo_facturacion,
+        tipo_tiempo: r.tipo_tiempo,
+        observacion: r.observacion,
+        cod_mercaderia: r.cod_mercaderia,
+        codigo_fabricante: r.codigo_fabricante,
+        mercaderia: r.mercaderia,
+        cantidad: r.cantidad,
+        valor_unitario: r.valor_unitario,
+        total_venta: r.total_venta,
+        raw_data: r.raw_data,
+      }));
+
+      let insertadosReal = 0;
+      for (let i = 0; i < payload.length; i += 500) {
+        const chunk = payload.slice(i, i + 500);
+        const { error, count } = await (supabase
+          .from("facturacion_lineas_importadas" as any)
+          .upsert(chunk, {
+            onConflict: "origen_sistema,linea_hash",
+            ignoreDuplicates: true,
+            count: "exact",
+          }) as any);
+        if (error) {
+          if (isMissingBillingLinesTableError(error)) {
+            return toast.error("Falta aplicar la migracion de facturacion detallada antes de importar el GRID.");
+          }
+          throw error;
+        }
+        insertadosReal += count ?? 0;
+      }
+
+      const { error: updError } = await supabase
+        .from("importaciones")
+        .update({
+          insertados: insertadosReal,
+          duplicados: gridRows.length - insertadosReal,
+        } as any)
+        .eq("id", imp?.id);
+      if (updError) throw updError;
+
+      toast.success(`Importadas ${insertadosReal} lineas GRID`);
+      setGridRows(null);
+      setGridFile("");
+      setGridDiag(null);
+      await cargarHistorial();
+      onChanged();
+    } catch (e) {
+      toast.error("Error: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const procesarClientes = async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
@@ -1228,6 +1529,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           onFile={procesarFact}
         />
         <DropZone
+          title="Importar GRID Campos"
+          help="Relacion de Facturas de Ventas - GRID - CDM.xls - detalle facturado a Campos del Manana. Clasifica Garantia/Interno por observacion y guarda lineas por factura interna + codigo."
+          onFile={procesarFacturacionGridCampos}
+        />
+        <DropZone
           title="Importar clientes"
           help="MATRIZ CLIENTES.xlsx — une Cadastro de Entidad v2 + BD CLIENTES por código de entidad. BD CLIENTES complementa y sobreescribe datos."
           onFile={procesarClientes}
@@ -1324,6 +1630,99 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
             onCancel={() => {
               setFactRows(null);
               setFactDiag(null);
+            }}
+            busy={busy}
+          />
+        </>
+      )}
+
+      {gridRows && (
+        <>
+          {gridDiag && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="p-3 sm:p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold">Resumen GRID Campos</div>
+                    <div className="text-xs text-muted-foreground">
+                      Clasificacion por observacion para distinguir Garantia e Interno.
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">
+                    {gridDiag.total.toLocaleString()} lineas
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
+                  <div>
+                    <div className="text-muted-foreground">Garantia</div>
+                    <div className="font-semibold">{gridDiag.garantia.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Interno</div>
+                    <div className="font-semibold">{gridDiag.interno.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Cliente</div>
+                    <div className="font-semibold">{gridDiag.cliente.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Sin factura</div>
+                    <div className="font-semibold">{gridDiag.sinFactura.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Sin fecha</div>
+                    <div className="font-semibold">{gridDiag.sinFecha.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Sin interno</div>
+                    <div className="font-semibold">{gridDiag.sinCodigoInterno.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Sin cod. merc.</div>
+                    <div className="font-semibold">{gridDiag.sinCodMercaderia.toLocaleString()}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(gridDiag.porMarca).map(([marca, count]) => (
+                    <Badge key={marca} variant="secondary" className="text-[10px]">
+                      {marca}: {count.toLocaleString()}
+                    </Badge>
+                  ))}
+                  {gridDiag.porSubgrupo
+                    .slice(0, 12)
+                    .map((item) => (
+                      <Badge
+                        key={item.subgrupo}
+                        variant="outline"
+                        className="max-w-[220px] truncate text-[10px]"
+                        title={item.subgrupo}
+                      >
+                        {item.subgrupo}: {item.lineas.toLocaleString()}
+                      </Badge>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          <Preview
+            title={`GRID Campos - ${gridFile}`}
+            rows={gridRows}
+            columns={[
+              "codigo_interno_factura",
+              "factura",
+              "fecha_factura",
+              "tipo_tiempo",
+              "marca_normalizada",
+              "subgrupo_original",
+              "cod_mercaderia",
+              "codigo_fabricante",
+              "total_venta",
+            ]}
+            onConfirm={confirmarFacturacionGridCampos}
+            onCancel={() => {
+              setGridRows(null);
+              setGridFile("");
+              setGridDiag(null);
             }}
             busy={busy}
           />
