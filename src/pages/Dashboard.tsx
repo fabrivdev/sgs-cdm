@@ -309,7 +309,7 @@ export default function Dashboard() {
       try {
         let factQuery = supabase
           .from("facturacion")
-          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura, tipo_tiempo, origen_sistema")
+          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura")
           .gte("fecha", dateKey(queryStart))
           .lte("fecha", dateKey(queryEnd))
           .order("fecha", { ascending: false });
@@ -336,8 +336,8 @@ export default function Dashboard() {
           .filter((row) => !hasGridCampos || !row.entidad_nombre.toUpperCase().includes("CAMPOS DEL MA"))
           .map((row) => ({
             ...row,
-            tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
-            origen_sistema: row.origen_sistema ?? "legacy",
+            tipo_tiempo: "Cliente" as Facturacion["tipo_tiempo"],
+            origen_sistema: "legacy",
           }));
 
         const gridRows: Facturacion[] = gridRowsRaw.map((row) => {
