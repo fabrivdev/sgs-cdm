@@ -183,6 +183,16 @@ function compact(value: string, max = 34) {
   return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
 
+function normalizeClienteKey(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\bS\.?A\.?(C\.?I\.?)?\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [servicios, setServicios] = useState<Servicio[]>([]);
