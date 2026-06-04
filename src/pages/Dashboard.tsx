@@ -103,6 +103,8 @@ interface Facturacion {
   grupo: string | null;
   grupo_fx: string | null;
   cod_factura: string;
+  tipo_tiempo: "Cliente" | "Garantia" | "Interno";
+  origen_sistema?: string | null;
 }
 
 type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
@@ -194,6 +196,7 @@ export default function Dashboard() {
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
   const [fMarcas, setFMarcas] = useState<string[]>([]);
+  const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
@@ -306,15 +309,56 @@ export default function Dashboard() {
       try {
         let factQuery = supabase
           .from("facturacion")
-          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura")
+          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura, tipo_tiempo, origen_sistema")
           .gte("fecha", dateKey(queryStart))
           .lte("fecha", dateKey(queryEnd))
           .order("fecha", { ascending: false });
         if (fSucursales.length > 0) factQuery = factQuery.in("sucursal", fSucursales as Sucursal[]);
 
-        const factRows = await cargarTodo<Facturacion>(factQuery);
+        let gridQuery = (supabase
+          .from("facturacion_lineas_importadas" as any)
+          .select(
+            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
+          )
+          .gte("fecha_factura", dateKey(queryStart))
+          .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
+          .eq("origen_sistema", "grid_campos")
+          .order("fecha_factura", { ascending: false }) as any);
+        if (fSucursales.length > 0) gridQuery = gridQuery.in("sucursal", fSucursales as Sucursal[]);
 
-        if (alive) setFacturacion(factRows);
+        const [legacyRows, gridRowsRaw] = await Promise.all([
+          cargarTodo<Facturacion>(factQuery),
+          cargarTodo<any>(gridQuery),
+        ]);
+
+        const hasGridCampos = gridRowsRaw.length > 0;
+        const legacyRowsNormalizados = legacyRows
+          .filter((row) => !hasGridCampos || !row.entidad_nombre.toUpperCase().includes("CAMPOS DEL MA"))
+          .map((row) => ({
+            ...row,
+            tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
+            origen_sistema: row.origen_sistema ?? "legacy",
+          }));
+
+        const gridRows: Facturacion[] = gridRowsRaw.map((row) => {
+          const factura = String(row.factura ?? row.codigo_interno_factura ?? "").trim();
+          const tipo = row.tipo_facturacion === "Servicio" ? "Servicio" : "Repuesto";
+          return {
+            fecha: String(row.fecha_factura ?? "").slice(0, 10),
+            sucursal: row.sucursal,
+            tipo,
+            cliente_id: null,
+            entidad_nombre: row.entidad_nombre ?? "CAMPOS DEL MANANA S.A.",
+            total_venta: Number(row.total_venta || 0),
+            grupo: row.subgrupo_original ?? row.grupo_normalizado ?? null,
+            grupo_fx: row.grupo_normalizado ?? null,
+            cod_factura: factura,
+            tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
+            origen_sistema: row.origen_sistema ?? "grid_campos",
+          };
+        });
+
+        if (alive) setFacturacion([...legacyRowsNormalizados, ...gridRows]);
       } catch (error) {
         console.error(error);
       } finally {
@@ -384,6 +428,7 @@ export default function Dashboard() {
       facturacion.filter((row) => {
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (fMarcas.length > 0 && !fMarcas.includes(clasificarMarcaFacturacion(row.grupo))) return false;
+        if (fTiposTiempo.length > 0 && !fTiposTiempo.includes(row.tipo_tiempo)) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
@@ -393,7 +438,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fMarcas, fRubros, facturacion, query],
+    [clienteById, fMarcas, fRubros, fTiposTiempo, facturacion, query],
   );
 
   const scopedServicio = (servicio: Servicio | undefined | null) => {
@@ -861,6 +906,7 @@ export default function Dashboard() {
     setFSucursales([]);
     setFRubros([]);
     setFMarcas([]);
+    setFTiposTiempo([]);
     setFEstadosTrabajo([]);
     setFTecnicos([]);
     setPeriodMode("mes");
@@ -872,6 +918,7 @@ export default function Dashboard() {
     (fSucursales.length > 0 ? 1 : 0) +
     (fRubros.length > 0 ? 1 : 0) +
     (fMarcas.length > 0 ? 1 : 0) +
+    (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fTecnicos.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
@@ -919,6 +966,18 @@ export default function Dashboard() {
             { value: "Repuestos", label: "Repuestos" },
             { value: "Kilometraje", label: "Kilometraje" },
             { value: "Otros", label: "Otros" },
+          ]}
+        />
+        <FilterMultiSelect
+          label="Tipo tiempo"
+          values={fTiposTiempo}
+          onChange={setFTiposTiempo}
+          placeholder="Todos"
+          width="w-[180px]"
+          options={[
+            { value: "Cliente", label: "Cliente" },
+            { value: "Garantia", label: "Garantia" },
+            { value: "Interno", label: "Interno" },
           ]}
         />
         {section === "trabajos" && (
