@@ -92,7 +92,6 @@ export default function Calendario() {
   const [cursor, setCursor] = useState(new Date());
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [tecnicoIds, setTecnicoIds] = useState<Set<string>>(new Set());
   const [adminCabecillaIds, setAdminCabecillaIds] = useState<Set<string>>(new Set());
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [fTecnico, setFTecnico] = useState<string>("all");
@@ -167,13 +166,10 @@ export default function Calendario() {
 
       setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
-      const tecSet = new Set<string>();
       const adminCabSet = new Set<string>();
       for (const r of (roles ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "tecnico") tecSet.add(r.user_id);
         if (r.role === "admin" || r.role === "cabecilla") adminCabSet.add(r.user_id);
       }
-      setTecnicoIds(tecSet);
       setAdminCabecillaIds(adminCabSet);
       const nlMap = new Map<string, { id: string; motivo: string | null }>();
       for (const d of (nl ?? []) as Array<{ id: string; fecha: string; motivo: string | null }>) {
@@ -233,8 +229,13 @@ export default function Calendario() {
     [profiles, adminCabecillaIds],
   );
 
+  const tecnicosVisibles = useMemo(
+    () => (fTecnico === "all" ? tecnicosSolo : tecnicosSolo.filter((t) => t.id === fTecnico)),
+    [tecnicosSolo, fTecnico],
+  );
+
   const eventsForTecnicoDay = (tecId: string, d: Date) =>
-    servicios.filter(
+    filtered.filter(
       (s) =>
         isSameDay(parseISO(s.fecha_programada), d) &&
         (s.tecnico_responsable_id === tecId || s.auxiliares.includes(tecId)),
@@ -413,12 +414,12 @@ export default function Calendario() {
                   })}
                 </div>
 
-                {tecnicosSolo.length === 0 ? (
+                {tecnicosVisibles.length === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">
                     No hay técnicos activos.
                   </div>
                 ) : (
-                  tecnicosSolo.map((tec) => {
+                  tecnicosVisibles.map((tec) => {
                     const total = semanaDays.reduce(
                       (acc, d) => acc + eventsForTecnicoDay(tec.id, d).length,
                       0,

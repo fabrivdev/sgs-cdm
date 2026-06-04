@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
 import { ESTADOS, ESTADO_LABELS, MARCAS, SUCURSALES, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
@@ -291,64 +290,15 @@ export default function Planificador() {
     });
   }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
-  // Fechas agrupadas por servicio (dentro del set filtrado) para vista "por semana"
-  const fechasPorServicio = useMemo(() => {
-    const m = new Map<string, string[]>();
-    for (const s of filtered) {
-      const a = m.get(s.id) ?? [];
-      a.push(s.fecha_programada);
-      m.set(s.id, a);
-    }
-    for (const a of m.values()) a.sort();
-    return m;
-  }, [filtered]);
-
-  const displayed = useMemo(() => {
-    if (vista === "dia") return filtered;
-    const seen = new Set<string>();
-    const out: Servicio[] = [];
-    for (const s of filtered) {
-      if (seen.has(s.id)) continue;
-      seen.add(s.id);
-      const fechas = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
-      out.push({ ...s, fecha_programada: fechas[0] });
-    }
-    return out;
-  }, [filtered, vista, fechasPorServicio]);
+  const displayed = useMemo(() => filtered, [filtered]);
 
   const canCreate = isAdmin || isCabecilla;
 
-  const onChangeEstado = async (s: Servicio, estado: Estado) => {
-    if (estado === "Completado" && !s.horas_trabajadas) {
-      setDetalle(s);
-      toast.warning("Cargá las horas trabajadas para registrar la intervención como realizada.");
-      return;
-    }
-
-    const error = s.jornada_id
-      ? (await supabase
-          .from("servicio_jornadas")
-          .update({ estado })
-          .eq("id", s.jornada_id)
-          .eq("servicio_id", s.id)).error
-      : (await supabase.from("servicios").update({ estado }).eq("id", s.id)).error;
-
-    if (error) {
-      toast.error(error.message);
-    } else {
-      const trabajo = trabajosLite.find((t) => t.legacy_servicio_id === s.id);
-      if (trabajo?.id) {
-        await supabase.rpc("recalcular_estado_trabajo" as any, { p_trabajo_id: trabajo.id });
-      }
-      toast.success(`Estado: ${estado}`);
-      load();
-    }
-  };
 
   const exportExcel = () => {
     const rows = displayed.map((s) => ({
       Fecha: s.fecha_programada,
-      Día: s.dia_semana,
+      Dia: s.dia_semana,
       Semana: s.semana,
       Tipo: s.tipo_trabajo,
       "Técnico Responsable": s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "",
@@ -480,7 +430,7 @@ export default function Planificador() {
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando…</TableCell>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
                 </TableRow>
               )}
 
@@ -496,11 +446,7 @@ export default function Planificador() {
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
-                const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
-                const multi = vista === "semana" && fechasSrv.length > 1;
-                const fechaLabel = multi
-                  ? `${format(parseISO(fechasSrv[0]), "dd/MM")} – ${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM/yy")}`
-                  : format(parseISO(s.fecha_programada), "dd/MM/yy");
+                const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM/yy");
 
                 return (
                   <TableRow
@@ -511,11 +457,6 @@ export default function Planificador() {
                     <TableCell className="px-3 py-2 align-top">
                       <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
                         {fechaLabel}
-                        {multi && (
-                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal tabular-nums">
-                            {fechasSrv.length}d
-                          </Badge>
-                        )}
                       </div>
                       <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
@@ -553,29 +494,8 @@ export default function Planificador() {
                       {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top" onClick={(e) => e.stopPropagation()}>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button className="w-full text-left">
-                            <EstadoBadge estado={s.estado} className="cursor-pointer" />
-                          </button>
-                        </PopoverTrigger>
-
-                        <PopoverContent className="w-40 p-1" align="start">
-                          {ESTADOS.map((e) => (
-                            <button
-                              key={e}
-                              onClick={() => onChangeEstado(s, e)}
-                              className={cn(
-                                "block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent",
-                                s.estado === e && "bg-accent font-semibold",
-                              )}
-                            >
-                              {ESTADO_LABELS[e]}
-                            </button>
-                          ))}
-                        </PopoverContent>
-                      </Popover>
+                    <TableCell className="px-3 py-2 align-top">
+                      <EstadoBadge estado={s.estado} />
                     </TableCell>
 
                     <TableCell className="px-3 py-2 align-top text-right tabular-nums">
@@ -591,7 +511,7 @@ export default function Planificador() {
 
       {/* Mobile list */}
       <div className="space-y-2 md:hidden">
-        {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando…</p>}
+        {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando...</p>}
         {!loading && displayed.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin intervenciones.</p>}
 
         {displayed.map((s) => {
@@ -600,11 +520,7 @@ export default function Planificador() {
           const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
           const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
           const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
-          const fechasSrv = fechasPorServicio.get(s.id) ?? [s.fecha_programada];
-          const multi = vista === "semana" && fechasSrv.length > 1;
-          const fechaLabel = multi
-            ? `${format(parseISO(fechasSrv[0]), "dd/MM")}–${format(parseISO(fechasSrv[fechasSrv.length - 1]), "dd/MM")}`
-            : format(parseISO(s.fecha_programada), "dd/MM");
+          const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
 
           return (
             <Card
@@ -626,11 +542,6 @@ export default function Planificador() {
                         <span>·</span>
                         <span>{s.dia_semana.slice(0, 3)}</span>
                         <TipoIcon className="h-3 w-3 shrink-0" />
-                        {multi && (
-                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">
-                            {fechasSrv.length}d
-                          </Badge>
-                        )}
                       </div>
                     </div>
 
