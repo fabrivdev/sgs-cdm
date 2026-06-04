@@ -183,6 +183,16 @@ function compact(value: string, max = 34) {
   return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
 
+function normalizeClienteKey(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\bS\.?A\.?(C\.?I\.?)?\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -516,7 +526,10 @@ export default function Dashboard() {
 
       for (const row of weekFacts) byConcept[concept(row)] += Number(row.total_venta || 0);
 
-      const clients = new Set(weekFacts.map((row) => row.cliente_id ?? row.entidad_nombre));
+      const clients = new Set(weekFacts.map((row) => {
+        const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
+        return normalizeClienteKey(nombre);
+      }));
       const invoices = new Set(weekFacts.map((row) => row.cod_factura));
       return {
         key: dateKey(start),
@@ -561,11 +574,14 @@ export default function Dashboard() {
     const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
     for (const row of selectedFacts) {
       const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
-      const current = map.get(nombre) ?? { nombre, total: 0, facturas: 0, rows: [] };
+      const key = normalizeClienteKey(nombre);
+      const current = map.get(key) ?? { nombre, total: 0, facturas: 0, rows: [] };
       current.total += Number(row.total_venta || 0);
       current.rows.push(row);
       current.facturas = new Set(current.rows.map((item) => item.cod_factura)).size;
-      map.set(nombre, current);
+      // Keep the longest/most descriptive display name
+      if (nombre.length > current.nombre.length) current.nombre = nombre;
+      map.set(key, current);
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30);
   }, [clienteById, selectedFacts]);
