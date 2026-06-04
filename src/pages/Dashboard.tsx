@@ -1325,27 +1325,40 @@ function SummaryCard({
   detail,
   tone = "neutral",
   onClick,
+  trend,
+  children,
+  footer,
 }: {
   icon: React.ElementType;
   title: string;
   value: React.ReactNode;
-  detail: string;
+  detail?: React.ReactNode;
   tone?: Tone;
   onClick: () => void;
+  trend?: { value: number | null; suffix?: string } | null;
+  children?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   return (
     <button className="h-full rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("flex h-full min-h-[112px] flex-col p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+      <Card className={cn("flex h-full min-h-[128px] flex-col gap-2 p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
             <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
-            <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
+            {trend !== undefined && trend !== null && trend.value !== null ? (
+              <div className={cn("mt-1 truncate text-[11px] font-medium tabular-nums", trend.value >= 0 ? "text-emerald-600" : "text-destructive")}>
+                {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.suffix ?? "vs período anterior"}
+              </div>
+            ) : null}
+            {detail ? <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div> : null}
           </div>
           <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", toneClasses[tone])}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
+        {children ? <div className="mt-auto">{children}</div> : null}
+        {footer ? <div className="truncate text-[11px] text-muted-foreground">{footer}</div> : null}
       </Card>
     </button>
   );
