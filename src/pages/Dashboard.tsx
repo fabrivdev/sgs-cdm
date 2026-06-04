@@ -571,11 +571,14 @@ export default function Dashboard() {
     const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
     for (const row of selectedFacts) {
       const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
-      const current = map.get(nombre) ?? { nombre, total: 0, facturas: 0, rows: [] };
+      const key = normalizeClienteKey(nombre);
+      const current = map.get(key) ?? { nombre, total: 0, facturas: 0, rows: [] };
       current.total += Number(row.total_venta || 0);
       current.rows.push(row);
       current.facturas = new Set(current.rows.map((item) => item.cod_factura)).size;
-      map.set(nombre, current);
+      // Keep the longest/most descriptive display name
+      if (nombre.length > current.nombre.length) current.nombre = nombre;
+      map.set(key, current);
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30);
   }, [clienteById, selectedFacts]);
