@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart3,
   Building2,
@@ -13,6 +14,8 @@ import {
   CheckCircle2,
   ClipboardList,
   DollarSign,
+  PieChart,
+  Receipt,
   Users,
 } from "lucide-react";
 import {
@@ -202,6 +205,7 @@ export default function Dashboard() {
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
+  const [rangoEvolucion, setRangoEvolucion] = useState<"6" | "12" | "24" | "all">("12");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
 
@@ -607,11 +611,46 @@ export default function Dashboard() {
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
   const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
+  const previousPeriodRow = weeklyRows[weeklyRows.length - 2];
   const clientesAtendidosSemana = currentWeekRow?.clientes ?? 0;
   const sucursalesConMovimiento = new Set((currentWeekRow?.rows ?? []).map((row) => row.sucursal).filter(Boolean)).size;
   const mixServicioRepuestoTotal = (currentWeekRow?.servicio ?? 0) + (currentWeekRow?.repuestos ?? 0);
   const pctServicio = mixServicioRepuestoTotal > 0 ? Math.round(((currentWeekRow?.servicio ?? 0) / mixServicioRepuestoTotal) * 100) : 0;
   const pctRepuesto = mixServicioRepuestoTotal > 0 ? 100 - pctServicio : 0;
+
+  // KPIs enriquecidos para las cards superiores
+  const facturasPeriodo = currentWeekRow?.facturas ?? 0;
+  const totalPeriodo = currentWeekRow?.total ?? 0;
+  const totalPrevPeriodo = previousPeriodRow?.total ?? 0;
+  const variacionTotalPct = pct(totalPeriodo, totalPrevPeriodo);
+  const ticketPromedio = facturasPeriodo > 0 ? Math.round(totalPeriodo / facturasPeriodo) : 0;
+  const ticketPromedioPrev = (previousPeriodRow?.facturas ?? 0) > 0 ? (previousPeriodRow!.total / previousPeriodRow!.facturas) : 0;
+  const variacionTicketPct = pct(ticketPromedio, ticketPromedioPrev);
+  const facturasPorCliente = clientesAtendidosSemana > 0 ? facturasPeriodo / clientesAtendidosSemana : 0;
+  const tipoFactBreakdown = (() => {
+    const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
+    for (const row of selectedFacts) {
+      const k = (row.tipo_tiempo ?? "Cliente") as keyof typeof groups;
+      groups[k] = (groups[k] ?? 0) + Number(row.total_venta || 0);
+    }
+    const totalTF = groups.Cliente + groups.Garantia + groups.Interno;
+    const p = (n: number) => (totalTF > 0 ? Math.round((n / totalTF) * 100) : 0);
+    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantia: p(groups.Garantia), pctInterno: p(groups.Interno) };
+  })();
+  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
+    ? { label: "Cliente", value: tipoFactBreakdown.pctCliente }
+    : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
+      ? { label: "Garantía", value: tipoFactBreakdown.pctGarantia }
+      : { label: "Interno", value: tipoFactBreakdown.pctInterno };
+  const top5ClientesPct = (() => {
+    const t = topClientes.slice(0, 5).reduce((a, r) => a + r.total, 0);
+    return totalPeriodo > 0 ? Math.round((t / totalPeriodo) * 100) : 0;
+  })();
+  const topSucursalesPct = (() => {
+    const top2 = [...factBySucursal].sort((a, b) => b.total - a.total).slice(0, 2).reduce((a, r) => a + r.total, 0);
+    return totalPeriodo > 0 ? Math.round((top2 / totalPeriodo) * 100) : 0;
+  })();
+
   const periodoLabel = periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
@@ -1011,46 +1050,61 @@ export default function Dashboard() {
       <section className="grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
-          title="Facturacion del periodo"
-          value={money(currentWeekRow?.total ?? 0)}
-          detail={`${currentWeekRow?.facturas ?? 0} facturas - ${currentWeekRow?.clientes ?? 0} clientes`}
-          tone={(currentWeekRow?.variacion ?? 0) < -20 ? "bad" : "neutral"}
+          title="Facturación del período"
+          value={money(totalPeriodo)}
+          trend={{ value: variacionTotalPct }}
+          footer={`${facturasPeriodo} facturas · ${clientesAtendidosSemana} clientes`}
+          tone={(variacionTotalPct ?? 0) < -20 ? "bad" : "neutral"}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
           icon={Users}
           title="Clientes atendidos"
           value={clientesAtendidosSemana}
-          detail={`Distintos en ${T.seleccionado}`}
-          tone="neutral"
+          detail={`${facturasPorCliente.toFixed(1).replace(".", ",")} facturas por cliente`}
+          footer={`Top 5 concentran ${top5ClientesPct}%`}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
-          icon={Building2}
-          title="Sucursales con movimiento"
-          value={sucursalesConMovimiento}
-          detail={`de ${SUCURSALES.length} sucursales`}
-          tone="neutral"
+          icon={Receipt}
+          title="Ticket promedio"
+          value={money(ticketPromedio)}
+          trend={{ value: variacionTicketPct }}
+          footer="Promedio por factura"
+          tone={(variacionTicketPct ?? 0) < -10 ? "bad" : "neutral"}
           onClick={() => setSection("facturacion")}
         />
         <SummaryCard
-          icon={BarChart3}
-          title="Servicios / Repuestos"
-          value={`${pctServicio}% / ${pctRepuesto}%`}
-          detail=""
-          tone="neutral"
+          icon={PieChart}
+          title="Tipo de facturación"
+          value={`${tipoFactDominante.label} ${tipoFactDominante.value}%`}
+          detail={
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Garantía {tipoFactBreakdown.pctGarantia}%</span>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Interno {tipoFactBreakdown.pctInterno}%</span>
+            </span>
+          }
           onClick={() => setSection("facturacion")}
-        />
+        >
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
+            <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
+            <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
+          </div>
+          <div className="text-[11px] text-muted-foreground">Base: {money(tipoFactBreakdown.total)}</div>
+        </SummaryCard>
         <SummaryCard
-          icon={ClipboardList}
-          title="Actividad operativa"
-          value={trabajosActivos.length}
-          detail={`${jornadasRealizadasPrev.length} jornadas cerradas · ${jornadasProgramadas.length} planificadas`}
-          tone={trabajosPausados.length ? "warn" : "neutral"}
+          icon={CheckCircle2}
+          title="Flujo operativo"
+          value={flujo.total}
+          detail="trabajos gestionados"
+          footer={`${flujo.culminados} Culminados · ${flujo.abiertos} Abiertos · ${flujo.pausados} Pausados`}
+          tone={flujo.pausados > 0 ? "warn" : "neutral"}
           onClick={() => setSection("trabajos")}
         />
-
       </section>
+
 
       <Tabs value={section} onValueChange={setSection} className="space-y-3">
         <TabsList className="grid h-auto w-full grid-cols-3 sm:w-fit">
@@ -1063,8 +1117,33 @@ export default function Dashboard() {
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
             <Card className="flex h-full flex-col p-3 xl:col-span-2">
-              <PanelTitle icon={BarChart3} title="Evolucion de facturacion" subtitle={`Comparativo ${periodoLabel} con seleccion directa.`} />
-              <WeeklyBars rows={weeklyRows} activeKey={selectedWeek?.key} onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }} />
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
+                  <p className="truncate text-xs text-muted-foreground">Comparativo {periodoLabel} con selección directa.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
+                    <SelectTrigger className="h-8 w-[130px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="6">Últimos 6</SelectItem>
+                      <SelectItem value="12">Últimos 12</SelectItem>
+                      <SelectItem value="24">Últimos 24</SelectItem>
+                      <SelectItem value="all">Todo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <BarChart3 className="h-4 w-4" />
+                  </div>
+                </div>
+              </div>
+              <WeeklyBars
+                rows={rangoEvolucion === "all" ? weeklyRows : weeklyRows.slice(-Number(rangoEvolucion))}
+                activeKey={selectedWeek?.key}
+                onSelect={(key) => { setSelectedWeekKey(key); setSection("facturacion"); }}
+              />
               <div className="mt-2 border-t pt-2">
                 <MixRubros
                   row={currentWeekRow}
@@ -1076,10 +1155,31 @@ export default function Dashboard() {
             </Card>
 
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Participacion del periodo seleccionado." />
+              <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
               <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); setSection("facturacion"); }} />
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 rounded-md border p-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
+                    <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">sucursales con movimiento</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border p-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <BarChart3 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">Top 2</div>
+                    <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">concentran {topSucursalesPct}% del total</div>
+                  </div>
+                </div>
+              </div>
             </Card>
           </section>
+
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
@@ -1325,27 +1425,40 @@ function SummaryCard({
   detail,
   tone = "neutral",
   onClick,
+  trend,
+  children,
+  footer,
 }: {
   icon: React.ElementType;
   title: string;
   value: React.ReactNode;
-  detail: string;
+  detail?: React.ReactNode;
   tone?: Tone;
   onClick: () => void;
+  trend?: { value: number | null; suffix?: string } | null;
+  children?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   return (
     <button className="h-full rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("flex h-full min-h-[112px] flex-col p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+      <Card className={cn("flex h-full min-h-[128px] flex-col gap-2 p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
             <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
-            <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
+            {trend !== undefined && trend !== null && trend.value !== null ? (
+              <div className={cn("mt-1 truncate text-[11px] font-medium tabular-nums", trend.value >= 0 ? "text-emerald-600" : "text-destructive")}>
+                {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.suffix ?? "vs período anterior"}
+              </div>
+            ) : null}
+            {detail ? <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div> : null}
           </div>
           <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", toneClasses[tone])}>
             <Icon className="h-4 w-4" />
           </div>
         </div>
+        {children ? <div className="mt-auto">{children}</div> : null}
+        {footer ? <div className="truncate text-[11px] text-muted-foreground">{footer}</div> : null}
       </Card>
     </button>
   );
