@@ -1262,6 +1262,7 @@ export default function Dashboard() {
                   <p className="truncate text-xs text-muted-foreground">Comparativo {periodoLabel} con selección directa.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
                   {periodMode !== "anio" && (
                     <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
                       <SelectTrigger className="h-8 w-[150px] text-xs">
@@ -1294,6 +1295,7 @@ export default function Dashboard() {
               <WeeklyBars
                 rows={weeklyRows}
                 activeKey={selectedWeek?.key}
+                metric={factMetric}
                 onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
               />
               <div className="mt-2 border-t pt-2">
@@ -1303,7 +1305,7 @@ export default function Dashboard() {
                   onSelect={(rubro) => { setFRubros([rubro]); goSection("facturacion"); }}
                 />
               </div>
-              <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} />
+              <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} metric={factMetric} />
             </Card>
 
             <Card className="flex h-full flex-col p-3">
@@ -1727,18 +1729,29 @@ function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (v
   );
 }
 
-function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?: string; onSelect: (key: string) => void }) {
-  const max = Math.max(1, ...rows.map((row) => row.total));
+function WeeklyBars({
+  rows,
+  activeKey,
+  metric,
+  onSelect,
+}: {
+  rows: WeekRow[];
+  activeKey?: string;
+  metric: FactMetric;
+  onSelect: (key: string) => void;
+}) {
+  const max = Math.max(1, ...rows.map((row) => weekMetric(row, metric)));
 
   return (
     <div className="overflow-x-auto">
       <div className="flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
         {rows.map((row) => {
-          const height = Math.max(8, Math.round((row.total / max) * 180));
+          const value = weekMetric(row, metric);
+          const height = Math.max(8, Math.round((value / max) * 180));
           const active = row.key === activeKey;
           return (
             <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
-              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{row.total ? money(row.total) : "$ 0"}</span>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{formatFactMetric(value, metric)}</span>
               <span
                 className={cn(
                   "w-full max-w-[42px] rounded-t-md bg-primary/80 transition-all hover:bg-primary",
@@ -1753,7 +1766,7 @@ function WeeklyBars({ rows, activeKey, onSelect }: { rows: WeekRow[]; activeKey?
       </div>
       <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        Facturacion ($)
+        {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
       </div>
     </div>
   );
@@ -2537,9 +2550,9 @@ function TrabajoChip({
   );
 }
 
-function EvolucionKpis({ rows, currentKey }: { rows: WeekRow[]; currentKey?: string }) {
+function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; currentKey?: string; metric: FactMetric }) {
   if (!rows.length) return null;
-  const totals = rows.map((r) => r.total);
+  const totals = rows.map((r) => weekMetric(r, metric));
   const sum = totals.reduce((a, b) => a + b, 0);
   const promedio = sum / rows.length;
   const currentIdx = currentKey ? rows.findIndex((r) => r.key === currentKey) : rows.length - 1;
@@ -2551,11 +2564,11 @@ function EvolucionKpis({ rows, currentKey }: { rows: WeekRow[]; currentKey?: str
     <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
       <div>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total acumulado</div>
-        <div className="mt-0.5 text-sm font-semibold tabular-nums">{money(sum)}</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{formatFactMetric(sum, metric)}</div>
       </div>
       <div>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Promedio por periodo</div>
-        <div className="mt-0.5 text-sm font-semibold tabular-nums">{money(promedio)}</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{formatFactMetric(promedio, metric)}</div>
       </div>
       <div>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs anterior</div>
