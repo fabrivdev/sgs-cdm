@@ -1022,7 +1022,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           null;
         const codigoFabricante = norm(pick(r, ["Código Fabricante", "CÃ³digo Fabricante", "Codigo Fabricante"])) || null;
         const mercaderia = norm(pick(r, ["MercaderÃ­a", "Mercaderia", "Mercadería", "Nombre ImpresiÃ³n", "Nombre Impresión"])) || null;
-        const cantidad = parseMoney(pick(r, ["Cantidad"]));
+        const cantidad = parseMoney(pick(r, ["Cant. Unit.", "Cant Unit", "Cantidad"]));
         const valorUnitario = parseMoney(pick(r, ["Valor Unitario"]));
         const totalVenta = parseMoney(pick(r, ["Sub-total Items", "Sub-Total (Facturas)", "Sub-Total Facturas", "Total Venta"]));
         const tipoTiempo = clasificarTipoTiempoFacturacion(entidad, observacion);

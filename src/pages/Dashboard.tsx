@@ -108,6 +108,7 @@ interface Facturacion {
   cliente_id: string | null;
   entidad_nombre: string;
   total_venta: number;
+  cantidad: number;
   grupo: string | null;
   grupo_fx: string | null;
   cod_factura: string;
@@ -117,6 +118,7 @@ interface Facturacion {
 
 type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
 type Tone = "neutral" | "good" | "warn" | "bad";
+type FactMetric = "usd" | "horasServicio" | "kmFacturados";
 
 interface WeekRow {
   key: string;
@@ -128,6 +130,8 @@ interface WeekRow {
   servicio: number;
   kilometraje: number;
   otros: number;
+  horasServicio: number;
+  kmFacturados: number;
   facturas: number;
   clientes: number;
   variacion: number | null;
@@ -184,6 +188,25 @@ function total(rows: Facturacion[]) {
   return rows.reduce((acc, row) => acc + Number(row.total_venta || 0), 0);
 }
 
+function weekMetric(row: WeekRow | undefined, metric: FactMetric) {
+  if (!row) return 0;
+  if (metric === "horasServicio") return row.horasServicio;
+  if (metric === "kmFacturados") return row.kmFacturados;
+  return row.total;
+}
+
+function formatFactMetric(value: number, metric: FactMetric) {
+  if (metric === "horasServicio") return `${Number(value || 0).toFixed(1).replace(".0", "")} hs`;
+  if (metric === "kmFacturados") return `${Number(value || 0).toFixed(0)} km`;
+  return money(value);
+}
+
+function factMetricLabel(metric: FactMetric) {
+  if (metric === "horasServicio") return "Horas servicio";
+  if (metric === "kmFacturados") return "Km fact.";
+  return "Total";
+}
+
 function compact(value: string, max = 34) {
   return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
@@ -223,6 +246,7 @@ export default function Dashboard() {
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
   const [rangoEvolucion, setRangoEvolucion] = useState<"4" | "6" | "8" | "12" | "24" | "all">("12");
+  const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const goSection = (value: string) => startTransition(() => setSection(value));
@@ -363,7 +387,7 @@ export default function Dashboard() {
         let gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
           .select(
-            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
+            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
           )
           .gte("fecha_factura", dateKey(queryStart))
           .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
@@ -388,6 +412,7 @@ export default function Dashboard() {
           })
           .map((row) => ({
             ...row,
+            cantidad: Number((row as any).cantidad || 0),
             tipo_tiempo: "Cliente" as Facturacion["tipo_tiempo"],
             origen_sistema: "legacy",
           }));
@@ -402,6 +427,7 @@ export default function Dashboard() {
             cliente_id: null,
             entidad_nombre: row.entidad_nombre ?? "CAMPOS DEL MANANA S.A.",
             total_venta: Number(row.total_venta || 0),
+            cantidad: Number(row.cantidad || 0),
             grupo: row.subgrupo_original ?? row.grupo_normalizado ?? null,
             grupo_fx: row.grupo_normalizado ?? null,
             cod_factura: factura,
@@ -538,8 +564,15 @@ export default function Dashboard() {
         Kilometraje: 0,
         Otros: 0,
       };
+      let horasServicio = 0;
+      let kmFacturados = 0;
 
-      for (const row of weekFacts) byConcept[concept(row)] += Number(row.total_venta || 0);
+      for (const row of weekFacts) {
+        const rowConcept = concept(row);
+        byConcept[rowConcept] += Number(row.total_venta || 0);
+        if (rowConcept === "Servicio") horasServicio += Number(row.cantidad || 0);
+        if (rowConcept === "Kilometraje") kmFacturados += Number(row.cantidad || 0);
+      }
 
       const clients = new Set(weekFacts.map((row) => {
         const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
@@ -556,6 +589,8 @@ export default function Dashboard() {
         servicio: byConcept.Servicio,
         kilometraje: byConcept.Kilometraje,
         otros: byConcept.Otros,
+        horasServicio,
+        kmFacturados,
         facturas: invoices.size,
         clientes: clients.size,
         variacion: null,
@@ -711,6 +746,13 @@ export default function Dashboard() {
   const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
+  const selectedMetricValue = weekMetric(selectedWeek, factMetric);
+  const selectedMetricPrevValue = (() => {
+    if (!selectedWeek) return 0;
+    const selectedIndex = weeklyRows.findIndex((row) => row.key === selectedWeek.key);
+    return selectedIndex > 0 ? weekMetric(weeklyRows[selectedIndex - 1], factMetric) : 0;
+  })();
+  const selectedMetricTrend = factMetric === "usd" ? selectedTrend : pct(selectedMetricValue, selectedMetricPrevValue);
   const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
   const previousPeriodRow = weeklyRows[weeklyRows.length - 2];
   const clientesAtendidosSemana = currentWeekRow?.clientes ?? 0;
@@ -1340,11 +1382,14 @@ export default function Dashboard() {
                 <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
                 <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
-                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(selectedWeek?.total ?? 0)}</div>
-                <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
-                  {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}
+              <div className="flex flex-col items-end gap-2">
+                <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
+                <div className="text-right">
+                  <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
+                  <div className="text-lg font-semibold tabular-nums">{loading ? "..." : formatFactMetric(selectedMetricValue, factMetric)}</div>
+                  <div className={cn("text-[11px]", selectedMetricTrend != null && selectedMetricTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
+                    {selectedMetricTrend == null ? "sin base previa" : `${selectedMetricTrend > 0 ? "+" : ""}${selectedMetricTrend}% vs anterior`}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1352,7 +1397,7 @@ export default function Dashboard() {
             <div className="rounded-md border">
               <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                 <div>{T.columnaPeriodo}</div>
-                <div className="text-right">Total</div>
+                <div className="text-right">{factMetricLabel(factMetric)}</div>
                 <div className="text-right">Repuestos</div>
                 <div className="text-right">Servicio</div>
                 <div className="text-right">Km</div>
@@ -1361,8 +1406,10 @@ export default function Dashboard() {
                 <div className="text-right">Clientes</div>
                 <div className="text-right">Var.</div>
               </div>
-              {weeklyRows.map((row) => {
+              {weeklyRows.map((row, index) => {
                 const active = row.key === selectedWeek?.key;
+                const metricValue = weekMetric(row, factMetric);
+                const metricTrend = factMetric === "usd" ? row.variacion : pct(metricValue, index > 0 ? weekMetric(weeklyRows[index - 1], factMetric) : 0);
                 return (
                   <button
                     key={row.key}
@@ -1373,15 +1420,15 @@ export default function Dashboard() {
                     )}
                   >
                     <div className="font-medium">{row.label}</div>
-                    <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
+                    <div className="text-right font-semibold tabular-nums">{formatFactMetric(metricValue, factMetric)}</div>
                     <div className="text-right tabular-nums">{money(row.repuestos)}</div>
                     <div className="text-right tabular-nums">{money(row.servicio)}</div>
                     <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
                     <div className="text-right tabular-nums">{money(row.otros)}</div>
                     <div className="text-right tabular-nums">{row.facturas}</div>
                     <div className="text-right tabular-nums">{row.clientes}</div>
-                    <div className={cn("text-right tabular-nums", row.variacion != null && row.variacion < 0 && "text-destructive")}>
-                      {row.variacion == null ? "-" : `${row.variacion > 0 ? "+" : ""}${row.variacion}%`}
+                    <div className={cn("text-right tabular-nums", metricTrend != null && metricTrend < 0 && "text-destructive")}>
+                      {metricTrend == null ? "-" : `${metricTrend > 0 ? "+" : ""}${metricTrend}%`}
                     </div>
                   </button>
                 );
@@ -1651,6 +1698,31 @@ function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio";
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (value: FactMetric) => void }) {
+  const options: Array<{ value: FactMetric; label: string }> = [
+    { value: "usd", label: "$" },
+    { value: "horasServicio", label: "Hs servicio" },
+    { value: "kmFacturados", label: "Km" },
+  ];
+  return (
+    <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border bg-background text-[11px]">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "border-r px-2 last:border-r-0 hover:bg-accent",
+            value === option.value && "bg-primary text-primary-foreground hover:bg-primary",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }
