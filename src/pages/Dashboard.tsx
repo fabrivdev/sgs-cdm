@@ -114,6 +114,7 @@ interface Facturacion {
   cod_factura: string;
   tipo_tiempo: "Cliente" | "Garantia" | "Interno";
   origen_sistema?: string | null;
+  raw_data?: Record<string, unknown> | null;
 }
 
 type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
@@ -177,15 +178,38 @@ function pct(current: number, previous: number) {
 }
 
 function concept(row: Facturacion): Concepto {
+  const grupoFx = String(row.grupo_fx ?? "").toLowerCase();
   const group = `${row.grupo_fx ?? ""} ${row.grupo ?? ""}`.toLowerCase();
   if (row.tipo === "Repuesto" || group.includes("repuesto")) return "Repuestos";
-  if (group.includes("kilomet")) return "Kilometraje";
-  if (group.includes("mano de obra")) return "Servicio";
+  if (grupoFx === "kilometraje" || group.includes("kilomet")) return "Kilometraje";
+  if (grupoFx === "servicio" || group.includes("mano de obra") || group.includes("service") || group.includes("servicio")) return "Servicio";
   return "Otros";
 }
 
 function total(rows: Facturacion[]) {
   return rows.reduce((acc, row) => acc + Number(row.total_venta || 0), 0);
+}
+
+function parseQuantity(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const cleaned = raw
+    .replace(/[^\d,.-]/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function rawQuantity(rawData: Record<string, unknown> | null | undefined) {
+  if (!rawData) return 0;
+  return parseQuantity(
+    rawData["Cant. Unit."] ??
+      rawData["Cant Unit"] ??
+      rawData["Cantidad"] ??
+      rawData["cantidad"],
+  );
 }
 
 function weekMetric(row: WeekRow | undefined, metric: FactMetric) {
@@ -387,7 +411,7 @@ export default function Dashboard() {
         let gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
           .select(
-            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
+            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, raw_data, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
           )
           .gte("fecha_factura", dateKey(queryStart))
           .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
@@ -427,12 +451,13 @@ export default function Dashboard() {
             cliente_id: null,
             entidad_nombre: row.entidad_nombre ?? "CAMPOS DEL MANANA S.A.",
             total_venta: Number(row.total_venta || 0),
-            cantidad: Number(row.cantidad || 0),
+            cantidad: Number(row.cantidad || 0) || rawQuantity(row.raw_data),
             grupo: row.subgrupo_original ?? row.grupo_normalizado ?? null,
             grupo_fx: row.grupo_normalizado ?? null,
             cod_factura: factura,
             tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
             origen_sistema: row.origen_sistema ?? "grid_campos",
+            raw_data: row.raw_data ?? null,
           };
         });
 
