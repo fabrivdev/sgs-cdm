@@ -801,6 +801,60 @@ export type Database = {
           },
         ]
       }
+      tecnico_disponibilidad: {
+        Row: {
+          actualizado_en: string
+          bloquea_agenda: boolean
+          creado_en: string
+          creado_por: string | null
+          fecha_fin: string
+          fecha_inicio: string
+          id: string
+          observacion: string | null
+          tecnico_id: string
+          tipo: string
+        }
+        Insert: {
+          actualizado_en?: string
+          bloquea_agenda?: boolean
+          creado_en?: string
+          creado_por?: string | null
+          fecha_fin: string
+          fecha_inicio: string
+          id?: string
+          observacion?: string | null
+          tecnico_id: string
+          tipo?: string
+        }
+        Update: {
+          actualizado_en?: string
+          bloquea_agenda?: boolean
+          creado_en?: string
+          creado_por?: string | null
+          fecha_fin?: string
+          fecha_inicio?: string
+          id?: string
+          observacion?: string | null
+          tecnico_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tecnico_disponibilidad_creado_por_fkey"
+            columns: ["creado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tecnico_disponibilidad_tecnico_id_fkey"
+            columns: ["tecnico_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicios: {
         Row: {
           actualizado_en: string

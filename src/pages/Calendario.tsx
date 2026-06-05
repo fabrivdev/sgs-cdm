@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { ChevronLeft, ChevronRight, MapPin, Wrench, Plus, Ban, RotateCcw } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw } from "lucide-react";
 import {
   format,
   addMonths,
@@ -25,6 +25,7 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
+import { DisponibilidadDialog } from "@/components/tecnicos/DisponibilidadDialog";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
 import { cn } from "@/lib/utils";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
@@ -59,6 +60,16 @@ interface Cliente {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+}
+
+interface DisponibilidadTecnico {
+  id: string;
+  tecnico_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo: string;
+  observacion: string | null;
+  bloquea_agenda: boolean;
 }
 
 const PAGE = 1000;
@@ -98,7 +109,10 @@ export default function Calendario() {
   const [detalle, setDetalle] = useState<Servicio | null>(null);
   const [diaSel, setDiaSel] = useState<Date | null>(null);
   const [diaForm, setDiaForm] = useState<Date | null>(null);
+  const [diaDisponibilidad, setDiaDisponibilidad] = useState<string | undefined>();
   const [openForm, setOpenForm] = useState(false);
+  const [openDisponibilidad, setOpenDisponibilidad] = useState(false);
+  const [disponibilidades, setDisponibilidades] = useState<DisponibilidadTecnico[]>([]);
   const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
 
   const [codigoByServicio, setCodigoByServicio] = useState<Map<string, string>>(new Map());
@@ -177,6 +191,17 @@ export default function Calendario() {
       }
       setDiasNL(nlMap);
       setClientes(cli);
+
+      try {
+        const { data: disp, error: dispError } = await supabase
+          .from("tecnico_disponibilidad")
+          .select("id, tecnico_id, fecha_inicio, fecha_fin, tipo, observacion, bloquea_agenda");
+        if (dispError) throw dispError;
+        setDisponibilidades((disp ?? []) as DisponibilidadTecnico[]);
+      } catch (dispError) {
+        console.warn("Disponibilidad tecnica no disponible", dispError);
+        setDisponibilidades([]);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -241,6 +266,23 @@ export default function Calendario() {
         (s.tecnico_responsable_id === tecId || s.auxiliares.includes(tecId)),
     );
 
+  const dateKey = (d: Date) => format(d, "yyyy-MM-dd");
+
+  const dispIncludesDay = (disp: DisponibilidadTecnico, d: Date) => {
+    const key = dateKey(d);
+    return key >= disp.fecha_inicio && key <= disp.fecha_fin;
+  };
+
+  const disponibilidadForTecnicoDay = (tecId: string, d: Date) =>
+    disponibilidades.filter((disp) => disp.tecnico_id === tecId && dispIncludesDay(disp, d));
+
+  const disponibilidadForDay = (d: Date) =>
+    disponibilidades.filter(
+      (disp) => dispIncludesDay(disp, d) && (fTecnico === "all" || disp.tecnico_id === fTecnico),
+    );
+
+  const disponibilidadLabel = (tipo: string) => tipo || "No disponible";
+
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
@@ -277,6 +319,7 @@ export default function Calendario() {
 
   const canCreate = isAdmin || isCabecilla;
   const eventosDia = diaSel ? eventsForDay(diaSel) : [];
+  const disponibilidadDiaSel = diaSel ? disponibilidadForDay(diaSel) : [];
   const diaSelKey = diaSel ? format(diaSel, "yyyy-MM-dd") : "";
   const diaSelNL = diaSelKey ? diasNL.get(diaSelKey) : undefined;
 
@@ -339,6 +382,20 @@ export default function Calendario() {
           <Button variant="outline" size="sm" className="h-9" onClick={() => setCursor(new Date())}>
             Hoy
           </Button>
+          {canCreate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2"
+              onClick={() => {
+                setDiaDisponibilidad(undefined);
+                setOpenDisponibilidad(true);
+              }}
+            >
+              <CalendarOff className="h-4 w-4" />
+              Disponibilidad
+            </Button>
+          )}
           <Button
             variant="outline"
             size="icon"
@@ -424,6 +481,10 @@ export default function Calendario() {
                       (acc, d) => acc + eventsForTecnicoDay(tec.id, d).length,
                       0,
                     );
+                    const diasBloqueados = semanaDays.reduce(
+                      (acc, d) => acc + (disponibilidadForTecnicoDay(tec.id, d).length > 0 ? 1 : 0),
+                      0,
+                    );
                     return (
                       <div
                         key={tec.id}
@@ -434,10 +495,12 @@ export default function Calendario() {
                           <div className="text-sm font-medium truncate">{tec.nombre}</div>
                           <div className="text-[10px] text-muted-foreground">
                             {tec.sucursal ?? "—"} · {total} {total === 1 ? "servicio" : "servicios"}
+                            {diasBloqueados > 0 ? ` · ${diasBloqueados} no disp.` : ""}
                           </div>
                         </div>
                         {semanaDays.map((d) => {
                           const evs = eventsForTecnicoDay(tec.id, d);
+                          const bloqueos = disponibilidadForTecnicoDay(tec.id, d);
                           const esDom = d.getDay() === 0;
                           return (
                             <div
@@ -445,10 +508,22 @@ export default function Calendario() {
                               className={cn(
                                 "p-1 border-r min-h-[80px] space-y-1",
                                 esDom && "bg-slate-50",
-                                evs.length === 0 && !esDom && "bg-amber-50/40",
+                                evs.length === 0 && bloqueos.length === 0 && !esDom && "bg-amber-50/40",
+                                bloqueos.length > 0 && !esDom && "bg-sky-50/50",
                               )}
                             >
-                              {evs.length === 0 ? (
+                              {bloqueos.map((disp) => (
+                                <div
+                                  key={disp.id}
+                                  className="flex items-center gap-1 truncate rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-800"
+                                  title={disp.observacion ?? undefined}
+                                >
+                                  <GraduationCap className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate">{disponibilidadLabel(disp.tipo)}</span>
+                                </div>
+                              ))}
+
+                              {evs.length === 0 && bloqueos.length === 0 ? (
                                 <div className="text-[10px] text-muted-foreground/60 italic text-center pt-3">
                                   {esDom ? "—" : "libre"}
                                 </div>
@@ -503,6 +578,8 @@ export default function Calendario() {
             const isDragOver = dragOverKey === dayKey;
             const esSemana = vista === "semana";
             const visibles = esSemana ? evs : evs.slice(0, 3);
+            const disponibilidadDia = disponibilidadForDay(d);
+            const visiblesDisponibilidad = esSemana ? disponibilidadDia : disponibilidadDia.slice(0, 2);
             const esDomingo = d.getDay() === 0;
             const nlInfo = diasNL.get(dayKey);
             const esNL = !!nlInfo || esDomingo;
@@ -583,6 +660,29 @@ export default function Calendario() {
                 )}
 
                 <div className={cn("space-y-1", !esSemana && "hidden sm:block")}>
+                  {visiblesDisponibilidad.map((disp) => (
+                    <div
+                      key={disp.id}
+                      className={cn(
+                        "flex items-center gap-1 truncate rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-left text-[10px] font-medium text-sky-800",
+                        esSemana && "text-[11px] py-1",
+                      )}
+                      title={`${profById[disp.tecnico_id] ?? "Tecnico"} - ${disp.observacion ?? disponibilidadLabel(disp.tipo)}`}
+                    >
+                      <GraduationCap className="h-2.5 w-2.5 shrink-0" />
+                      <span className="truncate">
+                        {fTecnico === "all" ? `${profById[disp.tecnico_id] ?? "Tecnico"} · ` : ""}
+                        {disponibilidadLabel(disp.tipo)}
+                      </span>
+                    </div>
+                  ))}
+
+                  {!esSemana && disponibilidadDia.length > 2 && (
+                    <div className="text-[10px] text-sky-700 font-medium">
+                      +{disponibilidadDia.length - 2} no disp.
+                    </div>
+                  )}
+
                   {visibles.map((s) => {
                     const TipoIcon = (s.tipo_trabajo ?? "Visita de campo") === "Máquina en taller" ? Wrench : MapPin;
                     const draggable = canDrag(s);
@@ -671,6 +771,11 @@ export default function Calendario() {
             <SheetDescription>
               {eventosDia.length} servicio{eventosDia.length !== 1 ? "s" : ""} programado
               {eventosDia.length !== 1 ? "s" : ""}
+              {disponibilidadDiaSel.length > 0 && (
+                <span className="ml-1 text-sky-700">
+                  · {disponibilidadDiaSel.length} no disponible{disponibilidadDiaSel.length !== 1 ? "s" : ""}
+                </span>
+              )}
               {diaSelNL && (
                 <span className="ml-1 text-amber-600">
                   · No laboral{diaSelNL.motivo ? `: ${diaSelNL.motivo}` : ""}
@@ -684,17 +789,53 @@ export default function Calendario() {
 
           <div className="mt-4 space-y-2">
             {canCreate && (
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  setDiaForm(diaSel);
-                  setDiaSel(null);
-                  setOpenForm(true);
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Nuevo servicio en este día
-              </Button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setDiaForm(diaSel);
+                    setDiaSel(null);
+                    setOpenForm(true);
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Nuevo servicio
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    if (diaSel) setDiaDisponibilidad(format(diaSel, "yyyy-MM-dd"));
+                    setDiaSel(null);
+                    setOpenDisponibilidad(true);
+                  }}
+                >
+                  <CalendarOff className="mr-2 h-4 w-4" /> Disponibilidad
+                </Button>
+              </div>
+            )}
+
+            {disponibilidadDiaSel.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">No disponibilidad</p>
+                {disponibilidadDiaSel.map((disp) => (
+                  <div key={disp.id} className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sky-900">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <GraduationCap className="h-4 w-4 shrink-0" />
+                        <span className="truncate text-sm font-medium">{profById[disp.tecnico_id] ?? "Tecnico"}</span>
+                      </div>
+                      <Badge variant="outline" className="border-sky-200 bg-white text-sky-800">
+                        {disponibilidadLabel(disp.tipo)}
+                      </Badge>
+                    </div>
+                    {disp.observacion && (
+                      <p className="mt-1 text-xs text-sky-800">{disp.observacion}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
 
             {eventosDia.length === 0 ? (
@@ -760,6 +901,14 @@ export default function Calendario() {
         clientes={clientes}
         onSaved={load}
         defaultDate={diaForm ? format(diaForm, "yyyy-MM-dd") : undefined}
+      />
+
+      <DisponibilidadDialog
+        open={openDisponibilidad}
+        onOpenChange={setOpenDisponibilidad}
+        tecnicos={tecnicosSolo}
+        fechaInicial={diaDisponibilidad}
+        onSaved={load}
       />
     </div>
   );
