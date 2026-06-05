@@ -73,6 +73,7 @@ interface FactRow {
   entidad_nombre: string;
   cod_entidad: string | null;
   total_venta: number;
+  cantidad: number;
   grupo: string | null;
   grupo_fx: string | null;
   cod_factura: string;
@@ -803,6 +804,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
           const grupo = norm(pick(r, ["Grupo", "grupo"])) || null;
           const totalVenta = parseMoney(pick(r, ["Total Venta", "total venta", "Total venta"]));
+          const cantidad = parseMoney(pick(r, ["Cant. Unit.", "Cant Unit", "Cantidad"]));
 
           const key = factKey({
             cod_factura: codFactura,
@@ -818,6 +820,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           const prev = agg.get(key);
           if (prev) {
             prev.total_venta += totalVenta;
+            prev.cantidad += cantidad;
           } else {
             agg.set(key, {
               fecha,
@@ -825,6 +828,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
               entidad_nombre: entidadNombre,
               cod_entidad: codEntidad,
               total_venta: totalVenta,
+              cantidad,
               grupo,
               grupo_fx: grupoFx,
               cod_factura: codFactura,
@@ -893,6 +897,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         entidad_nombre: r.entidad_nombre,
         cod_entidad: r.cod_entidad,
         total_venta: r.total_venta,
+        cantidad: r.cantidad,
         grupo: r.grupo,
         grupo_fx: r.grupo_fx,
         cod_factura: r.cod_factura,
@@ -905,7 +910,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           .from("facturacion")
           .upsert(chunk as any, {
             onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx",
-            ignoreDuplicates: true,
             count: "exact",
           });
         if (error) throw error;

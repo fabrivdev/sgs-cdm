@@ -142,6 +142,7 @@ export type Database = {
       }
       facturacion: {
         Row: {
+          cantidad: number
           cliente_id: string | null
           cod_entidad: string | null
           cod_factura: string
@@ -156,6 +157,7 @@ export type Database = {
           total_venta: number
         }
         Insert: {
+          cantidad?: number
           cliente_id?: string | null
           cod_entidad?: string | null
           cod_factura: string
@@ -170,6 +172,7 @@ export type Database = {
           total_venta?: number
         }
         Update: {
+          cantidad?: number
           cliente_id?: string | null
           cod_entidad?: string | null
           cod_factura?: string

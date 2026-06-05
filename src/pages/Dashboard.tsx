@@ -414,14 +414,29 @@ export default function Dashboard() {
     (async () => {
       setFacturacionLoading(true);
       try {
-        let factQuery = supabase
-          .from("facturacion")
-          .select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura")
-          .gte("fecha", dateKey(queryStart))
-          .lte("fecha", dateKey(queryEnd))
-          .order("fecha", { ascending: false });
+        const cargarFacturacionHistorica = async () => {
+          const base = () =>
+            supabase
+              .from("facturacion")
+              .gte("fecha", dateKey(queryStart))
+              .lte("fecha", dateKey(queryEnd))
+              .order("fecha", { ascending: false });
 
-        let gridQuery = (supabase
+          try {
+            return await cargarTodo<Facturacion>(
+              base().select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, cantidad, grupo, grupo_fx, cod_factura"),
+            );
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (!message.includes("cantidad")) throw error;
+            const rows = await cargarTodo<Omit<Facturacion, "cantidad">>(
+              base().select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura"),
+            );
+            return rows.map((row) => ({ ...row, cantidad: 0 }));
+          }
+        };
+
+        const gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
           .select(
             "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, raw_data, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
@@ -432,7 +447,7 @@ export default function Dashboard() {
           .order("fecha_factura", { ascending: false }) as any);
 
         const [legacyRows, gridRowsRaw] = await Promise.all([
-          cargarTodo<Facturacion>(factQuery),
+          cargarFacturacionHistorica(),
           cargarTodo<any>(gridQuery),
         ]);
 
