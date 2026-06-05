@@ -1066,6 +1066,20 @@ export default function Dashboard() {
     const bucketsSet = new Set<string>();
     const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
 
+    const ensureTecnicoRow = (id: string) => {
+      if (map.has(id)) return;
+      map.set(id, {
+        id,
+        nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
+        porBucket: {},
+        totalJornadas: 0,
+        totalHoras: 0,
+        trabajos: new Set<string>(),
+      });
+    };
+
+    for (const id of activeTechnicianIds) ensureTecnicoRow(id);
+
     // Scope: trabajos visibles tras aplicar filtros de la pestaña Trabajos (estado/técnico/marca).
     const trabajoIdsEnScope = new Set(trabajosResumen.map((t) => t.id));
     // Mapa inverso: servicio_id -> trabajo_id (mismo criterio que jornadasByTrabajo)
@@ -1086,6 +1100,7 @@ export default function Dashboard() {
       // Solo Completado aporta horas reales
       const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
       for (const id of validJornadaCrew(jornada)) {
+        ensureTecnicoRow(id);
         const current = map.get(id) ?? {
           id,
           nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
@@ -1105,6 +1120,25 @@ export default function Dashboard() {
       }
     }
 
+    if (bucketsSet.size === 0) {
+      if (periodMode === "semana") {
+        const start = startOfWeek(periodStart, { weekStartsOn: 1 });
+        const end = endOfWeek(periodEnd, { weekStartsOn: 1 });
+        let cursor = start;
+        while (cursor <= end) {
+          bucketsSet.add(`${getISOWeekYear(cursor)}-W${String(getISOWeek(cursor)).padStart(2, "0")}`);
+          cursor = addWeeks(cursor, 1);
+        }
+      } else {
+        let cursor = startOfMonth(periodStart);
+        const end = startOfMonth(periodEnd);
+        while (cursor <= end) {
+          bucketsSet.add(format(cursor, "yyyy-MM"));
+          cursor = addMonths(cursor, 1);
+        }
+      }
+    }
+
     const buckets = Array.from(bucketsSet).sort();
     const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
     const rowsAll = Array.from(map.values())
@@ -1116,7 +1150,7 @@ export default function Dashboard() {
         totalHoras: row.totalHoras,
         trabajos: row.trabajos.size,
       }))
-      .sort((a, b) => b.totalJornadas - a.totalJornadas || b.totalHoras - a.totalHoras);
+      .sort((a, b) => b.totalJornadas - a.totalJornadas || b.totalHoras - a.totalHoras || a.nombre.localeCompare(b.nombre));
     const rows = tecnicoFilterSet ? rowsAll.filter((r) => tecnicoFilterSet.has(r.id)) : rowsAll;
 
     const totalesPorBucket: Record<string, { jornadas: number; horas: number }> = {};
@@ -1132,7 +1166,7 @@ export default function Dashboard() {
     }
 
     return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
-  }, [jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
+  }, [activeTechnicianIds, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
     setWeekStartInput(initialWeekStart);
