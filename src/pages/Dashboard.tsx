@@ -1439,16 +1439,11 @@ export default function Dashboard() {
                 <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
                 <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
-                <div className="text-right">
-                  <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
-                  <div className="text-lg font-semibold tabular-nums">{loading ? "..." : formatWeekMetric(selectedWeek, factMetric)}</div>
-                  <div className={cn("text-[11px]", selectedMetricTrend != null && selectedMetricTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
-                    {metricUnavailable(selectedWeek, factMetric)
-                      ? "sin cantidad disponible"
-                      : selectedMetricTrend == null ? "sin base previa" : `${selectedMetricTrend > 0 ? "+" : ""}${selectedMetricTrend}% vs anterior`}
-                  </div>
+              <div className="text-right">
+                <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
+                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : formatWeekMetric(selectedWeek, "usd")}</div>
+                <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
+                  {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}
                 </div>
               </div>
             </div>
@@ -1456,7 +1451,7 @@ export default function Dashboard() {
             <div className="rounded-md border">
               <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                 <div>{T.columnaPeriodo}</div>
-                <div className="text-right">{factMetricLabel(factMetric)}</div>
+                <div className="text-right">{factMetricLabel("usd")}</div>
                 <div className="text-right">Repuestos</div>
                 <div className="text-right">Servicio</div>
                 <div className="text-right">Km</div>
@@ -1465,10 +1460,9 @@ export default function Dashboard() {
                 <div className="text-right">Clientes</div>
                 <div className="text-right">Var.</div>
               </div>
-              {weeklyRows.map((row, index) => {
+              {weeklyRows.map((row) => {
                 const active = row.key === selectedWeek?.key;
-                const metricValue = weekMetric(row, factMetric);
-                const metricTrend = factMetric === "usd" ? row.variacion : pct(metricValue, index > 0 ? weekMetric(weeklyRows[index - 1], factMetric) : 0);
+                const metricTrend = row.variacion;
                 return (
                   <button
                     key={row.key}
@@ -1479,7 +1473,7 @@ export default function Dashboard() {
                     )}
                   >
                     <div className="font-medium">{row.label}</div>
-                    <div className="text-right font-semibold tabular-nums">{formatWeekMetric(row, factMetric)}</div>
+                    <div className="text-right font-semibold tabular-nums">{formatWeekMetric(row, "usd")}</div>
                     <div className="text-right tabular-nums">{money(row.repuestos)}</div>
                     <div className="text-right tabular-nums">{money(row.servicio)}</div>
                     <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
@@ -1487,7 +1481,7 @@ export default function Dashboard() {
                     <div className="text-right tabular-nums">{row.facturas}</div>
                     <div className="text-right tabular-nums">{row.clientes}</div>
                     <div className={cn("text-right tabular-nums", metricTrend != null && metricTrend < 0 && "text-destructive")}>
-                      {metricUnavailable(row, factMetric) ? "-" : metricTrend == null ? "-" : `${metricTrend > 0 ? "+" : ""}${metricTrend}%`}
+                      {metricTrend == null ? "-" : `${metricTrend > 0 ? "+" : ""}${metricTrend}%`}
                     </div>
                   </button>
                 );
