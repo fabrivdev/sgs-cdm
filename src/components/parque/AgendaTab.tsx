@@ -240,6 +240,20 @@ export function AgendaTab({
       if (!cur || new Date(cur.fecha) < new Date(sg.fecha)) ultPorCliente.set(sg.cliente_id, sg);
     }
 
+    for (const trabajo of trabajos) {
+      if (!trabajo.cliente_id) continue;
+      const cur = ultPorCliente.get(trabajo.cliente_id);
+      if (!cur || new Date(cur.fecha) < new Date(trabajo.creado_en)) {
+        ultPorCliente.set(trabajo.cliente_id, {
+          cliente_id: trabajo.cliente_id,
+          fecha: trabajo.creado_en,
+          resultado: "Agendó servicio",
+          observaciones: `TR asociado: ${trabajoReferencia(trabajo)}`,
+          trabajo_id: trabajo.id,
+        });
+      }
+    }
+
     const hoy = Date.now();
 
     return [...cantPorCliente.entries()]
@@ -273,7 +287,7 @@ export function AgendaTab({
         const db = b.dias ?? Number.MAX_SAFE_INTEGER;
         return db - da;
       });
-  }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajosAbiertosPorCliente]);
+  }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajos, trabajosAbiertosPorCliente]);
 
   const agendaKpis = useMemo(() => {
     const desde90 = Date.now() - 90 * 86400000;

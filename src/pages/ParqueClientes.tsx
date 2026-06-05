@@ -156,13 +156,13 @@ export default function ParqueClientes() {
 
   // En la pestaña Parque mostramos métricas que reflejan los filtros aplicados
   useEffect(() => {
-    if (tab !== "parque" || vistaParque !== "clientes") {
+    if (tab !== "parque") {
       setParqueMetricas(null);
     }
-  }, [tab, vistaParque]);
+  }, [tab]);
 
   const metricasMostradas =
-    tab === "parque" && vistaParque === "clientes" && parqueMetricas ? parqueMetricas : metricas;
+    tab === "parque" && parqueMetricas ? parqueMetricas : metricas;
 
   const cards = useMemo(
     () => [

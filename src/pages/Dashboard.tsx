@@ -683,6 +683,22 @@ export default function Dashboard() {
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
   const tecnicosProximoPeriodo = new Set(jornadasProximoPeriodo.flatMap((j) => validJornadaCrew(j))).size;
   const tecnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
+  const jornadasOperativasPeriodo = useMemo(
+    () =>
+      jornadas.filter((jornada) => {
+        const servicio = servicioById.get(jornada.servicio_id);
+        return (
+          (jornada.estado === "Pendiente" || jornada.estado === "Completado") &&
+          inRange(jornada.fecha, periodStart, periodEnd) &&
+          scopedServicio(servicio)
+        );
+      }),
+    [clienteById, fSucursales, jornadas, periodEnd, periodStart, query, servicioById],
+  );
+  const tecnicosConActividadPeriodo = useMemo(
+    () => new Set(jornadasOperativasPeriodo.flatMap((j) => validJornadaCrew(j))),
+    [activeTechnicianIds, jornadasOperativasPeriodo, servicioById],
+  );
   const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > 7);
   const selectedTrend = selectedWeek?.variacion ?? null;
@@ -822,9 +838,6 @@ export default function Dashboard() {
 
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
-  const tecnicosConActividad = new Set(
-    [...jornadasRealizadasPrev, ...jornadasProgramadas].flatMap((j) => validJornadaCrew(j)),
-  );
   const tecnicosTotales = activeTechnicianIds.size;
 
   // Estadísticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestaña Trabajos).
@@ -1413,15 +1426,25 @@ export default function Dashboard() {
             <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
             <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
             <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
-            <TrabajoChip label="Jornadas" value={jornadasRealizadasPrev.length} onClick={() => setFEstadosTrabajo([])} />
-            <TrabajoChip label="Tecnicos" value={`${tecnicosConActividad.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
+            <TrabajoChip label="Jornadas" value={jornadasOperativasPeriodo.length} onClick={() => setFEstadosTrabajo([])} />
+            <TrabajoChip label="Tecnicos" value={`${tecnicosConActividadPeriodo.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
             <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
           </div>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
-              <EstadoCompacto flujo={flujo} onSelect={(estado) => setFEstadosTrabajo([estado])} />
+              <EstadoCompacto
+                flujo={flujo}
+                onSelect={(estado) => setFEstadosTrabajo([estado])}
+                planificados={trabajosPlanificadosProximoPeriodo}
+                tecnicosAsignados={tecnicosProximoPeriodo}
+                jornadasPlanificadas={jornadasProximoPeriodo.length}
+                jornadasPrev={jornadasRealizadasPrev.length}
+                horasPrev={horasPrev}
+                tecnicosCierreAnterior={tecnicosCierreAnterior}
+                cierreAnteriorRango={cierreAnteriorRango}
+              />
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
