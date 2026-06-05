@@ -703,7 +703,6 @@ export type Database = {
           id: string
           observaciones: string | null
           resultado: Database["public"]["Enums"]["resultado_seguimiento"]
-          trabajo_id: string | null
           usuario_id: string | null
         }
         Insert: {
@@ -713,7 +712,6 @@ export type Database = {
           id?: string
           observaciones?: string | null
           resultado: Database["public"]["Enums"]["resultado_seguimiento"]
-          trabajo_id?: string | null
           usuario_id?: string | null
         }
         Update: {
@@ -723,7 +721,6 @@ export type Database = {
           id?: string
           observaciones?: string | null
           resultado?: Database["public"]["Enums"]["resultado_seguimiento"]
-          trabajo_id?: string | null
           usuario_id?: string | null
         }
         Relationships: [
@@ -739,13 +736,6 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "v_clientes_resumen"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "seguimiento_comercial_trabajo_id_fkey"
-            columns: ["trabajo_id"]
-            isOneToOne: false
-            referencedRelation: "trabajos"
             referencedColumns: ["id"]
           },
           {
