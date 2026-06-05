@@ -415,26 +415,28 @@ export default function Dashboard() {
       setFacturacionLoading(true);
       try {
         const cargarFacturacionHistorica = async () => {
-          const base = () =>
+          const build = (cols: string) =>
             supabase
               .from("facturacion")
+              .select(cols)
               .gte("fecha", dateKey(queryStart))
               .lte("fecha", dateKey(queryEnd))
               .order("fecha", { ascending: false });
 
           try {
             return await cargarTodo<Facturacion>(
-              base().select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, cantidad, grupo, grupo_fx, cod_factura"),
+              build("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, cantidad, grupo, grupo_fx, cod_factura") as any,
             );
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             if (!message.includes("cantidad")) throw error;
             const rows = await cargarTodo<Omit<Facturacion, "cantidad">>(
-              base().select("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura"),
+              build("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura") as any,
             );
             return rows.map((row) => ({ ...row, cantidad: 0 }));
           }
         };
+
 
         const gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
