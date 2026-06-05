@@ -1763,7 +1763,7 @@ function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio";
 
 function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (value: FactMetric) => void }) {
   const options: Array<{ value: FactMetric; label: string; icon?: React.ElementType }> = [
-    { value: "usd", label: "Usd" },
+    { value: "usd", label: "$" },
     { value: "horasServicio", label: "Hs", icon: Clock3 },
     { value: "kmFacturados", label: "Km", icon: Truck },
   ];
@@ -1783,7 +1783,7 @@ function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (v
             )}
           >
             {Icon ? <Icon className="h-3.5 w-3.5" /> : <span className="font-semibold">{option.label}</span>}
-            <span>{option.label}</span>
+            <span>{option.value === "usd" ? "Usd" : option.label}</span>
           </button>
         );
       })}
