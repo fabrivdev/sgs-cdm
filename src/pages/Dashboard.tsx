@@ -623,18 +623,24 @@ export default function Dashboard() {
     () =>
       jornadas.filter((jornada) => {
         const servicio = servicioById.get(jornada.servicio_id);
-        return jornada.estado === "Pendiente" && inRange(jornada.fecha, nextPeriodStart, nextPeriodEnd) && scopedServicio(servicio);
+        const periodoEnCurso = todayStr >= dateKey(periodStart) && todayStr <= dateKey(periodEnd);
+        const planStart = periodoEnCurso ? periodStart : nextPeriodStart;
+        const planEnd = periodoEnCurso ? periodEnd : nextPeriodEnd;
+        return jornada.estado === "Pendiente" && inRange(jornada.fecha, planStart, planEnd) && scopedServicio(servicio);
       }),
-    [clienteById, fSucursales, jornadas, nextPeriodEnd, nextPeriodStart, query, servicioById],
+    [clienteById, fSucursales, jornadas, nextPeriodEnd, nextPeriodStart, periodEnd, periodStart, query, servicioById],
   );
+
+  const periodoSeleccionadoEnCurso = todayStr >= dateKey(periodStart) && todayStr <= dateKey(periodEnd);
+  const jornadasPlanificacion = periodoSeleccionadoEnCurso ? jornadasProgramadas : jornadasProximoPeriodo;
 
   const trabajosPlanificadosProximoPeriodo = useMemo(() => {
     const servicioATrabajo = new Map<string, string>();
     for (const trabajo of trabajos) {
       if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
     }
-    return new Set(jornadasProximoPeriodo.map((j) => servicioATrabajo.get(j.servicio_id) ?? j.servicio_id)).size;
-  }, [jornadasProximoPeriodo, trabajos]);
+    return new Set(jornadasPlanificacion.map((j) => servicioATrabajo.get(j.servicio_id) ?? j.servicio_id)).size;
+  }, [jornadasPlanificacion, trabajos]);
 
   const jornadasPendientesCierre = useMemo(
     () =>
@@ -681,7 +687,7 @@ export default function Dashboard() {
 
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
-  const tecnicosProximoPeriodo = new Set(jornadasProximoPeriodo.flatMap((j) => validJornadaCrew(j))).size;
+  const tecnicosProximoPeriodo = new Set(jornadasPlanificacion.flatMap((j) => validJornadaCrew(j))).size;
   const tecnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
   const jornadasOperativasPeriodo = useMemo(
     () =>
