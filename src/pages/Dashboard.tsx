@@ -633,6 +633,9 @@ export default function Dashboard() {
 
   const periodoSeleccionadoEnCurso = todayStr >= dateKey(periodStart) && todayStr <= dateKey(periodEnd);
   const jornadasPlanificacion = periodoSeleccionadoEnCurso ? jornadasProgramadas : jornadasProximoPeriodo;
+  const planificacionRango = periodoSeleccionadoEnCurso
+    ? `${format(periodStart, "dd/MM")} - ${format(periodEnd, "dd/MM")}`
+    : `${format(nextPeriodStart, "dd/MM")} - ${format(nextPeriodEnd, "dd/MM")}`;
 
   const trabajosPlanificadosProximoPeriodo = useMemo(() => {
     const servicioATrabajo = new Map<string, string>();
@@ -1296,7 +1299,8 @@ export default function Dashboard() {
                 onSelect={(estado) => { setFEstadosTrabajo([estado]); goSection("trabajos"); }}
                 planificados={trabajosPlanificadosProximoPeriodo}
                 tecnicosAsignados={tecnicosProximoPeriodo}
-                jornadasPlanificadas={jornadasProximoPeriodo.length}
+                jornadasPlanificadas={jornadasPlanificacion.length}
+                planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
                 tecnicosCierreAnterior={tecnicosCierreAnterior}
@@ -1445,7 +1449,8 @@ export default function Dashboard() {
                 onSelect={(estado) => setFEstadosTrabajo([estado])}
                 planificados={trabajosPlanificadosProximoPeriodo}
                 tecnicosAsignados={tecnicosProximoPeriodo}
-                jornadasPlanificadas={jornadasProximoPeriodo.length}
+                jornadasPlanificadas={jornadasPlanificacion.length}
+                planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
                 tecnicosCierreAnterior={tecnicosCierreAnterior}
@@ -1957,6 +1962,7 @@ function EstadoCompacto({
   planificados,
   tecnicosAsignados,
   jornadasPlanificadas,
+  planificacionRango,
   jornadasPrev,
   horasPrev,
   tecnicosCierreAnterior,
@@ -1967,6 +1973,7 @@ function EstadoCompacto({
   planificados?: number;
   tecnicosAsignados?: number;
   jornadasPlanificadas?: number;
+  planificacionRango?: string;
   jornadasPrev?: number;
   horasPrev?: number;
   tecnicosCierreAnterior?: number;
@@ -2072,6 +2079,7 @@ function EstadoCompacto({
           <EstadoMiniCard
             icon={CalendarDays}
             title="PRÓXIMO PERIODO"
+            subtitle={planificacionRango}
             value={`${planificados ?? 0} planificados`}
             detail={[
               tecnicosAsignados ? `${tecnicosAsignados} técnicos asignados` : null,
