@@ -12,12 +12,14 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  Clock3,
   ClipboardList,
   DollarSign,
   FileText,
   Activity,
   PieChart,
   Receipt,
+  Truck,
   Users,
 } from "lucide-react";
 import {
@@ -217,6 +219,17 @@ function weekMetric(row: WeekRow | undefined, metric: FactMetric) {
   if (metric === "horasServicio") return row.horasServicio;
   if (metric === "kmFacturados") return row.kmFacturados;
   return row.total;
+}
+
+function metricUnavailable(row: WeekRow | undefined, metric: FactMetric) {
+  if (!row || metric === "usd") return false;
+  if (metric === "horasServicio") return row.servicio > 0 && row.horasServicio === 0;
+  return row.kilometraje > 0 && row.kmFacturados === 0;
+}
+
+function formatWeekMetric(row: WeekRow | undefined, metric: FactMetric) {
+  if (metricUnavailable(row, metric)) return "Sin dato";
+  return formatFactMetric(weekMetric(row, metric), metric);
 }
 
 function formatFactMetric(value: number, metric: FactMetric) {
@@ -1413,9 +1426,11 @@ export default function Dashboard() {
                 <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
                 <div className="text-right">
                   <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
-                  <div className="text-lg font-semibold tabular-nums">{loading ? "..." : formatFactMetric(selectedMetricValue, factMetric)}</div>
+                  <div className="text-lg font-semibold tabular-nums">{loading ? "..." : formatWeekMetric(selectedWeek, factMetric)}</div>
                   <div className={cn("text-[11px]", selectedMetricTrend != null && selectedMetricTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
-                    {selectedMetricTrend == null ? "sin base previa" : `${selectedMetricTrend > 0 ? "+" : ""}${selectedMetricTrend}% vs anterior`}
+                    {metricUnavailable(selectedWeek, factMetric)
+                      ? "sin cantidad disponible"
+                      : selectedMetricTrend == null ? "sin base previa" : `${selectedMetricTrend > 0 ? "+" : ""}${selectedMetricTrend}% vs anterior`}
                   </div>
                 </div>
               </div>
@@ -1447,7 +1462,7 @@ export default function Dashboard() {
                     )}
                   >
                     <div className="font-medium">{row.label}</div>
-                    <div className="text-right font-semibold tabular-nums">{formatFactMetric(metricValue, factMetric)}</div>
+                    <div className="text-right font-semibold tabular-nums">{formatWeekMetric(row, factMetric)}</div>
                     <div className="text-right tabular-nums">{money(row.repuestos)}</div>
                     <div className="text-right tabular-nums">{money(row.servicio)}</div>
                     <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
@@ -1455,7 +1470,7 @@ export default function Dashboard() {
                     <div className="text-right tabular-nums">{row.facturas}</div>
                     <div className="text-right tabular-nums">{row.clientes}</div>
                     <div className={cn("text-right tabular-nums", metricTrend != null && metricTrend < 0 && "text-destructive")}>
-                      {metricTrend == null ? "-" : `${metricTrend > 0 ? "+" : ""}${metricTrend}%`}
+                      {metricUnavailable(row, factMetric) ? "-" : metricTrend == null ? "-" : `${metricTrend > 0 ? "+" : ""}${metricTrend}%`}
                     </div>
                   </button>
                 );
@@ -1730,26 +1745,31 @@ function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio";
 }
 
 function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (value: FactMetric) => void }) {
-  const options: Array<{ value: FactMetric; label: string }> = [
+  const options: Array<{ value: FactMetric; label: string; icon?: React.ElementType }> = [
     { value: "usd", label: "$" },
-    { value: "horasServicio", label: "Hs servicio" },
-    { value: "kmFacturados", label: "Km" },
+    { value: "horasServicio", label: "Hs", icon: Clock3 },
+    { value: "kmFacturados", label: "Km", icon: Truck },
   ];
   return (
     <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border bg-background text-[11px]">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "border-r px-2 last:border-r-0 hover:bg-accent",
-            value === option.value && "bg-primary text-primary-foreground hover:bg-primary",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
+      {options.map((option) => {
+        const Icon = option.icon;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            title={option.value === "usd" ? "Facturacion" : option.value === "horasServicio" ? "Horas de servicio facturadas" : "Kilometros facturados"}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "inline-flex items-center justify-center gap-1 border-r px-2 last:border-r-0 hover:bg-accent",
+              value === option.value && "bg-primary text-primary-foreground hover:bg-primary",
+            )}
+          >
+            {Icon ? <Icon className="h-3.5 w-3.5" /> : <span className="font-semibold">{option.label}</span>}
+            <span>{option.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1772,11 +1792,12 @@ function WeeklyBars({
       <div className="flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
         {rows.map((row) => {
           const value = weekMetric(row, metric);
-          const height = Math.max(8, Math.round((value / max) * 180));
+          const unavailable = metricUnavailable(row, metric);
+          const height = unavailable || value <= 0 ? 0 : Math.max(8, Math.round((value / max) * 180));
           const active = row.key === activeKey;
           return (
             <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
-              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{formatFactMetric(value, metric)}</span>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{formatWeekMetric(row, metric)}</span>
               <span
                 className={cn(
                   "w-full max-w-[42px] rounded-t-md bg-primary/80 transition-all hover:bg-primary",
@@ -2030,7 +2051,7 @@ function MixRubros({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-[10px] uppercase text-muted-foreground">
-        <span>Mix del periodo</span>
+        <span>Mix $ del periodo</span>
         <span className="tabular-nums normal-case text-foreground/70">{money(row.total)}</span>
       </div>
       <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
@@ -2577,28 +2598,30 @@ function TrabajoChip({
 
 function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; currentKey?: string; metric: FactMetric }) {
   if (!rows.length) return null;
-  const totals = rows.map((r) => weekMetric(r, metric));
+  const metricRows = rows.filter((row) => !metricUnavailable(row, metric));
+  const totals = metricRows.map((r) => weekMetric(r, metric));
   const sum = totals.reduce((a, b) => a + b, 0);
-  const promedio = sum / rows.length;
+  const promedio = totals.length ? sum / totals.length : 0;
   const currentIdx = currentKey ? rows.findIndex((r) => r.key === currentKey) : rows.length - 1;
   const idx = currentIdx >= 0 ? currentIdx : rows.length - 1;
-  const actual = rows[idx]?.total ?? 0;
-  const prev = idx > 0 ? rows[idx - 1].total : 0;
+  const actual = weekMetric(rows[idx], metric);
+  const prev = idx > 0 ? weekMetric(rows[idx - 1], metric) : 0;
   const variacion = pct(actual, prev);
+  const currentUnavailable = metricUnavailable(rows[idx], metric);
   return (
     <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
       <div>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total acumulado</div>
-        <div className="mt-0.5 text-sm font-semibold tabular-nums">{formatFactMetric(sum, metric)}</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{totals.length ? formatFactMetric(sum, metric) : "Sin dato"}</div>
       </div>
       <div>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Promedio por periodo</div>
-        <div className="mt-0.5 text-sm font-semibold tabular-nums">{formatFactMetric(promedio, metric)}</div>
+        <div className="mt-0.5 text-sm font-semibold tabular-nums">{totals.length ? formatFactMetric(promedio, metric) : "Sin dato"}</div>
       </div>
       <div>
         <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs anterior</div>
-        <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
-          {variacion == null ? "—" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
+        <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", currentUnavailable || variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
+          {currentUnavailable || variacion == null ? "-" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
         </div>
       </div>
     </div>
