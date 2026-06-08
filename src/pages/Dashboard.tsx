@@ -660,7 +660,10 @@ export default function Dashboard() {
   }, [evolutionPeriods, factFiltered, monthStart, periodMode, weekStart]);
 
   const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
+  const selectedWeekIndex = selectedWeek ? weeklyRows.findIndex((row) => row.key === selectedWeek.key) : -1;
+  const previousSelectedWeek = selectedWeekIndex > 0 ? weeklyRows[selectedWeekIndex - 1] : undefined;
   const selectedFacts = selectedWeek?.rows ?? [];
+  const previousSelectedFacts = previousSelectedWeek?.rows ?? [];
   const visibleSelectedFacts = useMemo(() => selectedFacts.slice(0, MAX_FACTURAS_RENDER), [selectedFacts]);
 
   const factMes = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, monthStart, monthEnd)), [factFiltered, monthEnd, monthStart]);
@@ -671,9 +674,15 @@ export default function Dashboard() {
   const factBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
       const rows = selectedFacts.filter((row) => row.sucursal === sucursal);
-      return { sucursal, total: total(rows), facturas: new Set(rows.map((row) => row.cod_factura)).size };
+      const previousRows = previousSelectedFacts.filter((row) => row.sucursal === sucursal);
+      return {
+        sucursal,
+        total: total(rows),
+        previousTotal: total(previousRows),
+        facturas: new Set(rows.map((row) => row.cod_factura)).size,
+      };
     }).sort((a, b) => b.total - a.total);
-  }, [selectedFacts]);
+  }, [previousSelectedFacts, selectedFacts]);
 
   const topClientes = useMemo(() => {
     const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
@@ -1385,6 +1394,7 @@ export default function Dashboard() {
                 rows={weeklyRows}
                 activeKey={selectedWeek?.key}
                 metric={factMetric}
+                previousValue={previousSelectedWeek ? weekMetric(previousSelectedWeek, factMetric) : undefined}
                 onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
               />
               <div className="mt-2 border-t pt-2">
@@ -1399,7 +1409,7 @@ export default function Dashboard() {
 
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
-              <SucursalBars rows={factBySucursal} totalValue={currentWeekRow?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
+              <SucursalBars rows={factBySucursal} totalValue={selectedWeek?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -1823,18 +1833,33 @@ function WeeklyBars({
   rows,
   activeKey,
   metric,
+  previousValue,
   onSelect,
 }: {
   rows: WeekRow[];
   activeKey?: string;
   metric: FactMetric;
+  previousValue?: number;
   onSelect: (key: string) => void;
 }) {
-  const max = Math.max(1, ...rows.map((row) => weekMetric(row, metric)));
+  const previous = Number(previousValue || 0);
+  const hasPrevious = previous > 0;
+  const max = Math.max(1, previous, ...rows.map((row) => weekMetric(row, metric)));
+  const previousBottom = hasPrevious ? 48 + Math.round((previous / max) * 180) : 0;
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
+      <div className="relative flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
+        {hasPrevious && (
+          <div
+            className="pointer-events-none absolute left-2 right-2 z-10 border-t border-dashed border-slate-400/80"
+            style={{ bottom: previousBottom }}
+          >
+            <span className="absolute -top-5 right-0 rounded bg-background px-1.5 py-0.5 text-[10px] font-medium text-slate-500 shadow-sm">
+              Anterior {formatFactMetric(previous, metric)}
+            </span>
+          </div>
+        )}
         {rows.map((row) => {
           const value = weekMetric(row, metric);
           const unavailable = metricUnavailable(row, metric);
@@ -1868,11 +1893,11 @@ function SucursalBars({
   totalValue,
   onSelect,
 }: {
-  rows: Array<{ sucursal: Sucursal; total: number; facturas: number }>;
+  rows: Array<{ sucursal: Sucursal; total: number; previousTotal?: number; facturas: number }>;
   totalValue: number;
   onSelect: (sucursal: Sucursal) => void;
 }) {
-  const max = Math.max(1, ...rows.map((row) => row.total));
+  const max = Math.max(1, ...rows.map((row) => Math.max(row.total, row.previousTotal ?? 0)));
 
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin movimiento por sucursal.</div>;
@@ -1883,6 +1908,7 @@ function SucursalBars({
       {rows.map((row) => {
         const isZero = row.total <= 0;
         const width = isZero ? 0 : Math.max(4, Math.round((row.total / max) * 100));
+        const previousWidth = row.previousTotal && row.previousTotal > 0 ? Math.round((row.previousTotal / max) * 100) : 0;
         const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
         return (
           <button key={row.sucursal} onClick={() => !isZero && onSelect(row.sucursal)} className={cn("w-full rounded-md px-2 py-1.5 text-left", !isZero && "hover:bg-accent", isZero && "opacity-60 cursor-default")}>
@@ -1890,12 +1916,25 @@ function SucursalBars({
               <span className={cn("font-medium", isZero && "text-muted-foreground")}>{row.sucursal}</span>
               <span className="tabular-nums text-muted-foreground">{money(row.total)} - {participation}%</span>
             </div>
-            <div className="h-2 rounded-full bg-muted">
+            <div className="relative h-2 rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
+              {previousWidth > 0 && (
+                <span
+                  className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
+                  style={{ left: `${previousWidth}%` }}
+                  title={`Periodo anterior: ${money(row.previousTotal ?? 0)}`}
+                />
+              )}
             </div>
           </button>
         );
       })}
+      {rows.some((row) => (row.previousTotal ?? 0) > 0) && (
+        <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
+          <span className="h-3 border-l-2 border-dashed border-slate-500" />
+          Periodo anterior
+        </div>
+      )}
     </div>
   );
 }
