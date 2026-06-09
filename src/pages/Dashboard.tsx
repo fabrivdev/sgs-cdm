@@ -320,11 +320,12 @@ export default function Dashboard() {
     return Number(rangoEvolucion);
   }, [periodMode, rangoEvolucion]);
   const firstComparisonWeek = useMemo(() => subWeeks(weekStart, Math.max(evolutionPeriods - 1, 0)), [evolutionPeriods, weekStart]);
-  const queryStart = useMemo(() => {
+  const visibleQueryStart = useMemo(() => {
     if (periodMode === "anio") return subYears(yearStart, 4);
     if (periodMode === "mes") return subMonths(monthStart, Math.max(evolutionPeriods - 1, 0));
     return firstComparisonWeek;
   }, [evolutionPeriods, firstComparisonWeek, monthStart, periodMode, yearStart]);
+  const queryStart = useMemo(() => subYears(visibleQueryStart, 1), [visibleQueryStart]);
   const queryEnd = useMemo(() => periodEnd, [periodEnd]);
 
   useEffect(() => {
@@ -660,11 +661,45 @@ export default function Dashboard() {
   }, [evolutionPeriods, factFiltered, monthStart, periodMode, weekStart]);
 
   const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
-  const selectedWeekIndex = selectedWeek ? weeklyRows.findIndex((row) => row.key === selectedWeek.key) : -1;
-  const previousSelectedWeek = selectedWeekIndex > 0 ? weeklyRows[selectedWeekIndex - 1] : undefined;
   const selectedFacts = selectedWeek?.rows ?? [];
-  const previousSelectedFacts = previousSelectedWeek?.rows ?? [];
   const visibleSelectedFacts = useMemo(() => selectedFacts.slice(0, MAX_FACTURAS_RENDER), [selectedFacts]);
+
+  const comparisonRange = useMemo(() => {
+    if (!selectedWeek) return null;
+    if (periodMode === "anio") {
+      const start = startOfYear(subYears(selectedWeek.start, 1));
+      const cut = new Date(selectedWeek.start.getFullYear() - 1, weekStart.getMonth(), weekStart.getDate());
+      const end = cut > endOfYear(start) ? endOfYear(start) : cut;
+      return { start, end };
+    }
+    return {
+      start: subYears(selectedWeek.start, 1),
+      end: subYears(selectedWeek.end, 1),
+    };
+  }, [periodMode, selectedWeek, weekStart]);
+
+  const comparisonFacts = useMemo(
+    () => comparisonRange ? factFiltered.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end)) : [],
+    [comparisonRange, factFiltered],
+  );
+
+  const comparisonMetricValue = useMemo(() => {
+    if (factMetric === "horasServicio") {
+      return comparisonFacts.reduce((acc, row) => acc + (concept(row) === "Servicio" ? Number(row.cantidad || 0) : 0), 0);
+    }
+    if (factMetric === "kmFacturados") {
+      return comparisonFacts.reduce((acc, row) => acc + (concept(row) === "Kilometraje" ? Number(row.cantidad || 0) : 0), 0);
+    }
+    return total(comparisonFacts);
+  }, [comparisonFacts, factMetric]);
+
+  const comparisonLabel = comparisonRange
+    ? periodMode === "anio"
+      ? `${format(comparisonRange.start, "yyyy")} acum. ${format(comparisonRange.end, "dd/MM")}`
+      : periodMode === "mes"
+        ? format(comparisonRange.start, "MM/yyyy")
+        : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yyyy")}`
+    : undefined;
 
   const factMes = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, monthStart, monthEnd)), [factFiltered, monthEnd, monthStart]);
   const factMesPrev = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, previousMonthStart, previousMonthEnd)), [factFiltered, previousMonthEnd, previousMonthStart]);
@@ -674,7 +709,7 @@ export default function Dashboard() {
   const factBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
       const rows = selectedFacts.filter((row) => row.sucursal === sucursal);
-      const previousRows = previousSelectedFacts.filter((row) => row.sucursal === sucursal);
+      const previousRows = comparisonFacts.filter((row) => row.sucursal === sucursal);
       return {
         sucursal,
         total: total(rows),
@@ -682,7 +717,7 @@ export default function Dashboard() {
         facturas: new Set(rows.map((row) => row.cod_factura)).size,
       };
     }).sort((a, b) => b.total - a.total);
-  }, [previousSelectedFacts, selectedFacts]);
+  }, [comparisonFacts, selectedFacts]);
 
   const topClientes = useMemo(() => {
     const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
@@ -1394,7 +1429,8 @@ export default function Dashboard() {
                 rows={weeklyRows}
                 activeKey={selectedWeek?.key}
                 metric={factMetric}
-                previousValue={previousSelectedWeek ? weekMetric(previousSelectedWeek, factMetric) : undefined}
+                comparisonValue={comparisonMetricValue}
+                comparisonLabel={comparisonLabel}
                 onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
               />
               <div className="mt-2 border-t pt-2">
@@ -1409,7 +1445,7 @@ export default function Dashboard() {
 
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
-              <SucursalBars rows={factBySucursal} totalValue={selectedWeek?.total ?? 0} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
+              <SucursalBars rows={factBySucursal} totalValue={selectedWeek?.total ?? 0} comparisonLabel={comparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -1833,30 +1869,32 @@ function WeeklyBars({
   rows,
   activeKey,
   metric,
-  previousValue,
+  comparisonValue,
+  comparisonLabel,
   onSelect,
 }: {
   rows: WeekRow[];
   activeKey?: string;
   metric: FactMetric;
-  previousValue?: number;
+  comparisonValue?: number;
+  comparisonLabel?: string;
   onSelect: (key: string) => void;
 }) {
-  const previous = Number(previousValue || 0);
-  const hasPrevious = previous > 0;
-  const max = Math.max(1, previous, ...rows.map((row) => weekMetric(row, metric)));
-  const previousBottom = hasPrevious ? 48 + Math.round((previous / max) * 180) : 0;
+  const comparison = Number(comparisonValue || 0);
+  const hasComparison = comparison > 0;
+  const max = Math.max(1, comparison, ...rows.map((row) => weekMetric(row, metric)));
+  const comparisonBottom = hasComparison ? 48 + Math.round((comparison / max) * 180) : 0;
 
   return (
     <div className="overflow-x-auto">
       <div className="relative flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
-        {hasPrevious && (
+        {hasComparison && (
           <div
             className="pointer-events-none absolute left-2 right-2 z-10 border-t border-dashed border-slate-400/80"
-            style={{ bottom: previousBottom }}
+            style={{ bottom: comparisonBottom }}
           >
             <span className="absolute -top-5 right-0 rounded bg-background px-1.5 py-0.5 text-[10px] font-medium text-slate-500 shadow-sm">
-              Anterior {formatFactMetric(previous, metric)}
+              {comparisonLabel ?? "Año anterior"} {formatFactMetric(comparison, metric)}
             </span>
           </div>
         )}
@@ -1891,10 +1929,12 @@ function WeeklyBars({
 function SucursalBars({
   rows,
   totalValue,
+  comparisonLabel,
   onSelect,
 }: {
   rows: Array<{ sucursal: Sucursal; total: number; previousTotal?: number; facturas: number }>;
   totalValue: number;
+  comparisonLabel?: string;
   onSelect: (sucursal: Sucursal) => void;
 }) {
   const max = Math.max(1, ...rows.map((row) => Math.max(row.total, row.previousTotal ?? 0)));
@@ -1922,7 +1962,7 @@ function SucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`Periodo anterior: ${money(row.previousTotal ?? 0)}`}
+                  title={`${comparisonLabel ?? "Año anterior"}: ${money(row.previousTotal ?? 0)}`}
                 />
               )}
             </div>
@@ -1932,7 +1972,7 @@ function SucursalBars({
       {rows.some((row) => (row.previousTotal ?? 0) > 0) && (
         <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
           <span className="h-3 border-l-2 border-dashed border-slate-500" />
-          Periodo anterior
+          {comparisonLabel ?? "Año anterior"}
         </div>
       )}
     </div>
