@@ -62,7 +62,7 @@ export function FilterMultiSelect({
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[240px] p-0">
+        <PopoverContent align="start" className="w-[240px] max-w-[calc(100vw-2rem)] p-0">
           <div className="flex items-center justify-between border-b px-2 py-1.5">
             <button
               type="button"

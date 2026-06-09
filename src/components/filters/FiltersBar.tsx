@@ -48,10 +48,10 @@ export function FiltersBar({
   className?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const hasControls = !!children || (activeCount > 0 && !!onClear);
+  const hasControls = !!children || !!actions || (activeCount > 0 && !!onClear);
 
   return (
-    <Card className={cn("p-2.5", className)}>
+    <Card className={cn("p-2 sm:p-2.5", className)}>
       <div className="flex gap-2 sm:hidden">
         {search && (
           <div className="relative min-w-0 flex-1">
@@ -89,15 +89,19 @@ export function FiltersBar({
       </div>
 
       {hasControls && mobileOpen && (
-        <div className="mt-2 flex flex-col gap-2 sm:hidden">
+        <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/20 p-2 sm:hidden">
           {children}
           {activeCount > 0 && onClear && (
             <Button variant="ghost" size="sm" onClick={onClear} className="h-9 justify-start text-xs">
               <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
             </Button>
           )}
+          {actions && <div className="flex flex-col gap-2 border-t pt-2">{actions}</div>}
           {meta && <div className="text-[11px] text-muted-foreground">{meta}</div>}
         </div>
+      )}
+      {!mobileOpen && meta && (
+        <div className="mt-1 text-right text-[11px] text-muted-foreground sm:hidden">{meta}</div>
       )}
 
       <div className="hidden gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end">

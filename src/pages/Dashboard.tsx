@@ -1268,7 +1268,7 @@ export default function Dashboard() {
     (q.trim() ? 1 : 0);
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-3 px-3 py-3 sm:px-4 sm:py-4">
+    <div className="mx-auto max-w-[1440px] space-y-2.5 px-3 py-3 sm:space-y-3 sm:px-4 sm:py-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard ejecutivo</h1>
       </div>
@@ -1351,7 +1351,7 @@ export default function Dashboard() {
         )}
       </FiltersBar>
 
-      <section className="grid auto-rows-fr gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
           title="Facturación del período"
@@ -1420,16 +1420,16 @@ export default function Dashboard() {
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
             <Card className="flex h-full flex-col p-3 xl:col-span-2">
-              <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
                   <p className="truncate text-xs text-muted-foreground">Comparativo {periodoLabel} con selección directa.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
                   {periodMode !== "anio" && (
                     <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
-                      <SelectTrigger className="h-8 w-[150px] text-xs">
+                      <SelectTrigger className="h-8 w-[150px] flex-1 text-xs sm:flex-none">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1779,11 +1779,11 @@ function SummaryCard({
 }) {
   return (
     <button className="h-full rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("flex h-full min-h-[128px] flex-col gap-2 p-3 transition-colors hover:bg-accent/50", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+      <Card className={cn("flex h-full min-h-[104px] flex-col gap-1.5 p-2.5 transition-colors hover:bg-accent/50 sm:min-h-[128px] sm:gap-2 sm:p-3", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
-            <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
+            <div className="mt-0.5 truncate text-xl font-bold tabular-nums sm:mt-1 sm:text-2xl">{value}</div>
             {trend !== undefined && trend !== null && trend.value !== null ? (
               <div className={cn("mt-1 truncate text-[11px] font-medium tabular-nums", trend.value >= 0 ? "text-emerald-600" : "text-destructive")}>
                 {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.suffix ?? "vs período anterior"}
@@ -1871,7 +1871,7 @@ function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (v
     { value: "kmFacturados", label: "Km", icon: Truck },
   ];
   return (
-    <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border bg-background text-[11px]">
+    <div className="grid h-8 w-full grid-cols-3 overflow-hidden rounded-md border bg-background text-[11px] sm:w-auto sm:min-w-[190px]">
       {options.map((option) => {
         const Icon = option.icon;
         return (

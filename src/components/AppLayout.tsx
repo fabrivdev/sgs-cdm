@@ -10,7 +10,6 @@ import {
   Wrench,
   Bell,
   Tractor,
-  User as UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +56,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Top header */}
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-card px-4 shadow-sm">
+      <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b bg-card/95 px-3 shadow-sm backdrop-blur sm:h-14 sm:px-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Wrench className="h-4 w-4" />
@@ -139,27 +138,29 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="pb-20 md:pb-6">{children ?? <Outlet />}</main>
+      <main className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">{children ?? <Outlet />}</main>
 
       {/* Bottom nav (mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t bg-card md:hidden">
-        {navItems.slice(0, 5).map((it) => {
-          const active =
-            it.end ? location.pathname === it.to : location.pathname.startsWith(it.to);
-          return (
-            <NavLink
-              key={it.to}
-              to={it.to}
-              className={cn(
-                "flex flex-1 max-w-[96px] flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
-                active ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              <it.icon className="h-5 w-5" />
-              {it.label}
-            </NavLink>
-          );
-        })}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:hidden">
+        <div className="flex overflow-x-auto px-1 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {navItems.map((it) => {
+            const active =
+              it.end ? location.pathname === it.to : location.pathname.startsWith(it.to);
+            return (
+              <NavLink
+                key={it.to}
+                to={it.to}
+                className={cn(
+                  "flex min-w-[72px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium",
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                <it.icon className="h-5 w-5" />
+                <span className="max-w-full truncate">{it.label}</span>
+              </NavLink>
+            );
+          })}
+        </div>
       </nav>
     </div>
   );
