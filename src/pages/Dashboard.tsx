@@ -137,6 +137,10 @@ interface WeekRow {
   kmFacturados: number;
   facturas: number;
   clientes: number;
+  comparisonTotal: number;
+  comparisonHorasServicio: number;
+  comparisonKmFacturados: number;
+  comparisonLabel: string;
   variacion: number | null;
   rows: Facturacion[];
 }
@@ -219,6 +223,13 @@ function weekMetric(row: WeekRow | undefined, metric: FactMetric) {
   if (metric === "horasServicio") return row.horasServicio;
   if (metric === "kmFacturados") return row.kmFacturados;
   return row.total;
+}
+
+function comparisonWeekMetric(row: WeekRow | undefined, metric: FactMetric) {
+  if (!row) return 0;
+  if (metric === "horasServicio") return row.comparisonHorasServicio;
+  if (metric === "kmFacturados") return row.comparisonKmFacturados;
+  return row.comparisonTotal;
 }
 
 function metricUnavailable(row: WeekRow | undefined, metric: FactMetric) {
@@ -612,8 +623,22 @@ export default function Dashboard() {
               return { start, end: endOfYear(start), label: format(start, "yyyy") };
             });
 
+    const comparisonForPeriod = (start: Date, end: Date) => {
+      if (periodMode === "anio") {
+        const comparisonStart = startOfYear(subYears(start, 1));
+        const comparisonEnd = new Date(start.getFullYear() - 1, weekStart.getMonth(), weekStart.getDate());
+        return {
+          start: comparisonStart,
+          end: comparisonEnd > endOfYear(comparisonStart) ? endOfYear(comparisonStart) : comparisonEnd,
+        };
+      }
+      return { start: subYears(start, 1), end: subYears(end, 1) };
+    };
+
     const rows = periods.map(({ start, end, label }) => {
       const weekFacts = factFiltered.filter((row) => inRange(row.fecha, start, end));
+      const comparisonRange = comparisonForPeriod(start, end);
+      const comparisonFacts = factFiltered.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end));
       const byConcept = {
         Repuestos: 0,
         Servicio: 0,
@@ -622,12 +647,20 @@ export default function Dashboard() {
       };
       let horasServicio = 0;
       let kmFacturados = 0;
+      let comparisonHorasServicio = 0;
+      let comparisonKmFacturados = 0;
 
       for (const row of weekFacts) {
         const rowConcept = concept(row);
         byConcept[rowConcept] += Number(row.total_venta || 0);
         if (rowConcept === "Servicio") horasServicio += Number(row.cantidad || 0);
         if (rowConcept === "Kilometraje") kmFacturados += Number(row.cantidad || 0);
+      }
+
+      for (const row of comparisonFacts) {
+        const rowConcept = concept(row);
+        if (rowConcept === "Servicio") comparisonHorasServicio += Number(row.cantidad || 0);
+        if (rowConcept === "Kilometraje") comparisonKmFacturados += Number(row.cantidad || 0);
       }
 
       const clients = new Set(weekFacts.map((row) => {
@@ -649,6 +682,14 @@ export default function Dashboard() {
         kmFacturados,
         facturas: invoices.size,
         clientes: clients.size,
+        comparisonTotal: total(comparisonFacts),
+        comparisonHorasServicio,
+        comparisonKmFacturados,
+        comparisonLabel: periodMode === "anio"
+          ? `${format(comparisonRange.start, "yyyy")} acum. ${format(comparisonRange.end, "dd/MM")}`
+          : periodMode === "mes"
+            ? format(comparisonRange.start, "MM/yyyy")
+            : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yyyy")}`,
         variacion: null,
         rows: weekFacts,
       };
@@ -682,16 +723,6 @@ export default function Dashboard() {
     () => comparisonRange ? factFiltered.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end)) : [],
     [comparisonRange, factFiltered],
   );
-
-  const comparisonMetricValue = useMemo(() => {
-    if (factMetric === "horasServicio") {
-      return comparisonFacts.reduce((acc, row) => acc + (concept(row) === "Servicio" ? Number(row.cantidad || 0) : 0), 0);
-    }
-    if (factMetric === "kmFacturados") {
-      return comparisonFacts.reduce((acc, row) => acc + (concept(row) === "Kilometraje" ? Number(row.cantidad || 0) : 0), 0);
-    }
-    return total(comparisonFacts);
-  }, [comparisonFacts, factMetric]);
 
   const comparisonLabel = comparisonRange
     ? periodMode === "anio"
@@ -1429,8 +1460,6 @@ export default function Dashboard() {
                 rows={weeklyRows}
                 activeKey={selectedWeek?.key}
                 metric={factMetric}
-                comparisonValue={comparisonMetricValue}
-                comparisonLabel={comparisonLabel}
                 onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
               />
               <div className="mt-2 border-t pt-2">
@@ -1869,50 +1898,47 @@ function WeeklyBars({
   rows,
   activeKey,
   metric,
-  comparisonValue,
-  comparisonLabel,
   onSelect,
 }: {
   rows: WeekRow[];
   activeKey?: string;
   metric: FactMetric;
-  comparisonValue?: number;
-  comparisonLabel?: string;
   onSelect: (key: string) => void;
 }) {
-  const comparison = Number(comparisonValue || 0);
-  const hasComparison = comparison > 0;
-  const max = Math.max(1, comparison, ...rows.map((row) => weekMetric(row, metric)));
-  const comparisonBottom = hasComparison ? 48 + Math.round((comparison / max) * 180) : 0;
+  const max = Math.max(
+    1,
+    ...rows.flatMap((row) => [weekMetric(row, metric), comparisonWeekMetric(row, metric)]),
+  );
 
   return (
     <div className="overflow-x-auto">
       <div className="relative flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
-        {hasComparison && (
-          <div
-            className="pointer-events-none absolute left-2 right-2 z-10 border-t border-dashed border-slate-400/80"
-            style={{ bottom: comparisonBottom }}
-          >
-            <span className="absolute -top-5 right-0 rounded bg-background px-1.5 py-0.5 text-[10px] font-medium text-slate-500 shadow-sm">
-              {comparisonLabel ?? "Año anterior"} {formatFactMetric(comparison, metric)}
-            </span>
-          </div>
-        )}
         {rows.map((row) => {
           const value = weekMetric(row, metric);
+          const comparison = comparisonWeekMetric(row, metric);
           const unavailable = metricUnavailable(row, metric);
           const height = unavailable || value <= 0 ? 0 : Math.max(8, Math.round((value / max) * 180));
+          const comparisonBottom = comparison > 0 ? Math.max(4, Math.round((comparison / max) * 180)) : 0;
           const active = row.key === activeKey;
           return (
             <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
               <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{formatWeekMetric(row, metric)}</span>
-              <span
-                className={cn(
-                  "w-full max-w-[42px] rounded-t-md bg-primary/80 transition-all hover:bg-primary",
-                  active && "bg-primary ring-2 ring-primary/20",
+              <span className="relative flex h-[180px] w-full max-w-[42px] items-end justify-center">
+                {comparison > 0 && (
+                  <span
+                    className="absolute left-0 right-0 z-10 border-t border-dashed border-slate-500"
+                    style={{ bottom: comparisonBottom }}
+                    title={`${row.comparisonLabel}: ${formatFactMetric(comparison, metric)}`}
+                  />
                 )}
-                style={{ height }}
-              />
+                <span
+                  className={cn(
+                    "w-full rounded-t-md bg-primary/80 transition-all hover:bg-primary",
+                    active && "bg-primary ring-2 ring-primary/20",
+                  )}
+                  style={{ height }}
+                />
+              </span>
               <span className="min-h-8 text-[10px] leading-4 text-muted-foreground">{row.label}</span>
             </button>
           );
@@ -1921,6 +1947,8 @@ function WeeklyBars({
       <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
         {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
+        <span className="ml-3 h-0 w-5 border-t border-dashed border-slate-500" />
+        Año anterior equivalente
       </div>
     </div>
   );
