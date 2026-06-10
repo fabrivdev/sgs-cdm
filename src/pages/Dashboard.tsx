@@ -162,6 +162,8 @@ interface OSImpactRow {
   total: number;
 }
 
+type OSRubro = "Servicio" | "Repuestos" | "Kilometraje";
+
 interface WeekRow {
   key: string;
   label: string;
@@ -306,6 +308,31 @@ function osMetricValue(row: { total: number; horas: number; km: number }, metric
   return row.total;
 }
 
+function osRubroValue(row: OSImpactRow, rubro: OSRubro) {
+  if (rubro === "Servicio") return row.servicios;
+  if (rubro === "Repuestos") return row.repuestos;
+  return row.kilometraje;
+}
+
+function applyOSRubros(row: OSImpactRow, rubros: OSRubro[]): OSImpactRow {
+  if (rubros.length === 0) return row;
+  const includeServicio = rubros.includes("Servicio");
+  const includeRepuestos = rubros.includes("Repuestos");
+  const includeKilometraje = rubros.includes("Kilometraje");
+  const servicios = includeServicio ? row.servicios : 0;
+  const repuestos = includeRepuestos ? row.repuestos : 0;
+  const kilometraje = includeKilometraje ? row.kilometraje : 0;
+  return {
+    ...row,
+    servicios,
+    repuestos,
+    kilometraje,
+    horas: includeServicio ? row.horas : 0,
+    km: includeKilometraje ? row.km : 0,
+    total: servicios + repuestos + kilometraje,
+  };
+}
+
 function osEstaCerrada(row: OrdenServicioImportada) {
   return String(row.situacion_os ?? "").toUpperCase().includes("CERRAD");
 }
@@ -392,6 +419,7 @@ export default function Dashboard() {
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
+  const [fOSRubros, setFOSRubros] = useState<OSRubro[]>([]);
   const [fMarcas, setFMarcas] = useState<string[]>([]);
   const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
@@ -404,7 +432,16 @@ export default function Dashboard() {
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
-  const goSection = (value: string) => startTransition(() => setSection(value));
+  const filtrosOSActivos = section === "os";
+  const goSection = (value: string) =>
+    startTransition(() => {
+      setSection(value);
+      if (value === "os") {
+        setFRubros([]);
+      } else {
+        setFOSRubros([]);
+      }
+    });
 
   const weekStart = useMemo(() => startOfWeek(parseISO(weekStartInput), { weekStartsOn: 1 }), [weekStartInput]);
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
@@ -787,14 +824,8 @@ export default function Dashboard() {
           const tipoFiltro = row.tipo === "Absorve CDM" ? "Interno" : row.tipo;
           if (!fTiposTiempo.includes(tipoFiltro) && !fTiposTiempo.includes(row.tipo)) return false;
         }
-        if (fRubros.length > 0) {
-          const hasRubro = fRubros.some((rubro) => {
-            if (rubro === "Repuestos") return row.repuestos > 0;
-            if (rubro === "Servicio") return row.servicios > 0;
-            if (rubro === "Kilometraje") return row.kilometraje > 0;
-            if (rubro === "Otros") return row.terceros > 0;
-            return false;
-          });
+        if (fOSRubros.length > 0) {
+          const hasRubro = fOSRubros.some((rubro) => osRubroValue(row, rubro) > 0);
           if (!hasRubro) return false;
         }
         if (!query) return true;
@@ -809,8 +840,9 @@ export default function Dashboard() {
           row.situacionFacturacion,
         ].join(" ").toLowerCase();
         return hay.includes(query);
-      });
-  }, [clienteById, clienteByName, fMarcas, fRubros, fSucursales, fTiposTiempo, ordenesServicio, query, trabajoById]);
+      })
+      .map((row) => applyOSRubros(row, fOSRubros));
+  }, [clienteById, clienteByName, fMarcas, fOSRubros, fSucursales, fTiposTiempo, ordenesServicio, query, trabajoById]);
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
     const periods =
@@ -1512,6 +1544,7 @@ export default function Dashboard() {
     setSelectedWeekKey(initialWeekStart);
     setFSucursales([]);
     setFRubros([]);
+    setFOSRubros([]);
     setFMarcas([]);
     setFTiposTiempo([]);
     setFEstadosTrabajo([]);
@@ -1523,7 +1556,8 @@ export default function Dashboard() {
   const filtrosActivos =
     (weekStartInput !== initialWeekStart ? 1 : 0) +
     (fSucursales.length > 0 ? 1 : 0) +
-    (fRubros.length > 0 ? 1 : 0) +
+    (!filtrosOSActivos && fRubros.length > 0 ? 1 : 0) +
+    (filtrosOSActivos && fOSRubros.length > 0 ? 1 : 0) +
     (fMarcas.length > 0 ? 1 : 0) +
     (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
@@ -1563,19 +1597,34 @@ export default function Dashboard() {
           width="w-[170px]"
           options={MARCAS.map((m) => ({ value: m, label: m }))}
         />
-        <FilterMultiSelect
-          label="Rubro"
-          values={fRubros}
-          onChange={setFRubros}
-          placeholder="Todos"
-          width="w-[170px]"
-          options={[
-            { value: "Servicio", label: "Servicios" },
-            { value: "Repuestos", label: "Repuestos" },
-            { value: "Kilometraje", label: "Kilometraje" },
-            { value: "Otros", label: "Otros" },
-          ]}
-        />
+        {section === "os" ? (
+          <FilterMultiSelect
+            label="Concepto OS"
+            values={fOSRubros}
+            onChange={(values) => setFOSRubros(values as OSRubro[])}
+            placeholder="Todos"
+            width="w-[180px]"
+            options={[
+              { value: "Servicio", label: "Servicio" },
+              { value: "Repuestos", label: "Repuestos" },
+              { value: "Kilometraje", label: "Kilometraje" },
+            ]}
+          />
+        ) : (
+          <FilterMultiSelect
+            label="Rubro"
+            values={fRubros}
+            onChange={setFRubros}
+            placeholder="Todos"
+            width="w-[170px]"
+            options={[
+              { value: "Servicio", label: "Servicios" },
+              { value: "Repuestos", label: "Repuestos" },
+              { value: "Kilometraje", label: "Kilometraje" },
+              { value: "Otros", label: "Otros" },
+            ]}
+          />
+        )}
         <FilterMultiSelect
           label="Tipo tiempo"
           values={fTiposTiempo}
@@ -1923,10 +1972,12 @@ export default function Dashboard() {
               selectedSummary={osSelectedSummary}
               sucursalRows={osBySucursal}
               detailRows={osSelectedRows}
+              selectedRubros={fOSRubros}
               comparisonLabel={comparisonLabel}
               onSelectPeriod={setSelectedWeekKey}
               onSelectSucursal={(sucursal) => setFSucursales([sucursal])}
-              onSelectRubro={(rubro) => setFRubros([rubro])}
+              onSelectRubro={(rubro) => setFOSRubros((prev) => (prev.length === 1 && prev[0] === rubro ? [] : [rubro]))}
+              onClearRubros={() => setFOSRubros([])}
               onSelectOS={(os) => setQ(os)}
             />
           </Card>
@@ -2274,10 +2325,12 @@ function OSImpactSection({
   selectedSummary,
   sucursalRows,
   detailRows,
+  selectedRubros,
   comparisonLabel,
   onSelectPeriod,
   onSelectSucursal,
   onSelectRubro,
+  onClearRubros,
   onSelectOS,
 }: {
   loading: boolean;
@@ -2287,10 +2340,12 @@ function OSImpactSection({
   selectedSummary: ReturnType<typeof summarizeOSImpact>;
   sucursalRows: Array<{ sucursal: Sucursal; rows: number; total: number; horas: number; km: number; previousTotal: number }>;
   detailRows: OSImpactRow[];
+  selectedRubros: OSRubro[];
   comparisonLabel?: string;
   onSelectPeriod: (key: string) => void;
   onSelectSucursal: (sucursal: Sucursal) => void;
-  onSelectRubro: (rubro: string) => void;
+  onSelectRubro: (rubro: OSRubro) => void;
+  onClearRubros: () => void;
   onSelectOS: (os: string) => void;
 }) {
   if (loading) {
@@ -2301,7 +2356,7 @@ function OSImpactSection({
       <div className="space-y-3">
         <OSImpactKpis summary={selectedSummary} metric={metric} />
         <OSEvolution rows={evolutionRows} activeKey={activeKey} metric={metric} onSelect={onSelectPeriod} />
-        <OSMix summary={selectedSummary} onSelect={onSelectRubro} />
+        <OSMix summary={selectedSummary} selectedRubros={selectedRubros} onSelect={onSelectRubro} onClear={onClearRubros} />
       </div>
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-1">
         <div className="rounded-md border p-3">
@@ -2400,9 +2455,19 @@ function OSEvolution({
   );
 }
 
-function OSMix({ summary, onSelect }: { summary: ReturnType<typeof summarizeOSImpact>; onSelect: (rubro: string) => void }) {
+function OSMix({
+  summary,
+  selectedRubros,
+  onSelect,
+  onClear,
+}: {
+  summary: ReturnType<typeof summarizeOSImpact>;
+  selectedRubros: OSRubro[];
+  onSelect: (rubro: OSRubro) => void;
+  onClear: () => void;
+}) {
   const total = summary.total || 1;
-  const items = [
+  const items: Array<{ label: string; filter: OSRubro; value: number; bar: string; dot: string }> = [
     { label: "Repuestos", filter: "Repuestos", value: summary.repuestos, bar: "bg-primary", dot: "bg-primary" },
     { label: "Servicio", filter: "Servicio", value: summary.servicios, bar: "bg-sky-500/80", dot: "bg-sky-500" },
     { label: "Kilometraje", filter: "Kilometraje", value: summary.kilometraje, bar: "bg-amber-500/80", dot: "bg-amber-500" },
@@ -2410,7 +2475,9 @@ function OSMix({ summary, onSelect }: { summary: ReturnType<typeof summarizeOSIm
   return (
     <div className="border-t pt-2">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase text-muted-foreground">
-        <span>Mix OS absorbido</span>
+        <button type="button" onClick={onClear} className="hover:text-primary">
+          Mix OS absorbido
+        </button>
         <span className="tabular-nums normal-case text-foreground/70">
           Garantia {money(summary.garantia)} · Absorve CDM {money(summary.absorveCdm)}
         </span>
@@ -2421,7 +2488,7 @@ function OSMix({ summary, onSelect }: { summary: ReturnType<typeof summarizeOSIm
             key={item.label}
             type="button"
             onClick={() => onSelect(item.filter)}
-            className={cn("h-full transition-opacity hover:opacity-80", item.bar)}
+            className={cn("h-full transition-opacity hover:opacity-80", item.bar, selectedRubros.includes(item.filter) && "opacity-90 ring-1 ring-inset ring-foreground/20")}
             style={{ width: `${(item.value / total) * 100}%` }}
             title={`${item.label}: ${money(item.value)}`}
           />
@@ -2429,7 +2496,12 @@ function OSMix({ summary, onSelect }: { summary: ReturnType<typeof summarizeOSIm
       </div>
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
         {items.map((item) => (
-          <button key={item.label} type="button" onClick={() => onSelect(item.filter)} className="flex items-center gap-1.5 text-[11px] hover:text-primary">
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => onSelect(item.filter)}
+            className={cn("flex items-center gap-1.5 text-[11px] hover:text-primary", selectedRubros.includes(item.filter) && "text-primary")}
+          >
             <span className={cn("h-2 w-2 rounded-full", item.dot)} />
             <span className="font-medium">{item.label}</span>
             <span className="tabular-nums text-muted-foreground">{money(item.value)}</span>
