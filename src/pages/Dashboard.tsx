@@ -1268,7 +1268,8 @@ export default function Dashboard() {
     (q.trim() ? 1 : 0);
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-2.5 px-3 py-3 sm:space-y-3 sm:px-4 sm:py-4">
+    <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 py-3 sm:px-4 sm:py-4">
+      <div className="space-y-2.5 sm:space-y-3">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard ejecutivo</h1>
       </div>
@@ -1679,7 +1680,57 @@ export default function Dashboard() {
               </div>
               <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
             </div>
-            <div className="overflow-x-auto rounded-md border">
+            <div className="space-y-2 md:hidden">
+              {trabajosResumen.length === 0 ? (
+                <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin trabajos para los filtros actuales.</div>
+              ) : (
+                trabajosResumen.slice(0, 40).map((row) => (
+                  <button
+                    key={row.id}
+                    onClick={() => navigate(`/trabajos?q=${encodeURIComponent(row.ref)}`)}
+                    className="w-full rounded-md border bg-background px-3 py-2.5 text-left shadow-sm"
+                  >
+                    <div className="mb-1 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-mono text-[11px] font-semibold text-muted-foreground">{row.ref}</div>
+                        <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                      </div>
+                      <Badge variant={row.estado === "pausado" ? "default" : "secondary"} className={cn("shrink-0 text-[10px]", row.estado === "pausado" && "bg-amber-600 text-white")}>
+                        {estadoLabel(row.estado)}
+                      </Badge>
+                    </div>
+                    <div className="line-clamp-2 text-xs text-muted-foreground">{row.descripcion}</div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="rounded-md bg-muted/50 px-2 py-1">
+                        <div className="text-muted-foreground">Jornadas</div>
+                        <div className="font-semibold tabular-nums">{row.realizadasPeriodo}/{row.totalJornadasPeriodo}</div>
+                      </div>
+                      <div className="rounded-md bg-muted/50 px-2 py-1">
+                        <div className="text-muted-foreground">Técnicos</div>
+                        <div className="font-semibold tabular-nums">{row.participantes}</div>
+                      </div>
+                      <div className="rounded-md bg-muted/50 px-2 py-1">
+                        <div className="text-muted-foreground">Horas</div>
+                        <div className="font-semibold tabular-nums">{row.horasPeriodo.toFixed(1)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                      <span className="truncate">{row.sucursal}</span>
+                      <span className="shrink-0">
+                        {row.pendientesPeriodoVencidas > 0
+                          ? `${row.pendientesPeriodoVencidas} vencida${row.pendientesPeriodoVencidas !== 1 ? "s" : ""}`
+                          : row.pendientesPeriodo > 0
+                            ? `${row.pendientesPeriodo} pendiente${row.pendientesPeriodo !== 1 ? "s" : ""}`
+                            : row.totalJornadasPeriodo === 0
+                              ? "Sin jornadas"
+                              : "Sin pendientes"}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="hidden overflow-x-auto rounded-md border md:block">
               <div className="min-w-[980px] max-h-[420px] overflow-y-auto">
                 <div className="sticky top-0 grid grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                   <div>OS/TR</div>
@@ -1752,6 +1803,7 @@ export default function Dashboard() {
 
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
@@ -1910,20 +1962,26 @@ function WeeklyBars({
     ...rows.flatMap((row) => [weekMetric(row, metric), comparisonWeekMetric(row, metric)]),
   );
 
+  const labelEvery = rows.length > 14 ? Math.ceil(rows.length / 6) : rows.length > 9 ? 2 : 1;
+
   return (
-    <div className="overflow-x-auto">
-      <div className="relative flex min-h-[260px] min-w-[720px] items-end gap-3 border-b px-2 pt-4">
-        {rows.map((row) => {
+    <div className="overflow-hidden">
+      <div
+        className="relative grid min-h-[218px] items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[260px] sm:gap-3 sm:px-2 sm:pt-4"
+        style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {rows.map((row, index) => {
           const value = weekMetric(row, metric);
           const comparison = comparisonWeekMetric(row, metric);
           const unavailable = metricUnavailable(row, metric);
-          const height = unavailable || value <= 0 ? 0 : Math.max(8, Math.round((value / max) * 180));
-          const comparisonBottom = comparison > 0 ? Math.max(4, Math.round((comparison / max) * 180)) : 0;
+          const height = unavailable || value <= 0 ? 0 : Math.max(6, Math.round((value / max) * 150));
+          const comparisonBottom = comparison > 0 ? Math.max(4, Math.round((comparison / max) * 150)) : 0;
           const active = row.key === activeKey;
+          const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
           return (
-            <button key={row.key} onClick={() => onSelect(row.key)} className="flex flex-1 flex-col items-center gap-2 text-center">
-              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">{formatWeekMetric(row, metric)}</span>
-              <span className="relative flex h-[180px] w-full max-w-[42px] items-end justify-center">
+            <button key={row.key} onClick={() => onSelect(row.key)} className="flex min-w-0 flex-col items-center gap-1.5 text-center sm:gap-2">
+              <span className="max-w-full truncate text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">{formatWeekMetric(row, metric)}</span>
+              <span className="relative flex h-[150px] w-full items-end justify-center sm:h-[180px]">
                 {comparison > 0 && (
                   <span
                     className="absolute left-0 right-0 z-10 border-t border-dashed border-slate-500"
@@ -1933,18 +1991,20 @@ function WeeklyBars({
                 )}
                 <span
                   className={cn(
-                    "w-full rounded-t-md bg-primary/80 transition-all hover:bg-primary",
+                    "w-full max-w-[34px] rounded-t-md bg-primary/80 transition-all hover:bg-primary sm:max-w-[42px]",
                     active && "bg-primary ring-2 ring-primary/20",
                   )}
                   style={{ height }}
                 />
               </span>
-              <span className="min-h-8 text-[10px] leading-4 text-muted-foreground">{row.label}</span>
+              <span className="min-h-7 max-w-full truncate text-[9px] leading-3 text-muted-foreground sm:min-h-8 sm:text-[10px] sm:leading-4">
+                {showLabel ? row.label : ""}
+              </span>
             </button>
           );
         })}
       </div>
-      <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
         {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
         <span className="ml-3 h-0 w-5 border-t border-dashed border-slate-500" />
@@ -2604,7 +2664,34 @@ function CargaTecnicaMatriz({
         <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>
       ) : (
         <>
-          <div className={cn("overflow-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[280px]")}>
+          <div className="space-y-2 md:hidden">
+            {visible.map((r) => {
+              const total = metrica === "horas" ? r.totalHoras : r.totalJornadas;
+              return (
+                <button
+                  key={r.id}
+                  onClick={onClick}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-left"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-xs font-semibold">{r.nombre}</div>
+                    <div className="shrink-0 text-sm font-bold tabular-nums">
+                      {metrica === "horas" ? `${total.toFixed(1)} hs` : `${total} serv.`}
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    {buckets.slice(0, 6).map((k) => (
+                      <div key={k} className="rounded bg-muted/50 px-2 py-1 text-[10px]">
+                        <div className="truncate text-muted-foreground">{bucketLabel(k)}</div>
+                        <div className="font-semibold tabular-nums">{fmt(getVal(r.porBucket[k]))}</div>
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className={cn("hidden overflow-auto rounded-md border md:block", expanded ? "max-h-[440px]" : "max-h-[280px]")}>
             <div
               className="sticky top-0 z-10 grid bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"
               style={{ gridTemplateColumns: gridCols }}
