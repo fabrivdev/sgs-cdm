@@ -310,15 +310,25 @@ function osEstaCerrada(row: OrdenServicioImportada) {
   return String(row.situacion_os ?? "").toUpperCase().includes("CERRAD");
 }
 
+function normalizeOSLookup(value: string | null | undefined) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+}
+
 function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | null {
-  const tipoTiempo = String(row.tipo_tiempo ?? "").toUpperCase();
-  const situacionFacturacion = String(row.situacion_facturacion ?? "").toUpperCase();
-  if (tipoTiempo.includes("GARANT")) return "Garantia";
+  const tipoTiempo = normalizeOSLookup(row.tipo_tiempo);
+  const situacionFacturacion = normalizeOSLookup(row.situacion_facturacion);
+  const combined = `${tipoTiempo} ${situacionFacturacion}`;
+  if (combined.includes("GARANT")) return "Garantia";
   if (
-    tipoTiempo.includes("INTERNO") ||
-    situacionFacturacion.includes("ABSORVE") ||
-    situacionFacturacion.includes("ABSORBE") ||
-    situacionFacturacion.includes("INTERNO")
+    combined.includes("INTERNO") ||
+    combined.includes("ABSOR") ||
+    combined.includes("ABZOR") ||
+    combined.includes("CDM")
   ) {
     return "Absorve CDM";
   }
