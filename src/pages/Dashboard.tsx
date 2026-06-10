@@ -430,6 +430,7 @@ export default function Dashboard() {
   const [rangoEvolucion, setRangoEvolucion] = useState<"4" | "6" | "8" | "12" | "24" | "all">("12");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
+  const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const filtrosOSActivos = section === "os";
@@ -1013,6 +1014,13 @@ export default function Dashboard() {
     ),
     [osSelectedRows, osSelectedPeriod, periodEnd, periodStart],
   );
+  const osAccumulatedSummary = useMemo(() => {
+    const first = osEvolutionRows[0];
+    const last = osEvolutionRows[osEvolutionRows.length - 1];
+    if (!first || !last) return summarizeOSImpact([], "acumulado", "Acumulado", periodStart, periodEnd);
+    const rows = osImpactRows.filter((row) => inRange(row.fecha, first.start, last.end));
+    return summarizeOSImpact(rows, "acumulado", "Acumulado visible", first.start, last.end);
+  }, [osEvolutionRows, osImpactRows, periodEnd, periodStart]);
   const osBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
       const rows = osSelectedRows.filter((row) => row.sucursal === sucursal);
@@ -1962,7 +1970,33 @@ export default function Dashboard() {
                 <h2 className="truncate text-sm font-semibold">Detalle OS absorbidas</h2>
                 <p className="truncate text-xs text-muted-foreground">Garantia y Absorve CDM separados de la facturacion vendida.</p>
               </div>
-              <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
+                {periodMode !== "anio" && (
+                  <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
+                    <SelectTrigger className="h-8 w-[150px] flex-1 text-xs sm:flex-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodMode === "semana" ? (
+                        <>
+                          <SelectItem value="4">Ultimas 4 semanas</SelectItem>
+                          <SelectItem value="8">Ultimas 8 semanas</SelectItem>
+                          <SelectItem value="12">Ultimas 12 semanas</SelectItem>
+                          <SelectItem value="all">Todas las semanas</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="6">Ultimos 6 meses</SelectItem>
+                          <SelectItem value="12">Ultimos 12 meses</SelectItem>
+                          <SelectItem value="24">Ultimos 24 meses</SelectItem>
+                          <SelectItem value="all">Todos los meses</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
             <OSImpactSection
               loading={ordenesLoading}
@@ -1970,14 +2004,17 @@ export default function Dashboard() {
               activeKey={osSelectedPeriod?.key}
               metric={osMetric}
               selectedSummary={osSelectedSummary}
+              accumulatedSummary={osAccumulatedSummary}
               sucursalRows={osBySucursal}
               detailRows={osSelectedRows}
+              detailMode={osDetailMode}
               selectedRubros={fOSRubros}
               comparisonLabel={comparisonLabel}
               onSelectPeriod={setSelectedWeekKey}
               onSelectSucursal={(sucursal) => setFSucursales([sucursal])}
               onSelectRubro={(rubro) => setFOSRubros((prev) => (prev.length === 1 && prev[0] === rubro ? [] : [rubro]))}
               onClearRubros={() => setFOSRubros([])}
+              onDetailModeChange={setOsDetailMode}
               onSelectOS={(os) => setQ(os)}
             />
           </Card>
@@ -2323,14 +2360,17 @@ function OSImpactSection({
   activeKey,
   metric,
   selectedSummary,
+  accumulatedSummary,
   sucursalRows,
   detailRows,
+  detailMode,
   selectedRubros,
   comparisonLabel,
   onSelectPeriod,
   onSelectSucursal,
   onSelectRubro,
   onClearRubros,
+  onDetailModeChange,
   onSelectOS,
 }: {
   loading: boolean;
@@ -2338,14 +2378,17 @@ function OSImpactSection({
   activeKey?: string;
   metric: OSMetric;
   selectedSummary: ReturnType<typeof summarizeOSImpact>;
+  accumulatedSummary: ReturnType<typeof summarizeOSImpact>;
   sucursalRows: Array<{ sucursal: Sucursal; rows: number; total: number; horas: number; km: number; previousTotal: number }>;
   detailRows: OSImpactRow[];
+  detailMode: "os" | "cliente";
   selectedRubros: OSRubro[];
   comparisonLabel?: string;
   onSelectPeriod: (key: string) => void;
   onSelectSucursal: (sucursal: Sucursal) => void;
   onSelectRubro: (rubro: OSRubro) => void;
   onClearRubros: () => void;
+  onDetailModeChange: (mode: "os" | "cliente") => void;
   onSelectOS: (os: string) => void;
 }) {
   if (loading) {
@@ -2354,7 +2397,7 @@ function OSImpactSection({
   return (
     <div className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
       <div className="space-y-3">
-        <OSImpactKpis summary={selectedSummary} metric={metric} />
+        <OSImpactKpis summary={selectedSummary} accumulatedSummary={accumulatedSummary} metric={metric} />
         <OSEvolution rows={evolutionRows} activeKey={activeKey} metric={metric} onSelect={onSelectPeriod} />
         <OSMix summary={selectedSummary} selectedRubros={selectedRubros} onSelect={onSelectRubro} onClear={onClearRubros} />
       </div>
@@ -2368,39 +2411,85 @@ function OSImpactSection({
         </div>
         <div className="rounded-md border p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold">Detalle por OS</div>
-            <Receipt className="h-4 w-4 text-primary" />
+            <div className="text-xs font-semibold">{detailMode === "os" ? "Detalle por OS" : "Detalle por cliente"}</div>
+            <div className="flex items-center gap-2">
+              <div className="grid h-7 grid-cols-2 overflow-hidden rounded-md border text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => onDetailModeChange("os")}
+                  className={cn("px-2 hover:bg-accent", detailMode === "os" && "bg-primary text-primary-foreground hover:bg-primary")}
+                >
+                  OS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDetailModeChange("cliente")}
+                  className={cn("border-l px-2 hover:bg-accent", detailMode === "cliente" && "bg-primary text-primary-foreground hover:bg-primary")}
+                >
+                  Cliente
+                </button>
+              </div>
+              <Receipt className="h-4 w-4 text-primary" />
+            </div>
           </div>
-          <OSDetalle rows={detailRows} metric={metric} onSelect={onSelectOS} />
+          <OSDetalle rows={detailRows} metric={metric} mode={detailMode} onSelect={onSelectOS} />
         </div>
       </div>
     </div>
   );
 }
 
-function OSImpactKpis({ summary, metric }: { summary: ReturnType<typeof summarizeOSImpact>; metric: OSMetric }) {
+function OSImpactKpis({
+  summary,
+  accumulatedSummary,
+  metric,
+}: {
+  summary: ReturnType<typeof summarizeOSImpact>;
+  accumulatedSummary: ReturnType<typeof summarizeOSImpact>;
+  metric: OSMetric;
+}) {
   const selectedValue = osMetricValue(summary, metric);
+  const accumulatedValue = osMetricValue(accumulatedSummary, metric);
+  const accumulatedRange = accumulatedSummary.osCount > 0
+    ? `${format(accumulatedSummary.start, "dd/MM/yyyy")} - ${format(accumulatedSummary.end, "dd/MM/yyyy")}`
+    : "Sin acumulado visible";
   return (
-    <div className="grid gap-2 sm:grid-cols-4">
-      <div className="rounded-md border bg-primary/5 px-3 py-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Impacto OS</div>
-        <div className="mt-1 text-xl font-bold tabular-nums">{formatOSMetric(selectedValue, metric)}</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground">{summary.osCount} OS cerradas</div>
+    <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-4">
+        <div className="rounded-md border bg-primary/5 px-3 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Impacto OS</div>
+          <div className="mt-1 text-xl font-bold tabular-nums">{formatOSMetric(selectedValue, metric)}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{summary.osCount} OS cerradas</div>
+        </div>
+        <div className="rounded-md border px-3 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Servicio</div>
+          <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.servicios)}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.horas, "horas")}</div>
+        </div>
+        <div className="rounded-md border px-3 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Kilometraje</div>
+          <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.kilometraje)}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.km, "km")}</div>
+        </div>
+        <div className="rounded-md border px-3 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Repuestos</div>
+          <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.repuestos)}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">incluido en impacto OS</div>
+        </div>
       </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Servicio</div>
-        <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.servicios)}</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.horas, "horas")}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Kilometraje</div>
-        <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.kilometraje)}</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.km, "km")}</div>
-      </div>
-      <div className="rounded-md border px-3 py-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Repuestos</div>
-        <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.repuestos)}</div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground">incluido en impacto OS</div>
+      <div className="rounded-md border bg-muted/20 px-3 py-2">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Acumulado visible</div>
+            <div className="text-[11px] text-muted-foreground">{accumulatedRange}</div>
+          </div>
+          <div className="text-left sm:text-right">
+            <div className="text-lg font-bold tabular-nums">{formatOSMetric(accumulatedValue, metric)}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {accumulatedSummary.osCount} OS · {formatOSMetric(accumulatedSummary.horas, "horas")} · {formatOSMetric(accumulatedSummary.km, "km")}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -2563,11 +2652,94 @@ function OSSucursalBars({
   );
 }
 
-function OSDetalle({ rows, metric, onSelect }: { rows: OSImpactRow[]; metric: OSMetric; onSelect: (os: string) => void }) {
-  const visible = rows.slice().sort((a, b) => b.total - a.total).slice(0, 10);
+function OSDetalle({
+  rows,
+  metric,
+  mode,
+  onSelect,
+}: {
+  rows: OSImpactRow[];
+  metric: OSMetric;
+  mode: "os" | "cliente";
+  onSelect: (value: string) => void;
+}) {
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas en el periodo.</div>;
   }
+  if (mode === "cliente") {
+    const grouped = Array.from(rows.reduce((map, row) => {
+      const current = map.get(row.cliente) ?? {
+        cliente: row.cliente,
+        sucursales: new Set<string>(),
+        os: new Set<string>(),
+        total: 0,
+        horas: 0,
+        km: 0,
+        servicios: 0,
+        repuestos: 0,
+        kilometraje: 0,
+      };
+      if (row.sucursal) current.sucursales.add(row.sucursal);
+      current.os.add(row.os);
+      current.total += row.total;
+      current.horas += row.horas;
+      current.km += row.km;
+      current.servicios += row.servicios;
+      current.repuestos += row.repuestos;
+      current.kilometraje += row.kilometraje;
+      map.set(row.cliente, current);
+      return map;
+    }, new Map<string, {
+      cliente: string;
+      sucursales: Set<string>;
+      os: Set<string>;
+      total: number;
+      horas: number;
+      km: number;
+      servicios: number;
+      repuestos: number;
+      kilometraje: number;
+    }>()).values())
+      .sort((a, b) => osMetricValue(a, metric) - osMetricValue(b, metric))
+      .reverse()
+      .slice(0, 10);
+
+    return (
+      <div className="overflow-hidden rounded-md border">
+        <div className="grid grid-cols-[minmax(0,1fr)_72px_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]">
+          <div>Cliente</div>
+          <div className="text-right">OS</div>
+          <div className="hidden text-right sm:block">Sucursal</div>
+          <div className="text-right">{metric === "usd" ? "Impacto" : metric === "horas" ? "Horas" : "Km"}</div>
+        </div>
+        {grouped.map((row) => (
+          <button
+            key={row.cliente}
+            type="button"
+            onClick={() => onSelect(row.cliente)}
+            className="grid w-full grid-cols-[minmax(0,1fr)_72px_82px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]"
+          >
+            <div className="min-w-0">
+              <div className="truncate font-medium">{row.cliente}</div>
+              <div className="truncate text-[10px] text-muted-foreground">
+                Servicio {money(row.servicios)} · Repuestos {money(row.repuestos)} · Km {money(row.kilometraje)}
+              </div>
+            </div>
+            <div className="text-right font-mono text-[11px] font-semibold">{row.os.size}</div>
+            <div className="hidden truncate text-right text-[11px] text-muted-foreground sm:block">{Array.from(row.sucursales).join(", ") || "Sin sucursal"}</div>
+            <div className="text-right font-semibold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
+          </button>
+        ))}
+        {rows.length > grouped.length && (
+          <div className="border-t px-3 py-1.5 text-center text-[11px] text-muted-foreground">
+            Mostrando {grouped.length} clientes principales
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const visible = rows.slice().sort((a, b) => b.total - a.total).slice(0, 10);
   return (
     <div className="overflow-hidden rounded-md border">
       <div className="grid grid-cols-[72px_minmax(0,1fr)_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[72px_minmax(0,1fr)_86px_86px]">
