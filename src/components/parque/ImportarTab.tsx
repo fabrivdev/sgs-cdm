@@ -180,6 +180,13 @@ const normRuc = (s: unknown) => norm(s).replace(/[.\s-]/g, "").toLowerCase();
 const normPhone = (s: unknown) => norm(s).replace(/[^\d]/g, "");
 const normCode = (s: unknown) => norm(s).replace(/\s+/g, "").toLowerCase();
 const normOs = (s: unknown) => norm(s).replace(/[^\d]/g, "");
+const normHeader = (s: unknown) =>
+  norm(s)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
 const isMissingOsImportTableError = (error: unknown) => {
   const message = String((error as any)?.message ?? "");
@@ -292,10 +299,44 @@ const matchMarca = (s: unknown): Marca | null => {
 const pick = (row: Record<string, unknown>, aliases: string[]): unknown => {
   const keys = Object.keys(row);
   for (const a of aliases) {
-    const k = keys.find((x) => x.trim().toLowerCase() === a.toLowerCase());
+    const alias = normHeader(a);
+    const k = keys.find((x) => x.trim().toLowerCase() === a.toLowerCase() || normHeader(x) === alias);
     if (k != null && row[k] != null && String(row[k]).trim() !== "") return row[k];
   }
   return null;
+};
+
+const osHeaderScore = (row: Record<string, unknown>): number => {
+  const situacionOs = norm(pick(row, ["Situación O.S", "Situacion O.S", "Situacion OS"])).toLowerCase();
+  const tipoTiempo = norm(pick(row, ["Tipo de Tiempo"]));
+  const valores =
+    parseMoney(pick(row, ["Terceros"])) +
+    parseMoney(pick(row, ["Kilometro", "Kilómetro"])) +
+    parseMoney(pick(row, ["Servicios"])) +
+    parseMoney(pick(row, ["Repuesto"]));
+
+  return (
+    (situacionOs.includes("cerrad") ? 1000 : 0) +
+    (valores > 0 ? 500 : 0) +
+    (tipoTiempo ? 100 : 0) +
+    (parseExcelDate(pick(row, ["Fc Abierta OS", "Fecha Abierta OS"])) ? 10 : 0)
+  );
+};
+
+const applyOrdenServicioHeader = (target: OrdenServicioRow, source: Record<string, unknown>) => {
+  target.cliente_nombre = norm(pick(source, ["Nombre", "Cliente"])) || target.cliente_nombre;
+  target.situacion_os = norm(pick(source, ["Situación O.S", "Situacion O.S", "Situacion OS"])) || target.situacion_os;
+  target.situacion_facturacion = norm(pick(source, ["Situación", "Situacion"])) || target.situacion_facturacion;
+  target.responsable = norm(pick(source, ["Responsable"])) || target.responsable;
+  target.cod_mecanico = norm(pick(source, ["Cod. Mecanico", "Cod Mecanico"])) || target.cod_mecanico;
+  target.factura = norm(pick(source, ["Factura"])) || target.factura;
+  target.cod_interno = norm(pick(source, ["Cod. Interno", "Cod Interno"])) || target.cod_interno;
+  target.fecha_abierta_os = parseExcelDate(pick(source, ["Fc Abierta OS", "Fecha Abierta OS"])) || target.fecha_abierta_os;
+  target.fecha_emision_factura = parseExcelDate(pick(source, ["Emisión Fact.", "Emision Fact.", "Fecha Factura"])) || target.fecha_emision_factura;
+  target.nro_chasis = norm(pick(source, ["Nro Chasis", "Nº Chasis"])) || target.nro_chasis;
+  target.marca = norm(pick(source, ["Marca"])) || target.marca;
+  target.tipo_tiempo = norm(pick(source, ["Tipo de Tiempo"])) || target.tipo_tiempo;
+  target.problema = norm(pick(source, ["Problema"])) || target.problema;
 };
 
 export function ImportarTab({ onChanged }: { onChanged: () => void }) {
@@ -403,8 +444,9 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       }
 
       const rowsByOs = new Map<string, OrdenServicioRow>();
+      const headerScoreByOs = new Map<string, number>();
       for (const r of json) {
-        const os = normOs(pick(r, ["Nº OS", "Nro OS", "Nro. OS", "Numero OS", "Número OS", "OS"]));
+        const os = normOs(pick(r, ["Nº OS", "N OS", "Nro OS", "Nro. OS", "Numero OS", "Número OS", "OS"]));
         if (!os) continue;
 
         const trabajo = trabajosPorOs.get(os) ?? null;
@@ -437,6 +479,12 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           raw_data: {},
           _isNew: !osImportadas.has(os),
         };
+        const incomingHeaderScore = osHeaderScore(r);
+        const currentHeaderScore = headerScoreByOs.get(os) ?? -1;
+        if (!prev || incomingHeaderScore >= currentHeaderScore) {
+          applyOrdenServicioHeader(row, r);
+          headerScoreByOs.set(os, incomingHeaderScore);
+        }
 
         row.km_cantidad += parseMoney(pick(r, ["Km Cnt. Utilizada", "Km Cnt Utilizada"]));
         row.km_valor_unitario = row.km_valor_unitario || parseMoney(pick(r, ["Km Vlr. Unitario", "Km Vlr Unitario"]));
