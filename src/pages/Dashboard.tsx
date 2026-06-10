@@ -122,47 +122,6 @@ interface Facturacion {
 type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
 type Tone = "neutral" | "good" | "warn" | "bad";
 type FactMetric = "usd" | "horasServicio" | "kmFacturados";
-type OSMetric = "usd" | "horas" | "km";
-
-interface OrdenServicioImportada {
-  os_numero: string;
-  trabajo_id: string | null;
-  cliente_nombre: string | null;
-  fecha_abierta_os: string | null;
-  factura: string | null;
-  marca: string | null;
-  problema: string | null;
-  tipo_tiempo: string | null;
-  servicios_cantidad: number | null;
-  servicios_valor: number | null;
-  repuesto_valor: number | null;
-  km_cantidad: number | null;
-  kilometro_valor: number | null;
-  terceros_valor: number | null;
-  situacion_os: string | null;
-  situacion_facturacion: string | null;
-}
-
-interface OSImpactRow {
-  os: string;
-  trabajoId: string | null;
-  cliente: string;
-  fecha: string;
-  sucursal: Sucursal | null;
-  marca: Marca;
-  tipo: "Garantia" | "Absorve CDM";
-  situacionOs: string;
-  situacionFacturacion: string;
-  problema: string;
-  factura: string;
-  horas: number;
-  km: number;
-  servicios: number;
-  repuestos: number;
-  kilometraje: number;
-  terceros: number;
-  total: number;
-}
 
 interface WeekRow {
   key: string;
@@ -296,63 +255,6 @@ function factMetricLabel(metric: FactMetric) {
   return "Total";
 }
 
-function formatOSMetric(value: number, metric: OSMetric) {
-  if (metric === "horas") return `${Number(value || 0).toFixed(1).replace(".0", "")} hs`;
-  if (metric === "km") return `${Number(value || 0).toFixed(0)} km`;
-  return money(value);
-}
-
-function osMetricValue(row: { total: number; horas: number; km: number }, metric: OSMetric) {
-  if (metric === "horas") return row.horas;
-  if (metric === "km") return row.km;
-  return row.total;
-}
-
-function osEstaCerrada(row: OrdenServicioImportada) {
-  return String(row.situacion_os ?? "").toUpperCase().includes("CERRAD");
-}
-
-function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | null {
-  const tipoTiempo = String(row.tipo_tiempo ?? "").toUpperCase();
-  const situacionFacturacion = String(row.situacion_facturacion ?? "").toUpperCase();
-  if (tipoTiempo.includes("GARANT")) return "Garantia";
-  if (
-    tipoTiempo.includes("INTERNO") ||
-    situacionFacturacion.includes("ABSORVE") ||
-    situacionFacturacion.includes("ABSORBE") ||
-    situacionFacturacion.includes("INTERNO")
-  ) {
-    return "Absorve CDM";
-  }
-  return null;
-}
-
-function marcaDesdeOS(marca: string | null | undefined): Marca {
-  const normalized = String(marca ?? "").toUpperCase();
-  if (normalized.includes("CLAAS")) return "CLAAS";
-  if (normalized.includes("HORSCH")) return "HORSCH";
-  return "OTROS";
-}
-
-function summarizeOSImpact(rows: OSImpactRow[], key: string, label: string, start: Date, end: Date) {
-  return {
-    key,
-    label,
-    start,
-    end,
-    rows,
-    osCount: rows.length,
-    total: rows.reduce((acc, row) => acc + row.total, 0),
-    horas: rows.reduce((acc, row) => acc + row.horas, 0),
-    km: rows.reduce((acc, row) => acc + row.km, 0),
-    servicios: rows.reduce((acc, row) => acc + row.servicios, 0),
-    repuestos: rows.reduce((acc, row) => acc + row.repuestos, 0),
-    kilometraje: rows.reduce((acc, row) => acc + row.kilometraje, 0),
-    garantia: rows.filter((row) => row.tipo === "Garantia").reduce((acc, row) => acc + row.total, 0),
-    absorveCdm: rows.filter((row) => row.tipo === "Absorve CDM").reduce((acc, row) => acc + row.total, 0),
-  };
-}
-
 function compact(value: string, max = 34) {
   return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
@@ -376,11 +278,9 @@ export default function Dashboard() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [facturacion, setFacturacion] = useState<Facturacion[]>([]);
-  const [ordenesServicio, setOrdenesServicio] = useState<OrdenServicioImportada[]>([]);
   const [baseLoading, setBaseLoading] = useState(true);
   const [jornadasLoading, setJornadasLoading] = useState(true);
   const [facturacionLoading, setFacturacionLoading] = useState(true);
-  const [ordenesLoading, setOrdenesLoading] = useState(true);
 
   const [weekStartInput, setWeekStartInput] = useState(initialWeekStart);
   const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
@@ -395,8 +295,7 @@ export default function Dashboard() {
   const [section, setSection] = useState("resumen");
   const [rangoEvolucion, setRangoEvolucion] = useState<"4" | "6" | "8" | "12" | "24" | "all">("12");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
-  const [osMetric, setOsMetric] = useState<OSMetric>("usd");
-  const loading = baseLoading || jornadasLoading || facturacionLoading || ordenesLoading;
+  const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const goSection = (value: string) => startTransition(() => setSection(value));
 
@@ -617,39 +516,9 @@ export default function Dashboard() {
     };
   }, [queryEnd, queryStart]);
 
-  useEffect(() => {
-    let alive = true;
-
-    (async () => {
-      setOrdenesLoading(true);
-      try {
-        const rows = await cargarTodo<OrdenServicioImportada>(
-          (supabase
-            .from("ordenes_servicio_importadas" as any)
-            .select("os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, factura, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion")
-            .gte("fecha_abierta_os", dateKey(queryStart))
-            .lte("fecha_abierta_os", `${dateKey(queryEnd)}T23:59:59`)
-            .order("fecha_abierta_os", { ascending: false }) as any),
-        );
-        if (alive) setOrdenesServicio(rows);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes("ordenes_servicio_importadas")) console.error(error);
-        if (alive) setOrdenesServicio([]);
-      } finally {
-        if (alive) setOrdenesLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [queryEnd, queryStart]);
-
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
   const profileById = useMemo(() => new Map(profiles.map((item) => [item.id, item])), [profiles]);
-  const trabajoById = useMemo(() => new Map(trabajos.map((item) => [item.id, item])), [trabajos]);
   // Resuelve la cuadrilla efectiva de una jornada con herencia desde el servicio padre,
   // igual que Planificador: si la jornada no tiene principal/auxiliares propios, hereda
   // los del servicio.
@@ -736,75 +605,6 @@ export default function Dashboard() {
       (trabajo.codigo ?? "").toLowerCase().includes(query)
     );
   };
-
-  const osImpactRows = useMemo<OSImpactRow[]>(() => {
-    return ordenesServicio
-      .map((row) => {
-        if (!row.fecha_abierta_os || !osEstaCerrada(row)) return null;
-        const tipo = osTipoAbsorbido(row);
-        if (!tipo) return null;
-        const trabajo = row.trabajo_id ? trabajoById.get(row.trabajo_id) : null;
-        const clienteTrabajo = trabajo?.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre : null;
-        const cliente = clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente";
-        const sucursal = trabajo?.sucursal ?? null;
-        const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
-        const servicios = Number(row.servicios_valor || 0);
-        const repuestos = Number(row.repuesto_valor || 0);
-        const kilometraje = Number(row.kilometro_valor || 0);
-        const terceros = Number(row.terceros_valor || 0);
-        return {
-          os: row.os_numero,
-          trabajoId: row.trabajo_id,
-          cliente,
-          fecha: String(row.fecha_abierta_os).slice(0, 10),
-          sucursal,
-          marca,
-          tipo,
-          situacionOs: row.situacion_os ?? "",
-          situacionFacturacion: row.situacion_facturacion ?? "",
-          problema: row.problema ?? trabajo?.descripcion_problema ?? "",
-          factura: row.factura ?? "",
-          horas: Number(row.servicios_cantidad || 0),
-          km: Number(row.km_cantidad || 0),
-          servicios,
-          repuestos,
-          kilometraje,
-          terceros,
-          total: servicios + repuestos + kilometraje,
-        };
-      })
-      .filter((row): row is OSImpactRow => {
-        if (!row) return false;
-        if (fSucursales.length > 0 && (!row.sucursal || !fSucursales.includes(row.sucursal))) return false;
-        if (fMarcas.length > 0 && !fMarcas.includes(row.marca)) return false;
-        if (fTiposTiempo.length > 0) {
-          const tipoFiltro = row.tipo === "Absorve CDM" ? "Interno" : row.tipo;
-          if (!fTiposTiempo.includes(tipoFiltro) && !fTiposTiempo.includes(row.tipo)) return false;
-        }
-        if (fRubros.length > 0) {
-          const hasRubro = fRubros.some((rubro) => {
-            if (rubro === "Repuestos") return row.repuestos > 0;
-            if (rubro === "Servicio") return row.servicios > 0;
-            if (rubro === "Kilometraje") return row.kilometraje > 0;
-            if (rubro === "Otros") return row.terceros > 0;
-            return false;
-          });
-          if (!hasRubro) return false;
-        }
-        if (!query) return true;
-        const hay = [
-          row.os,
-          row.factura,
-          row.cliente,
-          row.problema,
-          row.sucursal ?? "",
-          row.marca,
-          row.tipo,
-          row.situacionFacturacion,
-        ].join(" ").toLowerCase();
-        return hay.includes(query);
-      });
-  }, [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, ordenesServicio, query, trabajoById]);
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
     const periods =
@@ -931,41 +731,6 @@ export default function Dashboard() {
         ? format(comparisonRange.start, "MM/yyyy")
         : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yyyy")}`
     : undefined;
-
-  const osSelectedRows = useMemo(
-    () => (selectedWeek ? osImpactRows.filter((row) => inRange(row.fecha, selectedWeek.start, selectedWeek.end)) : []),
-    [osImpactRows, selectedWeek],
-  );
-  const osComparisonRows = useMemo(
-    () => comparisonRange ? osImpactRows.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end)) : [],
-    [comparisonRange, osImpactRows],
-  );
-  const osEvolutionRows = useMemo(() => {
-    return weeklyRows.map((period) => {
-      const rows = osImpactRows.filter((row) => inRange(row.fecha, period.start, period.end));
-      return summarizeOSImpact(rows, period.key, period.label, period.start, period.end);
-    });
-  }, [osImpactRows, weeklyRows]);
-  const osSelectedSummary = useMemo(
-    () => summarizeOSImpact(osSelectedRows, selectedWeek?.key ?? "", selectedWeek?.label ?? "", selectedWeek?.start ?? periodStart, selectedWeek?.end ?? periodEnd),
-    [osSelectedRows, periodEnd, periodStart, selectedWeek],
-  );
-  const osBySucursal = useMemo(() => {
-    const maxTotal = Math.max(1, ...SUCURSALES.map((sucursal) => osSelectedRows.filter((row) => row.sucursal === sucursal).reduce((acc, row) => acc + row.total, 0)));
-    return SUCURSALES.map((sucursal) => {
-      const rows = osSelectedRows.filter((row) => row.sucursal === sucursal);
-      const previousRows = osComparisonRows.filter((row) => row.sucursal === sucursal);
-      return {
-        sucursal,
-        rows: rows.length,
-        total: rows.reduce((acc, row) => acc + row.total, 0),
-        horas: rows.reduce((acc, row) => acc + row.horas, 0),
-        km: rows.reduce((acc, row) => acc + row.km, 0),
-        previousTotal: previousRows.reduce((acc, row) => acc + row.total, 0),
-        maxTotal,
-      };
-    }).sort((a, b) => b.total - a.total);
-  }, [osComparisonRows, osSelectedRows]);
 
   const factMes = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, monthStart, monthEnd)), [factFiltered, monthEnd, monthStart]);
   const factMesPrev = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, previousMonthStart, previousMonthEnd)), [factFiltered, previousMonthEnd, previousMonthStart]);
@@ -1735,21 +1500,25 @@ export default function Dashboard() {
           </section>
 
 
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
-            <Card className="flex h-full flex-col p-3 xl:col-span-2">
-              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Impacto OS absorbido</h2>
-                  <p className="truncate text-xs text-muted-foreground">Garantia y Absorve CDM desde ordenes de servicio.</p>
-                </div>
-                <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
-              </div>
-              <OSEvolution rows={osEvolutionRows} activeKey={selectedWeek?.key} metric={osMetric} onSelect={setSelectedWeekKey} />
-              <OSMix summary={osSelectedSummary} onSelect={(rubro) => setFRubros([rubro])} />
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
+            <Card className="flex h-full flex-col p-3">
+              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
+              <EstadoCompacto
+                flujo={flujo}
+                onSelect={(estado) => { setFEstadosTrabajo([estado]); goSection("trabajos"); }}
+                planificados={trabajosPlanificadosProximoPeriodo}
+                tecnicosAsignados={tecnicosProximoPeriodo}
+                jornadasPlanificadas={jornadasPlanificacion.length}
+                planificacionRango={planificacionRango}
+                jornadasPrev={jornadasRealizadasPrev.length}
+                horasPrev={horasPrev}
+                tecnicosCierreAnterior={tecnicosCierreAnterior}
+                cierreAnteriorRango={cierreAnteriorRango}
+              />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="OS por sucursal" subtitle="Impacto absorbido del periodo." />
-              <OSSucursalBars rows={osBySucursal} totalValue={osSelectedSummary.total} metric={osMetric} comparisonLabel={comparisonLabel} onSelect={(sucursal) => setFSucursales([sucursal])} />
+              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
+              <CargaTecnicaMatriz data={productividadMatriz} onClick={() => goSection("trabajos")} />
             </Card>
           </section>
 
@@ -1765,9 +1534,9 @@ export default function Dashboard() {
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Receipt} title="Detalle OS absorbidas" subtitle="Servicio, repuestos y kilometraje." />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Cerrados, abiertos y pausados dentro del período." />
 
-              <OSDetalle rows={osSelectedRows} metric={osMetric} onSelect={(text) => setQ(text)} />
+              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("trabajos"); }} />
             </Card>
           </section>
 
@@ -2173,249 +1942,6 @@ function FactMetricSwitch({ value, onChange }: { value: FactMetric; onChange: (v
           </button>
         );
       })}
-    </div>
-  );
-}
-
-function OSMetricSwitch({ value, onChange }: { value: OSMetric; onChange: (value: OSMetric) => void }) {
-  const options: Array<{ value: OSMetric; label: string; icon?: React.ElementType }> = [
-    { value: "usd", label: "$" },
-    { value: "horas", label: "Hs", icon: Clock3 },
-    { value: "km", label: "Km", icon: Truck },
-  ];
-  return (
-    <div className="grid h-8 w-full grid-cols-3 overflow-hidden rounded-md border bg-background text-[11px] sm:w-auto sm:min-w-[176px]">
-      {options.map((option) => {
-        const Icon = option.icon;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            title={option.value === "usd" ? "Impacto absorbido" : option.value === "horas" ? "Horas de OS" : "Kilometros de OS"}
-            onClick={() => onChange(option.value)}
-            className={cn(
-              "inline-flex items-center justify-center gap-1 border-r px-2 last:border-r-0 hover:bg-accent",
-              value === option.value && "bg-primary text-primary-foreground hover:bg-primary",
-            )}
-          >
-            {Icon ? <Icon className="h-3.5 w-3.5" /> : <span className="font-semibold">{option.label}</span>}
-            <span>{option.value === "usd" ? "Usd" : option.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function OSEvolution({
-  rows,
-  activeKey,
-  metric,
-  onSelect,
-}: {
-  rows: ReturnType<typeof summarizeOSImpact>[];
-  activeKey?: string;
-  metric: OSMetric;
-  onSelect: (key: string) => void;
-}) {
-  const max = Math.max(1, ...rows.map((row) => osMetricValue(row, metric)));
-  const labelEvery = rows.length > 14 ? Math.ceil(rows.length / 6) : rows.length > 9 ? 2 : 1;
-  if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas en el rango.</div>;
-  }
-  return (
-    <div className="overflow-hidden">
-      <div
-        className="relative grid min-h-[188px] items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[220px] sm:gap-3 sm:px-2 sm:pt-4"
-        style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(0, 1fr))` }}
-      >
-        {rows.map((row, index) => {
-          const value = osMetricValue(row, metric);
-          const height = value <= 0 ? 0 : Math.max(6, Math.round((value / max) * 140));
-          const active = row.key === activeKey;
-          const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
-          return (
-            <button key={row.key} onClick={() => onSelect(row.key)} className="flex min-w-0 flex-col items-center gap-1.5 text-center sm:gap-2">
-              <span className="max-w-full truncate text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">{formatOSMetric(value, metric)}</span>
-              <span className="flex h-[140px] w-full items-end justify-center sm:h-[160px]">
-                <span
-                  className={cn(
-                    "w-full max-w-[34px] rounded-t-md bg-primary/80 transition-all hover:bg-primary sm:max-w-[42px]",
-                    active && "bg-primary ring-2 ring-primary/20",
-                  )}
-                  style={{ height }}
-                />
-              </span>
-              <span className="min-h-7 max-w-full truncate text-[9px] leading-3 text-muted-foreground sm:min-h-8 sm:text-[10px] sm:leading-4">
-                {showLabel ? row.label : ""}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
-        <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        {metric === "usd" ? "Impacto absorbido ($)" : metric === "horas" ? "Horas OS" : "Km OS"}
-      </div>
-    </div>
-  );
-}
-
-function OSMix({
-  summary,
-  onSelect,
-}: {
-  summary: ReturnType<typeof summarizeOSImpact>;
-  onSelect?: (rubro: string) => void;
-}) {
-  const total = summary.total || 1;
-  const items: Array<{ label: string; filter: string; value: number; bar: string; dot: string }> = [
-    { label: "Repuestos", filter: "Repuestos", value: summary.repuestos, bar: "bg-primary", dot: "bg-primary" },
-    { label: "Servicio", filter: "Servicio", value: summary.servicios, bar: "bg-sky-500/80", dot: "bg-sky-500" },
-    { label: "Kilometraje", filter: "Kilometraje", value: summary.kilometraje, bar: "bg-amber-500/80", dot: "bg-amber-500" },
-  ];
-  return (
-    <div className="mt-2 border-t pt-2">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase text-muted-foreground">
-        <span>Mix OS absorbido</span>
-        <span className="tabular-nums normal-case text-foreground/70">
-          {summary.osCount} OS · {formatOSMetric(summary.horas, "horas")} · {formatOSMetric(summary.km, "km")}
-        </span>
-      </div>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
-        {items.map((item) => item.value > 0 && (
-          <button
-            key={item.label}
-            type="button"
-            onClick={() => onSelect?.(item.filter)}
-            className={cn("h-full transition-opacity hover:opacity-80", item.bar)}
-            style={{ width: `${(item.value / total) * 100}%` }}
-            title={`${item.label}: ${money(item.value)}`}
-          />
-        ))}
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-        {items.map((item) => (
-          <button key={item.label} type="button" onClick={() => onSelect?.(item.filter)} className="flex items-center gap-1.5 text-[11px] hover:text-primary">
-            <span className={cn("h-2 w-2 rounded-full", item.dot)} />
-            <span className="font-medium">{item.label}</span>
-            <span className="tabular-nums text-muted-foreground">{money(item.value)}</span>
-          </button>
-        ))}
-        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-blue-500" /> Garantia {money(summary.garantia)}
-        </span>
-        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-amber-500" /> Absorve CDM {money(summary.absorveCdm)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function OSSucursalBars({
-  rows,
-  totalValue,
-  metric,
-  comparisonLabel,
-  onSelect,
-}: {
-  rows: Array<{ sucursal: Sucursal; rows: number; total: number; horas: number; km: number; previousTotal: number; maxTotal: number }>;
-  totalValue: number;
-  metric: OSMetric;
-  comparisonLabel?: string;
-  onSelect: (sucursal: Sucursal) => void;
-}) {
-  const visibleRows = rows.filter((row) => row.total > 0 || row.horas > 0 || row.km > 0);
-  const max = Math.max(1, ...visibleRows.map((row) => osMetricValue(row, metric)));
-  if (visibleRows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas por sucursal.</div>;
-  }
-  return (
-    <div className="space-y-2">
-      {visibleRows.map((row) => {
-        const value = osMetricValue(row, metric);
-        const width = value <= 0 ? 0 : Math.max(4, Math.round((value / max) * 100));
-        const previousWidth = row.previousTotal > 0 && metric === "usd" ? Math.round((row.previousTotal / max) * 100) : 0;
-        const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
-        return (
-          <button key={row.sucursal} onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
-            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-              <span className="font-medium">{row.sucursal}</span>
-              <span className="tabular-nums text-muted-foreground">
-                {formatOSMetric(value, metric)}{metric === "usd" ? ` - ${participation}%` : ""}
-              </span>
-            </div>
-            <div className="relative h-2 rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
-              {previousWidth > 0 && (
-                <span
-                  className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
-                  style={{ left: `${previousWidth}%` }}
-                  title={`${comparisonLabel ?? "Año anterior"}: ${money(row.previousTotal)}`}
-                />
-              )}
-            </div>
-            <div className="mt-1 text-[10px] text-muted-foreground">{row.rows} OS · {formatOSMetric(row.horas, "horas")} · {formatOSMetric(row.km, "km")}</div>
-          </button>
-        );
-      })}
-      {visibleRows.some((row) => row.previousTotal > 0) && metric === "usd" && (
-        <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
-          <span className="h-3 border-l-2 border-dashed border-slate-500" />
-          {comparisonLabel ?? "Año anterior"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OSDetalle({
-  rows,
-  metric,
-  onSelect,
-}: {
-  rows: OSImpactRow[];
-  metric: OSMetric;
-  onSelect: (text: string) => void;
-}) {
-  const visible = rows.slice().sort((a, b) => b.total - a.total).slice(0, 12);
-  if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas en el periodo.</div>;
-  }
-  return (
-    <div className="overflow-hidden rounded-md border">
-      <div className="grid grid-cols-[76px_minmax(0,1fr)_88px_86px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-        <div>OS</div>
-        <div>Cliente</div>
-        <div className="hidden text-right sm:block">Tipo</div>
-        <div className="text-right">{metric === "usd" ? "Impacto" : metric === "horas" ? "Horas" : "Km"}</div>
-      </div>
-      {visible.map((row) => (
-        <button
-          key={`${row.os}-${row.fecha}`}
-          type="button"
-          onClick={() => onSelect(row.os)}
-          className="grid w-full grid-cols-[76px_minmax(0,1fr)_88px_86px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
-        >
-          <div className="font-mono text-[11px] font-semibold">{row.os}</div>
-          <div className="min-w-0">
-            <div className="truncate font-medium">{row.cliente}</div>
-            <div className="truncate text-[10px] text-muted-foreground">
-              {format(parseISO(row.fecha), "dd/MM")} · {row.sucursal ?? "Sin sucursal"} · {row.problema}
-            </div>
-          </div>
-          <div className="hidden text-right sm:block">
-            <Badge variant="secondary" className="text-[10px]">{row.tipo}</Badge>
-          </div>
-          <div className="text-right font-semibold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
-        </button>
-      ))}
-      {rows.length > visible.length && (
-        <div className="border-t px-3 py-1.5 text-center text-[11px] text-muted-foreground">
-          Mostrando {visible.length} de {rows.length} OS
-        </div>
-      )}
     </div>
   );
 }
