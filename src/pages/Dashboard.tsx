@@ -149,7 +149,7 @@ interface OSImpactRow {
   fecha: string;
   sucursal: Sucursal | null;
   marca: Marca;
-  tipo: "Garantia" | "Absorve CDM";
+  tipo: "Garantia" | "Interno";
   situacionFacturacion: string;
   problema: string;
   factura: string;
@@ -355,7 +355,7 @@ function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | nul
     tipoTiempo.includes("ABZOR") ||
     tipoTiempo.includes("CDM")
   ) {
-    return "Absorve CDM";
+    return "Interno";
   }
   return null;
 }
@@ -382,7 +382,7 @@ function summarizeOSImpact(rows: OSImpactRow[], key: string, label: string, star
     repuestos: rows.reduce((acc, row) => acc + row.repuestos, 0),
     kilometraje: rows.reduce((acc, row) => acc + row.kilometraje, 0),
     garantia: rows.filter((row) => row.tipo === "Garantia").reduce((acc, row) => acc + row.total, 0),
-    absorveCdm: rows.filter((row) => row.tipo === "Absorve CDM").reduce((acc, row) => acc + row.total, 0),
+    interno: rows.filter((row) => row.tipo === "Interno").reduce((acc, row) => acc + row.total, 0),
   };
 }
 
@@ -822,7 +822,7 @@ export default function Dashboard() {
         if (fSucursales.length > 0 && (!row.sucursal || !fSucursales.includes(row.sucursal))) return false;
         if (fMarcas.length > 0 && !fMarcas.includes(row.marca)) return false;
         if (fTiposTiempo.length > 0) {
-          const tipoFiltro = row.tipo === "Absorve CDM" ? "Interno" : row.tipo;
+          const tipoFiltro = row.tipo;
           if (!fTiposTiempo.includes(tipoFiltro) && !fTiposTiempo.includes(row.tipo)) return false;
         }
         if (fOSRubros.length > 0) {
@@ -1968,7 +1968,7 @@ export default function Dashboard() {
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold">Detalle OS absorbidas</h2>
-                <p className="truncate text-xs text-muted-foreground">Garantia y Absorve CDM separados de la facturacion vendida.</p>
+                <p className="truncate text-xs text-muted-foreground">Garantia e Interno separados de la facturacion vendida.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
@@ -2568,7 +2568,7 @@ function OSMix({
           Mix OS absorbido
         </button>
         <span className="tabular-nums normal-case text-foreground/70">
-          Garantia {money(summary.garantia)} · Absorve CDM {money(summary.absorveCdm)}
+          Garantia {money(summary.garantia)} · Interno {money(summary.interno)}
         </span>
       </div>
       <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
