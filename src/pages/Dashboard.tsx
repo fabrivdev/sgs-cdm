@@ -646,6 +646,7 @@ export default function Dashboard() {
 
   const servicioById = useMemo(() => new Map(servicios.map((item) => [item.id, item])), [servicios]);
   const clienteById = useMemo(() => new Map(clientes.map((item) => [item.id, item])), [clientes]);
+  const clienteByName = useMemo(() => new Map(clientes.map((item) => [normalizeClienteKey(item.nombre), item])), [clientes]);
   const profileById = useMemo(() => new Map(profiles.map((item) => [item.id, item])), [profiles]);
   const trabajoById = useMemo(() => new Map(trabajos.map((item) => [item.id, item])), [trabajos]);
   // Resuelve la cuadrilla efectiva de una jornada con herencia desde el servicio padre,
@@ -744,7 +745,8 @@ export default function Dashboard() {
         const trabajo = row.trabajo_id ? trabajoById.get(row.trabajo_id) : null;
         const clienteTrabajo = trabajo?.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre : null;
         const cliente = clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente";
-        const sucursal = trabajo?.sucursal ?? null;
+        const clienteMatched = clienteByName.get(normalizeClienteKey(cliente));
+        const sucursal = trabajo?.sucursal ?? clienteMatched?.sucursal ?? null;
         const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
         const servicios = Number(row.servicios_valor || 0);
         const repuestos = Number(row.repuesto_valor || 0);
@@ -800,7 +802,7 @@ export default function Dashboard() {
         ].join(" ").toLowerCase();
         return hay.includes(query);
       });
-  }, [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, ordenesServicio, query, trabajoById]);
+  }, [clienteById, clienteByName, fMarcas, fRubros, fSucursales, fTiposTiempo, ordenesServicio, query, trabajoById]);
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
     const periods =
@@ -928,14 +930,6 @@ export default function Dashboard() {
         : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yyyy")}`
     : undefined;
 
-  const osSelectedRows = useMemo(
-    () => (selectedWeek ? osImpactRows.filter((row) => inRange(row.fecha, selectedWeek.start, selectedWeek.end)) : []),
-    [osImpactRows, selectedWeek],
-  );
-  const osComparisonRows = useMemo(
-    () => comparisonRange ? osImpactRows.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end)) : [],
-    [comparisonRange, osImpactRows],
-  );
   const osEvolutionRows = useMemo(
     () => weeklyRows.map((period) => summarizeOSImpact(
       osImpactRows.filter((row) => inRange(row.fecha, period.start, period.end)),
@@ -946,15 +940,38 @@ export default function Dashboard() {
     )),
     [osImpactRows, weeklyRows],
   );
+  const osSelectedPeriod = useMemo(() => {
+    const current = osEvolutionRows.find((row) => row.key === selectedWeekKey);
+    if (current && current.osCount > 0) return current;
+    return [...osEvolutionRows].reverse().find((row) => row.osCount > 0) ?? current ?? osEvolutionRows[osEvolutionRows.length - 1];
+  }, [osEvolutionRows, selectedWeekKey]);
+  const osComparisonRange = useMemo(() => {
+    if (!osSelectedPeriod) return null;
+    if (periodMode === "anio") {
+      const start = startOfYear(subYears(osSelectedPeriod.start, 1));
+      const cut = new Date(osSelectedPeriod.start.getFullYear() - 1, weekStart.getMonth(), weekStart.getDate());
+      const end = cut > endOfYear(start) ? endOfYear(start) : cut;
+      return { start, end };
+    }
+    return { start: subYears(osSelectedPeriod.start, 1), end: subYears(osSelectedPeriod.end, 1) };
+  }, [osSelectedPeriod, periodMode, weekStart]);
+  const osSelectedRows = useMemo(
+    () => (osSelectedPeriod ? osImpactRows.filter((row) => inRange(row.fecha, osSelectedPeriod.start, osSelectedPeriod.end)) : []),
+    [osImpactRows, osSelectedPeriod],
+  );
+  const osComparisonRows = useMemo(
+    () => osComparisonRange ? osImpactRows.filter((row) => inRange(row.fecha, osComparisonRange.start, osComparisonRange.end)) : [],
+    [osComparisonRange, osImpactRows],
+  );
   const osSelectedSummary = useMemo(
     () => summarizeOSImpact(
       osSelectedRows,
-      selectedWeek?.key ?? "",
-      selectedWeek?.label ?? "",
-      selectedWeek?.start ?? periodStart,
-      selectedWeek?.end ?? periodEnd,
+      osSelectedPeriod?.key ?? "",
+      osSelectedPeriod?.label ?? "",
+      osSelectedPeriod?.start ?? periodStart,
+      osSelectedPeriod?.end ?? periodEnd,
     ),
-    [osSelectedRows, periodEnd, periodStart, selectedWeek],
+    [osSelectedRows, osSelectedPeriod, periodEnd, periodStart],
   );
   const osBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
@@ -1650,10 +1667,11 @@ export default function Dashboard() {
 
 
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-        <TabsList className="grid h-auto w-full grid-cols-3 sm:w-fit">
+        <TabsList className="grid h-auto w-full grid-cols-4 sm:w-fit">
           <TabsTrigger value="resumen">Vista general</TabsTrigger>
           <TabsTrigger value="facturacion">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos">Trabajos</TabsTrigger>
+          <TabsTrigger value="os">OS absorbidas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-3">
@@ -1760,30 +1778,6 @@ export default function Dashboard() {
               <CargaTecnicaMatriz data={productividadMatriz} onClick={() => goSection("trabajos")} />
             </Card>
           </section>
-
-          <Card className="flex flex-col p-3">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate text-sm font-semibold">Detalle OS absorbidas</h2>
-                <p className="truncate text-xs text-muted-foreground">Garantia y Absorve CDM separados de la facturacion vendida.</p>
-              </div>
-              <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
-            </div>
-            <OSImpactSection
-              loading={ordenesLoading}
-              evolutionRows={osEvolutionRows}
-              activeKey={selectedWeek?.key}
-              metric={osMetric}
-              selectedSummary={osSelectedSummary}
-              sucursalRows={osBySucursal}
-              detailRows={osSelectedRows}
-              comparisonLabel={comparisonLabel}
-              onSelectPeriod={setSelectedWeekKey}
-              onSelectSucursal={(sucursal) => setFSucursales([sucursal])}
-              onSelectRubro={(rubro) => setFRubros([rubro])}
-              onSelectOS={(os) => setQ(os)}
-            />
-          </Card>
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
@@ -1901,6 +1895,32 @@ export default function Dashboard() {
                 })
               )}
             </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="os" className="space-y-3">
+          <Card className="flex flex-col p-3">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold">Detalle OS absorbidas</h2>
+                <p className="truncate text-xs text-muted-foreground">Garantia y Absorve CDM separados de la facturacion vendida.</p>
+              </div>
+              <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
+            </div>
+            <OSImpactSection
+              loading={ordenesLoading}
+              evolutionRows={osEvolutionRows}
+              activeKey={osSelectedPeriod?.key}
+              metric={osMetric}
+              selectedSummary={osSelectedSummary}
+              sucursalRows={osBySucursal}
+              detailRows={osSelectedRows}
+              comparisonLabel={comparisonLabel}
+              onSelectPeriod={setSelectedWeekKey}
+              onSelectSucursal={(sucursal) => setFSucursales([sucursal])}
+              onSelectRubro={(rubro) => setFRubros([rubro])}
+              onSelectOS={(os) => setQ(os)}
+            />
           </Card>
         </TabsContent>
 
