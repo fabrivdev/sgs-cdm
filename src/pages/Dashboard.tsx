@@ -321,14 +321,12 @@ function normalizeOSLookup(value: string | null | undefined) {
 
 function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | null {
   const tipoTiempo = normalizeOSLookup(row.tipo_tiempo);
-  const situacionFacturacion = normalizeOSLookup(row.situacion_facturacion);
-  const combined = `${tipoTiempo} ${situacionFacturacion}`;
-  if (combined.includes("GARANT")) return "Garantia";
+  if (tipoTiempo.includes("GARANT")) return "Garantia";
   if (
-    combined.includes("INTERNO") ||
-    combined.includes("ABSOR") ||
-    combined.includes("ABZOR") ||
-    combined.includes("CDM")
+    tipoTiempo.includes("INTERNO") ||
+    tipoTiempo.includes("ABSOR") ||
+    tipoTiempo.includes("ABZOR") ||
+    tipoTiempo.includes("CDM")
   ) {
     return "Absorve CDM";
   }
