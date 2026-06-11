@@ -101,12 +101,12 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           cargarTodo<Maquina>(
             supabase
               .from("parque_maquinas")
-              .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo"),
+              .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(
             supabase
               .from("clientes")
-              .select("id, nombre, sucursal")
+              .select("id, nombre, sucursal, ruc, region, direccion, localidad, correo_principal, cod_entidad, activo")
               .order("nombre", { ascending: true }),
           ),
         ]);
