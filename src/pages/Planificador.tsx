@@ -76,7 +76,7 @@ async function cargarTodosLosClientes() {
   while (true) {
     const { data, error } = await supabase
       .from("clientes")
-      .select("id, nombre, sucursal")
+      .select("id, nombre, sucursal, cod_entidad, ruc, region, direccion, localidad, correo_principal")
       .order("nombre", { ascending: true })
       .range(from, from + PAGE - 1);
 
