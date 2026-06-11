@@ -50,6 +50,12 @@ interface Cliente {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  cod_entidad?: string | null;
+  ruc?: string | null;
+  region?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
+  correo_principal?: string | null;
 }
 
 const SUCURSAL_ABBR: Record<Sucursal, string> = {
