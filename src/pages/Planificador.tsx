@@ -50,6 +50,12 @@ interface Cliente {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  cod_entidad?: string | null;
+  ruc?: string | null;
+  region?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
+  correo_principal?: string | null;
 }
 
 const SUCURSAL_ABBR: Record<Sucursal, string> = {
@@ -70,7 +76,7 @@ async function cargarTodosLosClientes() {
   while (true) {
     const { data, error } = await supabase
       .from("clientes")
-      .select("id, nombre, sucursal")
+      .select("id, nombre, sucursal, cod_entidad, ruc, region, direccion, localidad, correo_principal")
       .order("nombre", { ascending: true })
       .range(from, from + PAGE - 1);
 
@@ -296,21 +302,41 @@ export default function Planificador() {
 
 
   const exportExcel = () => {
-    const rows = displayed.map((s) => ({
-      Fecha: s.fecha_programada,
-      Dia: s.dia_semana,
-      Semana: s.semana,
-      Tipo: s.tipo_trabajo,
-      "Técnico Responsable": s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : "",
-      Auxiliares: s.auxiliares.map((a) => profById[a]?.nombre).filter(Boolean).join(", "),
-      Sucursal: s.sucursal,
-      Cliente: s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "" : "",
-      Marca: s.marca,
-      Trabajo: s.trabajo_descripcion,
-      Resultado: s.estado,
-      Observaciones: s.observaciones ?? "",
-      Horas: s.horas_trabajadas ?? "",
-    }));
+    const rows = displayed.map((s) => {
+      const cli = s.cliente_id ? cliById[s.cliente_id] : null;
+      const ref = refByServicio.get(s.id);
+      const resp = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] : null;
+      return {
+        Fecha: s.fecha_programada,
+        Dia: s.dia_semana,
+        Semana: s.semana,
+        Tipo: s.tipo_trabajo,
+        "Código Trabajo": ref?.codigo ?? "",
+        "OS Nº": ref?.os ?? "",
+        Referencia: ref?.ref ?? "",
+        "Técnico Responsable": resp?.nombre ?? "",
+        "Sucursal Técnico": resp?.sucursal ?? "",
+        Auxiliares: s.auxiliares.map((a) => profById[a]?.nombre).filter(Boolean).join(", "),
+        Sucursal: s.sucursal,
+        Cliente: cli?.nombre ?? "",
+        "Cod. Entidad": cli?.cod_entidad ?? "",
+        RUC: cli?.ruc ?? "",
+        "Sucursal Cliente": cli?.sucursal ?? "",
+        Region: cli?.region ?? "",
+        "Direccion Cliente": cli?.direccion ?? "",
+        "Localidad Cliente": cli?.localidad ?? "",
+        "Correo Cliente": cli?.correo_principal ?? "",
+        Marca: s.marca,
+        Trabajo: s.trabajo_descripcion,
+        Resultado: s.estado,
+        Observaciones: s.observaciones ?? "",
+        Horas: s.horas_trabajadas ?? "",
+        "Visto por (cant.)": s.visto_por?.length ?? 0,
+        "ID Servicio": s.id,
+        "ID Jornada": s.jornada_id ?? "",
+        "ID Cliente": s.cliente_id ?? "",
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
