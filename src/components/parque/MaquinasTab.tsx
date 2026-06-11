@@ -200,9 +200,18 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
     const data = ordenadas.map((m) => {
       const activa = m.activo !== false;
+      const cli = m.cliente_id ? cliById.get(m.cliente_id) : null;
 
       return {
-        Cliente: m.cliente_id ? cliById.get(m.cliente_id)?.nombre ?? "" : "",
+        Cliente: cli?.nombre ?? "",
+        "Cod. Entidad": cli?.cod_entidad ?? "",
+        RUC: cli?.ruc ?? "",
+        "Sucursal Cliente": cli?.sucursal ?? "",
+        Region: cli?.region ?? "",
+        "Direccion Cliente": cli?.direccion ?? "",
+        "Localidad Cliente": cli?.localidad ?? "",
+        "Correo Cliente": cli?.correo_principal ?? "",
+        "Cliente Activo": cli ? (cli.activo === false ? "No" : "Si") : "",
         Sucursal: m.sucursal ?? "",
         Localidad: m.localidad ?? "",
         Marca: m.marca,
@@ -213,6 +222,12 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         Serie: m.serie,
         Vendedor: m.vendedor ?? "",
         Estado: activa ? "Activa" : "Inactiva",
+        "Agregado Manualmente": m.agregado_manualmente ? "Si" : "No",
+        Notas: m.notas ?? "",
+        "Creado en": m.creado_en ?? "",
+        "Actualizado en": m.actualizado_en ?? "",
+        "ID Maquina": m.id,
+        "ID Cliente": m.cliente_id ?? "",
       };
     });
 
