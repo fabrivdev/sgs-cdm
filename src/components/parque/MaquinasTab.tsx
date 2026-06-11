@@ -34,12 +34,23 @@ type Maquina = {
   sucursal: Sucursal | null;
   localidad: string | null;
   activo: boolean | null;
+  agregado_manualmente?: boolean | null;
+  notas?: string | null;
+  creado_en?: string | null;
+  actualizado_en?: string | null;
 };
 
 type Cliente = {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  ruc?: string | null;
+  region?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
+  correo_principal?: string | null;
+  cod_entidad?: string | null;
+  activo?: boolean | null;
 };
 
 type SortKey = "cliente" | "marca" | "subgrupo" | "año" | "serie" | "sucursal";
