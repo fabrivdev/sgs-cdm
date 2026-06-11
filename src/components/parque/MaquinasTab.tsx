@@ -34,12 +34,23 @@ type Maquina = {
   sucursal: Sucursal | null;
   localidad: string | null;
   activo: boolean | null;
+  agregado_manualmente?: boolean | null;
+  notas?: string | null;
+  creado_en?: string | null;
+  actualizado_en?: string | null;
 };
 
 type Cliente = {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
+  ruc?: string | null;
+  region?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
+  correo_principal?: string | null;
+  cod_entidad?: string | null;
+  activo?: boolean | null;
 };
 
 type SortKey = "cliente" | "marca" | "subgrupo" | "año" | "serie" | "sucursal";
@@ -90,12 +101,12 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           cargarTodo<Maquina>(
             supabase
               .from("parque_maquinas")
-              .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo"),
+              .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(
             supabase
               .from("clientes")
-              .select("id, nombre, sucursal")
+              .select("id, nombre, sucursal, ruc, region, direccion, localidad, correo_principal, cod_entidad, activo")
               .order("nombre", { ascending: true }),
           ),
         ]);
@@ -189,9 +200,18 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
     const data = ordenadas.map((m) => {
       const activa = m.activo !== false;
+      const cli = m.cliente_id ? cliById.get(m.cliente_id) : null;
 
       return {
-        Cliente: m.cliente_id ? cliById.get(m.cliente_id)?.nombre ?? "" : "",
+        Cliente: cli?.nombre ?? "",
+        "Cod. Entidad": cli?.cod_entidad ?? "",
+        RUC: cli?.ruc ?? "",
+        "Sucursal Cliente": cli?.sucursal ?? "",
+        Region: cli?.region ?? "",
+        "Direccion Cliente": cli?.direccion ?? "",
+        "Localidad Cliente": cli?.localidad ?? "",
+        "Correo Cliente": cli?.correo_principal ?? "",
+        "Cliente Activo": cli ? (cli.activo === false ? "No" : "Si") : "",
         Sucursal: m.sucursal ?? "",
         Localidad: m.localidad ?? "",
         Marca: m.marca,
@@ -202,6 +222,12 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         Serie: m.serie,
         Vendedor: m.vendedor ?? "",
         Estado: activa ? "Activa" : "Inactiva",
+        "Agregado Manualmente": m.agregado_manualmente ? "Si" : "No",
+        Notas: m.notas ?? "",
+        "Creado en": m.creado_en ?? "",
+        "Actualizado en": m.actualizado_en ?? "",
+        "ID Maquina": m.id,
+        "ID Cliente": m.cliente_id ?? "",
       };
     });
 
