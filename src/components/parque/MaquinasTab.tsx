@@ -264,11 +264,11 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[140px]"
-          options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
-          options={[{ value: "all", label: "Todas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+          options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[170px]"
@@ -285,7 +285,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           options={[
             { value: "activa", label: "Activas" },
             { value: "inactiva", label: "Inactivas" },
-            { value: "all", label: "Todas" },
+            { value: "all", label: "Todos" },
           ]}
         />
       </FiltersBar>
@@ -378,3 +378,5 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
     </div>
   );
 }
+
+

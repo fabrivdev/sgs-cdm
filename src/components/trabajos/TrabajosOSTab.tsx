@@ -234,15 +234,15 @@ export function TrabajosOSTab({
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Sit. OS" value={fSitOs} onChange={setFSitOs} placeholder="Situación OS" width="w-[150px]"
-          options={[{ value: "all", label: "Todas" }, ...sitOsOpts.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...sitOsOpts.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Sit. Fact." value={fSitFac} onChange={setFSitFac} placeholder="Sit. Fact." width="w-[150px]"
-          options={[{ value: "all", label: "Todas" }, ...sitFacOpts.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...sitFacOpts.map(s => ({ value: s, label: s }))]}
         />
         <FilterDate label="Desde" value={fDesde} onChange={setFDesde} title="Fecha apertura OS desde" />
         <FilterDate label="Hasta" value={fHasta} onChange={setFHasta} title="Fecha apertura OS hasta" />
@@ -357,3 +357,5 @@ export function TrabajosOSTab({
     </div>
   );
 }
+
+

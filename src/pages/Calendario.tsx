@@ -430,7 +430,7 @@ export default function Calendario() {
           placeholder="Técnico"
           width="w-[180px]"
           options={[
-            { value: "all", label: "Todos los técnicos" },
+            { value: "all", label: "Todos" },
             ...profiles.filter(p => !adminCabecillaIds.has(p.id)).map(p => ({ value: p.id, label: p.nombre })),
           ]}
         />
@@ -913,3 +913,5 @@ export default function Calendario() {
     </div>
   );
 }
+
+

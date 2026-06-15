@@ -637,15 +637,15 @@ export function ParqueTab({
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
-          options={[{ value: "all", label: "Todas las marcas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+          options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"
-          options={[{ value: "all", label: "Todos los subgrupos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Seguimiento" value={fSeguimiento} onChange={setFSeguimiento} placeholder="Seguimiento" width="w-[170px]"
@@ -921,3 +921,4 @@ export function ParqueTab({
     </div>
   );
 }
+

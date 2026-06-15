@@ -21,7 +21,7 @@ export function FilterMultiSelect({
   values,
   onChange,
   options,
-  placeholder = "Todas",
+  placeholder = "Todos",
   width = "w-[150px]",
 }: {
   label?: string;
@@ -69,7 +69,7 @@ export function FilterMultiSelect({
               onClick={() => onChange([])}
               className="text-[11px] text-muted-foreground hover:text-foreground"
             >
-              Todas
+              Todos
             </button>
             {values.length > 0 && (
               <button
@@ -109,3 +109,4 @@ export function matchesMulti(values: string[], target: string | null | undefined
   if (values.length === 0) return true;
   return target != null && values.includes(target);
 }
+

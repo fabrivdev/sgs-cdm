@@ -184,15 +184,15 @@ export default function Trabajos() {
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Prioridad" value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-[130px]"
-          options={[{ value: "all", label: "Toda prioridad" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]}
+          options={[{ value: "all", label: "Todos" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]}
         />
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
-          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
+          options={[{ value: "all", label: "Todos" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
         />
         <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" />
       </FiltersBar>
@@ -373,3 +373,4 @@ export default function Trabajos() {
     </div>
   );
 }
+

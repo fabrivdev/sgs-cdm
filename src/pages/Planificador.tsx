@@ -436,21 +436,21 @@ export default function Planificador() {
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todas las sucursales" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Técnico" value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
-          options={[{ value: "all", label: "Todos los técnicos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
+          options={[{ value: "all", label: "Todos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
         />
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
-          options={[{ value: "all", label: "Todas las marcas" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+          options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
         />
         <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
-          options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
+          options={[{ value: "all", label: "Todos" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
         />
-        <FilterCustom label="Semana" width="w-[210px]">
+        <FilterCustom label="Semana" width="w-[230px]">
           <div className="flex h-9 overflow-hidden rounded-md border bg-background">
             <Button
               type="button"
@@ -468,10 +468,10 @@ export default function Planificador() {
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="max-h-[280px] min-w-[--radix-select-trigger-width]">
-                <SelectItem value="all">Toda semana</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 {semanasSelector.map((s) => (
                   <SelectItem key={s} value={String(s)}>
-                    Semana {s}{String(s) === currentWeek ? " · actual" : ""}
+                    Semana {s}{String(s) === currentWeek ? " (actual)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -708,3 +708,5 @@ export default function Planificador() {
     </div>
   );
 }
+
+

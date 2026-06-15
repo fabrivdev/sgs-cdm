@@ -504,7 +504,7 @@ export function AgendaTab({
               <SelectValue placeholder="Sucursal" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas las sucursales</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {SUCURSALES.map((sucursal) => (
                 <SelectItem key={sucursal} value={sucursal}>
                   {sucursal}
@@ -622,7 +622,7 @@ export function AgendaTab({
               <SelectValue placeholder="Resultado" />
             </SelectTrigger>
             <SelectContent className="max-w-[calc(100vw-2rem)]">
-              <SelectItem value="all">Todos los resultados</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {RESULTADOS.map((r) => (
                 <SelectItem key={r} value={r} className="max-w-[calc(100vw-3rem)] truncate">
                   {r}
@@ -719,3 +719,4 @@ function AgendaMetricCard({
     </Card>
   );
 }
+

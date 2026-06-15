@@ -1594,7 +1594,7 @@ export default function Dashboard() {
           label="Sucursal"
           values={fSucursales}
           onChange={setFSucursales}
-          placeholder="Todas"
+          placeholder="Todos"
           width="w-[170px]"
           options={SUCURSALES.map((s) => ({ value: s, label: s }))}
         />
@@ -1602,7 +1602,7 @@ export default function Dashboard() {
           label="Marca"
           values={fMarcas}
           onChange={setFMarcas}
-          placeholder="Todas"
+          placeholder="Todos"
           width="w-[170px]"
           options={MARCAS.map((m) => ({ value: m, label: m }))}
         />
@@ -1764,14 +1764,14 @@ export default function Dashboard() {
                             <SelectItem value="4">Ultimas 4 semanas</SelectItem>
                             <SelectItem value="8">Ultimas 8 semanas</SelectItem>
                             <SelectItem value="12">Ultimas 12 semanas</SelectItem>
-                            <SelectItem value="all">Todas las semanas</SelectItem>
+                            <SelectItem value="all">Todos</SelectItem>
                           </>
                         ) : (
                           <>
                             <SelectItem value="6">Ultimos 6 meses</SelectItem>
                             <SelectItem value="12">Ultimos 12 meses</SelectItem>
                             <SelectItem value="24">Ultimos 24 meses</SelectItem>
-                            <SelectItem value="all">Todos los meses</SelectItem>
+                            <SelectItem value="all">Todos</SelectItem>
                           </>
                         )}
                       </SelectContent>
@@ -1992,14 +1992,14 @@ export default function Dashboard() {
                           <SelectItem value="4">Ultimas 4 semanas</SelectItem>
                           <SelectItem value="8">Ultimas 8 semanas</SelectItem>
                           <SelectItem value="12">Ultimas 12 semanas</SelectItem>
-                          <SelectItem value="all">Todas las semanas</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
                         </>
                       ) : (
                         <>
                           <SelectItem value="6">Ultimos 6 meses</SelectItem>
                           <SelectItem value="12">Ultimos 12 meses</SelectItem>
                           <SelectItem value="24">Ultimos 24 meses</SelectItem>
-                          <SelectItem value="all">Todos los meses</SelectItem>
+                          <SelectItem value="all">Todos</SelectItem>
                         </>
                       )}
                     </SelectContent>
@@ -3934,5 +3934,7 @@ function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; currentK
     </div>
   );
 }
+
+
 
 
