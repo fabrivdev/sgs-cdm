@@ -9,6 +9,7 @@ import {
   LogOut,
   Wrench,
   Tractor,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,13 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
       ? [{ to: "/parque-clientes", label: "Parque", icon: Tractor, end: false }]
       : []),
   ];
+  const mobilePrimaryItems = isAdmin
+    ? navItems.filter((it) => ["/", "/trabajos", "/dashboard"].includes(it.to))
+    : navItems.slice(0, 3);
+  const mobileOverflowItems = navItems.filter((it) => !mobilePrimaryItems.some((primary) => primary.to === it.to));
+  const isItemActive = (it: { to: string; end?: boolean }) =>
+    it.end ? location.pathname === it.to : location.pathname.startsWith(it.to);
+  const overflowActive = mobileOverflowItems.some(isItemActive);
 
   const initials = (profile?.nombre ?? "?")
     .split(" ")
@@ -142,10 +150,9 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
       {/* Bottom nav (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:hidden">
-        <div className="grid grid-cols-5 px-1 pb-[env(safe-area-inset-bottom)]">
-          {navItems.map((it) => {
-            const active =
-              it.end ? location.pathname === it.to : location.pathname.startsWith(it.to);
+        <div className="grid grid-cols-4 px-1 pb-[env(safe-area-inset-bottom)]">
+          {mobilePrimaryItems.map((it) => {
+            const active = isItemActive(it);
             return (
               <NavLink
                 key={it.to}
@@ -160,6 +167,38 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               </NavLink>
             );
           })}
+          {mobileOverflowItems.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium",
+                    overflowActive ? "text-primary" : "text-muted-foreground",
+                  )}
+                  aria-label="Mas paginas"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                  <span className="max-w-full truncate">Mas</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" className="mb-2 w-48">
+                {mobileOverflowItems.map((it) => {
+                  const active = isItemActive(it);
+                  return (
+                    <DropdownMenuItem
+                      key={it.to}
+                      onClick={() => navigate(it.to)}
+                      className={cn("gap-2", active && "bg-accent font-medium text-primary")}
+                    >
+                      <it.icon className="h-4 w-4" />
+                      {it.label}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </nav>
     </div>

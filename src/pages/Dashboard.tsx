@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart3,
@@ -18,7 +17,6 @@ import {
   DollarSign,
   FileText,
   Activity,
-  MoreHorizontal,
   PieChart,
   Receipt,
   Truck,
@@ -1735,32 +1733,13 @@ export default function Dashboard() {
 
 
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-        <div className="flex items-center gap-1 sm:block">
-          <TabsList className="grid h-auto flex-1 grid-cols-3 sm:inline-grid sm:w-fit sm:flex-none sm:grid-cols-4">
-            <TabsTrigger value="resumen" className="whitespace-nowrap px-2 text-xs sm:px-3 sm:text-sm">Vista general</TabsTrigger>
-            <TabsTrigger value="facturacion" className="whitespace-nowrap px-2 text-xs sm:px-3 sm:text-sm">Facturacion</TabsTrigger>
-            <TabsTrigger value="trabajos" className="whitespace-nowrap px-2 text-xs sm:px-3 sm:text-sm">Trabajos</TabsTrigger>
-            <TabsTrigger value="os" className="hidden whitespace-nowrap sm:inline-flex">OS absorbidas</TabsTrigger>
-          </TabsList>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex h-9 w-10 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm sm:hidden",
-                  section === "os" && "border-primary bg-primary text-primary-foreground",
-                )}
-                aria-label="Mas secciones"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44 sm:hidden">
-              <DropdownMenuItem onClick={() => goSection("os")} className={cn(section === "os" && "bg-accent font-medium")}>
-                OS absorbidas
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+        <TabsList className="inline-flex h-auto min-w-max sm:grid sm:w-fit sm:grid-cols-4">
+          <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
+          <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturacion</TabsTrigger>
+          <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
+          <TabsTrigger value="os" className="whitespace-nowrap">OS absorbidas</TabsTrigger>
+        </TabsList>
         </div>
 
         <TabsContent value="resumen" className="space-y-3">
