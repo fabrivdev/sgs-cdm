@@ -1,0 +1,10 @@
+{
+  "name": "Servicios Tecnicos CDM",
+  "short_name": "SGS CDM",
+  "description": "Planificador operativo de servicios tecnicos CDM.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8faf7",
+  "theme_color": "#86a536",
+  "icons": []
+}

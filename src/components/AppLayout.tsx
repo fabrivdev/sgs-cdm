@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUnseen } from "@/hooks/useUnseen";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { cn } from "@/lib/utils";
 
 const baseItems = [
@@ -35,6 +36,7 @@ const baseItems = [
 export function AppLayout({ children }: { children?: React.ReactNode }) {
   const { profile, isAdmin, isCabecilla, signOut, roles } = useAuth();
   const unseen = useUnseen();
+  const online = useOnlineStatus();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -138,11 +140,17 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         </div>
       </header>
 
+      {!online && (
+        <div className="sticky top-[52px] z-30 border-b border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs font-medium text-amber-900 sm:top-14">
+          Sin conexion. Los datos pueden no estar actualizados.
+        </div>
+      )}
+
       <main className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">{children ?? <Outlet />}</main>
 
       {/* Bottom nav (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:hidden">
-        <div className="flex overflow-x-auto px-1 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="grid grid-cols-5 px-1 pb-[env(safe-area-inset-bottom)]">
           {navItems.map((it) => {
             const active =
               it.end ? location.pathname === it.to : location.pathname.startsWith(it.to);
@@ -151,7 +159,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                 key={it.to}
                 to={it.to}
                 className={cn(
-                  "flex min-w-[72px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium",
+                  "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >

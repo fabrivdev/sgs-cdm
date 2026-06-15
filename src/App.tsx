@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Auth from "./pages/Auth";
 import Planificador from "./pages/Planificador";
 import Calendario from "./pages/Calendario";
@@ -19,56 +20,58 @@ import NotFound from "./pages/NotFound.tsx";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<Planificador />} />
-              <Route path="/trabajos" element={<Trabajos />} />
-              <Route path="/calendario" element={<Calendario />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
               <Route
-                path="/dashboard"
                 element={
-                  <ProtectedRoute requireRoles={["admin"]}>
-                    <Dashboard />
+                  <ProtectedRoute>
+                    <AppLayout />
                   </ProtectedRoute>
                 }
-              />
-              <Route path="/historial" element={<Historial />} />
-              <Route
-                path="/parque-clientes"
-                element={
-                  <ProtectedRoute requireRoles={["admin"]}>
-                    <ParqueClientes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requireRoles={["admin"]}>
-                    <Admin />
-                  </ProtectedRoute>
-                }
-              />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+              >
+                <Route path="/" element={<Planificador />} />
+                <Route path="/trabajos" element={<Trabajos />} />
+                <Route path="/calendario" element={<Calendario />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute requireRoles={["admin"]}>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/historial" element={<Historial />} />
+                <Route
+                  path="/parque-clientes"
+                  element={
+                    <ProtectedRoute requireRoles={["admin"]}>
+                      <ParqueClientes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requireRoles={["admin"]}>
+                      <Admin />
+                    </ProtectedRoute>
+                  }
+                />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
