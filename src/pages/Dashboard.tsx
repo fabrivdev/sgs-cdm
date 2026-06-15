@@ -1674,7 +1674,7 @@ export default function Dashboard() {
         )}
       </FiltersBar>
 
-      <section className="grid auto-rows-fr grid-cols-1 gap-2 min-[430px]:grid-cols-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
           title="Facturación del período"
@@ -2230,24 +2230,24 @@ function SummaryCard({
 }) {
   return (
     <button className="h-full rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("flex h-full min-h-[96px] flex-col gap-1.5 p-2.5 transition-colors hover:bg-accent/50 sm:min-h-[128px] sm:gap-2 sm:p-3", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
-        <div className="flex items-start justify-between gap-3">
+      <Card className={cn("flex h-full min-h-[78px] flex-col gap-1 p-2 transition-colors hover:bg-accent/50 sm:min-h-[128px] sm:gap-2 sm:p-3", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
-            <div className="mt-0.5 truncate text-xl font-bold tabular-nums sm:mt-1 sm:text-2xl">{value}</div>
+            <div className="truncate text-[9px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[10px]">{title}</div>
+            <div className="mt-0.5 truncate text-lg font-bold leading-tight tabular-nums sm:mt-1 sm:text-2xl">{value}</div>
             {trend !== undefined && trend !== null && trend.value !== null ? (
-              <div className={cn("mt-1 truncate text-[11px] font-medium tabular-nums", trend.value >= 0 ? "text-emerald-600" : "text-destructive")}>
+              <div className={cn("mt-0.5 truncate text-[10px] font-medium tabular-nums sm:mt-1 sm:text-[11px]", trend.value >= 0 ? "text-emerald-600" : "text-destructive")}>
                 {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.suffix ?? "vs período anterior"}
               </div>
             ) : null}
-            {detail ? <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div> : null}
+            {detail ? <div className="mt-0.5 truncate text-[10px] text-muted-foreground sm:mt-1 sm:text-[11px]">{detail}</div> : null}
           </div>
-          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", toneClasses[tone])}>
-            <Icon className="h-4 w-4" />
+          <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8", toneClasses[tone])}>
+            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </div>
         </div>
         {children ? <div className="mt-auto">{children}</div> : null}
-        {footer ? <div className="truncate text-[11px] text-muted-foreground">{footer}</div> : null}
+        {footer ? <div className="truncate text-[10px] text-muted-foreground sm:text-[11px]">{footer}</div> : null}
       </Card>
     </button>
   );
@@ -2270,7 +2270,7 @@ function FactPeriodsMobile({
   }
 
   return (
-    <div className="space-y-2 md:hidden">
+    <div className="grid grid-cols-2 gap-2 md:hidden">
       {visible.map((row) => {
         const active = row.key === selectedKey;
         const trend = row.variacion;
@@ -2280,29 +2280,23 @@ function FactPeriodsMobile({
             type="button"
             onClick={() => onSelect(row.key)}
             className={cn(
-              "w-full rounded-md border bg-background p-3 text-left shadow-sm",
+              "w-full rounded-md border bg-background p-2 text-left shadow-sm",
               active && "border-primary bg-primary/5",
             )}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex min-h-[58px] flex-col justify-between gap-1">
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{row.label}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                <div className="truncate text-xs font-semibold">{row.label}</div>
+                <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
                   {row.facturas} facturas · {row.clientes} clientes
                 </div>
               </div>
-              <div className="shrink-0 text-right">
-                <div className="text-base font-bold tabular-nums">{money(row.total)}</div>
+              <div>
+                <div className="truncate text-sm font-bold tabular-nums">{money(row.total)}</div>
                 <div className={cn("text-[11px] tabular-nums", trend != null && trend < 0 ? "text-destructive" : "text-primary")}>
                   {trend == null ? "sin base" : `${trend > 0 ? "+" : ""}${trend}%`}
                 </div>
               </div>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] min-[420px]:grid-cols-4">
-              <MiniMetric label="Rep." value={money(row.repuestos)} />
-              <MiniMetric label="Serv." value={money(row.servicio)} />
-              <MiniMetric label="Km" value={money(row.kilometraje)} />
-              <MiniMetric label="Otros" value={money(row.otros)} />
             </div>
           </button>
         );
@@ -2311,7 +2305,7 @@ function FactPeriodsMobile({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+          className="col-span-2 w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
         >
           {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
         </button>
@@ -2335,21 +2329,21 @@ function FacturasMobile({
   }
 
   return (
-    <div className="space-y-2 md:hidden">
+    <div className="space-y-1.5 md:hidden">
       {source.map((row, index) => (
-        <div key={`${row.cod_factura}-${index}`} className="rounded-md border bg-background p-3 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+        <div key={`${row.cod_factura}-${index}`} className="rounded-md border bg-background px-2.5 py-2 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">{row.entidad_nombre || "Sin cliente"}</div>
+              <div className="truncate text-xs font-semibold">{row.entidad_nombre || "Sin cliente"}</div>
               <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.cod_factura}</div>
             </div>
-            <div className="shrink-0 text-right text-base font-bold tabular-nums">{money(Number(row.total_venta || 0))}</div>
+            <div className="shrink-0 text-right text-sm font-bold tabular-nums">{money(Number(row.total_venta || 0))}</div>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
-            <MiniMetric label="Fecha" value={format(parseISO(row.fecha), "dd/MM")} />
-            <MiniMetric label="Concepto" value={concept(row)} />
-            <MiniMetric label="Sucursal" value={row.sucursal ?? "-"} />
-            <MiniMetric label="Tipo" value={row.tipo_tiempo ?? "-"} />
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+            <span>{format(parseISO(row.fecha), "dd/MM")}</span>
+            <span>{concept(row)}</span>
+            <span>{row.sucursal ?? "-"}</span>
+            <span>{row.tipo_tiempo ?? "-"}</span>
           </div>
         </div>
       ))}
@@ -2853,29 +2847,27 @@ function OSDetalle({
 
     return (
       <>
-      <div className="space-y-2 md:hidden">
+      <div className="grid grid-cols-2 gap-2 md:hidden">
         {grouped.slice(0, 5).map((row) => (
           <button
             key={row.cliente}
             type="button"
             onClick={() => onSelect(row.cliente)}
-            className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+            className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{row.cliente}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">{row.os.size} OS - {Array.from(row.sucursales).join(", ") || "Sin sucursal"}</div>
-              </div>
-              <div className="shrink-0 text-right text-base font-bold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
+            <div className="min-w-0">
+              <div className="truncate text-xs font-semibold">{row.cliente}</div>
+              <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{row.os.size} OS - {Array.from(row.sucursales).join(", ") || "Sin sucursal"}</div>
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
-              <MiniMetric label="Servicio" value={money(row.servicios)} />
-              <MiniMetric label="Rep." value={money(row.repuestos)} />
-              <MiniMetric label="Km" value={money(row.kilometraje)} />
+            <div className="mt-1 text-sm font-bold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+              <span>Serv. {money(row.servicios)}</span>
+              <span>Rep. {money(row.repuestos)}</span>
+              <span>Km {money(row.kilometraje)}</span>
             </div>
           </button>
         ))}
-        {grouped.length > 5 && <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">Mostrando 5 de {grouped.length} clientes</div>}
+        {grouped.length > 5 && <div className="col-span-2 rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">Mostrando 5 de {grouped.length} clientes</div>}
       </div>
       <div className="hidden overflow-hidden rounded-md border md:block">
         <div className="grid grid-cols-[minmax(0,1fr)_72px_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]">
@@ -2915,26 +2907,25 @@ function OSDetalle({
   const visible = rows.slice().sort((a, b) => b.total - a.total).slice(0, 10);
   return (
     <>
-    <div className="space-y-2 md:hidden">
+    <div className="space-y-1.5 md:hidden">
       {visible.slice(0, 5).map((row) => (
         <button
           key={`${row.os}-${row.fecha}`}
           type="button"
           onClick={() => onSelect(row.os)}
-          className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+          className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
         >
-          <div className="mb-1 flex items-start justify-between gap-3">
+          <div className="mb-1 flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <div className="font-mono text-[11px] font-semibold text-muted-foreground">{row.os}</div>
-              <div className="truncate text-sm font-semibold">{row.cliente}</div>
+              <div className="font-mono text-[10px] font-semibold text-muted-foreground">{row.os}</div>
+              <div className="truncate text-xs font-semibold">{row.cliente}</div>
             </div>
             <Badge variant="secondary" className="shrink-0 text-[10px]">{row.tipo}</Badge>
           </div>
-          <div className="line-clamp-2 text-xs text-muted-foreground">{row.problema}</div>
-          <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
-            <MiniMetric label="Impacto" value={formatOSMetric(osMetricValue(row, metric), metric)} />
-            <MiniMetric label="Fecha" value={format(parseISO(row.fecha), "dd/MM")} />
-            <MiniMetric label="Sucursal" value={row.sucursal ?? "-"} />
+          <div className="line-clamp-2 text-[11px] text-muted-foreground">{row.problema}</div>
+          <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+            <span className="truncate">{format(parseISO(row.fecha), "dd/MM")} - {row.sucursal ?? "-"}</span>
+            <span className="shrink-0 font-semibold tabular-nums text-foreground">{formatOSMetric(osMetricValue(row, metric), metric)}</span>
           </div>
         </button>
       ))}
@@ -3526,30 +3517,30 @@ function CargaSucursalTabla({
   }
   return (
     <>
-    <div className="space-y-2 md:hidden">
+    <div className="grid grid-cols-2 gap-2 md:hidden">
       {rows.slice(0, 5).map((r) => (
         <button
           key={r.sucursal}
           type="button"
           onClick={() => onSelect(r.sucursal)}
-          className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+          className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="truncate text-sm font-semibold">{r.sucursal}</div>
-            <div className="shrink-0 text-base font-bold tabular-nums">{r.total}</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="truncate text-xs font-semibold">{r.sucursal}</div>
+            <div className="shrink-0 text-sm font-bold tabular-nums">{r.total}</div>
           </div>
-          <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-            <MiniMetric label="Cerrados" value={r.cerrados} />
-            <MiniMetric label="Abiertos" value={r.abiertos} />
-            <MiniMetric label="Pausados" value={r.pausados} />
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+            <span>Cerr. {r.cerrados}</span>
+            <span>Ab. {r.abiertos}</span>
+            <span>Paus. {r.pausados}</span>
           </div>
-          <div className="mt-2 h-2 rounded-full bg-muted">
+          <div className="mt-1.5 h-1.5 rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, r.pct)}%` }} />
           </div>
         </button>
       ))}
       {rows.length > 5 && (
-        <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">
+        <div className="col-span-2 rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">
           Mostrando 5 de {rows.length} sucursales
         </div>
       )}
@@ -3725,27 +3716,24 @@ function CargaTecnicaMatriz({
         <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>
       ) : (
         <>
-          <div className="space-y-2 md:hidden">
+          <div className="grid grid-cols-2 gap-2 md:hidden">
             {visible.map((r) => {
               const total = metrica === "horas" ? r.totalHoras : r.totalJornadas;
               return (
                 <button
                   key={r.id}
                   onClick={onClick}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-left"
+                  className="w-full rounded-md border bg-background px-2.5 py-2 text-left"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 truncate text-xs font-semibold">{r.nombre}</div>
+                    <div className="min-w-0 truncate text-[11px] font-semibold">{r.nombre}</div>
                     <div className="shrink-0 text-sm font-bold tabular-nums">
                       {metrica === "horas" ? `${total.toFixed(1)} hs` : `${total} serv.`}
                     </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    {buckets.slice(0, 6).map((k) => (
-                      <div key={k} className="rounded bg-muted/50 px-2 py-1 text-[10px]">
-                        <div className="truncate text-muted-foreground">{bucketLabel(k)}</div>
-                        <div className="font-semibold tabular-nums">{fmt(getVal(r.porBucket[k]))}</div>
-                      </div>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                    {buckets.slice(0, 3).map((k) => (
+                      <span key={k}>{bucketLabel(k)} {fmt(getVal(r.porBucket[k]))}</span>
                     ))}
                   </div>
                 </button>
@@ -3836,7 +3824,7 @@ function ClientesCompacto({
       <div className="mb-2 text-[11px] text-muted-foreground">
         {totalClientes} clientes · {totalFacturas} facturas · Top 5 concentra {pctTop5}%
       </div>
-      <div className="space-y-2 md:hidden">
+      <div className="grid grid-cols-2 gap-2 md:hidden">
         {visible.map((r) => {
           const pct = totalValue > 0 ? Math.round((r.total / totalValue) * 100) : 0;
           return (
@@ -3844,15 +3832,13 @@ function ClientesCompacto({
               key={r.nombre}
               type="button"
               onClick={() => onSelect(r.nombre)}
-              className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+              className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{r.nombre}</div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">{r.facturas} facturas - {pct}%</div>
-                </div>
-                <div className="shrink-0 text-right text-base font-bold tabular-nums">{money(r.total)}</div>
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold">{r.nombre}</div>
+                <div className="mt-0.5 text-[10px] text-muted-foreground">{r.facturas} facturas - {pct}%</div>
               </div>
+              <div className="mt-1 truncate text-sm font-bold tabular-nums">{money(r.total)}</div>
             </button>
           );
         })}
