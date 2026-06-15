@@ -11,10 +11,11 @@ import { ESTADOS, ESTADO_LABELS, MARCAS, SUCURSALES, type Estado, type Marca, ty
 import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
-import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
-import { CalendarPlus, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
@@ -264,6 +265,27 @@ export default function Planificador() {
     () => Array.from(new Set(servicios.map((s) => s.semana))).sort((a, b) => a - b),
     [servicios],
   );
+  const semanasSelector = useMemo(() => {
+    const current = Number(currentWeek);
+    const selected = Number(fSemana);
+    const set = new Set<number>();
+
+    for (let week = Math.max(1, current - 6); week <= Math.min(53, current + 8); week++) {
+      set.add(week);
+    }
+    if (Number.isFinite(selected) && selected >= 1 && selected <= 53) set.add(selected);
+    for (const week of semanasDisponibles) {
+      if (Math.abs(week - current) <= 8) set.add(week);
+    }
+
+    return Array.from(set).sort((a, b) => a - b);
+  }, [currentWeek, fSemana, semanasDisponibles]);
+
+  const moverSemana = (delta: number) => {
+    const base = fSemana === "all" ? Number(currentWeek) : Number(fSemana);
+    const next = Math.max(1, Math.min(53, (Number.isFinite(base) ? base : Number(currentWeek)) + delta));
+    setFSemana(String(next));
+  };
 
   const filtered = useMemo(() => {
     const q = fCliente.trim().toLowerCase();
@@ -428,10 +450,45 @@ export default function Planificador() {
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todo estado" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
         />
-        <FilterSelect
-          label="Semana" value={fSemana} onChange={setFSemana} placeholder="Semana" width="w-[130px]"
-          options={[{ value: "all", label: "Toda semana" }, ...semanasDisponibles.map(s => ({ value: String(s), label: `Semana ${s}` }))]}
-        />
+        <FilterCustom label="Semana" width="w-[210px]">
+          <div className="flex h-9 overflow-hidden rounded-md border bg-background">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-none border-r"
+              onClick={() => moverSemana(-1)}
+              disabled={fSemana !== "all" && Number(fSemana) <= 1}
+              title="Semana anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Select value={fSemana} onValueChange={setFSemana}>
+              <SelectTrigger className="h-9 min-w-0 flex-1 rounded-none border-0 px-2 text-xs shadow-none focus:ring-0">
+                <SelectValue placeholder="Semana" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[280px] min-w-[--radix-select-trigger-width]">
+                <SelectItem value="all">Toda semana</SelectItem>
+                {semanasSelector.map((s) => (
+                  <SelectItem key={s} value={String(s)}>
+                    Semana {s}{String(s) === currentWeek ? " · actual" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-none border-l"
+              onClick={() => moverSemana(1)}
+              disabled={fSemana !== "all" && Number(fSemana) >= 53}
+              title="Semana siguiente"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </FilterCustom>
       </FiltersBar>
 
 
