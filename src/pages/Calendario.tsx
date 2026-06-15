@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { CalendarOff, ChevronLeft, ChevronRight, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw, Trash2 } from "lucide-react";
 import {
   format,
   addMonths,
@@ -346,6 +346,17 @@ export default function Calendario() {
       setDiasNL(next);
       toast.success("Día marcado como No laboral");
     }
+  };
+
+  const quitarDisponibilidad = async (disp: DisponibilidadTecnico) => {
+    if (!canCreate) return;
+    const { error } = await supabase.from("tecnico_disponibilidad").delete().eq("id", disp.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setDisponibilidades((current) => current.filter((row) => row.id !== disp.id));
+    toast.success("Tecnico quitado de la no disponibilidad");
   };
 
   const dominantColor = (evs: Servicio[]) => {
@@ -826,9 +837,23 @@ export default function Calendario() {
                         <GraduationCap className="h-4 w-4 shrink-0" />
                         <span className="truncate text-sm font-medium">{profById[disp.tecnico_id] ?? "Tecnico"}</span>
                       </div>
-                      <Badge variant="outline" className="border-sky-200 bg-white text-sky-800">
-                        {disponibilidadLabel(disp.tipo)}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Badge variant="outline" className="border-sky-200 bg-white text-sky-800">
+                          {disponibilidadLabel(disp.tipo)}
+                        </Badge>
+                        {canCreate && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-sky-800 hover:bg-sky-100 hover:text-destructive"
+                            title="Quitar tecnico de esta no disponibilidad"
+                            onClick={() => quitarDisponibilidad(disp)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     {disp.observacion && (
                       <p className="mt-1 text-xs text-sky-800">{disp.observacion}</p>
