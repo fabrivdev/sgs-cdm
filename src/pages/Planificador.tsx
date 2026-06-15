@@ -303,7 +303,8 @@ export default function Planificador() {
   const canCreate = isAdmin || isCabecilla;
 
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
+    const XLSX = await import("xlsx");
     const rows = displayed.map((s) => {
       const cli = s.cliente_id ? cliById[s.cliente_id] : null;
       const ref = refByServicio.get(s.id);
