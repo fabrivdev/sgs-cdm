@@ -431,6 +431,7 @@ export default function Dashboard() {
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
+  const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const filtrosOSActivos = section === "os";
@@ -1574,7 +1575,7 @@ export default function Dashboard() {
     (q.trim() ? 1 : 0);
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 py-3 sm:px-4 sm:py-4">
+    <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
       <div className="space-y-2.5 sm:space-y-3">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard ejecutivo</h1>
@@ -1673,7 +1674,7 @@ export default function Dashboard() {
         )}
       </FiltersBar>
 
-      <section className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid auto-rows-fr grid-cols-1 gap-2 min-[430px]:grid-cols-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           icon={DollarSign}
           title="Facturación del período"
@@ -1732,12 +1733,14 @@ export default function Dashboard() {
 
 
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-        <TabsList className="grid h-auto w-full grid-cols-4 sm:w-fit">
-          <TabsTrigger value="resumen">Vista general</TabsTrigger>
-          <TabsTrigger value="facturacion">Facturacion</TabsTrigger>
-          <TabsTrigger value="trabajos">Trabajos</TabsTrigger>
-          <TabsTrigger value="os">OS absorbidas</TabsTrigger>
+        <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+        <TabsList className="inline-flex h-auto min-w-max sm:grid sm:w-fit sm:grid-cols-4">
+          <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
+          <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturacion</TabsTrigger>
+          <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
+          <TabsTrigger value="os" className="whitespace-nowrap">OS absorbidas</TabsTrigger>
         </TabsList>
+        </div>
 
         <TabsContent value="resumen" className="space-y-3">
 
@@ -1880,7 +1883,12 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="rounded-md border">
+            <FactPeriodsMobile
+              rows={weeklyRows}
+              selectedKey={selectedWeek?.key}
+              onSelect={setSelectedWeekKey}
+            />
+            <div className="hidden rounded-md border md:block">
               <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                 <div>{T.columnaPeriodo}</div>
                 <div className="text-right">{factMetricLabel("usd")}</div>
@@ -1933,7 +1941,8 @@ export default function Dashboard() {
               </div>
               <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
             </div>
-            <div className="max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border">
+            <FacturasMobile rows={selectedFacts} visibleRows={visibleSelectedFacts} />
+            <div className="hidden max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border md:block">
               <div className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                 <div>Fecha</div>
                 <div className="hidden md:block">Factura</div>
@@ -2063,7 +2072,8 @@ export default function Dashboard() {
               {trabajosResumen.length === 0 ? (
                 <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin trabajos para los filtros actuales.</div>
               ) : (
-                trabajosResumen.slice(0, 40).map((row) => (
+                <>
+                {(showAllMobileTrabajos ? trabajosResumen : trabajosResumen.slice(0, 5)).map((row) => (
                   <button
                     key={row.id}
                     onClick={() => navigate(`/trabajos?q=${encodeURIComponent(row.ref)}`)}
@@ -2106,7 +2116,17 @@ export default function Dashboard() {
                       </span>
                     </div>
                   </button>
-                ))
+                ))}
+                {trabajosResumen.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllMobileTrabajos((v) => !v)}
+                    className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+                  >
+                    {showAllMobileTrabajos ? "Ver menos" : `Ver todos (${trabajosResumen.length})`}
+                  </button>
+                )}
+                </>
               )}
             </div>
             <div className="hidden overflow-x-auto rounded-md border md:block">
@@ -2210,7 +2230,7 @@ function SummaryCard({
 }) {
   return (
     <button className="h-full rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("flex h-full min-h-[104px] flex-col gap-1.5 p-2.5 transition-colors hover:bg-accent/50 sm:min-h-[128px] sm:gap-2 sm:p-3", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+      <Card className={cn("flex h-full min-h-[96px] flex-col gap-1.5 p-2.5 transition-colors hover:bg-accent/50 sm:min-h-[128px] sm:gap-2 sm:p-3", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
@@ -2230,6 +2250,128 @@ function SummaryCard({
         {footer ? <div className="truncate text-[11px] text-muted-foreground">{footer}</div> : null}
       </Card>
     </button>
+  );
+}
+
+function FactPeriodsMobile({
+  rows,
+  selectedKey,
+  onSelect,
+}: {
+  rows: WeekRow[];
+  selectedKey?: string;
+  onSelect: (key: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? rows : rows.slice(-5);
+
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground md:hidden">Sin facturacion.</div>;
+  }
+
+  return (
+    <div className="space-y-2 md:hidden">
+      {visible.map((row) => {
+        const active = row.key === selectedKey;
+        const trend = row.variacion;
+        return (
+          <button
+            key={row.key}
+            type="button"
+            onClick={() => onSelect(row.key)}
+            className={cn(
+              "w-full rounded-md border bg-background p-3 text-left shadow-sm",
+              active && "border-primary bg-primary/5",
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">{row.label}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {row.facturas} facturas · {row.clientes} clientes
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="text-base font-bold tabular-nums">{money(row.total)}</div>
+                <div className={cn("text-[11px] tabular-nums", trend != null && trend < 0 ? "text-destructive" : "text-primary")}>
+                  {trend == null ? "sin base" : `${trend > 0 ? "+" : ""}${trend}%`}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] min-[420px]:grid-cols-4">
+              <MiniMetric label="Rep." value={money(row.repuestos)} />
+              <MiniMetric label="Serv." value={money(row.servicio)} />
+              <MiniMetric label="Km" value={money(row.kilometraje)} />
+              <MiniMetric label="Otros" value={money(row.otros)} />
+            </div>
+          </button>
+        );
+      })}
+      {rows.length > 5 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+        >
+          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FacturasMobile({
+  rows,
+  visibleRows,
+}: {
+  rows: Facturacion[];
+  visibleRows: Facturacion[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const source = expanded ? visibleRows : visibleRows.slice(0, 5);
+
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground md:hidden">Sin facturacion en el periodo.</div>;
+  }
+
+  return (
+    <div className="space-y-2 md:hidden">
+      {source.map((row, index) => (
+        <div key={`${row.cod_factura}-${index}`} className="rounded-md border bg-background p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold">{row.entidad_nombre || "Sin cliente"}</div>
+              <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.cod_factura}</div>
+            </div>
+            <div className="shrink-0 text-right text-base font-bold tabular-nums">{money(Number(row.total_venta || 0))}</div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+            <MiniMetric label="Fecha" value={format(parseISO(row.fecha), "dd/MM")} />
+            <MiniMetric label="Concepto" value={concept(row)} />
+            <MiniMetric label="Sucursal" value={row.sucursal ?? "-"} />
+            <MiniMetric label="Tipo" value={row.tipo_tiempo ?? "-"} />
+          </div>
+        </div>
+      ))}
+      {visibleRows.length > 5 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+        >
+          {expanded ? "Ver menos" : `Ver todos (${Math.min(visibleRows.length, MAX_FACTURAS_RENDER)})`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-md bg-muted/45 px-2 py-1">
+      <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="truncate font-semibold tabular-nums">{value}</div>
+    </div>
   );
 }
 
@@ -2621,7 +2763,7 @@ function OSSucursalBars({
   }
   return (
     <div className="space-y-2">
-      {visibleRows.map((row) => {
+      {visibleRows.slice(0, 5).map((row) => {
         const value = osMetricValue(row, metric);
         const width = value <= 0 ? 0 : Math.max(4, Math.round((value / max) * 100));
         const previousWidth = row.previousTotal > 0 && metric === "usd" ? Math.round((row.previousTotal / max) * 100) : 0;
@@ -2648,6 +2790,11 @@ function OSSucursalBars({
           </button>
         );
       })}
+      {visibleRows.length > 5 && (
+        <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground md:hidden">
+          Mostrando 5 de {visibleRows.length} sucursales
+        </div>
+      )}
     </div>
   );
 }
@@ -2705,7 +2852,32 @@ function OSDetalle({
       .slice(0, 10);
 
     return (
-      <div className="overflow-hidden rounded-md border">
+      <>
+      <div className="space-y-2 md:hidden">
+        {grouped.slice(0, 5).map((row) => (
+          <button
+            key={row.cliente}
+            type="button"
+            onClick={() => onSelect(row.cliente)}
+            className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">{row.os.size} OS - {Array.from(row.sucursales).join(", ") || "Sin sucursal"}</div>
+              </div>
+              <div className="shrink-0 text-right text-base font-bold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
+              <MiniMetric label="Servicio" value={money(row.servicios)} />
+              <MiniMetric label="Rep." value={money(row.repuestos)} />
+              <MiniMetric label="Km" value={money(row.kilometraje)} />
+            </div>
+          </button>
+        ))}
+        {grouped.length > 5 && <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">Mostrando 5 de {grouped.length} clientes</div>}
+      </div>
+      <div className="hidden overflow-hidden rounded-md border md:block">
         <div className="grid grid-cols-[minmax(0,1fr)_72px_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]">
           <div>Cliente</div>
           <div className="text-right">OS</div>
@@ -2736,12 +2908,39 @@ function OSDetalle({
           </div>
         )}
       </div>
+      </>
     );
   }
 
   const visible = rows.slice().sort((a, b) => b.total - a.total).slice(0, 10);
   return (
-    <div className="overflow-hidden rounded-md border">
+    <>
+    <div className="space-y-2 md:hidden">
+      {visible.slice(0, 5).map((row) => (
+        <button
+          key={`${row.os}-${row.fecha}`}
+          type="button"
+          onClick={() => onSelect(row.os)}
+          className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+        >
+          <div className="mb-1 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-mono text-[11px] font-semibold text-muted-foreground">{row.os}</div>
+              <div className="truncate text-sm font-semibold">{row.cliente}</div>
+            </div>
+            <Badge variant="secondary" className="shrink-0 text-[10px]">{row.tipo}</Badge>
+          </div>
+          <div className="line-clamp-2 text-xs text-muted-foreground">{row.problema}</div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5 text-[11px]">
+            <MiniMetric label="Impacto" value={formatOSMetric(osMetricValue(row, metric), metric)} />
+            <MiniMetric label="Fecha" value={format(parseISO(row.fecha), "dd/MM")} />
+            <MiniMetric label="Sucursal" value={row.sucursal ?? "-"} />
+          </div>
+        </button>
+      ))}
+      {rows.length > 5 && <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">Mostrando 5 de {rows.length} OS</div>}
+    </div>
+    <div className="hidden overflow-hidden rounded-md border md:block">
       <div className="grid grid-cols-[72px_minmax(0,1fr)_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[72px_minmax(0,1fr)_86px_86px]">
         <div>OS</div>
         <div>Cliente</div>
@@ -2774,6 +2973,7 @@ function OSDetalle({
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -3325,7 +3525,36 @@ function CargaSucursalTabla({
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
   }
   return (
-    <div className="rounded-md border">
+    <>
+    <div className="space-y-2 md:hidden">
+      {rows.slice(0, 5).map((r) => (
+        <button
+          key={r.sucursal}
+          type="button"
+          onClick={() => onSelect(r.sucursal)}
+          className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="truncate text-sm font-semibold">{r.sucursal}</div>
+            <div className="shrink-0 text-base font-bold tabular-nums">{r.total}</div>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+            <MiniMetric label="Cerrados" value={r.cerrados} />
+            <MiniMetric label="Abiertos" value={r.abiertos} />
+            <MiniMetric label="Pausados" value={r.pausados} />
+          </div>
+          <div className="mt-2 h-2 rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, r.pct)}%` }} />
+          </div>
+        </button>
+      ))}
+      {rows.length > 5 && (
+        <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">
+          Mostrando 5 de {rows.length} sucursales
+        </div>
+      )}
+    </div>
+    <div className="hidden rounded-md border md:block">
       <div className="grid grid-cols-[1fr_70px_70px_70px_60px_56px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
         <div>Sucursal</div>
         <div className="text-right">Cerrados</div>
@@ -3349,6 +3578,7 @@ function CargaSucursalTabla({
         </button>
       ))}
     </div>
+    </>
   );
 }
 
@@ -3457,7 +3687,7 @@ function CargaTecnicaMatriz({
   const getVal = (cell: { jornadas: number; horas: number } | undefined) =>
     cell ? (metrica === "horas" ? cell.horas : cell.jornadas) : 0;
 
-  const COLLAPSED = 6;
+  const COLLAPSED = 5;
   const visible = expanded ? rows : rows.slice(0, COLLAPSED);
 
   const totalGeneral = rows.reduce((acc, r) => acc + (metrica === "horas" ? r.totalHoras : r.totalJornadas), 0);
@@ -3606,7 +3836,28 @@ function ClientesCompacto({
       <div className="mb-2 text-[11px] text-muted-foreground">
         {totalClientes} clientes · {totalFacturas} facturas · Top 5 concentra {pctTop5}%
       </div>
-      <div className={cn("overflow-y-auto rounded-md border", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
+      <div className="space-y-2 md:hidden">
+        {visible.map((r) => {
+          const pct = totalValue > 0 ? Math.round((r.total / totalValue) * 100) : 0;
+          return (
+            <button
+              key={r.nombre}
+              type="button"
+              onClick={() => onSelect(r.nombre)}
+              className="w-full rounded-md border bg-background p-3 text-left shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{r.nombre}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">{r.facturas} facturas - {pct}%</div>
+                </div>
+                <div className="shrink-0 text-right text-base font-bold tabular-nums">{money(r.total)}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className={cn("hidden overflow-y-auto rounded-md border md:block", expanded ? "max-h-[440px]" : "max-h-[260px]")}>
         <div className="sticky top-0 grid grid-cols-[1fr_60px_96px_48px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
           <div>Cliente</div>
           <div className="text-right">Fact.</div>
