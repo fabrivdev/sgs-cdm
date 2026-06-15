@@ -8,11 +8,9 @@ import {
   Users,
   LogOut,
   Wrench,
-  Bell,
   Tractor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUnseen } from "@/hooks/useUnseen";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { cn } from "@/lib/utils";
 
 const baseItems = [
@@ -90,14 +89,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-4 w-4" />
-            {unseen > 0 && (
-              <Badge className="absolute -right-1 -top-1 h-5 min-w-5 rounded-full px-1 text-[10px] tabular-nums">
-                {unseen}
-              </Badge>
-            )}
-          </Button>
+          <NotificationsPanel count={unseen} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

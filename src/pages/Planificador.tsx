@@ -355,6 +355,13 @@ export default function Planificador() {
     }
   };
 
+  useEffect(() => {
+    const servicioId = searchParams.get("servicio");
+    if (!servicioId || loading || detalle) return;
+    const servicio = servicios.find((s) => s.id === servicioId);
+    if (servicio) openDetalle(servicio);
+  }, [searchParams, loading, servicios, detalle]);
+
   const limpiarFiltros = () => {
     setFSemana("all");
     setFSucursal("all");
@@ -472,6 +479,14 @@ export default function Planificador() {
                     key={`${s.id}-${s.fecha_programada}`}
                     className={cn(rowClassByEstado(s.estado), "cursor-pointer", unseen && "ring-2 ring-inset ring-primary/40")}
                     onClick={() => openDetalle(s)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDetalle(s);
+                      }
+                    }}
                   >
                     <TableCell className="px-3 py-2 align-top">
                       <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
@@ -553,6 +568,14 @@ export default function Planificador() {
                 unseen && "ring-2 ring-primary/40",
               )}
               onClick={() => openDetalle(s)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openDetalle(s);
+                }
+              }}
             >
               <div className="flex min-h-[108px] flex-col justify-between gap-2">
                 <div className="space-y-2">
