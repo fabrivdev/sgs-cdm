@@ -1,10 +1,11 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const labelCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
 
@@ -48,7 +49,22 @@ export function FiltersBar({
   className?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
+  const debouncedSearch = useDebouncedValue(searchDraft, 250);
   const hasControls = !!children || !!actions || (activeCount > 0 && !!onClear);
+
+  useEffect(() => {
+    setSearchDraft(search?.value ?? "");
+  }, [search?.value]);
+
+  useEffect(() => {
+    if (search && debouncedSearch !== search.value) search.onChange(debouncedSearch);
+  }, [debouncedSearch, search]);
+
+  const clearSearch = () => {
+    setSearchDraft("");
+    search?.onChange("");
+  };
 
   return (
     <Card className={cn("p-2 sm:p-2.5", className)}>
@@ -57,14 +73,16 @@ export function FiltersBar({
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={search.value}
-              onChange={(e) => search.onChange(e.target.value)}
+              type="search"
+              enterKeyHint="search"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
               placeholder={search.placeholder ?? "Buscar…"}
               className="h-9 pl-7 pr-7 text-sm"
             />
-            {search.value && (
+            {searchDraft && (
               <button
-                onClick={() => search.onChange("")}
+                onClick={clearSearch}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
                 aria-label="Limpiar búsqueda"
                 type="button"
@@ -110,14 +128,16 @@ export function FiltersBar({
             <div className="relative">
               <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                value={search.value}
-                onChange={(e) => search.onChange(e.target.value)}
+                type="search"
+                enterKeyHint="search"
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
                 placeholder={search.placeholder ?? "Buscar…"}
                 className="h-9 pl-7 pr-7 text-sm"
               />
-              {search.value && (
+              {searchDraft && (
                 <button
-                  onClick={() => search.onChange("")}
+                  onClick={clearSearch}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
                   aria-label="Limpiar búsqueda"
                   type="button"

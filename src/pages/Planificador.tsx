@@ -12,6 +12,8 @@ import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { EmptyState } from "@/components/EmptyState";
+import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
 import { CalendarPlus, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
@@ -445,14 +447,14 @@ export default function Planificador() {
 
             <TableBody>
               {loading && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
-                </TableRow>
+                <TableSkeletonRows columns={8} rows={7} />
               )}
 
               {!loading && displayed.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Sin intervenciones.</TableCell>
+                  <TableCell colSpan={8} className="py-6">
+                    <EmptyState title="Sin jornadas" description="No hay jornadas que coincidan con los filtros actuales." />
+                  </TableCell>
                 </TableRow>
               )}
 
@@ -527,8 +529,10 @@ export default function Planificador() {
 
       {/* Mobile list */}
       <div className="space-y-2 md:hidden">
-        {loading && <p className="text-center text-xs text-muted-foreground py-6">Cargando...</p>}
-        {!loading && displayed.length === 0 && <p className="text-center text-xs text-muted-foreground py-6">Sin intervenciones.</p>}
+        {loading && <MobileCardSkeletons rows={4} />}
+        {!loading && displayed.length === 0 && (
+          <EmptyState title="Sin jornadas" description="No hay jornadas que coincidan con los filtros actuales." />
+        )}
 
         {displayed.map((s) => {
           const tipo = s.tipo_trabajo ?? "Visita de campo";

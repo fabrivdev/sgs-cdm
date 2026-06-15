@@ -12,6 +12,8 @@ import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
 import { TrabajosOSTab } from "@/components/trabajos/TrabajosOSTab";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { EmptyState } from "@/components/EmptyState";
+import { KanbanSkeleton } from "@/components/LoadingSkeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseISO, format } from "date-fns";
 import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
@@ -198,7 +200,9 @@ export default function Trabajos() {
 
 
       {loading ? (
-        <Card className="p-8 text-center text-muted-foreground">Cargando…</Card>
+        <KanbanSkeleton columns={ESTADOS_TRABAJO.length} />
+      ) : filtered.length === 0 ? (
+        <EmptyState title="Sin trabajos" description="No hay trabajos que coincidan con los filtros actuales." />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {ESTADOS_TRABAJO.map(col => {
