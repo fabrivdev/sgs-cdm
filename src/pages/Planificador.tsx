@@ -236,7 +236,6 @@ export default function Planificador() {
         jornadas: t.legacy_servicio_id ? jornadasPorServicio.get(t.legacy_servicio_id) ?? [] : [],
       })));
     } catch (e: any) {
-      console.error(e);
       toast.error(e?.message ?? "No se pudieron cargar los datos del planificador");
     } finally {
       setLoading(false);
@@ -429,7 +428,7 @@ export default function Planificador() {
       </div>
 
       <FiltersBar
-        search={{ value: fCliente, onChange: setFCliente, placeholder: "Buscar OS, TR-000123 o cliente…" }}
+        search={{ value: fCliente, onChange: setFCliente, placeholder: "Cliente, OS o folio…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
@@ -529,7 +528,7 @@ export default function Planificador() {
                 const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
-                const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM/yy");
+                const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
 
                 return (
                   <TableRow
@@ -620,7 +619,6 @@ export default function Planificador() {
               key={`${s.id}-${s.fecha_programada}`}
               className={cn(
                 "cursor-pointer overflow-hidden rounded-[18px] border bg-card p-3 shadow-sm transition-colors",
-                "min-h-[132px]",
                 rowClassByEstado(s.estado),
                 unseen && "ring-2 ring-primary/40",
               )}
@@ -634,7 +632,7 @@ export default function Planificador() {
                 }
               }}
             >
-              <div className="flex min-h-[108px] flex-col justify-between gap-2">
+              <div className="flex flex-col justify-between gap-2">
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

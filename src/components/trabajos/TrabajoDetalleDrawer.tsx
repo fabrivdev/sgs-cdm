@@ -26,7 +26,7 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarPlus, ClipboardList, Clock, MoreVertical, PauseCircle, Pencil, PlayCircle, Trash2, User, Users } from "lucide-react";
 import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoPausado, trabajoReferencia } from "@/lib/trabajos";
-import { ESTADO_LABELS, type Estado, type Sucursal } from "@/lib/constants";
+import { ESTADO_LABELS, DIAS_JORNADA_VENCIDA, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { ProgramarIntervencionDialog } from "./ProgramarIntervencionDialog";
@@ -85,7 +85,7 @@ const startToday = () => {
 function jornadaTone(j: Jornada) {
   if (j.estado === "Completado") return "border-l-emerald-500 bg-emerald-50/30";
   if (j.estado === "Cancelada") return "border-l-orange-500 bg-orange-50/30";
-  return differenceInCalendarDays(startToday(), parseISO(j.fecha)) > 7
+  return differenceInCalendarDays(startToday(), parseISO(j.fecha)) > DIAS_JORNADA_VENCIDA
     ? "border-l-amber-500 bg-amber-50/40"
     : "border-l-blue-400 bg-card";
 }
@@ -235,7 +235,7 @@ export function TrabajoDetalleDrawer({
     pendientes: jornadas.filter((j) => j.estado === "Pendiente"),
     realizadas: jornadas.filter((j) => j.estado === "Completado"),
     noRealizadas: jornadas.filter((j) => j.estado === "Cancelada"),
-    vencidas: jornadas.filter((j) => j.estado === "Pendiente" && differenceInCalendarDays(startToday(), parseISO(j.fecha)) > 7),
+    vencidas: jornadas.filter((j) => j.estado === "Pendiente" && differenceInCalendarDays(startToday(), parseISO(j.fecha)) > DIAS_JORNADA_VENCIDA),
     horas: jornadas.reduce((acc, j) => acc + (j.estado === "Completado" ? Number(j.horas_trabajadas) || 0 : 0), 0),
   }), [jornadas]);
 
@@ -498,7 +498,7 @@ export function TrabajoDetalleDrawer({
                 {jornadas.map((j) => {
                   const principal = j.tecnico_responsable_id ? profileMap.get(j.tecnico_responsable_id)?.nombre : null;
                   const aux = (j.auxiliares ?? []).map((id) => profileMap.get(id)?.nombre).filter(Boolean);
-                  const vencida = j.estado === "Pendiente" && differenceInCalendarDays(startToday(), parseISO(j.fecha)) > 7;
+                  const vencida = j.estado === "Pendiente" && differenceInCalendarDays(startToday(), parseISO(j.fecha)) > DIAS_JORNADA_VENCIDA;
                   return (
                     <div key={j.id} className={cn("rounded-lg border border-l-4 p-3", jornadaTone(j))}>
                       <div className="flex items-start justify-between gap-3">

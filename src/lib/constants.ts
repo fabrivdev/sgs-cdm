@@ -34,3 +34,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   cabecilla: "Cabecilla",
   tecnico: "Técnico",
 };
+
+export const FMT_DATE = "dd/MM/yyyy";
+export const FMT_DATE_SHORT = "dd/MM";
+export const FMT_DATE_DB = "yyyy-MM-dd";
+
+export const DIAS_JORNADA_VENCIDA = 7;
+export const MAX_SEARCH_RESULTS = 12;
+export const MAX_TOP_RANKING = 5;
+export const MAX_EVENTOS_DIA_CALENDARIO = 3;
+export const MAX_DISPONIBILIDADES_DIA = 2;

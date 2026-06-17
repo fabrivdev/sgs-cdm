@@ -34,7 +34,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, formatGuaranies } from "@/lib/utils";
 import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
 
 const SUBGRUPOS = [
@@ -144,8 +144,7 @@ const resultadoColor = (r: string | undefined) => {
   }
 };
 
-const fmtMoney = (n: number) =>
-  new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(n);
+const fmtMoney = (n: number) => formatGuaranies(n);
 
 const initials = (s: string) =>
   s

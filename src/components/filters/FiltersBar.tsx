@@ -6,8 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-
-const labelCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
+import { cardLabel as labelCls } from "@/lib/ui-classes";
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (

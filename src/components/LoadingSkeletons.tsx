@@ -1,6 +1,26 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
+export function DashboardKPISkeleton({ count = 5 }: { count?: number }) {
+  return (
+    <div className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
+      {Array.from({ length: count }).map((_, i) => (
+        <Card key={i} className="flex min-h-[78px] flex-col gap-2 p-2 sm:min-h-[128px] sm:p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-2.5 w-20" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-2.5 w-1/2" />
+            </div>
+            <Skeleton className="h-7 w-7 shrink-0 rounded-md sm:h-8 sm:w-8" />
+          </div>
+          <Skeleton className="mt-auto h-2.5 w-2/3" />
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export function TableSkeletonRows({ columns, rows = 6 }: { columns: number; rows?: number }) {
   return (
     <>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, CalendarDays } from "lucide-react";
-import { SUCURSALES, type Sucursal } from "@/lib/constants";
+import { SUCURSALES, DIAS_JORNADA_VENCIDA, type Sucursal } from "@/lib/constants";
 import { ESTADOS_TRABAJO, PRIORIDADES, prioridadBadge, estadoTrabajoDesdeJornadas, trabajoOsNumero, trabajoPausado, trabajoReferencia } from "@/lib/trabajos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -250,7 +250,7 @@ export default function Trabajos() {
                       });
                       const agendasVencidasViejas = agendasVencidas.filter(p => {
                         const dias = Math.floor((hoy.getTime() - new Date(`${p.fecha_programada}T00:00:00`).getTime()) / 86400000);
-                        return dias > 7;
+                        return dias > DIAS_JORNADA_VENCIDA;
                       });
                       const proxima = agendasFuturas[0];
                       const prioLabel = PRIORIDADES.find(p => p.key === t.prioridad)?.label ?? "";

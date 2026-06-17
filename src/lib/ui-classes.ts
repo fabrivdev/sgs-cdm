@@ -4,3 +4,8 @@ export const pageTitle = "text-xl font-bold tracking-tight sm:text-2xl";
 export const pageDescription = "text-xs text-muted-foreground";
 export const sectionTitle = "text-sm font-semibold";
 export const tableText = "text-[13px]";
+
+// Etiqueta de campo/filtro: "SUCURSAL", "PERÍODO", etc.
+export const cardLabel = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
+// Texto secundario de apoyo: contadores, fechas, metadatos.
+export const metaText = "text-[11px] text-muted-foreground";

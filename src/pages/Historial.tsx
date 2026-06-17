@@ -4,11 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
-import { Search, MapPin, Wrench } from "lucide-react";
+import { Search, MapPin, Wrench, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
+import { MAX_SEARCH_RESULTS } from "@/lib/constants";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 import { pageDescription, pageShell, pageTitle } from "@/lib/ui-classes";
+import { ErrorState } from "@/components/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 interface Servicio {
   id: string;
@@ -69,8 +74,12 @@ export default function Historial() {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Cliente | null>(null);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const load = async () => {
+    setLoading(true);
+    setError(false);
     try {
       const [srv, prof, cli, parque] = await Promise.all([
         cargarTodo<Servicio>(
@@ -96,8 +105,11 @@ export default function Historial() {
         if (p.cliente_id) ids.add(p.cliente_id);
       }
       setClienteIdsParque(ids);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setError(true);
+      toast.error(e?.message ?? "No se pudo cargar el historial");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -115,13 +127,11 @@ export default function Historial() {
     return clientes.filter((c) => clienteIdsParque.has(c.id));
   }, [clientes, clienteIdsParque]);
 
-  const matches = useMemo(() => {
+  const { matches, totalMatches } = useMemo(() => {
     const query = q.trim().toLowerCase();
-    if (!query) return [];
-
-    return clientesDelParque
-      .filter((c) => c.nombre.toLowerCase().includes(query))
-      .slice(0, 12);
+    if (!query) return { matches: [], totalMatches: 0 };
+    const all = clientesDelParque.filter((c) => c.nombre.toLowerCase().includes(query));
+    return { matches: all.slice(0, MAX_SEARCH_RESULTS), totalMatches: all.length };
   }, [q, clientesDelParque]);
 
   const historial = useMemo(() => {
@@ -138,11 +148,25 @@ export default function Historial() {
         </p>
       </div>
 
-      <Card className="p-3">
+      {error && (
+        <ErrorState
+          title="No se pudo cargar el historial"
+          description="Verificá tu conexión e intentá de nuevo."
+          onRetry={load}
+        />
+      )}
+
+      {loading && (
+        <Card className="p-3">
+          <Skeleton className="h-9 w-full" />
+        </Card>
+      )}
+
+      {!loading && !error && <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="pl-9"
+            className={q ? "pl-9 pr-9" : "pl-9"}
             placeholder="Buscar cliente del parque…"
             value={q}
             onChange={(e) => {
@@ -150,6 +174,16 @@ export default function Historial() {
               setSelected(null);
             }}
           />
+          {q && (
+            <button
+              type="button"
+              aria-label="Limpiar búsqueda"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={() => { setQ(""); setSelected(null); }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {q.trim() && matches.length === 0 && !selected && (
@@ -176,9 +210,15 @@ export default function Historial() {
             ))}
           </ul>
         )}
-      </Card>
 
-      {selected && (
+        {totalMatches > MAX_SEARCH_RESULTS && !selected && (
+          <p className="mt-1 text-center text-[11px] text-muted-foreground">
+            Mostrando {MAX_SEARCH_RESULTS} de {totalMatches} — afinás la búsqueda para ver más.
+          </p>
+        )}
+      </Card>}
+
+      {!loading && !error && selected && (
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <div>

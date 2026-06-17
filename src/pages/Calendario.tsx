@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { CalendarOff, ChevronLeft, ChevronRight, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw, Trash2 } from "lucide-react";
 import {
   format,
@@ -28,6 +31,7 @@ import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { DisponibilidadDialog } from "@/components/tecnicos/DisponibilidadDialog";
 import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
 import { cn } from "@/lib/utils";
+import { MAX_EVENTOS_DIA_CALENDARIO, MAX_DISPONIBILIDADES_DIA } from "@/lib/constants";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 
 interface Servicio {
@@ -114,6 +118,8 @@ export default function Calendario() {
   const [openDisponibilidad, setOpenDisponibilidad] = useState(false);
   const [disponibilidades, setDisponibilidades] = useState<DisponibilidadTecnico[]>([]);
   const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
+  const [motivoDialogOpen, setMotivoDialogOpen] = useState(false);
+  const [motivoPendiente, setMotivoPendiente] = useState("");
 
   const [codigoByServicio, setCodigoByServicio] = useState<Map<string, string>>(new Map());
 
@@ -333,19 +339,27 @@ export default function Calendario() {
       const next = new Map(diasNL); next.delete(key); setDiasNL(next);
       toast.success("Día marcado como laboral");
     } else {
-      const motivo = window.prompt("Motivo (opcional, ej: Feriado nacional):", "")?.trim() || null;
-      const { data: u } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from("dias_no_laborales")
-        .insert({ fecha: key, motivo, creado_por: u.user?.id ?? null })
-        .select("id, fecha, motivo")
-        .single();
-      if (error) { toast.error(error.message); return; }
-      const next = new Map(diasNL);
-      next.set(data.fecha, { id: data.id, motivo: data.motivo });
-      setDiasNL(next);
-      toast.success("Día marcado como No laboral");
+      setMotivoPendiente("");
+      setMotivoDialogOpen(true);
     }
+  };
+
+  const confirmarNoLaboral = async () => {
+    if (!diaSel) return;
+    const key = format(diaSel, "yyyy-MM-dd");
+    const { data: u } = await supabase.auth.getUser();
+    const motivo = motivoPendiente.trim() || null;
+    const { data, error } = await supabase
+      .from("dias_no_laborales")
+      .insert({ fecha: key, motivo, creado_por: u.user?.id ?? null })
+      .select("id, fecha, motivo")
+      .single();
+    if (error) { toast.error(error.message); return; }
+    const next = new Map(diasNL);
+    next.set(data.fecha, { id: data.id, motivo: data.motivo });
+    setDiasNL(next);
+    setMotivoDialogOpen(false);
+    toast.success("Día marcado como No laboral");
   };
 
   const quitarDisponibilidad = async (disp: DisponibilidadTecnico) => {
@@ -450,6 +464,7 @@ export default function Calendario() {
 
 
       {vista === "tecnicos" ? (
+        <div className="relative">
         <Card className="overflow-x-auto">
           {(() => {
             const semanaDays = eachDayOfInterval({
@@ -564,6 +579,8 @@ export default function Calendario() {
             );
           })()}
         </Card>
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-card to-transparent md:hidden" aria-hidden />
+        </div>
       ) : (
       <Card className="overflow-hidden">
         <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
@@ -588,9 +605,9 @@ export default function Calendario() {
             const dayKey = format(d, "yyyy-MM-dd");
             const isDragOver = dragOverKey === dayKey;
             const esSemana = vista === "semana";
-            const visibles = esSemana ? evs : evs.slice(0, 3);
+            const visibles = esSemana ? evs : evs.slice(0, MAX_EVENTOS_DIA_CALENDARIO);
             const disponibilidadDia = disponibilidadForDay(d);
-            const visiblesDisponibilidad = esSemana ? disponibilidadDia : disponibilidadDia.slice(0, 2);
+            const visiblesDisponibilidad = esSemana ? disponibilidadDia : disponibilidadDia.slice(0, MAX_DISPONIBILIDADES_DIA);
             const esDomingo = d.getDay() === 0;
             const nlInfo = diasNL.get(dayKey);
             const esNL = !!nlInfo || esDomingo;
@@ -600,9 +617,10 @@ export default function Calendario() {
                 key={d.toISOString()}
                 role="button"
                 tabIndex={0}
+                aria-label={format(d, "EEEE d 'de' MMMM", { locale: es })}
                 onClick={() => setDiaSel(d)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") setDiaSel(d);
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDiaSel(d); }
                 }}
                 onDragOver={(e) => {
                   if (dragId) {
@@ -688,9 +706,9 @@ export default function Calendario() {
                     </div>
                   ))}
 
-                  {!esSemana && disponibilidadDia.length > 2 && (
+                  {!esSemana && disponibilidadDia.length > MAX_DISPONIBILIDADES_DIA && (
                     <div className="text-[10px] text-sky-700 font-medium">
-                      +{disponibilidadDia.length - 2} no disp.
+                      +{disponibilidadDia.length - MAX_DISPONIBILIDADES_DIA} no disp.
                     </div>
                   )}
 
@@ -723,7 +741,8 @@ export default function Calendario() {
                           setDetalle(s);
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
                             e.stopPropagation();
                             setDetalle(s);
                           }
@@ -742,9 +761,9 @@ export default function Calendario() {
                     );
                   })}
 
-                  {!esSemana && evs.length > 3 && (
+                  {!esSemana && evs.length > MAX_EVENTOS_DIA_CALENDARIO && (
                     <div className="text-[10px] text-muted-foreground font-medium">
-                      +{evs.length - 3} más…
+                      +{evs.length - MAX_EVENTOS_DIA_CALENDARIO} más…
                     </div>
                   )}
                 </div>
@@ -935,6 +954,36 @@ export default function Calendario() {
         fechaInicial={diaDisponibilidad}
         onSaved={load}
       />
+
+      <Dialog open={motivoDialogOpen} onOpenChange={setMotivoDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Marcar día no laboral</DialogTitle>
+            {diaSel && (
+              <DialogDescription>
+                {format(diaSel, "EEEE d 'de' MMMM", { locale: es })}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-nl">
+              Motivo <span className="font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input
+              id="motivo-nl"
+              placeholder="Ej: Feriado nacional"
+              value={motivoPendiente}
+              onChange={(e) => setMotivoPendiente(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") confirmarNoLaboral(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMotivoDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmarNoLaboral}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

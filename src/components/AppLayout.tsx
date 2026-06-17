@@ -64,6 +64,12 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-primary"
+      >
+        Ir al contenido principal
+      </a>
       {/* Top header */}
       <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b bg-card/95 px-3 shadow-sm backdrop-blur sm:h-14 sm:px-4">
         <div className="flex items-center gap-2">
@@ -146,7 +152,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         </div>
       )}
 
-      <main className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">{children ?? <Outlet />}</main>
+      <main id="main-content" className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">{children ?? <Outlet />}</main>
 
       {/* Bottom nav (mobile) */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:hidden">
@@ -158,7 +164,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                 key={it.to}
                 to={it.to}
                 className={cn(
-                  "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium",
+                  "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
@@ -173,13 +179,13 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                 <button
                   type="button"
                   className={cn(
-                    "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium",
+                    "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium",
                     overflowActive ? "text-primary" : "text-muted-foreground",
                   )}
-                  aria-label="Mas paginas"
+                  aria-label="Más páginas"
                 >
                   <MoreHorizontal className="h-5 w-5" />
-                  <span className="max-w-full truncate">Mas</span>
+                  <span className="max-w-full truncate">Más</span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="top" className="mb-2 w-48">
