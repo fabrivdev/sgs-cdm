@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, CalendarCheck2, ChevronRight, Clock3, PhoneCall, Save, X, MessageSquarePlus, Search } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, ChevronRight, Clock3, PhoneCall, ReceiptText, Save, X, MessageSquarePlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -293,6 +293,7 @@ export function AgendaTab({
     const desde90 = new Date(Date.now() - 90 * 86400000);
     const pendienteIds = new Set(filas.map((fila) => fila.clienteId));
     const gestionados90 = new Set<string>();
+    const facturados90 = new Set<string>();
 
     for (const seguimiento of seguimientos) {
       if (!pendienteIds.has(seguimiento.cliente_id)) continue;
@@ -300,13 +301,22 @@ export function AgendaTab({
       gestionados90.add(seguimiento.cliente_id);
     }
 
+    for (const factura of ultimasFacturas) {
+      const ultServicio = factura.ult_servicio ? new Date(`${factura.ult_servicio}T00:00:00`) : null;
+      const ultRepuesto = factura.ult_repuesto ? new Date(`${factura.ult_repuesto}T00:00:00`) : null;
+      if ((ultServicio && ultServicio >= desde90) || (ultRepuesto && ultRepuesto >= desde90)) {
+        facturados90.add(factura.cliente_id);
+      }
+    }
+
     return {
       pendientes: filas.length,
       serviciosAsociados: clientesConTrabajoAbierto.size,
       gestionados90: gestionados90.size,
+      facturados90: facturados90.size,
       sinHistorial: filas.filter((fila) => fila.dias == null).length,
     };
-  }, [filas, seguimientos, clientesConTrabajoAbierto]);
+  }, [filas, seguimientos, ultimasFacturas, clientesConTrabajoAbierto]);
 
   const filasFiltradas = useMemo(() => {
     const ql = pQ.trim().toLowerCase();
@@ -448,7 +458,7 @@ export function AgendaTab({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <AgendaMetricCard
           title="Para contactar"
           value={agendaKpis.pendientes.toLocaleString()}
@@ -469,6 +479,13 @@ export function AgendaTab({
           detail="Seguimientos recientes"
           icon={PhoneCall}
           accent="text-blue-600"
+        />
+        <AgendaMetricCard
+          title="Facturación 90d"
+          value={agendaKpis.facturados90.toLocaleString()}
+          detail="Servicio o repuestos"
+          icon={ReceiptText}
+          accent="text-emerald-600"
         />
         <AgendaMetricCard
           title="Sin gestión registrada"
