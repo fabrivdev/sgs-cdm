@@ -9,6 +9,7 @@ import {
   LogOut,
   Wrench,
   Tractor,
+  TrendingUp,
   MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,10 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   const navItems = [
     ...baseItems.filter((it) => !(it.adminOnly && !isAdmin)),
     ...(isAdmin
-      ? [{ to: "/parque-clientes", label: "Parque", icon: Tractor, end: false }]
+      ? [
+          { to: "/parque-clientes", label: "Parque", icon: Tractor, end: false },
+          { to: "/agenda", label: "Agenda", icon: TrendingUp, end: false },
+        ]
       : []),
   ];
   const mobilePrimaryItems = isAdmin
