@@ -26,7 +26,12 @@ import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
-import { normalizarEstadoTrabajo } from "@/lib/trabajos";
+import {
+  type ClienteContactoInput,
+  type KpiResult,
+  calcularKpis,
+  buildClientesConTrabajoAbierto,
+} from "@/lib/contacto-utils";
 
 const SUBGRUPOS = [
   "COSECHADORAS",
@@ -157,12 +162,7 @@ const antiguedadColor = (a: number | null) => {
   return "bg-destructive text-destructive-foreground";
 };
 
-export interface ParqueMetricas {
-  totalMaquinas: number;
-  pctConServicioUltimoAño: number;
-  pctContactadosEsteMes: number;
-  sinContacto60d: number;
-}
+export type { KpiResult as ParqueMetricas };
 
 export function ParqueTab({
   onChanged: _onChanged,
@@ -171,7 +171,7 @@ export function ParqueTab({
 }: {
   onChanged?: () => void;
   onOpenCliente?: (id: string) => void;
-  onMetricasChange?: (m: ParqueMetricas) => void;
+  onMetricasChange?: (m: KpiResult) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [factLoading, setFactLoading] = useState(true);
@@ -490,49 +490,29 @@ export function ParqueTab({
     });
   }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento]);
 
-  const clientesConTrabajoAbierto = useMemo(() => {
-    return new Set(
-      trabajos
-        .filter((trabajo) => trabajo.cliente_id && normalizarEstadoTrabajo(trabajo.estado_general) !== "completado")
-        .map((trabajo) => trabajo.cliente_id as string),
-    );
-  }, [trabajos]);
+  const clientesConTrabajoAbierto = useMemo(
+    () => buildClientesConTrabajoAbierto(trabajos),
+    [trabajos],
+  );
 
-  // Métricas calculadas a partir de los clientes filtrados (para las cards superiores)
+  // Metricas calculadas a partir de los clientes filtrados con criterio compartido.
   useEffect(() => {
     if (!onMetricasChange) return;
-    const desdeMs = desdeDate.getTime();
-    const totalClientes = filtradas.length;
-    let totalMaquinas = 0;
-    let conServicio = 0;
-    let contactadosRango = 0;
-    let sinContacto = 0;
-    for (const r of filtradas) {
-      totalMaquinas += r.cantTotal;
-      if (r.diasUltServicio != null && r.diasUltServicio <= 365) conServicio++;
-      if (
-        (r.ultSeg && new Date(r.ultSeg.fecha).getTime() >= desdeMs) ||
-        clientesConTrabajoAbierto.has(r.cliente.id) ||
-        r.tieneRepEnRango ||
-        r.tieneSrvEnRango
-      ) {
-        contactadosRango++;
-      }
-      const sinServicioUltimoAño = r.diasUltServicio == null || r.diasUltServicio > 365;
-      const sinSeg60 =
-        !r.ultSeg ||
-        (Date.now() - new Date(r.ultSeg.fecha).getTime()) / 86400000 > 60;
-      if (sinServicioUltimoAño && sinSeg60 && !clientesConTrabajoAbierto.has(r.cliente.id)) sinContacto++;
-    }
-    onMetricasChange({
-      totalMaquinas,
-      pctConServicioUltimoAño:
-        totalClientes > 0 ? Math.round((conServicio / totalClientes) * 100) : 0,
-      pctContactadosEsteMes:
-        totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,
-      sinContacto60d: sinContacto,
+    const inputs: (ClienteContactoInput & { cantMaquinas: number })[] = filtradas.map((r) => {
+      const fact = factAgregados.get(r.cliente.id);
+      return {
+        clienteId: r.cliente.id,
+        ultSeguimientoFecha: r.ultSeg?.fecha ?? null,
+        ultServicioFecha: fact?.ult_servicio ?? null,
+        ultRepuestoFecha: fact?.ult_repuesto ?? null,
+        tieneTrabajoAbierto: clientesConTrabajoAbierto.has(r.cliente.id),
+        tieneRepEnRango: r.tieneRepEnRango,
+        tieneSrvEnRango: r.tieneSrvEnRango,
+        cantMaquinas: r.cantTotal,
+      };
     });
-  }, [filtradas, onMetricasChange, desdeDate, clientesConTrabajoAbierto]);
+    onMetricasChange(calcularKpis(inputs, desdeDate));
+  }, [filtradas, onMetricasChange, desdeDate, clientesConTrabajoAbierto, factAgregados]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;

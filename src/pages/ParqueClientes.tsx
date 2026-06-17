@@ -1,168 +1,49 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ParqueTab, type ParqueMetricas } from "@/components/parque/ParqueTab";
+import { ParqueTab } from "@/components/parque/ParqueTab";
 import { AgendaTab } from "@/components/parque/AgendaTab";
 import { MaquinasTab } from "@/components/parque/MaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
 import { Tractor, CheckCircle2, PhoneCall, AlertTriangle, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { pageShell, pageTitle } from "@/lib/ui-classes";
-import { normalizarEstadoTrabajo } from "@/lib/trabajos";
+import type { KpiResult } from "@/lib/contacto-utils";
 
-interface Metricas {
-  totalMaquinas: number;
-  pctConServicioUltimoAño: number;
-  pctContactadosEsteMes: number;
-  sinContacto60d: number;
-}
-
-const PAGE = 1000;
-
-async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
-  let from = 0;
-  const all: T[] = [];
-
-  while (true) {
-    const { data, error } = await queryBuilder.range(from, from + PAGE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    all.push(...(data as T[]));
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
-
-  return all;
-}
+const METRICAS_VACIAS: KpiResult = {
+  totalMaquinas: 0,
+  totalClientes: 0,
+  conServicioAnio: 0,
+  pctConServicioUltimoAnio: 0,
+  contactadosRango: 0,
+  pctContactadosRango: 0,
+  sinContacto60d: 0,
+};
 
 export default function ParqueClientes() {
-  const [metricas, setMetricas] = useState<Metricas>({
-    totalMaquinas: 0,
-    pctConServicioUltimoAño: 0,
-    pctContactadosEsteMes: 0,
-    sinContacto60d: 0,
-  });
-  const [refreshKey, setRefreshKey] = useState(0);
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [tab, setTab] = useState("parque");
   const [vistaParque, setVistaParque] = useState<"clientes" | "maquinas">("clientes");
-  const [parqueMetricas, setParqueMetricas] = useState<ParqueMetricas | null>(null);
+  const [parqueMetricas, setParqueMetricas] = useState<KpiResult | null>(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
-  const cargarMetricas = async () => {
-    try {
-      const [maquinas, seguimientos, ultimas, trabajos] = await Promise.all([
-        cargarTodo<{ cliente_id: string | null }>(
-          supabase.from("parque_maquinas").select("cliente_id").eq("activo", true),
-        ),
-        cargarTodo<{ cliente_id: string; fecha: string }>(
-          supabase.from("seguimiento_comercial").select("cliente_id, fecha").order("fecha", { ascending: false }),
-        ),
-        supabase.rpc("parque_ultimas_facturas"),
-        cargarTodo<{ cliente_id: string | null; estado_general: string }>(
-          supabase.from("trabajos").select("cliente_id, estado_general"),
-        ),
-      ]);
-
-      const hoy = new Date();
-      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      const clienteIds = new Set(maquinas.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id));
-      const ultFacturacionByCliente = new Map(
-        ((ultimas.data ?? []) as Array<{
-          cliente_id: string;
-          ult_repuesto: string | null;
-          ult_servicio: string | null;
-        }>).map((row) => [
-          row.cliente_id,
-          {
-            ultRepuesto: row.ult_repuesto,
-            ultServicio: row.ult_servicio,
-          },
-        ]),
-      );
-      const ultSeguimientoByCliente = new Map<string, string>();
-      const clientesConTrabajoAbierto = new Set(
-        trabajos
-          .filter((trabajo) => trabajo.cliente_id && normalizarEstadoTrabajo(trabajo.estado_general) !== "completado")
-          .map((trabajo) => trabajo.cliente_id as string),
-      );
-
-      for (const seguimiento of seguimientos) {
-        const current = ultSeguimientoByCliente.get(seguimiento.cliente_id);
-        if (!current || new Date(current) < new Date(seguimiento.fecha)) {
-          ultSeguimientoByCliente.set(seguimiento.cliente_id, seguimiento.fecha);
-        }
-      }
-
-      let conServicioAño = 0;
-      let contactadosMes = 0;
-      let paraContactar = 0;
-
-      for (const clienteId of clienteIds) {
-        const ultFacturacion = ultFacturacionByCliente.get(clienteId);
-        const ultServicio = ultFacturacion?.ultServicio ?? null;
-        const ultRepuesto = ultFacturacion?.ultRepuesto ?? null;
-        const ultSeguimiento = ultSeguimientoByCliente.get(clienteId) ?? null;
-        const diasServicio = ultServicio
-          ? Math.floor((hoy.getTime() - new Date(`${ultServicio}T00:00:00`).getTime()) / 86400000)
-          : null;
-        const diasSeguimiento = ultSeguimiento
-          ? Math.floor((hoy.getTime() - new Date(`${ultSeguimiento}T00:00:00`).getTime()) / 86400000)
-          : null;
-        const tieneServicioAño = diasServicio != null && diasServicio <= 365;
-        const tuvoFacturacionPeriodo =
-          (!!ultServicio && new Date(`${ultServicio}T00:00:00`) >= inicioMes) ||
-          (!!ultRepuesto && new Date(`${ultRepuesto}T00:00:00`) >= inicioMes);
-        const tieneTrabajoAbierto = clientesConTrabajoAbierto.has(clienteId);
-
-        if (tieneServicioAño) conServicioAño++;
-        if (
-          (ultSeguimiento && new Date(`${ultSeguimiento}T00:00:00`) >= inicioMes) ||
-          tieneTrabajoAbierto ||
-          tuvoFacturacionPeriodo
-        ) {
-          contactadosMes++;
-        }
-        if (!tieneServicioAño && !tieneTrabajoAbierto && (diasSeguimiento == null || diasSeguimiento > 60)) paraContactar++;
-      }
-
-      const totalClientes = clienteIds.size;
-
-      setMetricas({
-        totalMaquinas: maquinas.length,
-        pctConServicioUltimoAño:
-          totalClientes > 0 ? Math.round((conServicioAño / totalClientes) * 100) : 0,
-        pctContactadosEsteMes:
-          totalClientes > 0 ? Math.round((contactadosMes / totalClientes) * 100) : 0,
-        sinContacto60d: paraContactar,
-      });
-    } catch (error) {
-      console.error(error);
-    }
+  const handleChanged = () => {
+    setParqueMetricas(null);
+    setRefreshCounter((k) => k + 1);
   };
-
-  useEffect(() => {
-    cargarMetricas();
-  }, [refreshKey]);
-
-  const handleChanged = () => setRefreshKey((k) => k + 1);
 
   const handleOpenCliente = (id: string) => {
     setClienteAbierto(id);
     setPanelOpen(true);
   };
 
-  // En la pestaña Parque mostramos métricas que reflejan los filtros aplicados
   useEffect(() => {
-    if (tab !== "parque") {
-      setParqueMetricas(null);
-    }
+    if (tab !== "parque") setParqueMetricas(null);
   }, [tab]);
 
-  const metricasMostradas =
-    tab === "parque" && parqueMetricas ? parqueMetricas : metricas;
+  const metricasMostradas = parqueMetricas ?? METRICAS_VACIAS;
 
   const cards = useMemo(
     () => [
@@ -174,13 +55,13 @@ export default function ParqueClientes() {
       },
       {
         label: "% con servicio último año",
-        value: `${metricasMostradas.pctConServicioUltimoAño}%`,
+        value: `${metricasMostradas.pctConServicioUltimoAnio}%`,
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
       {
         label: "% contactados este período",
-        value: `${metricasMostradas.pctContactadosEsteMes}%`,
+        value: `${metricasMostradas.pctContactadosRango}%`,
         icon: PhoneCall,
         accent: "text-blue-600",
       },
@@ -201,40 +82,42 @@ export default function ParqueClientes() {
         <h1 className={pageTitle}>Parque &amp; Clientes</h1>
       </div>
 
-      {/* Métricas */}
       {tab === "parque" && (
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-        {cards.map((c) => (
-          <Card
-            key={c.label}
-            className={cn(
-              "border",
-              c.critical && "border-destructive/40 bg-destructive/5",
-            )}
-          >
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-                    {c.label}
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+          {cards.map((c) => (
+            <Card
+              key={c.label}
+              className={cn(
+                "border",
+                c.critical && "border-destructive/40 bg-destructive/5",
+              )}
+            >
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
+                      {c.label}
+                    </div>
+                    <div className={cn("mt-1 text-xl font-bold sm:text-2xl", c.accent)}>
+                      {c.value}
+                    </div>
                   </div>
-                  <div className={cn("mt-1 text-xl font-bold sm:text-2xl", c.accent)}>
-                    {c.value}
-                  </div>
+                  <c.icon className={cn("h-4 w-4 shrink-0 sm:h-5 sm:w-5", c.accent)} />
                 </div>
-                <c.icon className={cn("h-4 w-4 shrink-0 sm:h-5 sm:w-5", c.accent)} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-2 h-auto">
-          <TabsTrigger value="parque" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Parque<span className="hidden sm:inline">&nbsp;de máquinas</span></TabsTrigger>
-          <TabsTrigger value="agenda" className="text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap px-2 py-1.5">Agenda<span className="hidden sm:inline">&nbsp;comercial</span></TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2">
+          <TabsTrigger value="parque" className="whitespace-normal px-2 py-1.5 text-xs sm:whitespace-nowrap sm:text-sm">
+            Parque<span className="hidden sm:inline">&nbsp;de máquinas</span>
+          </TabsTrigger>
+          <TabsTrigger value="agenda" className="whitespace-normal px-2 py-1.5 text-xs sm:whitespace-nowrap sm:text-sm">
+            Agenda<span className="hidden sm:inline">&nbsp;comercial</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="parque" className="mt-4 space-y-3">
@@ -243,23 +126,35 @@ export default function ParqueClientes() {
               type="single"
               value={vistaParque}
               onValueChange={(v) => v && setVistaParque(v as "clientes" | "maquinas")}
-              className="border rounded-md"
+              className="rounded-md border"
             >
-              <ToggleGroupItem value="clientes" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                <Users className="h-3.5 w-3.5 mr-1" /> Por cliente
+              <ToggleGroupItem
+                value="clientes"
+                className="h-8 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              >
+                <Users className="mr-1 h-3.5 w-3.5" /> Por cliente
               </ToggleGroupItem>
-              <ToggleGroupItem value="maquinas" className="text-xs px-3 h-8 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                <Wrench className="h-3.5 w-3.5 mr-1" /> Por máquina
+              <ToggleGroupItem
+                value="maquinas"
+                className="h-8 px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              >
+                <Wrench className="mr-1 h-3.5 w-3.5" /> Por máquina
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
 
           {vistaParque === "clientes" ? (
-            <ParqueTab onChanged={handleChanged} onOpenCliente={handleOpenCliente} onMetricasChange={setParqueMetricas} />
+            <ParqueTab
+              key={refreshCounter}
+              onChanged={handleChanged}
+              onOpenCliente={handleOpenCliente}
+              onMetricasChange={setParqueMetricas}
+            />
           ) : (
             <MaquinasTab onOpenCliente={handleOpenCliente} />
           )}
         </TabsContent>
+
         <TabsContent value="agenda" className="mt-4">
           <AgendaTab onOpenCliente={handleOpenCliente} onChanged={handleChanged} />
         </TabsContent>

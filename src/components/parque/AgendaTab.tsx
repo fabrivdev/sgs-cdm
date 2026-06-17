@@ -13,7 +13,12 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
+import { trabajoReferencia } from "@/lib/trabajos";
+import {
+  esParaContactar,
+  buildClientesConTrabajoAbierto,
+  diasDesde,
+} from "@/lib/contacto-utils";
 
 const RESULTADOS = [
   "Contactado",
@@ -25,7 +30,7 @@ const RESULTADOS = [
 
 type Cliente = { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean | null };
 type Maquina = { cliente_id: string | null; sucursal: Sucursal | null };
-type UltimaFactura = { cliente_id: string; ult_servicio: string | null };
+type UltimaFactura = { cliente_id: string; ult_servicio: string | null; ult_repuesto: string | null };
 type TrabajoAgenda = {
   id: string;
   cliente_id: string | null;
@@ -196,18 +201,22 @@ export function AgendaTab({
     return m;
   }, [maquinas]);
 
+  const clientesConTrabajoAbierto = useMemo(
+    () => buildClientesConTrabajoAbierto(trabajos),
+    [trabajos],
+  );
+
   const trabajosAbiertosPorCliente = useMemo(() => {
     const map = new Map<string, TrabajoAgenda[]>();
     for (const trabajo of trabajos) {
       if (!trabajo.cliente_id) continue;
-      const estado = normalizarEstadoTrabajo(trabajo.estado_general);
-      if (estado === "completado") continue;
+      if (!clientesConTrabajoAbierto.has(trabajo.cliente_id)) continue;
       const list = map.get(trabajo.cliente_id) ?? [];
       list.push(trabajo);
       map.set(trabajo.cliente_id, list);
     }
     return map;
-  }, [trabajos]);
+  }, [trabajos, clientesConTrabajoAbierto]);
 
   const trabajosPorCliente = useMemo(() => {
     const map = new Map<string, TrabajoAgenda[]>();
@@ -220,7 +229,7 @@ export function AgendaTab({
     return map;
   }, [trabajos]);
 
-  const filas = useMemo(() => {
+  const filasLegacy = useMemo(() => {
     const cantPorCliente = new Map<string, number>();
 
     for (const mq of maquinas) {
@@ -289,22 +298,99 @@ export function AgendaTab({
       });
   }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajos, trabajosAbiertosPorCliente]);
 
+  const filas = useMemo(() => {
+    const cantPorCliente = new Map<string, number>();
+    const ultSegPorCliente = new Map<string, Seguimiento>();
+    const ultFactPorCliente = new Map<string, UltimaFactura>();
+
+    for (const mq of maquinas) {
+      if (!mq.cliente_id) continue;
+      cantPorCliente.set(mq.cliente_id, (cantPorCliente.get(mq.cliente_id) ?? 0) + 1);
+    }
+
+    for (const uf of ultimasFacturas) {
+      ultFactPorCliente.set(uf.cliente_id, uf);
+    }
+
+    for (const sg of seguimientos) {
+      const cur = ultSegPorCliente.get(sg.cliente_id);
+      if (!cur || new Date(cur.fecha) < new Date(sg.fecha)) {
+        ultSegPorCliente.set(sg.cliente_id, sg);
+      }
+    }
+
+    return [...cantPorCliente.entries()]
+      .map(([clienteId, cantMaquinas]) => {
+        const cli = cliById.get(clienteId);
+        const ult = ultSegPorCliente.get(clienteId);
+        const ultFactura = ultFactPorCliente.get(clienteId);
+        const ultServicio = ultFactura?.ult_servicio ?? null;
+        const ultRepuesto = ultFactura?.ult_repuesto ?? null;
+        const trabajosAbiertos = trabajosAbiertosPorCliente.get(clienteId) ?? [];
+        const trabajoActivo = trabajosAbiertos[0] ?? null;
+
+        return {
+          clienteId,
+          cliente: cli ?? null,
+          cantMaquinas,
+          dias: diasDesde(ult?.fecha ?? null),
+          diasUltServicio: diasDesde(ultServicio),
+          ultResultado: ult?.resultado ?? null,
+          trabajoActivo,
+          trabajosAbiertosCount: trabajosAbiertos.length,
+          paraContactar: esParaContactar({
+            clienteId,
+            ultSeguimientoFecha: ult?.fecha ?? null,
+            ultServicioFecha: ultServicio,
+            ultRepuestoFecha: ultRepuesto,
+            tieneTrabajoAbierto: clientesConTrabajoAbierto.has(clienteId),
+            tieneRepEnRango: false,
+            tieneSrvEnRango: false,
+          }),
+        };
+      })
+      .filter((f) => !!f.cliente)
+      .filter((f) => f.paraContactar)
+      .sort((a, b) => {
+        const da = a.dias ?? Number.MAX_SAFE_INTEGER;
+        const db = b.dias ?? Number.MAX_SAFE_INTEGER;
+        return db - da;
+      });
+  }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajosAbiertosPorCliente, clientesConTrabajoAbierto]);
+
   const agendaKpis = useMemo(() => {
-    const desde90 = Date.now() - 90 * 86400000;
+    const desde90 = new Date(Date.now() - 90 * 86400000);
+    const clienteIds = new Set(
+      maquinas.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id),
+    );
     const gestionados90 = new Set<string>();
 
     for (const seguimiento of seguimientos) {
-      if (new Date(seguimiento.fecha).getTime() < desde90) continue;
+      if (!clienteIds.has(seguimiento.cliente_id)) continue;
+      if (new Date(seguimiento.fecha) < desde90) continue;
       gestionados90.add(seguimiento.cliente_id);
+    }
+
+    for (const factura of ultimasFacturas) {
+      if (!clienteIds.has(factura.cliente_id)) continue;
+      const ultServicio = factura.ult_servicio ? new Date(`${factura.ult_servicio}T00:00:00`) : null;
+      const ultRepuesto = factura.ult_repuesto ? new Date(`${factura.ult_repuesto}T00:00:00`) : null;
+      if ((ultServicio && ultServicio >= desde90) || (ultRepuesto && ultRepuesto >= desde90)) {
+        gestionados90.add(factura.cliente_id);
+      }
+    }
+
+    for (const clienteId of clientesConTrabajoAbierto) {
+      if (clienteIds.has(clienteId)) gestionados90.add(clienteId);
     }
 
     return {
       pendientes: filas.length,
-      serviciosAsociados: trabajosAbiertosPorCliente.size,
+      serviciosAsociados: Array.from(clientesConTrabajoAbierto).filter((id) => clienteIds.has(id)).length,
       gestionados90: gestionados90.size,
       sinHistorial: filas.filter((fila) => fila.dias == null).length,
     };
-  }, [filas, seguimientos, trabajosAbiertosPorCliente]);
+  }, [filas, seguimientos, ultimasFacturas, clientesConTrabajoAbierto, maquinas]);
 
   const filasFiltradas = useMemo(() => {
     const ql = pQ.trim().toLowerCase();
