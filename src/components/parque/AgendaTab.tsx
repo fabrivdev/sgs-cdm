@@ -229,75 +229,6 @@ export function AgendaTab({
     return map;
   }, [trabajos]);
 
-  const filasLegacy = useMemo(() => {
-    const cantPorCliente = new Map<string, number>();
-
-    for (const mq of maquinas) {
-      if (!mq.cliente_id) continue;
-      cantPorCliente.set(mq.cliente_id, (cantPorCliente.get(mq.cliente_id) ?? 0) + 1);
-    }
-
-    const ultPorCliente = new Map<string, Seguimiento>();
-    const ultServicioPorCliente = new Map<string, string | null>();
-
-    for (const uf of ultimasFacturas) {
-      ultServicioPorCliente.set(uf.cliente_id, uf.ult_servicio);
-    }
-
-    for (const sg of seguimientos) {
-      const cur = ultPorCliente.get(sg.cliente_id);
-      if (!cur || new Date(cur.fecha) < new Date(sg.fecha)) ultPorCliente.set(sg.cliente_id, sg);
-    }
-
-    for (const trabajo of trabajos) {
-      if (!trabajo.cliente_id) continue;
-      const cur = ultPorCliente.get(trabajo.cliente_id);
-      if (!cur || new Date(cur.fecha) < new Date(trabajo.creado_en)) {
-        ultPorCliente.set(trabajo.cliente_id, {
-          cliente_id: trabajo.cliente_id,
-          fecha: trabajo.creado_en,
-          resultado: "Agendó servicio",
-          observaciones: `TR asociado: ${trabajoReferencia(trabajo)}`,
-          trabajo_id: trabajo.id,
-        });
-      }
-    }
-
-    const hoy = Date.now();
-
-    return [...cantPorCliente.entries()]
-      .map(([clienteId, cantMaquinas]) => {
-        const cli = cliById.get(clienteId);
-        const ult = ultPorCliente.get(clienteId);
-        const dias = ult ? Math.floor((hoy - new Date(ult.fecha).getTime()) / 86400000) : null;
-        const ultServicio = ultServicioPorCliente.get(clienteId) ?? null;
-        const trabajosAbiertos = trabajosAbiertosPorCliente.get(clienteId) ?? [];
-        const trabajoActivo = trabajosAbiertos[0] ?? null;
-        const diasUltServicio = ultServicio
-          ? Math.floor((hoy - new Date(`${ultServicio}T00:00:00`).getTime()) / 86400000)
-          : null;
-
-        return {
-          clienteId,
-          cliente: cli ?? null,
-          cantMaquinas,
-          dias,
-          diasUltServicio,
-          ultResultado: ult?.resultado ?? null,
-          trabajoActivo,
-          trabajosAbiertosCount: trabajosAbiertos.length,
-        };
-      })
-      .filter((f) => !!f.cliente)
-      .filter((f) => !f.trabajoActivo)
-      .filter((f) => (f.diasUltServicio == null || f.diasUltServicio > 365) && (f.dias == null || f.dias > 60))
-      .sort((a, b) => {
-        const da = a.dias ?? Number.MAX_SAFE_INTEGER;
-        const db = b.dias ?? Number.MAX_SAFE_INTEGER;
-        return db - da;
-      });
-  }, [maquinas, seguimientos, ultimasFacturas, cliById, trabajos, trabajosAbiertosPorCliente]);
-
   const filas = useMemo(() => {
     const cantPorCliente = new Map<string, number>();
     const ultSegPorCliente = new Map<string, Seguimiento>();
@@ -360,37 +291,22 @@ export function AgendaTab({
 
   const agendaKpis = useMemo(() => {
     const desde90 = new Date(Date.now() - 90 * 86400000);
-    const clienteIds = new Set(
-      maquinas.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id),
-    );
+    const pendienteIds = new Set(filas.map((fila) => fila.clienteId));
     const gestionados90 = new Set<string>();
 
     for (const seguimiento of seguimientos) {
-      if (!clienteIds.has(seguimiento.cliente_id)) continue;
+      if (!pendienteIds.has(seguimiento.cliente_id)) continue;
       if (new Date(seguimiento.fecha) < desde90) continue;
       gestionados90.add(seguimiento.cliente_id);
     }
 
-    for (const factura of ultimasFacturas) {
-      if (!clienteIds.has(factura.cliente_id)) continue;
-      const ultServicio = factura.ult_servicio ? new Date(`${factura.ult_servicio}T00:00:00`) : null;
-      const ultRepuesto = factura.ult_repuesto ? new Date(`${factura.ult_repuesto}T00:00:00`) : null;
-      if ((ultServicio && ultServicio >= desde90) || (ultRepuesto && ultRepuesto >= desde90)) {
-        gestionados90.add(factura.cliente_id);
-      }
-    }
-
-    for (const clienteId of clientesConTrabajoAbierto) {
-      if (clienteIds.has(clienteId)) gestionados90.add(clienteId);
-    }
-
     return {
       pendientes: filas.length,
-      serviciosAsociados: Array.from(clientesConTrabajoAbierto).filter((id) => clienteIds.has(id)).length,
+      serviciosAsociados: clientesConTrabajoAbierto.size,
       gestionados90: gestionados90.size,
       sinHistorial: filas.filter((fila) => fila.dias == null).length,
     };
-  }, [filas, seguimientos, ultimasFacturas, clientesConTrabajoAbierto, maquinas]);
+  }, [filas, seguimientos, clientesConTrabajoAbierto]);
 
   const filasFiltradas = useMemo(() => {
     const ql = pQ.trim().toLowerCase();
@@ -548,14 +464,14 @@ export function AgendaTab({
           accent="text-emerald-600"
         />
         <AgendaMetricCard
-          title="Gestiones 90d"
+          title="Contactados 90d"
           value={agendaKpis.gestionados90.toLocaleString()}
-          detail="Contactos recientes"
+          detail="Seguimientos recientes"
           icon={PhoneCall}
           accent="text-blue-600"
         />
         <AgendaMetricCard
-          title="Sin historial"
+          title="Sin gestión registrada"
           value={agendaKpis.sinHistorial.toLocaleString()}
           detail="Nunca contactados"
           icon={Clock3}
