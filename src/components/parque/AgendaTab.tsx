@@ -188,6 +188,11 @@ export function AgendaTab({
     return m;
   }, [clientes]);
 
+  const clientesParqueIds = useMemo(
+    () => new Set(maquinas.map((maquina) => maquina.cliente_id).filter((id): id is string => !!id)),
+    [maquinas],
+  );
+
   const sucursalesPorCliente = useMemo(() => {
     const m = new Map<string, string>();
     const sets = new Map<string, Set<string>>();
@@ -294,18 +299,40 @@ export function AgendaTab({
     const pendienteIds = new Set(filas.map((fila) => fila.clienteId));
     const gestionados90 = new Set<string>();
     const facturados90 = new Set<string>();
+    const facturados90FueraParque = new Set<string>();
+    const clientesConSeguimiento = new Set<string>();
+    const seguimientosPorCliente = new Map<string, number>();
+    const maquinasPorCliente = new Map<string, number>();
 
     for (const seguimiento of seguimientos) {
+      if (clientesParqueIds.has(seguimiento.cliente_id)) {
+        clientesConSeguimiento.add(seguimiento.cliente_id);
+        seguimientosPorCliente.set(
+          seguimiento.cliente_id,
+          (seguimientosPorCliente.get(seguimiento.cliente_id) ?? 0) + 1,
+        );
+      }
+
       if (!pendienteIds.has(seguimiento.cliente_id)) continue;
       if (new Date(seguimiento.fecha) < desde90) continue;
       gestionados90.add(seguimiento.cliente_id);
     }
 
+    for (const maquina of maquinas) {
+      if (!maquina.cliente_id) continue;
+      maquinasPorCliente.set(maquina.cliente_id, (maquinasPorCliente.get(maquina.cliente_id) ?? 0) + 1);
+    }
+
     for (const factura of ultimasFacturas) {
+      if (!factura.cliente_id) continue;
       const ultServicio = factura.ult_servicio ? new Date(`${factura.ult_servicio}T00:00:00`) : null;
       const ultRepuesto = factura.ult_repuesto ? new Date(`${factura.ult_repuesto}T00:00:00`) : null;
       if ((ultServicio && ultServicio >= desde90) || (ultRepuesto && ultRepuesto >= desde90)) {
-        facturados90.add(factura.cliente_id);
+        if (clientesParqueIds.has(factura.cliente_id)) {
+          facturados90.add(factura.cliente_id);
+        } else {
+          facturados90FueraParque.add(factura.cliente_id);
+        }
       }
     }
 
@@ -315,8 +342,15 @@ export function AgendaTab({
       gestionados90: gestionados90.size,
       facturados90: facturados90.size,
       sinHistorial: filas.filter((fila) => fila.dias == null).length,
+      validacion: {
+        registrosSeguimiento: seguimientos.filter((seguimiento) => clientesParqueIds.has(seguimiento.cliente_id)).length,
+        clientesUnicosSeguimiento: clientesConSeguimiento.size,
+        clientesConMasDeUnaGestion: Array.from(seguimientosPorCliente.values()).filter((total) => total > 1).length,
+        clientesConMasDeUnaMaquina: Array.from(maquinasPorCliente.values()).filter((total) => total > 1).length,
+        facturados90FueraParque: facturados90FueraParque.size,
+      },
     };
-  }, [filas, seguimientos, ultimasFacturas, clientesConTrabajoAbierto]);
+  }, [filas, seguimientos, ultimasFacturas, clientesConTrabajoAbierto, clientesParqueIds, maquinas]);
 
   const filasFiltradas = useMemo(() => {
     const ql = pQ.trim().toLowerCase();
@@ -483,7 +517,7 @@ export function AgendaTab({
         <AgendaMetricCard
           title="Facturación 90d"
           value={agendaKpis.facturados90.toLocaleString()}
-          detail="Servicio o repuestos"
+          detail="Clientes del parque"
           icon={ReceiptText}
           accent="text-emerald-600"
         />
@@ -494,6 +528,15 @@ export function AgendaTab({
           icon={Clock3}
           accent="text-amber-600"
         />
+      </div>
+
+      <div className="rounded-md border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+        <span className="font-medium text-foreground">Validación:</span>{" "}
+        {agendaKpis.validacion.registrosSeguimiento.toLocaleString()} gestiones ·{" "}
+        {agendaKpis.validacion.clientesUnicosSeguimiento.toLocaleString()} clientes únicos ·{" "}
+        {agendaKpis.validacion.clientesConMasDeUnaGestion.toLocaleString()} con +1 gestión ·{" "}
+        {agendaKpis.validacion.clientesConMasDeUnaMaquina.toLocaleString()} con +1 máquina ·{" "}
+        {agendaKpis.validacion.facturados90FueraParque.toLocaleString()} facturados fuera del parque
       </div>
 
     <Tabs defaultValue="pendientes" className="space-y-3">
