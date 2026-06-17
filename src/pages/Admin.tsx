@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { Building2, Database, KeyRound, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
+import { Database, Eye, EyeOff, KeyRound, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,12 +33,6 @@ interface Profile {
   activo: boolean;
 }
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  sucursal: Sucursal | null;
-}
-
 interface UserRole {
   user_id: string;
   role: Role;
@@ -48,7 +42,6 @@ export default function Admin() {
   const { isSuperAdmin } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [emails, setEmails] = useState<Record<string, string>>({});
 
   const [email, setEmail] = useState("");
@@ -58,9 +51,6 @@ export default function Admin() {
   const [nuRol, setNuRol] = useState<Role>("tecnico");
   const [busy, setBusy] = useState(false);
 
-  const [cliNombre, setCliNombre] = useState("");
-  const [cliSucursal, setCliSucursal] = useState<Sucursal | "">("");
-
   const [credUser, setCredUser] = useState<Profile | null>(null);
   const [credEmail, setCredEmail] = useState("");
   const [credPassword, setCredPassword] = useState("");
@@ -68,6 +58,9 @@ export default function Admin() {
 
   const [delUser, setDelUser] = useState<Profile | null>(null);
   const [delBusy, setDelBusy] = useState(false);
+  const [toggleActivoPending, setToggleActivoPending] = useState<Profile | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showCredPassword, setShowCredPassword] = useState(false);
 
   const rolesByUser = useMemo(
     () =>
@@ -86,10 +79,9 @@ export default function Admin() {
   };
 
   const load = async () => {
-    const [profileResult, roleResult, clientResult] = await Promise.all([
+    const [profileResult, roleResult] = await Promise.all([
       (supabase as any).from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
       supabase.from("user_roles").select("user_id, role"),
-      supabase.from("clientes").select("id, nombre, sucursal").order("nombre"),
     ]);
 
     let loadedProfiles = (profileResult.data ?? []) as Profile[];
@@ -115,7 +107,6 @@ export default function Admin() {
 
     setProfiles(loadedProfiles);
     setRoles((roleResult.data ?? []) as UserRole[]);
-    setClientes((clientResult.data ?? []) as Cliente[]);
 
     const { data: emailData, error: emailErr } = await supabase.functions.invoke("admin-list-users");
     if (!emailErr && emailData?.users) {
@@ -156,9 +147,18 @@ export default function Admin() {
   };
 
   const toggleActivo = async (profile: Profile) => {
-    const { error } = await supabase.from("profiles").update({ activo: !profile.activo }).eq("id", profile.id);
+    if (profile.activo) { setToggleActivoPending(profile); return; }
+    const { error } = await supabase.from("profiles").update({ activo: true }).eq("id", profile.id);
     if (error) toast.error(error.message);
-    else load();
+    else { toast.success("Usuario reactivado"); load(); }
+  };
+
+  const confirmarToggleActivo = async () => {
+    if (!toggleActivoPending) return;
+    const { error } = await supabase.from("profiles").update({ activo: false }).eq("id", toggleActivoPending.id);
+    if (error) toast.error(error.message);
+    else { toast.success("Usuario desactivado"); load(); }
+    setToggleActivoPending(null);
   };
 
   const cambiarRol = async (userId: string, role: Role) => {
@@ -177,22 +177,11 @@ export default function Admin() {
     else load();
   };
 
-  const crearCliente = async () => {
-    if (!cliNombre.trim()) return;
-    const { error } = await supabase.from("clientes").insert({ nombre: cliNombre.trim(), sucursal: cliSucursal || null });
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Cliente creado");
-      setCliNombre("");
-      setCliSucursal("");
-      load();
-    }
-  };
-
   const openCred = (profile: Profile) => {
     setCredUser(profile);
     setCredEmail(emailByProfile(profile));
     setCredPassword("");
+    setShowCredPassword(false);
   };
 
   const guardarCred = async () => {
@@ -270,10 +259,6 @@ export default function Admin() {
             <Users className="mr-2 h-4 w-4" />
             Usuarios
           </TabsTrigger>
-          <TabsTrigger value="clientes">
-            <Building2 className="mr-2 h-4 w-4" />
-            Clientes
-          </TabsTrigger>
           <TabsTrigger value="importar">
             <Database className="mr-2 h-4 w-4" />
             Importar datos
@@ -313,7 +298,22 @@ export default function Admin() {
                 </div>
                 <div>
                   <Label className="text-xs">Contraseña</Label>
-                  <Input type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-9"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">Sucursal</Label>
@@ -417,19 +417,19 @@ export default function Admin() {
                   <div className="flex shrink-0 gap-1.5">
                     {isSuperAdmin && (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => openCred(profile)} className="h-7 px-2">
-                          <KeyRound className="h-3.5 w-3.5" />
+                        <Button variant="outline" size="sm" onClick={() => openCred(profile)} className="h-9 w-9 px-0">
+                          <KeyRound className="h-4 w-4" />
                         </Button>
                         {emailByProfile(profile) && (
-                          <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} className="h-7 px-2 text-destructive hover:text-destructive">
-                            <Trash2 className="h-3.5 w-3.5" />
+                          <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} className="h-9 w-9 px-0 text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                         <Button
                           variant={profile.activo ? "default" : "outline"}
                           size="sm"
                           onClick={() => toggleActivo(profile)}
-                          className="h-7 px-2 text-[10px]"
+                          className="h-9 px-3 text-xs"
                         >
                           {profile.activo ? "Activo" : "Inactivo"}
                         </Button>
@@ -472,40 +472,6 @@ export default function Admin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="clientes" className="space-y-4">
-          <Card className="p-3 sm:p-4">
-            <h3 className="mb-3 text-sm font-semibold">Crear cliente</h3>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div><Label className="text-xs">Nombre</Label><Input value={cliNombre} onChange={(e) => setCliNombre(e.target.value)} /></div>
-              <div>
-                <Label className="text-xs">Sucursal principal (opcional)</Label>
-                <Select value={cliSucursal || "none"} onValueChange={(value) => setCliSucursal(value === "none" ? "" : (value as Sucursal))}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Ninguna —</SelectItem>
-                    {SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-end"><Button onClick={crearCliente}>Agregar</Button></div>
-            </div>
-          </Card>
-
-          <Card>
-            <Table>
-              <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Sucursal principal</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {clientes.map((cliente) => (
-                  <TableRow key={cliente.id}>
-                    <TableCell className="font-medium">{cliente.nombre}</TableCell>
-                    <TableCell>{cliente.sucursal ? <Badge variant="outline">{cliente.sucursal}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="importar" className="space-y-4">
           <ImportarTab onChanged={load} />
         </TabsContent>
@@ -523,12 +489,23 @@ export default function Admin() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">{credUser && emailByProfile(credUser) ? "Nueva contraseña" : "Contraseña inicial"}</Label>
-              <Input
-                type="text"
-                value={credPassword}
-                onChange={(e) => setCredPassword(e.target.value)}
-                placeholder={credUser && emailByProfile(credUser) ? "Dejar vacío para no cambiar" : "Obligatoria para crear el acceso"}
-              />
+              <div className="relative">
+                <Input
+                  type={showCredPassword ? "text" : "password"}
+                  value={credPassword}
+                  onChange={(e) => setCredPassword(e.target.value)}
+                  placeholder={credUser && emailByProfile(credUser) ? "Dejar vacío para no cambiar" : "Obligatoria para crear el acceso"}
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowCredPassword((v) => !v)}
+                  aria-label={showCredPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showCredPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               <p className="text-[11px] text-muted-foreground">Mínimo 6 caracteres.</p>
             </div>
             {!hasLinkedSchema && !(credUser && emailByProfile(credUser)) && (
@@ -543,6 +520,26 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!toggleActivoPending} onOpenChange={(open) => !open && setToggleActivoPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Desactivar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-semibold">{toggleActivoPending?.nombre}</span> perderá acceso al sistema de inmediato. Podés reactivarlo en cualquier momento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmarToggleActivo(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Desactivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!delUser} onOpenChange={(open) => !open && setDelUser(null)}>
         <AlertDialogContent>

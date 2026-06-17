@@ -22,8 +22,9 @@ import {
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
+import { NuevoClienteDialog } from "./NuevoClienteDialog";
 import { Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatGuaranies } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import {
@@ -135,8 +136,7 @@ const dias = (d: string | null | undefined) => {
   return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 };
 
-const fmtMoney = (n: number) =>
-  new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(n);
+const fmtMoney = (n: number) => formatGuaranies(n);
 
 const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -197,6 +197,7 @@ export function ParqueTab({
 
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
   const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
+  const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
@@ -606,6 +607,9 @@ export function ParqueTab({
         
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button variant="default" size="sm" onClick={() => setNuevoClienteOpen(true)} className="h-9">
+              <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
+            </Button>
             <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9">
               <Plus className="mr-1 h-4 w-4" /> Nueva máquina
             </Button>
@@ -653,7 +657,7 @@ export function ParqueTab({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
                     <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                    {customDesde ? format(customDesde, "dd/MM/yy") : "Desde"}
+                    {customDesde ? format(customDesde, "dd/MM") : "Desde"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -666,7 +670,7 @@ export function ParqueTab({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
                     <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                    {customHasta ? format(customHasta, "dd/MM/yy") : "Hasta"}
+                    {customHasta ? format(customHasta, "dd/MM") : "Hasta"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -698,7 +702,7 @@ export function ParqueTab({
 
       <div className="text-xs text-muted-foreground">
         {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
-        {format(desdeDate, "dd/MM/yy")} – {format(hastaDate, "dd/MM/yy")}
+        {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
         {factLoading && !loading && (
           <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/80">
             · cargando facturación…
@@ -893,6 +897,14 @@ export function ParqueTab({
       <NuevaMaquinaDialog
         open={nuevaMaquinaOpen}
         onOpenChange={setNuevaMaquinaOpen}
+        onCreated={() => {
+          cargar();
+          _onChanged?.();
+        }}
+      />
+      <NuevoClienteDialog
+        open={nuevoClienteOpen}
+        onOpenChange={setNuevoClienteOpen}
         onCreated={() => {
           cargar();
           _onChanged?.();
