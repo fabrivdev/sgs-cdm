@@ -871,6 +871,18 @@ export default function Dashboard() {
     const rows = osImpactRows.filter((row) => inRange(row.fecha, first.start, last.end));
     return summarizeOSImpact(rows, "acumulado", "Acumulado visible", first.start, last.end);
   }, [osEvolutionRows, osImpactRows, periodEnd, periodStart]);
+  const osAccumulatedComparisonSummary = useMemo(() => {
+    const first = osEvolutionRows[0];
+    const last = osEvolutionRows[osEvolutionRows.length - 1];
+    if (!first || !last) return summarizeOSImpact([], "comp-acumulado", "Año anterior", periodStart, periodEnd);
+    const compStart = subYears(first.start, 1);
+    const compEnd = subYears(last.end, 1);
+    const rows = osImpactRows.filter((row) => inRange(row.fecha, compStart, compEnd));
+    return summarizeOSImpact(rows, "comp-acumulado", "Año anterior", compStart, compEnd);
+  }, [osEvolutionRows, osImpactRows, periodStart, periodEnd]);
+  const osVarPct = osAccumulatedComparisonSummary.total > 0
+    ? Math.round(((osAccumulatedSummary.total - osAccumulatedComparisonSummary.total) / osAccumulatedComparisonSummary.total) * 100)
+    : null;
   const osBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
       const rows = osSelectedRows.filter((row) => row.sucursal === sucursal);
@@ -1791,6 +1803,50 @@ export default function Dashboard() {
               />
             </Card>
           </section>
+
+          <Card
+            className="cursor-pointer p-3 transition-colors hover:bg-accent/50"
+            onClick={() => goSection("os")}
+            role="button"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-semibold">OS absorbidas (garantía + interno)</h2>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  Costo absorbido en el rango visible
+                  {osAccumulatedSummary.osCount > 0 && ` · ${format(osAccumulatedSummary.start, "dd/MM/yy")} – ${format(osAccumulatedSummary.end, "dd/MM/yy")}`}
+                </p>
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground">Ver detalle →</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-3">
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Monto absorbido</div>
+                <div className="mt-1 text-xl font-bold tabular-nums">{money(osAccumulatedSummary.total)}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">{osAccumulatedSummary.osCount === 0 ? "Sin OS en el rango" : `${osAccumulatedSummary.garantia > 0 ? money(osAccumulatedSummary.garantia) + " garantía" : ""}${osAccumulatedSummary.garantia > 0 && osAccumulatedSummary.interno > 0 ? " · " : ""}${osAccumulatedSummary.interno > 0 ? money(osAccumulatedSummary.interno) + " interno" : ""}`}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Vs año anterior</div>
+                <div className={cn(
+                  "mt-1 text-xl font-bold tabular-nums",
+                  osVarPct == null ? "text-muted-foreground" : osVarPct > 0 ? "text-destructive" : "text-emerald-600",
+                )}>
+                  {osVarPct == null ? "—" : `${osVarPct > 0 ? "+" : ""}${osVarPct}%`}
+                </div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {osAccumulatedComparisonSummary.total > 0 ? money(osAccumulatedComparisonSummary.total) + " año anterior" : "Sin datos previos"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Casos</div>
+                <div className="mt-1 text-xl font-bold tabular-nums">{osAccumulatedSummary.osCount}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">OS cerradas</div>
+              </div>
+            </div>
+          </Card>
 
         </TabsContent>
 
