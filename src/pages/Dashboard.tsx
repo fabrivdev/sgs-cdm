@@ -2,6 +2,7 @@ import { startTransition, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
@@ -1741,7 +1742,7 @@ export default function Dashboard() {
           </section>
 
 
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
+          <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
             <Card className="flex h-full flex-col p-3">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
                 <div className="min-w-0">
@@ -1763,6 +1764,21 @@ export default function Dashboard() {
                 </div>
               </div>
               <CargaEquipoChart data={productividadMatriz} />
+            </Card>
+            <Card className="flex h-full flex-col p-3">
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
+              <EstadoCompacto
+                flujo={flujo}
+                onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}
+                planificados={trabajosPlanificadosProximoPeriodo}
+                tecnicosAsignados={tecnicosProximoPeriodo}
+                jornadasPlanificadas={jornadasPlanificacion.length}
+                planificacionRango={planificacionRango}
+                jornadasPrev={jornadasRealizadasPrev.length}
+                horasPrev={horasPrev}
+                tecnicosCierreAnterior={tecnicosCierreAnterior}
+                cierreAnteriorRango={cierreAnteriorRango}
+              />
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
@@ -1840,47 +1856,51 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <Card className="flex flex-col p-3">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold">{T.facturas}</h2>
-                {selectedFacts.length > MAX_FACTURAS_RENDER && (
-                  <p className="text-xs text-muted-foreground">
-                    Mostrando {MAX_FACTURAS_RENDER} de {selectedFacts.length} lineas para mantener fluida la vista.
-                  </p>
-                )}
-              </div>
-              <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
-            </div>
-            <FacturasMobile rows={selectedFacts} visibleRows={visibleSelectedFacts} />
-            <div className="hidden max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border md:block">
-              <div className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-                <div>Fecha</div>
-                <div className="hidden md:block">Factura</div>
-                <div>Cliente</div>
-                <div>Concepto</div>
-                <div className="hidden md:block">Sucursal</div>
-                <div className="text-right">Importe</div>
-              </div>
-              {selectedFacts.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-muted-foreground">{T.sinFacturacion}</div>
-              ) : (
-                visibleSelectedFacts.map((row, index) => {
-                  const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
-                  return (
-                    <div key={`${row.cod_factura}-${index}`} className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] items-center border-t px-3 py-2 text-xs">
-                      <div className="tabular-nums">{format(parseISO(row.fecha), "dd/MM")}</div>
-                      <div className="hidden truncate font-mono text-[11px] md:block" title={row.cod_factura}>{row.cod_factura}</div>
-                      <div className="truncate font-medium" title={cliente ?? ""}>{cliente}</div>
-                      <div className="truncate" title={concept(row)}>{concept(row)}</div>
-                      <div className="hidden truncate md:block" title={row.sucursal ?? ""}>{row.sucursal ?? "-"}</div>
-                      <div className="text-right font-semibold tabular-nums">{money(Number(row.total_venta || 0))}</div>
+          <Accordion type="single" collapsible>
+            <AccordionItem value="facturas" className="overflow-hidden rounded-lg border bg-card shadow-sm">
+              <AccordionTrigger className="px-3 py-3 text-left hover:no-underline hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="text-sm font-semibold">{T.facturas}</span>
+                  <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
+                  {selectedFacts.length > MAX_FACTURAS_RENDER && (
+                    <span className="hidden text-xs font-normal text-muted-foreground sm:inline">(mostrando {MAX_FACTURAS_RENDER})</span>
+                  )}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-3 pt-0">
+                <div className="px-3">
+                  <FacturasMobile rows={selectedFacts} visibleRows={visibleSelectedFacts} />
+                  <div className="hidden max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border md:block">
+                    <div className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+                      <div>Fecha</div>
+                      <div className="hidden md:block">Factura</div>
+                      <div>Cliente</div>
+                      <div>Concepto</div>
+                      <div className="hidden md:block">Sucursal</div>
+                      <div className="text-right">Importe</div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </Card>
+                    {selectedFacts.length === 0 ? (
+                      <div className="px-3 py-10 text-center text-xs text-muted-foreground">{T.sinFacturacion}</div>
+                    ) : (
+                      visibleSelectedFacts.map((row, index) => {
+                        const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
+                        return (
+                          <div key={`${row.cod_factura}-${index}`} className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] items-center border-t px-3 py-2 text-xs">
+                            <div className="tabular-nums">{format(parseISO(row.fecha), "dd/MM")}</div>
+                            <div className="hidden truncate font-mono text-[11px] md:block" title={row.cod_factura}>{row.cod_factura}</div>
+                            <div className="truncate font-medium" title={cliente ?? ""}>{cliente}</div>
+                            <div className="truncate" title={concept(row)}>{concept(row)}</div>
+                            <div className="hidden truncate md:block" title={row.sucursal ?? ""}>{row.sucursal ?? "-"}</div>
+                            <div className="text-right font-semibold tabular-nums">{money(Number(row.total_venta || 0))}</div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </TabsContent>
 
         <TabsContent value="os" className="space-y-3">

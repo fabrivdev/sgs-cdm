@@ -75,3 +75,35 @@ Admin user operations (create/delete/list/update) are handled via Edge Functions
 ### TypeScript Config
 
 `strictNullChecks` and `noImplicitAny` are both `false`. Do not introduce TypeScript strict-mode patterns that would conflict with the existing loose config.
+
+## Convenciones de diseño y UX
+
+Estos principios aplican a TODO cambio de UI. Respetarlos sin que haga falta recordarlos.
+
+### Honestidad de datos (CRÍTICO)
+- NUNCA mostrar un número sin confirmar qué significa exactamente y de dónde sale. Si un dato puede dar 0 o engañoso (ej: horas que solo cuentan jornadas Completado, "planificados" que mezclan vencido con futuro), NO mostrarlo o aclarar la limitación.
+- Las etiquetas deben ser literalmente verdaderas. No llamar "próximo período" a algo que incluye el período actual, ni "planificado" a un backlog que mezcla vencido y futuro.
+- Antes de agregar una métrica nueva, verificar que el dato exista y sea sólido. No inventar de memoria.
+
+### KPI cards
+- Un card = un titular claro + como máximo una línea de apoyo. Nunca 3-4 datos amontonados en un card.
+- Una sola unidad/concepto por card. No mezclar personas con trabajos en el mismo card.
+- El texto debe entrar completo, sin truncarse. Preferir etiquetas cortas antes que reducir fuente.
+- Usar unidades que el usuario final entienda (trabajos, plata, clientes), no unidades operativas internas (ej: "jornadas") sin contexto.
+
+### Jerarquía y densidad
+- Resumen arriba (glanceable), detalle abajo o detrás de "ver detalle". No repetir el mismo dato con igual peso en dos lugares.
+- Tablas largas (cientos de filas) o datos de uso contable/operativo no van como bloque principal: van colapsadas o detrás de un botón.
+- Distinguir audiencias: lo ejecutivo (CEO) y lo operativo no deben competir al mismo nivel visual.
+- Lean no es vacío: pocos bloques fuertes es mejor que muchos compitiendo. No llenar espacio con datos de relleno.
+
+### Gráficos
+- Eje con escala fija escalonada (topes redondos), no ajustada exacta al dato, para que no salte entre períodos.
+- Mostrar siempre el rango completo de buckets (ej: los 7 días de la semana) aunque alguno esté en 0. Un día en 0 es información, no se oculta.
+- Consistencia con gráficos existentes: si ya hay un patrón visual (ej: WeeklyBars), los gráficos nuevos deben "rimar" con él.
+- Dar aire: las barras no deben quedar pegadas al eje. Aprovechar todo el alto del componente sin dejar espacio muerto.
+
+### Reglas de trabajo
+- Un cambio a la vez. No mezclar varios cambios grandes en una sola tanda.
+- Antes de borrar o mover algo, verificar el estado ACTUAL del código (no asumir de análisis viejos).
+- Tras tocar estructuras de datos (useMemo, returns), verificar que no queden referencias rotas.
