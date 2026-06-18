@@ -19,7 +19,9 @@ import {
   Activity,
   PieChart,
   Receipt,
+  User,
   Users,
+  Wrench,
 } from "lucide-react";
 import {
   addMonths,
@@ -50,7 +52,7 @@ import { TrabajoEstadoBadge } from "@/components/StatusBadges";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EvolucionKpis, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca } from "@/components/dashboard/DashboardCharts";
+import { WeeklyBars, SucursalBars, MixRubros, EvolucionKpis, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca } from "@/components/dashboard/DashboardCharts";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -1312,6 +1314,7 @@ export default function Dashboard() {
       if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
     }
 
+    const trabajosPorBucketMap = new Map<string, Set<string>>();
     for (const jornada of jornadas) {
       // Cancelada no cuenta; Pendiente y Completado sí (jornadas asignadas)
       if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado") continue;
@@ -1321,6 +1324,8 @@ export default function Dashboard() {
 
       const key = bucketKey(jornada.fecha);
       bucketsSet.add(key);
+      if (!trabajosPorBucketMap.has(key)) trabajosPorBucketMap.set(key, new Set());
+      trabajosPorBucketMap.get(key).add(trabajoId);
       // Solo Completado aporta horas reales
       const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
       for (const id of validJornadaCrew(jornada)) {
@@ -1364,6 +1369,8 @@ export default function Dashboard() {
     }
 
     const buckets = Array.from(bucketsSet).sort();
+    const trabajosPorBucket: Record<string, number> = {};
+    for (const k of buckets) trabajosPorBucket[k] = trabajosPorBucketMap.get(k)?.size ?? 0;
     const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
     const rowsAll = Array.from(map.values())
       .map((row) => ({
@@ -1389,7 +1396,7 @@ export default function Dashboard() {
       }
     }
 
-    return { buckets, rows, totalesPorBucket, bucketLabel, bucketMode };
+    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, bucketLabel, bucketMode };
   }, [activeTechnicianIds, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
@@ -1518,7 +1525,7 @@ export default function Dashboard() {
         )}
       </FiltersBar>
 
-      {loading ? <DashboardKPISkeleton count={5} /> : <section className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
+      {loading ? <DashboardKPISkeleton count={5} /> : <section className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-6">
         <SummaryCard
           icon={DollarSign}
           title="Facturación del período"
@@ -1569,10 +1576,51 @@ export default function Dashboard() {
           title="Flujo operativo"
           value={flujo.total}
           detail="trabajos gestionados"
-          footer={`${flujo.culminados} Culminados · ${flujo.abiertos} Abiertos · ${flujo.pausados} Pausados`}
           tone={flujo.pausados > 0 ? "warn" : "neutral"}
           onClick={() => goSection("trabajos")}
-        />
+        >
+          <div className="border-t pt-1.5">
+            <div className="flex justify-between">
+              {([
+                { dot: "bg-primary", count: flujo.culminados, label: "Culminados" },
+                { dot: "bg-amber-500", count: flujo.abiertos, label: "Abiertos" },
+                { dot: "bg-slate-400", count: flujo.pausados, label: "Pausados" },
+              ] as const).map(({ dot, count, label }) => (
+                <div key={label} className="flex flex-col items-center gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
+                    <span className="text-xs font-bold tabular-nums">{count}</span>
+                  </div>
+                  <span className="text-[9px] text-muted-foreground">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SummaryCard>
+        <SummaryCard
+          icon={Wrench}
+          title="Equipo técnico"
+          value={`${tecnicosConActividadPeriodo.size}/${activeTechnicianIds.size}`}
+          detail="técnicos activos"
+          tone="neutral"
+          onClick={() => goSection("trabajos")}
+        >
+          {(() => {
+            const total = activeTechnicianIds.size;
+            if (total === 0) return null;
+            const active = tecnicosConActividadPeriodo.size;
+            let filled = Math.round((active / total) * 10);
+            if (active > 0 && filled === 0) filled = 1;
+            if (active < total && filled === 10) filled = 9;
+            return (
+              <div className="flex items-center gap-0.5 pt-1">
+                {Array.from({ length: 10 }, (_, i) => (
+                  <User key={i} className={cn("h-3.5 w-3.5 shrink-0", i < filled ? "text-primary" : "text-muted-foreground/30")} />
+                ))}
+              </div>
+            );
+          })()}
+        </SummaryCard>
       </section>}
 
 
@@ -1671,27 +1719,9 @@ export default function Dashboard() {
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={CheckCircle2} title="Estado de trabajos" subtitle="" />
-              <EstadoCompacto
-                flujo={flujo}
-                onSelect={(estado) => { setFEstadosTrabajo([estado]); goSection("trabajos"); }}
-                planificados={trabajosPlanificadosProximoPeriodo}
-                tecnicosAsignados={tecnicosProximoPeriodo}
-                jornadasPlanificadas={jornadasPlanificacion.length}
-                planificacionRango={planificacionRango}
-                jornadasPrev={jornadasRealizadasPrev.length}
-                horasPrev={horasPrev}
-                tecnicosCierreAnterior={tecnicosCierreAnterior}
-                cierreAnteriorRango={cierreAnteriorRango}
-              />
+              <PanelTitle icon={CalendarDays} title="Carga del equipo" subtitle="Trabajos por período y técnicos activos" />
+              <CargaEquipoChart data={productividadMatriz} />
             </Card>
-            <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={CalendarDays} title={periodMode === "semana" ? "Carga tecnica" : "Carga tecnica del periodo"} subtitle="" />
-              <CargaTecnicaMatriz data={productividadMatriz} onClick={() => goSection("trabajos")} />
-            </Card>
-          </section>
-
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
               <ClientesCompacto
@@ -1701,11 +1731,6 @@ export default function Dashboard() {
                 totalClientes={currentWeekRow?.clientes ?? 0}
                 onSelect={(nombre) => { setQ(nombre); goSection("facturacion"); }}
               />
-            </Card>
-            <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Cerrados, abiertos y pausados dentro del período." />
-
-              <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("trabajos"); }} />
             </Card>
           </section>
 

@@ -949,11 +949,7 @@ export function EstadoCompacto({
             icon={CalendarDays}
             title="PRÓXIMO PERIODO"
             subtitle={planificacionRango}
-            value={`${planificados ?? 0} planificados`}
-            detail={[
-              tecnicosAsignados ? `${tecnicosAsignados} técnicos asignados` : null,
-              jornadasPlanificadas ? `${jornadasPlanificadas} jornadas` : null,
-            ].filter(Boolean).join(" · ")}
+            value={`${jornadasPlanificadas ?? 0} jornadas`}
           />
           <EstadoMiniCard
             icon={Activity}
@@ -1157,6 +1153,149 @@ export function DistribucionMarca({
           <span>{totales.horas.toFixed(1)} h</span>
           <span className="font-semibold text-foreground">{totales.total}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function CargaEquipoChart({
+  data,
+}: {
+  data: {
+    buckets: string[];
+    allRows: Array<{ porBucket: Record<string, { jornadas: number; horas: number }> }>;
+    trabajosPorBucket: Record<string, number>;
+    bucketLabel: (k: string) => string;
+  };
+}) {
+  const { buckets, allRows, trabajosPorBucket, bucketLabel } = data;
+  const n = buckets.length;
+
+  const trabajos = buckets.map((k) => trabajosPorBucket[k] ?? 0);
+  const techs = buckets.map((k) =>
+    allRows.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length
+  );
+
+  const maxTrabajos = Math.max(1, ...trabajos);
+  const maxTechs = Math.max(1, ...techs);
+  const labelEvery = n > 14 ? Math.ceil(n / 6) : n > 9 ? 2 : 1;
+  const gridCols = `repeat(${Math.max(n, 1)}, minmax(0, 1fr))`;
+
+  // Catmull-Rom cubic bezier smooth path (tension=0.3)
+  const svgPath = (() => {
+    if (n < 2) return "";
+    const pts = buckets.map((_, i) => ({
+      x: ((i + 0.5) / n) * 100,
+      y: 5 + (1 - techs[i] / maxTechs) * 90,
+    }));
+    const t = 0.3;
+    let d = `M ${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const cp1x = p1.x + t * (p2.x - p0.x);
+      const cp1y = p1.y + t * (p2.y - p0.y);
+      const cp2x = p2.x - t * (p3.x - p1.x);
+      const cp2y = p2.y - t * (p3.y - p1.y);
+      d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
+    }
+    return d;
+  })();
+
+  return (
+    <div className="overflow-hidden">
+      {/* Value labels with spacers matching axis widths */}
+      <div className="flex">
+        <div className="w-6 shrink-0" />
+        <div className="grid flex-1 gap-1 px-0.5 pb-1 sm:gap-3 sm:px-2" style={{ gridTemplateColumns: gridCols }}>
+          {buckets.map((k, i) => (
+            <div key={k} className="text-center text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">
+              {trabajos[i] || ""}
+            </div>
+          ))}
+        </div>
+        <div className="w-6 shrink-0" />
+      </div>
+
+      {/* Bar area flanked by Y axes */}
+      <div className="flex items-stretch">
+        {/* Left Y axis: Trabajos scale */}
+        <div className="relative w-6 shrink-0">
+          <span className="absolute right-1 top-0 text-[8px] tabular-nums text-muted-foreground/60">{maxTrabajos}</span>
+          <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] tabular-nums text-muted-foreground/60">{Math.round(maxTrabajos / 2)}</span>
+          <span className="absolute bottom-0 right-1 text-[8px] tabular-nums text-muted-foreground/60">0</span>
+        </div>
+
+        {/* Chart area */}
+        <div className="relative h-[150px] flex-1 border-b sm:h-[180px]">
+          {svgPath && (
+            <svg
+              className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+            >
+              <path
+                d={svgPath}
+                fill="none"
+                stroke="rgb(245,158,11)"
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+          <div
+            className="absolute inset-0 grid items-end gap-1 px-0.5 sm:gap-3 sm:px-2"
+            style={{ gridTemplateColumns: gridCols }}
+          >
+            {buckets.map((k, i) => {
+              const h = trabajos[i] <= 0 ? 0 : Math.max(6, Math.round((trabajos[i] / maxTrabajos) * 150));
+              return (
+                <div key={k} className="flex items-end justify-center">
+                  <span
+                    className="w-full max-w-[34px] rounded-t-md bg-primary/80 sm:max-w-[42px]"
+                    style={{ height: h }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right Y axis: Técnicos scale (amber, aligned to SVG line) */}
+        <div className="relative w-6 shrink-0">
+          <span
+            className="absolute left-1 text-[8px] tabular-nums text-amber-600/70"
+            style={{ top: "5%", transform: "translateY(-50%)" }}
+          >{maxTechs}</span>
+          <span
+            className="absolute left-1 text-[8px] tabular-nums text-amber-600/70"
+            style={{ top: "50%", transform: "translateY(-50%)" }}
+          >{Math.round(maxTechs / 2)}</span>
+        </div>
+      </div>
+
+      {/* Bucket labels with spacers */}
+      <div className="flex">
+        <div className="w-6 shrink-0" />
+        <div className="mt-1 grid flex-1 gap-1 px-0.5 sm:gap-3 sm:px-2" style={{ gridTemplateColumns: gridCols }}>
+          {buckets.map((k, i) => (
+            <div key={k} className="min-h-7 truncate text-center text-[9px] leading-3 text-muted-foreground sm:min-h-8 sm:text-[10px] sm:leading-4">
+              {i === 0 || i === n - 1 || i % labelEvery === 0 ? bucketLabel(k) : ""}
+            </div>
+          ))}
+        </div>
+        <div className="w-6 shrink-0" />
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
+        <span className="h-2.5 w-2.5 rounded-sm bg-primary/80" />
+        Trabajos
+        <span className="ml-3 inline-block h-px w-5 bg-amber-500" />
+        Técnicos activos
       </div>
     </div>
   );
