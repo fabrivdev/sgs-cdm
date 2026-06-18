@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, getDay, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
@@ -1179,139 +1179,133 @@ export function CargaEquipoChart({
     allRows.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length
   );
 
-  const maxTrabajos = Math.max(1, ...trabajos);
-  // maxTechs computed only from non-Sunday buckets in "dia" mode so it isn't skewed by 0s
-  const activeTechs = buckets.map((k, i) => (isSunday(k) ? null : techs[i]));
-  const maxTechs = Math.max(1, ...(activeTechs.filter((v) => v !== null) as number[]));
-  const labelEvery = n > 14 ? Math.ceil(n / 6) : n > 9 ? 2 : 1;
+  // Stepped scale: round up to next multiple of 5 (min 5)
+  const rawMax = Math.max(0, ...trabajos, ...techs);
+  const maxAll = Math.max(5, Math.ceil(rawMax / 5) * 5);
+
+  // Measure the bar area's actual rendered height so bars fill it correctly
+  const barAreaRef = useRef<HTMLDivElement>(null);
+  const [chartH, setChartH] = useState(140);
+  useEffect(() => {
+    const el = barAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (h && h > 20) setChartH(h);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // 8px breathing room at the bottom (matches pb-2 in bars grid)
+  const usableH = Math.max(20, chartH - 8);
+  const barH = (v: number) => v <= 0 ? 3 : Math.max(5, Math.round((v / maxAll) * usableH));
+
+  // Y axis ticks at multiples of 5
+  const yStep = maxAll > 20 ? 10 : 5;
+  const yTicks: number[] = [];
+  for (let v = 0; v <= maxAll; v += yStep) yTicks.push(v);
+  yTicks.reverse();
+
   const gridCols = `repeat(${Math.max(n, 1)}, minmax(0, 1fr))`;
 
-  // Catmull-Rom cubic bezier smooth path (tension=0.3), skipping Sunday in "dia" mode
-  const svgPath = (() => {
-    const activePts = buckets
-      .map((k, i) => ({ x: ((i + 0.5) / n) * 100, y: 5 + (1 - techs[i] / maxTechs) * 90 }))
-      .filter((_, i) => !isSunday(buckets[i]));
-    if (activePts.length < 2) return "";
-    const t = 0.3;
-    let d = `M ${activePts[0].x.toFixed(2)},${activePts[0].y.toFixed(2)}`;
-    for (let i = 0; i < activePts.length - 1; i++) {
-      const p0 = activePts[Math.max(0, i - 1)];
-      const p1 = activePts[i];
-      const p2 = activePts[i + 1];
-      const p3 = activePts[Math.min(activePts.length - 1, i + 2)];
-      const cp1x = p1.x + t * (p2.x - p0.x);
-      const cp1y = p1.y + t * (p2.y - p0.y);
-      const cp2x = p2.x - t * (p3.x - p1.x);
-      const cp2y = p2.y - t * (p3.y - p1.y);
-      d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
-    }
-    return d;
-  })();
-
   return (
-    <div className="overflow-hidden">
-      {/* Value labels with spacers matching axis widths */}
-      <div className="flex">
-        <div className="w-6 shrink-0" />
-        <div className="grid flex-1 gap-1 px-0.5 pb-1 sm:gap-3 sm:px-2" style={{ gridTemplateColumns: gridCols }}>
-          {buckets.map((k, i) => (
-            <div key={k} className="text-center text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">
-              {!isSunday(k) && (trabajos[i] || "")}
-            </div>
+    <div className="flex flex-1 min-h-0 flex-col gap-2">
+      {/* Chart: Y axis + bars — flex-1 fills remaining card height */}
+      <div className="flex flex-1 min-h-0 gap-1">
+        {/* Y axis */}
+        <div className="relative w-5 shrink-0">
+          {yTicks.map((tick) => (
+            <span
+              key={tick}
+              className="absolute right-0.5 -translate-y-1/2 text-[8px] tabular-nums text-muted-foreground/60"
+              style={{ top: `${((maxAll - tick) / maxAll) * 100}%` }}
+            >{tick}</span>
           ))}
         </div>
-        <div className="w-6 shrink-0" />
-      </div>
 
-      {/* Bar area flanked by Y axes */}
-      <div className="flex items-stretch">
-        {/* Left Y axis: Trabajos scale */}
-        <div className="relative w-6 shrink-0">
-          <span className="absolute right-1 top-0 text-[8px] tabular-nums text-muted-foreground/60">{maxTrabajos}</span>
-          <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] tabular-nums text-muted-foreground/60">{Math.round(maxTrabajos / 2)}</span>
-          <span className="absolute bottom-0 right-1 text-[8px] tabular-nums text-muted-foreground/60">0</span>
-        </div>
-
-        {/* Chart area */}
-        <div className="relative h-[150px] flex-1 border-b sm:h-[180px]">
-          {svgPath && (
-            <svg
-              className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-            >
-              <path
-                d={svgPath}
-                fill="none"
-                stroke="rgb(245,158,11)"
-                strokeWidth="1.5"
-                vectorEffect="non-scaling-stroke"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-            </svg>
-          )}
+        {/* Bar area — ref'd for height measurement */}
+        <div ref={barAreaRef} className="relative flex-1 border-b border-l">
+          {/* Gridlines */}
+          {yTicks.filter((t) => t > 0 && t < maxAll).map((tick) => (
+            <div
+              key={tick}
+              className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-muted-foreground/15"
+              style={{ top: `${((maxAll - tick) / maxAll) * 100}%` }}
+            />
+          ))}
+          {/* Bars grid */}
           <div
-            className="absolute inset-0 grid items-end gap-1 px-0.5 sm:gap-3 sm:px-2"
+            className="absolute inset-0 grid items-end px-0.5 pb-2"
             style={{ gridTemplateColumns: gridCols }}
           >
             {buckets.map((k, i) => {
               const sun = isSunday(k);
-              const h = sun
-                ? 4
-                : trabajos[i] <= 0 ? 0 : Math.max(6, Math.round((trabajos[i] / maxTrabajos) * 150));
+              const hT = barH(trabajos[i]);
+              const hTech = barH(techs[i]);
               return (
-                <div key={k} className="flex items-end justify-center">
-                  <span
-                    className={cn(
-                      "w-full max-w-[34px] rounded-t-md sm:max-w-[42px]",
-                      sun ? "bg-muted/50" : "bg-primary/80",
+                <div key={k} className="flex items-end justify-center gap-px">
+                  {/* Trabajos bar */}
+                  <div className="flex flex-col items-center">
+                    {trabajos[i] > 0 && (
+                      <span className={cn(
+                        "mb-0.5 text-[7px] font-semibold leading-none tabular-nums sm:text-[8px]",
+                        sun ? "text-muted-foreground/30" : "text-primary/90",
+                      )}>{trabajos[i]}</span>
                     )}
-                    style={{ height: h }}
-                  />
+                    <div
+                      style={{ height: hT }}
+                      className={cn("w-3 rounded-t-sm sm:w-4", sun ? "bg-muted/40" : "bg-primary/75")}
+                    />
+                  </div>
+                  {/* Técnicos bar */}
+                  <div className="flex flex-col items-center">
+                    {techs[i] > 0 && (
+                      <span className={cn(
+                        "mb-0.5 text-[7px] font-semibold leading-none tabular-nums sm:text-[8px]",
+                        sun ? "text-muted-foreground/30" : "text-amber-500",
+                      )}>{techs[i]}</span>
+                    )}
+                    <div
+                      style={{ height: hTech }}
+                      className={cn("w-3 rounded-t-sm sm:w-4", sun ? "bg-muted/40" : "bg-amber-400/90")}
+                    />
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
-
-        {/* Right Y axis: Técnicos scale (amber, aligned to SVG line) */}
-        <div className="relative w-6 shrink-0">
-          <span
-            className="absolute left-1 text-[8px] tabular-nums text-amber-600/70"
-            style={{ top: "5%", transform: "translateY(-50%)" }}
-          >{maxTechs}</span>
-          <span
-            className="absolute left-1 text-[8px] tabular-nums text-amber-600/70"
-            style={{ top: "50%", transform: "translateY(-50%)" }}
-          >{Math.round(maxTechs / 2)}</span>
-        </div>
       </div>
 
-      {/* Bucket labels with spacers */}
-      <div className="flex">
-        <div className="w-6 shrink-0" />
-        <div className="mt-1 grid flex-1 gap-1 px-0.5 sm:gap-3 sm:px-2" style={{ gridTemplateColumns: gridCols }}>
-          {buckets.map((k, i) => (
+      {/* Day labels — spacer matches Y axis width + gap */}
+      <div className="flex gap-1">
+        <div className="w-5 shrink-0" />
+        <div className="grid flex-1 px-0.5" style={{ gridTemplateColumns: gridCols }}>
+          {buckets.map((k) => (
             <div
               key={k}
               className={cn(
-                "min-h-7 truncate text-center text-[9px] leading-3 sm:min-h-8 sm:text-[10px] sm:leading-4",
+                "truncate text-center text-[9px] sm:text-[10px]",
                 isSunday(k) ? "text-muted-foreground/40" : "text-muted-foreground",
               )}
             >
-              {i === 0 || i === n - 1 || i % labelEvery === 0 ? bucketLabel(k) : ""}
+              {bucketLabel(k)}
             </div>
           ))}
         </div>
-        <div className="w-6 shrink-0" />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
-        <span className="h-2.5 w-2.5 rounded-sm bg-primary/80" />
-        Trabajos
-        <span className="ml-3 inline-block h-px w-5 bg-amber-500" />
-        Técnicos activos
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground sm:text-[11px]">
+        <div className="flex items-center gap-1">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary/75" />
+          Trabajos
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400/90" />
+          Técnicos activos
+        </div>
       </div>
     </div>
   );

@@ -1298,6 +1298,13 @@ export default function Dashboard() {
     };
 
     const bucketsSet = new Set<string>();
+    // In "dia" mode always seed all 7 days so days with no jornadas still appear
+    if (bucketMode === "dia") {
+      const weekMon = startOfWeek(periodStart, { weekStartsOn: 1 });
+      for (let i = 0; i < 7; i++) {
+        bucketsSet.add(format(addDays(weekMon, i), "yyyy-MM-dd"));
+      }
+    }
     const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
 
     const ensureTecnicoRow = (id: string) => {
@@ -1358,12 +1365,7 @@ export default function Dashboard() {
     }
 
     if (bucketsSet.size === 0) {
-      if (bucketMode === "dia") {
-        const weekMon = startOfWeek(periodStart, { weekStartsOn: 1 });
-        for (let i = 0; i < 7; i++) {
-          bucketsSet.add(format(addDays(weekMon, i), "yyyy-MM-dd"));
-        }
-      } else if (bucketMode === "semana") {
+      if (bucketMode === "semana") {
         const start = startOfWeek(periodStart, { weekStartsOn: 1 });
         const end = endOfWeek(periodEnd, { weekStartsOn: 1 });
         let cursor = start;
@@ -1409,7 +1411,16 @@ export default function Dashboard() {
       }
     }
 
-    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, bucketLabel, bucketMode };
+    const equipoTotalTrabajos = buckets.reduce((s, k) => s + (trabajosPorBucket[k] ?? 0), 0);
+    const isSunBucket = (k: string) => bucketMode === "dia" && getDay(parseISO(k)) === 0;
+    const nonSunTechCounts = buckets
+      .filter((k) => !isSunBucket(k))
+      .map((k) => rowsAll.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length);
+    const equipoPromTecnicos: string = nonSunTechCounts.length > 0
+      ? (nonSunTechCounts.reduce((a, b) => a + b, 0) / nonSunTechCounts.length).toFixed(1)
+      : "—";
+
+    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTecnicos };
   }, [activeTechnicianIds, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
 
   const limpiar = () => {
@@ -1732,7 +1743,25 @@ export default function Dashboard() {
 
           <section className="grid auto-rows-fr gap-3 xl:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={CalendarDays} title="Carga del equipo" subtitle="Trabajos por período y técnicos activos" />
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
+                  <p className="truncate text-xs text-muted-foreground">Trabajos por período y técnicos activos</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex items-center gap-1.5 rounded-md bg-primary/5 px-2 py-1">
+                    <span className="text-[10px] text-muted-foreground">Total</span>
+                    <span className="text-sm font-bold tabular-nums text-primary">{productividadMatriz.equipoTotalTrabajos}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1">
+                    <span className="text-[10px] text-muted-foreground">Prom. técnicos</span>
+                    <span className="text-sm font-bold tabular-nums text-amber-600">{productividadMatriz.equipoPromTecnicos}</span>
+                  </div>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <CalendarDays className="h-4 w-4" />
+                  </div>
+                </div>
+              </div>
               <CargaEquipoChart data={productividadMatriz} />
             </Card>
             <Card className="flex h-full flex-col p-3">
