@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, parseISO } from "date-fns";
+import { format, getDay, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -1166,10 +1166,13 @@ export function CargaEquipoChart({
     allRows: Array<{ porBucket: Record<string, { jornadas: number; horas: number }> }>;
     trabajosPorBucket: Record<string, number>;
     bucketLabel: (k: string) => string;
+    bucketMode: "dia" | "semana" | "mes";
   };
 }) {
-  const { buckets, allRows, trabajosPorBucket, bucketLabel } = data;
+  const { buckets, allRows, trabajosPorBucket, bucketLabel, bucketMode } = data;
   const n = buckets.length;
+
+  const isSunday = (k: string) => bucketMode === "dia" && getDay(parseISO(k)) === 0;
 
   const trabajos = buckets.map((k) => trabajosPorBucket[k] ?? 0);
   const techs = buckets.map((k) =>
@@ -1177,24 +1180,25 @@ export function CargaEquipoChart({
   );
 
   const maxTrabajos = Math.max(1, ...trabajos);
-  const maxTechs = Math.max(1, ...techs);
+  // maxTechs computed only from non-Sunday buckets in "dia" mode so it isn't skewed by 0s
+  const activeTechs = buckets.map((k, i) => (isSunday(k) ? null : techs[i]));
+  const maxTechs = Math.max(1, ...(activeTechs.filter((v) => v !== null) as number[]));
   const labelEvery = n > 14 ? Math.ceil(n / 6) : n > 9 ? 2 : 1;
   const gridCols = `repeat(${Math.max(n, 1)}, minmax(0, 1fr))`;
 
-  // Catmull-Rom cubic bezier smooth path (tension=0.3)
+  // Catmull-Rom cubic bezier smooth path (tension=0.3), skipping Sunday in "dia" mode
   const svgPath = (() => {
-    if (n < 2) return "";
-    const pts = buckets.map((_, i) => ({
-      x: ((i + 0.5) / n) * 100,
-      y: 5 + (1 - techs[i] / maxTechs) * 90,
-    }));
+    const activePts = buckets
+      .map((k, i) => ({ x: ((i + 0.5) / n) * 100, y: 5 + (1 - techs[i] / maxTechs) * 90 }))
+      .filter((_, i) => !isSunday(buckets[i]));
+    if (activePts.length < 2) return "";
     const t = 0.3;
-    let d = `M ${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[Math.max(0, i - 1)];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    let d = `M ${activePts[0].x.toFixed(2)},${activePts[0].y.toFixed(2)}`;
+    for (let i = 0; i < activePts.length - 1; i++) {
+      const p0 = activePts[Math.max(0, i - 1)];
+      const p1 = activePts[i];
+      const p2 = activePts[i + 1];
+      const p3 = activePts[Math.min(activePts.length - 1, i + 2)];
       const cp1x = p1.x + t * (p2.x - p0.x);
       const cp1y = p1.y + t * (p2.y - p0.y);
       const cp2x = p2.x - t * (p3.x - p1.x);
@@ -1212,7 +1216,7 @@ export function CargaEquipoChart({
         <div className="grid flex-1 gap-1 px-0.5 pb-1 sm:gap-3 sm:px-2" style={{ gridTemplateColumns: gridCols }}>
           {buckets.map((k, i) => (
             <div key={k} className="text-center text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">
-              {trabajos[i] || ""}
+              {!isSunday(k) && (trabajos[i] || "")}
             </div>
           ))}
         </div>
@@ -1252,11 +1256,17 @@ export function CargaEquipoChart({
             style={{ gridTemplateColumns: gridCols }}
           >
             {buckets.map((k, i) => {
-              const h = trabajos[i] <= 0 ? 0 : Math.max(6, Math.round((trabajos[i] / maxTrabajos) * 150));
+              const sun = isSunday(k);
+              const h = sun
+                ? 4
+                : trabajos[i] <= 0 ? 0 : Math.max(6, Math.round((trabajos[i] / maxTrabajos) * 150));
               return (
                 <div key={k} className="flex items-end justify-center">
                   <span
-                    className="w-full max-w-[34px] rounded-t-md bg-primary/80 sm:max-w-[42px]"
+                    className={cn(
+                      "w-full max-w-[34px] rounded-t-md sm:max-w-[42px]",
+                      sun ? "bg-muted/50" : "bg-primary/80",
+                    )}
                     style={{ height: h }}
                   />
                 </div>
@@ -1283,7 +1293,13 @@ export function CargaEquipoChart({
         <div className="w-6 shrink-0" />
         <div className="mt-1 grid flex-1 gap-1 px-0.5 sm:gap-3 sm:px-2" style={{ gridTemplateColumns: gridCols }}>
           {buckets.map((k, i) => (
-            <div key={k} className="min-h-7 truncate text-center text-[9px] leading-3 text-muted-foreground sm:min-h-8 sm:text-[10px] sm:leading-4">
+            <div
+              key={k}
+              className={cn(
+                "min-h-7 truncate text-center text-[9px] leading-3 sm:min-h-8 sm:text-[10px] sm:leading-4",
+                isSunday(k) ? "text-muted-foreground/40" : "text-muted-foreground",
+              )}
+            >
               {i === 0 || i === n - 1 || i % labelEvery === 0 ? bucketLabel(k) : ""}
             </div>
           ))}
@@ -1309,7 +1325,7 @@ export function CargaTecnicaMatriz({
     rows: Array<{ id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: number }>;
     totalesPorBucket: Record<string, { jornadas: number; horas: number }>;
     bucketLabel: (k: string) => string;
-    bucketMode: "semana" | "mes";
+    bucketMode: "dia" | "semana" | "mes";
   };
   onClick?: () => void;
 }) {
@@ -1435,7 +1451,7 @@ export function CargaTecnicaMatriz({
             </button>
           )}
           <div className="text-[10px] text-muted-foreground">
-            Agrupado por {bucketMode === "mes" ? "mes" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
+            Agrupado por {bucketMode === "mes" ? "mes" : bucketMode === "dia" ? "día" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
           </div>
         </>
       )}

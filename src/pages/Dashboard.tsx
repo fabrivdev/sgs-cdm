@@ -24,6 +24,7 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  addDays,
   addMonths,
   addWeeks,
   addYears,
@@ -32,6 +33,7 @@ import {
   endOfWeek,
   endOfYear,
   format,
+  getDay,
   getISOWeek,
   getISOWeekYear,
   parseISO,
@@ -1274,13 +1276,19 @@ export default function Dashboard() {
 
 
   const productividadMatriz = useMemo(() => {
-    const bucketMode: "semana" | "mes" = periodMode === "anio" ? "mes" : "semana";
+    const bucketMode: "dia" | "semana" | "mes" =
+      periodMode === "anio" ? "mes" : periodMode === "semana" ? "dia" : "semana";
     const bucketKey = (iso: string) => {
+      if (bucketMode === "dia") return iso; // yyyy-MM-dd, ya es la clave
       const d = parseISO(iso);
       if (bucketMode === "mes") return format(d, "yyyy-MM");
       return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, "0")}`;
     };
     const bucketLabel = (key: string) => {
+      if (bucketMode === "dia") {
+        const d = parseISO(key);
+        return ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][getDay(d)];
+      }
       if (bucketMode === "mes") {
         const [y, m] = key.split("-");
         return format(new Date(Number(y), Number(m) - 1, 1), "MMM yy");
@@ -1350,7 +1358,12 @@ export default function Dashboard() {
     }
 
     if (bucketsSet.size === 0) {
-      if (periodMode === "semana") {
+      if (bucketMode === "dia") {
+        const weekMon = startOfWeek(periodStart, { weekStartsOn: 1 });
+        for (let i = 0; i < 7; i++) {
+          bucketsSet.add(format(addDays(weekMon, i), "yyyy-MM-dd"));
+        }
+      } else if (bucketMode === "semana") {
         const start = startOfWeek(periodStart, { weekStartsOn: 1 });
         const end = endOfWeek(periodEnd, { weekStartsOn: 1 });
         let cursor = start;
