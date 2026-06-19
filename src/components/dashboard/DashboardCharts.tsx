@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Marca, Sucursal } from "@/lib/constants";
-import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric } from "./types";
+import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode } from "./types";
 import {
   money,
   pct,
@@ -1178,7 +1178,7 @@ export function CargaEquipoChart({
     allRows: Array<{ porBucket: Record<string, { jornadas: number; horas: number }> }>;
     trabajosPorBucket: Record<string, number>;
     bucketLabel: (k: string) => string;
-    bucketMode: "dia" | "semana" | "mes";
+    bucketMode: PeriodMode;
   };
 }) {
   const { buckets, allRows, trabajosPorBucket, bucketLabel, bucketMode } = data;
@@ -1331,7 +1331,7 @@ export function CargaTecnicaMatriz({
     rows: Array<{ id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: number }>;
     totalesPorBucket: Record<string, { jornadas: number; horas: number }>;
     bucketLabel: (k: string) => string;
-    bucketMode: "dia" | "semana" | "mes";
+    bucketMode: PeriodMode;
   };
   onClick?: () => void;
 }) {
