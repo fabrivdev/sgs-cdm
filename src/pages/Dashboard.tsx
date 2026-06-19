@@ -53,7 +53,7 @@ import { cn } from "@/lib/utils";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
-import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro } from "@/components/dashboard/types";
+import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
 import { WeeklyBars, SucursalBars, MixRubros, EvolucionKpis, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca } from "@/components/dashboard/DashboardCharts";
@@ -271,7 +271,7 @@ export default function Dashboard() {
   const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
-  const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
@@ -315,8 +315,8 @@ export default function Dashboard() {
     [periodStart, periodEnd],
   );
   const disabledGranularities = useMemo(() => {
-    const d = new Set<"semana" | "mes" | "anio">();
-    if (rangeDays > 31) d.add("anio");   // Día deshabilitado si rango > 31 días
+    const d = new Set<PeriodMode>();
+    if (rangeDays > 31) d.add("dia");   // Día deshabilitado si rango > 31 días
     if (rangeDays > 364) d.add("semana"); // Semana deshabilitada si rango > 52 semanas
     return d;
   }, [rangeDays]);
@@ -327,7 +327,7 @@ export default function Dashboard() {
   // Coerce automático: si el rango cambia y la granularidad actual queda inválida, ajustar
   useEffect(() => {
     const days = differenceInCalendarDays(parseISO(dateTo), parseISO(dateFrom));
-    if (periodMode === "anio" && days > 31) {
+    if (periodMode === "dia" && days > 31) {
       setPeriodMode(days <= 364 ? "semana" : "mes");
     } else if (periodMode === "semana" && days > 364) {
       setPeriodMode("mes");
@@ -702,10 +702,10 @@ export default function Dashboard() {
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
     // Generar buckets que cubran exactamente [periodStart, periodEnd] a la granularidad elegida.
-    // "anio" = Día, "semana" = Semana, "mes" = Mes (el renombre interno es Etapa 2)
+    // Día, semana, mes o año según el agrupador elegido.
     const periods: Array<{ start: Date; end: Date; label: string }> = [];
 
-    if (periodMode === "anio") {
+    if (periodMode === "dia") {
       // Día: un bucket por día
       let cursor = periodStart;
       while (cursor <= periodEnd) {
@@ -724,7 +724,7 @@ export default function Dashboard() {
         });
         cursor = addWeeks(cursor, 1);
       }
-    } else {
+    } else if (periodMode === "mes") {
       // Mes: un bucket por mes
       let cursor = startOfMonth(periodStart);
       while (cursor <= periodEnd) {
@@ -732,12 +732,20 @@ export default function Dashboard() {
         periods.push({ start: cursor, end: mEnd, label: format(cursor, "MM/yyyy") });
         cursor = addMonths(cursor, 1);
       }
+    } else {
+      let cursor = startOfYear(periodStart);
+      while (cursor <= periodEnd) {
+        const yEnd = endOfYear(cursor);
+        periods.push({ start: cursor, end: yEnd, label: format(cursor, "yyyy") });
+        cursor = addYears(cursor, 1);
+      }
     }
 
     // Comparación: mismo offset en el período inmediatamente anterior (criterio unificado con Fila 1)
     const comparisonLabelFor = (start: Date, end: Date) => {
       if (periodMode === "mes") return format(subYears(start, 1), "MM/yyyy");
-      if (periodMode === "anio") return format(subYears(start, 1), "dd/MM/yy");
+      if (periodMode === "dia") return format(subYears(start, 1), "dd/MM/yy");
+      if (periodMode === "anio") return format(subYears(start, 1), "yyyy");
       const cs = subYears(start, 1);
       const ce = subYears(end, 1);
       return `${format(cs, "dd/MM")} - ${format(ce, "dd/MM/yy")}`;
@@ -1120,11 +1128,12 @@ export default function Dashboard() {
     };
   }, [allPeriodFacts, totalPeriodo, facturasPeriodo, clientesAtendidosSemana, totalPrevPeriodo, periodStart, periodEnd, periodComparisonLabel, variacionTotalPct]);
 
-  // "anio" = Día, "semana" = Semana, "mes" = Mes (nombres de UI post-Etapa 1)
-  const periodoLabel = periodMode === "anio" ? "diario" : periodMode === "semana" ? "semanal" : "mensual";
+  // Textos derivados del agrupador elegido.
+  const periodoLabel =
+    periodMode === "dia" ? "diario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
-    const periodoNombre = periodMode === "anio" ? "día" : periodMode === "semana" ? "semana" : "mes";
+    const periodoNombre = periodMode === "dia" ? "día" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "año";
     return {
       seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
       facturacion: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
@@ -1133,7 +1142,7 @@ export default function Dashboard() {
       seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composicion.`,
       periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
       sinFacturacion: `Sin facturacion para este ${periodoNombre}.`,
-      columnaPeriodo: periodMode === "anio" ? "Día" : periodMode === "semana" ? "Semana" : "Mes",
+      columnaPeriodo: periodMode === "dia" ? "Día" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
       carga: isSemana ? "Carga semanal" : "Carga tecnica",
       lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
       plan: isSemana ? "Plan semana" : "Proximo periodo",
@@ -1322,13 +1331,13 @@ export default function Dashboard() {
 
 
   const productividadMatriz = useMemo(() => {
-    // "anio"=Día → dia, "semana"=Semana → semana, "mes"=Mes → mes
-    const bucketMode: "dia" | "semana" | "mes" =
-      periodMode === "anio" ? "dia" : periodMode === "semana" ? "semana" : "mes";
+    // Matriz técnica agrupada con el mismo criterio visible del dashboard.
+    const bucketMode: PeriodMode = periodMode;
     const bucketKey = (iso: string) => {
       if (bucketMode === "dia") return iso; // yyyy-MM-dd, ya es la clave
       const d = parseISO(iso);
       if (bucketMode === "mes") return format(d, "yyyy-MM");
+      if (bucketMode === "anio") return format(d, "yyyy");
       return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, "0")}`;
     };
     const bucketLabel = (key: string) => {
@@ -1340,6 +1349,7 @@ export default function Dashboard() {
         const [y, m] = key.split("-");
         return format(new Date(Number(y), Number(m) - 1, 1), "MMM yy");
       }
+      if (bucketMode === "anio") return key;
       const w = key.split("-W")[1];
       return `Sem ${Number(w)}`;
     };
@@ -1427,12 +1437,19 @@ export default function Dashboard() {
           bucketsSet.add(`${getISOWeekYear(cursor)}-W${String(getISOWeek(cursor)).padStart(2, "0")}`);
           cursor = addWeeks(cursor, 1);
         }
-      } else {
+      } else if (bucketMode === "mes") {
         let cursor = startOfMonth(periodStart);
         const end = startOfMonth(periodEnd);
         while (cursor <= end) {
           bucketsSet.add(format(cursor, "yyyy-MM"));
           cursor = addMonths(cursor, 1);
+        }
+      } else {
+        let cursor = startOfYear(periodStart);
+        const end = startOfYear(periodEnd);
+        while (cursor <= end) {
+          bucketsSet.add(format(cursor, "yyyy"));
+          cursor = addYears(cursor, 1);
         }
       }
     }

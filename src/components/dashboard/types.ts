@@ -1,6 +1,7 @@
 import type { Marca, Sucursal } from "@/lib/constants";
 
 export type Tone = "neutral" | "good" | "warn" | "bad";
+export type PeriodMode = "dia" | "semana" | "mes" | "anio";
 export type FactMetric = "usd" | "horasServicio" | "kmFacturados";
 export type OSMetric = "usd" | "horas" | "km";
 export type OSRubro = "Servicio" | "Repuestos" | "Kilometraje";

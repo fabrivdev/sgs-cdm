@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Clock3, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WeekRow, Facturacion, Tone, FactMetric, OSMetric } from "./types";
+import type { WeekRow, Facturacion, Tone, FactMetric, OSMetric, PeriodMode } from "./types";
 import { money, concept, formatWeekMetric } from "./utils";
 
 const toneClasses: Record<Tone, string> = {
@@ -211,27 +211,28 @@ export function PeriodSelector({
   onChange,
   disabledModes,
 }: {
-  value: "semana" | "mes" | "anio";
-  onChange: (value: "semana" | "mes" | "anio") => void;
-  disabledModes?: Set<"semana" | "mes" | "anio">;
+  value: PeriodMode;
+  onChange: (value: PeriodMode) => void;
+  disabledModes?: Set<PeriodMode>;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 max-sm:!w-full sm:w-[180px]">
+    <div className="flex min-w-0 flex-col gap-1 max-sm:!w-full sm:w-[220px]">
       <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Agrupar por</span>
-      <div className="grid h-9 grid-cols-3 overflow-hidden rounded-md border bg-background text-xs">
+      <div className="grid h-9 grid-cols-4 overflow-hidden rounded-md border bg-background text-[11px]">
         {[
-          { value: "anio", label: "Día" },
+          { value: "dia", label: "Día" },
           { value: "semana", label: "Semana" },
           { value: "mes", label: "Mes" },
+          { value: "anio", label: "Año" },
         ].map((option) => {
-          const disabled = disabledModes?.has(option.value as "semana" | "mes" | "anio") ?? false;
+          const disabled = disabledModes?.has(option.value as PeriodMode) ?? false;
           const active = value === option.value;
           return (
             <button
               key={option.value}
               type="button"
               disabled={disabled}
-              onClick={() => !disabled && onChange(option.value as "semana" | "mes" | "anio")}
+              onClick={() => !disabled && onChange(option.value as PeriodMode)}
               className={cn(
                 "border-r px-2 last:border-r-0",
                 disabled && "cursor-not-allowed opacity-40",
