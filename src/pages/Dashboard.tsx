@@ -56,7 +56,7 @@ import { TrabajoEstadoBadge } from "@/components/StatusBadges";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EvolucionKpis, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca } from "@/components/dashboard/DashboardCharts";
+import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca } from "@/components/dashboard/DashboardCharts";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -1794,7 +1794,6 @@ export default function Dashboard() {
                   onSelect={(rubro) => { setFRubros([rubro]); goSection("facturacion"); }}
                 />
               </div>
-              <EvolucionKpis rows={weeklyRows} currentKey={selectedWeek?.key} metric={factMetric} />
             </Card>
 
             <Card className="flex h-full min-w-0 flex-col p-3">

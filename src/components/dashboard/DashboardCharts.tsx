@@ -1566,37 +1566,3 @@ export function TrabajoChip({
   );
 }
 
-export function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; currentKey?: string; metric: FactMetric }) {
-  if (!rows.length) return null;
-  const metricRows = rows.filter((row) => !metricUnavailable(row, metric));
-  const totals = metricRows.map((r) => weekMetric(r, metric));
-  const sum = totals.reduce((a, b) => a + b, 0);
-  const promedio = totals.length ? sum / totals.length : 0;
-  const currentIdx = currentKey ? rows.findIndex((r) => r.key === currentKey) : rows.length - 1;
-  const idx = currentIdx >= 0 ? currentIdx : rows.length - 1;
-  const actual = weekMetric(rows[idx], metric);
-  const prevComp = comparisonWeekMetric(rows[idx], metric);
-  const variacion = pct(actual, prevComp);
-  const currentUnavailable = metricUnavailable(rows[idx], metric);
-  return (
-    <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
-      <div>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total acumulado</div>
-        <div className="mt-0.5 text-sm font-semibold tabular-nums">{totals.length ? formatFactMetric(sum, metric) : "Sin dato"}</div>
-      </div>
-      <div>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Promedio por periodo</div>
-        <div className="mt-0.5 text-sm font-semibold tabular-nums">{totals.length ? formatFactMetric(promedio, metric) : "Sin dato"}</div>
-      </div>
-      <div>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs año ant.</div>
-        <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", currentUnavailable || variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
-          {currentUnavailable || variacion == null ? "-" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
-        </div>
-        {!currentUnavailable && variacion == null && (
-          <div className="mt-0.5 text-[10px] text-muted-foreground">Sin dato año anterior</div>
-        )}
-      </div>
-    </div>
-  );
-}
