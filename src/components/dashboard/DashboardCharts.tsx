@@ -512,6 +512,7 @@ export function WeeklyBars({
     1,
     ...rows.flatMap((row) => [weekMetric(row, metric), comparisonWeekMetric(row, metric)]),
   );
+  const hasAnyComparisonData = rows.some((row) => comparisonWeekMetric(row, metric) > 0);
 
   const labelEvery = rows.length > 14 ? Math.ceil(rows.length / 6) : rows.length > 9 ? 2 : 1;
 
@@ -559,7 +560,7 @@ export function WeeklyBars({
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
         {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
         <span className="ml-3 h-0 w-5 border-t border-dashed border-slate-500" />
-        Año anterior equivalente
+        {hasAnyComparisonData ? "Año anterior equivalente" : "Año anterior: sin datos disponibles"}
       </div>
     </div>
   );
@@ -1581,6 +1582,9 @@ export function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; c
         <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", currentUnavailable || variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
           {currentUnavailable || variacion == null ? "-" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
         </div>
+        {!currentUnavailable && variacion == null && (
+          <div className="mt-0.5 text-[10px] text-muted-foreground">Sin dato año anterior</div>
+        )}
       </div>
     </div>
   );

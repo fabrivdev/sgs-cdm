@@ -1217,12 +1217,14 @@ export default function Dashboard() {
 
   // Estadísticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestaña Trabajos).
   const flujo = useMemo(() => {
-    const total = trabajosResumen.length;
-    const culminados = trabajosResumen.filter((r) => r.estado === "completado").length;
-    const pausados = trabajosResumen.filter((r) => r.estado === "pausado").length;
-    const pendiente = trabajosResumen.filter((r) => r.estado === "pendiente").length;
-    const programado = trabajosResumen.filter((r) => r.estado === "programado").length;
-    const iniciado = trabajosResumen.filter((r) => r.estado === "iniciado").length;
+    // Solo trabajos con al menos una jornada en el rango seleccionado
+    const enPeriodo = trabajosResumen.filter((r) => r.totalJornadasPeriodo > 0);
+    const total = enPeriodo.length;
+    const culminados = enPeriodo.filter((r) => r.estado === "completado").length;
+    const pausados = enPeriodo.filter((r) => r.estado === "pausado").length;
+    const pendiente = enPeriodo.filter((r) => r.estado === "pendiente").length;
+    const programado = enPeriodo.filter((r) => r.estado === "programado").length;
+    const iniciado = enPeriodo.filter((r) => r.estado === "iniciado").length;
     const abiertos = total - culminados - pausados;
     const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
     return { total, culminados, abiertos, pausados, pendiente, programado, iniciado, pct };
@@ -1760,7 +1762,7 @@ export default function Dashboard() {
           {/* FILA 3 — OPERATIVA */}
           <section className="grid gap-3 md:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="Período actual · clic filtra en Trabajos" />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle={`${format(periodStart, "dd/MM/yy")} – ${format(periodEnd, "dd/MM/yy")} · clic filtra en Trabajos`} />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}
