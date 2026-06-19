@@ -1869,20 +1869,6 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
-                  {activeTechnicianIds.size > 0 && (
-                    <div className="mt-2 flex gap-1">
-                      {(() => {
-                        const total = activeTechnicianIds.size;
-                        const active = tecnicosConActividadPeriodo.size;
-                        let filled = Math.round((active / total) * 10);
-                        if (active > 0 && filled === 0) filled = 1;
-                        if (active < total && filled === 10) filled = 9;
-                        return Array.from({ length: 10 }, (_, i) => (
-                          <User key={i} className={cn("h-3.5 w-3.5 shrink-0", i < filled ? "text-primary" : "text-muted-foreground/20")} />
-                        ));
-                      })()}
-                    </div>
-                  )}
                 </div>
                 <div className="rounded-md border bg-muted/10 p-2.5">
                   <div className="flex items-start gap-2">
