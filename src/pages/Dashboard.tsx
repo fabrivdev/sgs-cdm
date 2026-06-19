@@ -1769,6 +1769,9 @@ export default function Dashboard() {
                   (variacionTicketPct ?? 0) < -10 && "border-destructive/40",
                 )}>
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-emerald-500" />
+                  <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Receipt className="h-[18px] w-[18px]" />
+                  </div>
                   {ticketSparkline.path ? (
                     <svg
                       className="pointer-events-none absolute right-4 top-14 hidden h-9 w-24 text-primary/45 sm:block"
@@ -1786,9 +1789,6 @@ export default function Dashboard() {
                       <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
                       <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(ticketPromedio)}</div>
                       <div className="text-[11px] text-muted-foreground">por factura</div>
-                    </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Receipt className="h-[18px] w-[18px]" />
                     </div>
                   </div>
                   <div className="relative z-10 mt-3 flex items-center gap-2 text-[11px]">
