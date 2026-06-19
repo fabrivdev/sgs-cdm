@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -19,6 +20,7 @@ import {
   Activity,
   PieChart,
   Receipt,
+  SlidersHorizontal,
   User,
   Users,
   Wrench,
@@ -275,6 +277,7 @@ export default function Dashboard() {
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
   const loading = baseLoading || jornadasLoading || facturacionLoading;
   const filtrosTrabajoActivos = section === "trabajos";
@@ -1501,6 +1504,13 @@ export default function Dashboard() {
     (filtrosTrabajoActivos && fTecnicos.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
+  const filtrosAvanzadosActivos =
+    (!filtrosOSActivos && fRubros.length > 0 ? 1 : 0) +
+    (filtrosOSActivos && fOSRubros.length > 0 ? 1 : 0) +
+    (fMarcas.length > 0 ? 1 : 0) +
+    (fTiposTiempo.length > 0 ? 1 : 0) +
+    (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
+    (filtrosTrabajoActivos && fTecnicos.length > 0 ? 1 : 0);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
@@ -1527,81 +1537,100 @@ export default function Dashboard() {
           width="w-[170px]"
           options={SUCURSALES.map((s) => ({ value: s, label: s }))}
         />
-        <FilterMultiSelect
-          label="Marca"
-          values={fMarcas}
-          onChange={setFMarcas}
-          placeholder="Todos"
-          width="w-[170px]"
-          options={MARCAS.map((m) => ({ value: m, label: m }))}
-        />
-        {section === "os" ? (
-          <FilterMultiSelect
-            label="Concepto OS"
-            values={fOSRubros}
-            onChange={(values) => setFOSRubros(values as OSRubro[])}
-            placeholder="Todos"
-            width="w-[180px]"
-            options={[
-              { value: "Servicio", label: "Servicio" },
-              { value: "Repuestos", label: "Repuestos" },
-              { value: "Kilometraje", label: "Kilometraje" },
-            ]}
-          />
-        ) : (
-          <FilterMultiSelect
-            label="Rubro"
-            values={fRubros}
-            onChange={setFRubros}
-            placeholder="Todos"
-            width="w-[170px]"
-            options={[
-              { value: "Servicio", label: "Servicios" },
-              { value: "Repuestos", label: "Repuestos" },
-              { value: "Kilometraje", label: "Kilometraje" },
-              { value: "Otros", label: "Otros" },
-            ]}
-          />
-        )}
-        <FilterMultiSelect
-          label="Tipo tiempo"
-          values={fTiposTiempo}
-          onChange={setFTiposTiempo}
-          placeholder="Todos"
-          width="w-[180px]"
-          options={[
-            { value: "Cliente", label: "Cliente" },
-            { value: "Garantia", label: "Garantia" },
-            { value: "Interno", label: "Interno" },
-          ]}
-        />
-        {section === "trabajos" && (
-          <>
+        <FilterCustom label="Filtros" width="w-auto">
+          <Button
+            type="button"
+            variant={showAdvancedFilters || filtrosAvanzadosActivos > 0 ? "default" : "outline"}
+            size="sm"
+            className="h-9 w-full gap-2 whitespace-nowrap sm:w-auto"
+            onClick={() => setShowAdvancedFilters((value) => !value)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Más filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
+          </Button>
+        </FilterCustom>
+      </FiltersBar>
+
+      {showAdvancedFilters && (
+        <Card className="p-2.5">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             <FilterMultiSelect
-              label="Estado"
-              values={fEstadosTrabajo}
-              onChange={setFEstadosTrabajo}
+              label="Marca"
+              values={fMarcas}
+              onChange={setFMarcas}
               placeholder="Todos"
-              width="w-[170px]"
+              width="w-full"
+              options={MARCAS.map((m) => ({ value: m, label: m }))}
+            />
+            {section === "os" ? (
+              <FilterMultiSelect
+                label="Concepto OS"
+                values={fOSRubros}
+                onChange={(values) => setFOSRubros(values as OSRubro[])}
+                placeholder="Todos"
+                width="w-full"
+                options={[
+                  { value: "Servicio", label: "Servicio" },
+                  { value: "Repuestos", label: "Repuestos" },
+                  { value: "Kilometraje", label: "Kilometraje" },
+                ]}
+              />
+            ) : (
+              <FilterMultiSelect
+                label="Rubro"
+                values={fRubros}
+                onChange={setFRubros}
+                placeholder="Todos"
+                width="w-full"
+                options={[
+                  { value: "Servicio", label: "Servicios" },
+                  { value: "Repuestos", label: "Repuestos" },
+                  { value: "Kilometraje", label: "Kilometraje" },
+                  { value: "Otros", label: "Otros" },
+                ]}
+              />
+            )}
+            <FilterMultiSelect
+              label="Tipo tiempo"
+              values={fTiposTiempo}
+              onChange={setFTiposTiempo}
+              placeholder="Todos"
+              width="w-full"
               options={[
-                { value: "pendiente", label: "Pendiente" },
-                { value: "programado", label: "Programado" },
-                { value: "iniciado", label: "Iniciado" },
-                { value: "pausado", label: "Pausado" },
-                { value: "completado", label: "Completado" },
+                { value: "Cliente", label: "Cliente" },
+                { value: "Garantia", label: "Garantia" },
+                { value: "Interno", label: "Interno" },
               ]}
             />
-            <FilterMultiSelect
-              label="Tecnico o cuadrilla"
-              values={fTecnicos}
-              onChange={setFTecnicos}
-              placeholder="Todos"
-              width="w-[230px]"
-              options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
-            />
-          </>
-        )}
-      </FiltersBar>
+            {section === "trabajos" && (
+              <>
+                <FilterMultiSelect
+                  label="Estado"
+                  values={fEstadosTrabajo}
+                  onChange={setFEstadosTrabajo}
+                  placeholder="Todos"
+                  width="w-full"
+                  options={[
+                    { value: "pendiente", label: "Pendiente" },
+                    { value: "programado", label: "Programado" },
+                    { value: "iniciado", label: "Iniciado" },
+                    { value: "pausado", label: "Pausado" },
+                    { value: "completado", label: "Completado" },
+                  ]}
+                />
+                <FilterMultiSelect
+                  label="Tecnico o cuadrilla"
+                  values={fTecnicos}
+                  onChange={setFTecnicos}
+                  placeholder="Todos"
+                  width="w-full"
+                  options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
+                />
+              </>
+            )}
+          </div>
+        </Card>
+      )}
 
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
