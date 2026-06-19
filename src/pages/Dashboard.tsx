@@ -1714,15 +1714,18 @@ export default function Dashboard() {
                 className="text-left"
               >
                 <Card className={cn(
-                  "relative flex h-full flex-col gap-1.5 overflow-hidden p-4 transition-colors hover:bg-accent/50",
-                  (variacionTotalPct ?? 0) < -20 && "border-destructive/40 bg-destructive/5",
+                  "relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50",
+                  (variacionTotalPct ?? 0) < -20 && "border-destructive/40",
                 )}>
-                  <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary to-[#7a9642]" />
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <div className="absolute inset-x-0 top-0 h-[3px] bg-primary" />
+                  <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <DollarSign className="h-[18px] w-[18px]" />
+                  </div>
+                  <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
                     Facturación del período · {format(periodStart, "dd/MM/yy")} – {format(periodEnd, "dd/MM/yy")}
                   </div>
-                  <div className="text-[22px] font-extrabold leading-tight tabular-nums">{money(totalPeriodo)}</div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(totalPeriodo)}</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     {variacionTotalPct != null ? (
                       <span className={cn(
                         "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold",
@@ -1735,29 +1738,25 @@ export default function Dashboard() {
                     ) : (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">sin base previa</span>
                     )}
-                    <span className="text-[10px] text-muted-foreground">{facturasPeriodo} facturas</span>
+                    <span className="text-[11px] text-muted-foreground">{facturasPeriodo} facturas</span>
                   </div>
                 </Card>
               </button>
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
-                <Card className="relative flex h-full min-h-[126px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50">
-                  <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-36 overflow-hidden sm:block">
-                    <Users className="absolute right-5 top-7 h-28 w-28 text-primary opacity-[0.08]" strokeWidth={1.6} />
-                    <User className="absolute right-24 top-12 h-20 w-20 text-primary opacity-[0.07]" strokeWidth={1.6} />
-                    <User className="absolute -right-5 top-14 h-20 w-20 text-primary opacity-[0.07]" strokeWidth={1.6} />
-                  </div>
-                  <div className="relative z-10 flex flex-1 items-center gap-3 p-4">
+                <Card className="relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50">
+                  <div className="absolute inset-x-0 top-0 h-[3px] bg-sky-500" />
+                  <div className="relative z-10 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
+                      <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{clientesAtendidosSemana}</div>
+                      <div className="text-[11px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
+                    </div>
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <Users className="h-[18px] w-[18px]" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
-                      <div className="mt-1 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{clientesAtendidosSemana}</div>
-                      <div className="text-[11px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
-                    </div>
                   </div>
-                  <div className="relative z-10 flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-[11px] text-muted-foreground">
+                  <div className="relative z-10 mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
                     <BarChart3 className="h-3.5 w-3.5 shrink-0 text-primary" />
                     <span><span className="font-semibold text-foreground">{clientesPareto80}</span> clientes concentran 80%</span>
                   </div>
@@ -1766,32 +1765,33 @@ export default function Dashboard() {
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
                 <Card className={cn(
-                  "relative flex h-full min-h-[126px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50",
-                  (variacionTicketPct ?? 0) < -10 && "border-destructive/40 bg-destructive/5",
+                  "relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50",
+                  (variacionTicketPct ?? 0) < -10 && "border-destructive/40",
                 )}>
+                  <div className="absolute inset-x-0 top-0 h-[3px] bg-emerald-500" />
                   {ticketSparkline.path ? (
                     <svg
-                      className="pointer-events-none absolute right-3 top-8 hidden h-16 w-32 text-primary/70 sm:block"
+                      className="pointer-events-none absolute right-4 top-14 hidden h-9 w-24 text-primary/45 sm:block"
                       viewBox="0 0 120 44"
                       aria-hidden="true"
                     >
-                      <path d={ticketSparkline.path} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      <path d={ticketSparkline.path} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" />
                       {ticketSparkline.last ? (
-                        <circle cx={ticketSparkline.last.x} cy={ticketSparkline.last.y} r="3.2" fill="white" stroke="currentColor" strokeWidth="2.5" />
+                        <circle cx={ticketSparkline.last.x} cy={ticketSparkline.last.y} r="2.8" fill="white" stroke="currentColor" strokeWidth="2" />
                       ) : null}
                     </svg>
                   ) : null}
-                  <div className="relative z-10 flex flex-1 items-center gap-3 p-4 pr-20 sm:pr-32">
+                  <div className="relative z-10 flex items-start justify-between gap-3 pr-16 sm:pr-24">
+                    <div className="min-w-0">
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
+                      <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(ticketPromedio)}</div>
+                      <div className="text-[11px] text-muted-foreground">por factura</div>
+                    </div>
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <Receipt className="h-[18px] w-[18px]" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
-                      <div className="mt-1 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(ticketPromedio)}</div>
-                      <div className="text-[11px] text-muted-foreground">por factura</div>
-                    </div>
                   </div>
-                  <div className="relative z-10 flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-[11px]">
+                  <div className="relative z-10 mt-3 flex items-center gap-2 text-[11px]">
                     {variacionTicketPct != null ? (
                       <span className={cn("rounded-full px-2 py-0.5 font-semibold tabular-nums", variacionTicketPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive")}>
                         {variacionTicketPct >= 0 ? "+" : "-"}{Math.abs(variacionTicketPct)}% vs anterior
@@ -1804,19 +1804,23 @@ export default function Dashboard() {
               </button>
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
-                <Card className="flex h-full flex-col gap-2 p-4 transition-colors hover:bg-accent/50">
+                <Card className="relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50">
+                  <div className="absolute inset-x-0 top-0 h-[3px] bg-amber-500" />
+                  <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <PieChart className="h-[18px] w-[18px]" />
+                  </div>
                   <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>
-                  <div className="text-base font-extrabold leading-tight">
+                  <div className="mt-2 text-lg font-extrabold leading-tight">
                     {tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span>
                   </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full border border-border/60 bg-muted shadow-inner sm:h-3">
+                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div className="flex h-full">
                       <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
                       <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
                       <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                       Cliente {tipoFactBreakdown.pctCliente}%
