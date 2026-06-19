@@ -19,6 +19,17 @@ import {
   summarizeOSImpact,
 } from "./utils";
 
+const MAX_VISIBLE_BAR_COLUMNS = 12;
+
+function barGridStyle(count: number, minColumnPx = 58) {
+  const columns = Math.max(count, 1);
+  return {
+    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+    width: columns > MAX_VISIBLE_BAR_COLUMNS ? `${(columns / MAX_VISIBLE_BAR_COLUMNS) * 100}%` : "100%",
+    minWidth: columns > MAX_VISIBLE_BAR_COLUMNS ? `${columns * minColumnPx}px` : "100%",
+  };
+}
+
 export function OSImpactSection({
   loading,
   evolutionRows,
@@ -177,10 +188,10 @@ function OSEvolution({
     return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas.</div>;
   }
   return (
-    <div>
+    <div className="overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="grid min-h-[170px] items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[210px] sm:gap-3 sm:px-2 sm:pt-4"
-        style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(0, 1fr))` }}
+        className="grid min-h-[170px] shrink-0 items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[210px] sm:gap-3 sm:px-2 sm:pt-4"
+        style={barGridStyle(rows.length)}
       >
         {rows.map((row, index) => {
           const value = osMetricValue(row, metric);
@@ -303,7 +314,7 @@ function OSSucursalBars({
               <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
               {previousWidth > 0 && (
                 <span
-                  className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
+                  className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l border-red-500"
                   style={{ left: `${previousWidth}%` }}
                   title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal)}`}
                 />
@@ -517,10 +528,10 @@ export function WeeklyBars({
   const labelEvery = rows.length > 14 ? Math.ceil(rows.length / 6) : rows.length > 9 ? 2 : 1;
 
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="relative grid min-h-[218px] items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[260px] sm:gap-3 sm:px-2 sm:pt-4"
-        style={{ gridTemplateColumns: `repeat(${Math.max(rows.length, 1)}, minmax(0, 1fr))` }}
+        className="relative grid min-h-[218px] shrink-0 items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[260px] sm:gap-3 sm:px-2 sm:pt-4"
+        style={barGridStyle(rows.length, 62)}
       >
         {rows.map((row, index) => {
           const value = weekMetric(row, metric);
@@ -536,7 +547,7 @@ export function WeeklyBars({
               <span className="relative flex h-[150px] w-full items-end justify-center sm:h-[180px]">
                 {comparison > 0 && (
                   <span
-                    className="absolute left-0 right-0 z-10 border-t border-dashed border-slate-500"
+                    className="absolute left-1/2 z-10 w-full max-w-[34px] -translate-x-1/2 border-t-2 border-red-500 sm:max-w-[42px]"
                     style={{ bottom: comparisonBottom }}
                     title={`${row.comparisonLabel}: ${formatFactMetric(comparison, metric)}`}
                   />
@@ -559,7 +570,7 @@ export function WeeklyBars({
       <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
         {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
-        <span className="ml-3 h-0 w-5 border-t border-dashed border-slate-500" />
+        <span className="ml-3 h-0 w-8 max-w-[42px] border-t-2 border-red-500" />
         {hasAnyComparisonData ? "Año anterior equivalente" : "Año anterior: sin datos disponibles"}
       </div>
     </div>
@@ -600,7 +611,7 @@ export function SucursalBars({
               <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
               {previousWidth > 0 && (
                 <span
-                  className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
+                  className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l border-red-500"
                   style={{ left: `${previousWidth}%` }}
                   title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal ?? 0)}`}
                 />
@@ -611,7 +622,7 @@ export function SucursalBars({
       })}
       {rows.some((row) => (row.previousTotal ?? 0) > 0) && (
         <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
-          <span className="h-3 border-l-2 border-dashed border-slate-500" />
+          <span className="h-3 border-l border-red-500" />
           vs. {comparisonLabel ?? "año anterior"}
         </div>
       )}
