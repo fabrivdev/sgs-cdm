@@ -1875,7 +1875,7 @@ export default function Dashboard() {
                     <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div>
                       <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Trabajos totales</div>
-                      <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoTotalTrabajos}</div>
+                      <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{flujo.total}</div>
                     </div>
                   </div>
                 </div>
