@@ -607,12 +607,9 @@ export default function Dashboard() {
     () => factFiltered.filter((row) => inRange(row.fecha, periodStart, periodEnd)),
     [factFiltered, periodStart, periodEnd],
   );
-  // Período anterior de idéntico tamaño, inmediatamente antes de dateFrom
-  const prevPeriodEndDate = useMemo(() => addDays(periodStart, -1), [periodStart]);
-  const prevPeriodStartDate = useMemo(
-    () => addDays(prevPeriodEndDate, -rangeDays),
-    [prevPeriodEndDate, rangeDays],
-  );
+  // Año anterior: mismo rango exactamente 1 año atrás (subYears maneja feb-29 automáticamente)
+  const prevPeriodStartDate = useMemo(() => subYears(periodStart, 1), [periodStart]);
+  const prevPeriodEndDate = useMemo(() => subYears(periodEnd, 1), [periodEnd]);
   const allPrevPeriodFacts = useMemo(
     () => factFiltered.filter((row) => inRange(row.fecha, prevPeriodStartDate, prevPeriodEndDate)),
     [factFiltered, prevPeriodStartDate, prevPeriodEndDate],
@@ -734,7 +731,7 @@ export default function Dashboard() {
       }
     }
 
-    // Comparación: mismo bucket 1 año atrás
+    // Comparación: mismo offset en el período inmediatamente anterior (criterio unificado con Fila 1)
     const comparisonLabelFor = (start: Date, end: Date) => {
       if (periodMode === "mes") return format(subYears(start, 1), "MM/yyyy");
       if (periodMode === "anio") return format(subYears(start, 1), "dd/MM/yy");
@@ -795,9 +792,9 @@ export default function Dashboard() {
       };
     });
 
-    return rows.map((row, index) => ({
+    return rows.map((row) => ({
       ...row,
-      variacion: index === 0 ? null : pct(row.total, rows[index - 1].total),
+      variacion: pct(row.total, row.comparisonTotal),
     }));
   }, [factFiltered, periodMode, periodStart, periodEnd, clienteById]);
 
@@ -869,14 +866,9 @@ export default function Dashboard() {
     return summarizeOSImpact(rows, "acumulado", "Acumulado visible", first.start, last.end);
   }, [osEvolutionRows, osImpactRows, periodEnd, periodStart]);
   const osAccumulatedComparisonSummary = useMemo(() => {
-    const first = osEvolutionRows[0];
-    const last = osEvolutionRows[osEvolutionRows.length - 1];
-    if (!first || !last) return summarizeOSImpact([], "comp-acumulado", "Año anterior", periodStart, periodEnd);
-    const compStart = subYears(first.start, 1);
-    const compEnd = subYears(last.end, 1);
-    const rows = osImpactRows.filter((row) => inRange(row.fecha, compStart, compEnd));
-    return summarizeOSImpact(rows, "comp-acumulado", "Año anterior", compStart, compEnd);
-  }, [osEvolutionRows, osImpactRows, periodStart, periodEnd]);
+    const rows = osImpactRows.filter((row) => inRange(row.fecha, prevPeriodStartDate, prevPeriodEndDate));
+    return summarizeOSImpact(rows, "comp-acumulado", "Año anterior", prevPeriodStartDate, prevPeriodEndDate);
+  }, [osImpactRows, prevPeriodStartDate, prevPeriodEndDate]);
   const osVarPct = osAccumulatedComparisonSummary.total > 0
     ? Math.round(((osAccumulatedSummary.total - osAccumulatedComparisonSummary.total) / osAccumulatedComparisonSummary.total) * 100)
     : null;
@@ -894,7 +886,9 @@ export default function Dashboard() {
       };
     }).sort((a, b) => b.total - a.total);
   }, [osComparisonRows, osSelectedRows]);
-
+  const osComparisonLabel = osComparisonRange
+    ? `${format(osComparisonRange.start, "dd/MM/yy")} – ${format(osComparisonRange.end, "dd/MM/yy")}`
+    : undefined;
 
   const factBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
@@ -1053,7 +1047,7 @@ export default function Dashboard() {
   ).size;
   const sucursalesConMovimiento = new Set(allPeriodFacts.map((row) => row.sucursal).filter(Boolean)).size;
 
-  // Período anterior del mismo tamaño (inmediatamente antes de dateFrom)
+  // Año anterior: mismo rango 1 año atrás
   const totalPrevPeriodo = total(allPrevPeriodFacts);
   const facturasPrevPeriodo = new Set(allPrevPeriodFacts.map((row) => row.cod_factura)).size;
   const variacionTotalPct = pct(totalPeriodo, totalPrevPeriodo);
@@ -1086,8 +1080,42 @@ export default function Dashboard() {
     const top2 = [...factBySucursal].sort((a, b) => b.total - a.total).slice(0, 2).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((top2 / totalPeriodo) * 100) : 0;
   })();
-  // Label del período anterior para SucursalBars (rango completo previo)
+  // Label del año anterior para SucursalBars
   const periodComparisonLabel = `${format(prevPeriodStartDate, "dd/MM/yy")} – ${format(prevPeriodEndDate, "dd/MM/yy")}`;
+
+  // Fila sintética con la agregación del rango completo para MixRubros
+  const periodRow = useMemo<WeekRow>(() => {
+    const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
+    let horasServicio = 0;
+    let kmFacturados = 0;
+    for (const row of allPeriodFacts) {
+      const rowConcept = concept(row);
+      byConcept[rowConcept] += Number(row.total_venta || 0);
+      if (rowConcept === "Servicio") horasServicio += Number(row.cantidad || 0);
+      if (rowConcept === "Kilometraje") kmFacturados += Number(row.cantidad || 0);
+    }
+    return {
+      key: dateKey(periodStart),
+      label: `${format(periodStart, "dd/MM/yy")} – ${format(periodEnd, "dd/MM/yy")}`,
+      start: periodStart,
+      end: periodEnd,
+      total: totalPeriodo,
+      repuestos: byConcept.Repuestos,
+      servicio: byConcept.Servicio,
+      kilometraje: byConcept.Kilometraje,
+      otros: byConcept.Otros,
+      horasServicio,
+      kmFacturados,
+      facturas: facturasPeriodo,
+      clientes: clientesAtendidosSemana,
+      comparisonTotal: totalPrevPeriodo,
+      comparisonHorasServicio: 0,
+      comparisonKmFacturados: 0,
+      comparisonLabel: periodComparisonLabel,
+      variacion: variacionTotalPct,
+      rows: allPeriodFacts,
+    };
+  }, [allPeriodFacts, totalPeriodo, facturasPeriodo, clientesAtendidosSemana, totalPrevPeriodo, periodStart, periodEnd, periodComparisonLabel, variacionTotalPct]);
 
   // "anio" = Día, "semana" = Semana, "mes" = Mes (nombres de UI post-Etapa 1)
   const periodoLabel = periodMode === "anio" ? "diario" : periodMode === "semana" ? "semanal" : "mensual";
@@ -1612,7 +1640,7 @@ export default function Dashboard() {
                           ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
                           : "border border-red-200 bg-red-50 text-red-700",
                       )}>
-                        {variacionTotalPct >= 0 ? "▲" : "▼"} {Math.abs(variacionTotalPct)}% vs período anterior
+                        {variacionTotalPct >= 0 ? "▲" : "▼"} {Math.abs(variacionTotalPct)}% vs año anterior
                       </span>
                     ) : (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">sin base previa</span>
@@ -1695,7 +1723,7 @@ export default function Dashboard() {
               />
               <div className="mt-2 border-t pt-2">
                 <MixRubros
-                  row={selectedWeek}
+                  row={periodRow}
                   rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"}
                   onSelect={(rubro) => { setFRubros([rubro]); goSection("facturacion"); }}
                 />
@@ -1981,7 +2009,7 @@ export default function Dashboard() {
               detailRows={osSelectedRows}
               detailMode={osDetailMode}
               selectedRubros={fOSRubros}
-              comparisonLabel={comparisonLabel}
+              comparisonLabel={osComparisonLabel}
               onSelectPeriod={setSelectedWeekKey}
               onSelectSucursal={(sucursal) => setFSucursales([sucursal])}
               onSelectRubro={(rubro) => setFOSRubros((prev) => (prev.length === 1 && prev[0] === rubro ? [] : [rubro]))}

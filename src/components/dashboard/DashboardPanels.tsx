@@ -43,7 +43,7 @@ export function SummaryCard({
             <div className="mt-0.5 truncate text-lg font-bold leading-tight tabular-nums sm:mt-1 sm:text-2xl">{value}</div>
             {trend !== undefined && trend !== null && trend.value !== null ? (
               <div className={cn("mt-0.5 truncate text-[10px] font-medium tabular-nums sm:mt-1 sm:text-[11px]", trend.value >= 0 ? "text-emerald-600" : "text-destructive")}>
-                {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.suffix ?? "vs período anterior"}
+                {trend.value >= 0 ? "+" : ""}{trend.value}% {trend.suffix ?? "vs año anterior"}
               </div>
             ) : null}
             {detail ? <div className="mt-0.5 truncate text-[10px] text-muted-foreground sm:mt-1 sm:text-[11px]">{detail}</div> : null}

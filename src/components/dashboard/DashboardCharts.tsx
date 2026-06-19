@@ -305,7 +305,7 @@ function OSSucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`${comparisonLabel ?? "Año anterior"}: ${money(row.previousTotal)}`}
+                  title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal)}`}
                 />
               )}
             </div>
@@ -601,7 +601,7 @@ export function SucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l-2 border-dashed border-slate-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`${comparisonLabel ?? "Año anterior"}: ${money(row.previousTotal ?? 0)}`}
+                  title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal ?? 0)}`}
                 />
               )}
             </div>
@@ -611,7 +611,7 @@ export function SucursalBars({
       {rows.some((row) => (row.previousTotal ?? 0) > 0) && (
         <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
           <span className="h-3 border-l-2 border-dashed border-slate-500" />
-          {comparisonLabel ?? "Año anterior"}
+          vs. {comparisonLabel ?? "año anterior"}
         </div>
       )}
     </div>
@@ -1563,8 +1563,8 @@ export function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; c
   const currentIdx = currentKey ? rows.findIndex((r) => r.key === currentKey) : rows.length - 1;
   const idx = currentIdx >= 0 ? currentIdx : rows.length - 1;
   const actual = weekMetric(rows[idx], metric);
-  const prev = idx > 0 ? weekMetric(rows[idx - 1], metric) : 0;
-  const variacion = pct(actual, prev);
+  const prevComp = comparisonWeekMetric(rows[idx], metric);
+  const variacion = pct(actual, prevComp);
   const currentUnavailable = metricUnavailable(rows[idx], metric);
   return (
     <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
@@ -1577,7 +1577,7 @@ export function EvolucionKpis({ rows, currentKey, metric }: { rows: WeekRow[]; c
         <div className="mt-0.5 text-sm font-semibold tabular-nums">{totals.length ? formatFactMetric(promedio, metric) : "Sin dato"}</div>
       </div>
       <div>
-        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs anterior</div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Var. vs año ant.</div>
         <div className={cn("mt-0.5 text-sm font-semibold tabular-nums", currentUnavailable || variacion == null ? "text-muted-foreground" : variacion >= 0 ? "text-primary" : "text-destructive")}>
           {currentUnavailable || variacion == null ? "-" : `${variacion >= 0 ? "+" : ""}${variacion}%`}
         </div>
