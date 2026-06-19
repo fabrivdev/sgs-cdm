@@ -1532,16 +1532,20 @@ export default function Dashboard() {
   return (
     <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
       <div className="space-y-2.5 sm:space-y-3">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+      <Tabs value={section} onValueChange={goSection} className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <h1 className={pageTitle}>Dashboard ejecutivo</h1>
+        <TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
+          <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
+          <TabsTrigger value="facturacion" className="h-7 whitespace-nowrap px-3 text-xs">Facturacion</TabsTrigger>
+          <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
+          <TabsTrigger value="os" className="h-7 whitespace-nowrap px-3 text-xs">OS absorbidas</TabsTrigger>
+        </TabsList>
       </div>
-
-
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        
       >
         <FilterDate label="Desde" value={dateFrom} onChange={setDateFrom} width="w-[140px]" max={dateTo} />
         <FilterDate label="Hasta" value={dateTo} onChange={setDateTo} width="w-[140px]" min={dateFrom} max={initialDateTo} />
@@ -1649,9 +1653,8 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <Tabs value={section} onValueChange={goSection} className="space-y-3">
-        <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
-        <TabsList className="inline-flex h-auto min-w-max sm:grid sm:w-fit sm:grid-cols-4">
+        <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
+        <TabsList className="inline-flex h-auto min-w-max">
           <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
           <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
