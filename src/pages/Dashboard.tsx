@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart3,
   Building2,
@@ -61,7 +60,8 @@ const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
 const today = new Date();
 const todayStr = format(today, "yyyy-MM-dd");
-const initialWeekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
+const initialDateFrom = format(startOfMonth(subMonths(today, 11)), "yyyy-MM-dd");
+const initialDateTo = format(today, "yyyy-MM-dd");
 
 interface Servicio {
   id: string;
@@ -259,8 +259,9 @@ export default function Dashboard() {
   const [facturacionLoading, setFacturacionLoading] = useState(true);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
 
-  const [weekStartInput, setWeekStartInput] = useState(initialWeekStart);
-  const [selectedWeekKey, setSelectedWeekKey] = useState(initialWeekStart);
+  const [dateFrom, setDateFrom] = useState(initialDateFrom);
+  const [dateTo, setDateTo] = useState(initialDateTo);
+  const [selectedWeekKey, setSelectedWeekKey] = useState(initialDateTo);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
   const [fOSRubros, setFOSRubros] = useState<OSRubro[]>([]);
@@ -271,7 +272,6 @@ export default function Dashboard() {
   const [periodMode, setPeriodMode] = useState<"semana" | "mes" | "anio">("mes");
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
-  const [rangoEvolucion, setRangoEvolucion] = useState<"4" | "6" | "8" | "12" | "24" | "all">("12");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
@@ -289,58 +289,47 @@ export default function Dashboard() {
       }
     });
 
-  const weekStart = useMemo(() => startOfWeek(parseISO(weekStartInput), { weekStartsOn: 1 }), [weekStartInput]);
-  const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
+  // Semana actual (siempre referenciada a hoy, no al rango del usuario)
+  const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), []);
+  const weekEnd = useMemo(() => endOfWeek(today, { weekStartsOn: 1 }), []);
   const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
   const previousWeekEnd = useMemo(() => endOfWeek(previousWeekStart, { weekStartsOn: 1 }), [previousWeekStart]);
-  const monthStart = useMemo(() => startOfMonth(weekStart), [weekStart]);
-  const monthEnd = useMemo(() => endOfMonth(weekStart), [weekStart]);
-  const previousMonthStart = useMemo(() => startOfMonth(subMonths(weekStart, 1)), [weekStart]);
-  const previousMonthEnd = useMemo(() => endOfMonth(subMonths(weekStart, 1)), [weekStart]);
-  const yearStart = useMemo(() => startOfYear(weekStart), [weekStart]);
-  const yearEnd = useMemo(() => endOfYear(weekStart), [weekStart]);
-  const previousYearStart = useMemo(() => startOfYear(subYears(weekStart, 1)), [weekStart]);
-  const previousYearEnd = useMemo(() => endOfYear(subYears(weekStart, 1)), [weekStart]);
-  const periodStart = periodMode === "anio" ? yearStart : periodMode === "mes" ? monthStart : weekStart;
-  const periodEnd = periodMode === "anio" ? yearEnd : periodMode === "mes" ? monthEnd : weekEnd;
-  const previousPeriodStart = periodMode === "anio" ? previousYearStart : periodMode === "mes" ? previousMonthStart : previousWeekStart;
-  const previousPeriodEnd = periodMode === "anio" ? previousYearEnd : periodMode === "mes" ? previousMonthEnd : previousWeekEnd;
-  const nextPeriodStart = useMemo(() => {
-    if (periodMode === "anio") return startOfYear(addYears(weekStart, 1));
-    if (periodMode === "mes") return startOfMonth(addMonths(weekStart, 1));
-    return startOfWeek(addWeeks(weekStart, 1), { weekStartsOn: 1 });
-  }, [periodMode, weekStart]);
-  const nextPeriodEnd = useMemo(() => {
-    if (periodMode === "anio") return endOfYear(nextPeriodStart);
-    if (periodMode === "mes") return endOfMonth(nextPeriodStart);
-    return endOfWeek(nextPeriodStart, { weekStartsOn: 1 });
-  }, [nextPeriodStart, periodMode]);
-  const evolutionPeriods = useMemo(() => {
-    if (periodMode === "anio") return 5;
-    if (rangoEvolucion === "all") return periodMode === "semana" ? 26 : 60;
-    return Number(rangoEvolucion);
-  }, [periodMode, rangoEvolucion]);
-  const firstComparisonWeek = useMemo(() => subWeeks(weekStart, Math.max(evolutionPeriods - 1, 0)), [evolutionPeriods, weekStart]);
-  const visibleQueryStart = useMemo(() => {
-    if (periodMode === "anio") return subYears(yearStart, 4);
-    if (periodMode === "mes") return subMonths(monthStart, Math.max(evolutionPeriods - 1, 0));
-    return firstComparisonWeek;
-  }, [evolutionPeriods, firstComparisonWeek, monthStart, periodMode, yearStart]);
-  const queryStart = useMemo(() => subYears(visibleQueryStart, 1), [visibleQueryStart]);
+
+  // Rango libre definido por el usuario
+  const periodStart = useMemo(() => parseISO(dateFrom), [dateFrom]);
+  const periodEnd = useMemo(() => parseISO(dateTo), [dateTo]);
+  const previousPeriodStart = useMemo(() => subYears(periodStart, 1), [periodStart]);
+  const previousPeriodEnd = useMemo(() => subYears(periodEnd, 1), [periodEnd]);
+  const nextPeriodStart = useMemo(() => addDays(periodEnd, 1), [periodEnd]);
+  const nextPeriodEnd = useMemo(
+    () => addDays(periodEnd, Math.max(differenceInCalendarDays(periodEnd, periodStart), 0)),
+    [periodEnd, periodStart],
+  );
+
+  // Rango de días para validar granularidad y para queries
+  const rangeDays = useMemo(
+    () => differenceInCalendarDays(periodEnd, periodStart),
+    [periodStart, periodEnd],
+  );
+  const disabledGranularities = useMemo(() => {
+    const d = new Set<"semana" | "mes" | "anio">();
+    if (rangeDays > 31) d.add("anio");   // Día deshabilitado si rango > 31 días
+    if (rangeDays > 364) d.add("semana"); // Semana deshabilitada si rango > 52 semanas
+    return d;
+  }, [rangeDays]);
+
+  const queryStart = useMemo(() => subYears(periodStart, 1), [periodStart]);
   const queryEnd = useMemo(() => periodEnd, [periodEnd]);
 
+  // Coerce automático: si el rango cambia y la granularidad actual queda inválida, ajustar
   useEffect(() => {
-    setSelectedWeekKey(dateKey(periodMode === "anio" ? yearStart : periodMode === "semana" ? weekStart : monthStart));
-  }, [monthStart, periodMode, weekStart, yearStart]);
-
-  useEffect(() => {
-    if (periodMode === "semana" && !["4", "8", "12", "all"].includes(rangoEvolucion)) {
-      setRangoEvolucion("8");
+    const days = differenceInCalendarDays(parseISO(dateTo), parseISO(dateFrom));
+    if (periodMode === "anio" && days > 31) {
+      setPeriodMode(days <= 364 ? "semana" : "mes");
+    } else if (periodMode === "semana" && days > 364) {
+      setPeriodMode("mes");
     }
-    if (periodMode === "mes" && !["6", "12", "24", "all"].includes(rangoEvolucion)) {
-      setRangoEvolucion("12");
-    }
-  }, [periodMode, rangoEvolucion]);
+  }, [dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let alive = true;
@@ -393,8 +382,8 @@ export default function Dashboard() {
           supabase
             .from("servicio_jornadas")
             .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
-            .gte("fecha", dateKey(new Date(Math.min(subWeeks(previousWeekStart, 8).getTime(), periodStart.getTime(), previousPeriodStart.getTime()))))
-            .lte("fecha", dateKey(new Date(Math.max(weekEnd.getTime(), periodEnd.getTime(), nextPeriodEnd.getTime()))))
+            .gte("fecha", dateKey(previousPeriodStart))
+            .lte("fecha", dateKey(addDays(periodEnd, 90)))
             .order("fecha", { ascending: true }),
         );
 
@@ -410,7 +399,7 @@ export default function Dashboard() {
     return () => {
       alive = false;
     };
-  }, [nextPeriodEnd, previousWeekStart, weekEnd, periodStart, periodEnd, previousPeriodStart]);
+  }, [periodStart, periodEnd, previousPeriodStart]);
 
   useEffect(() => {
     let alive = true;
@@ -613,6 +602,22 @@ export default function Dashboard() {
     [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturacion, query],
   );
 
+  // Todos los registros del rango completo seleccionado por el usuario
+  const allPeriodFacts = useMemo(
+    () => factFiltered.filter((row) => inRange(row.fecha, periodStart, periodEnd)),
+    [factFiltered, periodStart, periodEnd],
+  );
+  // Período anterior de idéntico tamaño, inmediatamente antes de dateFrom
+  const prevPeriodEndDate = useMemo(() => addDays(periodStart, -1), [periodStart]);
+  const prevPeriodStartDate = useMemo(
+    () => addDays(prevPeriodEndDate, -rangeDays),
+    [prevPeriodEndDate, rangeDays],
+  );
+  const allPrevPeriodFacts = useMemo(
+    () => factFiltered.filter((row) => inRange(row.fecha, prevPeriodStartDate, prevPeriodEndDate)),
+    [factFiltered, prevPeriodStartDate, prevPeriodEndDate],
+  );
+
   const scopedServicio = (servicio: Servicio | undefined | null) => {
     if (!servicio) return false;
     if (fSucursales.length > 0 && !fSucursales.includes(servicio.sucursal)) return false;
@@ -696,44 +701,54 @@ export default function Dashboard() {
   }, [clienteById, clienteByName, fMarcas, fOSRubros, fSucursales, fTiposTiempo, ordenesServicio, query, trabajoById]);
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
-    const periods =
-      periodMode === "semana"
-        ? Array.from({ length: evolutionPeriods }, (_, index) => {
-            const start = subWeeks(weekStart, evolutionPeriods - 1 - index);
-            return { start, end: endOfWeek(start, { weekStartsOn: 1 }), label: `${format(start, "dd/MM")} - ${format(endOfWeek(start, { weekStartsOn: 1 }), "dd/MM")}` };
-          })
-        : periodMode === "mes"
-          ? Array.from({ length: evolutionPeriods }, (_, index) => {
-              const start = startOfMonth(subMonths(monthStart, evolutionPeriods - 1 - index));
-              return { start, end: endOfMonth(start), label: format(start, "MM/yyyy") };
-            })
-          : Array.from({ length: 5 }, (_, index) => {
-              const start = startOfYear(subYears(weekStart, 4 - index));
-              return { start, end: endOfYear(start), label: format(start, "yyyy") };
-            });
+    // Generar buckets que cubran exactamente [periodStart, periodEnd] a la granularidad elegida.
+    // "anio" = Día, "semana" = Semana, "mes" = Mes (el renombre interno es Etapa 2)
+    const periods: Array<{ start: Date; end: Date; label: string }> = [];
 
-    const comparisonForPeriod = (start: Date, end: Date) => {
-      if (periodMode === "anio") {
-        const comparisonStart = startOfYear(subYears(start, 1));
-        const comparisonEnd = new Date(start.getFullYear() - 1, weekStart.getMonth(), weekStart.getDate());
-        return {
-          start: comparisonStart,
-          end: comparisonEnd > endOfYear(comparisonStart) ? endOfYear(comparisonStart) : comparisonEnd,
-        };
+    if (periodMode === "anio") {
+      // Día: un bucket por día
+      let cursor = periodStart;
+      while (cursor <= periodEnd) {
+        periods.push({ start: cursor, end: cursor, label: format(cursor, "dd/MM") });
+        cursor = addDays(cursor, 1);
       }
-      return { start: subYears(start, 1), end: subYears(end, 1) };
+    } else if (periodMode === "semana") {
+      // Semana: un bucket por semana ISO (semana que contiene periodStart)
+      let cursor = startOfWeek(periodStart, { weekStartsOn: 1 });
+      while (cursor <= periodEnd) {
+        const wEnd = endOfWeek(cursor, { weekStartsOn: 1 });
+        periods.push({
+          start: cursor,
+          end: wEnd,
+          label: `${format(cursor, "dd/MM")} - ${format(wEnd, "dd/MM")}`,
+        });
+        cursor = addWeeks(cursor, 1);
+      }
+    } else {
+      // Mes: un bucket por mes
+      let cursor = startOfMonth(periodStart);
+      while (cursor <= periodEnd) {
+        const mEnd = endOfMonth(cursor);
+        periods.push({ start: cursor, end: mEnd, label: format(cursor, "MM/yyyy") });
+        cursor = addMonths(cursor, 1);
+      }
+    }
+
+    // Comparación: mismo bucket 1 año atrás
+    const comparisonLabelFor = (start: Date, end: Date) => {
+      if (periodMode === "mes") return format(subYears(start, 1), "MM/yyyy");
+      if (periodMode === "anio") return format(subYears(start, 1), "dd/MM/yy");
+      const cs = subYears(start, 1);
+      const ce = subYears(end, 1);
+      return `${format(cs, "dd/MM")} - ${format(ce, "dd/MM/yy")}`;
     };
 
     const rows = periods.map(({ start, end, label }) => {
       const weekFacts = factFiltered.filter((row) => inRange(row.fecha, start, end));
-      const comparisonRange = comparisonForPeriod(start, end);
-      const comparisonFacts = factFiltered.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end));
-      const byConcept = {
-        Repuestos: 0,
-        Servicio: 0,
-        Kilometraje: 0,
-        Otros: 0,
-      };
+      const compStart = subYears(start, 1);
+      const compEnd = subYears(end, 1);
+      const comparisonFacts = factFiltered.filter((row) => inRange(row.fecha, compStart, compEnd));
+      const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
       let horasServicio = 0;
       let kmFacturados = 0;
       let comparisonHorasServicio = 0;
@@ -745,7 +760,6 @@ export default function Dashboard() {
         if (rowConcept === "Servicio") horasServicio += Number(row.cantidad || 0);
         if (rowConcept === "Kilometraje") kmFacturados += Number(row.cantidad || 0);
       }
-
       for (const row of comparisonFacts) {
         const rowConcept = concept(row);
         if (rowConcept === "Servicio") comparisonHorasServicio += Number(row.cantidad || 0);
@@ -757,6 +771,7 @@ export default function Dashboard() {
         return normalizeClienteKey(nombre);
       }));
       const invoices = new Set(weekFacts.map((row) => row.cod_factura));
+
       return {
         key: dateKey(start),
         label,
@@ -774,11 +789,7 @@ export default function Dashboard() {
         comparisonTotal: total(comparisonFacts),
         comparisonHorasServicio,
         comparisonKmFacturados,
-        comparisonLabel: periodMode === "anio"
-          ? `${format(comparisonRange.start, "yyyy")} acum. ${format(comparisonRange.end, "dd/MM")}`
-          : periodMode === "mes"
-            ? format(comparisonRange.start, "MM/yyyy")
-            : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yyyy")}`,
+        comparisonLabel: comparisonLabelFor(start, end),
         variacion: null,
         rows: weekFacts,
       };
@@ -788,7 +799,7 @@ export default function Dashboard() {
       ...row,
       variacion: index === 0 ? null : pct(row.total, rows[index - 1].total),
     }));
-  }, [evolutionPeriods, factFiltered, monthStart, periodMode, weekStart]);
+  }, [factFiltered, periodMode, periodStart, periodEnd, clienteById]);
 
   const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
   const selectedFacts = selectedWeek?.rows ?? [];
@@ -796,17 +807,11 @@ export default function Dashboard() {
 
   const comparisonRange = useMemo(() => {
     if (!selectedWeek) return null;
-    if (periodMode === "anio") {
-      const start = startOfYear(subYears(selectedWeek.start, 1));
-      const cut = new Date(selectedWeek.start.getFullYear() - 1, weekStart.getMonth(), weekStart.getDate());
-      const end = cut > endOfYear(start) ? endOfYear(start) : cut;
-      return { start, end };
-    }
     return {
       start: subYears(selectedWeek.start, 1),
       end: subYears(selectedWeek.end, 1),
     };
-  }, [periodMode, selectedWeek, weekStart]);
+  }, [selectedWeek]);
 
   const comparisonFacts = useMemo(
     () => comparisonRange ? factFiltered.filter((row) => inRange(row.fecha, comparisonRange.start, comparisonRange.end)) : [],
@@ -814,11 +819,9 @@ export default function Dashboard() {
   );
 
   const comparisonLabel = comparisonRange
-    ? periodMode === "anio"
-      ? `${format(comparisonRange.start, "yyyy")} acum. ${format(comparisonRange.end, "dd/MM")}`
-      : periodMode === "mes"
-        ? format(comparisonRange.start, "MM/yyyy")
-        : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yyyy")}`
+    ? periodMode === "mes"
+      ? format(comparisonRange.start, "MM/yyyy")
+      : `${format(comparisonRange.start, "dd/MM")} - ${format(comparisonRange.end, "dd/MM/yy")}`
     : undefined;
 
   const osEvolutionRows = useMemo(
@@ -838,14 +841,8 @@ export default function Dashboard() {
   }, [osEvolutionRows, selectedWeekKey]);
   const osComparisonRange = useMemo(() => {
     if (!osSelectedPeriod) return null;
-    if (periodMode === "anio") {
-      const start = startOfYear(subYears(osSelectedPeriod.start, 1));
-      const cut = new Date(osSelectedPeriod.start.getFullYear() - 1, weekStart.getMonth(), weekStart.getDate());
-      const end = cut > endOfYear(start) ? endOfYear(start) : cut;
-      return { start, end };
-    }
     return { start: subYears(osSelectedPeriod.start, 1), end: subYears(osSelectedPeriod.end, 1) };
-  }, [osSelectedPeriod, periodMode, weekStart]);
+  }, [osSelectedPeriod]);
   const osSelectedRows = useMemo(
     () => (osSelectedPeriod ? osImpactRows.filter((row) => inRange(row.fecha, osSelectedPeriod.start, osSelectedPeriod.end)) : []),
     [osImpactRows, osSelectedPeriod],
@@ -898,15 +895,11 @@ export default function Dashboard() {
     }).sort((a, b) => b.total - a.total);
   }, [osComparisonRows, osSelectedRows]);
 
-  const factMes = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, monthStart, monthEnd)), [factFiltered, monthEnd, monthStart]);
-  const factMesPrev = useMemo(() => factFiltered.filter((row) => inRange(row.fecha, previousMonthStart, previousMonthEnd)), [factFiltered, previousMonthEnd, previousMonthStart]);
-  const totalMes = total(factMes);
-  const trendMes = pct(totalMes, total(factMesPrev));
 
   const factBySucursal = useMemo(() => {
     return SUCURSALES.map((sucursal) => {
-      const rows = selectedFacts.filter((row) => row.sucursal === sucursal);
-      const previousRows = comparisonFacts.filter((row) => row.sucursal === sucursal);
+      const rows = allPeriodFacts.filter((row) => row.sucursal === sucursal);
+      const previousRows = allPrevPeriodFacts.filter((row) => row.sucursal === sucursal);
       return {
         sucursal,
         total: total(rows),
@@ -914,7 +907,7 @@ export default function Dashboard() {
         facturas: new Set(rows.map((row) => row.cod_factura)).size,
       };
     }).sort((a, b) => b.total - a.total);
-  }, [comparisonFacts, selectedFacts]);
+  }, [allPeriodFacts, allPrevPeriodFacts]);
 
   const topClientes = useMemo(() => {
     const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
@@ -1049,26 +1042,28 @@ export default function Dashboard() {
     return selectedIndex > 0 ? weekMetric(weeklyRows[selectedIndex - 1], factMetric) : 0;
   })();
   const selectedMetricTrend = factMetric === "usd" ? selectedTrend : pct(selectedMetricValue, selectedMetricPrevValue);
-  const currentWeekRow = weeklyRows[weeklyRows.length - 1] ?? selectedWeek;
-  const previousPeriodRow = weeklyRows[weeklyRows.length - 2];
-  const clientesAtendidosSemana = currentWeekRow?.clientes ?? 0;
-  const sucursalesConMovimiento = new Set((currentWeekRow?.rows ?? []).map((row) => row.sucursal).filter(Boolean)).size;
-  const mixServicioRepuestoTotal = (currentWeekRow?.servicio ?? 0) + (currentWeekRow?.repuestos ?? 0);
-  const pctServicio = mixServicioRepuestoTotal > 0 ? Math.round(((currentWeekRow?.servicio ?? 0) / mixServicioRepuestoTotal) * 100) : 0;
-  const pctRepuesto = mixServicioRepuestoTotal > 0 ? 100 - pctServicio : 0;
+  // Fila 1 KPIs: calculados sobre el rango completo del usuario, no el último bucket
+  const totalPeriodo = total(allPeriodFacts);
+  const facturasPeriodo = new Set(allPeriodFacts.map((row) => row.cod_factura)).size;
+  const clientesAtendidosSemana = new Set(
+    allPeriodFacts.map((row) => {
+      const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
+      return normalizeClienteKey(nombre);
+    }),
+  ).size;
+  const sucursalesConMovimiento = new Set(allPeriodFacts.map((row) => row.sucursal).filter(Boolean)).size;
 
-  // KPIs enriquecidos para las cards superiores
-  const facturasPeriodo = currentWeekRow?.facturas ?? 0;
-  const totalPeriodo = currentWeekRow?.total ?? 0;
-  const totalPrevPeriodo = previousPeriodRow?.total ?? 0;
+  // Período anterior del mismo tamaño (inmediatamente antes de dateFrom)
+  const totalPrevPeriodo = total(allPrevPeriodFacts);
+  const facturasPrevPeriodo = new Set(allPrevPeriodFacts.map((row) => row.cod_factura)).size;
   const variacionTotalPct = pct(totalPeriodo, totalPrevPeriodo);
   const ticketPromedio = facturasPeriodo > 0 ? Math.round(totalPeriodo / facturasPeriodo) : 0;
-  const ticketPromedioPrev = (previousPeriodRow?.facturas ?? 0) > 0 ? (previousPeriodRow!.total / previousPeriodRow!.facturas) : 0;
+  const ticketPromedioPrev = facturasPrevPeriodo > 0 ? Math.round(totalPrevPeriodo / facturasPrevPeriodo) : 0;
   const variacionTicketPct = pct(ticketPromedio, ticketPromedioPrev);
   const facturasPorCliente = clientesAtendidosSemana > 0 ? facturasPeriodo / clientesAtendidosSemana : 0;
   const tipoFactBreakdown = (() => {
     const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
-    for (const row of selectedFacts) {
+    for (const row of allPeriodFacts) {
       const k = (row.tipo_tiempo ?? "Cliente") as keyof typeof groups;
       groups[k] = (groups[k] ?? 0) + Number(row.total_venta || 0);
     }
@@ -1081,19 +1076,24 @@ export default function Dashboard() {
     : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
       ? { label: "Garantía", value: tipoFactBreakdown.pctGarantia }
       : { label: "Interno", value: tipoFactBreakdown.pctInterno };
+  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturación)
   const top5ClientesPct = (() => {
     const t = topClientes.slice(0, MAX_TOP_RANKING).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((t / totalPeriodo) * 100) : 0;
   })();
+  // topSucursalesPct: Top 2 sucursales sobre el rango completo
   const topSucursalesPct = (() => {
     const top2 = [...factBySucursal].sort((a, b) => b.total - a.total).slice(0, 2).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((top2 / totalPeriodo) * 100) : 0;
   })();
+  // Label del período anterior para SucursalBars (rango completo previo)
+  const periodComparisonLabel = `${format(prevPeriodStartDate, "dd/MM/yy")} – ${format(prevPeriodEndDate, "dd/MM/yy")}`;
 
-  const periodoLabel = periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
+  // "anio" = Día, "semana" = Semana, "mes" = Mes (nombres de UI post-Etapa 1)
+  const periodoLabel = periodMode === "anio" ? "diario" : periodMode === "semana" ? "semanal" : "mensual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
-    const periodoNombre = periodMode === "anio" ? "año" : periodMode;
+    const periodoNombre = periodMode === "anio" ? "día" : periodMode === "semana" ? "semana" : "mes";
     return {
       seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
       facturacion: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
@@ -1102,7 +1102,7 @@ export default function Dashboard() {
       seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composicion.`,
       periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
       sinFacturacion: `Sin facturacion para este ${periodoNombre}.`,
-      columnaPeriodo: periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
+      columnaPeriodo: periodMode === "anio" ? "Día" : periodMode === "semana" ? "Semana" : "Mes",
       carga: isSemana ? "Carga semanal" : "Carga tecnica",
       lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
       plan: isSemana ? "Plan semana" : "Proximo periodo",
@@ -1289,8 +1289,9 @@ export default function Dashboard() {
 
 
   const productividadMatriz = useMemo(() => {
+    // "anio"=Día → dia, "semana"=Semana → semana, "mes"=Mes → mes
     const bucketMode: "dia" | "semana" | "mes" =
-      periodMode === "anio" ? "mes" : periodMode === "semana" ? "dia" : "semana";
+      periodMode === "anio" ? "dia" : periodMode === "semana" ? "semana" : "mes";
     const bucketKey = (iso: string) => {
       if (bucketMode === "dia") return iso; // yyyy-MM-dd, ya es la clave
       const d = parseISO(iso);
@@ -1311,11 +1312,12 @@ export default function Dashboard() {
     };
 
     const bucketsSet = new Set<string>();
-    // In "dia" mode always seed all 7 days so days with no jornadas still appear
+    // En modo "dia" sembrar todos los días del rango para que aparezcan aunque no haya jornadas
     if (bucketMode === "dia") {
-      const weekMon = startOfWeek(periodStart, { weekStartsOn: 1 });
-      for (let i = 0; i < 7; i++) {
-        bucketsSet.add(format(addDays(weekMon, i), "yyyy-MM-dd"));
+      let cursor = periodStart;
+      while (cursor <= periodEnd) {
+        bucketsSet.add(format(cursor, "yyyy-MM-dd"));
+        cursor = addDays(cursor, 1);
       }
     }
     const map = new Map<string, { id: string; nombre: string; porBucket: Record<string, { jornadas: number; horas: number }>; totalJornadas: number; totalHoras: number; trabajos: Set<string> }>();
@@ -1378,7 +1380,13 @@ export default function Dashboard() {
     }
 
     if (bucketsSet.size === 0) {
-      if (bucketMode === "semana") {
+      if (bucketMode === "dia") {
+        let cursor = periodStart;
+        while (cursor <= periodEnd) {
+          bucketsSet.add(format(cursor, "yyyy-MM-dd"));
+          cursor = addDays(cursor, 1);
+        }
+      } else if (bucketMode === "semana") {
         const start = startOfWeek(periodStart, { weekStartsOn: 1 });
         const end = endOfWeek(periodEnd, { weekStartsOn: 1 });
         let cursor = start;
@@ -1434,11 +1442,12 @@ export default function Dashboard() {
       : "—";
 
     return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTecnicos };
-  }, [activeTechnicianIds, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById]);
+  }, [activeTechnicianIds, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
 
   const limpiar = () => {
-    setWeekStartInput(initialWeekStart);
-    setSelectedWeekKey(initialWeekStart);
+    setDateFrom(initialDateFrom);
+    setDateTo(initialDateTo);
+    setSelectedWeekKey(initialDateTo);
     setFSucursales([]);
     setFRubros([]);
     setFOSRubros([]);
@@ -1451,7 +1460,8 @@ export default function Dashboard() {
   };
 
   const filtrosActivos =
-    (weekStartInput !== initialWeekStart ? 1 : 0) +
+    (dateFrom !== initialDateFrom ? 1 : 0) +
+    (dateTo !== initialDateTo ? 1 : 0) +
     (fSucursales.length > 0 ? 1 : 0) +
     (!filtrosOSActivos && fRubros.length > 0 ? 1 : 0) +
     (filtrosOSActivos && fOSRubros.length > 0 ? 1 : 0) +
@@ -1476,8 +1486,9 @@ export default function Dashboard() {
         onClear={limpiar}
         
       >
-        <PeriodSelector value={periodMode} onChange={setPeriodMode} />
-        <FilterDate label={periodMode === "anio" ? "Año base" : periodMode === "mes" ? "Mes base" : "Semana base"} value={weekStartInput} onChange={setWeekStartInput} width="w-[150px]" />
+        <FilterDate label="Desde" value={dateFrom} onChange={setDateFrom} width="w-[140px]" max={dateTo} />
+        <FilterDate label="Hasta" value={dateTo} onChange={setDateTo} width="w-[140px]" min={dateFrom} max={initialDateTo} />
+        <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
         <FilterMultiSelect
           label="Sucursal"
           values={fSucursales}
@@ -1590,7 +1601,7 @@ export default function Dashboard() {
                 )}>
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary to-[#7a9642]" />
                   <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Facturación del período{currentWeekRow?.label && ` · ${currentWeekRow.label}`}
+                    Facturación del período · {format(periodStart, "dd/MM/yy")} – {format(periodEnd, "dd/MM/yy")}
                   </div>
                   <div className="text-[22px] font-extrabold leading-tight tabular-nums">{money(totalPeriodo)}</div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1665,34 +1676,12 @@ export default function Dashboard() {
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
-                  <p className="truncate text-xs text-muted-foreground">Comparativo {periodoLabel} con selección directa.</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {format(periodStart, "dd/MM/yy")} – {format(periodEnd, "dd/MM/yy")} · clic en barra para seleccionar
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
-                  {periodMode !== "anio" && (
-                    <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
-                      <SelectTrigger className="h-8 w-[150px] flex-1 text-xs sm:flex-none">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {periodMode === "semana" ? (
-                          <>
-                            <SelectItem value="4">Ultimas 4 semanas</SelectItem>
-                            <SelectItem value="8">Ultimas 8 semanas</SelectItem>
-                            <SelectItem value="12">Ultimas 12 semanas</SelectItem>
-                            <SelectItem value="all">Todos</SelectItem>
-                          </>
-                        ) : (
-                          <>
-                            <SelectItem value="6">Ultimos 6 meses</SelectItem>
-                            <SelectItem value="12">Ultimos 12 meses</SelectItem>
-                            <SelectItem value="24">Ultimos 24 meses</SelectItem>
-                            <SelectItem value="all">Todos</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  )}
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <BarChart3 className="h-4 w-4" />
                   </div>
@@ -1706,17 +1695,17 @@ export default function Dashboard() {
               />
               <div className="mt-2 border-t pt-2">
                 <MixRubros
-                  row={currentWeekRow}
+                  row={selectedWeek}
                   rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"}
                   onSelect={(rubro) => { setFRubros([rubro]); goSection("facturacion"); }}
                 />
               </div>
-              <EvolucionKpis rows={weeklyRows} currentKey={currentWeekRow?.key} metric={factMetric} />
+              <EvolucionKpis rows={weeklyRows} currentKey={selectedWeek?.key} metric={factMetric} />
             </Card>
 
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Participación del período seleccionado." />
-              <SucursalBars rows={factBySucursal} totalValue={selectedWeek?.total ?? 0} comparisonLabel={comparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
+              <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Acumulado del rango completo." />
+              <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -1979,30 +1968,6 @@ export default function Dashboard() {
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
-                {periodMode !== "anio" && (
-                  <Select value={rangoEvolucion} onValueChange={(v) => setRangoEvolucion(v as typeof rangoEvolucion)}>
-                    <SelectTrigger className="h-8 w-[150px] flex-1 text-xs sm:flex-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {periodMode === "semana" ? (
-                        <>
-                          <SelectItem value="4">Ultimas 4 semanas</SelectItem>
-                          <SelectItem value="8">Ultimas 8 semanas</SelectItem>
-                          <SelectItem value="12">Ultimas 12 semanas</SelectItem>
-                          <SelectItem value="all">Todos</SelectItem>
-                        </>
-                      ) : (
-                        <>
-                          <SelectItem value="6">Ultimos 6 meses</SelectItem>
-                          <SelectItem value="12">Ultimos 12 meses</SelectItem>
-                          <SelectItem value="24">Ultimos 24 meses</SelectItem>
-                          <SelectItem value="all">Todos</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
               </div>
             </div>
             <OSImpactSection

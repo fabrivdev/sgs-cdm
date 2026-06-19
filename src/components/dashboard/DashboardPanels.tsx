@@ -206,25 +206,43 @@ export function ConceptLine({ label, value, total }: { label: string; value: num
   );
 }
 
-export function PeriodSelector({ value, onChange }: { value: "semana" | "mes" | "anio"; onChange: (value: "semana" | "mes" | "anio") => void }) {
+export function PeriodSelector({
+  value,
+  onChange,
+  disabledModes,
+}: {
+  value: "semana" | "mes" | "anio";
+  onChange: (value: "semana" | "mes" | "anio") => void;
+  disabledModes?: Set<"semana" | "mes" | "anio">;
+}) {
   return (
     <div className="flex min-w-0 flex-col gap-1 max-sm:!w-full sm:w-[180px]">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Periodo</span>
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Agrupar por</span>
       <div className="grid h-9 grid-cols-3 overflow-hidden rounded-md border bg-background text-xs">
         {[
+          { value: "anio", label: "Día" },
           { value: "semana", label: "Semana" },
           { value: "mes", label: "Mes" },
-          { value: "anio", label: "Año" },
-        ].map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value as "semana" | "mes" | "anio")}
-            className={cn("border-r px-2 last:border-r-0 hover:bg-accent", value === option.value && "bg-primary text-primary-foreground hover:bg-primary")}
-          >
-            {option.label}
-          </button>
-        ))}
+        ].map((option) => {
+          const disabled = disabledModes?.has(option.value as "semana" | "mes" | "anio") ?? false;
+          const active = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => !disabled && onChange(option.value as "semana" | "mes" | "anio")}
+              className={cn(
+                "border-r px-2 last:border-r-0",
+                disabled && "cursor-not-allowed opacity-40",
+                !disabled && "hover:bg-accent",
+                active && !disabled && "bg-primary text-primary-foreground hover:bg-primary",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

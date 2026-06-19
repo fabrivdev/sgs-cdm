@@ -210,12 +210,16 @@ export function FilterDate({
   onChange,
   title,
   width = "w-[150px]",
+  min,
+  max,
 }: {
   label?: string;
   value: string;
   onChange: (v: string) => void;
   title?: string;
   width?: string;
+  min?: string;
+  max?: string;
 }) {
   return (
     <Field label={label} className={width}>
@@ -225,6 +229,8 @@ export function FilterDate({
         onChange={(e) => onChange(e.target.value)}
         className="h-9 text-xs w-full"
         title={title}
+        min={min}
+        max={max}
       />
     </Field>
   );
