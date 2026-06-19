@@ -1562,105 +1562,6 @@ export default function Dashboard() {
         )}
       </FiltersBar>
 
-      {loading ? <DashboardKPISkeleton count={5} /> : <section className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <SummaryCard
-          icon={DollarSign}
-          title="Facturación del período"
-          value={money(totalPeriodo)}
-          trend={{ value: variacionTotalPct }}
-          footer={`${facturasPeriodo} facturas · ${clientesAtendidosSemana} clientes`}
-          tone={(variacionTotalPct ?? 0) < -20 ? "bad" : "neutral"}
-          onClick={() => goSection("facturacion")}
-        />
-        <SummaryCard
-          icon={Users}
-          title="Clientes atendidos"
-          value={clientesAtendidosSemana}
-          detail={`${facturasPorCliente.toFixed(1).replace(".", ",")} facturas por cliente`}
-          footer={`Top 5 concentran ${top5ClientesPct}%`}
-          onClick={() => goSection("facturacion")}
-        />
-        <SummaryCard
-          icon={Receipt}
-          title="Ticket promedio"
-          value={money(ticketPromedio)}
-          trend={{ value: variacionTicketPct }}
-          footer="Promedio por factura"
-          tone={(variacionTicketPct ?? 0) < -10 ? "bad" : "neutral"}
-          onClick={() => goSection("facturacion")}
-        />
-        <SummaryCard
-          icon={PieChart}
-          title="Tipo de facturación"
-          value={`${tipoFactDominante.label} ${tipoFactDominante.value}%`}
-          detail={
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-500" />Garantía {tipoFactBreakdown.pctGarantia}%</span>
-              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Interno {tipoFactBreakdown.pctInterno}%</span>
-            </span>
-          }
-          onClick={() => goSection("facturacion")}
-        >
-          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
-            <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
-            <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
-          </div>
-          <div className="text-[11px] text-muted-foreground">Base: {money(tipoFactBreakdown.total)}</div>
-        </SummaryCard>
-        <SummaryCard
-          icon={CheckCircle2}
-          title="Flujo operativo"
-          value={flujo.total}
-          detail="trabajos gestionados"
-          tone={flujo.pausados > 0 ? "warn" : "neutral"}
-          onClick={() => goSection("trabajos")}
-        >
-          <div className="border-t pt-1.5">
-            <div className="flex justify-between">
-              {([
-                { dot: "bg-primary", count: flujo.culminados, label: "Culminados" },
-                { dot: "bg-amber-500", count: flujo.abiertos, label: "Abiertos" },
-                { dot: "bg-slate-400", count: flujo.pausados, label: "Pausados" },
-              ] as const).map(({ dot, count, label }) => (
-                <div key={label} className="flex flex-col items-center gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
-                    <span className="text-xs font-bold tabular-nums">{count}</span>
-                  </div>
-                  <span className="text-[9px] text-muted-foreground">{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </SummaryCard>
-        <SummaryCard
-          icon={Wrench}
-          title="Equipo técnico"
-          value={`${tecnicosConActividadPeriodo.size}/${activeTechnicianIds.size}`}
-          detail="técnicos activos"
-          tone="neutral"
-          onClick={() => goSection("trabajos")}
-        >
-          {(() => {
-            const total = activeTechnicianIds.size;
-            if (total === 0) return null;
-            const active = tecnicosConActividadPeriodo.size;
-            let filled = Math.round((active / total) * 10);
-            if (active > 0 && filled === 0) filled = 1;
-            if (active < total && filled === 10) filled = 9;
-            return (
-              <div className="flex items-center gap-0.5 pt-1">
-                {Array.from({ length: 10 }, (_, i) => (
-                  <User key={i} className={cn("h-3.5 w-3.5 shrink-0", i < filled ? "text-primary" : "text-muted-foreground/30")} />
-                ))}
-              </div>
-            );
-          })()}
-        </SummaryCard>
-      </section>}
-
-
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
         <TabsList className="inline-flex h-auto min-w-max sm:grid sm:w-fit sm:grid-cols-4">
@@ -1673,8 +1574,94 @@ export default function Dashboard() {
 
         <TabsContent value="resumen" className="space-y-3">
 
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
-            <Card className="flex h-full flex-col p-3 xl:col-span-2">
+          {/* FILA 1 — FINANCIERO */}
+          {loading ? (
+            <DashboardKPISkeleton count={4} />
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => goSection("facturacion")}
+                className="text-left"
+              >
+                <Card className={cn(
+                  "relative flex h-full flex-col gap-1.5 overflow-hidden p-4 transition-colors hover:bg-accent/50",
+                  (variacionTotalPct ?? 0) < -20 && "border-destructive/40 bg-destructive/5",
+                )}>
+                  <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary to-[#7a9642]" />
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Facturación del período{currentWeekRow?.label && ` · ${currentWeekRow.label}`}
+                  </div>
+                  <div className="text-[22px] font-extrabold leading-tight tabular-nums">{money(totalPeriodo)}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {variacionTotalPct != null ? (
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold",
+                        variacionTotalPct >= 0
+                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border border-red-200 bg-red-50 text-red-700",
+                      )}>
+                        {variacionTotalPct >= 0 ? "▲" : "▼"} {Math.abs(variacionTotalPct)}% vs período anterior
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">sin base previa</span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">{facturasPeriodo} facturas</span>
+                  </div>
+                </Card>
+              </button>
+
+              <button type="button" onClick={() => goSection("facturacion")} className="text-left">
+                <Card className="flex h-full flex-col gap-1.5 p-4 transition-colors hover:bg-accent/50">
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
+                  <div className="text-[22px] font-extrabold leading-tight tabular-nums">{clientesAtendidosSemana}</div>
+                  <div className="text-[10px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
+                </Card>
+              </button>
+
+              <button type="button" onClick={() => goSection("facturacion")} className="text-left">
+                <Card className={cn(
+                  "flex h-full flex-col gap-1.5 p-4 transition-colors hover:bg-accent/50",
+                  (variacionTicketPct ?? 0) < -10 && "border-destructive/40 bg-destructive/5",
+                )}>
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
+                  <div className="text-[22px] font-extrabold leading-tight tabular-nums">{money(ticketPromedio)}</div>
+                  {variacionTicketPct != null && (
+                    <div className={cn("text-[10px] font-semibold tabular-nums", variacionTicketPct >= 0 ? "text-emerald-600" : "text-destructive")}>
+                      {variacionTicketPct >= 0 ? "▲" : "▼"} {Math.abs(variacionTicketPct)}% vs anterior
+                    </div>
+                  )}
+                  <div className="text-[10px] text-muted-foreground">por factura</div>
+                </Card>
+              </button>
+
+              <button type="button" onClick={() => goSection("facturacion")} className="text-left">
+                <Card className="flex h-full flex-col gap-1.5 p-4 transition-colors hover:bg-accent/50">
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>
+                  <div className="text-base font-extrabold leading-tight">
+                    {tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="flex h-full">
+                      <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
+                      <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
+                      <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {[
+                      tipoFactBreakdown.pctGarantia > 0 && `Gnt. ${tipoFactBreakdown.pctGarantia}%`,
+                      tipoFactBreakdown.pctInterno > 0 && `Int. ${tipoFactBreakdown.pctInterno}%`,
+                    ].filter(Boolean).join(" · ") || "Solo cliente"}
+                  </div>
+                </Card>
+              </button>
+            </div>
+          )}
+
+          {/* FILA 2 — TENDENCIA */}
+          <section className="grid gap-3 lg:grid-cols-[2fr_1fr]">
+            <Card className="flex h-full flex-col p-3">
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
@@ -1753,32 +1740,10 @@ export default function Dashboard() {
             </Card>
           </section>
 
-
-          <section className="grid auto-rows-fr gap-3 xl:grid-cols-3">
+          {/* FILA 3 — OPERATIVA */}
+          <section className="grid gap-3 md:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-                <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Trabajos por período y técnicos activos</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <div className="flex items-center gap-1.5 rounded-md bg-primary/5 px-2 py-1">
-                    <span className="text-[10px] text-muted-foreground">Total</span>
-                    <span className="text-sm font-bold tabular-nums text-primary">{productividadMatriz.equipoTotalTrabajos}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1">
-                    <span className="text-[10px] text-muted-foreground">Prom. técnicos</span>
-                    <span className="text-sm font-bold tabular-nums text-amber-600">{productividadMatriz.equipoPromTecnicos}</span>
-                  </div>
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <CalendarDays className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
-              <CargaEquipoChart data={productividadMatriz} />
-            </Card>
-            <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="Período actual · clic filtra en Trabajos" />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}
@@ -1792,29 +1757,70 @@ export default function Dashboard() {
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
+
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Users} title="Clientes atendidos" subtitle="" />
-              <ClientesCompacto
-                rows={topClientes}
-                totalValue={currentWeekRow?.total ?? 0}
-                totalFacturas={currentWeekRow?.facturas ?? 0}
-                totalClientes={currentWeekRow?.clientes ?? 0}
-                onSelect={(nombre) => { setQ(nombre); goSection("facturacion"); }}
-              />
+              <div className="mb-3 flex items-start justify-between">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
+                  <p className="truncate text-xs text-muted-foreground">Trabajos por período y técnicos activos</p>
+                </div>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <CalendarDays className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mb-3 flex items-center gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-[18px] font-extrabold leading-none tabular-nums">
+                    {tecnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Técnicos activos</div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoTotalTrabajos}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Trabajos totales</div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoPromTecnicos}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Prom. téc./período</div>
+                </div>
+              </div>
+              <CargaEquipoChart data={productividadMatriz} />
+              {activeTechnicianIds.size > 0 && (
+                <div className="mt-3 border-t pt-3">
+                  <div className="mb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                    Equipo activo en el período
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(() => {
+                      const total = activeTechnicianIds.size;
+                      const active = tecnicosConActividadPeriodo.size;
+                      let filled = Math.round((active / total) * 10);
+                      if (active > 0 && filled === 0) filled = 1;
+                      if (active < total && filled === 10) filled = 9;
+                      return Array.from({ length: 10 }, (_, i) => (
+                        <User key={i} className={cn("h-5 w-5 shrink-0", i < filled ? "text-primary" : "text-muted-foreground/20")} />
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
             </Card>
           </section>
 
+          {/* FILA 4 — OS ABSORBIDAS */}
           <Card
-            className="cursor-pointer p-3 transition-colors hover:bg-accent/50"
+            className={cn(
+              "cursor-pointer p-4 transition-colors hover:bg-accent/50",
+              osAccumulatedSummary.osCount > 0 && osVarPct != null && osVarPct > 0 && "border-amber-200 bg-amber-50/60",
+            )}
             onClick={() => goSection("os")}
             role="button"
           >
-            <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <Activity className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-semibold">OS absorbidas (garantía + interno)</h2>
-                </div>
+                <h2 className="text-sm font-semibold">OS absorbidas (garantía + interno)</h2>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   Costo absorbido en el rango visible
                   {osAccumulatedSummary.osCount > 0 && ` · ${format(osAccumulatedSummary.start, "dd/MM/yy")} – ${format(osAccumulatedSummary.end, "dd/MM/yy")}`}
@@ -1822,11 +1828,16 @@ export default function Dashboard() {
               </div>
               <span className="shrink-0 text-xs text-muted-foreground">Ver detalle →</span>
             </div>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Monto absorbido</div>
                 <div className="mt-1 text-xl font-bold tabular-nums">{money(osAccumulatedSummary.total)}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">{osAccumulatedSummary.osCount === 0 ? "Sin OS en el rango" : `${osAccumulatedSummary.garantia > 0 ? money(osAccumulatedSummary.garantia) + " garantía" : ""}${osAccumulatedSummary.garantia > 0 && osAccumulatedSummary.interno > 0 ? " · " : ""}${osAccumulatedSummary.interno > 0 ? money(osAccumulatedSummary.interno) + " interno" : ""}`}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  {[
+                    osAccumulatedSummary.garantia > 0 && `${money(osAccumulatedSummary.garantia)} gnt.`,
+                    osAccumulatedSummary.interno > 0 && `${money(osAccumulatedSummary.interno)} int.`,
+                  ].filter(Boolean).join(" · ") || "Sin OS en el rango"}
+                </div>
               </div>
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Vs año anterior</div>
@@ -1837,7 +1848,7 @@ export default function Dashboard() {
                   {osVarPct == null ? "—" : `${osVarPct > 0 ? "+" : ""}${osVarPct}%`}
                 </div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {osAccumulatedComparisonSummary.total > 0 ? money(osAccumulatedComparisonSummary.total) + " año anterior" : "Sin datos previos"}
+                  {osAccumulatedComparisonSummary.total > 0 ? `${money(osAccumulatedComparisonSummary.total)} año anterior` : "Sin datos previos"}
                 </div>
               </div>
               <div>
