@@ -55,7 +55,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: Props) {
 
   return (
     <ResponsiveDrawer open={open} onOpenChange={handleOpenChange} size="sm">
-      <ResponsiveDrawerHeader title="Nuevo cliente" />
+      <ResponsiveDrawerHeader><div className="text-lg font-semibold">Nuevo cliente</div></ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
         <div className="space-y-4">
           <div className="space-y-1.5">
