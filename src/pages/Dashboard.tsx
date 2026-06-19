@@ -1677,19 +1677,37 @@ export default function Dashboard() {
               </button>
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
-                <Card className="flex h-full flex-col gap-1.5 p-4 transition-colors hover:bg-accent/50">
+                <Card className="flex h-full flex-col gap-2 p-4 transition-colors hover:bg-accent/50">
                   <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>
                   <div className="text-base font-extrabold leading-tight">
                     {tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span>
                   </div>
-                  <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-2.5 w-full overflow-hidden rounded-full border border-border/60 bg-muted shadow-inner sm:h-3">
                     <div className="flex h-full">
                       <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
                       <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
                       <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
                     </div>
                   </div>
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      Cliente {tipoFactBreakdown.pctCliente}%
+                    </span>
+                    {tipoFactBreakdown.pctGarantia > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                        Gnt. {tipoFactBreakdown.pctGarantia}%
+                      </span>
+                    )}
+                    {tipoFactBreakdown.pctInterno > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        Int. {tipoFactBreakdown.pctInterno}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="hidden text-[10px] text-muted-foreground">
                     {[
                       tipoFactBreakdown.pctGarantia > 0 && `Gnt. ${tipoFactBreakdown.pctGarantia}%`,
                       tipoFactBreakdown.pctInterno > 0 && `Int. ${tipoFactBreakdown.pctInterno}%`,
