@@ -1069,6 +1069,24 @@ export default function Dashboard() {
   const ticketPromedioPrev = facturasPrevPeriodo > 0 ? Math.round(totalPrevPeriodo / facturasPrevPeriodo) : 0;
   const variacionTicketPct = pct(ticketPromedio, ticketPromedioPrev);
   const facturasPorCliente = clientesAtendidosSemana > 0 ? facturasPeriodo / clientesAtendidosSemana : 0;
+  const clientesPareto80 = (() => {
+    if (totalPeriodo <= 0) return 0;
+    const totalsByClient = new Map<string, number>();
+    for (const row of allPeriodFacts) {
+      const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
+      const key = normalizeClienteKey(nombre);
+      totalsByClient.set(key, (totalsByClient.get(key) ?? 0) + Number(row.total_venta || 0));
+    }
+    const threshold = totalPeriodo * 0.8;
+    let accumulated = 0;
+    let count = 0;
+    for (const value of Array.from(totalsByClient.values()).sort((a, b) => b - a)) {
+      accumulated += value;
+      count += 1;
+      if (accumulated >= threshold) break;
+    }
+    return count;
+  })();
   const tipoFactBreakdown = (() => {
     const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
     for (const row of allPeriodFacts) {
@@ -1702,26 +1720,48 @@ export default function Dashboard() {
               </button>
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
-                <Card className="flex h-full flex-col gap-1.5 p-4 transition-colors hover:bg-accent/50">
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
-                  <div className="text-[22px] font-extrabold leading-tight tabular-nums">{clientesAtendidosSemana}</div>
-                  <div className="text-[10px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
+                <Card className="flex h-full min-h-[116px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50">
+                  <div className="flex flex-1 items-center gap-3 p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Clientes</div>
+                      <div className="mt-1 text-[28px] font-extrabold leading-none tabular-nums">{clientesAtendidosSemana}</div>
+                      <div className="mt-2 text-xs text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-xs text-muted-foreground">
+                    <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
+                    <span><span className="font-semibold text-foreground">{clientesPareto80}</span> clientes concentran 80%</span>
+                  </div>
                 </Card>
               </button>
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
                 <Card className={cn(
-                  "flex h-full flex-col gap-1.5 p-4 transition-colors hover:bg-accent/50",
+                  "flex h-full min-h-[116px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50",
                   (variacionTicketPct ?? 0) < -10 && "border-destructive/40 bg-destructive/5",
                 )}>
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
-                  <div className="text-[22px] font-extrabold leading-tight tabular-nums">{money(ticketPromedio)}</div>
-                  {variacionTicketPct != null && (
-                    <div className={cn("text-[10px] font-semibold tabular-nums", variacionTicketPct >= 0 ? "text-emerald-600" : "text-destructive")}>
-                      {variacionTicketPct >= 0 ? "▲" : "▼"} {Math.abs(variacionTicketPct)}% vs anterior
+                  <div className="flex flex-1 items-center gap-3 p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Receipt className="h-5 w-5" />
                     </div>
-                  )}
-                  <div className="text-[10px] text-muted-foreground">por factura</div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Ticket promedio</div>
+                      <div className="mt-1 text-[28px] font-extrabold leading-none tabular-nums">{money(ticketPromedio)}</div>
+                      <div className="mt-2 text-xs text-muted-foreground">por factura</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-xs">
+                    {variacionTicketPct != null ? (
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", variacionTicketPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive")}>
+                        {variacionTicketPct >= 0 ? "+" : "-"}{Math.abs(variacionTicketPct)}% vs anterior
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Sin base previa</span>
+                    )}
+                  </div>
                 </Card>
               </button>
 
