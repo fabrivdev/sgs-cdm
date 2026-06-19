@@ -1037,6 +1037,9 @@ export default function Dashboard() {
     () => new Set(jornadasOperativasPeriodo.flatMap((j) => validJornadaCrew(j))),
     [activeTechnicianIds, jornadasOperativasPeriodo, servicioById],
   );
+  const tecnicosActivosPct = activeTechnicianIds.size > 0
+    ? Math.round((tecnicosConActividadPeriodo.size / activeTechnicianIds.size) * 100)
+    : 0;
   const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > DIAS_JORNADA_VENCIDA);
   const selectedTrend = selectedWeek?.variacion ?? null;
@@ -1850,44 +1853,57 @@ export default function Dashboard() {
                   <CalendarDays className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mb-3 flex items-center gap-4">
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[18px] font-extrabold leading-none tabular-nums">
-                    {tecnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
+              <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-md border bg-muted/10 p-2.5">
+                  <div className="flex items-start gap-2">
+                    <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Tecnicos activos</div>
+                      <div className="mt-0.5 flex items-baseline gap-2">
+                        <span className="text-[18px] font-extrabold leading-none tabular-nums">
+                          {tecnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
+                        </span>
+                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
+                          {tecnicosActivosPct}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Técnicos activos</div>
+                  {activeTechnicianIds.size > 0 && (
+                    <div className="mt-2 flex gap-1">
+                      {(() => {
+                        const total = activeTechnicianIds.size;
+                        const active = tecnicosConActividadPeriodo.size;
+                        let filled = Math.round((active / total) * 10);
+                        if (active > 0 && filled === 0) filled = 1;
+                        if (active < total && filled === 10) filled = 9;
+                        return Array.from({ length: 10 }, (_, i) => (
+                          <User key={i} className={cn("h-3.5 w-3.5 shrink-0", i < filled ? "text-primary" : "text-muted-foreground/20")} />
+                        ));
+                      })()}
+                    </div>
+                  )}
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoTotalTrabajos}</div>
-                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Trabajos totales</div>
+                <div className="rounded-md border bg-muted/10 p-2.5">
+                  <div className="flex items-start gap-2">
+                    <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div>
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Trabajos totales</div>
+                      <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoTotalTrabajos}</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="h-8 w-px bg-border" />
-                <div className="flex flex-col gap-0.5">
-                  <div className="text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoPromTecnicos}</div>
-                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Prom. téc./período</div>
+                <div className="rounded-md border bg-muted/10 p-2.5">
+                  <div className="flex items-start gap-2">
+                    <Activity className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div>
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Prom. tec./periodo</div>
+                      <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoPromTecnicos}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <CargaEquipoChart data={productividadMatriz} />
-              {activeTechnicianIds.size > 0 && (
-                <div className="mt-3 border-t pt-3">
-                  <div className="mb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                    Equipo activo en el período
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(() => {
-                      const total = activeTechnicianIds.size;
-                      const active = tecnicosConActividadPeriodo.size;
-                      let filled = Math.round((active / total) * 10);
-                      if (active > 0 && filled === 0) filled = 1;
-                      if (active < total && filled === 10) filled = 9;
-                      return Array.from({ length: 10 }, (_, i) => (
-                        <User key={i} className={cn("h-5 w-5 shrink-0", i < filled ? "text-primary" : "text-muted-foreground/20")} />
-                      ));
-                    })()}
-                  </div>
-                </div>
-              )}
             </Card>
           </section>
 
