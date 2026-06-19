@@ -1719,8 +1719,8 @@ export default function Dashboard() {
           )}
 
           {/* FILA 2 — TENDENCIA */}
-          <section className="grid gap-3 lg:grid-cols-[2fr_1fr]">
-            <Card className="flex h-full flex-col p-3">
+          <section className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Card className="flex h-full min-w-0 flex-col p-3">
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
@@ -1751,7 +1751,7 @@ export default function Dashboard() {
               <EvolucionKpis rows={weeklyRows} currentKey={selectedWeek?.key} metric={factMetric} />
             </Card>
 
-            <Card className="flex h-full flex-col p-3">
+            <Card className="flex h-full min-w-0 flex-col p-3">
               <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Acumulado del rango completo." />
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
               <div className="mt-3 flex flex-col gap-2">
