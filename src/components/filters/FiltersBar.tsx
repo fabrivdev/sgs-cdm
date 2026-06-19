@@ -31,6 +31,7 @@ export function FiltersBar({
   onClear,
   meta,
   actions,
+  expanded,
   className,
 }: {
   search?: {
@@ -45,6 +46,7 @@ export function FiltersBar({
   onClear?: () => void;
   meta?: ReactNode;
   actions?: ReactNode;
+  expanded?: ReactNode;
   className?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -108,6 +110,7 @@ export function FiltersBar({
       {hasControls && mobileOpen && (
         <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/20 p-2 sm:hidden">
           {children}
+          {expanded && <div className="border-t pt-2">{expanded}</div>}
           {activeCount > 0 && onClear && (
             <Button variant="ghost" size="sm" onClick={onClear} className="h-9 justify-start text-xs">
               <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
@@ -165,6 +168,12 @@ export function FiltersBar({
           {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
         </div>
       </div>
+
+      {expanded && (
+        <div className="mt-2 hidden border-t pt-2 sm:block">
+          {expanded}
+        </div>
+      )}
     </Card>
   );
 }

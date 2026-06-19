@@ -1546,34 +1546,7 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-      >
-        <FilterDate label="Desde" value={dateFrom} onChange={setDateFrom} width="w-[140px]" max={dateTo} />
-        <FilterDate label="Hasta" value={dateTo} onChange={setDateTo} width="w-[140px]" min={dateFrom} max={initialDateTo} />
-        <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
-        <FilterMultiSelect
-          label="Sucursal"
-          values={fSucursales}
-          onChange={setFSucursales}
-          placeholder="Todos"
-          width="w-[170px]"
-          options={SUCURSALES.map((s) => ({ value: s, label: s }))}
-        />
-        <FilterCustom label="Filtros" width="w-auto">
-          <Button
-            type="button"
-            variant={showAdvancedFilters || filtrosAvanzadosActivos > 0 ? "default" : "outline"}
-            size="sm"
-            className="h-9 w-full gap-2 whitespace-nowrap sm:w-auto"
-            onClick={() => setShowAdvancedFilters((value) => !value)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Más filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
-          </Button>
-        </FilterCustom>
-      </FiltersBar>
-
-      {showAdvancedFilters && (
-        <Card className="p-2.5">
+        expanded={showAdvancedFilters ? (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             <FilterMultiSelect
               label="Marca"
@@ -1650,8 +1623,32 @@ export default function Dashboard() {
               </>
             )}
           </div>
-        </Card>
-      )}
+        ) : null}
+      >
+        <FilterDate label="Desde" value={dateFrom} onChange={setDateFrom} width="w-[140px]" max={dateTo} />
+        <FilterDate label="Hasta" value={dateTo} onChange={setDateTo} width="w-[140px]" min={dateFrom} max={initialDateTo} />
+        <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
+        <FilterMultiSelect
+          label="Sucursal"
+          values={fSucursales}
+          onChange={setFSucursales}
+          placeholder="Todos"
+          width="w-[170px]"
+          options={SUCURSALES.map((s) => ({ value: s, label: s }))}
+        />
+        <FilterCustom label="Filtros" width="w-auto">
+          <Button
+            type="button"
+            variant={showAdvancedFilters || filtrosAvanzadosActivos > 0 ? "default" : "outline"}
+            size="sm"
+            className="h-9 w-full gap-2 whitespace-nowrap sm:w-auto"
+            onClick={() => setShowAdvancedFilters((value) => !value)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Más filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
+          </Button>
+        </FilterCustom>
+      </FiltersBar>
 
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
         <TabsList className="inline-flex h-auto min-w-max">
