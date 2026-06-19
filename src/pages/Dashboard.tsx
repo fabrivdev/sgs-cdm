@@ -1068,6 +1068,27 @@ export default function Dashboard() {
   const ticketPromedio = facturasPeriodo > 0 ? Math.round(totalPeriodo / facturasPeriodo) : 0;
   const ticketPromedioPrev = facturasPrevPeriodo > 0 ? Math.round(totalPrevPeriodo / facturasPrevPeriodo) : 0;
   const variacionTicketPct = pct(ticketPromedio, ticketPromedioPrev);
+  const ticketSparkline = useMemo(() => {
+    const values = weeklyRows
+      .map((row) => (row.facturas > 0 ? weekMetric(row, "usd") / row.facturas : 0))
+      .filter((value) => value > 0)
+      .slice(-8);
+
+    if (values.length < 2) return { path: "", last: null as { x: number; y: number } | null };
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const points = values.map((value, index) => ({
+      x: 6 + (index / (values.length - 1)) * 108,
+      y: 36 - ((value - min) / span) * 28,
+    }));
+
+    return {
+      path: points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" "),
+      last: points[points.length - 1],
+    };
+  }, [weeklyRows]);
   const facturasPorCliente = clientesAtendidosSemana > 0 ? facturasPeriodo / clientesAtendidosSemana : 0;
   const clientesPareto80 = (() => {
     if (totalPeriodo <= 0) return 0;
@@ -1720,19 +1741,24 @@ export default function Dashboard() {
               </button>
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
-                <Card className="flex h-full min-h-[116px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50">
-                  <div className="flex flex-1 items-center gap-3 p-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Users className="h-5 w-5" />
+                <Card className="relative flex h-full min-h-[126px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-36 overflow-hidden sm:block">
+                    <Users className="absolute right-5 top-7 h-28 w-28 text-primary opacity-[0.08]" strokeWidth={1.6} />
+                    <User className="absolute right-24 top-12 h-20 w-20 text-primary opacity-[0.07]" strokeWidth={1.6} />
+                    <User className="absolute -right-5 top-14 h-20 w-20 text-primary opacity-[0.07]" strokeWidth={1.6} />
+                  </div>
+                  <div className="relative z-10 flex flex-1 items-center gap-3 p-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Users className="h-[18px] w-[18px]" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Clientes</div>
-                      <div className="mt-1 text-[28px] font-extrabold leading-none tabular-nums">{clientesAtendidosSemana}</div>
-                      <div className="mt-2 text-xs text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
+                      <div className="mt-1 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{clientesAtendidosSemana}</div>
+                      <div className="text-[11px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-xs text-muted-foreground">
-                    <BarChart3 className="h-4 w-4 shrink-0 text-primary" />
+                  <div className="relative z-10 flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-[11px] text-muted-foreground">
+                    <BarChart3 className="h-3.5 w-3.5 shrink-0 text-primary" />
                     <span><span className="font-semibold text-foreground">{clientesPareto80}</span> clientes concentran 80%</span>
                   </div>
                 </Card>
@@ -1740,22 +1766,34 @@ export default function Dashboard() {
 
               <button type="button" onClick={() => goSection("facturacion")} className="text-left">
                 <Card className={cn(
-                  "flex h-full min-h-[116px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50",
+                  "relative flex h-full min-h-[126px] flex-col overflow-hidden p-0 transition-colors hover:bg-accent/50",
                   (variacionTicketPct ?? 0) < -10 && "border-destructive/40 bg-destructive/5",
                 )}>
-                  <div className="flex flex-1 items-center gap-3 p-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Receipt className="h-5 w-5" />
+                  {ticketSparkline.path ? (
+                    <svg
+                      className="pointer-events-none absolute right-3 top-8 hidden h-16 w-32 text-primary/70 sm:block"
+                      viewBox="0 0 120 44"
+                      aria-hidden="true"
+                    >
+                      <path d={ticketSparkline.path} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      {ticketSparkline.last ? (
+                        <circle cx={ticketSparkline.last.x} cy={ticketSparkline.last.y} r="3.2" fill="white" stroke="currentColor" strokeWidth="2.5" />
+                      ) : null}
+                    </svg>
+                  ) : null}
+                  <div className="relative z-10 flex flex-1 items-center gap-3 p-4 pr-20 sm:pr-32">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Receipt className="h-[18px] w-[18px]" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Ticket promedio</div>
-                      <div className="mt-1 text-[28px] font-extrabold leading-none tabular-nums">{money(ticketPromedio)}</div>
-                      <div className="mt-2 text-xs text-muted-foreground">por factura</div>
+                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
+                      <div className="mt-1 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(ticketPromedio)}</div>
+                      <div className="text-[11px] text-muted-foreground">por factura</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-xs">
+                  <div className="relative z-10 flex items-center gap-2 border-t bg-muted/10 px-4 py-2.5 text-[11px]">
                     {variacionTicketPct != null ? (
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", variacionTicketPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive")}>
+                      <span className={cn("rounded-full px-2 py-0.5 font-semibold tabular-nums", variacionTicketPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive")}>
                         {variacionTicketPct >= 0 ? "+" : "-"}{Math.abs(variacionTicketPct)}% vs anterior
                       </span>
                     ) : (
