@@ -4,8 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,9 @@ interface DisponibilidadTecnico {
 }
 
 const PAGE = 1000;
+const PASANTE_NOMBRE = "PASANTE";
+
+const esPasante = (profile: Profile) => profile.nombre.trim().toUpperCase() === PASANTE_NOMBRE;
 
 async function cargarTodosLosClientes() {
   let from = 0;
@@ -109,7 +112,7 @@ export default function Calendario() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [adminCabecillaIds, setAdminCabecillaIds] = useState<Set<string>>(new Set());
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [fTecnico, setFTecnico] = useState<string>("all");
+  const [fTecnicos, setFTecnicos] = useState<string[]>([]);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
   const [diaSel, setDiaSel] = useState<Date | null>(null);
   const [diaForm, setDiaForm] = useState<Date | null>(null);
@@ -227,17 +230,6 @@ export default function Calendario() {
     [clientes],
   );
 
-  const filtered = useMemo(
-    () =>
-      servicios.filter(
-        (s) =>
-          fTecnico === "all" ||
-          s.tecnico_responsable_id === fTecnico ||
-          s.auxiliares.includes(fTecnico),
-      ),
-    [servicios, fTecnico],
-  );
-
   const start =
     vista === "mes"
       ? startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 })
@@ -255,14 +247,29 @@ export default function Calendario() {
   const tecnicosSolo = useMemo(
     () =>
       profiles.filter(
-        (p) => p.activo !== false && !adminCabecillaIds.has(p.id),
+        (p) => p.activo !== false && !adminCabecillaIds.has(p.id) && !esPasante(p),
       ),
     [profiles, adminCabecillaIds],
   );
 
+  const tecnicoFilterSet = useMemo(
+    () => new Set(fTecnicos.length > 0 ? fTecnicos : tecnicosSolo.map((t) => t.id)),
+    [fTecnicos, tecnicosSolo],
+  );
+
+  const filtered = useMemo(
+    () =>
+      servicios.filter((s) => {
+        const crew = [s.tecnico_responsable_id, ...s.auxiliares].filter(Boolean) as string[];
+        if (crew.length === 0) return fTecnicos.length === 0;
+        return crew.some((id) => tecnicoFilterSet.has(id));
+      }),
+    [servicios, fTecnicos.length, tecnicoFilterSet],
+  );
+
   const tecnicosVisibles = useMemo(
-    () => (fTecnico === "all" ? tecnicosSolo : tecnicosSolo.filter((t) => t.id === fTecnico)),
-    [tecnicosSolo, fTecnico],
+    () => (fTecnicos.length === 0 ? tecnicosSolo : tecnicosSolo.filter((t) => fTecnicos.includes(t.id))),
+    [tecnicosSolo, fTecnicos],
   );
 
   const eventsForTecnicoDay = (tecId: string, d: Date) =>
@@ -284,7 +291,7 @@ export default function Calendario() {
 
   const disponibilidadForDay = (d: Date) =>
     disponibilidades.filter(
-      (disp) => dispIncludesDay(disp, d) && (fTecnico === "all" || disp.tecnico_id === fTecnico),
+      (disp) => dispIncludesDay(disp, d) && tecnicoFilterSet.has(disp.tecnico_id),
     );
 
   const disponibilidadLabel = (tipo: string) => tipo || "No disponible";
@@ -433,8 +440,8 @@ export default function Calendario() {
       </div>
 
       <FiltersBar
-        activeCount={fTecnico !== "all" ? 1 : 0}
-        onClear={() => setFTecnico("all")}
+        activeCount={fTecnicos.length > 0 ? 1 : 0}
+        onClear={() => setFTecnicos([])}
       >
         <FilterSelect
           label="Vista"
@@ -448,16 +455,13 @@ export default function Calendario() {
             { value: "tecnicos", label: "Por técnico" },
           ]}
         />
-        <FilterSelect
+        <FilterMultiSelect
           label="Técnico"
-          value={fTecnico}
-          onChange={setFTecnico}
-          placeholder="Técnico"
-          width="w-[180px]"
-          options={[
-            { value: "all", label: "Todos" },
-            ...profiles.filter(p => !adminCabecillaIds.has(p.id)).map(p => ({ value: p.id, label: p.nombre })),
-          ]}
+          values={fTecnicos}
+          onChange={setFTecnicos}
+          placeholder="Todos"
+          width="w-[220px]"
+          options={tecnicosSolo.map((p) => ({ value: p.id, label: p.nombre }))}
         />
       </FiltersBar>
 
@@ -700,7 +704,7 @@ export default function Calendario() {
                     >
                       <GraduationCap className="h-2.5 w-2.5 shrink-0" />
                       <span className="truncate">
-                        {fTecnico === "all" ? `${profById[disp.tecnico_id] ?? "Tecnico"} · ` : ""}
+                        {fTecnicos.length === 0 ? `${profById[disp.tecnico_id] ?? "Tecnico"} · ` : ""}
                         {disponibilidadLabel(disp.tipo)}
                       </span>
                     </div>
