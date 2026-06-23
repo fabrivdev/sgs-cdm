@@ -64,6 +64,35 @@ const today = new Date();
 const todayStr = format(today, "yyyy-MM-dd");
 const initialDateFrom = format(startOfMonth(subMonths(today, 11)), "yyyy-MM-dd");
 const initialDateTo = format(today, "yyyy-MM-dd");
+const DASHBOARD_FILTERS_STORAGE_KEY = "sgs-cdm.dashboard.filters.v1";
+
+type DashboardStoredFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  periodMode?: PeriodMode;
+};
+
+function isValidDateKey(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(parseISO(value).getTime());
+}
+
+function getInitialDashboardFilters(): Required<DashboardStoredFilters> {
+  if (typeof window === "undefined") {
+    return { dateFrom: initialDateFrom, dateTo: initialDateTo, periodMode: "mes" };
+  }
+
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(DASHBOARD_FILTERS_STORAGE_KEY) ?? "{}") as DashboardStoredFilters;
+    const savedFrom = isValidDateKey(saved.dateFrom) ? saved.dateFrom : initialDateFrom;
+    const savedTo = isValidDateKey(saved.dateTo) ? saved.dateTo : initialDateTo;
+    const from = savedFrom <= savedTo ? savedFrom : initialDateFrom;
+    const to = savedFrom <= savedTo ? savedTo : initialDateTo;
+    const mode: PeriodMode = saved.periodMode === "dia" || saved.periodMode === "semana" || saved.periodMode === "anio" ? saved.periodMode : "mes";
+    return { dateFrom: from, dateTo: to, periodMode: mode };
+  } catch {
+    return { dateFrom: initialDateFrom, dateTo: initialDateTo, periodMode: "mes" };
+  }
+}
 
 interface Servicio {
   id: string;
@@ -257,6 +286,7 @@ function normalizeClienteKey(name: string): string {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const initialFilters = useMemo(() => getInitialDashboardFilters(), []);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
@@ -271,9 +301,9 @@ export default function Dashboard() {
   const [facturacionLoading, setFacturacionLoading] = useState(true);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
 
-  const [dateFrom, setDateFrom] = useState(initialDateFrom);
-  const [dateTo, setDateTo] = useState(initialDateTo);
-  const [selectedWeekKey, setSelectedWeekKey] = useState(initialDateTo);
+  const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
+  const [dateTo, setDateTo] = useState(initialFilters.dateTo);
+  const [selectedWeekKey, setSelectedWeekKey] = useState(initialFilters.dateTo);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
   const [fOSRubros, setFOSRubros] = useState<OSRubro[]>([]);
@@ -281,7 +311,7 @@ export default function Dashboard() {
   const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
-  const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>(initialFilters.periodMode);
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
@@ -343,6 +373,14 @@ export default function Dashboard() {
       setPeriodMode("mes");
     }
   }, [dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      DASHBOARD_FILTERS_STORAGE_KEY,
+      JSON.stringify({ dateFrom, dateTo, periodMode }),
+    );
+  }, [dateFrom, dateTo, periodMode]);
 
   useEffect(() => {
     let alive = true;
