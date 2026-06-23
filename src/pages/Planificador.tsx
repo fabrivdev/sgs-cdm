@@ -321,7 +321,12 @@ export default function Planificador() {
 
   const displayed = useMemo(() => filtered, [filtered]);
 
+  const totalHoras = useMemo(() => {
+    return displayed.reduce((sum, s) => sum + (Number(s.horas_trabajadas) || 0), 0);
+  }, [displayed]);
+
   const canCreate = isAdmin || isCabecilla;
+
 
 
   const exportExcel = async () => {
