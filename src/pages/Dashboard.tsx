@@ -116,6 +116,15 @@ interface UserRole {
   role: "admin" | "cabecilla" | "tecnico";
 }
 
+interface DisponibilidadTecnico {
+  id: string;
+  tecnico_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo: string | null;
+  observacion: string | null;
+}
+
 interface OrdenServicioImportada {
   os_numero: string;
   trabajo_id: string | null;
@@ -256,6 +265,7 @@ export default function Dashboard() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [facturacion, setFacturacion] = useState<Facturacion[]>([]);
   const [ordenesServicio, setOrdenesServicio] = useState<OrdenServicioImportada[]>([]);
+  const [disponibilidades, setDisponibilidades] = useState<DisponibilidadTecnico[]>([]);
   const [baseLoading, setBaseLoading] = useState(true);
   const [jornadasLoading, setJornadasLoading] = useState(true);
   const [facturacionLoading, setFacturacionLoading] = useState(true);
@@ -381,16 +391,28 @@ export default function Dashboard() {
     (async () => {
       setJornadasLoading(true);
       try {
-        const jornadasRows = await cargarTodo<Jornada>(
-          supabase
-            .from("servicio_jornadas")
-            .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
-            .gte("fecha", dateKey(previousPeriodStart))
-            .lte("fecha", dateKey(addDays(periodEnd, 90)))
-            .order("fecha", { ascending: true }),
-        );
+        const [jornadasRows, disponibilidadRows] = await Promise.all([
+          cargarTodo<Jornada>(
+            supabase
+              .from("servicio_jornadas")
+              .select("id, servicio_id, fecha, estado, horas_trabajadas, tecnico_responsable_id, auxiliares")
+              .gte("fecha", dateKey(previousPeriodStart))
+              .lte("fecha", dateKey(addDays(periodEnd, 90)))
+              .order("fecha", { ascending: true }),
+          ),
+          cargarTodo<DisponibilidadTecnico>(
+            supabase
+              .from("tecnico_disponibilidad")
+              .select("id, tecnico_id, fecha_inicio, fecha_fin, tipo, observacion")
+              .lte("fecha_inicio", dateKey(periodEnd))
+              .gte("fecha_fin", dateKey(periodStart)),
+          ),
+        ]);
 
-        if (alive) setJornadas(jornadasRows);
+        if (alive) {
+          setJornadas(jornadasRows);
+          setDisponibilidades(disponibilidadRows);
+        }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         toast.error(`Error cargando jornadas: ${msg}`);
@@ -1464,6 +1486,25 @@ export default function Dashboard() {
       }
     }
 
+    const noDisponiblesPorBucketMap = new Map<string, Set<string>>();
+    for (const disp of disponibilidades) {
+      if (!activeTechnicianIds.has(disp.tecnico_id)) continue;
+      const desde = disp.fecha_inicio > dateKey(periodStart) ? disp.fecha_inicio : dateKey(periodStart);
+      const hasta = disp.fecha_fin < dateKey(periodEnd) ? disp.fecha_fin : dateKey(periodEnd);
+      if (desde > hasta) continue;
+
+      let cursor = parseISO(desde);
+      const endDisp = parseISO(hasta);
+      while (cursor <= endDisp) {
+        const key = bucketKey(format(cursor, "yyyy-MM-dd"));
+        bucketsSet.add(key);
+        const current = noDisponiblesPorBucketMap.get(key) ?? new Set<string>();
+        current.add(disp.tecnico_id);
+        noDisponiblesPorBucketMap.set(key, current);
+        cursor = addDays(cursor, 1);
+      }
+    }
+
     if (bucketsSet.size === 0) {
       if (bucketMode === "dia") {
         let cursor = periodStart;
@@ -1498,7 +1539,9 @@ export default function Dashboard() {
 
     const buckets = Array.from(bucketsSet).sort();
     const trabajosPorBucket: Record<string, number> = {};
+    const tecnicosNoDisponiblesPorBucket: Record<string, number> = {};
     for (const k of buckets) trabajosPorBucket[k] = trabajosPorBucketMap.get(k)?.size ?? 0;
+    for (const k of buckets) tecnicosNoDisponiblesPorBucket[k] = noDisponiblesPorBucketMap.get(k)?.size ?? 0;
     const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
     const rowsAll = Array.from(map.values())
       .map((row) => ({
@@ -1533,8 +1576,8 @@ export default function Dashboard() {
       ? (nonSunTechCounts.reduce((a, b) => a + b, 0) / nonSunTechCounts.length).toFixed(1)
       : "—";
 
-    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTecnicos };
-  }, [activeTechnicianIds, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
+    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, tecnicosNoDisponiblesPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTecnicos };
+  }, [activeTechnicianIds, disponibilidades, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
 
   const limpiar = () => {
     setDateFrom(initialDateFrom);

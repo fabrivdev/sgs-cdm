@@ -1177,11 +1177,12 @@ export function CargaEquipoChart({
     buckets: string[];
     allRows: Array<{ porBucket: Record<string, { jornadas: number; horas: number }> }>;
     trabajosPorBucket: Record<string, number>;
+    tecnicosNoDisponiblesPorBucket?: Record<string, number>;
     bucketLabel: (k: string) => string;
     bucketMode: PeriodMode;
   };
 }) {
-  const { buckets, allRows, trabajosPorBucket, bucketLabel, bucketMode } = data;
+  const { buckets, allRows, trabajosPorBucket, tecnicosNoDisponiblesPorBucket = {}, bucketLabel, bucketMode } = data;
   const n = buckets.length;
 
   const isSunday = (k: string) => bucketMode === "dia" && getDay(parseISO(k)) === 0;
@@ -1190,9 +1191,10 @@ export function CargaEquipoChart({
   const techs = buckets.map((k) =>
     allRows.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length
   );
+  const noDisponibles = buckets.map((k) => tecnicosNoDisponiblesPorBucket[k] ?? 0);
 
   // Stepped scale: round up to next multiple of 5 (min 5)
-  const rawMax = Math.max(0, ...trabajos, ...techs);
+  const rawMax = Math.max(0, ...trabajos, ...techs, ...noDisponibles);
   const maxAll = Math.max(5, Math.ceil(rawMax / 5) * 5);
 
   // Measure the bar area's actual rendered height so bars fill it correctly
@@ -1255,6 +1257,7 @@ export function CargaEquipoChart({
               const sun = isSunday(k);
               const hT = barH(trabajos[i]);
               const hTech = barH(techs[i]);
+              const hNoDisp = barH(noDisponibles[i]);
               return (
                 <div key={k} className="flex items-end justify-center gap-px">
                   {/* Trabajos bar */}
@@ -1283,6 +1286,18 @@ export function CargaEquipoChart({
                       className={cn("w-3 rounded-t-sm sm:w-4", sun ? "bg-muted/40" : "bg-amber-400/90")}
                     />
                   </div>
+                  <div className="flex flex-col items-center">
+                    {noDisponibles[i] > 0 && (
+                      <span className={cn(
+                        "mb-0.5 text-[7px] font-semibold leading-none tabular-nums sm:text-[8px]",
+                        sun ? "text-muted-foreground/30" : "text-sky-600",
+                      )}>{noDisponibles[i]}</span>
+                    )}
+                    <div
+                      style={{ height: hNoDisp }}
+                      className={cn("w-2.5 rounded-t-sm sm:w-3", sun ? "bg-muted/40" : "bg-sky-400/90")}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -1309,7 +1324,7 @@ export function CargaEquipoChart({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground sm:text-[11px]">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary/75" />
           Trabajos
@@ -1317,6 +1332,10 @@ export function CargaEquipoChart({
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400/90" />
           Técnicos activos
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-400/90" />
+          No disponibles
         </div>
       </div>
     </div>
