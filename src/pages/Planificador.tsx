@@ -15,7 +15,7 @@ import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/Fil
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
-import { CalendarPlus, ChevronLeft, ChevronRight, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
@@ -321,7 +321,12 @@ export default function Planificador() {
 
   const displayed = useMemo(() => filtered, [filtered]);
 
+  const totalHoras = useMemo(() => {
+    return displayed.reduce((sum, s) => sum + (Number(s.horas_trabajadas) || 0), 0);
+  }, [displayed]);
+
   const canCreate = isAdmin || isCabecilla;
+
 
 
   const exportExcel = async () => {
@@ -677,7 +682,21 @@ export default function Planificador() {
         })}
       </div>
 
+      <Card className="p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Total horas · {displayed.length} jornada{displayed.length !== 1 ? "s" : ""} filtrada{displayed.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="text-2xl font-bold tabular-nums">
+            {totalHoras.toFixed(totalHoras % 1 === 0 ? 0 : 1)}
+            <span className="ml-1 text-sm font-normal text-muted-foreground">hs</span>
+          </div>
+        </div>
+      </Card>
+
       <ServicioFormDialog
+
         open={openForm}
         onOpenChange={setOpenForm}
         servicio={editing}
