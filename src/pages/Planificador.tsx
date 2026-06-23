@@ -682,7 +682,21 @@ export default function Planificador() {
         })}
       </div>
 
+      <Card className="p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Total horas · {displayed.length} jornada{displayed.length !== 1 ? "s" : ""} filtrada{displayed.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="text-2xl font-bold tabular-nums">
+            {totalHoras.toFixed(totalHoras % 1 === 0 ? 0 : 1)}
+            <span className="ml-1 text-sm font-normal text-muted-foreground">hs</span>
+          </div>
+        </div>
+      </Card>
+
       <ServicioFormDialog
+
         open={openForm}
         onOpenChange={setOpenForm}
         servicio={editing}
