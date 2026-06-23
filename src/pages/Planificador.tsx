@@ -15,7 +15,7 @@ import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/Fil
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
-import { CalendarPlus, ChevronLeft, ChevronRight, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { format, parseISO, getISOWeek } from "date-fns";
 import * as XLSX from "xlsx";
