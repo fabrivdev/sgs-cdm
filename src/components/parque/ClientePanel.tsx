@@ -29,7 +29,9 @@ import {
   Tractor,
   ClipboardList,
   Receipt,
+  ArrowRightLeft,
 } from "lucide-react";
+import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -176,6 +178,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [newMaquina, setNewMaquina] = useState(false);
   const [maquinaForm, setMaquinaForm] = useState<Partial<Maquina>>({});
   const [mostrarInactivas, setMostrarInactivas] = useState(false);
+  const [transferMaquina, setTransferMaquina] = useState<MaquinaParaTransferir | null>(null);
 
   // Seguimiento form
   const [segResultado, setSegResultado] = useState<string>("Contactado");
@@ -481,6 +484,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader className="mb-3">
@@ -648,8 +652,25 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                           <div className="flex gap-1">
                             {m.activo ? (
                               <>
-                                <Button variant="ghost" size="sm" onClick={() => { setEditMaquina(m.id); setMaquinaForm(m); }}>
+                                <Button variant="ghost" size="sm" onClick={() => { setEditMaquina(m.id); setMaquinaForm(m); }} title="Editar datos">
                                   <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Transferir a otro cliente"
+                                  onClick={() => setTransferMaquina({
+                                    id: m.id,
+                                    clienteIdActual: m.cliente_id,
+                                    marca: m.marca,
+                                    modelo_tipo: m.modelo_tipo,
+                                    serie: m.serie,
+                                    anio: m.anio,
+                                    subgrupo: m.subgrupo,
+                                    notas: m.notas,
+                                  })}
+                                >
+                                  <ArrowRightLeft className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={() => desactivarMaquina(m.id)} className="text-xs h-8" title="Marcar como inactiva">
                                   Inactivar
@@ -795,6 +816,19 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         </section>
       </SheetContent>
     </Sheet>
+
+    <TransferirMaquinaDialog
+      maquina={transferMaquina}
+      clienteNombreActual={cliente?.nombre ?? ""}
+      open={!!transferMaquina}
+      onOpenChange={(v) => { if (!v) setTransferMaquina(null); }}
+      onTransferred={async () => {
+        setTransferMaquina(null);
+        if (cliente) await cargar(cliente.id);
+        onChanged();
+      }}
+    />
+    </>
   );
 }
 
