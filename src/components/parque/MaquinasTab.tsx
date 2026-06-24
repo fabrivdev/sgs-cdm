@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Download } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
+import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
 import * as XLSX from "xlsx";
 
 const SUBGRUPOS = [
@@ -80,6 +81,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
   const [loading, setLoading] = useState(true);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [transferMaquina, setTransferMaquina] = useState<MaquinaParaTransferir | null>(null);
 
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState("all");
@@ -92,34 +94,36 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
   const [sortKey, setSortKey] = useState<SortKey>("cliente");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
+  const cargar = useCallback(async () => {
+    setLoading(true);
 
-      try {
-        const [m, c] = await Promise.all([
-          cargarTodo<Maquina>(
-            supabase
-              .from("parque_maquinas")
-              .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
-          ),
-          cargarTodo<Cliente>(
-            supabase
-              .from("clientes")
-              .select("id, nombre, sucursal, ruc, region, direccion, localidad, correo_principal, cod_entidad, activo")
-              .order("nombre", { ascending: true }),
-          ),
-        ]);
+    try {
+      const [m, c] = await Promise.all([
+        cargarTodo<Maquina>(
+          supabase
+            .from("parque_maquinas")
+            .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
+        ),
+        cargarTodo<Cliente>(
+          supabase
+            .from("clientes")
+            .select("id, nombre, sucursal, ruc, region, direccion, localidad, correo_principal, cod_entidad, activo")
+            .order("nombre", { ascending: true }),
+        ),
+      ]);
 
-        setMaquinas(m);
-        setClientes(c);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    })();
+      setMaquinas(m);
+      setClientes(c);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
   const cliById = useMemo(() => {
     const map = new Map<string, Cliente>();
@@ -318,13 +322,14 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
               </TableHead>
               <TableHead>Vendedor</TableHead>
               <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="w-[64px] text-right">Acción</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
                   Cargando...
                 </TableCell>
               </TableRow>
@@ -332,7 +337,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
             {!loading && ordenadas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
                   Sin máquinas.
                 </TableCell>
               </TableRow>
@@ -369,12 +374,48 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
                         {activa ? "Activa" : "Inactiva"}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-right">
+                      {activa && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Transferir a otro cliente"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransferMaquina({
+                              id: m.id,
+                              clienteIdActual: m.cliente_id,
+                              marca: m.marca,
+                              modelo_tipo: m.modelo_tipo,
+                              serie: m.serie,
+                              anio: m.anio,
+                              subgrupo: m.subgrupo,
+                              notas: m.notas ?? null,
+                            });
+                          }}
+                        >
+                          <ArrowRightLeft className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}
           </TableBody>
         </Table>
       </div>
+      <TransferirMaquinaDialog
+        maquina={transferMaquina}
+        clienteNombreActual={transferMaquina?.clienteIdActual ? cliById.get(transferMaquina.clienteIdActual)?.nombre ?? "Cliente actual" : "Sin cliente"}
+        open={!!transferMaquina}
+        onOpenChange={(open) => { if (!open) setTransferMaquina(null); }}
+        onTransferred={async () => {
+          setTransferMaquina(null);
+          await cargar();
+        }}
+      />
     </div>
   );
 }

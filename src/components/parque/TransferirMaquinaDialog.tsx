@@ -9,12 +9,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowRightLeft, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowRightLeft, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { SUCURSALES, type Sucursal } from "@/lib/constants";
 
 type ClienteSimple = { id: string; nombre: string };
 
@@ -41,12 +43,21 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
   const [clientes, setClientes] = useState<ClienteSimple[]>([]);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [nuevoClienteId, setNuevoClienteId] = useState("");
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [crearClienteOpen, setCrearClienteOpen] = useState(false);
+  const [nuevoClienteNombre, setNuevoClienteNombre] = useState("");
+  const [nuevoClienteSucursal, setNuevoClienteSucursal] = useState<Sucursal | "">("");
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setNuevoClienteId("");
+    setClienteSearch("");
+    setCrearClienteOpen(false);
+    setNuevoClienteNombre("");
+    setNuevoClienteSucursal("");
     setMotivo("");
     (async () => {
       const all: ClienteSimple[] = [];
@@ -69,6 +80,29 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
 
   const nuevoCliente = clientes.find((c) => c.id === nuevoClienteId);
   const canConfirm = !!nuevoClienteId && nuevoClienteId !== maquina?.clienteIdActual;
+
+  const crearCliente = async () => {
+    const nombre = (nuevoClienteNombre || clienteSearch).trim();
+    if (!nombre) return toast.error("Ingresá el nombre del cliente");
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("clientes")
+      .insert({ nombre, sucursal: nuevoClienteSucursal || null })
+      .select("id, nombre")
+      .single();
+    setCreating(false);
+    if (error) return toast.error(error.message);
+
+    const creado = data as ClienteSimple;
+    setClientes((prev) => [...prev, creado].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    setNuevoClienteId(creado.id);
+    setClienteSearch("");
+    setNuevoClienteNombre("");
+    setNuevoClienteSucursal("");
+    setCrearClienteOpen(false);
+    setPopoverOpen(false);
+    toast.success("Cliente creado y seleccionado");
+  };
 
   const confirmar = async () => {
     if (!maquina || !nuevoClienteId) return;
@@ -132,9 +166,27 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Buscar cliente..." />
+                      <CommandInput value={clienteSearch} onValueChange={setClienteSearch} placeholder="Buscar cliente..." />
                       <CommandList>
-                        <CommandEmpty>Sin resultados.</CommandEmpty>
+                        <CommandEmpty>
+                          <div className="space-y-2 p-2 text-left">
+                            <div className="text-xs text-muted-foreground">No se encontró ese cliente.</div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-full justify-start text-xs"
+                              onClick={() => {
+                                setNuevoClienteNombre(clienteSearch);
+                                setCrearClienteOpen(true);
+                                setPopoverOpen(false);
+                              }}
+                            >
+                              <Plus className="mr-1 h-3.5 w-3.5" />
+                              Crear cliente
+                            </Button>
+                          </div>
+                        </CommandEmpty>
                         <CommandGroup>
                           {clientes.map((c) => (
                             <CommandItem
@@ -157,8 +209,57 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
                 {nuevoClienteId && nuevoClienteId === maquina.clienteIdActual && (
                   <p className="text-[11px] text-amber-600">Este cliente ya es el propietario actual.</p>
                 )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 justify-start px-0 text-xs text-primary hover:bg-transparent"
+                  onClick={() => {
+                    setNuevoClienteNombre(clienteSearch);
+                    setCrearClienteOpen((value) => !value);
+                  }}
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Crear cliente nuevo
+                </Button>
               </div>
             </div>
+
+            {crearClienteOpen && (
+              <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Nuevo cliente</div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Nombre *</Label>
+                  <Input
+                    value={nuevoClienteNombre}
+                    onChange={(e) => setNuevoClienteNombre(e.target.value)}
+                    placeholder="Nombre del cliente"
+                    onKeyDown={(e) => e.key === "Enter" && crearCliente()}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Sucursal principal (opcional)</Label>
+                  <select
+                    value={nuevoClienteSucursal}
+                    onChange={(e) => setNuevoClienteSucursal(e.target.value as Sucursal | "")}
+                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">Sin definir</option>
+                    {SUCURSALES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setCrearClienteOpen(false)} disabled={creating}>
+                    Cancelar
+                  </Button>
+                  <Button type="button" size="sm" onClick={crearCliente} disabled={creating || !nuevoClienteNombre.trim()}>
+                    {creating ? "Creando..." : "Crear y seleccionar"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-1.5">
               <Label className="text-xs">Motivo (opcional)</Label>

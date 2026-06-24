@@ -22,7 +22,6 @@ import {
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
-import { NuevoClienteDialog } from "./NuevoClienteDialog";
 import { Plus } from "lucide-react";
 import { cn, formatGuaranies } from "@/lib/utils";
 import * as XLSX from "xlsx";
@@ -197,7 +196,6 @@ export function ParqueTab({
 
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
   const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
-  const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
@@ -607,13 +605,10 @@ export function ParqueTab({
         
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="default" size="sm" onClick={() => setNuevoClienteOpen(true)} className="h-9">
-              <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
-            </Button>
-            <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9">
+            <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="hidden">
               <Plus className="mr-1 h-4 w-4" /> Nueva máquina
             </Button>
-            <Button variant="outline" size="sm" onClick={exportar} className="hidden h-9 sm:inline-flex">
+            <Button variant="outline" size="sm" onClick={exportar} className="hidden">
               <Download className="mr-1 h-4 w-4" /> Exportar
             </Button>
           </div>
@@ -690,6 +685,26 @@ export function ParqueTab({
         </FilterCustom>
       </FiltersBar>
 
+      <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
+          {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
+          {factLoading && !loading && (
+            <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/80">
+              · cargando facturación...
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-8">
+            <Plus className="mr-1 h-3.5 w-3.5" /> Nueva máquina
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportar} className="hidden h-8 sm:inline-flex">
+            <Download className="mr-1 h-3.5 w-3.5" /> Exportar
+          </Button>
+        </div>
+      </div>
+
 
       {!loading && !factLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
@@ -700,7 +715,7 @@ export function ParqueTab({
         </div>
       )}
 
-      <div className="text-xs text-muted-foreground">
+      <div className="hidden text-xs text-muted-foreground">
         {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
         {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
         {factLoading && !loading && (
@@ -897,14 +912,6 @@ export function ParqueTab({
       <NuevaMaquinaDialog
         open={nuevaMaquinaOpen}
         onOpenChange={setNuevaMaquinaOpen}
-        onCreated={() => {
-          cargar();
-          _onChanged?.();
-        }}
-      />
-      <NuevoClienteDialog
-        open={nuevoClienteOpen}
-        onOpenChange={setNuevoClienteOpen}
         onCreated={() => {
           cargar();
           _onChanged?.();
