@@ -171,7 +171,24 @@ export default function Planificador() {
       }
       setAdminCabIds(adminCab);
 
-      const serviciosBase = (srv ?? []) as Servicio[];
+      const trabajosRaw = (trabs ?? []) as any[];
+      const trabajoPorServicio = new Map<string, any>();
+      for (const t of trabajosRaw) {
+        if (t.legacy_servicio_id) trabajoPorServicio.set(t.legacy_servicio_id, t);
+      }
+
+      const serviciosBase = ((srv ?? []) as Servicio[]).map((s) => {
+        const t = trabajoPorServicio.get(s.id);
+        if (!t) return s;
+        return {
+          ...s,
+          cliente_id: t.cliente_id ?? s.cliente_id,
+          marca: t.marca ?? s.marca,
+          sucursal: t.sucursal ?? s.sucursal,
+          tipo_trabajo: t.tipo_trabajo ?? s.tipo_trabajo,
+          trabajo_descripcion: t.descripcion_problema ?? s.trabajo_descripcion,
+        };
+      });
       const jornadas = (jor ?? []) as Array<{
         id: string;
         servicio_id: string;
@@ -231,7 +248,7 @@ export default function Planificador() {
         jornadasPorServicio.set(j.servicio_id, list);
       }
 
-      setTrabajosLite(((trabs ?? []) as any[]).map((t) => ({
+      setTrabajosLite(trabajosRaw.map((t) => ({
         ...t,
         jornadas: t.legacy_servicio_id ? jornadasPorServicio.get(t.legacy_servicio_id) ?? [] : [],
       })));

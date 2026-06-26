@@ -135,15 +135,32 @@ export default function Calendario() {
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("dias_no_laborales").select("id, fecha, motivo"),
         cargarTodosLosClientes(),
-        supabase.from("trabajos").select("codigo, legacy_servicio_id"),
+        supabase.from("trabajos").select("codigo, legacy_servicio_id, cliente_id, descripcion_problema, sucursal, marca, tipo_trabajo"),
       ]);
       const codMap = new Map<string, string>();
-      for (const t of (trabs ?? []) as any[]) {
+      const trabajosRaw = (trabs ?? []) as any[];
+      for (const t of trabajosRaw) {
         if (t.legacy_servicio_id && t.codigo) codMap.set(t.legacy_servicio_id, t.codigo);
       }
       setCodigoByServicio(codMap);
 
-      const serviciosBase = (srv ?? []) as Servicio[];
+      const trabajoPorServicio = new Map<string, any>();
+      for (const t of trabajosRaw) {
+        if (t.legacy_servicio_id) trabajoPorServicio.set(t.legacy_servicio_id, t);
+      }
+
+      const serviciosBase = ((srv ?? []) as Servicio[]).map((s) => {
+        const t = trabajoPorServicio.get(s.id);
+        if (!t) return s;
+        return {
+          ...s,
+          cliente_id: t.cliente_id ?? s.cliente_id,
+          marca: t.marca ?? s.marca,
+          sucursal: t.sucursal ?? s.sucursal,
+          tipo_trabajo: t.tipo_trabajo ?? s.tipo_trabajo,
+          trabajo_descripcion: t.descripcion_problema ?? s.trabajo_descripcion,
+        };
+      });
       const jornadas = (jor ?? []) as Array<{
         id: string;
         servicio_id: string;

@@ -130,6 +130,19 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         trabajoId = await savePayload(false);
         toast.warning("Trabajo guardado. La OS se podrá guardar cuando Lovable aplique la migración de base de datos.");
       }
+      if (editing && trabajo?.legacy_servicio_id) {
+        const { error: syncError } = await supabase
+          .from("servicios")
+          .update({
+            cliente_id: clienteId,
+            marca: form.marca,
+            sucursal: form.sucursal,
+            tipo_trabajo: form.tipo_trabajo,
+            trabajo_descripcion: form.descripcion_problema.trim(),
+          })
+          .eq("id", trabajo.legacy_servicio_id);
+        if (syncError) console.warn("No se pudo sincronizar el servicio legado", syncError);
+      }
       toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
       onSaved(trabajoId);
       onOpenChange(false);
