@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarOff, ChevronLeft, ChevronRight, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, FileSpreadsheet, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw, Trash2 } from "lucide-react";
 import {
   format,
   addMonths,
@@ -409,6 +409,130 @@ export default function Calendario() {
     return cliById[clienteId] ?? "Cliente no encontrado";
   };
 
+  const servicioCodigo = (servicioId: string) => codigoByServicio.get(servicioId) ?? servicioId.slice(0, 8);
+
+  const exportarExcel = async () => {
+    const XLSX = await import("xlsx");
+    const periodoInicio = format(start, "dd-MM-yyyy");
+    const periodoFin = format(end, "dd-MM-yyyy");
+
+    const baseServicioRow = (s: Servicio, tecnicoId?: string) => {
+      const cuadrillaIds = [s.tecnico_responsable_id, ...s.auxiliares].filter(Boolean) as string[];
+      const rol =
+        tecnicoId && s.tecnico_responsable_id === tecnicoId
+          ? "Responsable"
+          : tecnicoId && s.auxiliares.includes(tecnicoId)
+          ? "Auxiliar"
+          : "";
+
+      return {
+        Fecha: format(parseISO(s.fecha_programada), "dd/MM/yyyy"),
+        Dia: format(parseISO(s.fecha_programada), "EEEE", { locale: es }),
+        Tecnico: tecnicoId ? profById[tecnicoId] ?? "Sin tecnico" : profById[s.tecnico_responsable_id ?? ""] ?? "Sin tecnico",
+        Rol: rol,
+        Agenda: "Servicio",
+        Codigo: servicioCodigo(s.id),
+        Cliente: clienteNombre(s.cliente_id),
+        Trabajo: s.trabajo_descripcion,
+        Estado: s.estado,
+        Sucursal: s.sucursal,
+        Marca: s.marca,
+        Tipo: s.tipo_trabajo,
+        Horas: s.horas_trabajadas ?? "",
+        Cuadrilla: cuadrillaIds.map((id) => profById[id] ?? id).join(", "),
+        Observaciones: s.observaciones ?? "",
+      };
+    };
+
+    const rows =
+      vista === "tecnicos"
+        ? tecnicosVisibles.flatMap((tec) => {
+            const semanaDays = eachDayOfInterval({
+              start: startOfWeek(cursor, { weekStartsOn: 0 }),
+              end: endOfWeek(cursor, { weekStartsOn: 0 }),
+            });
+
+            return semanaDays.flatMap((d) => {
+              const evs = eventsForTecnicoDay(tec.id, d);
+              const bloqueos = disponibilidadForTecnicoDay(tec.id, d);
+
+              const bloqueoRows = bloqueos.map((disp) => ({
+                Fecha: format(d, "dd/MM/yyyy"),
+                Dia: format(d, "EEEE", { locale: es }),
+                Tecnico: tec.nombre,
+                Rol: "",
+                Agenda: "No disponible",
+                Codigo: "",
+                Cliente: "",
+                Trabajo: disponibilidadLabel(disp.tipo),
+                Estado: disp.bloquea_agenda ? "Bloquea agenda" : "Informativo",
+                Sucursal: tec.sucursal ?? "",
+                Marca: "",
+                Tipo: "",
+                Horas: "",
+                Cuadrilla: tec.nombre,
+                Observaciones: disp.observacion ?? "",
+              }));
+
+              const servicioRows = evs.map((s) => baseServicioRow(s, tec.id));
+
+              if (bloqueoRows.length === 0 && servicioRows.length === 0) {
+                return [{
+                  Fecha: format(d, "dd/MM/yyyy"),
+                  Dia: format(d, "EEEE", { locale: es }),
+                  Tecnico: tec.nombre,
+                  Rol: "",
+                  Agenda: "Libre",
+                  Codigo: "",
+                  Cliente: "",
+                  Trabajo: "",
+                  Estado: "",
+                  Sucursal: tec.sucursal ?? "",
+                  Marca: "",
+                  Tipo: "",
+                  Horas: "",
+                  Cuadrilla: "",
+                  Observaciones: "",
+                }];
+              }
+
+              return [...bloqueoRows, ...servicioRows];
+            });
+          })
+        : filtered
+            .filter((s) => days.some((d) => isSameDay(parseISO(s.fecha_programada), d)))
+            .sort((a, b) => a.fecha_programada.localeCompare(b.fecha_programada))
+            .map((s) => baseServicioRow(s));
+
+    if (rows.length === 0) {
+      toast.info("No hay datos visibles para exportar.");
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 28 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 32 },
+      { wch: 48 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 10 },
+      { wch: 48 },
+      { wch: 42 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, vista === "tecnicos" ? "Tecnicos por dia" : "Calendario");
+    XLSX.writeFile(wb, `calendario-${vista}-${periodoInicio}-a-${periodoFin}.xlsx`);
+  };
+
   return (
     <div className="container max-w-[1400px] py-3 sm:py-4 px-3 sm:px-4 space-y-3 sm:space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -445,6 +569,15 @@ export default function Calendario() {
               Disponibilidad
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2"
+            onClick={exportarExcel}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Excel
+          </Button>
           <Button
             variant="outline"
             size="icon"
