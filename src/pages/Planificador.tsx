@@ -17,7 +17,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { format, parseISO, getISOWeek } from "date-fns";
+import { addDays, format, getISOWeek, parseISO, startOfWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -384,9 +384,74 @@ export default function Planificador() {
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
+
+    const ws = XLSX.utils.json_to_sheet(rows);
     XLSX.utils.book_append_sheet(wb, ws, "Intervenciones");
+
+    if (fSemana !== "all") {
+      const semanaServicios = displayed.filter((s) => s.semana === Number(fSemana));
+      const semanaBase =
+        semanaServicios[0]?.fecha_programada ??
+        servicios.find((s) => s.semana === Number(fSemana))?.fecha_programada;
+
+      if (semanaBase) {
+        const inicioSemana = startOfWeek(parseISO(semanaBase), { weekStartsOn: 1 });
+        const diasSemana = Array.from({ length: 7 }, (_, index) => addDays(inicioSemana, index));
+        const tecnicoIds = new Set<string>();
+
+        for (const s of semanaServicios) {
+          if (s.tecnico_responsable_id) tecnicoIds.add(s.tecnico_responsable_id);
+          for (const auxiliar of s.auxiliares) tecnicoIds.add(auxiliar);
+        }
+
+        const tecnicosSemana = (
+          fTecnico !== "all"
+            ? tecnicosSolo.filter((profile) => profile.id === fTecnico)
+            : tecnicosSolo.filter((profile) => tecnicoIds.has(profile.id))
+        ).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+        const sheetRows = tecnicosSemana.map((profile) => {
+          const baseRow: Record<string, string | number> = {
+            Tecnico: profile.nombre,
+            Sucursal: profile.sucursal ?? "",
+          };
+
+          let totalJornadas = 0;
+
+          for (const dia of diasSemana) {
+            const key = format(dia, "EEE dd/MM");
+            const serviciosDia = semanaServicios.filter((s) => {
+              const crew = [s.tecnico_responsable_id, ...s.auxiliares].filter(Boolean) as string[];
+              return crew.includes(profile.id) && s.fecha_programada === format(dia, "yyyy-MM-dd");
+            });
+
+            totalJornadas += serviciosDia.length;
+            baseRow[key] = serviciosDia
+              .map((s) => {
+                const ref = refByServicio.get(s.id);
+                const codigo = ref?.codigo ?? ref?.ref ?? "";
+                const cliente = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "Sin cliente";
+                return codigo ? `${codigo} - ${cliente}` : cliente;
+              })
+              .join(" | ");
+          }
+
+          baseRow["Total jornadas"] = totalJornadas;
+          return baseRow;
+        });
+
+        const wsTecnicos = XLSX.utils.json_to_sheet(sheetRows);
+        wsTecnicos["!cols"] = [
+          { wch: 28 },
+          { wch: 16 },
+          ...diasSemana.map(() => ({ wch: 32 })),
+          { wch: 14 },
+        ];
+        XLSX.utils.book_append_sheet(wb, wsTecnicos, "Tecnico por dia");
+      }
+    }
+
     XLSX.writeFile(wb, `intervenciones_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
   };
 
