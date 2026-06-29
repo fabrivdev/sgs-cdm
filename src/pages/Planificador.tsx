@@ -338,6 +338,39 @@ export default function Planificador() {
 
   const displayed = useMemo(() => filtered, [filtered]);
 
+  const continuidadByRow = useMemo(() => {
+    const meta = new Map<string, { orden: number; total: number }>();
+    const porServicio = new Map<string, Servicio[]>();
+
+    for (const servicio of servicios) {
+      const list = porServicio.get(servicio.id) ?? [];
+      list.push(servicio);
+      porServicio.set(servicio.id, list);
+    }
+
+    for (const [servicioId, lista] of porServicio.entries()) {
+      const ordenadas = [...lista].sort((a, b) => {
+        if (a.fecha_programada === b.fecha_programada) {
+          return String(a.jornada_id ?? "").localeCompare(String(b.jornada_id ?? ""));
+        }
+        return a.fecha_programada.localeCompare(b.fecha_programada);
+      });
+
+      const total = ordenadas.length;
+      if (total <= 1) continue;
+
+      ordenadas.forEach((row, index) => {
+        if (index === 0) return;
+        meta.set(`${servicioId}-${row.jornada_id ?? row.fecha_programada}`, {
+          orden: index + 1,
+          total,
+        });
+      });
+    }
+
+    return meta;
+  }, [servicios]);
+
   const totalHoras = useMemo(() => {
     return displayed.reduce((sum, s) => sum + (Number(s.horas_trabajadas) || 0), 0);
   }, [displayed]);
@@ -616,6 +649,7 @@ export default function Planificador() {
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
                 const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
+                const continuidad = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`);
 
                 return (
                   <TableRow
@@ -634,6 +668,11 @@ export default function Planificador() {
                     <TableCell className="px-3 py-2 align-top">
                       <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
                         {fechaLabel}
+                        {continuidad && (
+                          <Badge variant="outline" className="h-5 rounded-full border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">
+                            Continua {continuidad.orden}/{continuidad.total}
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
@@ -700,6 +739,7 @@ export default function Planificador() {
           const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
           const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
           const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
+          const continuidad = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`);
 
           return (
             <Card
@@ -728,6 +768,11 @@ export default function Planificador() {
                         <span>·</span>
                         <span>{s.dia_semana.slice(0, 3)}</span>
                         <TipoIcon className="h-3 w-3 shrink-0" />
+                        {continuidad && (
+                          <Badge variant="outline" className="h-5 rounded-full border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">
+                            Continua {continuidad.orden}/{continuidad.total}
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
