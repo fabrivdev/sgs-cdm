@@ -357,10 +357,7 @@ export default function Planificador() {
       });
 
       const total = ordenadas.length;
-      if (total <= 1) continue;
-
       ordenadas.forEach((row, index) => {
-        if (index === 0) return;
         meta.set(`${servicioId}-${row.jornada_id ?? row.fecha_programada}`, {
           orden: index + 1,
           total,
@@ -668,9 +665,9 @@ export default function Planificador() {
                     <TableCell className="px-3 py-2 align-top">
                       <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
                         {fechaLabel}
-                        {continuidad && (
+                        {continuidad && continuidad.total > 1 && (
                           <Badge variant="outline" className="h-5 rounded-full border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">
-                            Continua {continuidad.orden}/{continuidad.total}
+                            {continuidad.orden}/{continuidad.total}
                           </Badge>
                         )}
                       </div>
@@ -768,9 +765,9 @@ export default function Planificador() {
                         <span>·</span>
                         <span>{s.dia_semana.slice(0, 3)}</span>
                         <TipoIcon className="h-3 w-3 shrink-0" />
-                        {continuidad && (
+                        {continuidad && continuidad.total > 1 && (
                           <Badge variant="outline" className="h-5 rounded-full border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">
-                            Continua {continuidad.orden}/{continuidad.total}
+                            {continuidad.orden}/{continuidad.total}
                           </Badge>
                         )}
                       </div>
