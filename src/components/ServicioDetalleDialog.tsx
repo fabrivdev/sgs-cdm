@@ -124,6 +124,7 @@ export function ServicioDetalleDialog({
   const [programarOpen, setProgramarOpen] = useState(false);
   const [cargarOpen, setCargarOpen] = useState(false);
   const [editClosedOpen, setEditClosedOpen] = useState(false);
+  const [editPendingCrewOpen, setEditPendingCrewOpen] = useState(false);
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
   const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
@@ -211,6 +212,7 @@ export function ServicioDetalleDialog({
 
   useEffect(() => {
     setEditClosedOpen(false);
+    setEditPendingCrewOpen(false);
   }, [activeJornadaId]);
 
   useEffect(() => {
@@ -308,10 +310,16 @@ export function ServicioDetalleDialog({
     if (error) toast.error("Se actualizo la jornada, pero no se pudo sincronizar el trabajo");
   };
 
-  const save = async () => {
+  const persistEdits = async ({
+    closeAfter = true,
+    successMessage = "Resultado guardado",
+  }: {
+    closeAfter?: boolean;
+    successMessage?: string;
+  } = {}) => {
     const dirtyIds = Object.keys(edits).filter((id) => Object.keys(edits[id] ?? {}).length > 0);
     if (dirtyIds.length === 0) {
-      onOpenChange(false);
+      if (closeAfter) onOpenChange(false);
       return;
     }
 
@@ -355,9 +363,20 @@ export function ServicioDetalleDialog({
     await syncTrabajoMadre(servicio.id, merged);
 
     setBusy(false);
-    toast.success("Resultado guardado");
+    toast.success(successMessage);
     onChanged();
-    onOpenChange(false);
+    if (closeAfter) onOpenChange(false);
+  };
+
+  const save = async () => persistEdits();
+
+  const savePendingCrew = async () => {
+    if (!activeJornada) return;
+    await persistEdits({
+      closeAfter: false,
+      successMessage: "Cuadrilla actualizada",
+    });
+    setEditPendingCrewOpen(false);
   };
 
   const deleteJornada = async (id: string) => {
@@ -501,14 +520,51 @@ export function ServicioDetalleDialog({
                 </div>
 
                 {canEdit && activeIsPending ? (
-                  <Button
-                    type="button"
-                    className="h-11 w-full justify-start gap-2"
-                    onClick={() => setCargarOpen(true)}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Cargar resultado
-                  </Button>
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        type="button"
+                        className="h-11 flex-1 justify-start gap-2"
+                        onClick={() => setCargarOpen(true)}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Cargar resultado
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={editPendingCrewOpen ? "secondary" : "outline"}
+                        className="h-11 flex-1 justify-start gap-2"
+                        onClick={() => setEditPendingCrewOpen((v) => !v)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        {editPendingCrewOpen ? "Ocultar cuadrilla" : "Editar cuadrilla"}
+                      </Button>
+                    </div>
+
+                    {editPendingCrewOpen && (
+                      <div className="space-y-3 rounded-md border bg-card p-3">
+                        <TecnicosPicker
+                          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+                          principalId={activeCrew.tecnico_responsable_id}
+                          auxiliares={activeCrew.auxiliares ?? []}
+                          onChange={({ principalId, auxiliares }) =>
+                            jornadaPatch(activeJornada.id, {
+                              tecnico_responsable_id: principalId,
+                              auxiliares,
+                            })
+                          }
+                          label="Cuadrilla planificada"
+                          helperText="Esto cambia la cuadrilla de esta jornada pendiente, sin cargar resultado."
+                        />
+
+                        <div className="flex justify-end">
+                          <Button type="button" size="sm" onClick={savePendingCrew} disabled={busy}>
+                            Guardar cuadrilla
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : activeIsPending ? (
                   <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
                     No tenes permisos para editar esta jornada.
