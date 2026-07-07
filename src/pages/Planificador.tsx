@@ -121,6 +121,7 @@ export default function Planificador() {
   const [fVencidas, setFVencidas] = useState<string>("all");
   const [fDatos, setFDatos] = useState<string>("all");
   const [vista, setVista] = useState<"dia" | "semana">("dia");
+  const [soloPrincipalesSemana, setSoloPrincipalesSemana] = useState(false);
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
@@ -336,7 +337,16 @@ export default function Planificador() {
     });
   }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
-  const displayed = useMemo(() => filtered, [filtered]);
+  const displayed = useMemo(() => {
+    if (!soloPrincipalesSemana || fSemana === "all") return filtered;
+
+    const firstByServicio = new Set<string>();
+    return filtered.filter((row) => {
+      if (firstByServicio.has(row.id)) return false;
+      firstByServicio.add(row.id);
+      return true;
+    });
+  }, [filtered, soloPrincipalesSemana, fSemana]);
 
   const continuidadByRow = useMemo(() => {
     const meta = new Map<string, { orden: number; total: number }>();
@@ -509,6 +519,7 @@ export default function Planificador() {
     setFVencidas("all");
     setFDatos("all");
     setFCliente("");
+    setSoloPrincipalesSemana(false);
   };
 
   const activeChips: { label: string; clear: () => void }[] = [];
@@ -519,6 +530,7 @@ export default function Planificador() {
   if (fEstado !== "all") activeChips.push({ label: fEstado, clear: () => setFEstado("all") });
   if (fVencidas === "7") activeChips.push({ label: "+7d sin cierre", clear: () => setFVencidas("all") });
   if (fDatos === "sin_horas") activeChips.push({ label: "Sin horas", clear: () => setFDatos("all") });
+  if (soloPrincipalesSemana && fSemana !== "all") activeChips.push({ label: "Solo principales", clear: () => setSoloPrincipalesSemana(false) });
 
   return (
     <div className={pageShellWide}>
@@ -604,6 +616,19 @@ export default function Planificador() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+        </FilterCustom>
+        <FilterCustom label="Lectura" width="w-[150px]">
+          <Button
+            type="button"
+            variant={soloPrincipalesSemana ? "default" : "outline"}
+            size="sm"
+            className="h-9 w-full"
+            disabled={fSemana === "all"}
+            onClick={() => setSoloPrincipalesSemana((value) => !value)}
+            title={fSemana === "all" ? "Filtra una semana para resumir continuaciones" : "Muestra solo la primera fila de cada trabajo continuado en la semana"}
+          >
+            Solo principales
+          </Button>
         </FilterCustom>
       </FiltersBar>
 
