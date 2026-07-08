@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardList,
+  XCircle,
   DollarSign,
   FileText,
   Activity,
@@ -1349,6 +1350,44 @@ export default function Dashboard() {
     return { total, culminados, abiertos, pausados, pendiente, programado, iniciado, pct };
   }, [trabajosResumen]);
 
+  const jornadasResultadoResumen = useMemo(() => {
+    const trabajoIds = new Set(trabajosResumen.map((row) => row.id));
+    let programadas = 0;
+    let realizadas = 0;
+    let noRealizadas = 0;
+    let pendientes = 0;
+
+    for (const trabajoId of trabajoIds) {
+      const trabajoJornadas = (jornadasByTrabajo.get(trabajoId) ?? []).filter((jornada) => {
+        if (!inRange(jornada.fecha, periodStart, periodEnd)) return false;
+        if (fTecnicos.length === 0) return true;
+        return validJornadaCrew(jornada).some((id) => fTecnicos.includes(id));
+      });
+
+      for (const jornada of trabajoJornadas) {
+        programadas += 1;
+        if (jornada.estado === "Completado") realizadas += 1;
+        else if (jornada.estado === "Cancelada") noRealizadas += 1;
+        else if (jornada.estado === "Pendiente") pendientes += 1;
+      }
+    }
+
+    const cerradas = realizadas + noRealizadas;
+    const pct = (value: number) => (programadas > 0 ? Math.round((value / programadas) * 100) : 0);
+
+    return {
+      programadas,
+      realizadas,
+      noRealizadas,
+      pendientes,
+      cerradas,
+      pctRealizadas: pct(realizadas),
+      pctNoRealizadas: pct(noRealizadas),
+      pctPendientes: pct(pendientes),
+      pctCerradas: pct(cerradas),
+    };
+  }, [fTecnicos, jornadasByTrabajo, periodEnd, periodStart, trabajosResumen]);
+
   const trabajosPorEstado = useMemo(() => {
     const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
       "pendiente",
@@ -2147,6 +2186,60 @@ export default function Dashboard() {
             <TrabajoChip label="Tecnicos" value={`${tecnicosConActividadPeriodo.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
             <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
           </div>
+
+          <Card className="flex flex-col p-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">Resultado de jornadas</h2>
+                <p className="text-xs text-muted-foreground">
+                  {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} ? cierre operativo del periodo
+                </p>
+              </div>
+              <Badge variant="secondary">{jornadasResultadoResumen.programadas} programadas</Badge>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-md border bg-muted/10 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Realizadas</div>
+                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums text-emerald-600">{jornadasResultadoResumen.realizadas}</div>
+                  </div>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctRealizadas}% del total programado</div>
+              </div>
+              <div className="rounded-md border bg-muted/10 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">No realizadas</div>
+                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums text-amber-600">{jornadasResultadoResumen.noRealizadas}</div>
+                  </div>
+                  <XCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctNoRealizadas}% del total programado</div>
+              </div>
+              <div className="rounded-md border bg-muted/10 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pendientes</div>
+                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums">{jornadasResultadoResumen.pendientes}</div>
+                  </div>
+                  <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctPendientes}% aun sin cierre</div>
+              </div>
+              <div className="rounded-md border bg-muted/10 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cerradas</div>
+                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums">{jornadasResultadoResumen.cerradas}</div>
+                  </div>
+                  <Activity className="h-4 w-4 shrink-0 text-primary" />
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">Realizadas + no realizadas ? {jornadasResultadoResumen.pctCerradas}% del total</div>
+              </div>
+            </div>
+          </Card>
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="flex h-full flex-col p-3">
