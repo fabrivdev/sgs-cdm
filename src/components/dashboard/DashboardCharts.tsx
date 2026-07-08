@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { format, getDay, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Marca, Sucursal } from "@/lib/constants";
-import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode } from "./types";
+import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, OSSucursalMetric, PeriodMode, Facturacion } from "./types";
 import {
   money,
   pct,
   formatWeekMetric,
   formatFactMetric,
+  concept,
   factMetricLabel,
   formatOSMetric,
   osMetricValue,
@@ -316,7 +317,7 @@ function OSSucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l border-red-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal)}`}
+                  title={`vs. ${comparisonLabel ?? "aÃ±o anterior"}: ${money(row.previousTotal)}`}
                 />
               )}
             </div>
@@ -571,7 +572,7 @@ export function WeeklyBars({
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
         {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
         <span className="ml-3 h-0 w-8 max-w-[42px] border-t-2 border-red-500" />
-        {hasAnyComparisonData ? "Año anterior equivalente" : "Año anterior: sin datos disponibles"}
+        {hasAnyComparisonData ? "AÃ±o anterior equivalente" : "AÃ±o anterior: sin datos disponibles"}
       </div>
     </div>
   );
@@ -613,7 +614,7 @@ export function SucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l border-red-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal ?? 0)}`}
+                  title={`vs. ${comparisonLabel ?? "aÃ±o anterior"}: ${money(row.previousTotal ?? 0)}`}
                 />
               )}
             </div>
@@ -623,7 +624,7 @@ export function SucursalBars({
       {rows.some((row) => (row.previousTotal ?? 0) > 0) && (
         <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
           <span className="h-3 border-l border-red-500" />
-          vs. {comparisonLabel ?? "año anterior"}
+          vs. {comparisonLabel ?? "aÃ±o anterior"}
         </div>
       )}
     </div>
@@ -959,7 +960,7 @@ export function EstadoCompacto({
           />
           <EstadoMiniCard
             icon={CalendarDays}
-            title="PRÓXIMO PERIODO"
+            title="PRÃ“XIMO PERIODO"
             subtitle={planificacionRango}
             value={`${jornadasPlanificadas ?? 0} jornadas`}
           />
@@ -968,7 +969,7 @@ export function EstadoCompacto({
             title="CIERRE ANTERIOR"
             subtitle={jornadasPrev ? cierreAnteriorRango : undefined}
             value={jornadasPrev ? `${jornadasPrev} jornadas · ${(horasPrev ?? 0).toFixed(0)} hs` : "Sin cierre anterior disponible"}
-            detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} técnicos activos` : ""}
+            detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} tÃ©cnicos activos` : ""}
           />
         </div>
       </div>
@@ -1225,7 +1226,7 @@ export function CargaEquipoChart({
 
   return (
     <div className="flex flex-1 min-h-0 flex-col gap-2">
-      {/* Chart: Y axis + bars — flex-1 fills remaining card height */}
+      {/* Chart: Y axis + bars â€” flex-1 fills remaining card height */}
       <div className="flex flex-1 min-h-0 gap-1">
         {/* Y axis */}
         <div className="relative w-5 shrink-0">
@@ -1238,7 +1239,7 @@ export function CargaEquipoChart({
           ))}
         </div>
 
-        {/* Bar area — ref'd for height measurement */}
+        {/* Bar area â€” ref'd for height measurement */}
         <div ref={barAreaRef} className="relative flex-1 border-b border-l">
           {/* Gridlines */}
           {yTicks.filter((t) => t > 0 && t < maxAll).map((tick) => (
@@ -1273,7 +1274,7 @@ export function CargaEquipoChart({
                       className={cn("w-3 rounded-t-sm sm:w-4", sun ? "bg-muted/40" : "bg-primary/75")}
                     />
                   </div>
-                  {/* Técnicos bar */}
+                  {/* TÃ©cnicos bar */}
                   <div className="flex flex-col items-center">
                     {techs[i] > 0 && (
                       <span className={cn(
@@ -1305,7 +1306,7 @@ export function CargaEquipoChart({
         </div>
       </div>
 
-      {/* Day labels — spacer matches Y axis width + gap */}
+      {/* Day labels â€” spacer matches Y axis width + gap */}
       <div className="flex gap-1">
         <div className="w-5 shrink-0" />
         <div className="grid flex-1 px-0.5" style={{ gridTemplateColumns: gridCols }}>
@@ -1331,7 +1332,7 @@ export function CargaEquipoChart({
         </div>
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400/90" />
-          Técnicos activos
+          TÃ©cnicos activos
         </div>
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-400/90" />
@@ -1476,7 +1477,7 @@ export function CargaTecnicaMatriz({
             </button>
           )}
           <div className="text-[10px] text-muted-foreground">
-            Agrupado por {bucketMode === "mes" ? "mes" : bucketMode === "dia" ? "día" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
+            Agrupado por {bucketMode === "mes" ? "mes" : bucketMode === "dia" ? "dÃ­a" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
           </div>
         </>
       )}
@@ -1561,6 +1562,651 @@ export function ClientesCompacto({
   );
 }
 
+export function FacturacionExplorer({
+  view,
+  onViewChange,
+  selectedFacts,
+  selectedLabel,
+  clientRows: _clientRows,
+  periodRows: _periodRows,
+  selectedPeriodKey: _selectedPeriodKey,
+  isRangeSelected,
+  onSelectPeriod: _onSelectPeriod,
+  onSelectFullRange,
+}: {
+  view: "facturas" | "clientes" | "analisis";
+  onViewChange: (view: "facturas" | "clientes" | "analisis") => void;
+  selectedFacts: Facturacion[];
+  selectedLabel: string;
+  clientRows: Array<{ nombre: string; total: number; facturas: number; rows: Facturacion[] }>;
+  periodRows: WeekRow[];
+  selectedPeriodKey?: string;
+  isRangeSelected: boolean;
+  onSelectPeriod: (key: string) => void;
+  onSelectFullRange: () => void;
+}) {
+  type PivotRowDimension = "cliente" | "sucursal" | "tipoTiempo" | "concepto" | "factura" | "codigoRepuesto";
+  type PivotColumnDimension = "none" | "mes" | "sucursal" | "tipoTiempo" | "concepto";
+  type PivotMetric = "usd" | "lineas" | "cantidad";
+
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [pivotRows, setPivotRows] = useState<PivotRowDimension>("sucursal");
+  const [pivotColumns, setPivotColumns] = useState<PivotColumnDimension>("mes");
+  const [pivotMetric, setPivotMetric] = useState<PivotMetric>("usd");
+
+  const rowOptions: Array<{ value: PivotRowDimension; label: string }> = [
+    { value: "cliente", label: "Cliente" },
+    { value: "sucursal", label: "Sucursal" },
+    { value: "tipoTiempo", label: "Tipo de tiempo" },
+    { value: "concepto", label: "Rubro" },
+    { value: "factura", label: "Factura" },
+    { value: "codigoRepuesto", label: "Repuesto" },
+  ];
+
+  const columnOptions: Array<{ value: PivotColumnDimension; label: string }> = [
+    { value: "none", label: "Sin columnas" },
+    { value: "mes", label: "Mes" },
+    { value: "sucursal", label: "Sucursal" },
+    { value: "tipoTiempo", label: "Tipo de tiempo" },
+    { value: "concepto", label: "Rubro" },
+  ];
+
+  const metricOptions: Array<{ value: PivotMetric; label: string }> = [
+    { value: "usd", label: "USD" },
+    { value: "lineas", label: "Lineas" },
+    { value: "cantidad", label: "Cantidad" },
+  ];
+
+  const cleanValue = (value: unknown) => {
+    const text = String(value ?? "").trim();
+    return text || null;
+  };
+
+  const repuestoCode = (row: Facturacion) => {
+    const direct = cleanValue(row.codigo_fabricante) ?? cleanValue(row.cod_mercaderia);
+    if (direct) return direct;
+    const raw = row.raw_data ?? {};
+    return (
+      cleanValue(raw["Codigo Fabricante"]) ??
+      cleanValue(raw["CÃ³digo Fabricante"]) ??
+      cleanValue(raw["Cod. Fabricante"]) ??
+      cleanValue(raw["Codigo Mercaderia"]) ??
+      cleanValue(raw["CÃ³digo MercaderÃ­a"]) ??
+      cleanValue(raw["Cod. Mercaderia"]) ??
+      cleanValue(raw["Cod Mercaderia"])
+    );
+  };
+
+  const repuestoNombre = (row: Facturacion) => {
+    const direct = cleanValue(row.mercaderia) ?? cleanValue(row.grupo);
+    if (direct) return direct;
+    const raw = row.raw_data ?? {};
+    return (
+      cleanValue(raw["Mercaderia"]) ??
+      cleanValue(raw["MercaderÃ­a"]) ??
+      cleanValue(raw["Nombre Impresion"]) ??
+      cleanValue(raw["Nombre ImpresiÃ³n"]) ??
+      cleanValue(raw["Descripcion"]) ??
+      cleanValue(raw["DescripciÃ³n"])
+    );
+  };
+
+  const repuestoIdentity = (row: Facturacion) => {
+    const fabricante = repuestoCode(row);
+    const nombre = repuestoNombre(row);
+    return fabricante ?? nombre ?? null;
+  };
+
+  const repuestoDetail = (row: Facturacion) => {
+    const fabricante = repuestoCode(row);
+    const nombre = repuestoNombre(row);
+    if (fabricante && nombre && fabricante !== nombre) return `${fabricante} · ${nombre}`;
+    return fabricante ?? nombre ?? "-";
+  };
+
+  const quantityLabel = (value: number) => {
+    const fixed = Number(value || 0);
+    if (Math.abs(fixed - Math.round(fixed)) < 0.001) return String(Math.round(fixed));
+    return fixed.toFixed(1);
+  };
+
+  const metricValue = (value: { usd: number; lineas: number; cantidad: number }, metric: PivotMetric) => {
+    if (metric === "lineas") return value.lineas;
+    if (metric === "cantidad") return value.cantidad;
+    return value.usd;
+  };
+
+  const formatMetric = (value: number, metric: PivotMetric) => {
+    if (metric === "usd") return money(value);
+    if (metric === "lineas") return String(Math.round(value));
+    return quantityLabel(value);
+  };
+
+  const monthLabel = (date: string) => {
+    const key = `${date.slice(0, 7)}-01`;
+    return format(parseISO(key), "MM/yyyy");
+  };
+
+  const dimensionValue = (row: Facturacion, dimension: PivotRowDimension | PivotColumnDimension) => {
+    if (dimension === "none") return { key: "__single__", label: "Total", sortKey: "__single__" };
+    if (dimension === "mes") {
+      const key = row.fecha.slice(0, 7);
+      return { key, label: monthLabel(row.fecha), sortKey: key };
+    }
+    if (dimension === "cliente") {
+      const label = row.entidad_nombre || "Sin cliente";
+      return { key: label, label, sortKey: label };
+    }
+    if (dimension === "sucursal") {
+      const label = row.sucursal ?? "Sin sucursal";
+      return { key: label, label, sortKey: label };
+    }
+    if (dimension === "tipoTiempo") {
+      const label = row.tipo_tiempo ?? "Cliente";
+      return { key: label, label, sortKey: label };
+    }
+    if (dimension === "concepto") {
+      const label = concept(row);
+      return { key: label, label, sortKey: label };
+    }
+    if (dimension === "factura") {
+      const label = row.cod_factura || "Sin factura";
+      return { key: label, label, sortKey: label };
+    }
+    const label = repuestoIdentity(row) ?? "Sin repuesto";
+    return { key: label, label, sortKey: label };
+  };
+
+  const invoiceRows = useMemo(() => {
+    const map = new Map<string, {
+      key: string;
+      factura: string;
+      cliente: string;
+      rubro: string;
+      fecha: string;
+      sucursal: string;
+      total: number;
+      lineas: number;
+      rows: Facturacion[];
+      tiposTiempo: string[];
+      conceptos: string[];
+      repuestos: string[];
+    }>();
+    for (const row of selectedFacts) {
+      const key = `${row.cod_factura}__${row.entidad_nombre}__${row.fecha}`;
+      const current = map.get(key) ?? {
+        key,
+        factura: row.cod_factura || "Sin factura",
+        cliente: row.entidad_nombre || "Sin cliente",
+        rubro: "",
+        fecha: row.fecha,
+        sucursal: row.sucursal ?? "-",
+        total: 0,
+        lineas: 0,
+        rows: [],
+        tiposTiempo: [],
+        conceptos: [],
+        repuestos: [],
+      };
+      current.total += Number(row.total_venta || 0);
+      current.lineas += 1;
+      current.rows.push(row);
+      if (row.tipo_tiempo && !current.tiposTiempo.includes(row.tipo_tiempo)) current.tiposTiempo.push(row.tipo_tiempo);
+      const rowConcept = concept(row);
+      if (!current.conceptos.includes(rowConcept)) current.conceptos.push(rowConcept);
+      const code = repuestoCode(row);
+      if (code && !current.repuestos.includes(code)) current.repuestos.push(code);
+      map.set(key, current);
+    }
+    return Array.from(map.values())
+      .map((entry) => ({
+        ...entry,
+        rubro: entry.conceptos.join(" / ") || "Sin rubro",
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [selectedFacts]);
+
+  const clientRowsComputed = useMemo(() => {
+    const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
+    for (const row of selectedFacts) {
+      const key = row.entidad_nombre || "Sin cliente";
+      const current = map.get(key) ?? { nombre: key, total: 0, facturas: 0, rows: [] };
+      current.total += Number(row.total_venta || 0);
+      current.rows.push(row);
+      map.set(key, current);
+    }
+    for (const entry of map.values()) {
+      entry.facturas = new Set(entry.rows.map((row) => row.cod_factura || `${row.fecha}-${row.entidad_nombre}`)).size;
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [selectedFacts]);
+
+  const pivotSource = useMemo(() => {
+    return selectedFacts.filter((row) => {
+      if (pivotRows === "codigoRepuesto" && concept(row) !== "Repuestos") return false;
+      if (pivotRows === "codigoRepuesto" && !repuestoIdentity(row)) return false;
+      return true;
+    });
+  }, [pivotRows, selectedFacts]);
+
+  const pivot = useMemo(() => {
+    const columnMap = new Map<string, { key: string; label: string; sortKey: string }>();
+    const rowMap = new Map<string, {
+      key: string;
+      label: string;
+      sortKey: string;
+      cells: Map<string, { usd: number; lineas: number; cantidad: number }>;
+      usd: number;
+      lineas: number;
+      cantidad: number;
+    }>();
+
+    for (const row of pivotSource) {
+      const rowValue = dimensionValue(row, pivotRows);
+      const columnValue = dimensionValue(row, pivotColumns);
+      if (!columnMap.has(columnValue.key)) {
+        columnMap.set(columnValue.key, columnValue);
+      }
+      const currentRow = rowMap.get(rowValue.key) ?? {
+        key: rowValue.key,
+        label: rowValue.label,
+        sortKey: rowValue.sortKey,
+        cells: new Map<string, { usd: number; lineas: number; cantidad: number }>(),
+        usd: 0,
+        lineas: 0,
+        cantidad: 0,
+      };
+      const currentCell = currentRow.cells.get(columnValue.key) ?? { usd: 0, lineas: 0, cantidad: 0 };
+      currentCell.usd += Number(row.total_venta || 0);
+      currentCell.lineas += 1;
+      currentCell.cantidad += Number(row.cantidad || 0);
+      currentRow.cells.set(columnValue.key, currentCell);
+      currentRow.usd += Number(row.total_venta || 0);
+      currentRow.lineas += 1;
+      currentRow.cantidad += Number(row.cantidad || 0);
+      rowMap.set(rowValue.key, currentRow);
+    }
+
+    const columns = Array.from(columnMap.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    const rows = Array.from(rowMap.values()).sort((a, b) => metricValue(b, pivotMetric) - metricValue(a, pivotMetric));
+    const totals = new Map<string, { usd: number; lineas: number; cantidad: number }>();
+    for (const column of columns) {
+      totals.set(column.key, { usd: 0, lineas: 0, cantidad: 0 });
+    }
+    for (const row of rows) {
+      for (const column of columns) {
+        const cell = row.cells.get(column.key);
+        if (!cell) continue;
+        const totalCell = totals.get(column.key)!;
+        totalCell.usd += cell.usd;
+        totalCell.lineas += cell.lineas;
+        totalCell.cantidad += cell.cantidad;
+      }
+    }
+    return { columns, rows, totals };
+  }, [pivotColumns, pivotMetric, pivotRows, pivotSource]);
+
+    const visibleTotal = selectedFacts.reduce((acc, row) => acc + Number(row.total_venta || 0), 0);
+  const visibleFacturas = new Set(selectedFacts.map((row) => row.cod_factura || `${row.fecha}-${row.entidad_nombre}`)).size;
+  const visibleClientes = new Set(selectedFacts.map((row) => row.entidad_nombre || "Sin cliente")).size;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">Mesa flexible de facturacion</h3>
+          <p className="text-xs text-muted-foreground">
+            {selectedLabel} · explora por cliente, sucursal, tipo de tiempo, factura o repuesto.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isRangeSelected && (
+            <button
+              type="button"
+              onClick={() => {
+                onSelectFullRange();
+                setExpandedKey(null);
+              }}
+              className="h-8 rounded-md border px-3 text-[11px] font-medium text-muted-foreground hover:bg-accent"
+            >
+              Ver todo el rango
+            </button>
+          )}
+          <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
+            {([
+              ["facturas", "Facturas"],
+              ["clientes", "Clientes"],
+              ["analisis", "Analisis"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  onViewChange(value);
+                  setExpandedKey(null);
+                }}
+                className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {view === "facturas" && (
+        <>
+          <div className="space-y-2 md:hidden">
+            {invoiceRows.length === 0 ? (
+              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin facturas en el periodo seleccionado.</div>
+            ) : (
+              invoiceRows.slice(0, 30).map((row) => (
+                <div key={row.key} className="rounded-md border bg-background shadow-sm">
+                  <button type="button" onClick={() => setExpandedKey((current) => current === row.key ? null : row.key)} className="w-full px-3 py-2.5 text-left">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-[11px] font-semibold text-muted-foreground">{row.factura}</div>
+                        <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                        <div className="text-[10px] text-muted-foreground">{row.sucursal} · {format(parseISO(row.fecha), "dd/MM/yy")}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-bold tabular-nums">{money(row.total)}</div>
+                        <div className="text-[10px] text-muted-foreground">{row.lineas} lineas</div>
+                      </div>
+                    </div>
+                  </button>
+                  {expandedKey === row.key && (
+                    <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+                      <div className="mb-2 flex flex-wrap gap-1">
+                        {row.tiposTiempo.map((item) => <Badge key={item} variant="secondary">{item}</Badge>)}
+                        {row.conceptos.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+                      </div>
+                      <div className="space-y-1">
+                        {row.rows.map((detail, index) => {
+                          const code = repuestoCode(detail);
+                          return (
+                            <div key={`${row.key}-${index}`} className="rounded-md border bg-muted/20 px-2 py-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="truncate font-medium text-foreground">{concept(detail)} · {detail.tipo_tiempo ?? "-"}</div>
+                                  <div className="truncate">{repuestoDetail(detail)}</div>
+                                </div>
+                                <div className="shrink-0 tabular-nums text-foreground">{money(Number(detail.total_venta || 0))}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-md border md:block">
+            <div className="grid grid-cols-[110px_1.15fr_140px_90px_90px_80px_120px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+              <div>Factura</div>
+              <div>Cliente</div>
+              <div>Rubro</div>
+              <div>Fecha</div>
+              <div>Sucursal</div>
+              <div className="text-right">Lineas</div>
+              <div className="text-right">Importe</div>
+            </div>
+            <div className="max-h-[480px] overflow-y-auto">
+              {invoiceRows.length === 0 ? (
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturas en el periodo seleccionado.</div>
+              ) : (
+                invoiceRows.map((row) => (
+                  <div key={row.key} className="border-t">
+                    <button type="button" onClick={() => setExpandedKey((current) => current === row.key ? null : row.key)} className="grid w-full grid-cols-[110px_1.15fr_140px_90px_90px_80px_120px] items-center px-3 py-2 text-left text-xs hover:bg-accent">
+                      <div className="truncate font-mono font-semibold">{row.factura}</div>
+                      <div className="truncate font-medium">{row.cliente}</div>
+                      <div className="truncate text-muted-foreground">{row.rubro}</div>
+                      <div className="tabular-nums">{format(parseISO(row.fecha), "dd/MM/yy")}</div>
+                      <div className="truncate">{row.sucursal}</div>
+                      <div className="text-right tabular-nums">{row.lineas}</div>
+                      <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
+                    </button>
+                    {expandedKey === row.key && (
+                      <div className="bg-muted/20 px-3 py-2 text-xs">
+                        <div className="mb-2 flex flex-wrap gap-1">
+                          {row.tiposTiempo.map((item) => <Badge key={item} variant="secondary">{item}</Badge>)}
+                          {row.conceptos.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
+                        </div>
+                        <div className="grid grid-cols-[1fr_140px_90px_120px] gap-2 text-[11px] font-medium text-muted-foreground">
+                          <div>Concepto</div>
+                          <div>Codigo / detalle</div>
+                          <div className="text-right">Cantidad</div>
+                          <div className="text-right">Importe</div>
+                        </div>
+                        <div className="mt-1 space-y-1">
+                          {row.rows.map((detail, index) => {
+                            const code = repuestoCode(detail);
+                            return (
+                              <div key={`${row.key}-${index}`} className="grid grid-cols-[1fr_140px_90px_120px] gap-2 text-[11px] text-muted-foreground">
+                                <div className="truncate">{concept(detail)} · {detail.tipo_tiempo ?? "-"}</div>
+                                <div className="truncate">{repuestoDetail(detail)}</div>
+                                <div className="text-right tabular-nums">{quantityLabel(Number(detail.cantidad || 0))}</div>
+                                <div className="text-right font-medium tabular-nums text-foreground">{money(Number(detail.total_venta || 0))}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {view === "clientes" && (
+        <>
+          <div className="space-y-2 md:hidden">
+            {clientRowsComputed.length === 0 ? (
+              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin clientes facturados en el periodo.</div>
+            ) : (
+              clientRowsComputed.slice(0, 30).map((row) => (
+                <div key={row.nombre} className="rounded-md border bg-background shadow-sm">
+                  <button type="button" onClick={() => setExpandedKey((current) => current === row.nombre ? null : row.nombre)} className="w-full px-3 py-2.5 text-left">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{row.nombre}</div>
+                        <div className="text-[10px] text-muted-foreground">{row.facturas} facturas</div>
+                      </div>
+                      <div className="shrink-0 text-sm font-bold tabular-nums">{money(row.total)}</div>
+                    </div>
+                  </button>
+                  {expandedKey === row.nombre && (
+                    <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+                      {row.rows.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map((detail, index) => {
+                        const code = repuestoCode(detail);
+                        return (
+                          <div key={`${row.nombre}-${index}`} className="flex items-center justify-between gap-2 py-1">
+                            <span className="truncate">{detail.cod_factura} · {concept(detail)} · {repuestoDetail(detail)}</span>
+                            <span className="shrink-0 tabular-nums">{money(Number(detail.total_venta || 0))}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-md border md:block">
+            <div className="grid grid-cols-[1.4fr_84px_120px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+              <div>Cliente</div>
+              <div className="text-right">Fact.</div>
+              <div className="text-right">Ticket prom.</div>
+              <div className="text-right">Facturacion</div>
+            </div>
+            <div className="max-h-[480px] overflow-y-auto">
+              {clientRowsComputed.length === 0 ? (
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin clientes facturados en el periodo.</div>
+              ) : (
+                clientRowsComputed.map((row) => (
+                  <div key={row.nombre} className="border-t">
+                    <button type="button" onClick={() => setExpandedKey((current) => current === row.nombre ? null : row.nombre)} className="grid w-full grid-cols-[1.4fr_84px_120px_110px] items-center px-3 py-2 text-left text-xs hover:bg-accent">
+                      <div className="truncate font-medium">{row.nombre}</div>
+                      <div className="text-right tabular-nums">{row.facturas}</div>
+                      <div className="text-right tabular-nums">{money(row.facturas ? row.total / row.facturas : 0)}</div>
+                      <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
+                    </button>
+                    {expandedKey === row.nombre && (
+                      <div className="bg-muted/20 px-3 py-2 text-xs">
+                        <div className="mb-1 text-[11px] font-medium text-muted-foreground">Facturas del cliente en el periodo</div>
+                        {row.rows.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map((detail, index) => {
+                          const code = repuestoCode(detail);
+                          return (
+                            <div key={`${row.nombre}-${index}`} className="grid grid-cols-[90px_1fr_110px] gap-2 py-0.5 text-[11px]">
+                              <div className="font-mono text-muted-foreground">{detail.cod_factura}</div>
+                              <div className="truncate text-muted-foreground">{concept(detail)} · {detail.sucursal ?? "-"} · {repuestoDetail(detail)}</div>
+                              <div className="text-right font-medium tabular-nums">{money(Number(detail.total_venta || 0))}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {view === "analisis" && (
+        <div className="space-y-3">
+          <div className="grid gap-2 rounded-md border p-3 lg:grid-cols-[1.2fr_1.2fr_0.9fr]">
+            <label className="space-y-1">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Filas</span>
+              <select value={pivotRows} onChange={(e) => setPivotRows(e.target.value as PivotRowDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary">
+                {rowOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Columnas</span>
+              <select value={pivotColumns} onChange={(e) => setPivotColumns(e.target.value as PivotColumnDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary">
+                {columnOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Medida</span>
+              <select value={pivotMetric} onChange={(e) => setPivotMetric(e.target.value as PivotMetric)} className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary">
+                {metricOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="rounded-md border">
+            <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+              <div>
+                <div className="text-sm font-semibold">Tabla dinamica</div>
+                <div className="text-xs text-muted-foreground">Configurable por fila, columna y medida. En repuestos prioriza fabricante y descripcion.</div>
+              </div>
+              <Badge variant="secondary">{pivot.rows.length} filas</Badge>
+            </div>
+
+            {pivot.rows.length === 0 ? (
+              <div className="px-3 py-8 text-center text-xs text-muted-foreground">No hay datos para la combinacion elegida.</div>
+            ) : (
+              <>
+                <div className="space-y-2 p-3 md:hidden">
+                  {pivot.rows.slice(0, 25).map((row) => (
+                    <div key={row.key} className="rounded-md border bg-background px-3 py-2.5 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 text-sm font-semibold">{row.label}</div>
+                        <div className="shrink-0 text-sm font-bold tabular-nums">{formatMetric(metricValue(row, pivotMetric), pivotMetric)}</div>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {pivot.columns.map((column) => {
+                          const cell = row.cells.get(column.key);
+                          if (!cell) return null;
+                          return (
+                            <div key={`${row.key}-${column.key}`} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                              <span>{column.label}</span>
+                              <span className="shrink-0 tabular-nums text-foreground">{formatMetric(metricValue(cell, pivotMetric), pivotMetric)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <div className="min-w-max">
+                    <div
+                      className="grid items-center border-b bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"
+                      style={{ gridTemplateColumns: `240px repeat(${Math.max(pivot.columns.length, 1)}, minmax(120px, 1fr)) 140px` }}
+                    >
+                      <div>{rowOptions.find((option) => option.value === pivotRows)?.label ?? "Fila"}</div>
+                      {pivot.columns.map((column) => (
+                        <div key={column.key} className="text-right">{column.label}</div>
+                      ))}
+                      <div className="text-right">Total</div>
+                    </div>
+                    <div className="max-h-[520px] overflow-y-auto">
+                      {pivot.rows.map((row) => (
+                        <div
+                          key={row.key}
+                          className="grid items-center border-b px-3 py-2 text-xs"
+                          style={{ gridTemplateColumns: `240px repeat(${Math.max(pivot.columns.length, 1)}, minmax(120px, 1fr)) 140px` }}
+                        >
+                          <div className="truncate font-medium">{row.label}</div>
+                          {pivot.columns.map((column) => {
+                            const cell = row.cells.get(column.key);
+                            return (
+                              <div key={`${row.key}-${column.key}`} className="text-right tabular-nums text-muted-foreground">
+                                {cell ? formatMetric(metricValue(cell, pivotMetric), pivotMetric) : "-"}
+                              </div>
+                            );
+                          })}
+                          <div className="text-right font-semibold tabular-nums">{formatMetric(metricValue(row, pivotMetric), pivotMetric)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div
+                      className="grid items-center bg-muted/30 px-3 py-2 text-xs font-semibold"
+                      style={{ gridTemplateColumns: `240px repeat(${Math.max(pivot.columns.length, 1)}, minmax(120px, 1fr)) 140px` }}
+                    >
+                      <div>Total</div>
+                      {pivot.columns.map((column) => {
+                        const cell = pivot.totals.get(column.key) ?? { usd: 0, lineas: 0, cantidad: 0 };
+                        return (
+                          <div key={`total-${column.key}`} className="text-right tabular-nums">
+                            {formatMetric(metricValue(cell, pivotMetric), pivotMetric)}
+                          </div>
+                        );
+                      })}
+                      <div className="text-right tabular-nums">{formatMetric(metricValue({
+                        usd: pivotSource.reduce((acc, row) => acc + Number(row.total_venta || 0), 0),
+                        lineas: pivotSource.length,
+                        cantidad: pivotSource.reduce((acc, row) => acc + Number(row.cantidad || 0), 0),
+                      }, pivotMetric), pivotMetric)}</div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 export function TrabajoChip({
   label, value, tone = "neutral", onClick,
 }: {
@@ -1584,4 +2230,8 @@ export function TrabajoChip({
     </button>
   );
 }
+
+
+
+
 

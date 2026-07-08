@@ -1,4 +1,4 @@
-import type { Marca, Sucursal } from "@/lib/constants";
+﻿import type { Marca, Sucursal } from "@/lib/constants";
 
 export type Tone = "neutral" | "good" | "warn" | "bad";
 export type PeriodMode = "dia" | "semana" | "mes" | "anio";
@@ -63,3 +63,4 @@ export interface WeekRow {
   variacion: number | null;
   rows: Facturacion[];
 }
+

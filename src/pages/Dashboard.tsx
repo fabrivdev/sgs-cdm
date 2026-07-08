@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from "react";
+﻿import { startTransition, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,7 @@ import {
   Activity,
   PieChart,
   Receipt,
+  Shield,
   SlidersHorizontal,
   User,
   Users,
@@ -53,10 +54,10 @@ import { cn } from "@/lib/utils";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
-import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode } from "@/components/dashboard/types";
+import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, OSSucursalMetric, PeriodMode } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca } from "@/components/dashboard/DashboardCharts";
+import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer } from "@/components/dashboard/DashboardCharts";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -303,7 +304,7 @@ export default function Dashboard() {
 
   const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
   const [dateTo, setDateTo] = useState(initialFilters.dateTo);
-  const [selectedWeekKey, setSelectedWeekKey] = useState(initialFilters.dateTo);
+  const [selectedWeekKey, setSelectedWeekKey] = useState<string | null>(null);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
   const [fRubros, setFRubros] = useState<string[]>([]);
   const [fOSRubros, setFOSRubros] = useState<OSRubro[]>([]);
@@ -314,8 +315,10 @@ export default function Dashboard() {
   const [periodMode, setPeriodMode] = useState<PeriodMode>(initialFilters.periodMode);
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
+  const [factExplorerView, setFactExplorerView] = useState<"facturas" | "clientes" | "analisis">("facturas");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
+  const [osSucursalMetric, setOsSucursalMetric] = useState<OSSucursalMetric>("interno");
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
@@ -349,14 +352,14 @@ export default function Dashboard() {
     [periodEnd, periodStart],
   );
 
-  // Rango de días para validar granularidad y para queries
+  // Rango de dias para validar granularidad y para queries
   const rangeDays = useMemo(
     () => differenceInCalendarDays(periodEnd, periodStart),
     [periodStart, periodEnd],
   );
   const disabledGranularities = useMemo(() => {
     const d = new Set<PeriodMode>();
-    if (rangeDays > 31) d.add("dia");   // Día deshabilitado si rango > 31 días
+    if (rangeDays > 31) d.add("dia");   // Dia deshabilitado si rango > 31 dias
     if (rangeDays > 364) d.add("semana"); // Semana deshabilitada si rango > 52 semanas
     return d;
   }, [rangeDays]);
@@ -364,7 +367,7 @@ export default function Dashboard() {
   const queryStart = useMemo(() => subYears(periodStart, 1), [periodStart]);
   const queryEnd = useMemo(() => periodEnd, [periodEnd]);
 
-  // Coerce automático: si el rango cambia y la granularidad actual queda inválida, ajustar
+  // Coerce automatico: si el rango cambia y la granularidad actual queda invalida, ajustar
   useEffect(() => {
     const days = differenceInCalendarDays(parseISO(dateTo), parseISO(dateFrom));
     if (periodMode === "dia" && days > 31) {
@@ -497,7 +500,7 @@ export default function Dashboard() {
         const gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
           .select(
-            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, raw_data, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
+            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, cod_mercaderia, codigo_fabricante, mercaderia, observacion, raw_data, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
           )
           .gte("fecha_factura", dateKey(queryStart))
           .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
@@ -528,7 +531,7 @@ export default function Dashboard() {
           }));
 
         const gridRows: Facturacion[] = gridRowsRaw.map((row) => {
-          const factura = String(row.factura ?? row.codigo_interno_factura ?? "").trim();
+          const factura = String(row.codigo_interno_factura ?? row.factura ?? "").trim();
           const tipo = row.tipo_facturacion === "Servicio" ? "Servicio" : "Repuesto";
           return {
             fecha: String(row.fecha_factura ?? "").slice(0, 10),
@@ -550,7 +553,7 @@ export default function Dashboard() {
         if (alive) setFacturacion([...legacyRowsNormalizados, ...gridRows]);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        toast.error(`Error cargando facturación: ${msg}`);
+        toast.error(`Error cargando facturacion: ${msg}`);
       } finally {
         if (alive) setFacturacionLoading(false);
       }
@@ -579,7 +582,7 @@ export default function Dashboard() {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!message.includes("ordenes_servicio_importadas")) {
-          toast.error(`Error cargando órdenes de servicio: ${message}`);
+          toast.error(`Error cargando ordenes de servicio: ${message}`);
         }
         if (alive) setOrdenesServicio([]);
       } finally {
@@ -670,7 +673,7 @@ export default function Dashboard() {
     () => factFiltered.filter((row) => inRange(row.fecha, periodStart, periodEnd)),
     [factFiltered, periodStart, periodEnd],
   );
-  // Año anterior: mismo rango exactamente 1 año atrás (subYears maneja feb-29 automáticamente)
+  // Ano anterior: mismo rango exactamente 1 ano atras (subYears maneja feb-29 automaticamente)
   const prevPeriodStartDate = useMemo(() => subYears(periodStart, 1), [periodStart]);
   const prevPeriodEndDate = useMemo(() => subYears(periodEnd, 1), [periodEnd]);
   const allPrevPeriodFacts = useMemo(
@@ -762,11 +765,11 @@ export default function Dashboard() {
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
     // Generar buckets que cubran exactamente [periodStart, periodEnd] a la granularidad elegida.
-    // Día, semana, mes o año según el agrupador elegido.
+    // Dia, semana, mes o ano segun el agrupador elegido.
     const periods: Array<{ start: Date; end: Date; label: string }> = [];
 
     if (periodMode === "dia") {
-      // Día: un bucket por día
+      // Dia: un bucket por dia
       let cursor = periodStart;
       while (cursor <= periodEnd) {
         periods.push({ start: cursor, end: cursor, label: format(cursor, "dd/MM") });
@@ -801,7 +804,7 @@ export default function Dashboard() {
       }
     }
 
-    // Comparación: mismo offset en el período inmediatamente anterior (criterio unificado con Fila 1)
+    // Comparacion: mismo offset en el periodo inmediatamente anterior (criterio unificado con Fila 1)
     const comparisonLabelFor = (start: Date, end: Date) => {
       if (periodMode === "mes") return format(subYears(start, 1), "MM/yyyy");
       if (periodMode === "dia") return format(subYears(start, 1), "dd/MM/yy");
@@ -869,8 +872,9 @@ export default function Dashboard() {
     }));
   }, [factFiltered, periodMode, periodStart, periodEnd, clienteById]);
 
-  const selectedWeek = weeklyRows.find((row) => row.key === selectedWeekKey) ?? weeklyRows[weeklyRows.length - 1];
-  const selectedFacts = selectedWeek?.rows ?? [];
+  const selectedWeek = selectedWeekKey ? weeklyRows.find((row) => row.key === selectedWeekKey) : undefined;
+  const selectedFacts = selectedWeek ? selectedWeek.rows : allPeriodFacts;
+  const selectedLabelFacturacion = selectedWeek?.label ?? `${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")}`;
   const visibleSelectedFacts = useMemo(() => selectedFacts.slice(0, MAX_FACTURAS_RENDER), [selectedFacts]);
 
   const comparisonRange = useMemo(() => {
@@ -938,7 +942,7 @@ export default function Dashboard() {
   }, [osEvolutionRows, osImpactRows, periodEnd, periodStart]);
   const osAccumulatedComparisonSummary = useMemo(() => {
     const rows = osImpactRows.filter((row) => inRange(row.fecha, prevPeriodStartDate, prevPeriodEndDate));
-    return summarizeOSImpact(rows, "comp-acumulado", "Año anterior", prevPeriodStartDate, prevPeriodEndDate);
+    return summarizeOSImpact(rows, "comp-acumulado", "Ano anterior", prevPeriodStartDate, prevPeriodEndDate);
   }, [osImpactRows, prevPeriodStartDate, prevPeriodEndDate]);
   const osVarPct = osAccumulatedComparisonSummary.total > 0
     ? Math.round(((osAccumulatedSummary.total - osAccumulatedComparisonSummary.total) / osAccumulatedComparisonSummary.total) * 100)
@@ -958,7 +962,7 @@ export default function Dashboard() {
     }).sort((a, b) => b.total - a.total);
   }, [osComparisonRows, osSelectedRows]);
   const osComparisonLabel = osComparisonRange
-    ? `${format(osComparisonRange.start, "dd/MM/yy")} – ${format(osComparisonRange.end, "dd/MM/yy")}`
+    ? `${format(osComparisonRange.start, "dd/MM/yy")} - ${format(osComparisonRange.end, "dd/MM/yy")}`
     : undefined;
 
   const factBySucursal = useMemo(() => {
@@ -987,7 +991,7 @@ export default function Dashboard() {
       if (nombre.length > current.nombre.length) current.nombre = nombre;
       map.set(key, current);
     }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total).slice(0, 30);
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [clienteById, selectedFacts]);
 
   const jornadasRealizadasPrev = useMemo(
@@ -1102,15 +1106,16 @@ export default function Dashboard() {
     : 0;
   const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > DIAS_JORNADA_VENCIDA);
-  const selectedTrend = selectedWeek?.variacion ?? null;
-  const selectedMetricValue = weekMetric(selectedWeek, factMetric);
-  const selectedMetricPrevValue = (() => {
-    if (!selectedWeek) return 0;
-    const selectedIndex = weeklyRows.findIndex((row) => row.key === selectedWeek.key);
-    return selectedIndex > 0 ? weekMetric(weeklyRows[selectedIndex - 1], factMetric) : 0;
-  })();
+  const selectedTrend = selectedWeek?.variacion ?? pct(total(allPeriodFacts), total(allPrevPeriodFacts));
+  const selectedMetricValue = selectedWeek ? weekMetric(selectedWeek, factMetric) : factMetric === "usd" ? total(allPeriodFacts) : factMetric === "horasServicio" ? periodRow.horasServicio : periodRow.kmFacturados;
+  const selectedMetricPrevValue = selectedWeek
+    ? (() => {
+      const selectedIndex = weeklyRows.findIndex((row) => row.key === selectedWeek.key);
+      return selectedIndex > 0 ? weekMetric(weeklyRows[selectedIndex - 1], factMetric) : 0;
+    })()
+    : factMetric === "usd" ? total(allPrevPeriodFacts) : 0;
   const selectedMetricTrend = factMetric === "usd" ? selectedTrend : pct(selectedMetricValue, selectedMetricPrevValue);
-  // Fila 1 KPIs: calculados sobre el rango completo del usuario, no el último bucket
+  // Fila 1 KPIs: calculados sobre el rango completo del usuario, no el ultimo bucket
   const totalPeriodo = total(allPeriodFacts);
   const facturasPeriodo = new Set(allPeriodFacts.map((row) => row.cod_factura)).size;
   const clientesAtendidosSemana = new Set(
@@ -1121,7 +1126,7 @@ export default function Dashboard() {
   ).size;
   const sucursalesConMovimiento = new Set(allPeriodFacts.map((row) => row.sucursal).filter(Boolean)).size;
 
-  // Año anterior: mismo rango 1 año atrás
+  // Ano anterior: mismo rango 1 ano atras
   const totalPrevPeriodo = total(allPrevPeriodFacts);
   const facturasPrevPeriodo = new Set(allPrevPeriodFacts.map((row) => row.cod_factura)).size;
   const variacionTotalPct = pct(totalPeriodo, totalPrevPeriodo);
@@ -1181,9 +1186,9 @@ export default function Dashboard() {
   const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
     ? { label: "Cliente", value: tipoFactBreakdown.pctCliente }
     : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
-      ? { label: "Garantía", value: tipoFactBreakdown.pctGarantia }
+      ? { label: "Garantia", value: tipoFactBreakdown.pctGarantia }
       : { label: "Interno", value: tipoFactBreakdown.pctInterno };
-  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturación)
+  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturacion)
   const top5ClientesPct = (() => {
     const t = topClientes.slice(0, MAX_TOP_RANKING).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((t / totalPeriodo) * 100) : 0;
@@ -1193,10 +1198,10 @@ export default function Dashboard() {
     const top2 = [...factBySucursal].sort((a, b) => b.total - a.total).slice(0, 2).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((top2 / totalPeriodo) * 100) : 0;
   })();
-  // Label del año anterior para SucursalBars
-  const periodComparisonLabel = `${format(prevPeriodStartDate, "dd/MM/yy")} – ${format(prevPeriodEndDate, "dd/MM/yy")}`;
+  // Label del ano anterior para SucursalBars
+  const periodComparisonLabel = `${format(prevPeriodStartDate, "dd/MM/yy")} - ${format(prevPeriodEndDate, "dd/MM/yy")}`;
 
-  // Fila sintética con la agregación del rango completo para MixRubros
+  // Fila sintetica con la agregaciï¿½n del rango completo para MixRubros
   const periodRow = useMemo<WeekRow>(() => {
     const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
     let horasServicio = 0;
@@ -1209,7 +1214,7 @@ export default function Dashboard() {
     }
     return {
       key: dateKey(periodStart),
-      label: `${format(periodStart, "dd/MM/yy")} – ${format(periodEnd, "dd/MM/yy")}`,
+      label: `${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")}`,
       start: periodStart,
       end: periodEnd,
       total: totalPeriodo,
@@ -1235,7 +1240,7 @@ export default function Dashboard() {
     periodMode === "dia" ? "diario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
-    const periodoNombre = periodMode === "dia" ? "día" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "año";
+    const periodoNombre = periodMode === "dia" ? "dia" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "ano";
     return {
       seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
       facturacion: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
@@ -1244,7 +1249,7 @@ export default function Dashboard() {
       seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composicion.`,
       periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
       sinFacturacion: `Sin facturacion para este ${periodoNombre}.`,
-      columnaPeriodo: periodMode === "dia" ? "Día" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
+      columnaPeriodo: periodMode === "dia" ? "Dia" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Ano",
       carga: isSemana ? "Carga semanal" : "Carga tecnica",
       lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
       plan: isSemana ? "Plan semana" : "Proximo periodo",
@@ -1329,7 +1334,7 @@ export default function Dashboard() {
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
   const tecnicosTotales = activeTechnicianIds.size;
 
-  // Estadísticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestaña Trabajos).
+  // Estadisticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestana Trabajos).
   const flujo = useMemo(() => {
     // Solo trabajos con al menos una jornada en el rango seleccionado
     const enPeriodo = trabajosResumen.filter((r) => r.totalJornadasPeriodo > 0);
@@ -1359,10 +1364,10 @@ export default function Dashboard() {
     }));
   }, [trabajosResumen]);
 
-  // Carga por sucursal: clasifica trabajos según lo que ocurrió DENTRO del período.
-  // - cerrados: trabajos hoy completados cuya fecha de cierre cae en el período
-  // - pausados: trabajos hoy pausados con actividad (jornada/actualizacion) en el período
-  // - abiertos: trabajos con actividad en el período que no son cerrados-en-período ni pausados
+  // Carga por sucursal: clasifica trabajos segun lo que ocurrio DENTRO del periodo.
+  // - cerrados: trabajos hoy completados cuya fecha de cierre cae en el periodo
+  // - pausados: trabajos hoy pausados con actividad (jornada/actualizacion) en el periodo
+  // - abiertos: trabajos con actividad en el periodo que no son cerrados-en-periodo ni pausados
   const cargaSucursal = useMemo(() => {
     const tieneActividad = (r: typeof trabajosBase[number]) => {
       if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
@@ -1399,7 +1404,7 @@ export default function Dashboard() {
       .sort((a, b) => b.total - a.total);
   }, [trabajosResumen, periodStart, periodEnd]);
 
-  // Distribución por marca en el período (reemplaza "Lectura operativa")
+  // Distribucion por marca en el periodo (reemplaza "Lectura operativa")
   const cargaMarca = useMemo(() => {
     const tieneActividad = (r: typeof trabajosBase[number]) => {
       if (r.creadoEn && inRange(r.creadoEn, periodStart, periodEnd)) return true;
@@ -1433,7 +1438,7 @@ export default function Dashboard() {
 
 
   const productividadMatriz = useMemo(() => {
-    // Matriz técnica agrupada con el mismo criterio visible del dashboard.
+    // Matriz tecnica agrupada con el mismo criterio visible del dashboard.
     const bucketMode: PeriodMode = periodMode;
     const bucketKey = (iso: string) => {
       if (bucketMode === "dia") return iso; // yyyy-MM-dd, ya es la clave
@@ -1445,7 +1450,7 @@ export default function Dashboard() {
     const bucketLabel = (key: string) => {
       if (bucketMode === "dia") {
         const d = parseISO(key);
-        return ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][getDay(d)];
+        return ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][getDay(d)];
       }
       if (bucketMode === "mes") {
         const [y, m] = key.split("-");
@@ -1457,7 +1462,7 @@ export default function Dashboard() {
     };
 
     const bucketsSet = new Set<string>();
-    // En modo "dia" sembrar todos los días del rango para que aparezcan aunque no haya jornadas
+    // En modo "dia" sembrar todos los dias del rango para que aparezcan aunque no haya jornadas
     if (bucketMode === "dia") {
       let cursor = periodStart;
       while (cursor <= periodEnd) {
@@ -1481,7 +1486,7 @@ export default function Dashboard() {
 
     for (const id of activeTechnicianIds) ensureTecnicoRow(id);
 
-    // Scope: trabajos visibles tras aplicar filtros de la pestaña Trabajos (estado/técnico/marca).
+    // Scope: trabajos visibles tras aplicar filtros de la pestana Trabajos (estado/tï¿½cnico/marca).
     const trabajoIdsEnScope = new Set(trabajosResumen.map((t) => t.id));
     // Mapa inverso: servicio_id -> trabajo_id (mismo criterio que jornadasByTrabajo)
     const servicioATrabajo = new Map<string, string>();
@@ -1491,7 +1496,7 @@ export default function Dashboard() {
 
     const trabajosPorBucketMap = new Map<string, Set<string>>();
     for (const jornada of jornadas) {
-      // Cancelada no cuenta; Pendiente y Completado sí (jornadas asignadas)
+      // Cancelada no cuenta; Pendiente y Completado si (jornadas asignadas)
       if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado") continue;
       if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
       const trabajoId = servicioATrabajo.get(jornada.servicio_id);
@@ -1612,7 +1617,7 @@ export default function Dashboard() {
       .map((k) => rowsAll.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length);
     const equipoPromTecnicos: string = nonSunTechCounts.length > 0
       ? (nonSunTechCounts.reduce((a, b) => a + b, 0) / nonSunTechCounts.length).toFixed(1)
-      : "—";
+      : "ï¿½";
 
     return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, tecnicosNoDisponiblesPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTecnicos };
   }, [activeTechnicianIds, disponibilidades, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
@@ -1620,7 +1625,7 @@ export default function Dashboard() {
   const limpiar = () => {
     setDateFrom(initialDateFrom);
     setDateTo(initialDateTo);
-    setSelectedWeekKey(initialDateTo);
+    setSelectedWeekKey(null);
     setFSucursales([]);
     setFRubros([]);
     setFOSRubros([]);
@@ -1658,11 +1663,10 @@ export default function Dashboard() {
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <h1 className={pageTitle}>Dashboard ejecutivo</h1>
-        <TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
+        <TabsList className="hidden h-9 min-w-max grid-cols-3 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
           <TabsTrigger value="facturacion" className="h-7 whitespace-nowrap px-3 text-xs">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
-          <TabsTrigger value="os" className="h-7 whitespace-nowrap px-3 text-xs">OS absorbidas</TabsTrigger>
         </TabsList>
       </div>
       <FiltersBar
@@ -1768,7 +1772,7 @@ export default function Dashboard() {
             onClick={() => setShowAdvancedFilters((value) => !value)}
           >
             <SlidersHorizontal className="h-4 w-4" />
-            Más filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
+            Mas filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
           </Button>
         </FilterCustom>
       </FiltersBar>
@@ -1778,13 +1782,12 @@ export default function Dashboard() {
           <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
           <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
-          <TabsTrigger value="os" className="whitespace-nowrap">OS absorbidas</TabsTrigger>
         </TabsList>
         </div>
 
         <TabsContent value="resumen" className="space-y-3">
 
-          {/* FILA 1 — FINANCIERO */}
+          {/* FILA 1 - FINANCIERO */}
           {loading ? (
             <DashboardKPISkeleton count={4} />
           ) : (
@@ -1803,7 +1806,7 @@ export default function Dashboard() {
                     <DollarSign className="h-[18px] w-[18px]" />
                   </div>
                   <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Facturación del período · {format(periodStart, "dd/MM/yy")} – {format(periodEnd, "dd/MM/yy")}
+                    Facturacion del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
                   </div>
                   <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(totalPeriodo)}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1814,7 +1817,7 @@ export default function Dashboard() {
                           ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
                           : "border border-red-200 bg-red-50 text-red-700",
                       )}>
-                        {variacionTotalPct >= 0 ? "▲" : "▼"} {Math.abs(variacionTotalPct)}% vs año anterior
+                        {variacionTotalPct >= 0 ? "?" : "?"} {Math.abs(variacionTotalPct)}% vs ano anterior
                       </span>
                     ) : (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">sin base previa</span>
@@ -1890,7 +1893,7 @@ export default function Dashboard() {
                   <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <PieChart className="h-[18px] w-[18px]" />
                   </div>
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturacion</div>
                   <div className="mt-2 text-lg font-extrabold leading-tight">
                     {tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span>
                   </div>
@@ -1923,21 +1926,21 @@ export default function Dashboard() {
                     {[
                       tipoFactBreakdown.pctGarantia > 0 && `Gnt. ${tipoFactBreakdown.pctGarantia}%`,
                       tipoFactBreakdown.pctInterno > 0 && `Int. ${tipoFactBreakdown.pctInterno}%`,
-                    ].filter(Boolean).join(" · ") || "Solo cliente"}
+                    ].filter(Boolean).join(" - ") || "Solo cliente"}
                   </div>
                 </Card>
               </button>
             </div>
           )}
 
-          {/* FILA 2 — TENDENCIA */}
+          {/* FILA 2 - TENDENCIA */}
           <section className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Card className="flex h-full min-w-0 flex-col p-3">
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Evolución de facturación</h2>
+                  <h2 className="truncate text-sm font-semibold">Evolucion de facturacion</h2>
                   <p className="truncate text-xs text-muted-foreground">
-                    {format(periodStart, "dd/MM/yy")} – {format(periodEnd, "dd/MM/yy")} · clic en barra para seleccionar
+                    {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} - clic en barra para seleccionar
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -1963,7 +1966,7 @@ export default function Dashboard() {
             </Card>
 
             <Card className="flex h-full min-w-0 flex-col p-3">
-              <PanelTitle icon={Building2} title="Facturación por sucursal" subtitle="Acumulado del rango completo." />
+              <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Acumulado del rango completo." />
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
@@ -1988,10 +1991,10 @@ export default function Dashboard() {
             </Card>
           </section>
 
-          {/* FILA 3 — OPERATIVA */}
+          {/* FILA 3 - OPERATIVA */}
           <section className="grid gap-3 md:grid-cols-2">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle={`${format(periodStart, "dd/MM/yy")} – ${format(periodEnd, "dd/MM/yy")} · clic filtra en Trabajos`} />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} - clic filtra en Trabajos`} />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}
@@ -2010,7 +2013,7 @@ export default function Dashboard() {
               <div className="mb-3 flex items-start justify-between">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Trabajos por período y técnicos activos</p>
+                  <p className="truncate text-xs text-muted-foreground">Trabajos por periodo y tecnicos activos</p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <CalendarDays className="h-4 w-4" />
@@ -2054,58 +2057,7 @@ export default function Dashboard() {
               </div>
               <CargaEquipoChart data={productividadMatriz} />
             </Card>
-          </section>
-
-          {/* FILA 4 — OS ABSORBIDAS */}
-          <Card
-            className={cn(
-              "cursor-pointer p-4 transition-colors hover:bg-accent/50",
-              osAccumulatedSummary.osCount > 0 && osVarPct != null && osVarPct > 0 && "border-amber-200 bg-amber-50/60",
-            )}
-            onClick={() => goSection("os")}
-            role="button"
-          >
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold">OS absorbidas (garantía + interno)</h2>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  Costo absorbido en el rango visible
-                  {osAccumulatedSummary.osCount > 0 && ` · ${format(osAccumulatedSummary.start, "dd/MM/yy")} – ${format(osAccumulatedSummary.end, "dd/MM/yy")}`}
-                </p>
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground">Ver detalle →</span>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Monto absorbido</div>
-                <div className="mt-1 text-xl font-bold tabular-nums">{money(osAccumulatedSummary.total)}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {[
-                    osAccumulatedSummary.garantia > 0 && `${money(osAccumulatedSummary.garantia)} gnt.`,
-                    osAccumulatedSummary.interno > 0 && `${money(osAccumulatedSummary.interno)} int.`,
-                  ].filter(Boolean).join(" · ") || "Sin OS en el rango"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Vs año anterior</div>
-                <div className={cn(
-                  "mt-1 text-xl font-bold tabular-nums",
-                  osVarPct == null ? "text-muted-foreground" : osVarPct > 0 ? "text-destructive" : "text-emerald-600",
-                )}>
-                  {osVarPct == null ? "—" : `${osVarPct > 0 ? "+" : ""}${osVarPct}%`}
-                </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
-                  {osAccumulatedComparisonSummary.total > 0 ? `${money(osAccumulatedComparisonSummary.total)} año anterior` : "Sin datos previos"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Casos</div>
-                <div className="mt-1 text-xl font-bold tabular-nums">{osAccumulatedSummary.osCount}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">OS cerradas</div>
-              </div>
-            </div>
-          </Card>
-
+          </section>
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-3">
@@ -2116,8 +2068,8 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase text-muted-foreground">{T.periodoSeleccionado}</div>
-                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : formatWeekMetric(selectedWeek, "usd")}</div>
+                <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
+                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(selectedWeek ? selectedWeek.total : totalPeriodo)}</div>
                 <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
                   {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}
                 </div>
@@ -2170,82 +2122,18 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <Accordion type="single" collapsible>
-            <AccordionItem value="facturas" className="overflow-hidden rounded-lg border bg-card shadow-sm">
-              <AccordionTrigger className="px-3 py-3 text-left hover:no-underline hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="text-sm font-semibold">{T.facturas}</span>
-                  <Badge variant="secondary" className="tabular-nums">{selectedFacts.length} lineas</Badge>
-                  {selectedFacts.length > MAX_FACTURAS_RENDER && (
-                    <span className="hidden text-xs font-normal text-muted-foreground sm:inline">(mostrando {MAX_FACTURAS_RENDER})</span>
-                  )}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-3 pt-0">
-                <div className="px-3">
-                  <FacturasMobile rows={selectedFacts} visibleRows={visibleSelectedFacts} />
-                  <div className="hidden max-h-[420px] overflow-y-auto overflow-x-hidden rounded-md border md:block">
-                    <div className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-                      <div>Fecha</div>
-                      <div className="hidden md:block">Factura</div>
-                      <div>Cliente</div>
-                      <div>Concepto</div>
-                      <div className="hidden md:block">Sucursal</div>
-                      <div className="text-right">Importe</div>
-                    </div>
-                    {selectedFacts.length === 0 ? (
-                      <div className="px-3 py-10 text-center text-xs text-muted-foreground">{T.sinFacturacion}</div>
-                    ) : (
-                      visibleSelectedFacts.map((row, index) => {
-                        const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
-                        return (
-                          <div key={`${row.cod_factura}-${index}`} className="grid grid-cols-[72px_minmax(0,1.4fr)_minmax(0,1fr)_110px] md:grid-cols-[72px_104px_minmax(0,1.4fr)_minmax(0,1fr)_110px_104px] items-center border-t px-3 py-2 text-xs">
-                            <div className="tabular-nums">{format(parseISO(row.fecha), "dd/MM")}</div>
-                            <div className="hidden truncate font-mono text-[11px] md:block" title={row.cod_factura}>{row.cod_factura}</div>
-                            <div className="truncate font-medium" title={cliente ?? ""}>{cliente}</div>
-                            <div className="truncate" title={concept(row)}>{concept(row)}</div>
-                            <div className="hidden truncate md:block" title={row.sucursal ?? ""}>{row.sucursal ?? "-"}</div>
-                            <div className="text-right font-semibold tabular-nums">{money(Number(row.total_venta || 0))}</div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </TabsContent>
-
-        <TabsContent value="os" className="space-y-3">
           <Card className="flex flex-col p-3">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate text-sm font-semibold">Detalle OS absorbidas</h2>
-                <p className="truncate text-xs text-muted-foreground">Garantia e Interno separados de la facturacion vendida.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <OSMetricSwitch value={osMetric} onChange={setOsMetric} />
-              </div>
-            </div>
-            <OSImpactSection
-              loading={ordenesLoading}
-              evolutionRows={osEvolutionRows}
-              activeKey={osSelectedPeriod?.key}
-              metric={osMetric}
-              selectedSummary={osSelectedSummary}
-              accumulatedSummary={osAccumulatedSummary}
-              sucursalRows={osBySucursal}
-              detailRows={osSelectedRows}
-              detailMode={osDetailMode}
-              selectedRubros={fOSRubros}
-              comparisonLabel={osComparisonLabel}
+            <FacturacionExplorer
+              view={factExplorerView}
+              onViewChange={setFactExplorerView}
+              selectedFacts={selectedFacts}
+              selectedLabel={selectedLabelFacturacion}
+              clientRows={topClientes}
+              periodRows={weeklyRows}
+              selectedPeriodKey={selectedWeek?.key}
+              isRangeSelected={!selectedWeek}
               onSelectPeriod={setSelectedWeekKey}
-              onSelectSucursal={(sucursal) => setFSucursales([sucursal])}
-              onSelectRubro={(rubro) => setFOSRubros((prev) => (prev.length === 1 && prev[0] === rubro ? [] : [rubro]))}
-              onClearRubros={() => setFOSRubros([])}
-              onDetailModeChange={setOsDetailMode}
-              onSelectOS={(os) => setQ(os)}
+              onSelectFullRange={() => setSelectedWeekKey(null)}
             />
           </Card>
         </TabsContent>
@@ -2314,7 +2202,7 @@ export default function Dashboard() {
                         <div className="font-semibold tabular-nums">{row.realizadasPeriodo}/{row.totalJornadasPeriodo}</div>
                       </div>
                       <div className="rounded-md bg-muted/50 px-2 py-1">
-                        <div className="text-muted-foreground">Técnicos</div>
+                        <div className="text-muted-foreground">Tecnicos</div>
                         <div className="font-semibold tabular-nums">{row.participantes}</div>
                       </div>
                       <div className="rounded-md bg-muted/50 px-2 py-1">
@@ -2423,4 +2311,15 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
