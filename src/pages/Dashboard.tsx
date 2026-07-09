@@ -2166,7 +2166,7 @@ export default function Dashboard() {
               view={factExplorerView}
               onViewChange={setFactExplorerView}
               selectedFacts={selectedFacts}
-              selectedLabel={selectedLabelFacturación}
+              selectedLabel={selectedLabelFacturacion}
               clientRows={topClientes}
               periodRows={weeklyRows}
               selectedPeriodKey={selectedWeek?.key}
@@ -2404,6 +2404,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
