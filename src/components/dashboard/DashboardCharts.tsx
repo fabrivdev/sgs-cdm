@@ -960,7 +960,7 @@ export function EstadoCompacto({
           />
           <EstadoMiniCard
             icon={CalendarDays}
-            title="PRÃ“XIMO PERIODO"
+            title="PRÓXIMO PERIODO"
             subtitle={planificacionRango}
             value={`${jornadasPlanificadas ?? 0} jornadas`}
           />
@@ -2230,6 +2230,7 @@ export function TrabajoChip({
     </button>
   );
 }
+
 
 
 
