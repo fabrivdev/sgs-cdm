@@ -257,7 +257,7 @@ function normalizeOSLookup(value: string | null | undefined) {
 
 function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | null {
   const tipoTiempo = normalizeOSLookup(row.tipo_tiempo);
-  if (tipoTiempo.includes("GARANT")) return "Garantia";
+  if (tipoTiempo.includes("GARANT")) return "Garantía";
   if (
     tipoTiempo.includes("INTERNO") ||
     tipoTiempo.includes("ABSOR") ||
@@ -353,14 +353,14 @@ export default function Dashboard() {
     [periodEnd, periodStart],
   );
 
-  // Rango de dias para validar granularidad y para queries
+  // Rango de días para validar granularidad y para queries
   const rangeDays = useMemo(
     () => differenceInCalendarDays(periodEnd, periodStart),
     [periodStart, periodEnd],
   );
   const disabledGranularities = useMemo(() => {
     const d = new Set<PeriodMode>();
-    if (rangeDays > 31) d.add("dia");   // Dia deshabilitado si rango > 31 dias
+    if (rangeDays > 31) d.add("dia");   // Día deshabilitado si rango > 31 días
     if (rangeDays > 364) d.add("semana"); // Semana deshabilitada si rango > 52 semanas
     return d;
   }, [rangeDays]);
@@ -639,7 +639,7 @@ export default function Dashboard() {
   const technicianOptions = useMemo(
     () =>
       Array.from(activeTechnicianIds)
-        .map((id) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico" }))
+        .map((id) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin técnico" }))
         .sort((a, b) => a.nombre.localeCompare(b.nombre)),
     [activeTechnicianIds, profileById],
   );
@@ -674,7 +674,7 @@ export default function Dashboard() {
     () => factFiltered.filter((row) => inRange(row.fecha, periodStart, periodEnd)),
     [factFiltered, periodStart, periodEnd],
   );
-  // Ano anterior: mismo rango exactamente 1 ano atras (subYears maneja feb-29 automaticamente)
+  // Año anterior: mismo rango exactamente 1 año atras (subYears maneja feb-29 automaticamente)
   const prevPeriodStartDate = useMemo(() => subYears(periodStart, 1), [periodStart]);
   const prevPeriodEndDate = useMemo(() => subYears(periodEnd, 1), [periodEnd]);
   const allPrevPeriodFacts = useMemo(
@@ -724,7 +724,7 @@ export default function Dashboard() {
           sucursal,
           marca,
           tipo,
-          situacionFacturacion: row.situacion_facturacion ?? "",
+          situacionFacturación: row.situacion_facturacion ?? "",
           problema: row.problema ?? trabajo?.descripcion_problema ?? "",
           factura: row.factura ?? "",
           horas: Number(row.servicios_cantidad || 0),
@@ -766,11 +766,11 @@ export default function Dashboard() {
 
   const weeklyRows = useMemo<WeekRow[]>(() => {
     // Generar buckets que cubran exactamente [periodStart, periodEnd] a la granularidad elegida.
-    // Dia, semana, mes o ano segun el agrupador elegido.
+    // Día, semana, mes o año segun el agrupador elegido.
     const periods: Array<{ start: Date; end: Date; label: string }> = [];
 
     if (periodMode === "dia") {
-      // Dia: un bucket por dia
+      // Día: un bucket por día
       let cursor = periodStart;
       while (cursor <= periodEnd) {
         periods.push({ start: cursor, end: cursor, label: format(cursor, "dd/MM") });
@@ -943,7 +943,7 @@ export default function Dashboard() {
   }, [osEvolutionRows, osImpactRows, periodEnd, periodStart]);
   const osAccumulatedComparisonSummary = useMemo(() => {
     const rows = osImpactRows.filter((row) => inRange(row.fecha, prevPeriodStartDate, prevPeriodEndDate));
-    return summarizeOSImpact(rows, "comp-acumulado", "Ano anterior", prevPeriodStartDate, prevPeriodEndDate);
+    return summarizeOSImpact(rows, "comp-acumulado", "Año anterior", prevPeriodStartDate, prevPeriodEndDate);
   }, [osImpactRows, prevPeriodStartDate, prevPeriodEndDate]);
   const osVarPct = osAccumulatedComparisonSummary.total > 0
     ? Math.round(((osAccumulatedSummary.total - osAccumulatedComparisonSummary.total) / osAccumulatedComparisonSummary.total) * 100)
@@ -1070,14 +1070,14 @@ export default function Dashboard() {
     return estado === "pausado";
   });
 
-  const cargaTecnicos = useMemo(() => {
+  const cargaTécnicos = useMemo(() => {
     const map = new Map<string, number>();
     for (const jornada of jornadasProgramadas) {
       const ids = validJornadaCrew(jornada);
       for (const id of ids) map.set(id, (map.get(id) ?? 0) + 1);
     }
     return Array.from(map.entries())
-      .map(([id, count]) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin tecnico", count }))
+      .map(([id, count]) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin técnico", count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, MAX_TOP_RANKING);
   }, [activeTechnicianIds, jornadasProgramadas, profileById, servicioById]);
@@ -1127,7 +1127,7 @@ export default function Dashboard() {
   ).size;
   const sucursalesConMovimiento = new Set(allPeriodFacts.map((row) => row.sucursal).filter(Boolean)).size;
 
-  // Ano anterior: mismo rango 1 ano atras
+  // Año anterior: mismo rango 1 año atras
   const totalPrevPeriodo = total(allPrevPeriodFacts);
   const facturasPrevPeriodo = new Set(allPrevPeriodFacts.map((row) => row.cod_factura)).size;
   const variacionTotalPct = pct(totalPeriodo, totalPrevPeriodo);
@@ -1175,21 +1175,21 @@ export default function Dashboard() {
     return count;
   })();
   const tipoFactBreakdown = (() => {
-    const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
+    const groups = { Cliente: 0, Garantía: 0, Interno: 0 } as Record<"Cliente" | "Garantía" | "Interno", number>;
     for (const row of allPeriodFacts) {
       const k = (row.tipo_tiempo ?? "Cliente") as keyof typeof groups;
       groups[k] = (groups[k] ?? 0) + Number(row.total_venta || 0);
     }
-    const totalTF = groups.Cliente + groups.Garantia + groups.Interno;
+    const totalTF = groups.Cliente + groups.Garantía + groups.Interno;
     const p = (n: number) => (totalTF > 0 ? Math.round((n / totalTF) * 100) : 0);
-    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantia: p(groups.Garantia), pctInterno: p(groups.Interno) };
+    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantía: p(groups.Garantía), pctInterno: p(groups.Interno) };
   })();
-  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
+  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantía && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
     ? { label: "Cliente", value: tipoFactBreakdown.pctCliente }
-    : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
-      ? { label: "Garantia", value: tipoFactBreakdown.pctGarantia }
+    : tipoFactBreakdown.pctGarantía >= tipoFactBreakdown.pctInterno
+      ? { label: "Garantía", value: tipoFactBreakdown.pctGarantía }
       : { label: "Interno", value: tipoFactBreakdown.pctInterno };
-  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturacion)
+  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturación)
   const top5ClientesPct = (() => {
     const t = topClientes.slice(0, MAX_TOP_RANKING).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((t / totalPeriodo) * 100) : 0;
@@ -1199,7 +1199,7 @@ export default function Dashboard() {
     const top2 = [...factBySucursal].sort((a, b) => b.total - a.total).slice(0, 2).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((top2 / totalPeriodo) * 100) : 0;
   })();
-  // Label del ano anterior para SucursalBars
+  // Label del año anterior para SucursalBars
   const periodComparisonLabel = `${format(prevPeriodStartDate, "dd/MM/yy")} - ${format(prevPeriodEndDate, "dd/MM/yy")}`;
 
   // Fila sintetica con la agregaciï¿½n del rango completo para MixRubros
@@ -1241,19 +1241,19 @@ export default function Dashboard() {
     periodMode === "dia" ? "diario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
-    const periodoNombre = periodMode === "dia" ? "dia" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "ano";
+    const periodoNombre = periodMode === "dia" ? "dia" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "año";
     return {
       seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
-      facturacion: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
+      facturacion: isSemana ? "Facturación de la semana" : "Facturación del periodo",
       facturas: isSemana ? "Facturas de la semana" : "Facturas del periodo",
-      comparativoFacturacion: `Facturacion por ${periodoNombre}`,
-      seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composicion.`,
+      comparativoFacturación: `Facturación por ${periodoNombre}`,
+      seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composición.`,
       periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
-      sinFacturacion: `Sin facturacion para este ${periodoNombre}.`,
-      columnaPeriodo: periodMode === "dia" ? "Dia" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Ano",
-      carga: isSemana ? "Carga semanal" : "Carga tecnica",
+      sinFacturación: `Sin facturación para este ${periodoNombre}.`,
+      columnaPeriodo: periodMode === "dia" ? "Día" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
+      carga: isSemana ? "Carga semanal" : "Carga técnica",
       lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
-      plan: isSemana ? "Plan semana" : "Proximo periodo",
+      plan: isSemana ? "Plan semana" : "Próximo periodo",
     };
   }, [periodMode]);
 
@@ -1501,7 +1501,7 @@ export default function Dashboard() {
     };
 
     const bucketsSet = new Set<string>();
-    // En modo "dia" sembrar todos los dias del rango para que aparezcan aunque no haya jornadas
+    // En modo "dia" sembrar todos los días del rango para que aparezcan aunque no haya jornadas
     if (bucketMode === "dia") {
       let cursor = periodStart;
       while (cursor <= periodEnd) {
@@ -1515,7 +1515,7 @@ export default function Dashboard() {
       if (map.has(id)) return;
       map.set(id, {
         id,
-        nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
+        nombre: profileById.get(id)?.nombre ?? "Sin técnico",
         porBucket: {},
         totalJornadas: 0,
         totalHoras: 0,
@@ -1551,7 +1551,7 @@ export default function Dashboard() {
         ensureTecnicoRow(id);
         const current = map.get(id) ?? {
           id,
-          nombre: profileById.get(id)?.nombre ?? "Sin tecnico",
+          nombre: profileById.get(id)?.nombre ?? "Sin técnico",
           porBucket: {},
           totalJornadas: 0,
           totalHoras: 0,
@@ -1654,11 +1654,11 @@ export default function Dashboard() {
     const nonSunTechCounts = buckets
       .filter((k) => !isSunBucket(k))
       .map((k) => rowsAll.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length);
-    const equipoPromTecnicos: string = nonSunTechCounts.length > 0
+    const equipoPromTécnicos: string = nonSunTechCounts.length > 0
       ? (nonSunTechCounts.reduce((a, b) => a + b, 0) / nonSunTechCounts.length).toFixed(1)
       : "ï¿½";
 
-    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, tecnicosNoDisponiblesPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTecnicos };
+    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, tecnicosNoDisponiblesPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTécnicos };
   }, [activeTechnicianIds, disponibilidades, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
 
   const limpiar = () => {
@@ -1704,7 +1704,7 @@ export default function Dashboard() {
         <h1 className={pageTitle}>Dashboard ejecutivo</h1>
         <TabsList className="hidden h-9 min-w-max grid-cols-3 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
-          <TabsTrigger value="facturacion" className="h-7 whitespace-nowrap px-3 text-xs">Facturacion</TabsTrigger>
+          <TabsTrigger value="facturacion" className="h-7 whitespace-nowrap px-3 text-xs">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
         </TabsList>
       </div>
@@ -1758,7 +1758,7 @@ export default function Dashboard() {
               width="w-full"
               options={[
                 { value: "Cliente", label: "Cliente" },
-                { value: "Garantia", label: "Garantia" },
+                { value: "Garantía", label: "Garantía" },
                 { value: "Interno", label: "Interno" },
               ]}
             />
@@ -1779,7 +1779,7 @@ export default function Dashboard() {
                   ]}
                 />
                 <FilterMultiSelect
-                  label="Tecnico o cuadrilla"
+                  label="Técnico o cuadrilla"
                   values={fTecnicos}
                   onChange={setFTecnicos}
                   placeholder="Todos"
@@ -1811,7 +1811,7 @@ export default function Dashboard() {
             onClick={() => setShowAdvancedFilters((value) => !value)}
           >
             <SlidersHorizontal className="h-4 w-4" />
-            Mas filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
+            Más filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
           </Button>
         </FilterCustom>
       </FiltersBar>
@@ -1819,7 +1819,7 @@ export default function Dashboard() {
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
         <TabsList className="inline-flex h-auto min-w-max">
           <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
-          <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturacion</TabsTrigger>
+          <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
         </TabsList>
         </div>
@@ -1845,7 +1845,7 @@ export default function Dashboard() {
                     <DollarSign className="h-[18px] w-[18px]" />
                   </div>
                   <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Facturacion del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
+                    Facturación del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
                   </div>
                   <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(totalPeriodo)}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1856,7 +1856,7 @@ export default function Dashboard() {
                           ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
                           : "border border-red-200 bg-red-50 text-red-700",
                       )}>
-                        {variacionTotalPct >= 0 ? "?" : "?"} {Math.abs(variacionTotalPct)}% vs ano anterior
+                        {variacionTotalPct >= 0 ? "+" : "-"} {Math.abs(variacionTotalPct)}% vs año anterior
                       </span>
                     ) : (
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">sin base previa</span>
@@ -1939,7 +1939,7 @@ export default function Dashboard() {
                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div className="flex h-full">
                       <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
-                      <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
+                      <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantía}%` }} />
                       <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
                     </div>
                   </div>
@@ -1948,10 +1948,10 @@ export default function Dashboard() {
                       <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                       Cliente {tipoFactBreakdown.pctCliente}%
                     </span>
-                    {tipoFactBreakdown.pctGarantia > 0 && (
+                    {tipoFactBreakdown.pctGarantía > 0 && (
                       <span className="inline-flex items-center gap-1">
                         <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        Gnt. {tipoFactBreakdown.pctGarantia}%
+                        Gnt. {tipoFactBreakdown.pctGarantía}%
                       </span>
                     )}
                     {tipoFactBreakdown.pctInterno > 0 && (
@@ -1963,7 +1963,7 @@ export default function Dashboard() {
                   </div>
                   <div className="hidden text-[10px] text-muted-foreground">
                     {[
-                      tipoFactBreakdown.pctGarantia > 0 && `Gnt. ${tipoFactBreakdown.pctGarantia}%`,
+                      tipoFactBreakdown.pctGarantía > 0 && `Gnt. ${tipoFactBreakdown.pctGarantía}%`,
                       tipoFactBreakdown.pctInterno > 0 && `Int. ${tipoFactBreakdown.pctInterno}%`,
                     ].filter(Boolean).join(" - ") || "Solo cliente"}
                   </div>
@@ -2052,7 +2052,7 @@ export default function Dashboard() {
               <div className="mb-3 flex items-start justify-between">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Trabajos por periodo y tecnicos activos</p>
+                  <p className="truncate text-xs text-muted-foreground">Trabajos por periodo y técnicos activos</p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <CalendarDays className="h-4 w-4" />
@@ -2063,7 +2063,7 @@ export default function Dashboard() {
                   <div className="flex items-start gap-2">
                     <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div className="min-w-0">
-                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Tecnicos activos</div>
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Técnicos activos</div>
                       <div className="mt-0.5 flex items-baseline gap-2">
                         <span className="text-[18px] font-extrabold leading-none tabular-nums">
                           {tecnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
@@ -2089,7 +2089,7 @@ export default function Dashboard() {
                     <Activity className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div>
                       <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Prom. tec./periodo</div>
-                      <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoPromTecnicos}</div>
+                      <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoPromTécnicos}</div>
                     </div>
                   </div>
                 </div>
@@ -2103,7 +2103,7 @@ export default function Dashboard() {
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
+                <h2 className="text-base font-semibold">{T.comparativoFacturación}</h2>
                 <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
@@ -2166,7 +2166,7 @@ export default function Dashboard() {
               view={factExplorerView}
               onViewChange={setFactExplorerView}
               selectedFacts={selectedFacts}
-              selectedLabel={selectedLabelFacturacion}
+              selectedLabel={selectedLabelFacturación}
               clientRows={topClientes}
               periodRows={weeklyRows}
               selectedPeriodKey={selectedWeek?.key}
@@ -2183,7 +2183,7 @@ export default function Dashboard() {
             <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
             <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
             <TrabajoChip label="Jornadas" value={jornadasOperativasPeriodo.length} onClick={() => setFEstadosTrabajo([])} />
-            <TrabajoChip label="Tecnicos" value={`${tecnicosConActividadPeriodo.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
+            <TrabajoChip label="Técnicos" value={`${tecnicosConActividadPeriodo.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
             <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
           </div>
 
@@ -2192,7 +2192,7 @@ export default function Dashboard() {
               <div>
                 <h2 className="text-sm font-semibold">Resultado de jornadas</h2>
                 <p className="text-xs text-muted-foreground">
-                  {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} ? cierre operativo del periodo
+                  {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} · cierre operativo del periodo
                 </p>
               </div>
               <Badge variant="secondary">{jornadasResultadoResumen.programadas} programadas</Badge>
@@ -2226,7 +2226,7 @@ export default function Dashboard() {
                   </div>
                   <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
                 </div>
-                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctPendientes}% aun sin cierre</div>
+                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctPendientes}% aún sin cierre</div>
               </div>
               <div className="rounded-md border bg-muted/10 p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -2236,7 +2236,7 @@ export default function Dashboard() {
                   </div>
                   <Activity className="h-4 w-4 shrink-0 text-primary" />
                 </div>
-                <div className="mt-2 text-[11px] text-muted-foreground">Realizadas + no realizadas ? {jornadasResultadoResumen.pctCerradas}% del total</div>
+                <div className="mt-2 text-[11px] text-muted-foreground">Realizadas + no realizadas · {jornadasResultadoResumen.pctCerradas}% del total</div>
               </div>
             </div>
           </Card>
@@ -2295,7 +2295,7 @@ export default function Dashboard() {
                         <div className="font-semibold tabular-nums">{row.realizadasPeriodo}/{row.totalJornadasPeriodo}</div>
                       </div>
                       <div className="rounded-md bg-muted/50 px-2 py-1">
-                        <div className="text-muted-foreground">Tecnicos</div>
+                        <div className="text-muted-foreground">Técnicos</div>
                         <div className="font-semibold tabular-nums">{row.participantes}</div>
                       </div>
                       <div className="rounded-md bg-muted/50 px-2 py-1">
@@ -2336,7 +2336,7 @@ export default function Dashboard() {
                   <div>Cliente / trabajo</div>
                   <div>Sucursal</div>
                   <div className="text-right">Jornadas</div>
-                  <div className="text-right">Tecnicos</div>
+                  <div className="text-right">Técnicos</div>
                   <div className="text-right">Horas</div>
                   <div className="text-right">Ultima fecha</div>
                   <div className="text-right">Cierre</div>
@@ -2382,7 +2382,7 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Users} title="Productividad tecnica" subtitle="" />
+              <PanelTitle icon={Users} title="Productividad técnica" subtitle="" />
               <CargaTecnicaMatriz data={productividadMatriz} />
             </Card>
             <Card className="flex h-full flex-col p-3">
@@ -2404,6 +2404,11 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
+
+
 
 
 
