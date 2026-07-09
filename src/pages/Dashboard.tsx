@@ -2096,7 +2096,8 @@ export default function Dashboard() {
               </div>
               <CargaEquipoChart data={productividadMatriz} />
             </Card>
-          </section>
+          </section>
+
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-3">
@@ -2178,14 +2179,6 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="trabajos" className="space-y-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <TrabajoChip label="Activos" value={trabajosActivos.length} onClick={() => setFEstadosTrabajo([])} />
-            <TrabajoChip label="Cerrados" value={trabajosConCierre} tone="good" onClick={() => setFEstadosTrabajo(["completado"])} />
-            <TrabajoChip label="Pausados" value={trabajosPausados.length} tone={trabajosPausados.length ? "warn" : "neutral"} onClick={() => setFEstadosTrabajo(["pausado"])} />
-            <TrabajoChip label="Jornadas" value={jornadasOperativasPeriodo.length} onClick={() => setFEstadosTrabajo([])} />
-            <TrabajoChip label="Técnicos" value={`${tecnicosConActividadPeriodo.size}/${tecnicosTotales || "-"}`} onClick={() => setFEstadosTrabajo([])} />
-            <span className="ml-1 text-[11px] text-muted-foreground">{trabajosResumen.length} en lista</span>
-          </div>
 
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
