@@ -4,6 +4,7 @@ export type Tone = "neutral" | "good" | "warn" | "bad";
 export type PeriodMode = "dia" | "semana" | "mes" | "anio";
 export type FactMetric = "usd" | "horasServicio" | "kmFacturados";
 export type OSMetric = "usd" | "horas" | "km";
+export type OSSucursalMetric = "interno" | "garantia" | "total";
 export type OSRubro = "Servicio" | "Repuestos" | "Kilometraje";
 export type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
 
@@ -17,6 +18,9 @@ export interface Facturacion {
   cantidad: number;
   grupo: string | null;
   grupo_fx: string | null;
+  codigo_fabricante?: string | null;
+  cod_mercaderia?: string | null;
+  mercaderia?: string | null;
   cod_factura: string;
   tipo_tiempo: "Cliente" | "Garantia" | "Interno";
   origen_sistema?: string | null;

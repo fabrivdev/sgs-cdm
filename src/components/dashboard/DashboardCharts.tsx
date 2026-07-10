@@ -1031,23 +1031,10 @@ export function CargaSucursalTabla({
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
   }
 
-  const totalGeneral = rows.reduce((acc, row) => acc + row.total, 0);
   const maxTotal = Math.max(1, ...rows.map((row) => row.total));
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Culminados</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> Abiertos</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Pausados</span>
-        </div>
-        <div className="rounded-xl border bg-primary/5 px-3 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total trabajos</div>
-          <div className="text-2xl font-bold tabular-nums text-primary">{totalGeneral}</div>
-        </div>
-      </div>
-
       <div className="rounded-xl border overflow-hidden">
         <div className="grid grid-cols-[220px_minmax(0,1fr)_82px_56px] bg-muted/35 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           <div>Sucursal</div>
