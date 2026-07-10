@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { format, getDay, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Marca, Sucursal } from "@/lib/constants";
@@ -317,7 +318,7 @@ function OSSucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l border-red-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`vs. ${comparisonLabel ?? "aÃ±o anterior"}: ${money(row.previousTotal)}`}
+                  title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal)}`}
                 />
               )}
             </div>
@@ -572,7 +573,7 @@ export function WeeklyBars({
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
         {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
         <span className="ml-3 h-0 w-8 max-w-[42px] border-t-2 border-red-500" />
-        {hasAnyComparisonData ? "AÃ±o anterior equivalente" : "AÃ±o anterior: sin datos disponibles"}
+        {hasAnyComparisonData ? "Año anterior equivalente" : "Año anterior: sin datos disponibles"}
       </div>
     </div>
   );
@@ -614,7 +615,7 @@ export function SucursalBars({
                 <span
                   className="absolute top-1/2 h-4 w-0 -translate-y-1/2 border-l border-red-500"
                   style={{ left: `${previousWidth}%` }}
-                  title={`vs. ${comparisonLabel ?? "aÃ±o anterior"}: ${money(row.previousTotal ?? 0)}`}
+                  title={`vs. ${comparisonLabel ?? "año anterior"}: ${money(row.previousTotal ?? 0)}`}
                 />
               )}
             </div>
@@ -624,7 +625,7 @@ export function SucursalBars({
       {rows.some((row) => (row.previousTotal ?? 0) > 0) && (
         <div className="flex items-center justify-end gap-1.5 px-2 text-[10px] text-muted-foreground">
           <span className="h-3 border-l border-red-500" />
-          vs. {comparisonLabel ?? "aÃ±o anterior"}
+          vs. {comparisonLabel ?? "año anterior"}
         </div>
       )}
     </div>
@@ -742,7 +743,7 @@ export function TrabajoSucursalBars({
 
 export function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }> }) {
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin actividad tecnica en el periodo seleccionado.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin actividad tecnica en el periodo selecciónado.</div>;
   }
 
   return (
@@ -842,7 +843,7 @@ export function EstadoCompacto({
   flujo,
   onSelect,
   planificados,
-  tecnicosAsignados,
+  técnicosAsignados,
   jornadasPlanificadas,
   planificacionRango,
   jornadasPrev,
@@ -853,7 +854,7 @@ export function EstadoCompacto({
   flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
   onSelect: (estado: string) => void;
   planificados?: number;
-  tecnicosAsignados?: number;
+  técnicosAsignados?: number;
   jornadasPlanificadas?: number;
   planificacionRango?: string;
   jornadasPrev?: number;
@@ -864,7 +865,7 @@ export function EstadoCompacto({
   if (flujo.total === 0) {
     return (
       <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">
-        Sin trabajos en el periodo seleccionado.
+        Sin trabajos en el periodo selecciónado.
       </div>
     );
   }
@@ -969,7 +970,7 @@ export function EstadoCompacto({
             title="CIERRE ANTERIOR"
             subtitle={jornadasPrev ? cierreAnteriorRango : undefined}
             value={jornadasPrev ? `${jornadasPrev} jornadas · ${(horasPrev ?? 0).toFixed(0)} hs` : "Sin cierre anterior disponible"}
-            detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} tÃ©cnicos activos` : ""}
+            detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} técnicos activos` : ""}
           />
         </div>
       </div>
@@ -1020,7 +1021,8 @@ function EstadoMiniCard({
 }
 
 export function CargaSucursalTabla({
-  rows, onSelect,
+  rows,
+  onSelect,
 }: {
   rows: Array<{ sucursal: Sucursal; cerrados: number; abiertos: number; pausados: number; total: number; pct: number }>;
   onSelect: (sucursal: Sucursal) => void;
@@ -1028,61 +1030,76 @@ export function CargaSucursalTabla({
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
   }
+
+  const totalGeneral = rows.reduce((acc, row) => acc + row.total, 0);
+  const maxTotal = Math.max(1, ...rows.map((row) => row.total));
+
   return (
-    <>
-    <div className="grid grid-cols-2 gap-2 md:hidden">
-      {rows.slice(0, 5).map((r) => (
-        <button
-          key={r.sucursal}
-          type="button"
-          onClick={() => onSelect(r.sucursal)}
-          className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="truncate text-xs font-semibold">{r.sucursal}</div>
-            <div className="shrink-0 text-sm font-bold tabular-nums">{r.total}</div>
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-            <span>Cerr. {r.cerrados}</span>
-            <span>Ab. {r.abiertos}</span>
-            <span>Paus. {r.pausados}</span>
-          </div>
-          <div className="mt-1.5 h-1.5 rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, r.pct)}%` }} />
-          </div>
-        </button>
-      ))}
-      {rows.length > 5 && (
-        <div className="col-span-2 rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">
-          Mostrando 5 de {rows.length} sucursales
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> Culminados</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> Abiertos</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Pausados</span>
         </div>
-      )}
-    </div>
-    <div className="hidden rounded-md border md:block">
-      <div className="grid grid-cols-[1fr_70px_70px_70px_60px_56px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-        <div>Sucursal</div>
-        <div className="text-right">Cerrados</div>
-        <div className="text-right">Abiertos</div>
-        <div className="text-right">Pausados</div>
-        <div className="text-right">Total</div>
-        <div className="text-right">%</div>
+        <div className="rounded-xl border bg-primary/5 px-3 py-2 text-right">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total trabajos</div>
+          <div className="text-2xl font-bold tabular-nums text-primary">{totalGeneral}</div>
+        </div>
       </div>
-      {rows.map((r) => (
-        <button
-          key={r.sucursal}
-          onClick={() => onSelect(r.sucursal)}
-          className="grid w-full grid-cols-[1fr_70px_70px_70px_60px_56px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
-        >
-          <div className="truncate font-medium">{r.sucursal}</div>
-          <div className="text-right tabular-nums">{r.cerrados}</div>
-          <div className="text-right tabular-nums">{r.abiertos}</div>
-          <div className="text-right tabular-nums">{r.pausados}</div>
-          <div className="text-right font-semibold tabular-nums">{r.total}</div>
-          <div className="text-right tabular-nums text-muted-foreground">{r.pct}%</div>
-        </button>
-      ))}
+
+      <div className="rounded-xl border overflow-hidden">
+        <div className="grid grid-cols-[220px_minmax(0,1fr)_82px_56px] bg-muted/35 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div>Sucursal</div>
+          <div>Estado</div>
+          <div className="text-right">Total</div>
+          <div className="text-right">%</div>
+        </div>
+        <div className="divide-y">
+          {rows.map((row) => {
+            const widthPct = Math.max(8, Math.round((row.total / maxTotal) * 100));
+            const cerradosPct = row.total > 0 ? (row.cerrados / row.total) * 100 : 0;
+            const abiertosPct = row.total > 0 ? (row.abiertos / row.total) * 100 : 0;
+            const pausadosPct = row.total > 0 ? (row.pausados / row.total) * 100 : 0;
+
+            return (
+              <button
+                key={row.sucursal}
+                type="button"
+                onClick={() => onSelect(row.sucursal)}
+                className="grid w-full grid-cols-[220px_minmax(0,1fr)_82px_56px] items-center gap-4 px-4 py-4 text-left hover:bg-accent/35"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{row.sucursal}</div>
+                </div>
+
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-4 text-[12px] text-foreground/85">
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> {row.cerrados}</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> {row.abiertos}</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> {row.pausados}</span>
+                  </div>
+                  <div className="h-3 rounded-full bg-muted">
+                    <div className="flex h-full overflow-hidden rounded-full" style={{ width: `${widthPct}%` }}>
+                      <div className="h-full bg-emerald-600" style={{ width: `${cerradosPct}%` }} />
+                      <div className="h-full bg-sky-500" style={{ width: `${abiertosPct}%` }} />
+                      <div className="h-full bg-amber-500" style={{ width: `${pausadosPct}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="inline-flex min-w-[54px] justify-center rounded-xl bg-primary/5 px-2 py-1 text-lg font-bold tabular-nums text-primary">
+                    {row.total}
+                  </span>
+                </div>
+                <div className="text-right text-lg font-semibold tabular-nums text-primary">{row.pct}%</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
-    </>
   );
 }
 
@@ -1171,6 +1188,377 @@ export function DistribucionMarca({
   );
 }
 
+
+
+type MatrizCellRef = { ref: string; cliente: string; estado: string; motivo?: string | null };
+type MatrixBucketCell = {
+  jornadas: number;
+  horas: number;
+  realizadas: number;
+  noRealizadas: number;
+  programadas: number;
+  noDisponibilidad: string[];
+  refs: MatrizCellRef[];
+};
+type MatrizTecnicoRow = {
+  id: string;
+  nombre: string;
+  sucursal: string;
+  sinAsignacion: boolean;
+  tieneNoDisponibilidad: boolean;
+  cells: Record<string, MatrixBucketCell>;
+};
+type MatrizSucursalBlock = {
+  sucursal: string;
+  totalActividad: number;
+  totalTécnicos: number;
+  técnicos: MatrizTecnicoRow[];
+};
+
+function matrixBucketIsSunday(key: string, mode: PeriodMode) {
+  return mode === "dia" && getDay(parseISO(key)) === 0;
+}
+
+function MatrizCellVisual({
+  cell,
+  isCurrent,
+  isSunday,
+  metric,
+}: {
+  cell?: MatrixBucketCell;
+  isCurrent: boolean;
+  isSunday: boolean;
+  metric: "trabajos" | "horas";
+}) {
+  const totalJornadas = (cell?.realizadas ?? 0) + (cell?.noRealizadas ?? 0) + (cell?.programadas ?? 0);
+  const hasNoDisponibilidad = (cell?.noDisponibilidad?.length ?? 0) > 0;
+  const labelValue = metric === "horas"
+    ? ((cell?.horas ?? 0) > 0 ? `${Number(cell?.horas ?? 0).toFixed(1)}` : "")
+    : (totalJornadas > 1 ? String(totalJornadas) : "");
+
+  if (!cell || (totalJornadas === 0 && !hasNoDisponibilidad)) {
+    return <div className={cn("h-9 rounded-md border border-transparent", isSunday && "bg-muted/45", isCurrent && "ring-1 ring-primary/10")} />;
+  }
+
+  const hasRealizadas = (cell.realizadas ?? 0) > 0;
+  const hasNoRealizadas = (cell.noRealizadas ?? 0) > 0;
+  const hasProgramadas = (cell.programadas ?? 0) > 0;
+
+  if (hasRealizadas && hasNoRealizadas) {
+    return (
+      <div className={cn("relative flex h-9 items-center justify-center overflow-hidden rounded-md border border-border/60 text-[11px] font-semibold tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-muted/40")}>
+        <div className="absolute inset-y-0 left-0 w-1/2 bg-emerald-500/18" />
+        <div className="absolute inset-y-0 right-0 w-1/2 bg-amber-400/25" />
+        {hasNoDisponibilidad ? <div className="absolute inset-x-1 bottom-1 h-1 rounded-full bg-violet-400/75" /> : null}
+        <span className="relative z-10 text-foreground">{labelValue || "●"}</span>
+      </div>
+    );
+  }
+
+  if (hasRealizadas) {
+    return (
+      <div className={cn("flex h-9 items-center justify-center gap-1 rounded-md border border-emerald-200 bg-emerald-500/12 px-1 text-[11px] font-semibold text-emerald-700 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-emerald-500/8")}>
+        <span className="text-[10px] leading-none">●</span>
+        {labelValue ? <span>{labelValue}</span> : null}
+      </div>
+    );
+  }
+
+  if (hasNoRealizadas) {
+    return (
+      <div className={cn("flex h-9 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-400/12 px-1 text-[11px] font-semibold text-amber-700 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-amber-400/10")}>
+        <span className="text-[10px] leading-none">▲</span>
+        {labelValue ? <span>{labelValue}</span> : null}
+      </div>
+    );
+  }
+
+  if (hasProgramadas) {
+    return (
+      <div className={cn("flex h-9 items-center justify-center gap-1 rounded-md border border-sky-300 bg-sky-500/5 px-1 text-[11px] font-semibold text-sky-700 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-sky-500/5")}>
+        <span className="text-[10px] leading-none">○</span>
+        {labelValue ? <span>{labelValue}</span> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex h-9 items-center justify-center rounded-md border border-violet-200 bg-violet-500/10 px-1 text-[10px] font-semibold text-violet-700", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-violet-500/8")}>
+      ND
+    </div>
+  );
+}
+
+export function MatrizTécnicosDías({
+  data,
+  currentBucketKey,
+  onSelectTecnico,
+  onSelectSucursal,
+  metric,
+  onMetricChange,
+}: {
+  data: {
+    buckets: string[];
+    blocks: MatrizSucursalBlock[];
+    bucketLabels: Record<string, string>;
+    bucketMode: PeriodMode;
+    overLimit: boolean;
+  };
+  currentBucketKey?: string | null;
+  onSelectTecnico: (tecnicoId: string) => void;
+  onSelectSucursal: (sucursal: string) => void;
+  metric: "trabajos" | "horas";
+  onMetricChange: (metric: "trabajos" | "horas") => void;
+}) {
+  const { buckets, blocks, bucketLabels, bucketMode, overLimit } = data;
+  const [leftWidth, setLeftWidth] = useState(320);
+
+  if (overLimit) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Disponible para rangos de hasta 31 columnas visibles.</div>;
+  }
+
+  if (blocks.length === 0 || buckets.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin actividad técnica para los filtros actuales.</div>;
+  }
+
+  const dayWidth = buckets.length <= 7 ? 1 : buckets.length <= 14 ? 76 : 58;
+  const gridTemplateColumns = buckets.length <= 7
+    ? `${leftWidth}px repeat(${buckets.length}, minmax(120px, 1fr))`
+    : `${leftWidth}px repeat(${buckets.length}, ${dayWidth}px)`;
+
+  const startResize = (event: any) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const initialWidth = leftWidth;
+
+    const onMove = (moveEvent: any) => {
+      const next = Math.max(260, Math.min(520, initialWidth + (moveEvent.clientX - startX)));
+      setLeftWidth(next);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <TooltipProvider delayDuration={120}>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1"><span className="text-emerald-600">●</span> Realizadas</span>
+            <span className="inline-flex items-center gap-1"><span className="text-amber-600">▲</span> Vencidas</span>
+            <span className="inline-flex items-center gap-1"><span className="text-sky-700">○</span> Programadas</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> No disponible</span>
+          </div>
+
+          <div className="inline-flex overflow-hidden rounded-md border text-[11px]">
+            <button type="button" onClick={() => onMetricChange("trabajos")} className={cn("px-2.5 py-1", metric === "trabajos" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Trabajos</button>
+            <button type="button" onClick={() => onMetricChange("horas")} className={cn("border-l px-2.5 py-1", metric === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Horas</button>
+          </div>
+        </div>
+
+        <div className="space-y-3 overflow-x-auto pb-1">
+          {blocks.map((block) => (
+            <div key={block.sucursal} className="rounded-lg border bg-background">
+              <div className="grid min-w-max border-b bg-muted/25" style={{ gridTemplateColumns }}>
+                <div className="sticky left-0 z-20 border-r bg-muted/25">
+                  <button
+                    type="button"
+                    onClick={() => onSelectSucursal(block.sucursal)}
+                    className="flex h-11 w-full flex-col items-start justify-center px-3 text-left hover:bg-accent/60"
+                  >
+                    <span className="text-sm font-semibold">{block.sucursal}</span>
+                    <span className="text-[11px] text-muted-foreground">{block.totalTécnicos} técnicos · {block.totalActividad} {metric === "horas" ? "hs" : "registros"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Ajustar ancho de nombres"
+                    onPointerDown={startResize}
+                    className="absolute inset-y-0 right-0 w-2 cursor-col-resize bg-transparent hover:bg-primary/10"
+                  />
+                </div>
+                {buckets.map((bucket) => {
+                  const isCurrent = currentBucketKey === bucket;
+                  const isSunday = matrixBucketIsSunday(bucket, bucketMode);
+                  return (
+                    <div
+                      key={`${block.sucursal}-${bucket}`}
+                      className={cn(
+                        "flex h-11 items-center justify-center border-l px-1 text-center text-[11px] font-medium text-muted-foreground",
+                        isCurrent && "bg-primary/5 text-foreground",
+                        isSunday && "bg-muted/50"
+                      )}
+                    >
+                      {bucketLabels[bucket] ?? bucket}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {block.técnicos.map((row) => (
+                <div key={`${block.sucursal}-${row.id}`} className="grid min-w-max" style={{ gridTemplateColumns }}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectTecnico(row.id)}
+                    className={cn(
+                      "sticky left-0 z-10 flex h-12 flex-col items-start justify-center border-r border-t px-3 text-left hover:bg-accent/60",
+                      row.sinAsignacion ? "bg-red-50" : "bg-background"
+                    )}
+                  >
+                    <span className="truncate text-sm font-medium">{row.nombre}</span>
+                    <span className="truncate text-[11px] text-muted-foreground">
+                      {row.sinAsignacion ? "Sin asignación" : row.tieneNoDisponibilidad ? "Con no disponibilidad" : row.sucursal}
+                    </span>
+                  </button>
+
+                  {buckets.map((bucket) => {
+                    const cell = row.cells[bucket];
+                    const isCurrent = currentBucketKey === bucket;
+                    const isSunday = matrixBucketIsSunday(bucket, bucketMode);
+                    const title = cell?.refs?.length
+                      ? cell.refs.map((item) => `${item.ref} · ${item.cliente} · ${item.estado}${item.motivo ? ` · ${item.motivo}` : ""}`).join("\n")
+                      : cell?.noDisponibilidad?.length
+                        ? cell.noDisponibilidad.join("\n")
+                        : "Sin actividad";
+
+                    return (
+                      <div key={`${block.sucursal}-${row.id}-${bucket}`} className={cn("border-l border-t p-1", isCurrent && "bg-primary/5", isSunday && "bg-muted/35")}>
+                        {(cell?.refs?.length || cell?.noDisponibilidad?.length) ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="block w-full text-left" title={title}>
+                                <MatrizCellVisual cell={cell} isCurrent={isCurrent} isSunday={isSunday} metric={metric} />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[280px] p-2">
+                              <div className="space-y-1">
+                                <div className="text-[11px] font-semibold">{row.nombre} · {bucketLabels[bucket] ?? bucket}</div>
+                                {cell?.refs?.map((item, index) => (
+                                  <div key={`${item.ref}-${item.estado}-${index}`} className="text-[11px] leading-tight">
+                                    <div className="font-medium">{item.ref} · {item.cliente}</div>
+                                    <div className="text-muted-foreground">{item.estado}{item.motivo ? ` · ${item.motivo}` : ""}</div>
+                                  </div>
+                                ))}
+                                {cell?.noDisponibilidad?.map((item, index) => (
+                                  <div key={`${item}-${index}`} className="text-[11px] leading-tight text-violet-700">
+                                    {item}
+                                  </div>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <MatrizCellVisual cell={cell} isCurrent={isCurrent} isSunday={isSunday} metric={metric} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+export function TrabajosAbiertosList({
+  rows,
+  onSelect,
+}: {
+  rows: Array<{
+    id: string;
+    ref: string;
+    cliente: string;
+    sucursal: string;
+    estado: string;
+    ultimaFecha: string;
+    díasSinCierre: number;
+    pendientes: number;
+    programados: number;
+    iniciados: number;
+  }>;
+  onSelect: (row: { id: string; ref: string }) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (rows.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos abiertos para los filtros actuales.</div>;
+  }
+
+  const visibleRows = expanded ? rows : rows.slice(0, 5);
+
+  return (
+    <div className="space-y-2">
+      <div className="space-y-2 md:hidden">
+        {visibleRows.map((row) => (
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => onSelect(row)}
+            className="w-full rounded-md border bg-background px-3 py-2.5 text-left shadow-sm hover:bg-accent/40"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-mono text-[11px] font-semibold text-muted-foreground">{row.ref}</div>
+                <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                <div className="text-[11px] text-muted-foreground">{row.sucursal}</div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="text-sm font-bold tabular-nums">{row.díasSinCierre} d</div>
+                <div className="text-[11px] text-muted-foreground">{row.estado}</div>
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-muted-foreground">Última fecha {row.ultimaFecha}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="hidden rounded-md border md:block">
+        <div className="grid grid-cols-[90px_1.2fr_120px_100px_94px_90px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+          <div>OS/TR</div>
+          <div>Cliente</div>
+          <div>Sucursal</div>
+          <div className="text-right">Estado</div>
+          <div className="text-right">Últ. fecha</div>
+          <div className="text-right">Sin cierre</div>
+        </div>
+        {visibleRows.map((row) => (
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => onSelect(row)}
+            className="grid w-full grid-cols-[90px_1.2fr_120px_100px_94px_90px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent/40"
+          >
+            <div className="font-mono font-semibold text-muted-foreground">{row.ref}</div>
+            <div className="truncate font-medium">{row.cliente}</div>
+            <div className="truncate">{row.sucursal}</div>
+            <div className="text-right">{row.estado}</div>
+            <div className="text-right tabular-nums">{row.ultimaFecha}</div>
+            <div className="text-right font-semibold tabular-nums">{row.díasSinCierre} d</div>
+          </button>
+        ))}
+      </div>
+
+      {rows.length > 5 ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+        >
+          {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function CargaEquipoChart({
   data,
 }: {
@@ -1178,12 +1566,12 @@ export function CargaEquipoChart({
     buckets: string[];
     allRows: Array<{ porBucket: Record<string, { jornadas: number; horas: number }> }>;
     trabajosPorBucket: Record<string, number>;
-    tecnicosNoDisponiblesPorBucket?: Record<string, number>;
+    técnicosNoDisponiblesPorBucket?: Record<string, number>;
     bucketLabel: (k: string) => string;
     bucketMode: PeriodMode;
   };
 }) {
-  const { buckets, allRows, trabajosPorBucket, tecnicosNoDisponiblesPorBucket = {}, bucketLabel, bucketMode } = data;
+  const { buckets, allRows, trabajosPorBucket, técnicosNoDisponiblesPorBucket = {}, bucketLabel, bucketMode } = data;
   const n = buckets.length;
 
   const isSunday = (k: string) => bucketMode === "dia" && getDay(parseISO(k)) === 0;
@@ -1192,7 +1580,7 @@ export function CargaEquipoChart({
   const techs = buckets.map((k) =>
     allRows.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length
   );
-  const noDisponibles = buckets.map((k) => tecnicosNoDisponiblesPorBucket[k] ?? 0);
+  const noDisponibles = buckets.map((k) => técnicosNoDisponiblesPorBucket[k] ?? 0);
 
   // Stepped scale: round up to next multiple of 5 (min 5)
   const rawMax = Math.max(0, ...trabajos, ...techs, ...noDisponibles);
@@ -1226,7 +1614,7 @@ export function CargaEquipoChart({
 
   return (
     <div className="flex flex-1 min-h-0 flex-col gap-2">
-      {/* Chart: Y axis + bars â€” flex-1 fills remaining card height */}
+      {/* Chart: Y axis + bars — flex-1 fills remaining card height */}
       <div className="flex flex-1 min-h-0 gap-1">
         {/* Y axis */}
         <div className="relative w-5 shrink-0">
@@ -1239,7 +1627,7 @@ export function CargaEquipoChart({
           ))}
         </div>
 
-        {/* Bar area â€” ref'd for height measurement */}
+        {/* Bar area — ref'd for height measurement */}
         <div ref={barAreaRef} className="relative flex-1 border-b border-l">
           {/* Gridlines */}
           {yTicks.filter((t) => t > 0 && t < maxAll).map((tick) => (
@@ -1274,7 +1662,7 @@ export function CargaEquipoChart({
                       className={cn("w-3 rounded-t-sm sm:w-4", sun ? "bg-muted/40" : "bg-primary/75")}
                     />
                   </div>
-                  {/* TÃ©cnicos bar */}
+                  {/* Técnicos bar */}
                   <div className="flex flex-col items-center">
                     {techs[i] > 0 && (
                       <span className={cn(
@@ -1306,7 +1694,7 @@ export function CargaEquipoChart({
         </div>
       </div>
 
-      {/* Day labels â€” spacer matches Y axis width + gap */}
+      {/* Day labels — spacer matches Y axis width + gap */}
       <div className="flex gap-1">
         <div className="w-5 shrink-0" />
         <div className="grid flex-1 px-0.5" style={{ gridTemplateColumns: gridCols }}>
@@ -1332,7 +1720,7 @@ export function CargaEquipoChart({
         </div>
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400/90" />
-          TÃ©cnicos activos
+          Técnicos activos
         </div>
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-400/90" />
@@ -1396,7 +1784,7 @@ export function CargaTecnicaMatriz({
       </div>
 
       {rows.length === 0 || buckets.length === 0 ? (
-        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>
+        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros selecciónados.</div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 md:hidden">
@@ -1477,7 +1865,7 @@ export function CargaTecnicaMatriz({
             </button>
           )}
           <div className="text-[10px] text-muted-foreground">
-            Agrupado por {bucketMode === "mes" ? "mes" : bucketMode === "dia" ? "dÃ­a" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
+            Agrupado por {bucketMode === "mes" ? "mes" : bucketMode === "dia" ? "dia" : "semana ISO"} · servicios = jornadas asignadas (pendientes + completadas); horas = solo completadas
           </div>
         </>
       )}
@@ -1628,10 +2016,10 @@ export function FacturacionExplorer({
     const raw = row.raw_data ?? {};
     return (
       cleanValue(raw["Codigo Fabricante"]) ??
-      cleanValue(raw["CÃ³digo Fabricante"]) ??
+      cleanValue(raw["CÃƒ³digo Fabricante"]) ??
       cleanValue(raw["Cod. Fabricante"]) ??
       cleanValue(raw["Codigo Mercaderia"]) ??
-      cleanValue(raw["CÃ³digo MercaderÃ­a"]) ??
+      cleanValue(raw["CÃƒ³digo MercaderÃƒ­a"]) ??
       cleanValue(raw["Cod. Mercaderia"]) ??
       cleanValue(raw["Cod Mercaderia"])
     );
@@ -1643,11 +2031,11 @@ export function FacturacionExplorer({
     const raw = row.raw_data ?? {};
     return (
       cleanValue(raw["Mercaderia"]) ??
-      cleanValue(raw["MercaderÃ­a"]) ??
+      cleanValue(raw["MercaderÃƒ­a"]) ??
       cleanValue(raw["Nombre Impresion"]) ??
-      cleanValue(raw["Nombre ImpresiÃ³n"]) ??
+      cleanValue(raw["Nombre ImpresiÃƒ³n"]) ??
       cleanValue(raw["Descripcion"]) ??
-      cleanValue(raw["DescripciÃ³n"])
+      cleanValue(raw["DescripciÃƒ³n"])
     );
   };
 
@@ -1854,7 +2242,7 @@ export function FacturacionExplorer({
     <div className="space-y-3">
       <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold">Mesa flexible de facturacion</h3>
+          <h3 className="text-sm font-semibold">Mesa flexible de facturación</h3>
           <p className="text-xs text-muted-foreground">
             {selectedLabel} · explora por cliente, sucursal, tipo de tiempo, factura o repuesto.
           </p>
@@ -1898,7 +2286,7 @@ export function FacturacionExplorer({
         <>
           <div className="space-y-2 md:hidden">
             {invoiceRows.length === 0 ? (
-              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin facturas en el periodo seleccionado.</div>
+              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin facturas en el periodo selecciónado.</div>
             ) : (
               invoiceRows.slice(0, 30).map((row) => (
                 <div key={row.key} className="rounded-md border bg-background shadow-sm">
@@ -1956,7 +2344,7 @@ export function FacturacionExplorer({
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {invoiceRows.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturas en el periodo seleccionado.</div>
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturas en el periodo selecciónado.</div>
               ) : (
                 invoiceRows.map((row) => (
                   <div key={row.key} className="border-t">
@@ -2230,6 +2618,8 @@ export function TrabajoChip({
     </button>
   );
 }
+
+
 
 
 

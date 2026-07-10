@@ -58,7 +58,7 @@ import { TrabajoEstadoBadge } from "@/components/StatusBadges";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, OSSucursalMetric, PeriodMode } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaTecnicaMatriz, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer } from "@/components/dashboard/DashboardCharts";
+import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList } from "@/components/dashboard/DashboardCharts";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -257,7 +257,7 @@ function normalizeOSLookup(value: string | null | undefined) {
 
 function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | null {
   const tipoTiempo = normalizeOSLookup(row.tipo_tiempo);
-  if (tipoTiempo.includes("GARANT")) return "Garantía";
+  if (tipoTiempo.includes("GARANT")) return "Garantia";
   if (
     tipoTiempo.includes("INTERNO") ||
     tipoTiempo.includes("ABSOR") ||
@@ -295,12 +295,12 @@ export default function Dashboard() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [facturacion, setFacturacion] = useState<Facturacion[]>([]);
+  const [facturación, setFacturacion] = useState<Facturacion[]>([]);
   const [ordenesServicio, setOrdenesServicio] = useState<OrdenServicioImportada[]>([]);
   const [disponibilidades, setDisponibilidades] = useState<DisponibilidadTecnico[]>([]);
   const [baseLoading, setBaseLoading] = useState(true);
   const [jornadasLoading, setJornadasLoading] = useState(true);
-  const [facturacionLoading, setFacturacionLoading] = useState(true);
+  const [facturaciónLoading, setFacturacionLoading] = useState(true);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
 
   const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
@@ -312,7 +312,7 @@ export default function Dashboard() {
   const [fMarcas, setFMarcas] = useState<string[]>([]);
   const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
-  const [fTecnicos, setFTecnicos] = useState<string[]>([]);
+  const [fTécnicos, setFTécnicos] = useState<string[]>([]);
   const [periodMode, setPeriodMode] = useState<PeriodMode>(initialFilters.periodMode);
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
@@ -323,7 +323,8 @@ export default function Dashboard() {
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
-  const loading = baseLoading || jornadasLoading || facturacionLoading;
+  const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
+  const loading = baseLoading || jornadasLoading || facturaciónLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const filtrosOSActivos = section === "os";
   const goSection = (value: string) =>
@@ -652,7 +653,7 @@ export default function Dashboard() {
   const query = q.trim().toLowerCase();
   const factFiltered = useMemo(
     () =>
-      facturacion.filter((row) => {
+      facturación.filter((row) => {
         if (fSucursales.length > 0 && (!row.sucursal || !fSucursales.includes(row.sucursal))) return false;
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (fMarcas.length > 0 && !fMarcas.includes(clasificarMarcaFacturacion(row.grupo))) return false;
@@ -666,10 +667,10 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturacion, query],
+    [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturación, query],
   );
 
-  // Todos los registros del rango completo seleccionado por el usuario
+  // Todos los registros del rango completo selecciónado por el usuario
   const allPeriodFacts = useMemo(
     () => factFiltered.filter((row) => inRange(row.fecha, periodStart, periodEnd)),
     [factFiltered, periodStart, periodEnd],
@@ -724,7 +725,7 @@ export default function Dashboard() {
           sucursal,
           marca,
           tipo,
-          situacionFacturación: row.situacion_facturacion ?? "",
+          situacionFacturacion: row.situacion_facturacion ?? "",
           problema: row.problema ?? trabajo?.descripcion_problema ?? "",
           factura: row.factura ?? "",
           horas: Number(row.servicios_cantidad || 0),
@@ -805,7 +806,7 @@ export default function Dashboard() {
       }
     }
 
-    // Comparacion: mismo offset en el periodo inmediatamente anterior (criterio unificado con Fila 1)
+    // Comparacion: mismo offset en el periodo inmedíatamente anterior (criterio unificado con Fila 1)
     const comparisonLabelFor = (start: Date, end: Date) => {
       if (periodMode === "mes") return format(subYears(start, 1), "MM/yyyy");
       if (periodMode === "dia") return format(subYears(start, 1), "dd/MM/yy");
@@ -1013,7 +1014,7 @@ export default function Dashboard() {
     [clienteById, fSucursales, jornadas, query, servicioById, periodEnd, periodStart],
   );
 
-  const jornadasProximoPeriodo = useMemo(
+  const jornadasPróximoPeriodo = useMemo(
     () =>
       jornadas.filter((jornada) => {
         const servicio = servicioById.get(jornada.servicio_id);
@@ -1026,12 +1027,12 @@ export default function Dashboard() {
   );
 
   const periodoSeleccionadoEnCurso = todayStr >= dateKey(periodStart) && todayStr <= dateKey(periodEnd);
-  const jornadasPlanificacion = periodoSeleccionadoEnCurso ? jornadasProgramadas : jornadasProximoPeriodo;
+  const jornadasPlanificacion = periodoSeleccionadoEnCurso ? jornadasProgramadas : jornadasPróximoPeriodo;
   const planificacionRango = periodoSeleccionadoEnCurso
     ? `${format(periodStart, "dd/MM")} - ${format(periodEnd, "dd/MM")}`
     : `${format(nextPeriodStart, "dd/MM")} - ${format(nextPeriodEnd, "dd/MM")}`;
 
-  const trabajosPlanificadosProximoPeriodo = useMemo(() => {
+  const trabajosPlanificadosPróximoPeriodo = useMemo(() => {
     const servicioATrabajo = new Map<string, string>();
     for (const trabajo of trabajos) {
       if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
@@ -1084,8 +1085,8 @@ export default function Dashboard() {
 
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
-  const tecnicosProximoPeriodo = new Set(jornadasPlanificacion.flatMap((j) => validJornadaCrew(j))).size;
-  const tecnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
+  const técnicosPróximoPeriodo = new Set(jornadasPlanificacion.flatMap((j) => validJornadaCrew(j))).size;
+  const técnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
   const jornadasOperativasPeriodo = useMemo(
     () =>
       jornadas.filter((jornada) => {
@@ -1098,12 +1099,12 @@ export default function Dashboard() {
       }),
     [clienteById, fSucursales, jornadas, periodEnd, periodStart, query, servicioById],
   );
-  const tecnicosConActividadPeriodo = useMemo(
+  const técnicosConActividadPeriodo = useMemo(
     () => new Set(jornadasOperativasPeriodo.flatMap((j) => validJornadaCrew(j))),
     [activeTechnicianIds, jornadasOperativasPeriodo, servicioById],
   );
-  const tecnicosActivosPct = activeTechnicianIds.size > 0
-    ? Math.round((tecnicosConActividadPeriodo.size / activeTechnicianIds.size) * 100)
+  const técnicosActivosPct = activeTechnicianIds.size > 0
+    ? Math.round((técnicosConActividadPeriodo.size / activeTechnicianIds.size) * 100)
     : 0;
   const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > DIAS_JORNADA_VENCIDA);
@@ -1175,21 +1176,21 @@ export default function Dashboard() {
     return count;
   })();
   const tipoFactBreakdown = (() => {
-    const groups = { Cliente: 0, Garantía: 0, Interno: 0 } as Record<"Cliente" | "Garantía" | "Interno", number>;
+    const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
     for (const row of allPeriodFacts) {
       const k = (row.tipo_tiempo ?? "Cliente") as keyof typeof groups;
       groups[k] = (groups[k] ?? 0) + Number(row.total_venta || 0);
     }
-    const totalTF = groups.Cliente + groups.Garantía + groups.Interno;
+    const totalTF = groups.Cliente + groups.Garantia + groups.Interno;
     const p = (n: number) => (totalTF > 0 ? Math.round((n / totalTF) * 100) : 0);
-    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantía: p(groups.Garantía), pctInterno: p(groups.Interno) };
+    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantia: p(groups.Garantia), pctInterno: p(groups.Interno) };
   })();
-  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantía && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
+  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
     ? { label: "Cliente", value: tipoFactBreakdown.pctCliente }
-    : tipoFactBreakdown.pctGarantía >= tipoFactBreakdown.pctInterno
-      ? { label: "Garantía", value: tipoFactBreakdown.pctGarantía }
+    : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
+      ? { label: "Garantia", value: tipoFactBreakdown.pctGarantia }
       : { label: "Interno", value: tipoFactBreakdown.pctInterno };
-  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturación)
+  // top5ClientesPct: no se usa en el JSX (topClientes es para el tab Facturacion)
   const top5ClientesPct = (() => {
     const t = topClientes.slice(0, MAX_TOP_RANKING).reduce((a, r) => a + r.total, 0);
     return totalPeriodo > 0 ? Math.round((t / totalPeriodo) * 100) : 0;
@@ -1202,7 +1203,7 @@ export default function Dashboard() {
   // Label del año anterior para SucursalBars
   const periodComparisonLabel = `${format(prevPeriodStartDate, "dd/MM/yy")} - ${format(prevPeriodEndDate, "dd/MM/yy")}`;
 
-  // Fila sintetica con la agregaciï¿½n del rango completo para MixRubros
+  // Fila sintetica con la agregaci-n del rango completo para MixRubros
   const periodRow = useMemo<WeekRow>(() => {
     const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
     let horasServicio = 0;
@@ -1238,18 +1239,18 @@ export default function Dashboard() {
 
   // Textos derivados del agrupador elegido.
   const periodoLabel =
-    periodMode === "dia" ? "diario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
+    periodMode === "dia" ? "díario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
-    const periodoNombre = periodMode === "dia" ? "dia" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "año";
+    const periodoNombre = periodMode === "dia" ? "dia" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "anio";
     return {
-      seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
-      facturacion: isSemana ? "Facturación de la semana" : "Facturación del periodo",
+      selecciónado: isSemana ? "semana selecciónada" : "periodo selecciónado",
+      facturación: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
       facturas: isSemana ? "Facturas de la semana" : "Facturas del periodo",
-      comparativoFacturación: `Facturación por ${periodoNombre}`,
-      seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composición.`,
-      periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
-      sinFacturación: `Sin facturación para este ${periodoNombre}.`,
+      comparativoFacturacion: `Facturacion por ${periodoNombre}`,
+      selecciónaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composición.`,
+      periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} selecciónado`,
+      sinFacturacion: `Sin facturación para este ${periodoNombre}.`,
       columnaPeriodo: periodMode === "dia" ? "Día" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
       carga: isSemana ? "Carga semanal" : "Carga técnica",
       lectura: isSemana ? "Lectura semanal" : "Lectura operativa",
@@ -1321,23 +1322,281 @@ export default function Dashboard() {
   const trabajosResumen = useMemo(() => {
     return trabajosBase.filter((row) => {
       if (fEstadosTrabajo.length > 0 && !fEstadosTrabajo.includes(row.estado)) return false;
-      if (fTecnicos.length > 0 && !row.tecnicoIds.some((id) => fTecnicos.includes(id))) return false;
+      if (fTécnicos.length > 0 && !row.tecnicoIds.some((id) => fTécnicos.includes(id))) return false;
       if (fMarcas.length > 0 && !fMarcas.includes(row.marca)) return false;
       return true;
     }).sort((a, b) => {
       const order: Record<string, number> = { pausado: 0, iniciado: 1, programado: 2, pendiente: 3, completado: 4 };
       return (order[a.estado] ?? 9) - (order[b.estado] ?? 9) || b.ultimaFecha.localeCompare(a.ultimaFecha);
     });
-  }, [trabajosBase, fEstadosTrabajo, fTecnicos, fMarcas]);
+  }, [trabajosBase, fEstadosTrabajo, fTécnicos, fMarcas]);
 
 
+
+  const matrizTécnicosDías = useMemo(() => {
+    const bucketMode: PeriodMode = periodMode;
+    const bucketKey = (iso: string) => {
+      if (bucketMode === "dia") return iso;
+      const d = parseISO(iso);
+      if (bucketMode === "mes") return format(d, "yyyy-MM");
+      if (bucketMode === "anio") return format(d, "yyyy");
+      return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, "0")}`;
+    };
+    const bucketLabel = (key: string) => {
+      if (bucketMode === "dia") {
+        const d = parseISO(key);
+        return `${["D", "L", "M", "X", "J", "V", "S"][getDay(d)]} ${format(d, "dd")}`;
+      }
+      if (bucketMode === "mes") {
+        const [y, m] = key.split("-");
+        return format(new Date(Number(y), Number(m) - 1, 1), "MMM yy");
+      }
+      if (bucketMode === "anio") return key;
+      const w = key.split("-W")[1];
+      return `Sem ${Number(w)}`;
+    };
+
+    const bucketsSet = new Set<string>();
+    if (bucketMode === "dia") {
+      let cursor = periodStart;
+      while (cursor <= periodEnd) {
+        bucketsSet.add(format(cursor, "yyyy-MM-dd"));
+        cursor = addDays(cursor, 1);
+      }
+    }
+
+    const visibleTrabajoIds = new Set(trabajosResumen.map((row) => row.id));
+    const trabajoById = new Map(trabajos.map((trabajo) => [trabajo.id, trabajo]));
+    const servicioATrabajo = new Map<string, string>();
+    for (const trabajo of trabajos) {
+      if (trabajo.legacy_servicio_id) servicioATrabajo.set(trabajo.legacy_servicio_id, trabajo.id);
+    }
+
+    const rowsBySucursal = new Map<string, Map<string, {
+      id: string;
+      nombre: string;
+      sucursal: string;
+      cells: Record<string, {
+        jornadas: number;
+        horas: number;
+        realizadas: number;
+        noRealizadas: number;
+        programadas: number;
+        noDisponibilidad: string[];
+        refs: Array<{ ref: string; cliente: string; estado: string; motivo?: string | null }>;
+      }>;
+      tieneActividad: boolean;
+      tieneNoDisponibilidad: boolean;
+    }>>();
+
+    const ensureTecnicoRow = (tecnicoId: string) => {
+      const profile = profileById.get(tecnicoId);
+      const sucursalTecnico = profile?.sucursal ?? "Sin sucursal";
+      if (!rowsBySucursal.has(sucursalTecnico)) rowsBySucursal.set(sucursalTecnico, new Map());
+      const block = rowsBySucursal.get(sucursalTecnico)!;
+      if (!block.has(tecnicoId)) {
+        block.set(tecnicoId, {
+          id: tecnicoId,
+          nombre: profile?.nombre ?? "Sin técnico",
+          sucursal: sucursalTecnico,
+          cells: {},
+          tieneActividad: false,
+          tieneNoDisponibilidad: false,
+        });
+      }
+      return block.get(tecnicoId)!;
+    };
+
+    for (const tecnicoId of activeTechnicianIds) ensureTecnicoRow(tecnicoId);
+
+    for (const jornada of jornadas) {
+      if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado") continue;
+      if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
+      const trabajoId = servicioATrabajo.get(jornada.servicio_id);
+      if (!trabajoId || !visibleTrabajoIds.has(trabajoId)) continue;
+
+      const key = bucketKey(jornada.fecha);
+      bucketsSet.add(key);
+
+      const trabajo = trabajoById.get(trabajoId);
+      const servicio = servicioById.get(jornada.servicio_id);
+      const cliente = trabajo?.cliente_id
+        ? clienteById.get(trabajo.cliente_id)?.nombre ?? "Sin cliente"
+        : servicio?.cliente_id
+          ? clienteById.get(servicio.cliente_id)?.nombre ?? "Sin cliente"
+          : "Sin cliente";
+      const ref = trabajo?.codigo ?? "TR";
+      const estadoRef = jornada.estado === "Completado"
+        ? "Realizada"
+        : jornada.fecha < todayStr
+          ? "No realizada"
+          : "Programada";
+      const horasJornada = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
+
+      for (const tecnicoId of validJornadaCrew(jornada)) {
+        const row = ensureTecnicoRow(tecnicoId);
+        const cell = row.cells[key] ?? {
+          jornadas: 0,
+          horas: 0,
+          realizadas: 0,
+          noRealizadas: 0,
+          programadas: 0,
+          noDisponibilidad: [],
+          refs: [],
+        };
+        cell.jornadas += 1;
+        cell.horas += horasJornada;
+        if (jornada.estado === "Completado") cell.realizadas += 1;
+        else if (jornada.fecha < todayStr) cell.noRealizadas += 1;
+        else cell.programadas += 1;
+        cell.refs.push({ ref, cliente, estado: estadoRef });
+        row.cells[key] = cell;
+        row.tieneActividad = true;
+      }
+    }
+
+    for (const disp of disponibilidades) {
+      if (!activeTechnicianIds.has(disp.tecnico_id)) continue;
+      const desde = disp.fecha_inicio > dateKey(periodStart) ? disp.fecha_inicio : dateKey(periodStart);
+      const hasta = disp.fecha_fin < dateKey(periodEnd) ? disp.fecha_fin : dateKey(periodEnd);
+      if (desde > hasta) continue;
+
+      const row = ensureTecnicoRow(disp.tecnico_id);
+      let cursor = parseISO(desde);
+      const endDisp = parseISO(hasta);
+      while (cursor <= endDisp) {
+        const key = bucketKey(format(cursor, "yyyy-MM-dd"));
+        bucketsSet.add(key);
+        const cell = row.cells[key] ?? {
+          jornadas: 0,
+          horas: 0,
+          realizadas: 0,
+          noRealizadas: 0,
+          programadas: 0,
+          noDisponibilidad: [],
+          refs: [],
+        };
+        const motivo = disp.tipo ?? disp.observacion ?? "No disponible";
+        if (!cell.noDisponibilidad.includes(motivo)) cell.noDisponibilidad.push(motivo);
+        row.cells[key] = cell;
+        row.tieneNoDisponibilidad = true;
+        cursor = addDays(cursor, 1);
+      }
+    }
+
+    if (bucketsSet.size === 0) {
+      if (bucketMode === "dia") {
+        let cursor = periodStart;
+        while (cursor <= periodEnd) {
+          bucketsSet.add(format(cursor, "yyyy-MM-dd"));
+          cursor = addDays(cursor, 1);
+        }
+      } else if (bucketMode === "semana") {
+        const start = startOfWeek(periodStart, { weekStartsOn: 1 });
+        const end = endOfWeek(periodEnd, { weekStartsOn: 1 });
+        let cursor = start;
+        while (cursor <= end) {
+          bucketsSet.add(`${getISOWeekYear(cursor)}-W${String(getISOWeek(cursor)).padStart(2, "0")}`);
+          cursor = addWeeks(cursor, 1);
+        }
+      } else if (bucketMode === "mes") {
+        let cursor = startOfMonth(periodStart);
+        const end = startOfMonth(periodEnd);
+        while (cursor <= end) {
+          bucketsSet.add(format(cursor, "yyyy-MM"));
+          cursor = addMonths(cursor, 1);
+        }
+      } else {
+        let cursor = startOfYear(periodStart);
+        const end = startOfYear(periodEnd);
+        while (cursor <= end) {
+          bucketsSet.add(format(cursor, "yyyy"));
+          cursor = addYears(cursor, 1);
+        }
+      }
+    }
+
+    const buckets = Array.from(bucketsSet).sort();
+    const overLimit = buckets.length > 31;
+    const bucketLabels = Object.fromEntries(buckets.map((key) => [key, bucketLabel(key)]));
+    const currentBucketKey = inRange(todayStr, periodStart, periodEnd) ? bucketKey(todayStr) : null;
+
+    const blocks = Array.from(rowsBySucursal.entries())
+      .map(([sucursal, rowsMap]) => {
+        const técnicos = Array.from(rowsMap.values())
+          .map((row) => ({
+            id: row.id,
+            nombre: row.nombre,
+            sucursal: row.sucursal,
+            sinAsignacion: !row.tieneActividad && !row.tieneNoDisponibilidad,
+            tieneNoDisponibilidad: row.tieneNoDisponibilidad,
+            cells: row.cells,
+          }))
+          .sort((a, b) => {
+            if (a.sinAsignacion !== b.sinAsignacion) return a.sinAsignacion ? 1 : -1;
+            return a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+          });
+
+        const totalActividad = técnicos.reduce((acc, row) => {
+          return acc + buckets.reduce((bucketAcc, bucket) => {
+            const cell = row.cells[bucket];
+            if (!cell) return bucketAcc;
+            return bucketAcc + (matrixMetric === "horas" ? cell.horas : cell.jornadas + cell.noDisponibilidad.length);
+          }, 0);
+        }, 0);
+
+        return {
+          sucursal,
+          totalActividad,
+          totalTécnicos: técnicos.length,
+          técnicos,
+        };
+      })
+      .sort((a, b) => b.totalActividad - a.totalActividad || a.sucursal.localeCompare(b.sucursal, "es", { sensitivity: "base" }));
+
+    return {
+      buckets,
+      blocks,
+      bucketLabels,
+      bucketMode,
+      overLimit,
+      currentBucketKey,
+    };
+  }, [activeTechnicianIds, clienteById, disponibilidades, jornadas, matrixMetric, periodEnd, periodMode, periodStart, profileById, servicioById, todayStr, trabajos, trabajosResumen]);
   const trabajosActivos = trabajosResumen.filter((row) => row.estado !== "completado");
   const trabajosConCierre = trabajosResumen.filter((row) => row.estado === "completado").length;
-  const tecnicosTotales = activeTechnicianIds.size;
+  const técnicosTotales = activeTechnicianIds.size;
+
+  const trabajosAbiertosSinCierre = useMemo(() => {
+    return trabajosActivos
+      .map((row) => ({
+        id: row.id,
+        ref: row.ref,
+        cliente: row.cliente,
+        sucursal: row.sucursal,
+        estado: estadoTrabajoLabel(row.estado as EstadoTrabajo),
+        ultimaFecha: row.ultimaFechaPeriodo
+          ? format(parseISO(row.ultimaFechaPeriodo), "dd/MM/yy")
+          : row.ultimaFecha
+            ? format(parseISO(row.ultimaFecha), "dd/MM/yy")
+            : "Sin fecha",
+        díasSinCierre: Math.max(
+          0,
+          differenceInCalendarDays(
+            today,
+            parseISO(row.ultimaFechaPeriodo || row.ultimaFecha || row.creadoEn || todayStr),
+          ),
+        ),
+        pendientes: row.estado === "pendiente" ? row.totalJornadasPeriodo : row.pendientesPeriodoVencidas,
+        programados: row.estado === "programado" ? row.totalJornadasPeriodo : row.pendientesPeriodo,
+        iniciados: row.estado === "iniciado" ? row.realizadasPeriodo : 0,
+      }))
+      .sort((a, b) => b.díasSinCierre - a.díasSinCierre || a.ref.localeCompare(b.ref));
+  }, [trabajosActivos]);
 
   // Estadisticas de "flujo operativo" basadas en trabajosResumen (respeta los filtros activos de la pestana Trabajos).
   const flujo = useMemo(() => {
-    // Solo trabajos con al menos una jornada en el rango seleccionado
+    // Solo trabajos con al menos una jornada en el rango selecciónado
     const enPeriodo = trabajosResumen.filter((r) => r.totalJornadasPeriodo > 0);
     const total = enPeriodo.length;
     const culminados = enPeriodo.filter((r) => r.estado === "completado").length;
@@ -1360,8 +1619,8 @@ export default function Dashboard() {
     for (const trabajoId of trabajoIds) {
       const trabajoJornadas = (jornadasByTrabajo.get(trabajoId) ?? []).filter((jornada) => {
         if (!inRange(jornada.fecha, periodStart, periodEnd)) return false;
-        if (fTecnicos.length === 0) return true;
-        return validJornadaCrew(jornada).some((id) => fTecnicos.includes(id));
+        if (fTécnicos.length === 0) return true;
+        return validJornadaCrew(jornada).some((id) => fTécnicos.includes(id));
       });
 
       for (const jornada of trabajoJornadas) {
@@ -1386,7 +1645,7 @@ export default function Dashboard() {
       pctPendientes: pct(pendientes),
       pctCerradas: pct(cerradas),
     };
-  }, [fTecnicos, jornadasByTrabajo, periodEnd, periodStart, trabajosResumen]);
+  }, [fTécnicos, jornadasByTrabajo, periodEnd, periodStart, trabajosResumen]);
 
   const trabajosPorEstado = useMemo(() => {
     const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
@@ -1501,7 +1760,7 @@ export default function Dashboard() {
     };
 
     const bucketsSet = new Set<string>();
-    // En modo "dia" sembrar todos los días del rango para que aparezcan aunque no haya jornadas
+    // En modo "dia" sembrar todos los días del rango para que aparezcan aúnque no haya jornadas
     if (bucketMode === "dia") {
       let cursor = periodStart;
       while (cursor <= periodEnd) {
@@ -1525,7 +1784,7 @@ export default function Dashboard() {
 
     for (const id of activeTechnicianIds) ensureTecnicoRow(id);
 
-    // Scope: trabajos visibles tras aplicar filtros de la pestana Trabajos (estado/tï¿½cnico/marca).
+    // Scope: trabajos visibles tras aplicar filtros de la pestana Trabajos (estado/tecnico/marca).
     const trabajoIdsEnScope = new Set(trabajosResumen.map((t) => t.id));
     // Mapa inverso: servicio_id -> trabajo_id (mismo criterio que jornadasByTrabajo)
     const servicioATrabajo = new Map<string, string>();
@@ -1621,10 +1880,10 @@ export default function Dashboard() {
 
     const buckets = Array.from(bucketsSet).sort();
     const trabajosPorBucket: Record<string, number> = {};
-    const tecnicosNoDisponiblesPorBucket: Record<string, number> = {};
+    const técnicosNoDisponiblesPorBucket: Record<string, number> = {};
     for (const k of buckets) trabajosPorBucket[k] = trabajosPorBucketMap.get(k)?.size ?? 0;
-    for (const k of buckets) tecnicosNoDisponiblesPorBucket[k] = noDisponiblesPorBucketMap.get(k)?.size ?? 0;
-    const tecnicoFilterSet = fTecnicos.length > 0 ? new Set(fTecnicos) : null;
+    for (const k of buckets) técnicosNoDisponiblesPorBucket[k] = noDisponiblesPorBucketMap.get(k)?.size ?? 0;
+    const tecnicoFilterSet = fTécnicos.length > 0 ? new Set(fTécnicos) : null;
     const rowsAll = Array.from(map.values())
       .map((row) => ({
         id: row.id,
@@ -1656,10 +1915,10 @@ export default function Dashboard() {
       .map((k) => rowsAll.filter((r) => (r.porBucket[k]?.jornadas ?? 0) > 0).length);
     const equipoPromTécnicos: string = nonSunTechCounts.length > 0
       ? (nonSunTechCounts.reduce((a, b) => a + b, 0) / nonSunTechCounts.length).toFixed(1)
-      : "ï¿½";
+      : "-";
 
-    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, tecnicosNoDisponiblesPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTécnicos };
-  }, [activeTechnicianIds, disponibilidades, jornadas, trabajos, trabajosResumen, fTecnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
+    return { buckets, rows, allRows: rowsAll, totalesPorBucket, trabajosPorBucket, técnicosNoDisponiblesPorBucket, bucketLabel, bucketMode, equipoTotalTrabajos, equipoPromTécnicos };
+  }, [activeTechnicianIds, disponibilidades, jornadas, trabajos, trabajosResumen, fTécnicos, periodMode, periodStart, periodEnd, profileById, servicioById]);
 
   const limpiar = () => {
     setDateFrom(initialDateFrom);
@@ -1671,7 +1930,7 @@ export default function Dashboard() {
     setFMarcas([]);
     setFTiposTiempo([]);
     setFEstadosTrabajo([]);
-    setFTecnicos([]);
+    setFTécnicos([]);
     setPeriodMode("mes");
     setQ("");
   };
@@ -1685,7 +1944,7 @@ export default function Dashboard() {
     (fMarcas.length > 0 ? 1 : 0) +
     (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
-    (filtrosTrabajoActivos && fTecnicos.length > 0 ? 1 : 0) +
+    (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
   const filtrosAvanzadosActivos =
@@ -1694,7 +1953,7 @@ export default function Dashboard() {
     (fMarcas.length > 0 ? 1 : 0) +
     (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
-    (filtrosTrabajoActivos && fTecnicos.length > 0 ? 1 : 0);
+    (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
@@ -1704,7 +1963,7 @@ export default function Dashboard() {
         <h1 className={pageTitle}>Dashboard ejecutivo</h1>
         <TabsList className="hidden h-9 min-w-max grid-cols-3 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
-          <TabsTrigger value="facturacion" className="h-7 whitespace-nowrap px-3 text-xs">Facturación</TabsTrigger>
+          <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-xs">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
         </TabsList>
       </div>
@@ -1758,7 +2017,7 @@ export default function Dashboard() {
               width="w-full"
               options={[
                 { value: "Cliente", label: "Cliente" },
-                { value: "Garantía", label: "Garantía" },
+                { value: "Garantia", label: "Garantia" },
                 { value: "Interno", label: "Interno" },
               ]}
             />
@@ -1780,8 +2039,8 @@ export default function Dashboard() {
                 />
                 <FilterMultiSelect
                   label="Técnico o cuadrilla"
-                  values={fTecnicos}
-                  onChange={setFTecnicos}
+                  values={fTécnicos}
+                  onChange={setFTécnicos}
                   placeholder="Todos"
                   width="w-full"
                   options={technicianOptions.map((row) => ({ value: row.id, label: row.nombre }))}
@@ -1819,7 +2078,7 @@ export default function Dashboard() {
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
         <TabsList className="inline-flex h-auto min-w-max">
           <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
-          <TabsTrigger value="facturacion" className="whitespace-nowrap">Facturación</TabsTrigger>
+          <TabsTrigger value="facturación" className="whitespace-nowrap">Facturacion</TabsTrigger>
           <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
         </TabsList>
         </div>
@@ -1833,7 +2092,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
               <button
                 type="button"
-                onClick={() => goSection("facturacion")}
+                onClick={() => goSection("facturación")}
                 className="text-left"
               >
                 <Card className={cn(
@@ -1845,7 +2104,7 @@ export default function Dashboard() {
                     <DollarSign className="h-[18px] w-[18px]" />
                   </div>
                   <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Facturación del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
+                    Facturacion del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
                   </div>
                   <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(totalPeriodo)}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1866,7 +2125,7 @@ export default function Dashboard() {
                 </Card>
               </button>
 
-              <button type="button" onClick={() => goSection("facturacion")} className="text-left">
+              <button type="button" onClick={() => goSection("facturación")} className="text-left">
                 <Card className="relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50">
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-sky-500" />
                   <div className="relative z-10 flex items-start justify-between gap-3">
@@ -1886,7 +2145,7 @@ export default function Dashboard() {
                 </Card>
               </button>
 
-              <button type="button" onClick={() => goSection("facturacion")} className="text-left">
+              <button type="button" onClick={() => goSection("facturación")} className="text-left">
                 <Card className={cn(
                   "relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50",
                   (variacionTicketPct ?? 0) < -10 && "border-destructive/40",
@@ -1926,20 +2185,20 @@ export default function Dashboard() {
                 </Card>
               </button>
 
-              <button type="button" onClick={() => goSection("facturacion")} className="text-left">
+              <button type="button" onClick={() => goSection("facturación")} className="text-left">
                 <Card className="relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50">
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-amber-500" />
                   <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <PieChart className="h-[18px] w-[18px]" />
                   </div>
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturacion</div>
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>
                   <div className="mt-2 text-lg font-extrabold leading-tight">
                     {tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span>
                   </div>
                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div className="flex h-full">
                       <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
-                      <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantía}%` }} />
+                      <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
                       <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
                     </div>
                   </div>
@@ -1948,10 +2207,10 @@ export default function Dashboard() {
                       <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                       Cliente {tipoFactBreakdown.pctCliente}%
                     </span>
-                    {tipoFactBreakdown.pctGarantía > 0 && (
+                    {tipoFactBreakdown.pctGarantia > 0 && (
                       <span className="inline-flex items-center gap-1">
                         <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        Gnt. {tipoFactBreakdown.pctGarantía}%
+                        Gnt. {tipoFactBreakdown.pctGarantia}%
                       </span>
                     )}
                     {tipoFactBreakdown.pctInterno > 0 && (
@@ -1963,7 +2222,7 @@ export default function Dashboard() {
                   </div>
                   <div className="hidden text-[10px] text-muted-foreground">
                     {[
-                      tipoFactBreakdown.pctGarantía > 0 && `Gnt. ${tipoFactBreakdown.pctGarantía}%`,
+                      tipoFactBreakdown.pctGarantia > 0 && `Gnt. ${tipoFactBreakdown.pctGarantia}%`,
                       tipoFactBreakdown.pctInterno > 0 && `Int. ${tipoFactBreakdown.pctInterno}%`,
                     ].filter(Boolean).join(" - ") || "Solo cliente"}
                   </div>
@@ -1977,9 +2236,9 @@ export default function Dashboard() {
             <Card className="flex h-full min-w-0 flex-col p-3">
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Evolucion de facturacion</h2>
+                  <h2 className="truncate text-sm font-semibold">Evolucion de facturación</h2>
                   <p className="truncate text-xs text-muted-foreground">
-                    {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} - clic en barra para seleccionar
+                    {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} - clic en barra para selecciónar
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -1993,20 +2252,20 @@ export default function Dashboard() {
                 rows={weeklyRows}
                 activeKey={selectedWeek?.key}
                 metric={factMetric}
-                onSelect={(key) => { setSelectedWeekKey(key); goSection("facturacion"); }}
+                onSelect={(key) => { setSelectedWeekKey(key); goSection("facturación"); }}
               />
               <div className="mt-2 border-t pt-2">
                 <MixRubros
                   row={periodRow}
                   rubroFiltro={fRubros.length === 1 ? fRubros[0] : "all"}
-                  onSelect={(rubro) => { setFRubros([rubro]); goSection("facturacion"); }}
+                  onSelect={(rubro) => { setFRubros([rubro]); goSection("facturación"); }}
                 />
               </div>
             </Card>
 
             <Card className="flex h-full min-w-0 flex-col p-3">
               <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Acumulado del rango completo." />
-              <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturacion"); }} />
+              <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -2037,13 +2296,13 @@ export default function Dashboard() {
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}
-                planificados={trabajosPlanificadosProximoPeriodo}
-                tecnicosAsignados={tecnicosProximoPeriodo}
+                planificados={trabajosPlanificadosPróximoPeriodo}
+                técnicosAsignados={técnicosPróximoPeriodo}
                 jornadasPlanificadas={jornadasPlanificacion.length}
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                tecnicosCierreAnterior={tecnicosCierreAnterior}
+                técnicosCierreAnterior={técnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
@@ -2066,10 +2325,10 @@ export default function Dashboard() {
                       <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Técnicos activos</div>
                       <div className="mt-0.5 flex items-baseline gap-2">
                         <span className="text-[18px] font-extrabold leading-none tabular-nums">
-                          {tecnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
+                          {técnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
                         </span>
                         <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
-                          {tecnicosActivosPct}%
+                          {técnicosActivosPct}%
                         </span>
                       </div>
                     </div>
@@ -2100,12 +2359,12 @@ export default function Dashboard() {
 
         </TabsContent>
 
-        <TabsContent value="facturacion" className="space-y-3">
+        <TabsContent value="facturación" className="space-y-3">
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">{T.comparativoFacturación}</h2>
-                <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
+                <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
+                <p className="text-xs text-muted-foreground">{T.selecciónaPeriodo}</p>
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
@@ -2234,24 +2493,46 @@ export default function Dashboard() {
             </div>
           </Card>
 
+
+
+          <Card className="flex flex-col p-3">
+            <PanelTitle
+              icon={CalendarDays}
+              title="Matriz técnicos / periodo"
+              subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} · actividad por sucursal del técnico`}
+            />
+            <MatrizTécnicosDías
+              data={matrizTécnicosDías}
+              currentBucketKey={matrizTécnicosDías.currentBucketKey}
+              metric={matrixMetric}
+              onMetricChange={setMatrixMetric}
+              onSelectTecnico={(tecnicoId) =>
+                setFTécnicos((prev) => (prev.length === 1 && prev[0] === tecnicoId ? [] : [tecnicoId]))
+              }
+              onSelectSucursal={(sucursal) =>
+                setFSucursales((prev) => (prev.length === 1 && prev[0] === sucursal ? [] : [sucursal]))
+              }
+            />
+          </Card>
+
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => setFEstadosTrabajo([estado])}
-                planificados={trabajosPlanificadosProximoPeriodo}
-                tecnicosAsignados={tecnicosProximoPeriodo}
+                planificados={trabajosPlanificadosPróximoPeriodo}
+                técnicosAsignados={técnicosPróximoPeriodo}
                 jornadasPlanificadas={jornadasPlanificacion.length}
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                tecnicosCierreAnterior={tecnicosCierreAnterior}
+                técnicosCierreAnterior={técnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="" />
+              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Trabajos por sucursal segmentados por estado" />
               <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursales([sucursal])} />
             </Card>
           </section>
@@ -2331,7 +2612,7 @@ export default function Dashboard() {
                   <div className="text-right">Jornadas</div>
                   <div className="text-right">Técnicos</div>
                   <div className="text-right">Horas</div>
-                  <div className="text-right">Ultima fecha</div>
+                  <div className="text-right">Última fecha</div>
                   <div className="text-right">Cierre</div>
                   <div className="text-right">Estado</div>
                 </div>
@@ -2375,8 +2656,17 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1fr_0.9fr]">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Users} title="Productividad técnica" subtitle="" />
-              <CargaTecnicaMatriz data={productividadMatriz} />
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold">Trabajos abiertos sin cierre</h2>
+                  <p className="text-xs text-muted-foreground">Ordenados de mayor a menor por días sin cerrar</p>
+                </div>
+                <Badge variant="secondary">{trabajosAbiertosSinCierre.length} abiertos</Badge>
+              </div>
+              <TrabajosAbiertosList
+                rows={trabajosAbiertosSinCierre}
+                onSelect={(row) => navigate(`/trabajos?q=${encodeURIComponent(row.ref)}`)}
+              />
             </Card>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Distribucion por marca" subtitle="Trabajos con actividad en el periodo" />
@@ -2397,6 +2687,12 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
+
+
+
 
 
 
