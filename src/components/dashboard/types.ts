@@ -18,6 +18,9 @@ export interface Facturacion {
   cantidad: number;
   grupo: string | null;
   grupo_fx: string | null;
+  codigo_fabricante?: string | null;
+  cod_mercaderia?: string | null;
+  mercaderia?: string | null;
   cod_factura: string;
   tipo_tiempo: "Cliente" | "Garantia" | "Interno";
   origen_sistema?: string | null;
