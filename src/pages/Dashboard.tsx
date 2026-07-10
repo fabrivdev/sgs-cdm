@@ -2294,7 +2294,7 @@ export default function Dashboard() {
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                técnicosCierreAnterior={técnicosCierreAnterior}
+                tecnicosCierreAnterior={técnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
@@ -2519,7 +2519,7 @@ export default function Dashboard() {
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                técnicosCierreAnterior={técnicosCierreAnterior}
+                tecnicosCierreAnterior={técnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
