@@ -1034,9 +1034,9 @@ export function CargaSucursalTabla({
   const maxTotal = Math.max(1, ...rows.map((row) => row.total));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="rounded-xl border overflow-hidden">
-        <div className="grid grid-cols-[220px_minmax(0,1fr)_82px_56px] bg-muted/35 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[160px_minmax(0,1fr)_64px_44px] bg-muted/35 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           <div>Sucursal</div>
           <div>Estado</div>
           <div className="text-right">Total</div>
@@ -1054,19 +1054,19 @@ export function CargaSucursalTabla({
                 key={row.sucursal}
                 type="button"
                 onClick={() => onSelect(row.sucursal)}
-                className="grid w-full grid-cols-[220px_minmax(0,1fr)_82px_56px] items-center gap-4 px-4 py-4 text-left hover:bg-accent/35"
+                className="grid w-full grid-cols-[160px_minmax(0,1fr)_64px_44px] items-center gap-3 px-3 py-2 text-left hover:bg-accent/35"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{row.sucursal}</div>
+                  <div className="truncate text-sm font-medium">{row.sucursal}</div>
                 </div>
 
                 <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-4 text-[12px] text-foreground/85">
-                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-600" /> {row.cerrados}</span>
-                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-500" /> {row.abiertos}</span>
-                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> {row.pausados}</span>
+                  <div className="mb-1 flex flex-wrap items-center gap-3 text-[11px] text-foreground/85">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-600" /> {row.cerrados}</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-500" /> {row.abiertos}</span>
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> {row.pausados}</span>
                   </div>
-                  <div className="h-3 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-muted">
                     <div className="flex h-full overflow-hidden rounded-full" style={{ width: `${widthPct}%` }}>
                       <div className="h-full bg-emerald-600" style={{ width: `${cerradosPct}%` }} />
                       <div className="h-full bg-sky-500" style={{ width: `${abiertosPct}%` }} />
@@ -1076,11 +1076,11 @@ export function CargaSucursalTabla({
                 </div>
 
                 <div className="text-right">
-                  <span className="inline-flex min-w-[54px] justify-center rounded-xl bg-primary/5 px-2 py-1 text-lg font-bold tabular-nums text-primary">
+                  <span className="inline-flex min-w-[40px] justify-center rounded-lg bg-primary/5 px-1.5 py-0.5 text-sm font-bold tabular-nums text-primary">
                     {row.total}
                   </span>
                 </div>
-                <div className="text-right text-lg font-semibold tabular-nums text-primary">{row.pct}%</div>
+                <div className="text-right text-sm font-semibold tabular-nums text-primary">{row.pct}%</div>
               </button>
             );
           })}
