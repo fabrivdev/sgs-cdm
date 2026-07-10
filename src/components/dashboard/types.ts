@@ -4,6 +4,7 @@ export type Tone = "neutral" | "good" | "warn" | "bad";
 export type PeriodMode = "dia" | "semana" | "mes" | "anio";
 export type FactMetric = "usd" | "horasServicio" | "kmFacturados";
 export type OSMetric = "usd" | "horas" | "km";
+export type OSSucursalMetric = "interno" | "garantia" | "total";
 export type OSRubro = "Servicio" | "Repuestos" | "Kilometraje";
 export type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
 
