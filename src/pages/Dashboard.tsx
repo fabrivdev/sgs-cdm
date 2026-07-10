@@ -1109,14 +1109,6 @@ export default function Dashboard() {
   const cierreAnteriorRango = `${format(previousPeriodStart, "dd/MM")} - ${format(previousPeriodEnd, "dd/MM")}`;
   const fueraTolerancia = jornadasPendientesCierre.filter((row) => differenceInCalendarDays(today, parseISO(row.fecha)) > DIAS_JORNADA_VENCIDA);
   const selectedTrend = selectedWeek?.variacion ?? pct(total(allPeriodFacts), total(allPrevPeriodFacts));
-  const selectedMetricValue = selectedWeek ? weekMetric(selectedWeek, factMetric) : factMetric === "usd" ? total(allPeriodFacts) : factMetric === "horasServicio" ? periodRow.horasServicio : periodRow.kmFacturados;
-  const selectedMetricPrevValue = selectedWeek
-    ? (() => {
-      const selectedIndex = weeklyRows.findIndex((row) => row.key === selectedWeek.key);
-      return selectedIndex > 0 ? weekMetric(weeklyRows[selectedIndex - 1], factMetric) : 0;
-    })()
-    : factMetric === "usd" ? total(allPrevPeriodFacts) : 0;
-  const selectedMetricTrend = factMetric === "usd" ? selectedTrend : pct(selectedMetricValue, selectedMetricPrevValue);
   // Fila 1 KPIs: calculados sobre el rango completo del usuario, no el ultimo bucket
   const totalPeriodo = total(allPeriodFacts);
   const facturasPeriodo = new Set(allPeriodFacts.map((row) => row.cod_factura)).size;
