@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, History } from "lucide-react";
 import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
+import { NEW_SYSTEM_START, prepareNewSystemImportBundle, type NewSystemImportBundle } from "@/lib/imports";
 import {
   clasificarGrupoFacturacion,
   clasificarMarcaFacturacion,
@@ -139,6 +140,79 @@ interface OrdenServicioRow {
   _isNew: boolean;
 }
 
+const sumImportNumber = (current: unknown, next: unknown, decimals = 2) =>
+  Number((Number(current || 0) + Number(next || 0)).toFixed(decimals));
+
+const appendDistinctText = (current: unknown, next: unknown, maxItems = 4) => {
+  const parts = String(current ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const candidate = String(next ?? "").trim();
+
+  if (candidate && !parts.includes(candidate)) parts.push(candidate);
+  return parts.slice(0, maxItems).join("; ");
+};
+
+const aggregateNewSystemServiceOrders = (rows: any[]) => {
+  const byOs = new Map<string, any>();
+
+  for (const row of rows) {
+    const osNumero = String(row.os_numero ?? "").trim();
+    if (!osNumero) continue;
+
+    const current = byOs.get(osNumero);
+    if (!current) {
+      byOs.set(osNumero, {
+        ...row,
+        raw_data: {
+          ...(row.raw_data ?? {}),
+          lineas_agregadas: 1,
+          productos_agregados: row.problema ? [String(row.problema)] : [],
+        },
+      });
+      continue;
+    }
+
+    current.km_cantidad = sumImportNumber(current.km_cantidad, row.km_cantidad, 4);
+    current.kilometro_valor = sumImportNumber(current.kilometro_valor, row.kilometro_valor);
+    current.servicios_cantidad = sumImportNumber(current.servicios_cantidad, row.servicios_cantidad, 4);
+    current.servicios_valor = sumImportNumber(current.servicios_valor, row.servicios_valor);
+    current.terceros_valor = sumImportNumber(current.terceros_valor, row.terceros_valor);
+    current.repuesto_valor = sumImportNumber(current.repuesto_valor, row.repuesto_valor);
+
+    current.problema = appendDistinctText(current.problema, row.problema);
+    current.cliente_nombre = current.cliente_nombre ?? row.cliente_nombre;
+    current.situacion_os = current.situacion_os ?? row.situacion_os;
+    current.situacion_facturacion = current.situacion_facturacion ?? row.situacion_facturacion;
+    current.responsable = current.responsable ?? row.responsable;
+    current.cod_mecanico = current.cod_mecanico ?? row.cod_mecanico;
+    current.factura = current.factura ?? row.factura;
+    current.cod_interno = current.cod_interno ?? row.cod_interno;
+    current.fecha_abierta_os = current.fecha_abierta_os ?? row.fecha_abierta_os;
+    current.fecha_emision_factura = current.fecha_emision_factura ?? row.fecha_emision_factura;
+    current.nro_chasis = current.nro_chasis ?? row.nro_chasis;
+    current.marca = current.marca ?? row.marca;
+    current.tipo_tiempo = current.tipo_tiempo === "Desconocido" ? row.tipo_tiempo : current.tipo_tiempo ?? row.tipo_tiempo;
+
+    const currentProducts = Array.isArray(current.raw_data?.productos_agregados)
+      ? current.raw_data.productos_agregados
+      : [];
+    current.raw_data = {
+      ...(current.raw_data ?? {}),
+      lineas_agregadas: Number(current.raw_data?.lineas_agregadas ?? 1) + 1,
+      productos_agregados: Array.from(
+        new Set([
+          ...currentProducts.map(String),
+          ...(row.problema ? [String(row.problema)] : []),
+        ]),
+      ).slice(0, 20),
+    };
+  }
+
+  return Array.from(byOs.values());
+};
+
 interface FacturacionGridRow {
   origen_sistema: string;
   codigo_interno_factura: string | null;
@@ -160,6 +234,19 @@ interface FacturacionGridRow {
   total_venta: number;
   raw_data: Record<string, unknown>;
   _isNew: boolean;
+}
+
+type NewSystemXmlKind = "facturacion" | "ordenesServicio" | "productos";
+
+interface NewSystemXmlFile {
+  fileName: string;
+  xmlText: string;
+}
+
+interface NewSystemXmlFilesState {
+  facturacion: NewSystemXmlFile | null;
+  ordenesServicio: NewSystemXmlFile | null;
+  productos: NewSystemXmlFile | null;
 }
 
 interface Imp {
@@ -353,6 +440,12 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const [osFile, setOsFile] = useState<string>("");
   const [gridRows, setGridRows] = useState<FacturacionGridRow[] | null>(null);
   const [gridFile, setGridFile] = useState<string>("");
+  const [newSystemFiles, setNewSystemFiles] = useState<NewSystemXmlFilesState>({
+    facturacion: null,
+    ordenesServicio: null,
+    productos: null,
+  });
+  const [newSystemPreview, setNewSystemPreview] = useState<NewSystemImportBundle | null>(null);
   const [busy, setBusy] = useState(false);
   const [historial, setHistorial] = useState<Imp[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
@@ -379,6 +472,15 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     porMarca: Record<Marca, number>;
     porSubgrupo: { subgrupo: string; total: number; lineas: number }[];
   } | null>(null);
+
+  const resetNewSystemImport = () => {
+    setNewSystemFiles({
+      facturacion: null,
+      ordenesServicio: null,
+      productos: null,
+    });
+    setNewSystemPreview(null);
+  };
 
   const cargarHistorial = async () => {
     const [imp, prof] = await Promise.all([
@@ -511,6 +613,47 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
+  const procesarNuevoSistemaXml = async (kind: NewSystemXmlKind, file: File) => {
+    try {
+      const xmlText = await file.text();
+      const nextFiles: NewSystemXmlFilesState = {
+        ...newSystemFiles,
+        [kind]: {
+          fileName: file.name,
+          xmlText,
+        },
+      };
+
+      setNewSystemFiles(nextFiles);
+
+      if (!nextFiles.facturacion || !nextFiles.ordenesServicio || !nextFiles.productos) {
+        setNewSystemPreview(null);
+        const missing = [
+          !nextFiles.facturacion ? "Facturación" : null,
+          !nextFiles.ordenesServicio ? "Órdenes de servicio" : null,
+          !nextFiles.productos ? "Maestro de productos" : null,
+        ].filter(Boolean);
+        toast.success(`Archivo cargado. Faltan: ${missing.join(", ")}.`);
+        return;
+      }
+
+      const bundle = prepareNewSystemImportBundle({
+        facturacion: nextFiles.facturacion,
+        ordenesServicio: nextFiles.ordenesServicio,
+        productos: nextFiles.productos,
+        usuarioId: user?.id ?? null,
+      });
+
+      setNewSystemPreview(bundle);
+      toast.success(
+        `Nuevo sistema listo: ${bundle.diagnostics.billingRows} líneas de facturación y ${bundle.diagnostics.serviceOrders} líneas de OS.`,
+      );
+    } catch (e) {
+      setNewSystemPreview(null);
+      toast.error("Error leyendo XML del nuevo sistema: " + (e as Error).message);
+    }
+  };
+
   const confirmarOrdenesServicio = async () => {
     if (!osRows || !user) return;
 
@@ -615,6 +758,261 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       onChanged();
     } catch (e) {
       toast.error("Error: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmarNuevoSistemaXml = async () => {
+    if (!newSystemPreview || !user) return;
+
+    setBusy(true);
+    try {
+      const bundle = newSystemPreview;
+      const cliExistentes = await cargarTodosLosClientes();
+
+      const cliByCod = new Map<string, string>();
+      const cliByNombre = new Map<string, string>();
+      for (const c of (cliExistentes ?? []) as any[]) {
+        if (c.cod_entidad) cliByCod.set(normCode(c.cod_entidad), c.id);
+        if (c.nombre) cliByNombre.set(normText(c.nombre), c.id);
+      }
+
+      const factCrosswalkByRowId = new Map(bundle.billingCrosswalk.map((row) => [row.billingRowId, row]));
+
+      const facturacionResumenRows = bundle.facturacion.rows
+        .map((row) => {
+          const crosswalk = factCrosswalkByRowId.get(row.rowId);
+          const fecha = row.emissionDate ?? row.dueDate;
+          if (!fecha) return null;
+
+          return {
+            fecha,
+            sucursal: matchSucursalFromRegion(row.branch) ?? matchSucursal(row.branch),
+            tipo: crosswalk?.inferredLineType === "Repuestos" ? "Repuesto" : "Servicio",
+            cliente_id:
+              (row.clientCode && cliByCod.get(normCode(row.clientCode))) ??
+              cliByNombre.get(normText(row.clientName)) ??
+              null,
+            entidad_nombre: row.clientName,
+            cod_entidad: row.clientCode,
+            total_venta: Number((row.totalValueWithIva || row.totalValueBase || 0).toFixed(2)),
+            cantidad: Number((row.quantity || 0).toFixed(4)),
+            grupo: crosswalk?.productGroup ?? row.productGroup,
+            grupo_fx: crosswalk?.inferredLineType ?? row.lineType,
+            cod_factura:
+              row.invoiceShortNumber ??
+              row.invoiceLongNumber ??
+              row.documentNumber ??
+              `XML-${row.rowId.slice(0, 12)}`,
+          };
+        })
+        .filter(Boolean);
+
+      const facturacionResumenByKey = new Map<string, any>();
+      for (const row of facturacionResumenRows) {
+        const key = [
+          row.cod_factura,
+          row.tipo,
+          row.fecha,
+          row.cod_entidad ?? "",
+          row.entidad_nombre ?? "",
+          row.sucursal ?? "",
+          row.grupo ?? "",
+          row.grupo_fx ?? "",
+        ].join("||");
+        const current = facturacionResumenByKey.get(key);
+        if (!current) {
+          facturacionResumenByKey.set(key, { ...row });
+          continue;
+        }
+        current.total_venta = Number((Number(current.total_venta || 0) + Number(row.total_venta || 0)).toFixed(2));
+        current.cantidad = Number((Number(current.cantidad || 0) + Number(row.cantidad || 0)).toFixed(4));
+      }
+      const facturacionResumen = Array.from(facturacionResumenByKey.values());
+
+      const facturacionLineas = bundle.facturacion.rows.map((row) => {
+        const crosswalk = factCrosswalkByRowId.get(row.rowId);
+        return {
+          origen_sistema: crosswalk?.matchedBy === "none" ? "new_xml_facturacion_directa" : "new_xml_facturacion_os",
+          codigo_interno_factura: row.documentNumber ?? row.invoiceLongNumber,
+          factura: row.invoiceShortNumber ?? row.invoiceLongNumber,
+          entidad_nombre: row.clientName,
+          fecha_factura: row.emissionDate,
+          sucursal: matchSucursalFromRegion(row.branch) ?? matchSucursal(row.branch),
+          subgrupo_original: crosswalk?.productGroup ?? row.productGroup,
+          grupo_normalizado: crosswalk?.inferredLineType ?? row.lineType,
+          marca_normalizada: (crosswalk?.productBrand as Marca | undefined) ?? "OTROS",
+          tipo_facturacion: crosswalk?.inferredLineType === "Repuestos" ? "Repuesto" : "Servicio",
+          tipo_tiempo: crosswalk?.inferredTimeType ?? row.timeType,
+          observacion: row.productName,
+          cod_mercaderia: row.productCode,
+          codigo_fabricante: row.manufacturerCode,
+          mercaderia: row.productName,
+          cantidad: Number((row.quantity || 0).toFixed(4)),
+          valor_unitario: Number((row.unitValueWithIva || row.unitValueBase || 0).toFixed(2)),
+          total_venta: Number((row.totalValueWithIva || row.totalValueBase || 0).toFixed(2)),
+          raw_data: {
+            ...row.raw,
+            linked_service_order: crosswalk?.serviceOrderNumber ?? null,
+            canonical_line_type: crosswalk?.inferredLineType ?? row.lineType,
+            canonical_time_type: crosswalk?.inferredTimeType ?? row.timeType,
+            product_brand: crosswalk?.productBrand ?? null,
+            product_group: crosswalk?.productGroup ?? null,
+            product_family: crosswalk?.productFamily ?? null,
+            import_cutoff_mode: `legacy<=2026-06-30 / new>=${NEW_SYSTEM_START}`,
+          },
+        };
+      });
+
+      const osInvoiceDateByNumber = new Map<string, string>();
+      for (const crosswalk of bundle.billingCrosswalk) {
+        if (!crosswalk.serviceOrderNumber) continue;
+        const billingRow = bundle.facturacion.rows.find((row) => row.rowId === crosswalk.billingRowId);
+        const billingDate = billingRow?.emissionDate ?? billingRow?.dueDate ?? null;
+        if (!billingDate) continue;
+        const current = osInvoiceDateByNumber.get(crosswalk.serviceOrderNumber);
+        if (!current || billingDate > current) {
+          osInvoiceDateByNumber.set(crosswalk.serviceOrderNumber, billingDate);
+        }
+      }
+
+      const ordenesServicioPayload = aggregateNewSystemServiceOrders(bundle.ordenesServicioPayload).map((row) => ({
+        ...row,
+        fecha_emision_factura: row.fecha_emision_factura ?? osInvoiceDateByNumber.get(row.os_numero) ?? null,
+      }));
+
+      const { data: factImp, error: factImpError } = await supabase
+        .from("importaciones")
+        .insert({
+          ...bundle.importaciones.facturacion,
+          insertados: 0,
+          duplicados: 0,
+          usuario_id: user.id,
+          metadata: {
+            ...(bundle.importaciones.facturacion.metadata as Record<string, unknown>),
+            archivos_relacionados: {
+              facturacion: newSystemFiles.facturacion?.fileName ?? null,
+              ordenes_servicio: newSystemFiles.ordenesServicio?.fileName ?? null,
+              productos: newSystemFiles.productos?.fileName ?? null,
+            },
+          } as any,
+        } as any)
+        .select("id")
+        .single();
+      if (factImpError) throw factImpError;
+
+      const { data: osImp, error: osImpError } = await supabase
+        .from("importaciones")
+        .insert({
+          ...bundle.importaciones.ordenesServicio,
+          insertados: 0,
+          duplicados: 0,
+          usuario_id: user.id,
+          metadata: {
+            ...(bundle.importaciones.ordenesServicio.metadata as Record<string, unknown>),
+            archivos_relacionados: {
+              facturacion: newSystemFiles.facturacion?.fileName ?? null,
+              ordenes_servicio: newSystemFiles.ordenesServicio?.fileName ?? null,
+              productos: newSystemFiles.productos?.fileName ?? null,
+            },
+          } as any,
+        } as any)
+        .select("id")
+        .single();
+      if (osImpError) throw osImpError;
+
+      const billingWindow = bundle.diagnostics.replacement.facturacion;
+      if (billingWindow.shouldReplace && billingWindow.from && billingWindow.to) {
+        const { error: deleteFactSummaryError } = await supabase
+          .from("facturacion")
+          .delete()
+          .gte("fecha", billingWindow.from)
+          .lte("fecha", billingWindow.to);
+        if (deleteFactSummaryError) throw deleteFactSummaryError;
+
+        const { error: deleteFactLinesError } = await (supabase
+          .from("facturacion_lineas_importadas" as any)
+          .delete()
+          .gte("fecha_factura", billingWindow.from)
+          .lte("fecha_factura", billingWindow.to) as any);
+        if (deleteFactLinesError) throw deleteFactLinesError;
+      }
+
+      const osNumeros = ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean);
+      for (let i = 0; i < osNumeros.length; i += 500) {
+        const chunk = osNumeros.slice(i, i + 500);
+        const { error: deleteOsByNumberError } = await (supabase
+          .from("ordenes_servicio_importadas" as any)
+          .delete()
+          .in("os_numero", chunk) as any);
+        if (deleteOsByNumberError) throw deleteOsByNumberError;
+      }
+
+      for (let i = 0; i < facturacionResumen.length; i += 500) {
+        const chunk = facturacionResumen.slice(i, i + 500);
+        const { error } = await supabase.from("facturacion").upsert(chunk as any, {
+          onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx",
+        });
+        if (error) throw error;
+      }
+
+      for (let i = 0; i < facturacionLineas.length; i += 500) {
+        const chunk = facturacionLineas.slice(i, i + 500).map((row) => ({
+          ...row,
+          importacion_id: factImp.id,
+        }));
+        const { error } = await (supabase.from("facturacion_lineas_importadas" as any).upsert(chunk as any, {
+          onConflict: "origen_sistema,linea_hash",
+          ignoreDuplicates: true,
+        }) as any);
+        if (error) {
+          if (isMissingBillingLinesTableError(error)) {
+            throw new Error("Falta aplicar la migración de facturación detallada antes de importar XML del nuevo sistema.");
+          }
+          throw error;
+        }
+      }
+
+      for (let i = 0; i < ordenesServicioPayload.length; i += 500) {
+        const chunk = ordenesServicioPayload.slice(i, i + 500);
+        const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
+          onConflict: "os_numero",
+        }) as any);
+        if (error) {
+          if (isMissingOsImportTableError(error)) {
+            throw new Error("Falta aplicar la migración de órdenes de servicio antes de importar XML del nuevo sistema.");
+          }
+          throw error;
+        }
+      }
+
+      const { error: updateFactImpError } = await supabase
+        .from("importaciones")
+        .update({
+          insertados: facturacionLineas.length,
+          duplicados: 0,
+        } as any)
+        .eq("id", factImp.id);
+      if (updateFactImpError) throw updateFactImpError;
+
+      const { error: updateOsImpError } = await supabase
+        .from("importaciones")
+        .update({
+          insertados: ordenesServicioPayload.length,
+          duplicados: 0,
+        } as any)
+        .eq("id", osImp.id);
+      if (updateOsImpError) throw updateOsImpError;
+
+      toast.success(
+        `Nuevo sistema importado: ${facturacionLineas.length} líneas de facturación y ${ordenesServicioPayload.length} líneas de OS.`,
+      );
+      resetNewSystemImport();
+      await cargarHistorial();
+      onChanged();
+    } catch (e) {
+      toast.error("Error importando nuevo sistema: " + (e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -1569,6 +1967,40 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="space-y-4">
+      <Card className="border-primary/20">
+        <CardContent className="p-3 sm:p-4 space-y-4">
+          <div className="space-y-1">
+            <div className="font-semibold text-sm">Nuevo sistema XML (desde 01/07/2026)</div>
+            <div className="text-[11px] text-muted-foreground">
+              El histórico hasta 30/06/2026 queda congelado. Al confirmar, se reemplaza solo el tramo nuevo de facturación y órdenes de servicio.
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <DropZone
+              title="Facturación XML"
+              help="facturas - ndc - ncc - ventas.xml - base principal para la venta real del nuevo sistema."
+              onFile={(file) => procesarNuevoSistemaXml("facturacion", file)}
+              accept=".xml"
+              selectedFileLabel={newSystemFiles.facturacion?.fileName ?? null}
+            />
+            <DropZone
+              title="Órdenes de servicio XML"
+              help="ordenes_de_servicio.xml - cruza documento/factura para distinguir Cliente, Garantía e Interno."
+              onFile={(file) => procesarNuevoSistemaXml("ordenesServicio", file)}
+              accept=".xml"
+              selectedFileLabel={newSystemFiles.ordenesServicio?.fileName ?? null}
+            />
+            <DropZone
+              title="Maestro de productos XML"
+              help="maestro_de_productos.xml - completa marca, familia y grupo para enriquecer facturación y OS."
+              onFile={(file) => procesarNuevoSistemaXml("productos", file)}
+              accept=".xml"
+              selectedFileLabel={newSystemFiles.productos?.fileName ?? null}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2">
         <DropZone
           title="Importar parque de máquinas"
@@ -1781,6 +2213,16 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         </>
       )}
 
+      {newSystemPreview && (
+        <NewSystemXmlPreview
+          bundle={newSystemPreview}
+          files={newSystemFiles}
+          onConfirm={confirmarNuevoSistemaXml}
+          onCancel={resetNewSystemImport}
+          busy={busy}
+        />
+      )}
+
       {cliRows && (
         <Preview
           title={`Clientes — ${cliFile}`}
@@ -1879,7 +2321,19 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   );
 }
 
-function DropZone({ title, help, onFile }: { title: string; help: string; onFile: (f: File) => void }) {
+function DropZone({
+  title,
+  help,
+  onFile,
+  accept = ".xlsx,.xls,.csv",
+  selectedFileLabel = null,
+}: {
+  title: string;
+  help: string;
+  onFile: (f: File) => void;
+  accept?: string;
+  selectedFileLabel?: string | null;
+}) {
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1907,7 +2361,7 @@ function DropZone({ title, help, onFile }: { title: string; help: string; onFile
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xls,.csv"
+        accept={accept}
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -1918,8 +2372,169 @@ function DropZone({ title, help, onFile }: { title: string; help: string; onFile
       <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
         <Upload className="mr-1 h-3.5 w-3.5" /> Seleccionar archivo
       </Button>
+      {selectedFileLabel && (
+        <div className="mt-2 truncate text-[10px] font-medium text-primary" title={selectedFileLabel}>
+          {selectedFileLabel}
+        </div>
+      )}
       <div className="mt-1 text-[10px] text-muted-foreground">o arrastrá el archivo aquí</div>
     </div>
+  );
+}
+
+function NewSystemXmlPreview({
+  bundle,
+  files,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  bundle: NewSystemImportBundle;
+  files: NewSystemXmlFilesState;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  const factPreview = bundle.facturacion.rows.slice(0, 8);
+  const osPreview = bundle.ordenesServicio.rows.slice(0, 8);
+
+  return (
+    <Card className="border-primary/30">
+      <CardContent className="p-3 sm:p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-semibold text-sm">Nuevo sistema listo para importar</div>
+            <div className="text-[11px] text-muted-foreground">
+              Reemplaza solo datos desde {NEW_SYSTEM_START}. El histórico anterior queda intacto.
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{bundle.diagnostics.billingRows.toLocaleString()} líneas facturación</Badge>
+            <Badge variant="outline">{bundle.diagnostics.serviceOrders.toLocaleString()} líneas OS</Badge>
+            <Badge variant="outline">{bundle.diagnostics.products.toLocaleString()} productos</Badge>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <Card className="border-border/60">
+            <CardContent className="p-3">
+              <div className="text-[11px] text-muted-foreground">Venta directa</div>
+              <div className="text-2xl font-semibold">{bundle.diagnostics.billingDirectSales.toLocaleString()}</div>
+              <div className="text-[11px] text-muted-foreground">Sin cruce con OS</div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/60">
+            <CardContent className="p-3">
+              <div className="text-[11px] text-muted-foreground">Cruzadas con OS</div>
+              <div className="text-2xl font-semibold">{bundle.diagnostics.billingMatchedToOs.toLocaleString()}</div>
+              <div className="text-[11px] text-muted-foreground">Documento / factura</div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/60">
+            <CardContent className="p-3">
+              <div className="text-[11px] text-muted-foreground">Ventana facturación</div>
+              <div className="font-semibold">
+                {bundle.diagnostics.replacement.facturacion.from ?? "—"} · {bundle.diagnostics.replacement.facturacion.to ?? "—"}
+              </div>
+              <div className="text-[11px] text-muted-foreground">Se reemplaza solo este tramo</div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/60">
+            <CardContent className="p-3">
+              <div className="text-[11px] text-muted-foreground">Ventana OS</div>
+              <div className="font-semibold">
+                {bundle.diagnostics.replacement.ordenesServicio.from ?? "—"} · {bundle.diagnostics.replacement.ordenesServicio.to ?? "—"}
+              </div>
+              <div className="text-[11px] text-muted-foreground">Apertura / emisión</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="mb-2">
+                <div className="font-semibold text-sm">Facturación nueva</div>
+                <div className="text-[11px] text-muted-foreground">{files.facturacion?.fileName ?? "—"}</div>
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Factura</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {factPreview.map((row) => {
+                      const crosswalk = bundle.billingCrosswalk.find((item) => item.billingRowId === row.rowId);
+                      return (
+                        <TableRow key={row.rowId}>
+                          <TableCell className="text-xs whitespace-nowrap">{row.emissionDate ?? "—"}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">{row.invoiceShortNumber ?? row.invoiceLongNumber ?? "—"}</TableCell>
+                          <TableCell className="text-xs max-w-[220px] truncate">{row.clientName}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">{crosswalk?.inferredTimeType ?? row.timeType}</TableCell>
+                          <TableCell className="text-xs text-right whitespace-nowrap">
+                            USD {(row.totalValueWithIva || row.totalValueBase || 0).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="mb-2">
+                <div className="font-semibold text-sm">Órdenes de servicio nuevas</div>
+                <div className="text-[11px] text-muted-foreground">{files.ordenesServicio?.fileName ?? "—"}</div>
+              </div>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>OS</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {osPreview.map((row) => (
+                      <TableRow key={row.rowId}>
+                        <TableCell className="text-xs whitespace-nowrap">{row.serviceOrderNumber}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{row.openDate ?? row.invoiceDate ?? "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[220px] truncate">{row.ownerName ?? row.billedClientName ?? "—"}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{row.timeType}</TableCell>
+                        <TableCell className="text-xs text-right whitespace-nowrap">
+                          USD {(row.lineTotal || 0).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={onConfirm} disabled={busy}>
+            {busy ? "Importando..." : "Confirmar importación nuevo sistema"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -2105,3 +2720,4 @@ function ContactosPreview({
     </Card>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,11 +10,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
-import { TrabajosOSTab } from "@/components/trabajos/TrabajosOSTab";
 import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
 import { EmptyState } from "@/components/EmptyState";
 import { KanbanSkeleton } from "@/components/LoadingSkeletons";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { parseISO, format } from "date-fns";
 import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { useAuth } from "@/hooks/useAuth";
@@ -57,7 +55,6 @@ export default function Trabajos() {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
-  const [vista, setVista] = useState<"kanban" | "os">("kanban");
 
   useEffect(() => {
     if (isTecnico && !isAdmin && profile?.sucursal && fSucursal === "all") {
@@ -76,7 +73,7 @@ export default function Trabajos() {
       ]);
       setTrabajos(t);
 
-      // Mapear servicio_jornadas → trabajo via legacy_servicio_id
+      // Mapear servicio_jornadas â†’ trabajo via legacy_servicio_id
       const servToTrabajo = new Map<string, string>();
       for (const tr of t) {
         if (tr.legacy_servicio_id) servToTrabajo.set(tr.legacy_servicio_id, tr.id);
@@ -160,22 +157,12 @@ export default function Trabajos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tabs value={vista} onValueChange={(v) => setVista(v as "kanban" | "os")}>
-            <TabsList className="h-9">
-              <TabsTrigger value="kanban" className="text-xs">Kanban</TabsTrigger>
-              <TabsTrigger value="os" className="text-xs">Órdenes de servicio</TabsTrigger>
-            </TabsList>
-          </Tabs>
           <Button size="sm" onClick={() => setOpenNuevo(true)}>
             <Plus className="mr-1.5 h-4 w-4" /> Nuevo trabajo
           </Button>
         </div>
       </div>
 
-      {vista === "os" ? (
-        <TrabajosOSTab clientes={clientes} profiles={profiles} onChanged={load} />
-      ) : (
-        <>
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: "Buscar OS, TR, cliente o problema..." }}
         activeCount={activosCount}
@@ -233,7 +220,7 @@ export default function Trabajos() {
 
                   <div className="space-y-1.5">
                     {items.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">—</p>
+                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">â€”</p>
                     )}
 
                     {visibles.map(t => {
@@ -327,7 +314,7 @@ export default function Trabajos() {
                         onClick={() => setExpandidas(s => new Set(s).add(col.key))}
                         className="w-full rounded-md border border-dashed py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
-                        +{restantes} más
+                        +{restantes} mÃ¡s
                       </button>
                     )}
 
@@ -349,8 +336,6 @@ export default function Trabajos() {
             );
           })}
         </div>
-      )}
-        </>
       )}
 
 

@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Marca, Sucursal } from "@/lib/constants";
-import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, OSSucursalMetric, PeriodMode, Facturacion } from "./types";
+import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion } from "./types";
 import {
   money,
   pct,
@@ -571,7 +571,7 @@ export function WeeklyBars({
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
         <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
-        {metric === "usd" ? "Facturacion ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
+        {metric === "usd" ? "Facturación ($)" : metric === "horasServicio" ? "Horas servicio facturadas" : "Km facturados"}
         <span className="ml-3 h-0 w-8 max-w-[42px] border-t-2 border-red-500" />
         {hasAnyComparisonData ? "Año anterior equivalente" : "Año anterior: sin datos disponibles"}
       </div>
@@ -743,7 +743,7 @@ export function TrabajoSucursalBars({
 
 export function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }> }) {
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin actividad tecnica en el periodo selecciónado.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin actividad técnica en el período seleccionado.</div>;
   }
 
   return (
@@ -865,7 +865,7 @@ export function EstadoCompacto({
   if (flujo.total === 0) {
     return (
       <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">
-        Sin trabajos en el periodo selecciónado.
+        Sin trabajos en el período seleccionado.
       </div>
     );
   }
@@ -1771,7 +1771,7 @@ export function CargaTecnicaMatriz({
       </div>
 
       {rows.length === 0 || buckets.length === 0 ? (
-        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros selecciónados.</div>
+        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 md:hidden">
@@ -1905,7 +1905,7 @@ export function ClientesCompacto({
         <div className="sticky top-0 grid grid-cols-[1fr_60px_96px_48px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
           <div>Cliente</div>
           <div className="text-right">Fact.</div>
-          <div className="text-right">Facturacion</div>
+          <div className="text-right">Facturación</div>
           <div className="text-right">%</div>
         </div>
         {visible.map((r) => {
@@ -2273,7 +2273,7 @@ export function FacturacionExplorer({
         <>
           <div className="space-y-2 md:hidden">
             {invoiceRows.length === 0 ? (
-              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin facturas en el periodo selecciónado.</div>
+              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin facturas en el período seleccionado.</div>
             ) : (
               invoiceRows.slice(0, 30).map((row) => (
                 <div key={row.key} className="rounded-md border bg-background shadow-sm">
@@ -2331,7 +2331,7 @@ export function FacturacionExplorer({
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {invoiceRows.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturas en el periodo selecciónado.</div>
+                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturas en el período seleccionado.</div>
               ) : (
                 invoiceRows.map((row) => (
                   <div key={row.key} className="border-t">
@@ -2419,7 +2419,7 @@ export function FacturacionExplorer({
               <div>Cliente</div>
               <div className="text-right">Fact.</div>
               <div className="text-right">Ticket prom.</div>
-              <div className="text-right">Facturacion</div>
+              <div className="text-right">Facturación</div>
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {clientRowsComputed.length === 0 ? (

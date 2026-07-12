@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
-import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, OSSucursalMetric, PeriodMode } from "@/components/dashboard/types";
+import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
 import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList } from "@/components/dashboard/DashboardCharts";
@@ -161,6 +161,7 @@ interface OrdenServicioImportada {
   trabajo_id: string | null;
   cliente_nombre: string | null;
   fecha_abierta_os: string | null;
+  fecha_emision_factura: string | null;
   factura: string | null;
   marca: string | null;
   problema: string | null;
@@ -319,7 +320,6 @@ export default function Dashboard() {
   const [factExplorerView, setFactExplorerView] = useState<"facturas" | "clientes" | "analisis">("facturas");
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
-  const [osSucursalMetric, setOsSucursalMetric] = useState<OSSucursalMetric>("interno");
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
@@ -502,11 +502,10 @@ export default function Dashboard() {
         const gridQuery = (supabase
           .from("facturacion_lineas_importadas" as any)
           .select(
-            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, cod_mercaderia, codigo_fabricante, mercaderia, observacion, raw_data, subgrupo_original, grupo_normalizado, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
+            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, cod_mercaderia, codigo_fabricante, mercaderia, observacion, raw_data, subgrupo_original, grupo_normalizado, marca_normalizada, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
           )
           .gte("fecha_factura", dateKey(queryStart))
           .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
-          .eq("origen_sistema", "grid_campos")
           .order("fecha_factura", { ascending: false }) as any);
 
         const [legacyRows, gridRowsRaw] = await Promise.all([
@@ -516,18 +515,31 @@ export default function Dashboard() {
 
         const gridCamposYears = new Set(
           gridRowsRaw
+            .filter((row) => row.origen_sistema === "grid_campos")
             .map((row) => String(row.fecha_factura ?? "").slice(0, 4))
             .filter(Boolean),
+        );
+        const detailedLineKeys = new Set(
+          gridRowsRaw
+            .map((row) => {
+              const factura = String(row.codigo_interno_factura ?? row.factura ?? "").trim();
+              const fecha = String(row.fecha_factura ?? "").slice(0, 10);
+              return factura && fecha ? `${fecha}||${factura}` : null;
+            })
+            .filter(Boolean) as string[],
         );
         const legacyRowsNormalizados = legacyRows
           .filter((row) => {
             const esCampos = row.entidad_nombre.toUpperCase().includes("CAMPOS DEL MA");
             const year = row.fecha.slice(0, 4);
+            const detailKey = `${row.fecha}||${String(row.cod_factura ?? "").trim()}`;
+            if (detailedLineKeys.has(detailKey)) return false;
             return !esCampos || !gridCamposYears.has(year);
           })
           .map((row) => ({
             ...row,
             cantidad: Number((row as any).cantidad || 0),
+            marca: clasificarMarcaFacturacion(row.grupo),
             tipo_tiempo: "Cliente" as Facturacion["tipo_tiempo"],
             origen_sistema: "legacy",
           }));
@@ -547,6 +559,7 @@ export default function Dashboard() {
             grupo_fx: row.grupo_normalizado ?? null,
             cod_factura: factura,
             tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
+            marca: (row.marca_normalizada ?? clasificarMarcaFacturacion(row.subgrupo_original ?? row.grupo_normalizado)) as Marca,
             origen_sistema: row.origen_sistema ?? "grid_campos",
             raw_data: row.raw_data ?? null,
           };
@@ -572,13 +585,27 @@ export default function Dashboard() {
     (async () => {
       setOrdenesLoading(true);
       try {
-        const rows = await cargarTodo<OrdenServicioImportada>(
-          (supabase
-            .from("ordenes_servicio_importadas" as any)
-            .select("os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, factura, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion")
-            .gte("fecha_abierta_os", dateKey(queryStart))
-            .lte("fecha_abierta_os", `${dateKey(queryEnd)}T23:59:59`)
-            .order("fecha_abierta_os", { ascending: false }) as any),
+        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_emision_factura, factura, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion";
+        const [rowsByOpenDate, rowsByInvoiceDate] = await Promise.all([
+          cargarTodo<OrdenServicioImportada>(
+            (supabase
+              .from("ordenes_servicio_importadas" as any)
+              .select(osSelect)
+              .gte("fecha_abierta_os", dateKey(queryStart))
+              .lte("fecha_abierta_os", `${dateKey(queryEnd)}T23:59:59`)
+              .order("fecha_abierta_os", { ascending: false }) as any),
+          ),
+          cargarTodo<OrdenServicioImportada>(
+            (supabase
+              .from("ordenes_servicio_importadas" as any)
+              .select(osSelect)
+              .gte("fecha_emision_factura", dateKey(queryStart))
+              .lte("fecha_emision_factura", `${dateKey(queryEnd)}T23:59:59`)
+              .order("fecha_emision_factura", { ascending: false }) as any),
+          ),
+        ]);
+        const rows = Array.from(
+          new Map([...rowsByOpenDate, ...rowsByInvoiceDate].map((row) => [row.os_numero, row])).values(),
         );
         if (alive) setOrdenesServicio(rows);
       } catch (error) {
@@ -656,7 +683,7 @@ export default function Dashboard() {
       facturación.filter((row) => {
         if (fSucursales.length > 0 && (!row.sucursal || !fSucursales.includes(row.sucursal))) return false;
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
-        if (fMarcas.length > 0 && !fMarcas.includes(clasificarMarcaFacturacion(row.grupo))) return false;
+        if (fMarcas.length > 0 && !fMarcas.includes(row.marca ?? clasificarMarcaFacturacion(row.grupo))) return false;
         if (fTiposTiempo.length > 0 && !fTiposTiempo.includes(row.tipo_tiempo)) return false;
         if (!query) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
@@ -670,7 +697,7 @@ export default function Dashboard() {
     [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturación, query],
   );
 
-  // Todos los registros del rango completo selecciónado por el usuario
+  // Todos los registros del rango completo seleccionado por el usuario
   const allPeriodFacts = useMemo(
     () => factFiltered.filter((row) => inRange(row.fecha, periodStart, periodEnd)),
     [factFiltered, periodStart, periodEnd],
@@ -1086,7 +1113,7 @@ export default function Dashboard() {
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
   const técnicosPróximoPeriodo = new Set(jornadasPlanificacion.flatMap((j) => validJornadaCrew(j))).size;
-  const técnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
+  const tecnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
   const jornadasOperativasPeriodo = useMemo(
     () =>
       jornadas.filter((jornada) => {
@@ -1231,17 +1258,17 @@ export default function Dashboard() {
 
   // Textos derivados del agrupador elegido.
   const periodoLabel =
-    periodMode === "dia" ? "díario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
+    periodMode === "dia" ? "diario" : periodMode === "semana" ? "semanal" : periodMode === "mes" ? "mensual" : "anual";
   const T = useMemo(() => {
     const isSemana = periodMode === "semana";
     const periodoNombre = periodMode === "dia" ? "dia" : periodMode === "semana" ? "semana" : periodMode === "mes" ? "mes" : "anio";
     return {
-      selecciónado: isSemana ? "semana selecciónada" : "periodo selecciónado",
-      facturación: isSemana ? "Facturacion de la semana" : "Facturacion del periodo",
-      facturas: isSemana ? "Facturas de la semana" : "Facturas del periodo",
-      comparativoFacturacion: `Facturacion por ${periodoNombre}`,
-      selecciónaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composición.`,
-      periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} selecciónado`,
+      seleccionado: isSemana ? "semana seleccionada" : "periodo seleccionado",
+      facturacion: isSemana ? "Facturación de la semana" : "Facturación del período",
+      facturas: isSemana ? "Facturas de la semana" : "Facturas del período",
+      comparativoFacturacion: `Facturación por ${periodoNombre}`,
+      seleccionaPeriodo: `Selecciona un ${periodoNombre} para ver facturas, clientes y composición.`,
+      periodoSeleccionado: `${periodoNombre.charAt(0).toUpperCase()}${periodoNombre.slice(1)} seleccionado`,
       sinFacturacion: `Sin facturación para este ${periodoNombre}.`,
       columnaPeriodo: periodMode === "dia" ? "Día" : periodMode === "semana" ? "Semana" : periodMode === "mes" ? "Mes" : "Año",
       carga: isSemana ? "Carga semanal" : "Carga técnica",
@@ -2294,7 +2321,7 @@ export default function Dashboard() {
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                tecnicosCierreAnterior={técnicosCierreAnterior}
+                tecnicosCierreAnterior={tecnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
@@ -2356,7 +2383,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
-                <p className="text-xs text-muted-foreground">{T.selecciónaPeriodo}</p>
+                <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
@@ -2519,7 +2546,7 @@ export default function Dashboard() {
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                tecnicosCierreAnterior={técnicosCierreAnterior}
+                tecnicosCierreAnterior={tecnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
