@@ -729,6 +729,59 @@ export default function Dashboard() {
     );
   };
 
+  const ordenServicioByNumero = useMemo(() => {
+    const map = new Map<string, OrdenServicioImportada>();
+    for (const row of ordenesServicio) {
+      const key = String(row.os_numero ?? "").trim();
+      if (key) map.set(key, row);
+    }
+    return map;
+  }, [ordenesServicio]);
+
+  const linkedOSNumber = (row: Facturacion) => {
+    const raw = row.raw_data as Record<string, unknown> | null | undefined;
+    return String(raw?.linked_service_order ?? "").trim();
+  };
+
+  const factMetricQuantities = (rows: Facturacion[]) => {
+    let horasServicio = 0;
+    let kmFacturados = 0;
+    const countedServiceOS = new Set<string>();
+    const countedKmOS = new Set<string>();
+
+    for (const row of rows) {
+      const rowConcept = concept(row);
+      const osNumero = linkedOSNumber(row);
+      const os = osNumero ? ordenServicioByNumero.get(osNumero) : null;
+
+      if (rowConcept === "Servicio") {
+        const osHours = Number(os?.servicios_cantidad || 0);
+        if (osNumero && osHours > 0) {
+          if (!countedServiceOS.has(osNumero)) {
+            horasServicio += osHours;
+            countedServiceOS.add(osNumero);
+          }
+        } else {
+          horasServicio += Number(row.cantidad || 0);
+        }
+      }
+
+      if (rowConcept === "Kilometraje") {
+        const osKm = Number(os?.km_cantidad || 0);
+        if (osNumero && osKm > 0) {
+          if (!countedKmOS.has(osNumero)) {
+            kmFacturados += osKm;
+            countedKmOS.add(osNumero);
+          }
+        } else {
+          kmFacturados += Number(row.cantidad || 0);
+        }
+      }
+    }
+
+    return { horasServicio, kmFacturados };
+  };
+
   const osImpactRows = useMemo<OSImpactRow[]>(() => {
     return ordenesServicio
       .map((row) => {
@@ -849,22 +902,16 @@ export default function Dashboard() {
       const compEnd = subYears(end, 1);
       const comparisonFacts = factFiltered.filter((row) => inRange(row.fecha, compStart, compEnd));
       const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
-      let horasServicio = 0;
-      let kmFacturados = 0;
-      let comparisonHorasServicio = 0;
-      let comparisonKmFacturados = 0;
 
       for (const row of weekFacts) {
         const rowConcept = concept(row);
         byConcept[rowConcept] += Number(row.total_venta || 0);
-        if (rowConcept === "Servicio") horasServicio += Number(row.cantidad || 0);
-        if (rowConcept === "Kilometraje") kmFacturados += Number(row.cantidad || 0);
       }
-      for (const row of comparisonFacts) {
-        const rowConcept = concept(row);
-        if (rowConcept === "Servicio") comparisonHorasServicio += Number(row.cantidad || 0);
-        if (rowConcept === "Kilometraje") comparisonKmFacturados += Number(row.cantidad || 0);
-      }
+      const { horasServicio, kmFacturados } = factMetricQuantities(weekFacts);
+      const {
+        horasServicio: comparisonHorasServicio,
+        kmFacturados: comparisonKmFacturados,
+      } = factMetricQuantities(comparisonFacts);
 
       const clients = new Set(weekFacts.map((row) => {
         const nombre = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
@@ -899,7 +946,7 @@ export default function Dashboard() {
       ...row,
       variacion: pct(row.total, row.comparisonTotal),
     }));
-  }, [factFiltered, periodMode, periodStart, periodEnd, clienteById]);
+  }, [factFiltered, ordenServicioByNumero, periodMode, periodStart, periodEnd, clienteById]);
 
   const selectedWeek = selectedWeekKey ? weeklyRows.find((row) => row.key === selectedWeekKey) : undefined;
   const selectedFacts = selectedWeek ? selectedWeek.rows : allPeriodFacts;
@@ -1225,14 +1272,11 @@ export default function Dashboard() {
   // Fila sintetica con la agregaci-n del rango completo para MixRubros
   const periodRow = useMemo<WeekRow>(() => {
     const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
-    let horasServicio = 0;
-    let kmFacturados = 0;
     for (const row of allPeriodFacts) {
       const rowConcept = concept(row);
       byConcept[rowConcept] += Number(row.total_venta || 0);
-      if (rowConcept === "Servicio") horasServicio += Number(row.cantidad || 0);
-      if (rowConcept === "Kilometraje") kmFacturados += Number(row.cantidad || 0);
     }
+    const { horasServicio, kmFacturados } = factMetricQuantities(allPeriodFacts);
     return {
       key: dateKey(periodStart),
       label: `${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")}`,
@@ -1254,7 +1298,7 @@ export default function Dashboard() {
       variacion: variacionTotalPct,
       rows: allPeriodFacts,
     };
-  }, [allPeriodFacts, totalPeriodo, facturasPeriodo, clientesAtendidosSemana, totalPrevPeriodo, periodStart, periodEnd, periodComparisonLabel, variacionTotalPct]);
+  }, [allPeriodFacts, ordenServicioByNumero, totalPeriodo, facturasPeriodo, clientesAtendidosSemana, totalPrevPeriodo, periodStart, periodEnd, periodComparisonLabel, variacionTotalPct]);
 
   // Textos derivados del agrupador elegido.
   const periodoLabel =
