@@ -1446,7 +1446,7 @@ export default function Dashboard() {
         noRealizadas: number;
         programadas: number;
         noDisponibilidad: string[];
-        refs: Array<{ ref: string; cliente: string; estado: string; motivo?: string | null }>;
+        refs: Array<{ id?: string; fecha?: string; ref: string; cliente: string; trabajo?: string; sucursal?: string; tecnico?: string; estado: string; motivo?: string | null }>;
       }>;
       tieneActividad: boolean;
       tieneNoDisponibilidad: boolean;
@@ -1489,6 +1489,8 @@ export default function Dashboard() {
           ? clienteById.get(servicio.cliente_id)?.nombre ?? "Sin cliente"
           : "Sin cliente";
       const ref = trabajo?.codigo ?? "TR";
+      const trabajoDescripcion = trabajo?.descripcion_problema ?? servicio?.trabajo_descripcion ?? "";
+      const sucursalTrabajo = trabajo?.sucursal ?? servicio?.sucursal ?? "Sin sucursal";
       const estadoRef = jornada.estado === "Completado"
         ? "Realizada"
         : jornada.estado === "Cancelada"
@@ -1514,7 +1516,16 @@ export default function Dashboard() {
         if (jornada.estado === "Completado") cell.realizadas += 1;
         else if (jornada.estado === "Cancelada" || jornada.fecha < todayStr) cell.noRealizadas += 1;
         else cell.programadas += 1;
-        cell.refs.push({ ref, cliente, estado: estadoRef });
+        cell.refs.push({
+          id: jornada.id,
+          fecha: jornada.fecha,
+          ref,
+          cliente,
+          trabajo: trabajoDescripcion,
+          sucursal: sucursalTrabajo,
+          tecnico: row.nombre,
+          estado: estadoRef,
+        });
         row.cells[key] = cell;
         row.tieneActividad = true;
       }
