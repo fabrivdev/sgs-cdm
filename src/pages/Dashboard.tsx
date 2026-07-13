@@ -74,6 +74,23 @@ type DashboardStoredFilters = {
   periodMode?: PeriodMode;
 };
 
+type DashboardDatePresetKey =
+  | "current-week"
+  | "previous-week"
+  | "previous-current-week"
+  | "current-month"
+  | "last-6-months"
+  | "last-12-months"
+  | "current-year";
+
+type DashboardDatePreset = {
+  key: DashboardDatePresetKey;
+  label: string;
+  from: Date;
+  to: Date;
+  mode: PeriodMode;
+};
+
 function isValidDateKey(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(parseISO(value).getTime());
 }
@@ -342,6 +359,74 @@ export default function Dashboard() {
   const weekEnd = useMemo(() => endOfWeek(today, { weekStartsOn: 1 }), []);
   const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
   const previousWeekEnd = useMemo(() => endOfWeek(previousWeekStart, { weekStartsOn: 1 }), [previousWeekStart]);
+  const datePresets = useMemo<DashboardDatePreset[]>(() => [
+    {
+      key: "current-week",
+      label: "Semana actual",
+      from: weekStart,
+      to: weekEnd,
+      mode: "dia",
+    },
+    {
+      key: "previous-week",
+      label: "Semana anterior",
+      from: previousWeekStart,
+      to: previousWeekEnd,
+      mode: "dia",
+    },
+    {
+      key: "previous-current-week",
+      label: "Semana anterior + actual",
+      from: previousWeekStart,
+      to: weekEnd,
+      mode: "dia",
+    },
+    {
+      key: "current-month",
+      label: "Este mes",
+      from: startOfMonth(today),
+      to: endOfMonth(today),
+      mode: "semana",
+    },
+    {
+      key: "last-6-months",
+      label: "Últimos 6 meses",
+      from: startOfMonth(subMonths(today, 5)),
+      to: today,
+      mode: "mes",
+    },
+    {
+      key: "last-12-months",
+      label: "Últimos 12 meses",
+      from: startOfMonth(subMonths(today, 11)),
+      to: today,
+      mode: "mes",
+    },
+    {
+      key: "current-year",
+      label: "Este año",
+      from: startOfYear(today),
+      to: endOfYear(today),
+      mode: "mes",
+    },
+  ], [previousWeekEnd, previousWeekStart, weekEnd, weekStart]);
+
+  const activeDatePreset = useMemo(() => {
+    return datePresets.find((preset) =>
+      dateFrom === format(preset.from, "yyyy-MM-dd") &&
+      dateTo === format(preset.to, "yyyy-MM-dd") &&
+      periodMode === preset.mode
+    )?.key ?? "";
+  }, [dateFrom, datePresets, dateTo, periodMode]);
+
+  const applyDatePreset = (key: string) => {
+    const preset = datePresets.find((item) => item.key === key);
+    if (!preset) return;
+    setDateFrom(format(preset.from, "yyyy-MM-dd"));
+    setDateTo(format(preset.to, "yyyy-MM-dd"));
+    setPeriodMode(preset.mode);
+    setSelectedWeekKey(null);
+  };
 
   // Rango libre definido por el usuario
   const periodStart = useMemo(() => parseISO(dateFrom), [dateFrom]);
@@ -2126,6 +2211,18 @@ export default function Dashboard() {
           </div>
         ) : null}
       >
+        <FilterCustom label="Período rápido" width="w-[190px]">
+          <select
+            value={activeDatePreset}
+            onChange={(event) => applyDatePreset(event.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">Personalizado</option>
+            {datePresets.map((preset) => (
+              <option key={preset.key} value={preset.key}>{preset.label}</option>
+            ))}
+          </select>
+        </FilterCustom>
         <FilterDate label="Desde" value={dateFrom} onChange={setDateFrom} width="w-[140px]" max={dateTo} />
         <FilterDate label="Hasta" value={dateTo} onChange={setDateTo} width="w-[140px]" min={dateFrom} />
         <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
