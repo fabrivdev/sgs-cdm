@@ -2,7 +2,7 @@
 import { format, getDay, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Activity, Building2, CalendarDays, FileText, Receipt } from "lucide-react";
+import { Activity, Building2, CalendarDays, FileText, Printer, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Marca, Sucursal } from "@/lib/constants";
 import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion } from "./types";
@@ -1313,6 +1313,20 @@ export function MatrizTécnicosDías({
     ? `${leftWidth}px repeat(${buckets.length}, minmax(120px, 1fr))`
     : `${leftWidth}px repeat(${buckets.length}, ${dayWidth}px)`;
 
+  const printMatrix = () => {
+    document.body.classList.add("printing-dashboard-matrix");
+    window.setTimeout(() => window.print(), 30);
+  };
+
+  useEffect(() => {
+    const cleanup = () => document.body.classList.remove("printing-dashboard-matrix");
+    window.addEventListener("afterprint", cleanup);
+    return () => {
+      window.removeEventListener("afterprint", cleanup);
+      cleanup();
+    };
+  }, []);
+
   const startResize = (event: any) => {
     event.preventDefault();
     const startX = event.clientX;
@@ -1334,8 +1348,20 @@ export function MatrizTécnicosDías({
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="dashboard-matrix-print-root space-y-3">
+        <div className="dashboard-matrix-print-header hidden">
+          <div>
+            <div className="text-sm font-bold">Matriz técnicos por período</div>
+            <div className="text-[10px] text-muted-foreground">
+              {bucketMode === "dia" ? "Vista diaria" : bucketMode === "semana" ? "Vista semanal" : bucketMode === "mes" ? "Vista mensual" : "Vista anual"} · {metric === "horas" ? "Horas" : "Trabajos"}
+            </div>
+          </div>
+          <div className="text-right text-[10px] text-muted-foreground">
+            {buckets[0] ? bucketLabels[buckets[0]] ?? buckets[0] : ""} - {buckets[buckets.length - 1] ? bucketLabels[buckets[buckets.length - 1]] ?? buckets[buckets.length - 1] : ""}
+          </div>
+        </div>
+
+        <div className="dashboard-matrix-print-toolbar flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1"><span className="text-emerald-600">●</span> Realizadas</span>
             <span className="inline-flex items-center gap-1"><span className="text-amber-600">▲</span> Vencidas</span>
@@ -1343,21 +1369,34 @@ export function MatrizTécnicosDías({
             <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> No disponible</span>
           </div>
 
-          <div className="inline-flex overflow-hidden rounded-md border text-[11px]">
-            <button type="button" onClick={() => onMetricChange("trabajos")} className={cn("px-2.5 py-1", metric === "trabajos" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Trabajos</button>
-            <button type="button" onClick={() => onMetricChange("horas")} className={cn("border-l px-2.5 py-1", metric === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Horas</button>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex overflow-hidden rounded-md border text-[11px]">
+              <button type="button" onClick={() => onMetricChange("trabajos")} className={cn("px-2.5 py-1", metric === "trabajos" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Trabajos</button>
+              <button type="button" onClick={() => onMetricChange("horas")} className={cn("border-l px-2.5 py-1", metric === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Horas</button>
+            </div>
+            <button
+              type="button"
+              onClick={printMatrix}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-[11px] font-medium hover:bg-accent"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Imprimir
+            </button>
           </div>
         </div>
 
-        <div className="space-y-3 overflow-x-auto pb-1">
+        <div className="dashboard-matrix-scroll space-y-3 overflow-x-auto pb-1">
           {blocks.map((block) => (
-            <div key={block.sucursal} className="rounded-lg border bg-background">
-              <div className="grid min-w-max border-b bg-muted/25" style={{ gridTemplateColumns }}>
-                <div className="sticky left-0 z-20 border-r bg-muted/25">
+            <div key={block.sucursal} className="dashboard-matrix-block rounded-lg border bg-background">
+              <div
+                className="dashboard-matrix-grid grid min-w-max border-b bg-muted/25"
+                style={{ gridTemplateColumns, "--matrix-days": buckets.length } as { [key: string]: string | number }}
+              >
+                <div className="dashboard-matrix-left sticky left-0 z-20 border-r bg-muted/25">
                   <button
                     type="button"
                     onClick={() => onSelectSucursal(block.sucursal)}
-                    className="flex h-11 w-full flex-col items-start justify-center px-3 text-left hover:bg-accent/60"
+                    className="dashboard-matrix-sucursal flex h-11 w-full flex-col items-start justify-center px-3 text-left hover:bg-accent/60"
                   >
                     <span className="text-sm font-semibold">{block.sucursal}</span>
                     <span className="text-[11px] text-muted-foreground">{block.totalTécnicos} técnicos · {block.totalActividad} {metric === "horas" ? "hs" : "registros"}</span>
@@ -1376,7 +1415,7 @@ export function MatrizTécnicosDías({
                     <div
                       key={`${block.sucursal}-${bucket}`}
                       className={cn(
-                        "flex h-11 items-center justify-center border-l px-1 text-center text-[11px] font-medium text-muted-foreground",
+                        "dashboard-matrix-day-header flex h-11 items-center justify-center border-l px-1 text-center text-[11px] font-medium text-muted-foreground",
                         isCurrent && "bg-primary/5 text-foreground",
                         isSunday && "bg-muted/50"
                       )}
@@ -1388,12 +1427,16 @@ export function MatrizTécnicosDías({
               </div>
 
               {block.técnicos.map((row) => (
-                <div key={`${block.sucursal}-${row.id}`} className="grid min-w-max" style={{ gridTemplateColumns }}>
+                <div
+                  key={`${block.sucursal}-${row.id}`}
+                  className="dashboard-matrix-grid grid min-w-max"
+                  style={{ gridTemplateColumns, "--matrix-days": buckets.length } as { [key: string]: string | number }}
+                >
                   <button
                     type="button"
                     onClick={() => onSelectTecnico(row.id)}
                     className={cn(
-                      "sticky left-0 z-10 flex h-12 flex-col items-start justify-center border-r border-t px-3 text-left hover:bg-accent/60",
+                      "dashboard-matrix-tech sticky left-0 z-10 flex h-12 flex-col items-start justify-center border-r border-t px-3 text-left hover:bg-accent/60",
                       row.sinAsignacion ? "bg-red-50" : "bg-background"
                     )}
                   >
@@ -1414,7 +1457,7 @@ export function MatrizTécnicosDías({
                         : "Sin actividad";
 
                     return (
-                      <div key={`${block.sucursal}-${row.id}-${bucket}`} className={cn("border-l border-t p-1", isCurrent && "bg-primary/5", isSunday && "bg-muted/35")}>
+                      <div key={`${block.sucursal}-${row.id}-${bucket}`} className={cn("dashboard-matrix-cell border-l border-t p-1", isCurrent && "bg-primary/5", isSunday && "bg-muted/35")}>
                         {(cell?.refs?.length || cell?.noDisponibilidad?.length) ? (
                           <Tooltip>
                             <TooltipTrigger asChild>

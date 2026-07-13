@@ -109,3 +109,130 @@
   .row-iniciado { @apply bg-[hsl(var(--estado-iniciado-bg))]; }
   .row-completado { @apply bg-[hsl(var(--estado-completado-bg))]; }
 }
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 6mm;
+  }
+
+  body.printing-dashboard-matrix {
+    background: white !important;
+  }
+
+  body.printing-dashboard-matrix * {
+    visibility: hidden !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-print-root,
+  body.printing-dashboard-matrix .dashboard-matrix-print-root * {
+    visibility: visible !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-print-root {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #111 !important;
+    background: white !important;
+    font-size: 8px !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-print-header {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin-bottom: 4px !important;
+    padding-bottom: 4px !important;
+    border-bottom: 1px solid #d9d9d9 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-print-toolbar {
+    display: none !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-scroll {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-block {
+    break-inside: avoid !important;
+    border-radius: 4px !important;
+    margin-bottom: 4px !important;
+    box-shadow: none !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-grid {
+    display: grid !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    grid-template-columns: 128px repeat(var(--matrix-days), minmax(0, 1fr)) !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-left,
+  body.printing-dashboard-matrix .dashboard-matrix-tech {
+    position: static !important;
+    min-width: 0 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-sucursal {
+    height: 20px !important;
+    padding: 2px 4px !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-sucursal span:first-child {
+    font-size: 8px !important;
+    line-height: 1.05 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-sucursal span:last-child {
+    font-size: 6.5px !important;
+    line-height: 1.05 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-day-header {
+    height: 20px !important;
+    padding: 1px !important;
+    font-size: 7px !important;
+    line-height: 1 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-tech {
+    height: 21px !important;
+    padding: 2px 4px !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-tech span:first-child {
+    max-width: 118px !important;
+    font-size: 7px !important;
+    line-height: 1.05 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-tech span:last-child {
+    font-size: 6px !important;
+    line-height: 1.05 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-cell {
+    padding: 1px !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-cell > *,
+  body.printing-dashboard-matrix .dashboard-matrix-cell button > * {
+    height: 17px !important;
+    min-height: 17px !important;
+    border-radius: 3px !important;
+    font-size: 7px !important;
+    line-height: 1 !important;
+  }
+
+  body.printing-dashboard-matrix button[aria-label="Ajustar ancho de nombres"],
+  body.printing-dashboard-matrix [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
+}
