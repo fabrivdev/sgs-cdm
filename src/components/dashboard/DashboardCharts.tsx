@@ -1364,7 +1364,7 @@ export function MatrizTécnicosDías({
         <div className="dashboard-matrix-print-toolbar flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1"><span className="text-emerald-600">●</span> Realizadas</span>
-            <span className="inline-flex items-center gap-1"><span className="text-amber-600">▲</span> Vencidas</span>
+            <span className="inline-flex items-center gap-1"><span className="text-amber-600">▲</span> No realizadas / vencidas</span>
             <span className="inline-flex items-center gap-1"><span className="text-sky-700">○</span> Programadas</span>
             <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> No disponible</span>
           </div>

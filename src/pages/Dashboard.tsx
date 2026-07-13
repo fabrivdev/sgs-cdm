@@ -1473,7 +1473,7 @@ export default function Dashboard() {
     for (const tecnicoId of activeTechnicianIds) ensureTecnicoRow(tecnicoId);
 
     for (const jornada of jornadas) {
-      if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado") continue;
+      if (jornada.estado !== "Pendiente" && jornada.estado !== "Completado" && jornada.estado !== "Cancelada") continue;
       if (!inRange(jornada.fecha, periodStart, periodEnd)) continue;
       const trabajoId = servicioATrabajo.get(jornada.servicio_id);
       if (!trabajoId || !visibleTrabajoIds.has(trabajoId)) continue;
@@ -1491,9 +1491,11 @@ export default function Dashboard() {
       const ref = trabajo?.codigo ?? "TR";
       const estadoRef = jornada.estado === "Completado"
         ? "Realizada"
-        : jornada.fecha < todayStr
+        : jornada.estado === "Cancelada"
           ? "No realizada"
-          : "Programada";
+          : jornada.fecha < todayStr
+            ? "Vencida"
+            : "Programada";
       const horasJornada = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
 
       for (const tecnicoId of validJornadaCrew(jornada)) {
@@ -1510,7 +1512,7 @@ export default function Dashboard() {
         cell.jornadas += 1;
         cell.horas += horasJornada;
         if (jornada.estado === "Completado") cell.realizadas += 1;
-        else if (jornada.fecha < todayStr) cell.noRealizadas += 1;
+        else if (jornada.estado === "Cancelada" || jornada.fecha < todayStr) cell.noRealizadas += 1;
         else cell.programadas += 1;
         cell.refs.push({ ref, cliente, estado: estadoRef });
         row.cells[key] = cell;
