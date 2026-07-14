@@ -26,9 +26,6 @@ export interface Facturacion {
   marca?: Marca | null;
   origen_sistema?: string | null;
   raw_data?: Record<string, unknown> | null;
-  codigo_fabricante?: string | null;
-  cod_mercaderia?: string | null;
-  mercaderia?: string | null;
 }
 
 export interface OSImpactRow {
