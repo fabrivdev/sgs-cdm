@@ -448,6 +448,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const [newSystemPreview, setNewSystemPreview] = useState<NewSystemImportBundle | null>(null);
   const [busy, setBusy] = useState(false);
   const [historial, setHistorial] = useState<Imp[]>([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [factDiag, setFactDiag] = useState<{
     porHoja: Record<string, number>;
@@ -1965,74 +1966,78 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
+  const historialVisible = showAllHistory ? historial : historial.slice(0, 10);
+  const historialOculto = Math.max(historial.length - historialVisible.length, 0);
+
   return (
     <div className="space-y-4">
       <Card className="border-primary/20">
-        <CardContent className="p-3 sm:p-4 space-y-4">
-          <div className="space-y-1">
-            <div className="font-semibold text-sm">Nuevo sistema XML (desde 01/07/2026)</div>
-            <div className="text-[11px] text-muted-foreground">
-              El histórico hasta 30/06/2026 queda congelado. Al confirmar, se reemplaza solo el tramo nuevo de facturación y órdenes de servicio.
+        <CardContent className="space-y-3 p-3 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold">Importacion vigente - Nuevo sistema XML</div>
+              <div className="max-w-3xl text-[11px] text-muted-foreground">
+                El historico hasta 30/06/2026 queda congelado. Al confirmar, se reemplaza solo el tramo nuevo de facturacion y ordenes de servicio.
+              </div>
             </div>
+            <Badge variant="secondary" className="text-[10px]">Desde 01/07/2026</Badge>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="overflow-hidden rounded-lg border bg-background">
             <DropZone
-              title="Facturación XML"
+              title="Facturacion XML"
               help="facturas - ndc - ncc - ventas.xml - base principal para la venta real del nuevo sistema."
               onFile={(file) => procesarNuevoSistemaXml("facturacion", file)}
               accept=".xml"
               selectedFileLabel={newSystemFiles.facturacion?.fileName ?? null}
+              compact
             />
             <DropZone
-              title="Órdenes de servicio XML"
-              help="ordenes_de_servicio.xml - cruza documento/factura para distinguir Cliente, Garantía e Interno."
+              title="Ordenes de servicio XML"
+              help="ordenes_de_servicio.xml - cruza documento/factura para distinguir Cliente, Garantia e Interno."
               onFile={(file) => procesarNuevoSistemaXml("ordenesServicio", file)}
               accept=".xml"
               selectedFileLabel={newSystemFiles.ordenesServicio?.fileName ?? null}
+              compact
             />
             <DropZone
               title="Maestro de productos XML"
-              help="maestro_de_productos.xml - completa marca, familia y grupo para enriquecer facturación y OS."
+              help="maestro_de_productos.xml - completa marca, familia y grupo para enriquecer facturacion y OS."
               onFile={(file) => procesarNuevoSistemaXml("productos", file)}
               accept=".xml"
               selectedFileLabel={newSystemFiles.productos?.fileName ?? null}
+              compact
             />
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <DropZone
-          title="Importar parque de máquinas"
-          help="COBERTURA PARQUE DE MAQUINAS.xlsx — usa solo la hoja BD_CLAAS_HORSCH y exige coincidencia exacta del CLIENTE con la matriz ya importada."
-          onFile={procesarParque}
-        />
-        <DropZone
-          title="Importar facturación"
-          help="FACTURACIÓN HISTORICA.xlsx — usa Fact. Repuestos + Fact. Servicios, filtra Tp. Movimento = S y guarda GRUPO FX. Se importan TODAS las líneas; el filtro 'Mano de Obra/Kilometraje' aplica sólo al cálculo del Parque."
-          onFile={procesarFact}
-        />
-        <DropZone
-          title="Importar GRID Campos"
-          help="Relacion de Facturas de Ventas - GRID - CDM.xls - detalle facturado a Campos del Manana. Clasifica Garantia/Interno por observacion y guarda lineas por factura interna + codigo."
-          onFile={procesarFacturacionGridCampos}
-        />
-        <DropZone
-          title="Importar clientes"
-          help="MATRIZ CLIENTES.xlsx — une Cadastro de Entidad v2 + BD CLIENTES por código de entidad. BD CLIENTES complementa y sobreescribe datos."
-          onFile={procesarClientes}
-        />
-        <DropZone
-          title="Importar contactos"
-          help="MATRIZ CLIENTES.xlsx — toma contactos solo desde BD CLIENTES y los vincula por NRO ENTIDAD."
-          onFile={procesarContactos}
-        />
-        <DropZone
-          title="Importar ordenes de servicio"
-          help="Ordenes de Servicios - CDM.xlsx - usa Nro OS para vincular con trabajos que tengan cargada la OS interna."
-          onFile={procesarOrdenesServicio}
-        />
-      </div>
+      <Card className="border-muted bg-muted/20">
+        <CardContent className="space-y-3 p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-semibold">Importaciones anteriores</div>
+              <div className="text-[11px] text-muted-foreground">Archivadas por cambio de sistema. Se conservan solo como referencia.</div>
+            </div>
+            <Badge variant="outline" className="text-[10px]">Deshabilitado</Badge>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              "Parque de maquinas",
+              "Facturacion historica",
+              "GRID Campos",
+              "Clientes",
+              "Contactos",
+              "Ordenes de servicio",
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-2 rounded-md border bg-background/70 px-3 py-2 text-sm text-muted-foreground">
+                <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                <span className="truncate">{item}</span>
+                <Badge variant="outline" className="ml-auto text-[10px]">Archivado</Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {parqueRows && (
         <Preview
@@ -2267,8 +2272,15 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
       <Card>
         <CardContent className="p-3 sm:p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <History className="h-4 w-4 text-primary" /> Historial de importaciones
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <History className="h-4 w-4 text-primary" /> Historial de importaciones
+            </div>
+            {historial.length > 10 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowAllHistory((value) => !value)}>
+                {showAllHistory ? "Mostrar ultimos 10" : `Ver ${historial.length}`}
+              </Button>
+            )}
           </div>
           {historial.length === 0 ? (
             <div className="text-xs text-muted-foreground">Sin importaciones registradas.</div>
@@ -2287,7 +2299,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {historial.map((h) => (
+                  {historialVisible.map((h) => (
                     <TableRow key={h.id}>
                       <TableCell className="text-xs">
                         {new Date(h.creado_en).toLocaleString("es-PY", {
@@ -2315,6 +2327,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
               </Table>
             </div>
           )}
+          {historialOculto > 0 && (
+            <div className="mt-2 text-right text-[11px] text-muted-foreground">
+              {historialOculto} registros anteriores ocultos.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -2327,12 +2344,14 @@ function DropZone({
   onFile,
   accept = ".xlsx,.xls,.csv",
   selectedFileLabel = null,
+  compact = false,
 }: {
   title: string;
   help: string;
   onFile: (f: File) => void;
   accept?: string;
   selectedFileLabel?: string | null;
+  compact?: boolean;
 }) {
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -2340,7 +2359,8 @@ function DropZone({
   return (
     <div
       className={cn(
-        "rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+        "border-dashed transition-colors",
+        compact ? "border-b p-3 last:border-b-0" : "rounded-lg border-2 p-4 text-center",
         drag ? "border-primary bg-primary/5" : "border-border bg-card",
       )}
       onDragOver={(e) => {
@@ -2355,9 +2375,30 @@ function DropZone({
         if (f) onFile(f);
       }}
     >
-      <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-      <div className="font-medium text-sm">{title}</div>
-      <div className="mb-3 mt-1 text-[11px] text-muted-foreground">{help}</div>
+      <div className={cn(compact && "flex items-center gap-3")}>
+        <FileSpreadsheet className={cn("text-muted-foreground", compact ? "h-5 w-5 shrink-0" : "mx-auto mb-2 h-8 w-8")} />
+        <div className={cn(compact && "min-w-0 flex-1 text-left")}>
+          <div className="text-sm font-medium">{title}</div>
+          <div className={cn("text-[11px] text-muted-foreground", compact ? "truncate" : "mb-3 mt-1")} title={help}>
+            {help}
+          </div>
+          {selectedFileLabel && compact && (
+            <div className="mt-1 truncate text-[10px] font-medium text-primary" title={selectedFileLabel}>
+              {selectedFileLabel}
+            </div>
+          )}
+        </div>
+        {selectedFileLabel && compact ? (
+          <Badge variant="secondary" className="shrink-0 text-[10px]">
+            Listo
+          </Badge>
+        ) : null}
+        {compact && (
+          <Button variant="outline" size="sm" className="shrink-0" onClick={() => inputRef.current?.click()}>
+            <Upload className="mr-1 h-3.5 w-3.5" /> Seleccionar
+          </Button>
+        )}
+      </div>
       <input
         ref={inputRef}
         type="file"
@@ -2369,15 +2410,17 @@ function DropZone({
           e.target.value = "";
         }}
       />
-      <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-        <Upload className="mr-1 h-3.5 w-3.5" /> Seleccionar archivo
-      </Button>
-      {selectedFileLabel && (
+      {!compact && (
+        <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+          <Upload className="mr-1 h-3.5 w-3.5" /> Seleccionar archivo
+        </Button>
+      )}
+      {!compact && selectedFileLabel && (
         <div className="mt-2 truncate text-[10px] font-medium text-primary" title={selectedFileLabel}>
           {selectedFileLabel}
         </div>
       )}
-      <div className="mt-1 text-[10px] text-muted-foreground">o arrastrá el archivo aquí</div>
+      {!compact && <div className="mt-1 text-[10px] text-muted-foreground">o arrastrá el archivo aquí</div>}
     </div>
   );
 }
