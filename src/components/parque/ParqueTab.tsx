@@ -51,6 +51,13 @@ const RESULTADOS = [
   "Pendiente llamar",
 ] as const;
 
+const MARCA_AMBAS = "ambas";
+const MARCA_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: MARCA_AMBAS, label: "C/Ambas" },
+  ...MARCAS.map((m) => ({ value: m, label: m })),
+];
+
 type Cliente = {
   id: string;
   nombre: string;
@@ -409,7 +416,6 @@ export function ParqueTab({
     for (const mq of maquinas) {
       if (!mq.cliente_id) continue;
       if (!incluirPlataformas && esPlataformaOCabezal(mq.subgrupo)) continue;
-      if (fMarca !== "all" && mq.marca !== fMarca) continue;
       if (fSubgrupo !== "all" && mq.subgrupo !== fSubgrupo) continue;
       const arr = maquinasByCliente.get(mq.cliente_id) ?? [];
       arr.push(mq);
@@ -464,7 +470,7 @@ export function ParqueTab({
         ultSeg: ultSegByCliente.get(cli.id) ?? null,
       };
     });
-  }, [clientes, contactos, maquinas, factAgregados, seguimientos, incluirPlataformas, fMarca, fSubgrupo]);
+  }, [clientes, contactos, maquinas, factAgregados, seguimientos, incluirPlataformas, fSubgrupo]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -474,6 +480,7 @@ export function ParqueTab({
       if (fSucursal !== "all" && !r.sucursales.includes(fSucursal as Sucursal)) return false;
 
       if (fMarca !== "all") {
+        if (fMarca === MARCA_AMBAS && (r.cantClaas === 0 || r.cantHorsch === 0)) return false;
         if (fMarca === "CLAAS" && r.cantClaas === 0) return false;
         if (fMarca === "HORSCH" && r.cantHorsch === 0) return false;
       }
@@ -619,8 +626,8 @@ export function ParqueTab({
           options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
-          options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[135px]"
+          options={MARCA_OPTIONS}
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"

@@ -23,6 +23,13 @@ const SUBGRUPOS = [
   "OTRO",
 ] as const;
 
+const MARCA_AMBAS = "ambas";
+const MARCA_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: MARCA_AMBAS, label: "C/Ambas" },
+  ...MARCAS.map((m) => ({ value: m, label: m })),
+];
+
 type Maquina = {
   id: string;
   cliente_id: string | null;
@@ -131,6 +138,27 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
     return map;
   }, [clientes]);
 
+  const clientesConAmbasMarcas = useMemo(() => {
+    const marcasByCliente = new Map<string, Set<Marca>>();
+
+    for (const m of maquinas) {
+      if (!m.cliente_id) continue;
+      const activa = m.activo !== false;
+      if (fEstado === "activa" && !activa) continue;
+      if (fEstado === "inactiva" && activa) continue;
+
+      const marcas = marcasByCliente.get(m.cliente_id) ?? new Set<Marca>();
+      marcas.add(m.marca);
+      marcasByCliente.set(m.cliente_id, marcas);
+    }
+
+    const clientes = new Set<string>();
+    for (const [clienteId, marcas] of marcasByCliente) {
+      if (marcas.has("CLAAS") && marcas.has("HORSCH")) clientes.add(clienteId);
+    }
+    return clientes;
+  }, [maquinas, fEstado]);
+
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
     const ad = añoDesde ? Number(añoDesde) : null;
@@ -142,7 +170,9 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
       if (fEstado === "activa" && !activa) return false;
       if (fEstado === "inactiva" && activa) return false;
       if (fSucursal !== "all" && m.sucursal !== fSucursal) return false;
-      if (fMarca !== "all" && m.marca !== fMarca) return false;
+      if (fMarca === MARCA_AMBAS) {
+        if (!m.cliente_id || !clientesConAmbasMarcas.has(m.cliente_id)) return false;
+      } else if (fMarca !== "all" && m.marca !== fMarca) return false;
       if (fSubgrupo !== "all" && m.subgrupo !== fSubgrupo) return false;
       if (ad != null && (m.anio == null || m.anio < ad)) return false;
       if (ah != null && (m.anio == null || m.anio > ah)) return false;
@@ -159,7 +189,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
       return true;
     });
-  }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, añoDesde, añoHasta]);
+  }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, añoDesde, añoHasta, clientesConAmbasMarcas]);
 
   const ordenadas = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
@@ -271,8 +301,8 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
-          options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
+          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[135px]"
+          options={MARCA_OPTIONS}
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[170px]"
