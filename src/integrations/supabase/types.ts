@@ -599,6 +599,7 @@ export type Database = {
         Row: {
           activo: boolean
           actualizado_en: string
+          auth_user_id: string | null
           creado_en: string
           id: string
           nombre: string
@@ -607,6 +608,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           actualizado_en?: string
+          auth_user_id?: string | null
           creado_en?: string
           id: string
           nombre: string
@@ -615,6 +617,7 @@ export type Database = {
         Update: {
           activo?: boolean
           actualizado_en?: string
+          auth_user_id?: string | null
           creado_en?: string
           id?: string
           nombre?: string
