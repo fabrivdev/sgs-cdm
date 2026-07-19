@@ -9,7 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, History } from "lucide-react";
 import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
-import { NEW_SYSTEM_START, prepareNewSystemImportBundle, type NewSystemImportBundle } from "@/lib/imports";
+import {
+  NEW_SYSTEM_START,
+  aggregateNewSystemServiceOrders,
+  prepareNewSystemImportBundle,
+  type NewSystemImportBundle,
+} from "@/lib/imports";
 import {
   clasificarGrupoFacturacion,
   clasificarMarcaFacturacion,
@@ -139,79 +144,6 @@ interface OrdenServicioRow {
   raw_data: Record<string, unknown>;
   _isNew: boolean;
 }
-
-const sumImportNumber = (current: unknown, next: unknown, decimals = 2) =>
-  Number((Number(current || 0) + Number(next || 0)).toFixed(decimals));
-
-const appendDistinctText = (current: unknown, next: unknown, maxItems = 4) => {
-  const parts = String(current ?? "")
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const candidate = String(next ?? "").trim();
-
-  if (candidate && !parts.includes(candidate)) parts.push(candidate);
-  return parts.slice(0, maxItems).join("; ");
-};
-
-const aggregateNewSystemServiceOrders = (rows: any[]) => {
-  const byOs = new Map<string, any>();
-
-  for (const row of rows) {
-    const osNumero = String(row.os_numero ?? "").trim();
-    if (!osNumero) continue;
-
-    const current = byOs.get(osNumero);
-    if (!current) {
-      byOs.set(osNumero, {
-        ...row,
-        raw_data: {
-          ...(row.raw_data ?? {}),
-          lineas_agregadas: 1,
-          productos_agregados: row.problema ? [String(row.problema)] : [],
-        },
-      });
-      continue;
-    }
-
-    current.km_cantidad = sumImportNumber(current.km_cantidad, row.km_cantidad, 4);
-    current.kilometro_valor = sumImportNumber(current.kilometro_valor, row.kilometro_valor);
-    current.servicios_cantidad = sumImportNumber(current.servicios_cantidad, row.servicios_cantidad, 4);
-    current.servicios_valor = sumImportNumber(current.servicios_valor, row.servicios_valor);
-    current.terceros_valor = sumImportNumber(current.terceros_valor, row.terceros_valor);
-    current.repuesto_valor = sumImportNumber(current.repuesto_valor, row.repuesto_valor);
-
-    current.problema = appendDistinctText(current.problema, row.problema);
-    current.cliente_nombre = current.cliente_nombre ?? row.cliente_nombre;
-    current.situacion_os = current.situacion_os ?? row.situacion_os;
-    current.situacion_facturacion = current.situacion_facturacion ?? row.situacion_facturacion;
-    current.responsable = current.responsable ?? row.responsable;
-    current.cod_mecanico = current.cod_mecanico ?? row.cod_mecanico;
-    current.factura = current.factura ?? row.factura;
-    current.cod_interno = current.cod_interno ?? row.cod_interno;
-    current.fecha_abierta_os = current.fecha_abierta_os ?? row.fecha_abierta_os;
-    current.fecha_emision_factura = current.fecha_emision_factura ?? row.fecha_emision_factura;
-    current.nro_chasis = current.nro_chasis ?? row.nro_chasis;
-    current.marca = current.marca ?? row.marca;
-    current.tipo_tiempo = current.tipo_tiempo === "Desconocido" ? row.tipo_tiempo : current.tipo_tiempo ?? row.tipo_tiempo;
-
-    const currentProducts = Array.isArray(current.raw_data?.productos_agregados)
-      ? current.raw_data.productos_agregados
-      : [];
-    current.raw_data = {
-      ...(current.raw_data ?? {}),
-      lineas_agregadas: Number(current.raw_data?.lineas_agregadas ?? 1) + 1,
-      productos_agregados: Array.from(
-        new Set([
-          ...currentProducts.map(String),
-          ...(row.problema ? [String(row.problema)] : []),
-        ]),
-      ).slice(0, 20),
-    };
-  }
-
-  return Array.from(byOs.values());
-};
 
 interface FacturacionGridRow {
   origen_sistema: string;
@@ -940,7 +872,12 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (deleteFactLinesError) throw deleteFactLinesError;
       }
 
-      const osNumeros = ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean);
+      const osNumeros = Array.from(
+        new Set([
+          ...ordenesServicioPayload.map((row) => row.os_numero),
+          ...bundle.ordenesServicio.rows.map((row) => row.sourceServiceOrderNumber),
+        ].filter(Boolean)),
+      );
       for (let i = 0; i < osNumeros.length; i += 500) {
         const chunk = osNumeros.slice(i, i + 500);
         const { error: deleteOsByNumberError } = await (supabase
@@ -2454,6 +2391,9 @@ function NewSystemXmlPreview({
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{bundle.diagnostics.billingRows.toLocaleString()} líneas facturación</Badge>
             <Badge variant="outline">{bundle.diagnostics.serviceOrders.toLocaleString()} líneas OS</Badge>
+            <Badge variant="outline">{bundle.diagnostics.serviceOrderTimeTypes.Cliente} Cliente</Badge>
+            <Badge variant="outline">{bundle.diagnostics.serviceOrderTimeTypes.Garantia} Garantía</Badge>
+            <Badge variant="outline">{bundle.diagnostics.serviceOrderTimeTypes.Interno} Interno</Badge>
             <Badge variant="outline">{bundle.diagnostics.products.toLocaleString()} productos</Badge>
           </div>
         </div>

@@ -47,6 +47,8 @@ export interface CanonicalBillingRow {
 
 export interface CanonicalServiceOrderRow {
   rowId: string;
+  sourceServiceOrderNumber: string;
+  branchCode: string | null;
   serviceOrderNumber: string;
   branch: string | null;
   status: string | null;

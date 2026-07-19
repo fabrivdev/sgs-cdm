@@ -50,6 +50,7 @@ export interface NewSystemImportBundle {
     billingMatchedToOs: number;
     billingDirectSales: number;
     serviceOrders: number;
+    serviceOrderTimeTypes: Record<"Cliente" | "Garantia" | "Interno" | "Desconocido", number>;
     products: number;
     replacement: {
       facturacion: ReturnType<typeof resolveReplacementWindow>;
@@ -102,6 +103,13 @@ export function prepareNewSystemImportBundle(input: NewSystemImportBundleInput):
 
   const billingMatchedToOs = billingCrosswalk.filter((row) => row.serviceOrderNumber).length;
   const billingDirectSales = billingCrosswalk.filter((row) => row.matchedBy === "none").length;
+  const serviceOrderTimeTypes = ordenesServicio.rows.reduce(
+    (counts, row) => {
+      counts[row.timeType] += 1;
+      return counts;
+    },
+    { Cliente: 0, Garantia: 0, Interno: 0, Desconocido: 0 },
+  );
 
   return {
     facturacion,
@@ -150,6 +158,7 @@ export function prepareNewSystemImportBundle(input: NewSystemImportBundleInput):
       billingMatchedToOs,
       billingDirectSales,
       serviceOrders: ordenesServicio.rows.length,
+      serviceOrderTimeTypes,
       products: productos.rows.length,
       replacement: {
         facturacion: resolveReplacementWindow(factSummary),

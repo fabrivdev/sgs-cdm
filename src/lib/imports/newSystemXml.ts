@@ -154,6 +154,11 @@ export function mapOrdenesServicioSheet(
 ): CanonicalImportEnvelope<CanonicalServiceOrderRow> {
   const rows = sheet.rows.map((row, index) => {
     const serviceOrderNumber = text(row, ["Nº OS", "NÂº OS", "NRO OS", "OS"]) || `os-${index + 1}`;
+    const sourceServiceOrderNumber = serviceOrderNumber;
+    const branchCode = text(row, ["Sucursal", "SUCURSAL", "FILIAL"]);
+    const qualifiedServiceOrderNumber = branchCode
+      ? `${branchCode.padStart(2, "0")}-${sourceServiceOrderNumber}`
+      : sourceServiceOrderNumber;
     const timeTypeRaw = text(row, ["TIPTEM"]);
     const productGroup = text(row, ["GRUPO"]);
     const manufacturerCode = text(row, ["CODFAB"]);
@@ -164,9 +169,11 @@ export function mapOrdenesServicioSheet(
 
     return {
       rowId:
-        buildRowId(serviceOrderNumber, text(row, ["ITEM"]), text(row, ["DOCUMENTO"]), String(index + 1)) ||
+        buildRowId(qualifiedServiceOrderNumber, text(row, ["ITEM"]), text(row, ["DOCUMENTO"]), String(index + 1)) ||
         `os-row-${index + 1}`,
-      serviceOrderNumber,
+      sourceServiceOrderNumber,
+      branchCode,
+      serviceOrderNumber: qualifiedServiceOrderNumber,
       branch: normalizeXmlSucursal(firstValue(row, ["Sucursal", "SUCURSAL", "FILIAL"])),
       status: text(row, ["ESTADO"]),
       billingStatus: text(row, ["CNDPAG"]),

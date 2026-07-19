@@ -160,12 +160,121 @@ export function mapCanonicalOsToImportRow(row: CanonicalServiceOrderRow): Servic
     repuesto_valor: roundMoney(row.sparePartsValue),
     raw_data: {
       ...row.raw,
+      source_os_number: row.sourceServiceOrderNumber,
+      source_branch_code: row.branchCode,
       canonical_group: row.group,
       canonical_model: row.model,
+      canonical_time_type: row.timeType,
       canonical_currency: row.currency,
       import_era: resolveImportEra(row.openDate ?? row.invoiceDate),
     } as any,
   };
+}
+
+const sumImportNumber = (current: unknown, next: unknown, decimals = 2) =>
+  Number((Number(current || 0) + Number(next || 0)).toFixed(decimals));
+
+const appendDistinctText = (current: unknown, next: unknown, maxItems = 4) => {
+  const parts = String(current ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const candidate = String(next ?? "").trim();
+  if (candidate && !parts.includes(candidate)) parts.push(candidate);
+  return parts.slice(0, maxItems).join("; ");
+};
+
+const serviceOrderTypeTotals = (row: any) => ({
+  kilometros: Number(row.km_cantidad || 0),
+  horas: Number(row.servicios_cantidad || 0),
+  valor_kilometraje: Number(row.kilometro_valor || 0),
+  valor_servicio: Number(row.servicios_valor || 0),
+  valor_repuestos: Number(row.repuesto_valor || 0),
+  valor_terceros: Number(row.terceros_valor || 0),
+});
+
+export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
+  const byOs = new Map<string, any>();
+
+  for (const row of rows) {
+    const osNumero = String(row.os_numero ?? "").trim();
+    if (!osNumero) continue;
+    const current = byOs.get(osNumero);
+
+    if (!current) {
+      const timeType = String(row.tipo_tiempo ?? "Desconocido");
+      const invoice = String(row.factura ?? "").trim();
+      byOs.set(osNumero, {
+        ...row,
+        raw_data: {
+          ...((row.raw_data as any) ?? {}),
+          lineas_agregadas: 1,
+          productos_agregados: row.problema ? [String(row.problema)] : [],
+          tipos_tiempo: [timeType],
+          facturas_por_tipo: invoice ? { [timeType]: [invoice] } : {},
+          totales_por_tipo: { [timeType]: serviceOrderTypeTotals(row) },
+        },
+      });
+      continue;
+    }
+
+    current.km_cantidad = sumImportNumber(current.km_cantidad, row.km_cantidad, 4);
+    current.kilometro_valor = sumImportNumber(current.kilometro_valor, row.kilometro_valor);
+    current.servicios_cantidad = sumImportNumber(current.servicios_cantidad, row.servicios_cantidad, 4);
+    current.servicios_valor = sumImportNumber(current.servicios_valor, row.servicios_valor);
+    current.terceros_valor = sumImportNumber(current.terceros_valor, row.terceros_valor);
+    current.repuesto_valor = sumImportNumber(current.repuesto_valor, row.repuesto_valor);
+
+    current.problema = appendDistinctText(current.problema, row.problema);
+    current.cliente_nombre = current.cliente_nombre ?? row.cliente_nombre;
+    current.situacion_os = current.situacion_os ?? row.situacion_os;
+    current.situacion_facturacion = current.situacion_facturacion ?? row.situacion_facturacion;
+    current.responsable = current.responsable ?? row.responsable;
+    current.cod_mecanico = current.cod_mecanico ?? row.cod_mecanico;
+    current.factura = appendDistinctText(current.factura, row.factura, 20);
+    current.cod_interno = current.cod_interno ?? row.cod_interno;
+    current.fecha_abierta_os = current.fecha_abierta_os ?? row.fecha_abierta_os;
+    current.fecha_emision_factura = current.fecha_emision_factura ?? row.fecha_emision_factura;
+    current.nro_chasis = current.nro_chasis ?? row.nro_chasis;
+    current.marca = current.marca ?? row.marca;
+
+    const currentRaw = (current.raw_data ?? {}) as Record<string, any>;
+    const rowTimeType = String(row.tipo_tiempo ?? "Desconocido");
+    const timeTypes = Array.from(
+      new Set([...(Array.isArray(currentRaw.tipos_tiempo) ? currentRaw.tipos_tiempo.map(String) : []), rowTimeType]),
+    );
+    current.tipo_tiempo = timeTypes.length > 1 ? "Mixto" : timeTypes[0] ?? "Desconocido";
+
+    const invoicesByType = { ...(currentRaw.facturas_por_tipo ?? {}) } as Record<string, string[]>;
+    const rowInvoice = String(row.factura ?? "").trim();
+    invoicesByType[rowTimeType] = Array.from(
+      new Set([...(invoicesByType[rowTimeType] ?? []).map(String), ...(rowInvoice ? [rowInvoice] : [])]),
+    );
+
+    const totalsByType = { ...(currentRaw.totales_por_tipo ?? {}) } as Record<string, any>;
+    const previousTypeTotals = totalsByType[rowTimeType] ?? serviceOrderTypeTotals({});
+    const nextTypeTotals = serviceOrderTypeTotals(row);
+    totalsByType[rowTimeType] = Object.fromEntries(
+      Object.keys(nextTypeTotals).map((key) => [
+        key,
+        sumImportNumber(previousTypeTotals[key], nextTypeTotals[key], key === "kilometros" || key === "horas" ? 4 : 2),
+      ]),
+    );
+
+    const currentProducts = Array.isArray(currentRaw.productos_agregados) ? currentRaw.productos_agregados : [];
+    current.raw_data = {
+      ...currentRaw,
+      lineas_agregadas: Number(currentRaw.lineas_agregadas ?? 1) + 1,
+      tipos_tiempo: timeTypes,
+      facturas_por_tipo: invoicesByType,
+      totales_por_tipo: totalsByType,
+      productos_agregados: Array.from(
+        new Set([...currentProducts.map(String), ...(row.problema ? [String(row.problema)] : [])]),
+      ).slice(0, 20),
+    };
+  }
+
+  return Array.from(byOs.values()) as ServiceOrderInsert[];
 }
 
 export function buildImportInsert(args: {
