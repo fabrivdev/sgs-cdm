@@ -73,7 +73,7 @@ export default function Trabajos() {
       ]);
       setTrabajos(t);
 
-      // Mapear servicio_jornadas â†’ trabajo via legacy_servicio_id
+      // Mapear servicio_jornadas -> trabajo via legacy_servicio_id
       const servToTrabajo = new Map<string, string>();
       for (const tr of t) {
         if (tr.legacy_servicio_id) servToTrabajo.set(tr.legacy_servicio_id, tr.id);
@@ -220,7 +220,7 @@ export default function Trabajos() {
 
                   <div className="space-y-1.5">
                     {items.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">â€”</p>
+                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">-</p>
                     )}
 
                     {visibles.map(t => {
@@ -314,7 +314,7 @@ export default function Trabajos() {
                         onClick={() => setExpandidas(s => new Set(s).add(col.key))}
                         className="w-full rounded-md border border-dashed py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
-                        +{restantes} mÃ¡s
+                        +{restantes} más
                       </button>
                     )}
 
