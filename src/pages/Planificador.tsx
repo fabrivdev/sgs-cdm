@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -97,6 +98,7 @@ async function cargarTodosLosClientes() {
 
 export default function Planificador() {
   const { user, profile, isAdmin, isCabecilla } = useAuth();
+  const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [searchParams] = useSearchParams();
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -122,6 +124,20 @@ export default function Planificador() {
   const [fDatos, setFDatos] = useState<string>("all");
   const [vista, setVista] = useState<"dia" | "semana">("dia");
   const [soloPrincipalesSemana, setSoloPrincipalesSemana] = useState(false);
+
+  useEffect(() => {
+    setPageFilters({
+      vista,
+      semana: fSemana === "all" ? undefined : fSemana,
+      sucursal: fSucursal === "all" ? undefined : fSucursal,
+      tecnico: fTecnico === "all" ? undefined : fTecnico,
+      marca: fMarca === "all" ? undefined : fMarca,
+      estado: fEstado === "all" ? undefined : fEstado,
+      cliente: fCliente || undefined,
+      vencimiento: fVencidas === "all" ? undefined : fVencidas,
+    });
+    return clearPageFilters;
+  }, [clearPageFilters, fCliente, fEstado, fMarca, fSemana, fSucursal, fTecnico, fVencidas, setPageFilters, vista]);
 
   // Default sucursal por perfil al primer load
   useEffect(() => {

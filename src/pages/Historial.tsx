@@ -14,6 +14,7 @@ import { pageDescription, pageShell, pageTitle } from "@/lib/ui-classes";
 import { ErrorState } from "@/components/ErrorState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
 interface Servicio {
   id: string;
@@ -67,6 +68,7 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 }
 
 export default function Historial() {
+  const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -76,6 +78,11 @@ export default function Historial() {
   const [detalle, setDetalle] = useState<Servicio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setPageFilters({ busqueda: q || undefined, cliente: selected?.nombre });
+    return clearPageFilters;
+  }, [clearPageFilters, q, selected?.nombre, setPageFilters]);
 
   const load = async () => {
     setLoading(true);

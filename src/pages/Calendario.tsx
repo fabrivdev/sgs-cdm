@@ -33,6 +33,7 @@ import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
 import { cn } from "@/lib/utils";
 import { MAX_EVENTOS_DIA_CALENDARIO, MAX_DISPONIBILIDADES_DIA } from "@/lib/constants";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
+import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
 interface Servicio {
   id: string;
@@ -106,6 +107,7 @@ async function cargarTodosLosClientes() {
 
 export default function Calendario() {
   const { isAdmin, isCabecilla } = useAuth();
+  const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [vista, setVista] = useState<"mes" | "semana" | "tecnicos">("mes");
   const [cursor, setCursor] = useState(new Date());
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -123,6 +125,18 @@ export default function Calendario() {
   const [diasNL, setDiasNL] = useState<Map<string, { id: string; motivo: string | null }>>(new Map());
   const [motivoDialogOpen, setMotivoDialogOpen] = useState(false);
   const [motivoPendiente, setMotivoPendiente] = useState("");
+
+  useEffect(() => {
+    const start = vista === "mes" ? startOfWeek(startOfMonth(cursor), { weekStartsOn: 0 }) : startOfWeek(cursor, { weekStartsOn: 0 });
+    const end = vista === "mes" ? endOfWeek(endOfMonth(cursor), { weekStartsOn: 0 }) : endOfWeek(cursor, { weekStartsOn: 0 });
+    setPageFilters({
+      vista,
+      fecha_desde: format(start, "yyyy-MM-dd"),
+      fecha_hasta: format(end, "yyyy-MM-dd"),
+      tecnicos: fTecnicos,
+    });
+    return clearPageFilters;
+  }, [clearPageFilters, cursor, fTecnicos, setPageFilters, vista]);
 
   const [codigoByServicio, setCodigoByServicio] = useState<Map<string, string>>(new Map());
 

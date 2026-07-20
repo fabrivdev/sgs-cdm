@@ -16,6 +16,7 @@ import { KanbanSkeleton } from "@/components/LoadingSkeletons";
 import { parseISO, format } from "date-fns";
 import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { useAuth } from "@/hooks/useAuth";
+import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
@@ -38,6 +39,7 @@ const MAX_VISIBLES = 5;
 
 export default function Trabajos() {
   const { isAdmin, isTecnico, profile } = useAuth();
+  const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [trabajos, setTrabajos] = useState<any[]>([]);
   const [agendasByTrabajo, setAgendasByTrabajo] = useState<Map<string, any[]>>(new Map());
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -55,6 +57,17 @@ export default function Trabajos() {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPageFilters({
+      busqueda: q || undefined,
+      sucursal: fSucursal === "all" ? undefined : fSucursal,
+      prioridad: fPrio === "all" ? undefined : fPrio,
+      estado: fEstado === "all" ? undefined : fEstado,
+      fecha: fFecha || undefined,
+    });
+    return clearPageFilters;
+  }, [clearPageFilters, fEstado, fFecha, fPrio, fSucursal, q, setPageFilters]);
 
   useEffect(() => {
     if (isTecnico && !isAdmin && profile?.sucursal && fSucursal === "all") {

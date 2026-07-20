@@ -66,6 +66,7 @@ import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUna
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
 import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList } from "@/components/dashboard/DashboardCharts";
 import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
+import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -375,6 +376,7 @@ function productivityGoalForRange(start: Date, end: Date, monthlyGoal: number): 
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const initialFilters = useMemo(() => getInitialDashboardFilters(), []);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [jornadas, setJornadas] = useState<Jornada[]>([]);
@@ -548,6 +550,23 @@ export default function Dashboard() {
       JSON.stringify({ dateFrom, dateTo, periodMode }),
     );
   }, [dateFrom, dateTo, periodMode]);
+
+  useEffect(() => {
+    setPageFilters({
+      seccion: section,
+      fecha_desde: dateFrom,
+      fecha_hasta: dateTo,
+      agrupacion: periodMode,
+      sucursales: fSucursales,
+      marcas: fMarcas,
+      rubros: fRubros,
+      tipo_tiempo: fTiposTiempo,
+      estados_trabajo: fEstadosTrabajo,
+      tecnicos: fTécnicos,
+      busqueda: q || undefined,
+    });
+    return clearPageFilters;
+  }, [clearPageFilters, dateFrom, dateTo, fEstadosTrabajo, fMarcas, fRubros, fSucursales, fTiposTiempo, fTécnicos, periodMode, q, section, setPageFilters]);
 
   useEffect(() => {
     let alive = true;

@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AssistantPageProvider } from "@/contexts/AssistantPageContext";
 const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
@@ -35,7 +36,9 @@ const App = () => (
               <Route
                 element={
                   <ProtectedRoute>
-                    <AppLayout />
+                    <AssistantPageProvider>
+                      <AppLayout />
+                    </AssistantPageProvider>
                   </ProtectedRoute>
                 }
               >
