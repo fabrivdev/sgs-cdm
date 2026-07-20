@@ -1,4 +1,4 @@
-# Asistente de datos con Kimi
+# Asistente de datos con Groq
 
 El asistente se ejecuta en una Supabase Edge Function. La API key nunca se guarda en el frontend.
 
@@ -10,12 +10,12 @@ Desde la raiz del repositorio:
 npx supabase login
 npx supabase link --project-ref tgwoqdsrbomuwfanhuzp
 npx supabase db push
-npx supabase secrets set MOONSHOT_API_KEY=TU_API_KEY
-npx supabase secrets set MOONSHOT_MODEL=kimi-k2.5
+npx supabase secrets set GROQ_API_KEY=TU_API_KEY
+npx supabase secrets set GROQ_MODEL=llama-3.3-70b-versatile
 npx supabase functions deploy ai-data-assistant
 ```
 
-`MOONSHOT_MODEL` es opcional. El codigo usa `kimi-k2.5` por defecto porque es el modelo publicado actualmente por Moonshot. Cuando exista un identificador oficial de K3, basta con actualizar este secreto sin modificar la app.
+`GROQ_MODEL` es opcional. La funcion usa `llama-3.3-70b-versatile` por defecto por su soporte de herramientas, contexto amplio y buen desempeno en espanol.
 
 ## Verificacion
 

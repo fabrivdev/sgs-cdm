@@ -383,10 +383,10 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const kimiKey = Deno.env.get("MOONSHOT_API_KEY");
-    const kimiModel = Deno.env.get("MOONSHOT_MODEL") || "kimi-k2.5";
+    const groqKey = Deno.env.get("GROQ_API_KEY");
+    const groqModel = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
     if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Configuracion de Supabase incompleta" }, 500);
-    if (!kimiKey) return json({ error: "MOONSHOT_API_KEY no esta configurada" }, 503);
+    if (!groqKey) return json({ error: "GROQ_API_KEY no esta configurada" }, 503);
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
@@ -446,16 +446,16 @@ Deno.serve(async (req) => {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       for (let iteration = 0; iteration <= maxToolCalls; iteration++) {
-        const response = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${kimiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: kimiModel, messages, tools, tool_choice: "auto", reasoning_effort: "low", max_tokens: maxTokens, temperature: 0.2, safety_identifier: userId }),
+          headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: groqModel, messages, tools, tool_choice: "auto", max_tokens: maxTokens, temperature: 0.2 }),
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const message = payload?.error?.message ?? payload?.message ?? `Kimi respondio ${response.status}`;
-          throw new Error(response.status === 402 ? "La cuenta Kimi no tiene saldo disponible" : message);
+          const message = payload?.error?.message ?? payload?.message ?? `Groq respondio ${response.status}`;
+          throw new Error(response.status === 429 ? "Se alcanzo el limite gratuito de Groq. Intenta nuevamente mas tarde." : message);
         }
         const usage = payload.usage ?? {};
         totalUsage = {
@@ -464,7 +464,7 @@ Deno.serve(async (req) => {
           total_tokens: totalUsage.total_tokens + (usage.total_tokens ?? 0),
         };
         const message = payload.choices?.[0]?.message;
-        if (!message) throw new Error("Kimi no devolvio una respuesta valida");
+        if (!message) throw new Error("Groq no devolvio una respuesta valida");
         messages.push(message);
         const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
         if (!calls.length) {
@@ -500,7 +500,7 @@ Deno.serve(async (req) => {
     const { data: assistantMessage, error: assistantError } = await userClient.from("ai_messages").insert({ conversation_id: conversationId, user_id: userId, role: "assistant", content: finalContent, answer_mode: answerMode, page_context: pageContext, sources }).select("id,created_at").single();
     if (assistantError) throw assistantError;
     await userClient.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-    await admin.from("ai_usage").insert({ conversation_id: conversationId, user_id: userId, model: kimiModel, ...totalUsage, latency_ms: Date.now() - startedAt, status: "completed" });
+    await admin.from("ai_usage").insert({ conversation_id: conversationId, user_id: userId, model: groqModel, ...totalUsage, latency_ms: Date.now() - startedAt, status: "completed" });
 
     return json({ conversation_id: conversationId, message: { ...assistantMessage, role: "assistant", content: finalContent, sources }, usage: totalUsage });
   } catch (error) {
@@ -509,8 +509,8 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const admin = createClient(supabaseUrl, serviceKey);
-      await admin.from("ai_usage").insert({ conversation_id: conversationId || null, user_id: userId, model: Deno.env.get("MOONSHOT_MODEL") || "kimi-k2.5", latency_ms: Date.now() - startedAt, status: "error" });
+      await admin.from("ai_usage").insert({ conversation_id: conversationId || null, user_id: userId, model: Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile", latency_ms: Date.now() - startedAt, status: "error" });
     }
-    return json({ error: message }, /saldo/i.test(message) ? 402 : /tiempo limite/i.test(message) ? 408 : 500);
+    return json({ error: message }, /limite gratuito/i.test(message) ? 429 : /tiempo limite/i.test(message) ? 408 : 500);
   }
 });

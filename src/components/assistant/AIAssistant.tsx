@@ -26,8 +26,8 @@ const examples = [
 
 function friendlyError(message: string) {
   if (/ai_conversations|schema cache|does not exist/i.test(message)) return "Falta aplicar la migración del asistente en Supabase.";
-  if (/MOONSHOT_API_KEY/i.test(message)) return "Falta configurar la API key de Kimi en Supabase Secrets.";
-  if (/saldo/i.test(message)) return "La cuenta de Kimi no tiene saldo disponible.";
+  if (/GROQ_API_KEY/i.test(message)) return "Falta configurar GROQ_API_KEY en Lovable Cloud Secrets.";
+  if (/rate limit|limite gratuito|too many requests/i.test(message)) return "Se alcanzó el límite gratuito de Groq. Intentá nuevamente más tarde.";
   return message;
 }
 
@@ -196,7 +196,7 @@ export function AIAssistant() {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <SheetTitle className="flex items-center gap-2"><Bot className="h-5 w-5 text-primary" />Asistente de datos</SheetTitle>
-                  <SheetDescription className="truncate">Kimi · solo lectura</SheetDescription>
+                  <SheetDescription className="truncate">Groq · solo lectura</SheetDescription>
                 </div>
                 <div className="flex items-center gap-1">
                   <DropdownMenu>
