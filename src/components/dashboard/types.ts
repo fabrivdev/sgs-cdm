@@ -69,3 +69,47 @@ export interface WeekRow {
   rows: Facturacion[];
 }
 
+export interface ServicioTecnicoRow {
+  tecnico: string;
+  totalOS: number;
+  cerradas: number;
+  abiertas: number;
+  otras: number;
+  horas: number;
+  km: number;
+  valorOS: number;
+}
+
+export interface ServicioOSRow {
+  key: string;
+  os: string;
+  tecnico: string;
+  cliente: string;
+  sucursal: Sucursal | null;
+  marca: Marca;
+  tipoTiempo: string;
+  fechaApertura: string | null;
+  estadoOS: string;
+  estadoFacturacion: string;
+  factura: string;
+  problema: string;
+  horas: number;
+  km: number;
+  valorOS: number;
+}
+
+export interface ServiciosDashboardData {
+  totalOS: number;
+  cerradas: number;
+  abiertas: number;
+  otras: number;
+  sinResponsable: number;
+  horas: number;
+  km: number;
+  valorOS: number;
+  tecnicos: ServicioTecnicoRow[];
+  ordenes: ServicioOSRow[];
+  estados: Array<{ label: string; total: number }>;
+  mixTiempo: Array<{ label: string; total: number }>;
+}
+

@@ -55,10 +55,10 @@ import { cn } from "@/lib/utils";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
-import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode } from "@/components/dashboard/types";
+import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode, ServiciosDashboardData } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList } from "@/components/dashboard/DashboardCharts";
+import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList, ServiciosDashboard } from "@/components/dashboard/DashboardCharts";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -180,6 +180,7 @@ interface OrdenServicioImportada {
   fecha_abierta_os: string | null;
   fecha_emision_factura: string | null;
   factura: string | null;
+  responsable: string | null;
   marca: string | null;
   problema: string | null;
   tipo_tiempo: string | null;
@@ -191,6 +192,7 @@ interface OrdenServicioImportada {
   terceros_valor: number | null;
   situacion_os: string | null;
   situacion_facturacion: string | null;
+  raw_data: Record<string, unknown> | null;
 }
 
 async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
@@ -273,6 +275,51 @@ function normalizeOSLookup(value: string | null | undefined) {
     .trim();
 }
 
+function canonicalTipoTiempo(value: string | null | undefined) {
+  const normalized = normalizeOSLookup(value);
+  if (!normalized) return "Sin tipo";
+  if (normalized.includes("GARANT")) return "Garantia";
+  if (normalized.includes("CLIENTE") || normalized.includes("FACTURAR")) return "Cliente";
+  if (
+    normalized.includes("INTERNO") ||
+    normalized.includes("ABSOR") ||
+    normalized.includes("ABZOR") ||
+    normalized.includes("CDM")
+  ) return "Interno";
+  if (normalized.includes("MIXTO")) return "Mixto";
+  return String(value ?? "Sin tipo").trim() || "Sin tipo";
+}
+
+function tiposTiempoOS(row: OrdenServicioImportada) {
+  const raw = row.raw_data ?? {};
+  const rawTypes = Array.isArray(raw.tipos_tiempo)
+    ? raw.tipos_tiempo
+    : raw.totales_por_tipo && typeof raw.totales_por_tipo === "object"
+      ? Object.keys(raw.totales_por_tipo as Record<string, unknown>)
+      : [];
+  const candidates = rawTypes.length > 0
+    ? rawTypes
+    : String(row.tipo_tiempo ?? "").split(/[;,|/+]/).filter(Boolean);
+  const canonical = Array.from(new Set(candidates.map((value) => canonicalTipoTiempo(String(value)))));
+  const withoutMixed = canonical.filter((value) => value !== "Mixto" && value !== "Sin tipo");
+  if (withoutMixed.length > 0) return withoutMixed;
+  if (canonical.includes("Mixto")) return ["Cliente", "Garantia", "Interno"];
+  return canonical.length > 0 ? canonical : ["Sin tipo"];
+}
+
+function canonicalSituacion(value: string | null | undefined) {
+  const normalized = normalizeOSLookup(value);
+  if (!normalized) return "Sin estado";
+  if (normalized.includes("CERRAD")) return "Cerrada";
+  if (normalized.includes("ABIERT")) return "Abierta";
+  if (normalized.includes("CANCEL")) return "Cancelada";
+  if (normalized.includes("ANUL")) return "Anulada";
+  if (normalized.includes("FACTUR")) return "Facturada";
+  return normalized
+    .toLocaleLowerCase("es")
+    .replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase("es"));
+}
+
 function osTipoAbsorbido(row: OrdenServicioImportada): OSImpactRow["tipo"] | null {
   const tipoTiempo = normalizeOSLookup(row.tipo_tiempo);
   if (tipoTiempo.includes("GARANT")) return "Garantia";
@@ -331,6 +378,7 @@ export default function Dashboard() {
   const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTécnicos, setFTécnicos] = useState<string[]>([]);
+  const [fResponsablesOS, setFResponsablesOS] = useState<string[]>([]);
   const [periodMode, setPeriodMode] = useState<PeriodMode>(initialFilters.periodMode);
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
@@ -343,7 +391,8 @@ export default function Dashboard() {
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const loading = baseLoading || jornadasLoading || facturaciónLoading;
   const filtrosTrabajoActivos = section === "trabajos";
-  const filtrosOSActivos = section === "os";
+  const filtrosOSActivos = section === "os" || section === "servicios";
+  const filtrosServiciosActivos = section === "servicios";
   const goSection = (value: string) =>
     startTransition(() => {
       setSection(value);
@@ -670,7 +719,7 @@ export default function Dashboard() {
     (async () => {
       setOrdenesLoading(true);
       try {
-        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_emision_factura, factura, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion";
+        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_emision_factura, factura, responsable, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion, raw_data";
         const [rowsByOpenDate, rowsByInvoiceDate] = await Promise.all([
           cargarTodo<OrdenServicioImportada>(
             (supabase
@@ -690,7 +739,17 @@ export default function Dashboard() {
           ),
         ]);
         const rows = Array.from(
-          new Map([...rowsByOpenDate, ...rowsByInvoiceDate].map((row) => [row.os_numero, row])).values(),
+          new Map([...rowsByOpenDate, ...rowsByInvoiceDate].map((row) => {
+            const key = [
+              row.os_numero,
+              row.fecha_abierta_os,
+              row.cliente_nombre,
+              row.tipo_tiempo,
+              row.responsable,
+              row.factura,
+            ].map((value) => String(value ?? "").trim()).join("||");
+            return [key, row] as const;
+          })).values(),
         );
         if (alive) setOrdenesServicio(rows);
       } catch (error) {
@@ -770,7 +829,7 @@ export default function Dashboard() {
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (fMarcas.length > 0 && !fMarcas.includes(row.marca ?? clasificarMarcaFacturacion(row.grupo))) return false;
         if (fTiposTiempo.length > 0 && !fTiposTiempo.includes(row.tipo_tiempo)) return false;
-        if (!query) return true;
+        if (!query || filtrosServiciosActivos) return true;
         const cliente = row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre;
         return (
           cliente.toLowerCase().includes(query) ||
@@ -779,7 +838,7 @@ export default function Dashboard() {
           (row.grupo ?? "").toLowerCase().includes(query)
         );
       }),
-    [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturación, query],
+    [clienteById, fMarcas, fRubros, fSucursales, fTiposTiempo, facturación, filtrosServiciosActivos, query],
   );
 
   // Todos los registros del rango completo seleccionado por el usuario
@@ -827,6 +886,138 @@ export default function Dashboard() {
     const raw = row.raw_data as Record<string, unknown> | null | undefined;
     return String(raw?.linked_service_order ?? "").trim();
   };
+
+  const responsablesOSOptions = useMemo(
+    () => Array.from(new Set(
+      ordenesServicio
+        .map((row) => String(row.responsable ?? "").trim())
+        .filter(Boolean),
+    )).sort((a, b) => a.localeCompare(b)),
+    [ordenesServicio],
+  );
+
+  const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
+    const tecnicoMap = new Map<string, {
+      tecnico: string;
+      totalOS: number;
+      cerradas: number;
+      abiertas: number;
+      otras: number;
+      horas: number;
+      km: number;
+      valorOS: number;
+    }>();
+    const estadosMap = new Map<string, number>();
+    const mixTiempoMap = new Map<string, number>();
+
+    const ordenes = ordenesServicio.flatMap((row, index) => {
+      const fechaApertura = String(row.fecha_abierta_os ?? "").slice(0, 10);
+      if (!fechaApertura || !inRange(fechaApertura, periodStart, periodEnd)) return [];
+
+      const trabajo = row.trabajo_id ? trabajoById.get(row.trabajo_id) : null;
+      const clienteTrabajo = trabajo?.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre : null;
+      const cliente = String(clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente").trim() || "Sin cliente";
+      const clienteMatched = clienteByName.get(normalizeClienteKey(cliente));
+      const sucursal = trabajo?.sucursal ?? clienteMatched?.sucursal ?? null;
+      const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
+      const tecnico = String(row.responsable ?? "").trim() || "Sin técnico asignado";
+      const tiposTiempo = tiposTiempoOS(row);
+      const tipoTiempo = tiposTiempo.join(" + ");
+      const estadoOS = canonicalSituacion(row.situacion_os);
+      const estadoNormalizado = normalizeOSLookup(estadoOS);
+      const estadoGrupo = estadoNormalizado.includes("CERRAD")
+        ? "cerrada"
+        : estadoNormalizado.includes("CANCEL") || estadoNormalizado.includes("ANUL")
+          ? "otra"
+          : "abierta";
+
+      if (fSucursales.length > 0 && (!sucursal || !fSucursales.includes(sucursal))) return [];
+      if (fMarcas.length > 0 && !fMarcas.includes(marca)) return [];
+      if (fResponsablesOS.length > 0 && !fResponsablesOS.includes(tecnico)) return [];
+      if (
+        fTiposTiempo.length > 0 &&
+        !fTiposTiempo.some((tipo) => tiposTiempo.includes(canonicalTipoTiempo(tipo)))
+      ) return [];
+      if (fOSRubros.length > 0) {
+        const matchesRubro = fOSRubros.some((rubro) => {
+          if (rubro === "Servicio") return Number(row.servicios_valor || 0) > 0 || Number(row.servicios_cantidad || 0) > 0;
+          if (rubro === "Repuestos") return Number(row.repuesto_valor || 0) > 0;
+          return Number(row.kilometro_valor || 0) > 0 || Number(row.km_cantidad || 0) > 0;
+        });
+        if (!matchesRubro) return [];
+      }
+      if (query) {
+        const searchable = [row.os_numero, row.factura, tecnico, cliente, row.problema, estadoOS, tipoTiempo]
+          .map((value) => String(value ?? ""))
+          .join(" ")
+          .toLowerCase();
+        if (!searchable.includes(query)) return [];
+      }
+
+      const horas = Number(row.servicios_cantidad || 0);
+      const km = Number(row.km_cantidad || 0);
+      const valorOS = Number(row.servicios_valor || 0) + Number(row.repuesto_valor || 0) +
+        Number(row.kilometro_valor || 0) + Number(row.terceros_valor || 0);
+
+      estadosMap.set(estadoOS, (estadosMap.get(estadoOS) ?? 0) + 1);
+      tiposTiempo.forEach((tipo) => mixTiempoMap.set(tipo, (mixTiempoMap.get(tipo) ?? 0) + 1));
+
+      const tecnicoRow = tecnicoMap.get(tecnico) ?? {
+        tecnico,
+        totalOS: 0,
+        cerradas: 0,
+        abiertas: 0,
+        otras: 0,
+        horas: 0,
+        km: 0,
+        valorOS: 0,
+      };
+      tecnicoRow.totalOS += 1;
+      if (estadoGrupo === "cerrada") tecnicoRow.cerradas += 1;
+      else if (estadoGrupo === "abierta") tecnicoRow.abiertas += 1;
+      else tecnicoRow.otras += 1;
+      tecnicoRow.horas += horas;
+      tecnicoRow.km += km;
+      tecnicoRow.valorOS += valorOS;
+      tecnicoMap.set(tecnico, tecnicoRow);
+
+      return [{
+        key: [row.os_numero, fechaApertura, tipoTiempo, tecnico, index].join("||"),
+        os: row.os_numero,
+        tecnico,
+        cliente,
+        sucursal,
+        marca,
+        tipoTiempo,
+        fechaApertura,
+        estadoOS,
+        estadoFacturacion: canonicalSituacion(row.situacion_facturacion),
+        factura: String(row.factura ?? "").trim(),
+        problema: String(row.problema ?? "").trim(),
+        horas,
+        km,
+        valorOS,
+      }];
+    }).sort((a, b) => (b.fechaApertura ?? "").localeCompare(a.fechaApertura ?? "") || a.os.localeCompare(b.os));
+
+    const cerradas = ordenes.filter((row) => row.estadoOS === "Cerrada").length;
+    const otras = ordenes.filter((row) => row.estadoOS === "Cancelada" || row.estadoOS === "Anulada").length;
+
+    return {
+      totalOS: ordenes.length,
+      cerradas,
+      abiertas: ordenes.length - cerradas - otras,
+      otras,
+      sinResponsable: ordenes.filter((row) => row.tecnico === "Sin técnico asignado").length,
+      horas: ordenes.reduce((sum, row) => sum + row.horas, 0),
+      km: ordenes.reduce((sum, row) => sum + row.km, 0),
+      valorOS: ordenes.reduce((sum, row) => sum + row.valorOS, 0),
+      tecnicos: Array.from(tecnicoMap.values()).sort((a, b) => b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico)),
+      ordenes,
+      estados: Array.from(estadosMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
+      mixTiempo: Array.from(mixTiempoMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
+    };
+  }, [clienteById, clienteByName, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, ordenesServicio, periodEnd, periodStart, query, trabajoById]);
 
   const factMetricQuantities = (rows: Facturacion[]) => {
     let horasServicio = 0;
@@ -2092,6 +2283,7 @@ export default function Dashboard() {
     setFTiposTiempo([]);
     setFEstadosTrabajo([]);
     setFTécnicos([]);
+    setFResponsablesOS([]);
     setPeriodMode("mes");
     setQ("");
   };
@@ -2106,6 +2298,7 @@ export default function Dashboard() {
     (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0) +
+    (filtrosServiciosActivos && fResponsablesOS.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
   const filtrosAvanzadosActivos =
@@ -2114,7 +2307,8 @@ export default function Dashboard() {
     (fMarcas.length > 0 ? 1 : 0) +
     (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
-    (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0);
+    (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0) +
+    (filtrosServiciosActivos && fResponsablesOS.length > 0 ? 1 : 0);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
@@ -2122,14 +2316,15 @@ export default function Dashboard() {
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <h1 className={pageTitle}>Dashboard ejecutivo</h1>
-        <TabsList className="hidden h-9 min-w-max grid-cols-3 sm:grid">
+        <TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
-          <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-xs">Facturacion</TabsTrigger>
+          <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-xs">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
+          <TabsTrigger value="servicios" className="h-7 whitespace-nowrap px-3 text-xs">Servicios</TabsTrigger>
         </TabsList>
       </div>
       <FiltersBar
-        search={{ value: q, onChange: setQ, placeholder: "Cliente, factura o concepto..." }}
+        search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
         expanded={showAdvancedFilters ? (
@@ -2208,6 +2403,16 @@ export default function Dashboard() {
                 />
               </>
             )}
+            {section === "servicios" && (
+              <FilterMultiSelect
+                label="Técnico responsable"
+                values={fResponsablesOS}
+                onChange={setFResponsablesOS}
+                placeholder="Todos"
+                width="w-full"
+                options={responsablesOSOptions.map((nombre) => ({ value: nombre, label: nombre }))}
+              />
+            )}
           </div>
         ) : null}
       >
@@ -2251,8 +2456,9 @@ export default function Dashboard() {
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
         <TabsList className="inline-flex h-auto min-w-max">
           <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
-          <TabsTrigger value="facturación" className="whitespace-nowrap">Facturacion</TabsTrigger>
+          <TabsTrigger value="facturación" className="whitespace-nowrap">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
+          <TabsTrigger value="servicios" className="whitespace-nowrap">Servicios</TabsTrigger>
         </TabsList>
         </div>
 
@@ -2608,6 +2814,17 @@ export default function Dashboard() {
               onSelectFullRange={() => setSelectedWeekKey(null)}
             />
           </Card>
+        </TabsContent>
+
+        <TabsContent value="servicios" className="space-y-3">
+          <ServiciosDashboard
+            data={serviciosDashboardData}
+            loading={ordenesLoading}
+            selectedTecnicos={fResponsablesOS}
+            onSelectTecnico={(tecnico) =>
+              setFResponsablesOS((prev) => (prev.length === 1 && prev[0] === tecnico ? [] : [tecnico]))
+            }
+          />
         </TabsContent>
 
         <TabsContent value="trabajos" className="space-y-3">

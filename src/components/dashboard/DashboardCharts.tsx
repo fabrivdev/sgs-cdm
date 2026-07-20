@@ -2,10 +2,10 @@
 import { format, getDay, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Activity, Building2, CalendarDays, FileText, Printer, Receipt } from "lucide-react";
+import { Activity, Building2, CalendarDays, Clock3, FileText, Printer, Receipt, Route, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Marca, Sucursal } from "@/lib/constants";
-import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion } from "./types";
+import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion, ServiciosDashboardData } from "./types";
 import {
   money,
   pct,
@@ -2792,6 +2792,215 @@ export function TrabajoChip({
       <span className="font-medium">{label}</span>
       <span className="tabular-nums font-semibold">{value}</span>
     </button>
+  );
+}
+
+const servicioMoney = (value: number) =>
+  `USD ${new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(Number(value || 0))}`;
+
+export function ServiciosDashboard({
+  data,
+  loading,
+  selectedTecnicos,
+  onSelectTecnico,
+}: {
+  data: ServiciosDashboardData;
+  loading: boolean;
+  selectedTecnicos: string[];
+  onSelectTecnico: (tecnico: string) => void;
+}) {
+  if (loading) {
+    return <div className="rounded-md border px-3 py-10 text-center text-xs text-muted-foreground">Cargando servicios...</div>;
+  }
+
+  const maxTecnico = Math.max(...data.tecnicos.map((row) => row.totalOS), 1);
+  const totalMixTiempo = data.mixTiempo.reduce((sum, row) => sum + row.total, 0);
+
+  const kpis = [
+    { label: "OS del periodo", value: String(data.totalOS), detail: `${data.cerradas} cerradas · ${data.abiertas} abiertas`, icon: Wrench },
+    { label: "OS cerradas", value: String(data.cerradas), detail: data.totalOS > 0 ? `${Math.round((data.cerradas / data.totalOS) * 100)}% del total` : "Sin OS en el periodo", icon: Receipt },
+    { label: "OS abiertas", value: String(data.abiertas), detail: data.otras > 0 ? `${data.otras} canceladas o anuladas` : "Pendientes de cierre", icon: Clock3 },
+    { label: "Sin responsable", value: String(data.sinResponsable), detail: "OS que requieren asignación", icon: Users },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={kpi.label} className="relative min-h-[112px] rounded-md border bg-card p-3.5">
+              <div className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
+              <div className="mt-2 text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{kpi.value}</div>
+              <div className="mt-2 text-[11px] text-muted-foreground">{kpi.detail}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="rounded-md border bg-card px-3 py-2.5">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Horas registradas</div>
+          <div className="mt-1 font-semibold tabular-nums">{data.horas.toFixed(1).replace(".0", "")} hs</div>
+        </div>
+        <div className="rounded-md border bg-card px-3 py-2.5">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Kilómetros registrados</div>
+          <div className="mt-1 font-semibold tabular-nums">{Math.round(data.km).toLocaleString("es-PY")} km</div>
+        </div>
+        <div className="rounded-md border bg-card px-3 py-2.5">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Valor registrado en OS</div>
+          <div className="mt-1 font-semibold tabular-nums">{servicioMoney(data.valorOS)}</div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-[1.25fr_0.75fr]">
+        <div className="rounded-md border bg-card p-3">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Órdenes por responsable</h2>
+              <p className="text-xs text-muted-foreground">Carga y estado de las OS asignadas</p>
+            </div>
+            <Users className="h-4 w-4 text-primary" />
+          </div>
+          <div className="space-y-2.5">
+            {data.tecnicos.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">Sin órdenes de servicio para los filtros actuales.</div>
+            ) : data.tecnicos.slice(0, 12).map((row) => {
+              const active = selectedTecnicos.includes(row.tecnico);
+              return (
+                <button
+                  type="button"
+                  key={row.tecnico}
+                  onClick={() => onSelectTecnico(row.tecnico)}
+                  className={cn("w-full rounded-md px-2 py-1.5 text-left hover:bg-accent", active && "bg-primary/5 ring-1 ring-primary/30")}
+                >
+                  <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                    <span className="min-w-0 truncate font-medium">{row.tecnico}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{row.totalOS} OS</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max((row.totalOS / maxTecnico) * 100, 1)}%` }} />
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    {row.cerradas} cerradas · {row.abiertas} abiertas · {row.horas.toFixed(1).replace(".0", "")} hs · {Math.round(row.km)} km
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-md border bg-card p-3">
+            <h2 className="text-sm font-semibold">Tipo de tiempo</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Cantidad de OS por clasificación</p>
+            <div className="space-y-2">
+              {data.mixTiempo.map((row) => (
+                <div key={row.label}>
+                  <div className="mb-1 flex justify-between gap-3 text-xs">
+                    <span>{row.label}</span>
+                    <span className="font-medium tabular-nums">{row.total} OS</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-sky-500" style={{ width: `${totalMixTiempo > 0 ? (row.total / totalMixTiempo) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-md border bg-card p-3">
+            <h2 className="text-sm font-semibold">Estados de las OS</h2>
+            <p className="mb-3 text-xs text-muted-foreground">Situación informada en el sistema de origen</p>
+            <div className="space-y-2">
+              {data.estados.map((row) => (
+                <div key={row.label}>
+                  <div className="mb-1 flex justify-between gap-3 text-xs">
+                    <span>{row.label}</span>
+                    <span className="font-medium tabular-nums">{row.total} OS</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${data.totalOS > 0 ? (row.total / data.totalOS) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-md border bg-card p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Detalle por orden de servicio</h2>
+            <p className="text-xs text-muted-foreground">Todas las OS abiertas en el periodo y su estado actual</p>
+          </div>
+          <Badge variant="secondary">{data.ordenes.length} OS</Badge>
+        </div>
+
+        <div className="space-y-2 md:hidden">
+          {data.ordenes.slice(0, 30).map((row) => (
+            <div key={row.key} className="rounded-md border p-3 text-xs">
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-mono font-semibold">{row.os}</div>
+                <Badge variant="outline">{row.estadoOS}</Badge>
+              </div>
+              <div className="mt-1 font-medium">{row.cliente}</div>
+              <div className="mt-1 text-muted-foreground">{row.tecnico} · {row.sucursal ?? "Sin sucursal"}</div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Badge variant="outline">{row.tipoTiempo || "Sin tipo"}</Badge>
+                <Badge variant="outline">{row.fechaApertura || "Sin fecha"}</Badge>
+                <Badge variant="outline">{row.horas.toFixed(1).replace(".0", "")} hs</Badge>
+                <Badge variant="outline">{Math.round(row.km)} km</Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden max-h-[430px] overflow-auto rounded-md border md:block">
+          <table className="w-full min-w-[920px] text-xs">
+            <thead className="sticky top-0 bg-muted/90 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">OS</th>
+                <th className="px-3 py-2">Técnico</th>
+                <th className="px-3 py-2">Cliente</th>
+                <th className="px-3 py-2">Sucursal</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Apertura</th>
+                <th className="px-3 py-2">Estado OS</th>
+                <th className="px-3 py-2">Factura</th>
+                <th className="px-3 py-2 text-right">Hs</th>
+                <th className="px-3 py-2 text-right">Km</th>
+                <th className="px-3 py-2 text-right">Valor OS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.ordenes.map((row) => (
+                <tr key={row.key} className="border-t">
+                  <td className="px-3 py-2 font-mono font-semibold">{row.os}</td>
+                  <td className="max-w-[190px] truncate px-3 py-2" title={row.tecnico}>{row.tecnico}</td>
+                  <td className="max-w-[220px] truncate px-3 py-2" title={row.cliente}>{row.cliente}</td>
+                  <td className="px-3 py-2">{row.sucursal ?? "-"}</td>
+                  <td className="px-3 py-2"><Badge variant="outline">{row.tipoTiempo || "Sin tipo"}</Badge></td>
+                  <td className="px-3 py-2 tabular-nums">{row.fechaApertura || "-"}</td>
+                  <td className="px-3 py-2"><Badge variant="outline">{row.estadoOS}</Badge></td>
+                  <td className="max-w-[180px] truncate px-3 py-2" title={row.factura}>{row.factura || "-"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{row.horas.toFixed(1).replace(".0", "")}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{Math.round(row.km)}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums">{servicioMoney(row.valorOS)}</td>
+                </tr>
+              ))}
+              {data.ordenes.length === 0 && (
+                <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes de servicio para los filtros actuales.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 
