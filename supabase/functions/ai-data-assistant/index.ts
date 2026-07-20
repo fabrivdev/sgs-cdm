@@ -147,11 +147,25 @@ async function getCalendarSummary(client: SupabaseClient, args: JsonRecord) {
   return { jornadas: jornadas.length, por_estado: countBy(jornadas, "estado"), no_disponibilidades: noDisponibles };
 }
 
+function canonicalBillingRubro(value: unknown) {
+  const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+  if (!normalized || normalized === "todos") return "";
+  if (normalized.includes("servicio") || normalized.includes("mano de obra")) return "Servicio";
+  if (normalized.includes("repuesto") || normalized.includes("pieza")) return "Repuestos";
+  if (normalized.includes("kilometr") || normalized === "km") return "Kilometraje";
+  if (normalized.includes("otro")) return "Otros";
+  return cleanText(value, 60);
+}
+
 async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   const sucursal = cleanText(args.sucursal, 40);
   const marca = cleanText(args.marca, 30);
   const tipo = cleanText(args.tipo_tiempo, 40);
-  const rubro = cleanText(args.rubro, 60);
+  const rubro = canonicalBillingRubro(args.rubro);
   const rows = await fetchPaged((from, to) => {
     let query = client
       .from("facturacion_lineas_importadas")
@@ -162,21 +176,48 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     if (sucursal && sucursal.toLowerCase() !== "todos") query = query.eq("sucursal", sucursal);
     if (marca && marca.toLowerCase() !== "todos") query = query.eq("marca_normalizada", marca);
     if (tipo && tipo.toLowerCase() !== "todos") query = query.ilike("tipo_tiempo", `%${tipo}%`);
-    if (rubro && rubro.toLowerCase() !== "todos") query = query.ilike("grupo_normalizado", `%${rubro}%`);
+    if (rubro) query = query.eq("grupo_normalizado", rubro);
     return query;
   }, 50000);
   const invoices = new Set(rows.map((row) => cleanText(row.factura, 80)).filter(Boolean));
   const clients = new Set(rows.map((row) => cleanText(row.entidad_nombre, 160).toUpperCase()).filter(Boolean));
   const byRubro: Record<string, number> = {};
   const bySucursal: Record<string, number> = {};
+  const byCliente = new Map<string, { cliente: string; totalUsd: number; facturas: Set<string> }>();
   for (const row of rows) {
     const value = Number(row.total_venta) || 0;
     const group = cleanText(row.grupo_normalizado, 80) || "Otros";
     const branch = cleanText(row.sucursal, 60) || "Sin sucursal";
+    const clientName = cleanText(row.entidad_nombre, 160) || "Sin cliente";
+    const clientKey = clientName.toUpperCase();
     byRubro[group] = (byRubro[group] ?? 0) + value;
     bySucursal[branch] = (bySucursal[branch] ?? 0) + value;
+    const clientEntry = byCliente.get(clientKey) ?? { cliente: clientName, totalUsd: 0, facturas: new Set<string>() };
+    clientEntry.totalUsd += value;
+    const invoice = cleanText(row.factura, 80);
+    if (invoice) clientEntry.facturas.add(invoice);
+    byCliente.set(clientKey, clientEntry);
   }
-  return { total_usd: sum(rows, "total_venta"), facturas: invoices.size, clientes: clients.size, por_rubro: byRubro, por_sucursal: bySucursal };
+  const rankingSucursales = Object.entries(bySucursal)
+    .map(([sucursalNombre, total]) => ({ sucursal: sucursalNombre, total_usd: total }))
+    .sort((a, b) => b.total_usd - a.total_usd);
+  const rankingRubros = Object.entries(byRubro)
+    .map(([rubroNombre, total]) => ({ rubro: rubroNombre, total_usd: total }))
+    .sort((a, b) => b.total_usd - a.total_usd);
+  const rankingClientes = [...byCliente.values()]
+    .map((item) => ({ cliente: item.cliente, total_usd: item.totalUsd, facturas: item.facturas.size }))
+    .sort((a, b) => b.total_usd - a.total_usd)
+    .slice(0, 25);
+  return {
+    total_usd: sum(rows, "total_venta"),
+    facturas: invoices.size,
+    clientes: clients.size,
+    lineas: rows.length,
+    rubro_aplicado: rubro || "Todos",
+    ranking_sucursales: rankingSucursales,
+    ranking_rubros: rankingRubros,
+    ranking_clientes: rankingClientes,
+  };
 }
 
 async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord) {
@@ -185,7 +226,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
   const rows = await fetchPaged((from, to) => {
     let query = client
       .from("ordenes_servicio_importadas")
-      .select("os_numero,cliente_nombre,fecha_abierta_os,fecha_emision_factura,factura,responsable,marca,tipo_tiempo,servicios_cantidad,servicios_valor,km_cantidad,kilometro_valor,repuesto_valor,terceros_valor,situacion_os,situacion_facturacion,trabajo_id")
+      .select("os_numero,cliente_nombre,fecha_abierta_os,fecha_emision_factura,factura,responsable,marca,tipo_tiempo,servicios_cantidad,servicios_valor,km_cantidad,kilometro_valor,repuesto_valor,terceros_valor,situacion_os,situacion_facturacion,trabajo_id,raw_data")
       .order("fecha_abierta_os")
       .range(from, to);
     query = dateFilter(query, "fecha_abierta_os", args);
@@ -194,11 +235,77 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     return query;
   }, 30000);
   const orders = new Set(rows.map((row) => cleanText(row.os_numero, 80)).filter(Boolean));
+  const technicians = new Map<string, {
+    tecnico: string;
+    ordenes: Set<string>;
+    abiertas: Set<string>;
+    cerradas: Set<string>;
+    otras: Set<string>;
+  }>();
+  const technicianAlias: Record<string, string> = {
+    "DENNIS BENITEZ": "DENIS DE LA CRUZ BENITEZ ARAUJO",
+  };
+  const normalizeTechnician = (value: unknown) => {
+    const normalized = String(value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/^(?:[A-Z]{1,6}[\s-]*)?\d{2,}\s*(?:[-:|/]\s*)?/, "")
+      .replace(/[^A-Z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+    return technicianAlias[normalized] ?? normalized;
+  };
+  const participantsFor = (row: JsonRecord) => {
+    const values: unknown[] = [row.responsable];
+    const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {};
+    const explicit = raw.tecnicos_participantes;
+    if (Array.isArray(explicit)) values.push(...explicit);
+    for (const [key, value] of Object.entries(raw)) {
+      const normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (normalizedKey === "responsable" || /^mec aux [1-6]$/.test(normalizedKey)) values.push(value);
+    }
+    return [...new Set(values.map(normalizeTechnician).filter(Boolean))];
+  };
+  for (const row of rows) {
+    const order = cleanText(row.os_numero, 80);
+    if (!order) continue;
+    const status = normalizeTechnician(row.situacion_os);
+    const state: "cerradas" | "abiertas" | "otras" = status.includes("CERRAD")
+      ? "cerradas"
+      : status.includes("ANUL") || status.includes("CANCEL")
+        ? "otras"
+        : "abiertas";
+    for (const technician of participantsFor(row)) {
+      const entry = technicians.get(technician) ?? {
+        tecnico: technician,
+        ordenes: new Set<string>(),
+        abiertas: new Set<string>(),
+        cerradas: new Set<string>(),
+        otras: new Set<string>(),
+      };
+      entry.ordenes.add(order);
+      entry[state].add(order);
+      technicians.set(technician, entry);
+    }
+  }
+  const rankingTechnicians = [...technicians.values()]
+    .map((row) => ({
+      tecnico: row.tecnico,
+      ordenes: row.ordenes.size,
+      abiertas: row.abiertas.size,
+      cerradas: row.cerradas.size,
+      otras: row.otras.size,
+    }))
+    .sort((a, b) => b.abiertas - a.abiertas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico))
+    .slice(0, 50);
   return {
     ordenes: orders.size,
     filas: rows.length,
     por_estado: countBy(rows, "situacion_os"),
     por_tipo_tiempo: countBy(rows, "tipo_tiempo"),
+    ranking_tecnicos: rankingTechnicians,
+    tecnico_mas_os_abiertas: rankingTechnicians[0] ?? null,
     horas: sum(rows, "servicios_cantidad"),
     km: sum(rows, "km_cantidad"),
     valores_usd: {
@@ -302,8 +409,8 @@ const toolSpecs = [
   ["get_operational_summary", "Resume trabajos y jornadas del periodo."],
   ["get_planning_summary", "Resume jornadas pendientes y tecnicos planificados."],
   ["get_calendar_summary", "Resume calendario y no disponibilidades."],
-  ["get_billing_summary", "Resume facturacion importada en USD."],
-  ["get_service_orders_summary", "Resume ordenes de servicio, horas, km y valores."],
+  ["get_billing_summary", "Resume facturacion importada en USD y devuelve rankings por sucursal, rubro y cliente unico. Usala tambien para responder repreguntas sobre el cliente que mas facturo. Los rubros validos son Servicio, Repuestos, Kilometraje y Otros."],
+  ["get_service_orders_summary", "Resume ordenes de servicio, horas, km y valores. Incluye ranking de tecnicos participantes por OS unicas abiertas, cerradas y anuladas; usala para preguntas sobre quien tiene mas OS."],
   ["get_park_summary", "Resume parque activo de maquinas y clientes."],
   ["get_commercial_followup", "Resume gestiones de agenda comercial."],
   ["get_technician_summary", "Resume tecnicos activos y su actividad."],
@@ -315,7 +422,7 @@ const filterProperties = {
   sucursal: { type: "string" },
   marca: { type: "string" },
   tipo_tiempo: { type: "string" },
-  rubro: { type: "string" },
+  rubro: { type: "string", description: "Rubro canonico: Servicio, Repuestos, Kilometraje, Otros o Todos" },
 };
 
 const tools = [
@@ -433,7 +540,7 @@ Deno.serve(async (req) => {
 
     const { data: history } = await userClient.from("ai_messages").select("role,content").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(12);
     const contextText = Object.keys(pageContext).length ? JSON.stringify(pageContext) : "Sin contexto de pantalla";
-    const systemPrompt = `Eres el asistente de datos de Servicios Tecnicos CDM. Responde en espanol. Solo puedes afirmar cifras obtenidas mediante herramientas. No inventes datos, no generes SQL y nunca solicites secretos. Aplica el contexto si es pertinente: ${contextText}. Modo de respuesta: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica periodo y filtros usados. Si faltan datos, dilo claramente. Los importes son USD.`;
+    const systemPrompt = `Eres el asistente de datos de Servicios Tecnicos CDM. Responde en espanol. Solo puedes afirmar cifras obtenidas mediante herramientas. No inventes datos, no generes SQL y nunca solicites secretos. Aplica el contexto si es pertinente: ${contextText}. Modo de respuesta: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica periodo y filtros usados. Si faltan datos, dilo claramente. Los importes son USD. Reutiliza los resultados y rankings ya devueltos en la conversacion; no repitas una herramienta con los mismos filtros para responder una repregunta.`;
     const messages: any[] = [
       { role: "system", content: systemPrompt },
       ...(history ?? []).reverse().map((row: any) => ({ role: row.role, content: row.content })),
