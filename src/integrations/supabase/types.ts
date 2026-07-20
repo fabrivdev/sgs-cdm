@@ -14,6 +14,168 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_messages: {
+        Row: {
+          answer_mode: string | null
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          page_context: Json
+          role: string
+          sources: Json
+          user_id: string
+        }
+        Insert: {
+          answer_mode?: string | null
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          page_context?: Json
+          role: string
+          sources?: Json
+          user_id: string
+        }
+        Update: {
+          answer_mode?: string | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          page_context?: Json
+          role?: string
+          sources?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_tool_runs: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          duration_ms: number
+          error: string | null
+          filters: Json
+          id: string
+          result_count: number
+          tool_name: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
+          filters?: Json
+          id?: string
+          result_count?: number
+          tool_name: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
+          filters?: Json
+          id?: string
+          result_count?: number
+          tool_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_tool_runs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage: {
+        Row: {
+          completion_tokens: number
+          conversation_id: string | null
+          created_at: string
+          estimated_cost_usd: number | null
+          id: string
+          latency_ms: number
+          model: string
+          prompt_tokens: number
+          status: string
+          total_tokens: number
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number
+          conversation_id?: string | null
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          latency_ms?: number
+          model?: string
+          prompt_tokens?: number
+          status?: string
+          total_tokens?: number
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number
+          conversation_id?: string | null
+          created_at?: string
+          estimated_cost_usd?: number | null
+          id?: string
+          latency_ms?: number
+          model?: string
+          prompt_tokens?: number
+          status?: string
+          total_tokens?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           activo: boolean
