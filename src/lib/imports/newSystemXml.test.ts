@@ -20,6 +20,7 @@ const sheet = {
       MARCA: "CLA - CLAAS",
       TIPTEM: "CS - CLIENTE SERVICIOS",
       PRODUCTO: "MA01",
+      TECNICO: "ME0017 - JUAN PATINO",
       CANTIDAD: "2:00 Hs.",
       DOCUMENTO: "0010010004798",
       TOTAL: "140",
@@ -33,6 +34,7 @@ const sheet = {
       MARCA: "CLA - CLAAS",
       TIPTEM: "GR - GARANTIA REPUESTOS",
       PRODUCTO: "SENSOR",
+      TECNICO: "ME0016 - GUSTAVO ARCE",
       CANTIDAD: "1",
       DOCUMENTO: "0010010004797",
       TOTAL: "316.11",
@@ -80,6 +82,12 @@ describe("importacion XML de ordenes de servicio", () => {
       Cliente: ["0010010004798"],
       Garantia: ["0010010004797"],
     });
+    expect(raw.tecnicos_participantes).toEqual([
+      "ME0017 - JUAN PATINO",
+      "ME0016 - GUSTAVO ARCE",
+    ]);
+    expect(raw.totales_por_tecnico["ME0017 - JUAN PATINO"].horas).toBe(2);
+    expect(raw.totales_por_tecnico["ME0016 - GUSTAVO ARCE"].horas).toBe(0);
   });
 
   it("clasifica cada factura por su documento aunque la OS sea mixta", () => {

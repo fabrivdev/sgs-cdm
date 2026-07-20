@@ -52,13 +52,20 @@ import { MARCAS, SUCURSALES, DIAS_JORNADA_VENCIDA, MAX_TOP_RANKING, type Marca, 
 import { estadoTrabajoDesdeJornadas, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
 import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
+import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal } from "@/lib/appSettings";
+import {
+  displayImportedTechnicianName,
+  importedServiceOrderParticipants,
+  matchTechnicianProfile,
+} from "@/lib/technicianMatching";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode, ServiciosDashboardData } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList, ServiciosDashboard } from "@/components/dashboard/DashboardCharts";
+import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList } from "@/components/dashboard/DashboardCharts";
+import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -351,6 +358,21 @@ function normalizeClienteKey(name: string): string {
     .trim();
 }
 
+function productivityGoalForRange(start: Date, end: Date, monthlyGoal: number): number {
+  let cursor = startOfMonth(start);
+  let target = 0;
+  while (cursor <= end) {
+    const monthEnd = endOfMonth(cursor);
+    const segmentStart = start > cursor ? start : cursor;
+    const segmentEnd = end < monthEnd ? end : monthEnd;
+    const includedDays = differenceInCalendarDays(segmentEnd, segmentStart) + 1;
+    const monthDays = differenceInCalendarDays(monthEnd, cursor) + 1;
+    target += monthlyGoal * (includedDays / monthDays);
+    cursor = addMonths(cursor, 1);
+  }
+  return Math.max(target, 0);
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const initialFilters = useMemo(() => getInitialDashboardFilters(), []);
@@ -367,6 +389,7 @@ export default function Dashboard() {
   const [jornadasLoading, setJornadasLoading] = useState(true);
   const [facturaciónLoading, setFacturacionLoading] = useState(true);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
+  const [metaHorasMensual, setMetaHorasMensual] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
 
   const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
   const [dateTo, setDateTo] = useState(initialFilters.dateTo);
@@ -379,6 +402,7 @@ export default function Dashboard() {
   const [fEstadosTrabajo, setFEstadosTrabajo] = useState<string[]>([]);
   const [fTécnicos, setFTécnicos] = useState<string[]>([]);
   const [fResponsablesOS, setFResponsablesOS] = useState<string[]>([]);
+  const [fEstadosOS, setFEstadosOS] = useState<Array<"cerrada" | "abierta" | "otra">>([]);
   const [periodMode, setPeriodMode] = useState<PeriodMode>(initialFilters.periodMode);
   const [q, setQ] = useState("");
   const [section, setSection] = useState("resumen");
@@ -402,6 +426,10 @@ export default function Dashboard() {
         setFOSRubros([]);
       }
     });
+
+  useEffect(() => {
+    loadMonthlyProductivityGoal().then(setMetaHorasMensual);
+  }, []);
 
   // Semana actual (siempre referenciada a hoy, no al rango del usuario)
   const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), []);
@@ -787,6 +815,9 @@ export default function Dashboard() {
 
   const activeTechnicianIds = useMemo(() => {
     const roleIds = new Set(userRoles.filter((row) => row.role === "tecnico").map((row) => row.user_id));
+    const administrativeRoleIds = new Set(
+      userRoles.filter((row) => row.role === "admin" || row.role === "cabecilla").map((row) => row.user_id),
+    );
     const referencedTechIds = new Set<string>();
     for (const jornada of jornadas) {
       for (const id of jornadaCrewIds(jornada)) referencedTechIds.add(id);
@@ -801,7 +832,8 @@ export default function Dashboard() {
           const name = profile.nombre.toLowerCase();
           const hasTecnicoRole = roleIds.has(profile.id);
           const referenced = referencedTechIds.has(profile.id);
-          return profile.activo !== false && (hasTecnicoRole || referenced) && !name.includes("pasante");
+          const isAdministrativeOnly = administrativeRoleIds.has(profile.id) && !hasTecnicoRole && !referenced;
+          return profile.activo !== false && !isAdministrativeOnly && !name.includes("pasante");
         })
         .map((profile) => profile.id),
     );
@@ -814,6 +846,15 @@ export default function Dashboard() {
         .map((id) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin técnico" }))
         .sort((a, b) => a.nombre.localeCompare(b.nombre)),
     [activeTechnicianIds, profileById],
+  );
+
+  const allTechnicianProfiles = useMemo(
+    () =>
+      profiles
+        .filter((profile) => !profile.nombre.toLowerCase().includes("pasante"))
+        .map((profile) => ({ id: profile.id, nombre: profile.nombre }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [profiles],
   );
 
   const validTechnicianIds = (ids: Array<string | null | undefined>) =>
@@ -888,17 +929,25 @@ export default function Dashboard() {
   };
 
   const responsablesOSOptions = useMemo(
-    () => Array.from(new Set(
-      ordenesServicio
-        .map((row) => String(row.responsable ?? "").trim())
-        .filter(Boolean),
-    )).sort((a, b) => a.localeCompare(b)),
-    [ordenesServicio],
+    () => Array.from(new Set([
+      ...technicianOptions.map((profile) => profile.nombre),
+      ...ordenesServicio.flatMap((row) => {
+        const rawData = (row.raw_data ?? {}) as Record<string, any>;
+        const sources = importedServiceOrderParticipants(rawData, row.responsable);
+        return sources.map((source) => {
+          const matched = matchTechnicianProfile(source, allTechnicianProfiles);
+          return matched?.nombre ?? displayImportedTechnicianName(source);
+        });
+      }),
+    ].filter((name) => name !== "Sin técnico asignado"))).sort((a, b) => a.localeCompare(b)),
+    [allTechnicianProfiles, ordenesServicio, technicianOptions],
   );
 
   const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
     const tecnicoMap = new Map<string, {
+      profileId: string | null;
       tecnico: string;
+      activo: boolean;
       totalOS: number;
       cerradas: number;
       abiertas: number;
@@ -909,6 +958,25 @@ export default function Dashboard() {
     }>();
     const estadosMap = new Map<string, number>();
     const mixTiempoMap = new Map<string, number>();
+    const evolucionMap = new Map<string, { key: string; label: string; dateFrom: string; dateTo: string; cerradas: number; abiertas: number; otras: number }>();
+    const sucursalMap = new Map<string, { sucursal: string; cerradas: number; abiertas: number; otras: number; total: number }>();
+
+    for (const profile of technicianOptions) {
+      const profileSucursal = profileById.get(profile.id)?.sucursal ?? null;
+      if (fSucursales.length > 0 && (!profileSucursal || !fSucursales.includes(profileSucursal))) continue;
+      tecnicoMap.set(profile.nombre, {
+        profileId: profile.id,
+        tecnico: profile.nombre,
+        activo: true,
+        totalOS: 0,
+        cerradas: 0,
+        abiertas: 0,
+        otras: 0,
+        horas: 0,
+        km: 0,
+        valorOS: 0,
+      });
+    }
 
     const ordenes = ordenesServicio.flatMap((row, index) => {
       const fechaApertura = String(row.fecha_abierta_os ?? "").slice(0, 10);
@@ -920,7 +988,29 @@ export default function Dashboard() {
       const clienteMatched = clienteByName.get(normalizeClienteKey(cliente));
       const sucursal = trabajo?.sucursal ?? clienteMatched?.sucursal ?? null;
       const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
-      const tecnico = String(row.responsable ?? "").trim() || "Sin técnico asignado";
+      const rawData = (row.raw_data ?? {}) as Record<string, any>;
+      const participantSources = importedServiceOrderParticipants(rawData, row.responsable);
+      const participantMap = new Map<string, {
+        tecnico: string;
+        profileId: string | null;
+        activo: boolean;
+        sources: string[];
+      }>();
+      for (const sourceName of participantSources) {
+        const matched = matchTechnicianProfile(sourceName, allTechnicianProfiles);
+        const tecnicoName = matched?.nombre ?? displayImportedTechnicianName(sourceName);
+        const currentParticipant = participantMap.get(tecnicoName) ?? {
+          tecnico: tecnicoName,
+          profileId: matched?.id ?? null,
+          activo: matched ? activeTechnicianIds.has(matched.id) : false,
+          sources: [],
+        };
+        currentParticipant.sources.push(sourceName);
+        participantMap.set(tecnicoName, currentParticipant);
+      }
+      const participants = Array.from(participantMap.values());
+      const participantNames = participants.map((participant) => participant.tecnico);
+      const tecnico = participantNames.length > 0 ? participantNames.join(" · ") : "Sin técnico asignado";
       const tiposTiempo = tiposTiempoOS(row);
       const tipoTiempo = tiposTiempo.join(" + ");
       const estadoOS = canonicalSituacion(row.situacion_os);
@@ -931,9 +1021,44 @@ export default function Dashboard() {
           ? "otra"
           : "abierta";
 
+      const bucketDate = parseISO(fechaApertura);
+      const rawBucketStart = periodMode === "dia"
+        ? bucketDate
+        : periodMode === "semana"
+          ? startOfWeek(bucketDate, { weekStartsOn: 1 })
+          : periodMode === "anio"
+            ? startOfYear(bucketDate)
+            : startOfMonth(bucketDate);
+      const rawBucketEnd = periodMode === "dia"
+        ? bucketDate
+        : periodMode === "semana"
+          ? endOfWeek(bucketDate, { weekStartsOn: 1 })
+          : periodMode === "anio"
+            ? endOfYear(bucketDate)
+            : endOfMonth(bucketDate);
+      const bucket = {
+        key: periodMode === "dia"
+          ? fechaApertura
+          : periodMode === "semana"
+            ? `${getISOWeekYear(bucketDate)}-W${String(getISOWeek(bucketDate)).padStart(2, "0")}`
+            : periodMode === "anio"
+              ? format(bucketDate, "yyyy")
+              : format(bucketDate, "yyyy-MM"),
+        label: periodMode === "dia"
+          ? format(bucketDate, "dd/MM")
+          : periodMode === "semana"
+            ? `Sem ${getISOWeek(bucketDate)} · ${getISOWeekYear(bucketDate)}`
+            : periodMode === "anio"
+              ? format(bucketDate, "yyyy")
+              : format(bucketDate, "MM/yyyy"),
+        dateFrom: format(rawBucketStart < periodStart ? periodStart : rawBucketStart, "yyyy-MM-dd"),
+        dateTo: format(rawBucketEnd > periodEnd ? periodEnd : rawBucketEnd, "yyyy-MM-dd"),
+      };
+
       if (fSucursales.length > 0 && (!sucursal || !fSucursales.includes(sucursal))) return [];
       if (fMarcas.length > 0 && !fMarcas.includes(marca)) return [];
-      if (fResponsablesOS.length > 0 && !fResponsablesOS.includes(tecnico)) return [];
+      if (fResponsablesOS.length > 0 && !fResponsablesOS.some((name) => participantNames.includes(name))) return [];
+      if (fEstadosOS.length > 0 && !fEstadosOS.includes(estadoGrupo)) return [];
       if (
         fTiposTiempo.length > 0 &&
         !fTiposTiempo.some((tipo) => tiposTiempo.includes(canonicalTipoTiempo(tipo)))
@@ -947,7 +1072,7 @@ export default function Dashboard() {
         if (!matchesRubro) return [];
       }
       if (query) {
-        const searchable = [row.os_numero, row.factura, tecnico, cliente, row.problema, estadoOS, tipoTiempo]
+        const searchable = [row.os_numero, row.factura, ...participantNames, cliente, row.problema, estadoOS, tipoTiempo]
           .map((value) => String(value ?? ""))
           .join(" ")
           .toLowerCase();
@@ -962,29 +1087,58 @@ export default function Dashboard() {
       estadosMap.set(estadoOS, (estadosMap.get(estadoOS) ?? 0) + 1);
       tiposTiempo.forEach((tipo) => mixTiempoMap.set(tipo, (mixTiempoMap.get(tipo) ?? 0) + 1));
 
-      const tecnicoRow = tecnicoMap.get(tecnico) ?? {
-        tecnico,
-        totalOS: 0,
-        cerradas: 0,
-        abiertas: 0,
-        otras: 0,
-        horas: 0,
-        km: 0,
-        valorOS: 0,
-      };
-      tecnicoRow.totalOS += 1;
-      if (estadoGrupo === "cerrada") tecnicoRow.cerradas += 1;
-      else if (estadoGrupo === "abierta") tecnicoRow.abiertas += 1;
-      else tecnicoRow.otras += 1;
-      tecnicoRow.horas += horas;
-      tecnicoRow.km += km;
-      tecnicoRow.valorOS += valorOS;
-      tecnicoMap.set(tecnico, tecnicoRow);
+      const evolucionRow = evolucionMap.get(bucket.key) ?? { ...bucket, cerradas: 0, abiertas: 0, otras: 0 };
+      evolucionRow[estadoGrupo === "cerrada" ? "cerradas" : estadoGrupo === "abierta" ? "abiertas" : "otras"] += 1;
+      evolucionMap.set(bucket.key, evolucionRow);
+
+      const sucursalLabel = sucursal ?? "Sin sucursal";
+      const sucursalRow = sucursalMap.get(sucursalLabel) ?? { sucursal: sucursalLabel, cerradas: 0, abiertas: 0, otras: 0, total: 0 };
+      sucursalRow[estadoGrupo === "cerrada" ? "cerradas" : estadoGrupo === "abierta" ? "abiertas" : "otras"] += 1;
+      sucursalRow.total += 1;
+      sucursalMap.set(sucursalLabel, sucursalRow);
+
+      const totalsByTechnician = (rawData.totales_por_tecnico ?? {}) as Record<string, Record<string, unknown>>;
+      const hasParticipantTotals = Object.keys(totalsByTechnician).length > 0;
+      participants.forEach((participant) => {
+        const participantTotals = participant.sources.reduce(
+          (totals, sourceName) => {
+            const sourceTotals = totalsByTechnician[sourceName] ?? {};
+            totals.horas += Number(sourceTotals.horas || 0);
+            totals.km += Number(sourceTotals.kilometros || 0);
+            totals.valor += Number(sourceTotals.valor_servicio || 0) + Number(sourceTotals.valor_repuestos || 0) +
+              Number(sourceTotals.valor_kilometraje || 0) + Number(sourceTotals.valor_terceros || 0);
+            return totals;
+          },
+          { horas: 0, km: 0, valor: 0 },
+        );
+        const useLegacyTotals = !hasParticipantTotals;
+        const tecnicoRow = tecnicoMap.get(participant.tecnico) ?? {
+          profileId: participant.profileId,
+          tecnico: participant.tecnico,
+          activo: participant.activo,
+          totalOS: 0,
+          cerradas: 0,
+          abiertas: 0,
+          otras: 0,
+          horas: 0,
+          km: 0,
+          valorOS: 0,
+        };
+        tecnicoRow.totalOS += 1;
+        if (estadoGrupo === "cerrada") tecnicoRow.cerradas += 1;
+        else if (estadoGrupo === "abierta") tecnicoRow.abiertas += 1;
+        else tecnicoRow.otras += 1;
+        tecnicoRow.horas += useLegacyTotals ? horas : participantTotals.horas;
+        tecnicoRow.km += useLegacyTotals ? km : participantTotals.km;
+        tecnicoRow.valorOS += useLegacyTotals ? valorOS : participantTotals.valor;
+        tecnicoMap.set(participant.tecnico, tecnicoRow);
+      });
 
       return [{
         key: [row.os_numero, fechaApertura, tipoTiempo, tecnico, index].join("||"),
         os: row.os_numero,
         tecnico,
+        tecnicoProfileId: participants[0]?.profileId ?? null,
         cliente,
         sucursal,
         marca,
@@ -1002,6 +1156,7 @@ export default function Dashboard() {
 
     const cerradas = ordenes.filter((row) => row.estadoOS === "Cerrada").length;
     const otras = ordenes.filter((row) => row.estadoOS === "Cancelada" || row.estadoOS === "Anulada").length;
+    const metaHorasPeriodo = productivityGoalForRange(periodStart, periodEnd, metaHorasMensual);
 
     return {
       totalOS: ordenes.length,
@@ -1012,12 +1167,18 @@ export default function Dashboard() {
       horas: ordenes.reduce((sum, row) => sum + row.horas, 0),
       km: ordenes.reduce((sum, row) => sum + row.km, 0),
       valorOS: ordenes.reduce((sum, row) => sum + row.valorOS, 0),
-      tecnicos: Array.from(tecnicoMap.values()).sort((a, b) => b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico)),
+      metaHorasMensual,
+      metaHorasPeriodo,
+      tecnicos: Array.from(tecnicoMap.values()).sort(
+        (a, b) => b.horas - a.horas || b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico),
+      ),
       ordenes,
       estados: Array.from(estadosMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
       mixTiempo: Array.from(mixTiempoMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
+      evolucion: Array.from(evolucionMap.values()).sort((a, b) => a.key.localeCompare(b.key)),
+      sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
-  }, [clienteById, clienteByName, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, ordenesServicio, periodEnd, periodStart, query, trabajoById]);
+  }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, trabajoById]);
 
   const factMetricQuantities = (rows: Facturacion[]) => {
     let horasServicio = 0;
@@ -2284,6 +2445,7 @@ export default function Dashboard() {
     setFEstadosTrabajo([]);
     setFTécnicos([]);
     setFResponsablesOS([]);
+    setFEstadosOS([]);
     setPeriodMode("mes");
     setQ("");
   };
@@ -2299,6 +2461,7 @@ export default function Dashboard() {
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0) +
     (filtrosServiciosActivos && fResponsablesOS.length > 0 ? 1 : 0) +
+    (filtrosServiciosActivos && fEstadosOS.length > 0 ? 1 : 0) +
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
   const filtrosAvanzadosActivos =
@@ -2308,7 +2471,8 @@ export default function Dashboard() {
     (fTiposTiempo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fEstadosTrabajo.length > 0 ? 1 : 0) +
     (filtrosTrabajoActivos && fTécnicos.length > 0 ? 1 : 0) +
-    (filtrosServiciosActivos && fResponsablesOS.length > 0 ? 1 : 0);
+    (filtrosServiciosActivos && fResponsablesOS.length > 0 ? 1 : 0) +
+    (filtrosServiciosActivos && fEstadosOS.length > 0 ? 1 : 0);
 
   return (
     <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
@@ -2404,14 +2568,28 @@ export default function Dashboard() {
               </>
             )}
             {section === "servicios" && (
-              <FilterMultiSelect
-                label="Técnico responsable"
-                values={fResponsablesOS}
-                onChange={setFResponsablesOS}
-                placeholder="Todos"
-                width="w-full"
-                options={responsablesOSOptions.map((nombre) => ({ value: nombre, label: nombre }))}
-              />
+              <>
+                <FilterMultiSelect
+                  label="Estado OS"
+                  values={fEstadosOS}
+                  onChange={(values) => setFEstadosOS(values as Array<"cerrada" | "abierta" | "otra">)}
+                  placeholder="Todos"
+                  width="w-full"
+                  options={[
+                    { value: "cerrada", label: "Cerradas" },
+                    { value: "abierta", label: "Abiertas" },
+                    { value: "otra", label: "Anuladas / canceladas" },
+                  ]}
+                />
+                <FilterMultiSelect
+                  label="Técnico responsable"
+                  values={fResponsablesOS}
+                  onChange={setFResponsablesOS}
+                  placeholder="Todos"
+                  width="w-full"
+                  options={responsablesOSOptions.map((nombre) => ({ value: nombre, label: nombre }))}
+                />
+              </>
             )}
           </div>
         ) : null}
@@ -2821,8 +2999,25 @@ export default function Dashboard() {
             data={serviciosDashboardData}
             loading={ordenesLoading}
             selectedTecnicos={fResponsablesOS}
+            selectedEstados={fEstadosOS}
+            selectedTiposTiempo={fTiposTiempo}
+            selectedSucursales={fSucursales}
             onSelectTecnico={(tecnico) =>
               setFResponsablesOS((prev) => (prev.length === 1 && prev[0] === tecnico ? [] : [tecnico]))
+            }
+            onSelectPeriodo={(periodo) => {
+              setDateFrom(periodo.dateFrom);
+              setDateTo(periodo.dateTo);
+            }}
+            onSelectEstado={(estado) =>
+              setFEstadosOS((prev) => (prev.length === 1 && prev[0] === estado ? [] : [estado]))
+            }
+            onSelectTipoTiempo={(tipo) => {
+              const canonical = canonicalTipoTiempo(tipo);
+              setFTiposTiempo((prev) => (prev.length === 1 && canonicalTipoTiempo(prev[0]) === canonical ? [] : [canonical]));
+            }}
+            onSelectSucursal={(sucursal) =>
+              setFSucursales((prev) => (prev.length === 1 && prev[0] === sucursal ? [] : [sucursal]))
             }
           />
         </TabsContent>

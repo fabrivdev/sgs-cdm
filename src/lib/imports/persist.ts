@@ -193,6 +193,15 @@ const serviceOrderTypeTotals = (row: any) => ({
   valor_terceros: Number(row.terceros_valor || 0),
 });
 
+const serviceOrderTechnicianTotals = (row: any) => ({
+  kilometros: Number(row.km_cantidad || 0),
+  horas: Number(row.servicios_cantidad || 0),
+  valor_kilometraje: Number(row.kilometro_valor || 0),
+  valor_servicio: Number(row.servicios_valor || 0),
+  valor_repuestos: Number(row.repuesto_valor || 0),
+  valor_terceros: Number(row.terceros_valor || 0),
+});
+
 export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
   const byOs = new Map<string, any>();
 
@@ -204,6 +213,7 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     if (!current) {
       const timeType = String(row.tipo_tiempo ?? "Desconocido");
       const invoice = String(row.factura ?? "").trim();
+      const technician = String(row.responsable ?? "").trim();
       byOs.set(osNumero, {
         ...row,
         raw_data: {
@@ -213,6 +223,8 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
           tipos_tiempo: [timeType],
           facturas_por_tipo: invoice ? { [timeType]: [invoice] } : {},
           totales_por_tipo: { [timeType]: serviceOrderTypeTotals(row) },
+          tecnicos_participantes: technician ? [technician] : [],
+          totales_por_tecnico: technician ? { [technician]: serviceOrderTechnicianTotals(row) } : {},
         },
       });
       continue;
@@ -262,12 +274,34 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     );
 
     const currentProducts = Array.isArray(currentRaw.productos_agregados) ? currentRaw.productos_agregados : [];
+    const rowTechnician = String(row.responsable ?? "").trim();
+    const currentTechnicians = Array.isArray(currentRaw.tecnicos_participantes)
+      ? currentRaw.tecnicos_participantes.map(String)
+      : [];
+    const technicians = Array.from(new Set([...currentTechnicians, ...(rowTechnician ? [rowTechnician] : [])]));
+    const totalsByTechnician = { ...(currentRaw.totales_por_tecnico ?? {}) } as Record<string, any>;
+    if (rowTechnician) {
+      const previousTechnicianTotals = totalsByTechnician[rowTechnician] ?? serviceOrderTechnicianTotals({});
+      const nextTechnicianTotals = serviceOrderTechnicianTotals(row);
+      totalsByTechnician[rowTechnician] = Object.fromEntries(
+        Object.keys(nextTechnicianTotals).map((key) => [
+          key,
+          sumImportNumber(
+            previousTechnicianTotals[key],
+            nextTechnicianTotals[key],
+            key === "kilometros" || key === "horas" ? 4 : 2,
+          ),
+        ]),
+      );
+    }
     current.raw_data = {
       ...currentRaw,
       lineas_agregadas: Number(currentRaw.lineas_agregadas ?? 1) + 1,
       tipos_tiempo: timeTypes,
       facturas_por_tipo: invoicesByType,
       totales_por_tipo: totalsByType,
+      tecnicos_participantes: technicians,
+      totales_por_tecnico: totalsByTechnician,
       productos_agregados: Array.from(
         new Set([...currentProducts.map(String), ...(row.problema ? [String(row.problema)] : [])]),
       ).slice(0, 20),

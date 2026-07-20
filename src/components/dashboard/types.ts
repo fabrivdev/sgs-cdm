@@ -70,7 +70,9 @@ export interface WeekRow {
 }
 
 export interface ServicioTecnicoRow {
+  profileId: string | null;
   tecnico: string;
+  activo: boolean;
   totalOS: number;
   cerradas: number;
   abiertas: number;
@@ -84,6 +86,7 @@ export interface ServicioOSRow {
   key: string;
   os: string;
   tecnico: string;
+  tecnicoProfileId: string | null;
   cliente: string;
   sucursal: Sucursal | null;
   marca: Marca;
@@ -107,9 +110,13 @@ export interface ServiciosDashboardData {
   horas: number;
   km: number;
   valorOS: number;
+  metaHorasMensual: number;
+  metaHorasPeriodo: number;
   tecnicos: ServicioTecnicoRow[];
   ordenes: ServicioOSRow[];
   estados: Array<{ label: string; total: number }>;
   mixTiempo: Array<{ label: string; total: number }>;
+  evolucion: Array<{ key: string; label: string; dateFrom: string; dateTo: string; cerradas: number; abiertas: number; otras: number }>;
+  sucursales: Array<{ sucursal: string; cerradas: number; abiertas: number; otras: number; total: number }>;
 }
 

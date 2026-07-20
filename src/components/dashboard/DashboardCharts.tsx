@@ -190,7 +190,7 @@ function OSEvolution({
     return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas.</div>;
   }
   return (
-    <div className="min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
         className="grid min-h-[170px] shrink-0 items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[210px] sm:gap-3 sm:px-2 sm:pt-4"
         style={barGridStyle(rows.length)}
@@ -530,7 +530,7 @@ export function WeeklyBars({
   const labelEvery = rows.length > 14 ? Math.ceil(rows.length / 6) : rows.length > 9 ? 2 : 1;
 
   return (
-    <div className="min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
         className="relative grid min-h-[218px] shrink-0 items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[260px] sm:gap-3 sm:px-2 sm:pt-4"
         style={barGridStyle(rows.length, 62)}

@@ -23,6 +23,7 @@ import {
   type TipoTiempoFacturacion,
 } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
+import { importedServiceOrderParticipants } from "@/lib/technicianMatching";
 
 const SUBGRUPOS_VALIDOS = new Set([
   "COSECHADORAS",
@@ -529,7 +530,45 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         row.kilometro_valor += parseMoney(pick(r, ["Kilometro", "Kilómetro"]));
         row.servicios_valor += parseMoney(pick(r, ["Servicios"]));
         row.repuesto_valor += parseMoney(pick(r, ["Repuesto"]));
-        row.raw_data = { ...row.raw_data, ...r };
+        const previousRaw = row.raw_data as Record<string, any>;
+        const previousParticipants = importedServiceOrderParticipants(previousRaw, row.responsable);
+        const rowResponsible = norm(pick(r, ["Responsable"])) || null;
+        const rowParticipants = importedServiceOrderParticipants(r, rowResponsible);
+        const participantNames = Array.from(new Set([...previousParticipants, ...rowParticipants]));
+        const totalsByTechnician = { ...(previousRaw.totales_por_tecnico ?? {}) } as Record<string, any>;
+        const rowTotals = {
+          horas: parseMoney(pick(r, ["Servicios Cnt. Utilizada", "Servicios Cnt Utilizada"])),
+          kilometros: parseMoney(pick(r, ["Km Cnt. Utilizada", "Km Cnt Utilizada"])),
+          valor_servicio: parseMoney(pick(r, ["Servicios"])),
+          valor_repuestos: parseMoney(pick(r, ["Repuesto"])),
+          valor_kilometraje: parseMoney(pick(r, ["Kilometro"])),
+          valor_terceros: parseMoney(pick(r, ["Terceros"])),
+        };
+
+        for (const participant of rowParticipants) {
+          const current = totalsByTechnician[participant] ?? {
+            horas: 0,
+            kilometros: 0,
+            valor_servicio: 0,
+            valor_repuestos: 0,
+            valor_kilometraje: 0,
+            valor_terceros: 0,
+          };
+          current.horas += rowTotals.horas;
+          current.kilometros += rowTotals.kilometros;
+          current.valor_servicio += rowTotals.valor_servicio;
+          current.valor_repuestos += rowTotals.valor_repuestos;
+          current.valor_kilometraje += rowTotals.valor_kilometraje;
+          current.valor_terceros += rowTotals.valor_terceros;
+          totalsByTechnician[participant] = current;
+        }
+
+        row.raw_data = {
+          ...row.raw_data,
+          ...r,
+          tecnicos_participantes: participantNames,
+          totales_por_tecnico: totalsByTechnician,
+        };
 
         rowsByOs.set(os, row);
       }

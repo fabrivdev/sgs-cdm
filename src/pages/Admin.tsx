@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
 import { toast } from "sonner";
-import { Database, Eye, EyeOff, KeyRound, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
+import { Database, Eye, EyeOff, KeyRound, Save, Settings2, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { ImportarTab } from "@/components/parque/ImportarTab";
+import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 
 interface Profile {
   id: string;
@@ -61,6 +62,8 @@ export default function Admin() {
   const [toggleActivoPending, setToggleActivoPending] = useState<Profile | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showCredPassword, setShowCredPassword] = useState(false);
+  const [monthlyProductivityGoal, setMonthlyProductivityGoal] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
+  const [savingParameters, setSavingParameters] = useState(false);
 
   const rolesByUser = useMemo(
     () =>
@@ -133,7 +136,24 @@ export default function Admin() {
 
   useEffect(() => {
     load();
+    loadMonthlyProductivityGoal().then(setMonthlyProductivityGoal);
   }, []);
+
+  const saveParameters = async () => {
+    if (!Number.isFinite(monthlyProductivityGoal) || monthlyProductivityGoal <= 0) {
+      toast.error("La meta mensual debe ser mayor que cero");
+      return;
+    }
+    setSavingParameters(true);
+    try {
+      await saveMonthlyProductivityGoal(monthlyProductivityGoal);
+      toast.success("Parámetros guardados");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron guardar los parámetros");
+    } finally {
+      setSavingParameters(false);
+    }
+  };
 
   const crearUsuario = async () => {
     if (!email.trim() || !password.trim() || !nombre.trim()) {
@@ -279,6 +299,10 @@ export default function Admin() {
           <TabsTrigger value="importar">
             <Database className="mr-2 h-4 w-4" />
             Importar datos
+          </TabsTrigger>
+          <TabsTrigger value="parametros">
+            <Settings2 className="mr-2 h-4 w-4" />
+            Parámetros
           </TabsTrigger>
         </TabsList>
 
@@ -576,6 +600,46 @@ export default function Admin() {
 
         <TabsContent value="importar" className="space-y-4">
           <ImportarTab onChanged={load} />
+        </TabsContent>
+
+        <TabsContent value="parametros" className="space-y-4">
+          <Card className="max-w-2xl p-4">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold">Productividad técnica</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Define la meta mensual usada para calcular la productividad en el Dashboard de Servicios.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,260px)_1fr] sm:items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="monthly-productivity-goal" className="text-xs">Meta mensual por técnico</Label>
+                <div className="relative">
+                  <Input
+                    id="monthly-productivity-goal"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={monthlyProductivityGoal}
+                    onChange={(event) => setMonthlyProductivityGoal(Number(event.target.value))}
+                    disabled={!isSuperAdmin}
+                    className="pr-12"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">hs</span>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Para rangos parciales, la aplicación prorratea esta meta por días calendario. Un mes completo siempre usa la meta indicada.
+              </div>
+            </div>
+            {isSuperAdmin ? (
+              <Button className="mt-4" onClick={saveParameters} disabled={savingParameters}>
+                <Save className="mr-2 h-4 w-4" />
+                {savingParameters ? "Guardando..." : "Guardar parámetro"}
+              </Button>
+            ) : (
+              <div className="mt-4 text-xs text-muted-foreground">Solo el super administrador puede modificar este parámetro.</div>
+            )}
+          </Card>
         </TabsContent>
       </Tabs>
 
