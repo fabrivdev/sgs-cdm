@@ -212,12 +212,22 @@ function formatUsd(value: unknown) {
   return new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
+function normalizedBillingClient(value: unknown) {
+  return cleanText(value, 160)
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\bS\.?A\.?(C\.?I\.?)?\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   const sucursal = cleanText(args.sucursal, 40);
   const marca = cleanText(args.marca, 30);
   const tipo = canonicalBillingTimeType(args.tipo_tiempo);
   const rubro = canonicalBillingRubro(args.rubro);
-  const [importedRows, historicalRows] = await Promise.all([
+  const [importedRows, historicalRows, clientRows] = await Promise.all([
     fetchPaged((from, to) => {
       let query = client
         .from("facturacion_lineas_importadas")
@@ -233,13 +243,24 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     fetchPaged((from, to) => {
       let query = client
         .from("facturacion")
-        .select("fecha,sucursal,tipo,entidad_nombre,total_venta,grupo,grupo_fx,cod_factura")
+        .select("fecha,sucursal,tipo,cliente_id,entidad_nombre,total_venta,grupo,grupo_fx,cod_factura")
         .order("fecha")
         .range(from, to);
       query = dateFilter(query, "fecha", args);
       return query;
     }, 100000),
+    fetchPaged((from, to) => client
+      .from("clientes")
+      .select("id,nombre")
+      .order("id")
+      .range(from, to), 30000),
   ]);
+
+  const clientNameById = new Map(
+    clientRows
+      .map((row) => [cleanText(row.id, 80), cleanText(row.nombre, 160)] as const)
+      .filter(([id, name]) => id && name),
+  );
 
   const detailedKeys = new Set<string>();
   const gridCamposYears = new Set<string>();
@@ -274,7 +295,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
       return {
         factura: cleanText(row.cod_factura, 80),
         fecha: cleanText(row.fecha, 10),
-        entidad_nombre: cleanText(row.entidad_nombre, 160) || "Sin cliente",
+        entidad_nombre: clientNameById.get(cleanText(row.cliente_id, 80)) || cleanText(row.entidad_nombre, 160) || "Sin cliente",
         sucursal: cleanText(row.sucursal, 60) || "Sin sucursal",
         marca: rule?.marca ?? "OTROS",
         rubro: billingConcept(row.tipo, row.grupo_fx, row.grupo),
@@ -291,7 +312,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     return true;
   });
   const invoices = new Set(rows.map((row) => cleanText(row.factura, 80)).filter(Boolean));
-  const clients = new Set(rows.map((row) => cleanText(row.entidad_nombre, 160).toUpperCase()).filter(Boolean));
+  const clients = new Set(rows.map((row) => normalizedBillingClient(row.entidad_nombre)).filter(Boolean));
   const byRubro: Record<string, number> = {};
   const bySucursal: Record<string, number> = {};
   const byCliente = new Map<string, { cliente: string; totalUsd: number; facturas: Set<string> }>();
@@ -300,7 +321,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     const group = cleanText(row.rubro, 80) || "Otros";
     const branch = cleanText(row.sucursal, 60) || "Sin sucursal";
     const clientName = cleanText(row.entidad_nombre, 160) || "Sin cliente";
-    const clientKey = clientName.toUpperCase();
+    const clientKey = normalizedBillingClient(clientName);
     byRubro[group] = (byRubro[group] ?? 0) + value;
     bySucursal[branch] = (bySucursal[branch] ?? 0) + value;
     const clientEntry = byCliente.get(clientKey) ?? { cliente: clientName, totalUsd: 0, facturas: new Set<string>() };
@@ -342,7 +363,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
   const rows = await fetchPaged((from, to) => {
     let query = client
       .from("ordenes_servicio_importadas")
-      .select("os_numero,cliente_nombre,fecha_abierta_os,fecha_emision_factura,factura,responsable,marca,tipo_tiempo,servicios_cantidad,servicios_valor,km_cantidad,kilometro_valor,repuesto_valor,terceros_valor,situacion_os,situacion_facturacion,trabajo_id,raw_data")
+      .select("os_numero,sucursal,cliente_nombre,fecha_abierta_os,fecha_emision_factura,factura,responsable,marca,tipo_tiempo,servicios_cantidad,servicios_valor,km_cantidad,kilometro_valor,repuesto_valor,terceros_valor,situacion_os,situacion_facturacion,trabajo_id,raw_data")
       .order("fecha_abierta_os")
       .range(from, to);
     query = dateFilter(query, "fecha_abierta_os", args);
@@ -350,7 +371,12 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     if (tipo && tipo.toLowerCase() !== "todos") query = query.ilike("tipo_tiempo", `%${tipo}%`);
     return query;
   }, 30000);
-  const orders = new Set(rows.map((row) => cleanText(row.os_numero, 80)).filter(Boolean));
+  const orderKey = (row: JsonRecord) => {
+    const order = cleanText(row.os_numero, 80);
+    const branch = cleanText(row.sucursal, 60) || "Sin sucursal";
+    return order ? `${normalizedKey(branch)}|${order}` : "";
+  };
+  const orders = new Set(rows.map(orderKey).filter(Boolean));
   const technicians = new Map<string, {
     tecnico: string;
     ordenes: Set<string>;
@@ -384,7 +410,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     return [...new Set(values.map(normalizeTechnician).filter(Boolean))];
   };
   for (const row of rows) {
-    const order = cleanText(row.os_numero, 80);
+    const order = orderKey(row);
     if (!order) continue;
     const status = normalizeTechnician(row.situacion_os);
     const state: "cerradas" | "abiertas" | "otras" = status.includes("CERRAD")
@@ -595,6 +621,152 @@ function sourceLabel(name: string) {
   } as Record<string, string>)[name] ?? name;
 }
 
+function firstFilterValue(value: unknown) {
+  if (Array.isArray(value)) return value.length === 1 ? cleanText(value[0], 80) : "";
+  return cleanText(value, 80);
+}
+
+function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate: string) {
+  const filters = pageContext.filters && typeof pageContext.filters === "object"
+    ? pageContext.filters as JsonRecord
+    : {};
+  const args: JsonRecord = {};
+  const from = cleanText(filters.fecha_desde ?? filters.date_from, 10);
+  const to = cleanText(filters.fecha_hasta ?? filters.date_to, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(from)) args.date_from = from;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(to)) args.date_to = to;
+
+  const sucursal = firstFilterValue(filters.sucursales ?? filters.sucursal);
+  const marca = firstFilterValue(filters.marcas ?? filters.marca);
+  const rubroFiltro = firstFilterValue(filters.rubros ?? filters.rubro);
+  const tipoTiempo = canonicalBillingTimeType(firstFilterValue(filters.tipo_tiempo));
+  if (sucursal && normalizedKey(sucursal) !== "TODOS") args.sucursal = sucursal;
+  if (marca && normalizedKey(marca) !== "TODOS") args.marca = marca;
+  if (rubroFiltro) args.rubro = canonicalBillingRubro(rubroFiltro);
+  if (tipoTiempo) args.tipo_tiempo = tipoTiempo;
+
+  const normalized = normalizedKey(question);
+  if (normalized.includes("REPUEST")) args.rubro = "Repuestos";
+  else if (normalized.includes("KILOMET") || /\bKM\b/.test(normalized)) args.rubro = "Kilometraje";
+  else if (normalized.includes("SERVICIO") || normalized.includes("MANO DE OBRA")) args.rubro = "Servicio";
+  else if (normalized.includes("OTROS")) args.rubro = "Otros";
+  // "facturo/facturacion" describe la metrica, no implica tipo de tiempo Cliente.
+  // Solo aplicar este filtro cuando el usuario nombre explicitamente la categoria.
+  if (normalized.includes("GARANT")) args.tipo_tiempo = "Garantia";
+  else if (normalized.includes("INTERNO") || normalized.includes("ABSORVE") || normalized.includes("ABSORBE")) args.tipo_tiempo = "Interno";
+  else if (normalized.includes("FACTURAR A CLIENTE") || normalized.includes("TIPO CLIENTE") || normalized.includes("A CLIENTE")) args.tipo_tiempo = "Cliente";
+
+  const monthNames: Record<string, number> = {
+    ENERO: 1, FEBRERO: 2, MARZO: 3, ABRIL: 4, MAYO: 5, JUNIO: 6,
+    JULIO: 7, AGOSTO: 8, SEPTIEMBRE: 9, SETIEMBRE: 9, OCTUBRE: 10, NOVIEMBRE: 11, DICIEMBRE: 12,
+  };
+  const monthEntry = Object.entries(monthNames).find(([name]) => normalized.includes(name));
+  if (monthEntry) {
+    const explicitYear = normalized.match(/\b(20\d{2})\b/)?.[1];
+    const year = Number(explicitYear ?? currentDate.slice(0, 4));
+    const month = monthEntry[1];
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    args.date_from = `${year}-${String(month).padStart(2, "0")}-01`;
+    args.date_to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  }
+  return args;
+}
+
+type SemanticResponse = { tool: string; args: JsonRecord; content: string; resultCount: number };
+
+async function resolveSemanticQuestion(
+  client: SupabaseClient,
+  question: string,
+  pageContext: JsonRecord,
+  currentDate: string,
+): Promise<SemanticResponse | null> {
+  const normalized = normalizedKey(question);
+  const moduleName = normalizedKey(pageContext.module);
+  const args = semanticToolArgs(question, pageContext, currentDate);
+  const asksCount = normalized.includes("CUANT") || normalized.includes("TOTAL");
+  const asksTop = normalized.includes(" MAS ") || normalized.startsWith("QUE ") || normalized.includes("MAYOR");
+  const asksBilling = normalized.includes("FACTUR") || normalized.includes("VENTA");
+  const asksOrders = /(^|\s)OS($|\s)/.test(normalized) || normalized.includes("ORDEN DE SERVICIO") || normalized.includes("ORDENES DE SERVICIO");
+  const asksTechnician = normalized.includes("TECNIC");
+  const asksClients = normalized.includes("CLIENT");
+  const asksBranch = normalized.includes("SUCURSAL");
+
+  if (asksOrders && asksTechnician && asksTop) {
+    const result = await getServiceOrdersSummary(client, args) as JsonRecord;
+    const ranking = Array.isArray(result.ranking_tecnicos)
+      ? result.ranking_tecnicos as Array<{ tecnico?: string; ordenes?: number; abiertas?: number; cerradas?: number }>
+      : [];
+    const onlyOpen = normalized.includes("ABIERT");
+    const leader = ranking.reduce<typeof ranking[number] | null>((best, row) => {
+      if (!best) return row;
+      const value = Number(onlyOpen ? row.abiertas : row.ordenes) || 0;
+      const bestValue = Number(onlyOpen ? best.abiertas : best.ordenes) || 0;
+      return value > bestValue ? row : best;
+    }, null);
+    if (!leader?.tecnico) return null;
+    const amount = Number(onlyOpen ? leader.abiertas : leader.ordenes) || 0;
+    const period = `${cleanText(args.date_from, 10) || "inicio disponible"} al ${cleanText(args.date_to, 10) || "fin disponible"}`;
+    return {
+      tool: "get_service_orders_summary",
+      args,
+      content: `${leader.tecnico} es el tecnico con mas ${onlyOpen ? "OS abiertas" : "OS"}: ${amount}. Periodo consultado: ${period}.`,
+      resultCount: Number(result.filas) || 0,
+    };
+  }
+
+  const dashboardBillingContext = moduleName === "DASHBOARD" && !normalized.includes("PARQUE") && !normalized.includes("MAQUINA");
+  if (asksBilling || (asksClients && asksCount && dashboardBillingContext)) {
+    const result = await getBillingSummary(client, args) as JsonRecord;
+    const period = `${cleanText(args.date_from, 10) || "inicio disponible"} al ${cleanText(args.date_to, 10) || "fin disponible"}`;
+    if (asksBranch && asksTop) {
+      const ranking = result.ranking_sucursales as Array<{ sucursal?: string; total_usd?: number }> | undefined;
+      const leader = ranking?.[0];
+      if (!leader?.sucursal) return null;
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `${leader.sucursal} fue la sucursal con mayor facturacion, con ${formatUsd(leader.total_usd)}. Periodo consultado: ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
+    if (asksClients && asksCount) {
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `Hay ${Number(result.clientes) || 0} clientes facturados unicos en el periodo ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
+    if (normalized.includes("FACTURA") && asksCount && !normalized.includes("FACTURACION")) {
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `Hay ${Number(result.facturas) || 0} facturas unicas en el periodo ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
+    if (asksCount || normalized.includes("CUANTO") || normalized.includes("MONTO")) {
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `La facturacion del periodo es ${formatUsd(result.total_usd)}. Periodo consultado: ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
+  }
+
+  if (asksClients && asksCount && (moduleName.includes("PARQUE") || normalized.includes("PARQUE") || normalized.includes("MAQUINA"))) {
+    const result = await getParkSummary(client, args) as JsonRecord;
+    return {
+      tool: "get_park_summary",
+      args,
+      content: `El parque activo tiene ${Number(result.clientes) || 0} clientes unicos y ${Number(result.maquinas_activas) || 0} maquinas activas.`,
+      resultCount: Number(result.maquinas_activas) || 0,
+    };
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Metodo no permitido" }, 405);
@@ -657,6 +829,38 @@ Deno.serve(async (req) => {
     const { data: history } = await userClient.from("ai_messages").select("role,content").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(12);
     const contextText = Object.keys(pageContext).length ? JSON.stringify(pageContext) : "Sin contexto de pantalla";
     const currentDate = new Date().toISOString().slice(0, 10);
+    const semanticStartedAt = Date.now();
+    const semantic = await resolveSemanticQuestion(admin, question, pageContext, currentDate);
+    if (semantic) {
+      const sources: ToolSource[] = [{ tool: semantic.tool, label: sourceLabel(semantic.tool), filters: semantic.args }];
+      await admin.from("ai_tool_runs").insert({
+        conversation_id: conversationId,
+        user_id: userId,
+        tool_name: semantic.tool,
+        filters: semantic.args,
+        result_count: semantic.resultCount,
+        duration_ms: Date.now() - semanticStartedAt,
+        error: null,
+      });
+      const { data: assistantMessage, error: assistantError } = await userClient
+        .from("ai_messages")
+        .insert({ conversation_id: conversationId, user_id: userId, role: "assistant", content: semantic.content, answer_mode: answerMode, page_context: pageContext, sources })
+        .select("id,created_at")
+        .single();
+      if (assistantError) throw assistantError;
+      await userClient.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+      await admin.from("ai_usage").insert({
+        conversation_id: conversationId,
+        user_id: userId,
+        model: "semantic-router",
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        latency_ms: Date.now() - startedAt,
+        status: "completed",
+      });
+      return json({ conversation_id: conversationId, message: { ...assistantMessage, role: "assistant", content: semantic.content, sources }, usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
+    }
     const systemPrompt = `Eres el asistente de datos de Servicios Tecnicos CDM. La fecha actual del sistema es ${currentDate}; interpreta "corriente", "actual", "hoy" y otros periodos relativos a partir de esa fecha. Responde en espanol. Solo puedes afirmar cifras obtenidas mediante herramientas. No inventes datos, no generes SQL y nunca solicites secretos. Aplica el contexto si es pertinente: ${contextText}. Modo de respuesta: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica periodo y filtros usados. Si faltan datos, dilo claramente. Los importes son USD. tipo_tiempo solo admite Cliente, Garantia o Interno; nunca coloques alli dia, semana, mes o anio. Reutiliza los resultados y rankings ya devueltos en la conversacion; no repitas una herramienta con los mismos filtros para responder una repregunta.`;
     const messages: any[] = [
       { role: "system", content: systemPrompt },
