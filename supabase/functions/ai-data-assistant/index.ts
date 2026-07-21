@@ -1291,7 +1291,9 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const groqKey = Deno.env.get("GROQ_API_KEY");
-    const groqModel = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+    const configuredGroqModel = Deno.env.get("GROQ_MODEL") || "openai/gpt-oss-20b";
+    const fallbackGroqModel = Deno.env.get("GROQ_FALLBACK_MODEL") || "llama-3.1-8b-instant";
+    let activeGroqModel = configuredGroqModel;
     if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Configuracion de Supabase incompleta" }, 500);
     if (!groqKey) return json({ error: "GROQ_API_KEY no esta configurada" }, 503);
 
@@ -1393,16 +1395,36 @@ Deno.serve(async (req) => {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       for (let iteration = 0; iteration <= maxToolCalls; iteration++) {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const requestBody = (model: string) => ({
+          model,
+          messages,
+          tools,
+          tool_choice: "auto",
+          parallel_tool_calls: false,
+          max_tokens: maxTokens,
+          temperature: 0.2,
+          ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
+        });
+        let response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: groqModel, messages, tools, tool_choice: "auto", max_tokens: maxTokens, temperature: 0.2 }),
+          body: JSON.stringify(requestBody(activeGroqModel)),
           signal: controller.signal,
         });
-        const payload = await response.json().catch(() => ({}));
+        let payload = await response.json().catch(() => ({}));
+        if (response.status === 429 && activeGroqModel !== fallbackGroqModel) {
+          activeGroqModel = fallbackGroqModel;
+          response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody(activeGroqModel)),
+            signal: controller.signal,
+          });
+          payload = await response.json().catch(() => ({}));
+        }
         if (!response.ok) {
           const message = payload?.error?.message ?? payload?.message ?? `Groq respondio ${response.status}`;
-          throw new Error(response.status === 429 ? "Se alcanzo el limite gratuito de Groq. Intenta nuevamente mas tarde." : message);
+          throw new Error(response.status === 429 ? "Se alcanzo el limite gratuito de los modelos principal y de respaldo de Groq. Intenta nuevamente mas tarde." : message);
         }
         const usage = payload.usage ?? {};
         totalUsage = {
@@ -1482,7 +1504,7 @@ Deno.serve(async (req) => {
     const { data: assistantMessage, error: assistantError } = await userClient.from("ai_messages").insert({ conversation_id: conversationId, user_id: userId, role: "assistant", content: finalContent, answer_mode: answerMode, page_context: pageContext, sources }).select("id,created_at").single();
     if (assistantError) throw assistantError;
     await userClient.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
-    await admin.from("ai_usage").insert({ conversation_id: conversationId, user_id: userId, model: groqModel, ...totalUsage, latency_ms: Date.now() - startedAt, status: "completed" });
+    await admin.from("ai_usage").insert({ conversation_id: conversationId, user_id: userId, model: activeGroqModel, ...totalUsage, latency_ms: Date.now() - startedAt, status: "completed" });
 
     return json({ conversation_id: conversationId, message: { ...assistantMessage, role: "assistant", content: finalContent, sources }, usage: totalUsage });
   } catch (error) {
@@ -1491,7 +1513,7 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const admin = createClient(supabaseUrl, serviceKey);
-      await admin.from("ai_usage").insert({ conversation_id: conversationId || null, user_id: userId, model: Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile", latency_ms: Date.now() - startedAt, status: "error" });
+      await admin.from("ai_usage").insert({ conversation_id: conversationId || null, user_id: userId, model: Deno.env.get("GROQ_MODEL") || "openai/gpt-oss-20b", latency_ms: Date.now() - startedAt, status: "error" });
     }
     return json({ error: message }, /limite gratuito/i.test(message) ? 429 : /tiempo limite/i.test(message) ? 408 : 500);
   }
