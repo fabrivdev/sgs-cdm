@@ -161,24 +161,129 @@ function canonicalBillingRubro(value: unknown) {
   return cleanText(value, 60);
 }
 
+function normalizedKey(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+function canonicalBillingTimeType(value: unknown) {
+  const normalized = normalizedKey(value);
+  if (normalized.includes("GARANT")) return "Garantia";
+  if (normalized.includes("INTERN") || normalized.includes("ABSOR")) return "Interno";
+  if (normalized.includes("CLIENT") || normalized.includes("FACTUR")) return "Cliente";
+  return "";
+}
+
+const legacyBillingRules: Record<string, { rubro: string; marca: string }> = {
+  "SERVICE - CLAAS": { rubro: "Servicio", marca: "CLAAS" },
+  "REPUESTOS - CLAAS": { rubro: "Repuestos", marca: "CLAAS" },
+  "REPUESTOS CLAAS - PROMOCION": { rubro: "Repuestos", marca: "CLAAS" },
+  "REPUESTOS - CABEZALES/PLATAFOR": { rubro: "Repuestos", marca: "CLAAS" },
+  "REPUESTOS TRACTOR": { rubro: "Repuestos", marca: "CLAAS" },
+  "REPUESTOS DIVERSOS --": { rubro: "Repuestos", marca: "CLAAS" },
+  "SERVICE - HORSCH": { rubro: "Servicio", marca: "HORSCH" },
+  "REPUESTOS PLANTADORA": { rubro: "Repuestos", marca: "HORSCH" },
+  "REPUESTOS PULVERIZADORAS": { rubro: "Repuestos", marca: "HORSCH" },
+  "SERVICIOS - OTROS": { rubro: "Servicio", marca: "OTROS" },
+  "REPUESTOS - RIEGO": { rubro: "Repuestos", marca: "OTROS" },
+  "OTROS PRODUCTOS": { rubro: "Otros", marca: "OTROS" },
+  "REPUESTOS USADO": { rubro: "Repuestos", marca: "OTROS" },
+  "ACCESORIOS DIVERSOS": { rubro: "Otros", marca: "OTROS" },
+  "REPUESTOS - ENROLLADORES": { rubro: "Repuestos", marca: "OTROS" },
+  "REPUESTOS - CESTARI": { rubro: "Repuestos", marca: "OTROS" },
+};
+
+function billingConcept(tipo: unknown, grupoFx: unknown, grupo: unknown) {
+  const fx = normalizedKey(grupoFx);
+  const combined = `${fx} ${normalizedKey(grupo)}`;
+  if (normalizedKey(tipo) === "REPUESTO" || combined.includes("REPUESTO")) return "Repuestos";
+  if (fx === "KILOMETRAJE" || combined.includes("KILOMET")) return "Kilometraje";
+  if (fx === "SERVICIO" || combined.includes("MANO DE OBRA") || combined.includes("SERVICE") || combined.includes("SERVICIO")) return "Servicio";
+  return "Otros";
+}
+
 async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   const sucursal = cleanText(args.sucursal, 40);
   const marca = cleanText(args.marca, 30);
-  const tipo = cleanText(args.tipo_tiempo, 40);
+  const tipo = canonicalBillingTimeType(args.tipo_tiempo);
   const rubro = canonicalBillingRubro(args.rubro);
-  const rows = await fetchPaged((from, to) => {
-    let query = client
-      .from("facturacion_lineas_importadas")
-      .select("factura,fecha_factura,entidad_nombre,sucursal,marca_normalizada,grupo_normalizado,tipo_tiempo,total_venta,cantidad,mercaderia")
-      .order("fecha_factura")
-      .range(from, to);
-    query = dateFilter(query, "fecha_factura", args);
-    if (sucursal && sucursal.toLowerCase() !== "todos") query = query.eq("sucursal", sucursal);
-    if (marca && marca.toLowerCase() !== "todos") query = query.eq("marca_normalizada", marca);
-    if (tipo && tipo.toLowerCase() !== "todos") query = query.ilike("tipo_tiempo", `%${tipo}%`);
-    if (rubro) query = query.eq("grupo_normalizado", rubro);
-    return query;
-  }, 50000);
+  const [importedRows, historicalRows] = await Promise.all([
+    fetchPaged((from, to) => {
+      let query = client
+        .from("facturacion_lineas_importadas")
+        .select("factura,codigo_interno_factura,fecha_factura,entidad_nombre,sucursal,marca_normalizada,subgrupo_original,grupo_normalizado,tipo_facturacion,tipo_tiempo,total_venta,origen_sistema")
+        .order("fecha_factura")
+        .range(from, to);
+      const dateFrom = cleanText(args.date_from, 10);
+      const dateTo = cleanText(args.date_to, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) query = query.gte("fecha_factura", `${dateFrom}T00:00:00`);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) query = query.lte("fecha_factura", `${dateTo}T23:59:59.999`);
+      return query;
+    }, 100000),
+    fetchPaged((from, to) => {
+      let query = client
+        .from("facturacion")
+        .select("fecha,sucursal,tipo,entidad_nombre,total_venta,grupo,grupo_fx,cod_factura")
+        .order("fecha")
+        .range(from, to);
+      query = dateFilter(query, "fecha", args);
+      return query;
+    }, 100000),
+  ]);
+
+  const detailedKeys = new Set<string>();
+  const gridCamposYears = new Set<string>();
+  for (const row of importedRows) {
+    const invoice = cleanText(row.codigo_interno_factura ?? row.factura, 80);
+    const date = cleanText(row.fecha_factura, 10);
+    if (invoice && date) detailedKeys.add(`${date}||${invoice}`);
+    if (row.origen_sistema === "grid_campos" && date) gridCamposYears.add(date.slice(0, 4));
+  }
+
+  const imported = importedRows.map((row) => ({
+    factura: cleanText(row.codigo_interno_factura ?? row.factura, 80),
+    fecha: cleanText(row.fecha_factura, 10),
+    entidad_nombre: cleanText(row.entidad_nombre, 160) || "Sin cliente",
+    sucursal: cleanText(row.sucursal, 60) || "Sin sucursal",
+    marca: normalizedKey(row.marca_normalizada) || "OTROS",
+    rubro: billingConcept(row.tipo_facturacion, row.grupo_normalizado, row.subgrupo_original),
+    tipo_tiempo: canonicalBillingTimeType(row.tipo_tiempo) || "Cliente",
+    total_venta: Number(row.total_venta) || 0,
+    origen: "importada",
+  }));
+  const historical = historicalRows
+    .filter((row) => {
+      const date = cleanText(row.fecha, 10);
+      const invoice = cleanText(row.cod_factura, 80);
+      if (date && invoice && detailedKeys.has(`${date}||${invoice}`)) return false;
+      const isCampos = normalizedKey(row.entidad_nombre).includes("CAMPOS DEL MANANA");
+      return !isCampos || !gridCamposYears.has(date.slice(0, 4));
+    })
+    .map((row) => {
+      const rule = legacyBillingRules[normalizedKey(row.grupo)];
+      return {
+        factura: cleanText(row.cod_factura, 80),
+        fecha: cleanText(row.fecha, 10),
+        entidad_nombre: cleanText(row.entidad_nombre, 160) || "Sin cliente",
+        sucursal: cleanText(row.sucursal, 60) || "Sin sucursal",
+        marca: rule?.marca ?? "OTROS",
+        rubro: billingConcept(row.tipo, row.grupo_fx, row.grupo),
+        tipo_tiempo: "Cliente",
+        total_venta: Number(row.total_venta) || 0,
+        origen: "historica",
+      };
+    });
+  const rows = [...historical, ...imported].filter((row) => {
+    if (sucursal && sucursal.toLowerCase() !== "todos" && normalizedKey(row.sucursal) !== normalizedKey(sucursal)) return false;
+    if (marca && marca.toLowerCase() !== "todos" && normalizedKey(row.marca) !== normalizedKey(marca)) return false;
+    if (tipo && row.tipo_tiempo !== tipo) return false;
+    if (rubro && row.rubro !== rubro) return false;
+    return true;
+  });
   const invoices = new Set(rows.map((row) => cleanText(row.factura, 80)).filter(Boolean));
   const clients = new Set(rows.map((row) => cleanText(row.entidad_nombre, 160).toUpperCase()).filter(Boolean));
   const byRubro: Record<string, number> = {};
@@ -186,7 +291,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   const byCliente = new Map<string, { cliente: string; totalUsd: number; facturas: Set<string> }>();
   for (const row of rows) {
     const value = Number(row.total_venta) || 0;
-    const group = cleanText(row.grupo_normalizado, 80) || "Otros";
+    const group = cleanText(row.rubro, 80) || "Otros";
     const branch = cleanText(row.sucursal, 60) || "Sin sucursal";
     const clientName = cleanText(row.entidad_nombre, 160) || "Sin cliente";
     const clientKey = clientName.toUpperCase();
@@ -214,6 +319,11 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     clientes: clients.size,
     lineas: rows.length,
     rubro_aplicado: rubro || "Todos",
+    tipo_tiempo_aplicado: tipo || "Todos",
+    fuentes: {
+      historica: rows.filter((row) => row.origen === "historica").length,
+      importada: rows.filter((row) => row.origen === "importada").length,
+    },
     ranking_sucursales: rankingSucursales,
     ranking_rubros: rankingRubros,
     ranking_clientes: rankingClientes,
@@ -421,7 +531,7 @@ const filterProperties = {
   date_to: { type: "string", description: "Fecha final YYYY-MM-DD" },
   sucursal: { type: "string" },
   marca: { type: "string" },
-  tipo_tiempo: { type: "string" },
+  tipo_tiempo: { type: "string", description: "Tipo comercial: Cliente, Garantia, Interno o Todos. No usar para dia, semana, mes o anio." },
   rubro: { type: "string", description: "Rubro canonico: Servicio, Repuestos, Kilometraje, Otros o Todos" },
 };
 
@@ -540,13 +650,16 @@ Deno.serve(async (req) => {
 
     const { data: history } = await userClient.from("ai_messages").select("role,content").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(12);
     const contextText = Object.keys(pageContext).length ? JSON.stringify(pageContext) : "Sin contexto de pantalla";
-    const systemPrompt = `Eres el asistente de datos de Servicios Tecnicos CDM. Responde en espanol. Solo puedes afirmar cifras obtenidas mediante herramientas. No inventes datos, no generes SQL y nunca solicites secretos. Aplica el contexto si es pertinente: ${contextText}. Modo de respuesta: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica periodo y filtros usados. Si faltan datos, dilo claramente. Los importes son USD. Reutiliza los resultados y rankings ya devueltos en la conversacion; no repitas una herramienta con los mismos filtros para responder una repregunta.`;
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const systemPrompt = `Eres el asistente de datos de Servicios Tecnicos CDM. La fecha actual del sistema es ${currentDate}; interpreta "corriente", "actual", "hoy" y otros periodos relativos a partir de esa fecha. Responde en espanol. Solo puedes afirmar cifras obtenidas mediante herramientas. No inventes datos, no generes SQL y nunca solicites secretos. Aplica el contexto si es pertinente: ${contextText}. Modo de respuesta: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica periodo y filtros usados. Si faltan datos, dilo claramente. Los importes son USD. tipo_tiempo solo admite Cliente, Garantia o Interno; nunca coloques alli dia, semana, mes o anio. Reutiliza los resultados y rankings ya devueltos en la conversacion; no repitas una herramienta con los mismos filtros para responder una repregunta.`;
     const messages: any[] = [
       { role: "system", content: systemPrompt },
       ...(history ?? []).reverse().map((row: any) => ({ role: row.role, content: row.content })),
     ];
 
     const sources: ToolSource[] = [];
+    const toolCache = new Map<string, unknown>();
+    const sourceKeys = new Set<string>();
     let totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
     let finalContent = "";
     const controller = new AbortController();
@@ -585,17 +698,26 @@ Deno.serve(async (req) => {
           const name = cleanText(call.function?.name, 80);
           let args: JsonRecord = {};
           try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
+          const cacheKey = `${name}:${JSON.stringify(args)}`;
           let toolResult: unknown;
           let toolError: string | null = null;
-          try {
-            toolResult = await executeTool(userClient, name, args);
-          } catch (error) {
-            toolError = error instanceof Error ? error.message : String(error);
-            toolResult = { error: toolError };
+          if (toolCache.has(cacheKey)) {
+            toolResult = toolCache.get(cacheKey);
+          } else {
+            try {
+              toolResult = await executeTool(userClient, name, args);
+            } catch (error) {
+              toolError = error instanceof Error ? error.message : String(error);
+              toolResult = { error: toolError };
+            }
+            toolCache.set(cacheKey, toolResult);
+            const resultCount = Array.isArray(toolResult) ? toolResult.length : 1;
+            await admin.from("ai_tool_runs").insert({ conversation_id: conversationId, user_id: userId, tool_name: name, filters: args, result_count: resultCount, duration_ms: Date.now() - toolStarted, error: toolError });
           }
-          const resultCount = Array.isArray(toolResult) ? toolResult.length : 1;
-          await admin.from("ai_tool_runs").insert({ conversation_id: conversationId, user_id: userId, tool_name: name, filters: args, result_count: resultCount, duration_ms: Date.now() - toolStarted, error: toolError });
-          sources.push({ tool: name, label: sourceLabel(name), filters: args });
+          if (!sourceKeys.has(cacheKey)) {
+            sourceKeys.add(cacheKey);
+            sources.push({ tool: name, label: sourceLabel(name), filters: args });
+          }
           messages.push({ role: "tool", tool_call_id: call.id, name, content: JSON.stringify(toolResult).slice(0, 50000) });
         }
       }
