@@ -1182,7 +1182,10 @@ function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate
   monday.setUTCDate(current.getUTCDate() - dayFromMonday);
   const sunday = new Date(monday);
   sunday.setUTCDate(monday.getUTCDate() + 6);
-  if (normalized.includes("SEMANA PASADA") || normalized.includes("SEMANA ANTERIOR")) {
+  if (normalized.includes("MES EN CURSO") || normalized.includes("MES ACTUAL") || normalized.includes("ESTE MES")) {
+    args.date_from = `${currentDate.slice(0, 7)}-01`;
+    args.date_to = currentDate;
+  } else if (normalized.includes("SEMANA PASADA") || normalized.includes("SEMANA ANTERIOR")) {
     const previousMonday = new Date(monday);
     previousMonday.setUTCDate(monday.getUTCDate() - 7);
     const previousSunday = new Date(sunday);
@@ -1316,9 +1319,20 @@ async function resolveSemanticQuestion(
     ? previousBillingSource.filters as JsonRecord
     : {};
   const args = semanticToolArgs(question, pageContext, currentDate, inheritedBillingFilters);
+  const isFollowUp = normalized.length <= 80 && (
+    normalized.startsWith("Y ") ||
+    normalized.startsWith("PERO ") ||
+    normalized.includes("EN ESE PERIODO") ||
+    normalized.includes("MES EN CURSO") ||
+    normalized.includes("MES ACTUAL") ||
+    normalized.includes("ESTE MES") ||
+    normalized.includes("QUIEN LE SIGUE") ||
+    normalized.includes("CUAL LE SIGUE")
+  );
   const asksCount = normalized.includes("CUANT") || normalized.includes("TOTAL");
   const asksTop = normalized.includes(" MAS ") || normalized.startsWith("QUE ") || normalized.includes("MAYOR");
-  const asksBilling = normalized.includes("FACTUR") || normalized.includes("VENTA");
+  const asksBilling = normalized.includes("FACTUR") || normalized.includes("VENTA") ||
+    (isFollowUp && conversationalIntent.includes("FACTUR"));
   const asksOrders = /(^|\s)OS($|\s)/.test(normalized) || normalized.includes("ORDEN DE SERVICIO") || normalized.includes("ORDENES DE SERVICIO");
   const asksTechnician = normalized.includes("TECNIC") || (asksOrders && conversationalIntent.includes("TECNIC"));
   const asksClients = normalized.includes("CLIENT");
@@ -1331,8 +1345,10 @@ async function resolveSemanticQuestion(
   const asksInactiveTechnician = normalized.includes("INACTIV") || (asksOrders && conversationalIntent.includes("INACTIV"));
   const asksProductivity = normalized.includes("PRODUCTIV") || (asksOrders && conversationalIntent.includes("PRODUCTIV"));
   const asksJornadas = normalized.includes("JORNAD") || normalized.includes("PLANIFICADOR") || normalized.includes("CALENDARIO");
-  const asksHours = normalized.includes("HORA") || /(^|\s)HS($|\s)/.test(normalized);
+  const asksHours = normalized.includes("HORA") || /(^|\s)HS($|\s)/.test(normalized) ||
+    (isFollowUp && (conversationalIntent.includes("HORA") || /(^|\s)HS($|\s)/.test(conversationalIntent)));
   const asksTimeTypeBreakdown = normalized.includes("TIPO DE TIEMPO") ||
+    (isFollowUp && conversationalIntent.includes("TIPO DE TIEMPO")) ||
     (conversationalIntent.includes("TIPO DE TIEMPO") && (normalized.includes("DESGLOS") || normalized.includes("HABLO DE")));
 
   if (asksBilling && asksHours) {
@@ -1740,12 +1756,17 @@ Deno.serve(async (req) => {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       for (let iteration = 0; iteration <= maxToolCalls; iteration++) {
+        const forceFinalAnswer = iteration >= maxToolCalls;
         const requestBody = (model: string) => ({
           model,
           messages: providerSafeMessages(messages),
-          tools: modelTools,
-          tool_choice: "auto",
-          parallel_tool_calls: false,
+          ...(forceFinalAnswer ? {
+            tool_choice: "none",
+          } : {
+            tools: modelTools,
+            tool_choice: "auto",
+            parallel_tool_calls: false,
+          }),
           max_tokens: model === fallbackGroqModel ? Math.min(maxTokens, 500) : Math.min(maxTokens, 900),
           temperature: 0.2,
           ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
@@ -1785,8 +1806,10 @@ Deno.serve(async (req) => {
           finalContent = cleanContent(message.content, 12000) || "No se pudo elaborar una respuesta con los datos disponibles.";
           break;
         }
-        if (sources.length >= maxToolCalls) throw new Error("La consulta requiere demasiadas operaciones; acota la pregunta");
-        if (iteration >= maxToolCalls) throw new Error("La consulta requiere demasiadas operaciones; acota la pregunta");
+        if (forceFinalAnswer) {
+          finalContent = "No se pudo completar la respuesta con las fuentes consultadas.";
+          break;
+        }
         for (const call of calls.slice(0, maxToolCalls - sources.length)) {
           const toolStarted = Date.now();
           const name = cleanText(call.function?.name, 80);
