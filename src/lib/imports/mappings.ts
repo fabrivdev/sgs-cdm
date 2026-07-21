@@ -44,7 +44,13 @@ export function inferCanonicalBillingType(group: unknown, description?: unknown)
     return "Otros";
   }
   if (sample.includes("KILOMET") || /\bKM\d*\b/.test(sample)) return "Kilometraje";
-  if (sample.includes("SERVIC") || sample.includes("SEVIC") || /\bMA\d*\b/.test(sample) || /\bMO\d*\b/.test(sample)) return "Servicio";
+  if (
+    sample.includes("SERVIC") ||
+    sample.includes("SEVIC") ||
+    /\bSE\d*\b/.test(sample) ||
+    /\bMA\d*\b/.test(sample) ||
+    /\bMO\d*\b/.test(sample)
+  ) return "Servicio";
   if (sample.includes("REPUEST")) return "Repuestos";
   return "Otros";
 }

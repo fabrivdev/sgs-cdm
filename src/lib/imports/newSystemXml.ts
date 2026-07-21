@@ -218,7 +218,7 @@ export function mapOrdenesServicioSheet(
       currency: resolveCurrency(firstValue(row, ["MONEDA"])),
       serviceHours: lineType === "Servicio" ? quantity : 0,
       kilometreQuantity: lineType === "Kilometraje" ? quantity : 0,
-      thirdPartyValue: 0,
+      thirdPartyValue: lineType === "Otros" ? lineTotal : 0,
       kilometreValue: lineType === "Kilometraje" ? lineTotal : 0,
       serviceValue: lineType === "Servicio" ? lineTotal : 0,
       sparePartsValue: lineType === "Repuestos" ? lineTotal : 0,

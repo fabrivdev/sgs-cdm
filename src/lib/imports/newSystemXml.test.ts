@@ -100,6 +100,46 @@ describe("importacion XML de ordenes de servicio", () => {
     });
   });
 
+  it("conserva el total de una linea SE como servicio", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "02",
+        "NÂº OS": "00000019",
+        ESTADO: "Cerrada",
+        "Fc Abiert OS": "2026-07-21T00:00:00.000",
+        GRUPO: "CO - COSECHADORA",
+        PRODUCTO: "SE01",
+        CANTIDAD: "1",
+        TOTAL: "66",
+        MONEDA: "2 - Dolares",
+      }],
+    });
+
+    expect(result.rows[0].serviceOrderNumber).toBe("02-00000019");
+    expect(result.rows[0].serviceValue).toBe(66);
+    expect(result.rows[0].thirdPartyValue).toBe(0);
+  });
+
+  it("conserva como terceros el total de una linea realmente no clasificada", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "02",
+        "NÂº OS": "00000020",
+        GRUPO: "OTROS",
+        PRODUCTO: "COURIER",
+        CANTIDAD: "1",
+        TOTAL: "25",
+      }],
+    });
+
+    expect(result.rows[0].serviceValue).toBe(0);
+    expect(result.rows[0].thirdPartyValue).toBe(25);
+  });
+
   it("mantiene separadas las facturas Cliente y Garantia de una OS mixta", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", sheet);
     const aggregated = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
