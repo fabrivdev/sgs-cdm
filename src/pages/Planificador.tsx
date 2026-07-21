@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { addDays, format, getISOWeek, parseISO, startOfWeek } from "date-fns";
+import { addDays, format, getISOWeek, parseISO, setISOWeek, startOfWeek } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -125,10 +125,22 @@ export default function Planificador() {
   const [vista, setVista] = useState<"dia" | "semana">("dia");
   const [soloPrincipalesSemana, setSoloPrincipalesSemana] = useState(false);
 
+  const assistantWeekRange = useMemo(() => {
+    if (fSemana === "all") return {};
+    const weekNumber = Number(fSemana);
+    if (!Number.isFinite(weekNumber)) return {};
+    const weekStart = startOfWeek(setISOWeek(new Date(), weekNumber), { weekStartsOn: 1 });
+    return {
+      fecha_desde: format(weekStart, "yyyy-MM-dd"),
+      fecha_hasta: format(addDays(weekStart, 6), "yyyy-MM-dd"),
+    };
+  }, [fSemana]);
+
   useEffect(() => {
     setPageFilters({
       vista,
       semana: fSemana === "all" ? undefined : fSemana,
+      ...assistantWeekRange,
       sucursal: fSucursal === "all" ? undefined : fSucursal,
       tecnico: fTecnico === "all" ? undefined : fTecnico,
       marca: fMarca === "all" ? undefined : fMarca,
@@ -137,7 +149,7 @@ export default function Planificador() {
       vencimiento: fVencidas === "all" ? undefined : fVencidas,
     });
     return clearPageFilters;
-  }, [clearPageFilters, fCliente, fEstado, fMarca, fSemana, fSucursal, fTecnico, fVencidas, setPageFilters, vista]);
+  }, [assistantWeekRange, clearPageFilters, fCliente, fEstado, fMarca, fSemana, fSucursal, fTecnico, fVencidas, setPageFilters, vista]);
 
   // Default sucursal por perfil al primer load
   useEffect(() => {

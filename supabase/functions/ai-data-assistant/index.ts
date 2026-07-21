@@ -758,6 +758,20 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
   };
 }
 
+async function getMachinesByChassisPrefix(client: SupabaseClient, prefix: string) {
+  const safePrefix = cleanText(prefix, 40).replace(/[^a-zA-Z0-9-]/g, "");
+  if (safePrefix.length < 2) return [];
+
+  return await checked<JsonRecord[]>(
+    client
+      .from("parque_maquinas")
+      .select("id,serie,marca,modelo_tipo,anio,sucursal,activo,cliente_id,clientes(nombre)")
+      .ilike("serie", `${safePrefix}%`)
+      .order("serie")
+      .limit(100),
+  );
+}
+
 async function searchEntities(client: SupabaseClient, args: JsonRecord) {
   const term = cleanText(args.query, 80).replace(/[%_,()]/g, " ");
   if (term.length < 2) return { error: "La busqueda requiere al menos 2 caracteres" };
@@ -1154,8 +1168,40 @@ function firstFilterValue(value: unknown) {
   return cleanText(value, 80);
 }
 
-function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate: string, inherited: JsonRecord = {}) {
-  const filters = pageContext.filters && typeof pageContext.filters === "object"
+function referencesVisibleContext(question: string) {
+  const normalized = normalizedKey(question);
+  return [
+    "PERIODO VISIBLE", "RANGO VISIBLE", "FILTROS ACTUALES", "FILTRO ACTUAL",
+    "ESTOS FILTROS", "ESTA SELECCION", "PERIODO SELECCIONADO", "EN ESTA VISTA",
+  ].some((term) => normalized.includes(term));
+}
+
+function pageContextMatchesQuestion(question: string, pageContext: JsonRecord) {
+  if (referencesVisibleContext(question)) return true;
+  const normalized = normalizedKey(question);
+  const moduleName = normalizedKey(pageContext.module);
+  if (moduleName === "DASHBOARD") return true;
+  if (moduleName.includes("PLANIFICADOR") || moduleName.includes("CALENDARIO")) {
+    return ["JORNAD", "PLANIFIC", "CALENDARIO", "PROGRAMAD", "DISPONIBIL", "CARGA", "CUADRILLA"]
+      .some((term) => normalized.includes(term));
+  }
+  if (moduleName === "TRABAJOS") {
+    return ["TRABAJO", "TR ", "PENDIENT", "INICIAD", "PAUSAD", "COMPLETAD", "CIERRE"]
+      .some((term) => normalized.includes(term));
+  }
+  if (moduleName.includes("PARQUE")) return ["PARQUE", "MAQUINA", "CLIENTE", "COBERTURA"].some((term) => normalized.includes(term));
+  if (moduleName.includes("AGENDA")) return ["AGENDA", "CONTACT", "SEGUIMIENTO", "CLIENTE"].some((term) => normalized.includes(term));
+  return false;
+}
+
+function semanticToolArgs(
+  question: string,
+  pageContext: JsonRecord,
+  currentDate: string,
+  inherited: JsonRecord = {},
+  usePageContext = true,
+) {
+  const filters = usePageContext && pageContext.filters && typeof pageContext.filters === "object"
     ? pageContext.filters as JsonRecord
     : {};
   const args: JsonRecord = {};
@@ -1318,7 +1364,6 @@ async function resolveSemanticQuestion(
   const inheritedBillingFilters = previousBillingSource?.filters && typeof previousBillingSource.filters === "object"
     ? previousBillingSource.filters as JsonRecord
     : {};
-  const args = semanticToolArgs(question, pageContext, currentDate, inheritedBillingFilters);
   const isFollowUp = normalized.length <= 80 && (
     normalized.startsWith("Y ") ||
     normalized.startsWith("PERO ") ||
@@ -1328,6 +1373,14 @@ async function resolveSemanticQuestion(
     normalized.includes("ESTE MES") ||
     normalized.includes("QUIEN LE SIGUE") ||
     normalized.includes("CUAL LE SIGUE")
+  );
+  const usePageContext = pageContextMatchesQuestion(question, pageContext);
+  const args = semanticToolArgs(
+    question,
+    pageContext,
+    currentDate,
+    isFollowUp ? inheritedBillingFilters : {},
+    usePageContext,
   );
   const asksCount = normalized.includes("CUANT") || normalized.includes("TOTAL");
   const asksTop = normalized.includes(" MAS ") || normalized.startsWith("QUE ") || normalized.includes("MAYOR");
@@ -1341,6 +1394,29 @@ async function resolveSemanticQuestion(
   const topN = Math.min(25, Math.max(1, Number(topMatch?.[1]) || 1));
   const asksClientRanking = asksClients && (Boolean(topMatch) || asksTop);
   const asksNext = normalized.includes("QUIEN LE SIGUE") || normalized.includes("CUAL LE SIGUE") || normalized.includes("SIGUIENTE");
+
+  const asksChassis = normalized.includes("CHASIS") || normalized.includes("SERIE");
+  const chassisPrefixMatch = normalized.match(/(?:EMPIE(?:ZA|CEN)|COMIEN(?:ZA|CEN)|PREFIJO)\s+(?:POR|CON|DE)?\s*([A-Z0-9-]{2,40})\b/);
+  if (asksChassis && chassisPrefixMatch?.[1]) {
+    const prefix = chassisPrefixMatch[1];
+    const machines = await getMachinesByChassisPrefix(client, prefix);
+    const lines = machines.map((machine, index) => {
+      const clientRelation = machine.clientes;
+      const owner = Array.isArray(clientRelation)
+        ? cleanText((clientRelation[0] as JsonRecord | undefined)?.nombre, 160)
+        : cleanText((clientRelation as JsonRecord | null)?.nombre, 160);
+      const status = machine.activo === false ? " · inactiva" : "";
+      return `${index + 1}. ${cleanText(machine.serie, 80)} · ${cleanText(machine.modelo_tipo, 120) || "Sin modelo"} · ${owner || "Sin dueño asociado"}${status}`;
+    });
+    return {
+      tool: "search_entities",
+      args: { entity_type: "maquina", chassis_prefix: prefix },
+      content: machines.length
+        ? `Chasis que comienzan por ${prefix} (${machines.length}):\n${lines.join("\n")}`
+        : `No se encontraron chasis que comiencen por ${prefix}.`,
+      resultCount: machines.length,
+    };
+  }
 
   const asksInactiveTechnician = normalized.includes("INACTIV") || (asksOrders && conversationalIntent.includes("INACTIV"));
   const asksProductivity = normalized.includes("PRODUCTIV") || (asksOrders && conversationalIntent.includes("PRODUCTIV"));
@@ -1817,7 +1893,13 @@ Deno.serve(async (req) => {
           try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
           args = normalizeToolArgs(name, args);
           if (name === "query_business_data") {
-            const contextualFilters = semanticToolArgs(question, pageContext, currentDate);
+            const contextualFilters = semanticToolArgs(
+              question,
+              pageContext,
+              currentDate,
+              {},
+              pageContextMatchesQuestion(question, pageContext),
+            );
             const requestedFilters = args.filters && typeof args.filters === "object" ? args.filters as JsonRecord : {};
             args.filters = { ...contextualFilters, ...requestedFilters };
           }
