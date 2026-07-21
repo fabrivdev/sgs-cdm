@@ -424,6 +424,14 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       .replace(/\s+/g, " ");
     return technicianAlias[normalized] ?? normalized;
   };
+  const profiles = await checked<JsonRecord[]>(
+    client.from("profiles").select("nombre,activo").limit(1000),
+  );
+  const technicianStatus = new Map(
+    profiles
+      .map((profile) => [normalizeTechnician(profile.nombre), profile.activo !== false] as const)
+      .filter(([name]) => Boolean(name)),
+  );
   const participantsFor = (row: JsonRecord) => {
     const values: unknown[] = [row.responsable];
     const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {};
@@ -457,6 +465,8 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       technicians.set(technician, entry);
     }
   }
+  const requestedActivity = normalizedKey(args.activo);
+  const orderTechniciansBy = normalizedKey(args.order_by);
   const rankingTechnicians = [...technicians.values()]
     .map((row) => ({
       tecnico: row.tecnico,
@@ -464,8 +474,16 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       abiertas: row.abiertas.size,
       cerradas: row.cerradas.size,
       otras: row.otras.size,
+      activo: technicianStatus.get(row.tecnico) ?? null,
     }))
-    .sort((a, b) => b.abiertas - a.abiertas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico))
+    .filter((row) => requestedActivity === "INACTIVO"
+      ? row.activo === false
+      : requestedActivity === "ACTIVO"
+        ? row.activo === true
+        : true)
+    .sort((a, b) => orderTechniciansBy === "ORDENES"
+      ? b.ordenes - a.ordenes || b.cerradas - a.cerradas || a.tecnico.localeCompare(b.tecnico)
+      : b.abiertas - a.abiertas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico))
     .slice(0, 50);
   const closedByTimeType = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -889,6 +907,8 @@ const filterProperties = {
   granularity: { type: "string", enum: ["day", "week", "month", "year"], description: "Agrupacion temporal solicitada" },
   order_by: { type: "string", description: "Metrica usada para ordenar" },
   limit: { type: "integer", minimum: 1, maximum: 100 },
+  dataset: { type: "string", description: "Alias tolerado; la herramienta ya determina su propia fuente" },
+  filters: { type: "object", description: "Alias tolerado para filtros anidados", additionalProperties: true },
 };
 
 const tools = [
@@ -933,7 +953,7 @@ const tools = [
   },
   ...toolSpecs.map(([name, description]) => ({
     type: "function",
-    function: { name, description, parameters: { type: "object", properties: filterProperties, additionalProperties: false } },
+    function: { name, description, parameters: { type: "object", properties: filterProperties, additionalProperties: true } },
   })),
   {
     type: "function",
@@ -1085,6 +1105,40 @@ function scopeRejection(question: string) {
   return "";
 }
 
+const summaryToolNames = new Set(toolSpecs.map(([name]) => name));
+const summaryArgNames = new Set([
+  "date_from", "date_to", "sucursal", "sucursales", "marca", "tipo_tiempo", "rubro",
+  "activo", "metrics", "dimensions", "granularity", "order_by", "limit", "__include_rows",
+]);
+
+function normalizeToolArgs(name: string, rawArgs: JsonRecord): JsonRecord {
+  if (!summaryToolNames.has(name as typeof toolSpecs[number][0])) return rawArgs;
+  const nestedFilters = rawArgs.filters && typeof rawArgs.filters === "object" && !Array.isArray(rawArgs.filters)
+    ? rawArgs.filters as JsonRecord
+    : {};
+  const merged = { ...nestedFilters, ...rawArgs };
+  return Object.fromEntries(Object.entries(merged).filter(([key]) => summaryArgNames.has(key)));
+}
+
+function providerSafeMessages(messages: any[]) {
+  return messages.map((message) => ({
+    role: message.role,
+    ...(message.content !== undefined ? { content: message.content } : {}),
+    ...(message.name ? { name: message.name } : {}),
+    ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+    ...(Array.isArray(message.tool_calls) ? {
+      tool_calls: message.tool_calls.map((call: any) => ({
+        id: call.id,
+        type: call.type || "function",
+        function: {
+          name: call.function?.name,
+          arguments: call.function?.arguments || "{}",
+        },
+      })),
+    } : {}),
+  }));
+}
+
 async function resolveSemanticQuestion(
   client: SupabaseClient,
   question: string,
@@ -1096,6 +1150,8 @@ async function resolveSemanticQuestion(
   if (rejected) return { tool: "scope_guard", args: {}, content: rejected, resultCount: 0 };
   const normalized = normalizedKey(question);
   const moduleName = normalizedKey(pageContext.module);
+  const previousUserQuestion = history.find((row) => row.role === "user" && normalizedKey(row.content) !== normalized)?.content;
+  const conversationalIntent = normalizedKey(`${cleanText(previousUserQuestion, 4000)} ${question}`);
   const previousBillingSource = history
     .filter((row) => row.role === "assistant" && Array.isArray(row.sources))
     .flatMap((row) => row.sources as JsonRecord[])
@@ -1108,7 +1164,7 @@ async function resolveSemanticQuestion(
   const asksTop = normalized.includes(" MAS ") || normalized.startsWith("QUE ") || normalized.includes("MAYOR");
   const asksBilling = normalized.includes("FACTUR") || normalized.includes("VENTA");
   const asksOrders = /(^|\s)OS($|\s)/.test(normalized) || normalized.includes("ORDEN DE SERVICIO") || normalized.includes("ORDENES DE SERVICIO");
-  const asksTechnician = normalized.includes("TECNIC");
+  const asksTechnician = normalized.includes("TECNIC") || (asksOrders && conversationalIntent.includes("TECNIC"));
   const asksClients = normalized.includes("CLIENT");
   const asksBranch = normalized.includes("SUCURSAL");
   const topMatch = normalized.match(/\bTOP\s*(\d{1,2})\b/);
@@ -1116,7 +1172,28 @@ async function resolveSemanticQuestion(
   const asksClientRanking = asksClients && (Boolean(topMatch) || asksTop);
   const asksNext = normalized.includes("QUIEN LE SIGUE") || normalized.includes("CUAL LE SIGUE") || normalized.includes("SIGUIENTE");
 
-  if (asksTechnician && normalized.includes("INACTIV") && (normalized.includes("PRODUCTIV") || asksTop)) {
+  const asksInactiveTechnician = normalized.includes("INACTIV") || (asksOrders && conversationalIntent.includes("INACTIV"));
+  const asksProductivity = normalized.includes("PRODUCTIV") || (asksOrders && conversationalIntent.includes("PRODUCTIV"));
+
+  if (asksOrders && asksTechnician && asksInactiveTechnician && (asksProductivity || asksTop || normalized.includes("POR OS"))) {
+    const orderArgs = { ...args, activo: "Inactivo", order_by: "ordenes" };
+    const result = await getServiceOrdersSummary(client, orderArgs) as JsonRecord;
+    const ranking = Array.isArray(result.ranking_tecnicos)
+      ? result.ranking_tecnicos as Array<{ tecnico?: string; ordenes?: number; abiertas?: number; cerradas?: number }>
+      : [];
+    const leader = ranking[0];
+    const period = `${cleanText(orderArgs.date_from, 10) || "inicio disponible"} al ${cleanText(orderArgs.date_to, 10) || "fin disponible"}`;
+    return {
+      tool: "get_service_orders_summary",
+      args: orderArgs,
+      content: leader?.tecnico
+        ? `${leader.tecnico} fue el tecnico inactivo con mas ordenes de servicio: ${Number(leader.ordenes) || 0} OS (${Number(leader.cerradas) || 0} cerradas y ${Number(leader.abiertas) || 0} abiertas). Periodo consultado: ${period}.`
+        : `No hay ordenes de servicio asociadas a tecnicos inactivos en el periodo ${period}.`,
+      resultCount: ranking.length,
+    };
+  }
+
+  if (asksTechnician && asksInactiveTechnician && (asksProductivity || asksTop)) {
     const technicianArgs = { ...args, activo: "Inactivo", metrics: ["horas"], order_by: "horas" };
     const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
     const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
@@ -1431,7 +1508,7 @@ Deno.serve(async (req) => {
       for (let iteration = 0; iteration <= maxToolCalls; iteration++) {
         const requestBody = (model: string) => ({
           model,
-          messages,
+          messages: providerSafeMessages(messages),
           tools,
           tool_choice: "auto",
           parallel_tool_calls: false,
@@ -1481,6 +1558,7 @@ Deno.serve(async (req) => {
           const name = cleanText(call.function?.name, 80);
           let args: JsonRecord = {};
           try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
+          args = normalizeToolArgs(name, args);
           if (name === "query_business_data") {
             const contextualFilters = semanticToolArgs(question, pageContext, currentDate);
             const requestedFilters = args.filters && typeof args.filters === "object" ? args.filters as JsonRecord : {};
