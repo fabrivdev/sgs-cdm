@@ -10,6 +10,7 @@ import {
   inferIvaRate,
   normalizeDateLike,
   normalizeText,
+  normalizeUpper,
   parseFlexibleNumber,
   resolveCurrency,
 } from "@/lib/imports/fiscal";
@@ -68,6 +69,17 @@ function normalizeXmlMarca(value: unknown) {
   return "OTROS";
 }
 
+function normalizeXmlOsStatus(value: unknown) {
+  const raw = normalizeText(value);
+  const upper = normalizeUpper(value);
+  if (!raw) return null;
+  if (upper.includes("CERRAD")) return "Cerrada";
+  if (upper.includes("LIBERAD") || upper.includes("ABIERT")) return "Abierta";
+  if (upper.includes("CANCEL")) return "Cancelada";
+  if (upper.includes("ANUL")) return "Anulada";
+  return raw;
+}
+
 export function parseNewSystemWorkbook(xmlText: string) {
   return parseSpreadsheetXml(xmlText);
 }
@@ -80,23 +92,26 @@ export function mapFacturaVentasSheet(
     const emissionDate = normalizeDateLike(firstValue(row, ["EMISION"]));
     const dueDate = normalizeDateLike(firstValue(row, ["FCHVEN"]));
     const invoiceLongNumber = text(row, ["DOCUMENTO"]);
-    const invoiceShortNumber =
-      extractShortInvoiceNumber(firstValue(row, ["NFORI"])) ??
-      extractShortInvoiceNumber(firstValue(row, ["DOCUMENTO"]));
+    const invoiceShortNumber = extractShortInvoiceNumber(firstValue(row, ["DOCUMENTO"]));
     const productCode = text(row, ["CODIGO"]);
     const productName = text(row, ["PRODUCTO"]);
     const quantity = number(row, ["CANTIDAD"]);
     const totalUsd = number(row, ["TOTALUSD"]);
     const totalGs = number(row, ["TOTALGS"]);
-    const currency = resolveCurrency(firstValue(row, ["MONORI"]), totalUsd ? "USD" : "", totalGs ? "GS" : "");
-    const totalBase = currency === "USD" ? totalUsd : totalGs;
-    const unitBase = currency === "USD" ? number(row, ["VUNITUSD"]) : number(row, ["VUNITGS"]);
+    const hasUsdValue = firstValue(row, ["TOTALUSD"]) !== null;
+    const currency = hasUsdValue
+      ? "USD"
+      : resolveCurrency(firstValue(row, ["MONORI"]), totalGs ? "GS" : "");
+    const totalBase = hasUsdValue ? totalUsd : totalGs;
+    const unitBase = hasUsdValue ? number(row, ["VUNITUSD"]) : number(row, ["VUNITGS"]);
     const ivaRate = inferIvaRate(
       firstValue(row, ["IVA", "TIPOES"]),
       firstValue(row, ["PRODUCTO"]),
       firstValue(row, ["ESPECIE"]),
     );
     const documentNumber = text(row, ["DOCUMENTO"]);
+    const isCreditNote = normalizeUpper(firstValue(row, ["ESPECIE"])).includes("NCC");
+    const sign = isCreditNote ? -1 : 1;
 
     return {
       rowId:
@@ -119,11 +134,11 @@ export function mapFacturaVentasSheet(
       manufacturerCode: null,
       productName,
       quantity,
-      unitValueBase: unitBase,
-      totalValueBase: totalBase,
+      unitValueBase: unitBase * sign,
+      totalValueBase: totalBase * sign,
       ivaRate,
-      unitValueWithIva: applyIva(unitBase, ivaRate),
-      totalValueWithIva: applyIva(totalBase, ivaRate),
+      unitValueWithIva: applyIva(unitBase * sign, ivaRate),
+      totalValueWithIva: applyIva(totalBase * sign, ivaRate),
       currency,
       exchangeRate: number(row, ["TIPCAM"]) || null,
       paymentCondition: text(row, ["CNDPAG"]),
@@ -135,7 +150,11 @@ export function mapFacturaVentasSheet(
       linkedServiceOrder: null,
       linkedTrabajo: null,
       isDirectSale: true,
-      raw: row,
+      raw: {
+        ...row,
+        original_invoice_number: text(row, ["NFORI"]),
+        canonical_document_kind: isCreditNote ? "NotaCredito" : "Factura",
+      },
     } satisfies CanonicalBillingRow;
   });
 
@@ -175,7 +194,7 @@ export function mapOrdenesServicioSheet(
       branchCode,
       serviceOrderNumber: qualifiedServiceOrderNumber,
       branch: normalizeXmlSucursal(firstValue(row, ["Sucursal", "SUCURSAL", "FILIAL"])),
-      status: text(row, ["ESTADO"]),
+      status: normalizeXmlOsStatus(firstValue(row, ["ESTADO"])),
       billingStatus: text(row, ["CNDPAG"]),
       openDate: normalizeDateLike(firstValue(row, ["Fc Abiert OS"])),
       invoiceDate: null,
@@ -203,7 +222,16 @@ export function mapOrdenesServicioSheet(
       kilometreValue: lineType === "Kilometraje" ? lineTotal : 0,
       serviceValue: lineType === "Servicio" ? lineTotal : 0,
       sparePartsValue: lineType === "Repuestos" ? lineTotal : 0,
-      raw: row,
+      raw: {
+        ...row,
+        canonical_internal_number: text(row, ["Nro. Interno"]),
+        canonical_start_date: normalizeDateLike(firstValue(row, ["Fch. Inicial"])),
+        canonical_start_time: text(row, ["Hora Inicial"]),
+        canonical_end_date: normalizeDateLike(firstValue(row, ["Fch. Final"])),
+        canonical_end_time: text(row, ["Hora Final"]),
+        canonical_parts_status: text(row, ["PIEZAS"]),
+        canonical_origin: text(row, ["ORIGEN"]),
+      },
     } satisfies CanonicalServiceOrderRow;
   });
 

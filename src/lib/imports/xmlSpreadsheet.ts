@@ -57,6 +57,17 @@ function materializeRow(row: Element) {
   return values;
 }
 
+function makeUniqueHeaders(headers: string[]) {
+  const occurrences = new Map<string, number>();
+
+  return headers.map((rawHeader, index) => {
+    const header = rawHeader || `col_${index + 1}`;
+    const occurrence = (occurrences.get(header) ?? 0) + 1;
+    occurrences.set(header, occurrence);
+    return occurrence === 1 ? header : `${header}_${occurrence}`;
+  });
+}
+
 export function parseSpreadsheetXml(xmlText: string): SpreadsheetXmlWorkbook {
   const parser = new DOMParser();
   const documentNode = parser.parseFromString(xmlText, "application/xml");
@@ -69,7 +80,7 @@ export function parseSpreadsheetXml(xmlText: string): SpreadsheetXmlWorkbook {
   const sheets: SpreadsheetXmlSheet[] = worksheets.map((worksheet) => {
     const table = worksheetTable(worksheet);
     const rows = table ? childElements(table, "Row").map(materializeRow) : [];
-    const headers = rows[0]?.map((header) => String(header || "").trim()) ?? [];
+    const headers = makeUniqueHeaders(rows[0]?.map((header) => String(header || "").trim()) ?? []);
     const dataRows = rows.slice(1).filter((row) => row.some((value) => String(value || "").trim() !== ""));
 
     const mappedRows = dataRows.map<Record<string, unknown>>((row) => {
