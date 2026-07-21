@@ -660,7 +660,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
 async function getParkSummary(client: SupabaseClient, args: JsonRecord) {
   let query = client
     .from("parque_maquinas")
-    .select("id,cliente_id,marca,subgrupo,sucursal,modelo_tipo,anio,activo")
+    .select("id,cliente_id,marca,subgrupo,sucursal,modelo_tipo,serie,anio,activo")
     .eq("activo", true)
     .limit(1000);
   query = commonFilters(query, args);
@@ -810,7 +810,7 @@ async function getEntityDetail(client: SupabaseClient, args: JsonRecord) {
 const businessCatalog = {
   facturacion: {
     description: "Facturacion historica y del sistema nuevo, unificada sin duplicar facturas detalladas.",
-    metrics: ["total_usd", "facturas", "clientes", "lineas", "ticket_promedio"],
+    metrics: ["total_usd", "facturas", "clientes", "lineas", "ticket_promedio", "horas", "km", "cantidad"],
     dimensions: ["periodo", "fecha", "sucursal", "cliente", "marca", "rubro", "tipo_tiempo", "factura", "origen"],
   },
   ordenes_servicio: {
@@ -836,7 +836,7 @@ const businessCatalog = {
   parque: {
     description: "Parque activo de maquinas y clientes.",
     metrics: ["maquinas", "clientes"],
-    dimensions: ["sucursal", "cliente", "marca", "subgrupo", "modelo"],
+    dimensions: ["sucursal", "cliente", "marca", "subgrupo", "modelo", "serie", "anio"],
   },
   agenda: {
     description: "Seguimientos comerciales manuales registrados por cliente.",
@@ -903,7 +903,7 @@ function semanticDimension(row: JsonRecord, dataset: BusinessDataset, dimension:
     },
     jornadas: { fecha: row.fecha, estado: row.estado, tecnico: row.tecnico_responsable_id, trabajo: row.servicio_id, sucursal: serviceRelation.sucursal, cliente: serviceRelation.cliente_id, marca: serviceRelation.marca },
     tecnicos: { sucursal: row.sucursal, tecnico: row.nombre, carga: Number(row.jornadas) > 0 ? "Con carga" : "Sin carga", activo: row.activo === false ? "Inactivo" : "Activo" },
-    parque: { sucursal: row.sucursal, cliente: row.cliente_id, marca: row.marca, subgrupo: row.subgrupo, modelo: row.modelo_tipo },
+    parque: { sucursal: row.sucursal, cliente: row.cliente_id, marca: row.marca, subgrupo: row.subgrupo, modelo: row.modelo_tipo, serie: row.serie, anio: row.anio },
     agenda: { fecha: row.fecha, sucursal: clientRelation.sucursal, cliente: row.cliente_id, resultado: row.resultado },
   };
   if (dimension === "periodo") return periodBucket(semanticDate(row, dataset), granularity);
@@ -921,14 +921,21 @@ function semanticMetric(rows: JsonRecord[], dataset: BusinessDataset, metric: st
       : dataset === "ordenes_servicio" ? row.cliente_nombre
         : row.cliente_id,
   ));
-  if (metric === "facturas") return distinctCount(rows, (row) => cleanText(row.factura, 100));
+  if (metric === "facturas") return distinctCount(rows, (row) => {
+    const invoice = cleanText(row.factura, 100);
+    if (!invoice) return "";
+    return dataset === "facturacion"
+      ? [row.origen, row.sucursal, row.fecha, invoice].map(normalizedKey).join("|")
+      : invoice;
+  });
   if (metric === "ordenes") return distinctCount(rows, (row) => {
     const order = cleanText(row.os_numero, 80);
     return order ? `${normalizedKey(row.sucursal)}|${order}|${canonicalBillingTimeType(row.tipo_tiempo) || "SIN TIPO"}` : "";
   });
   if (metric === "trabajos") return distinctCount(rows, (row) => cleanText(row.id, 100));
-  if (metric === "horas") return sum(rows, dataset === "ordenes_servicio" ? "servicios_cantidad" : dataset === "tecnicos" ? "horas" : "horas_trabajadas");
-  if (metric === "km") return sum(rows, "km_cantidad");
+  if (metric === "horas") return sum(rows, dataset === "ordenes_servicio" ? "servicios_cantidad" : dataset === "facturacion" ? "cantidad" : dataset === "tecnicos" ? "horas" : "horas_trabajadas");
+  if (metric === "km") return sum(rows, dataset === "facturacion" ? "cantidad" : "km_cantidad");
+  if (metric === "cantidad") return sum(rows, "cantidad");
   if (metric === "servicio_usd") return sum(rows, "servicios_valor");
   if (metric === "kilometraje_usd") return sum(rows, "kilometro_valor");
   if (metric === "repuestos_usd") return sum(rows, "repuesto_valor");
@@ -1180,7 +1187,7 @@ function pageContextMatchesQuestion(question: string, pageContext: JsonRecord) {
   if (referencesVisibleContext(question)) return true;
   const normalized = normalizedKey(question);
   const moduleName = normalizedKey(pageContext.module);
-  if (moduleName === "DASHBOARD") return true;
+  if (moduleName === "DASHBOARD") return referencesVisibleContext(question);
   if (moduleName.includes("PLANIFICADOR") || moduleName.includes("CALENDARIO")) {
     return ["JORNAD", "PLANIFIC", "CALENDARIO", "PROGRAMAD", "DISPONIBIL", "CARGA", "CUADRILLA"]
       .some((term) => normalized.includes(term));
@@ -1716,6 +1723,209 @@ async function resolveSemanticQuestion(
   return null;
 }
 
+type GenericQueryPlan = {
+  dataset: BusinessDataset;
+  metrics: string[];
+  dimensions: string[];
+  filters: JsonRecord;
+  granularity: "day" | "week" | "month" | "year";
+  order_by?: string;
+  order_direction?: "asc" | "desc";
+  limit?: number;
+};
+
+type GenericResolution = {
+  content: string;
+  sources: ToolSource[];
+  results: Array<{ args: JsonRecord; data: JsonRecord }>;
+  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  model: string;
+};
+
+function parseJsonObject(value: unknown): JsonRecord {
+  const text = cleanContent(value, 30000).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as JsonRecord : {};
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) return {};
+    try { return JSON.parse(text.slice(start, end + 1)) as JsonRecord; } catch { return {}; }
+  }
+}
+
+function addUsage(
+  total: { prompt_tokens: number; completion_tokens: number; total_tokens: number },
+  next: JsonRecord,
+) {
+  return {
+    prompt_tokens: total.prompt_tokens + (Number(next.prompt_tokens) || 0),
+    completion_tokens: total.completion_tokens + (Number(next.completion_tokens) || 0),
+    total_tokens: total.total_tokens + (Number(next.total_tokens) || 0),
+  };
+}
+
+async function requestGroq(
+  groqKey: string,
+  primaryModel: string,
+  fallbackModel: string,
+  bodyForModel: (model: string) => JsonRecord,
+  signal: AbortSignal,
+) {
+  const invoke = async (model: string) => {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(bodyForModel(model)),
+      signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload, model };
+  };
+  let result = await invoke(primaryModel);
+  if (result.response.status === 429 && primaryModel !== fallbackModel) result = await invoke(fallbackModel);
+  if (!result.response.ok) {
+    const message = result.payload?.error?.message ?? result.payload?.message ?? `Groq respondio ${result.response.status}`;
+    throw new Error(result.response.status === 429
+      ? "Se alcanzo el limite gratuito de los modelos principal y de respaldo de Groq. Intenta nuevamente mas tarde."
+      : message);
+  }
+  return result;
+}
+
+function validateGenericPlan(raw: JsonRecord, question: string, pageContext: JsonRecord, currentDate: string) {
+  const rawQueries = Array.isArray(raw.queries) ? raw.queries.slice(0, 3) : [];
+  const explicitFilters = semanticToolArgs(
+    question,
+    pageContext,
+    currentDate,
+    {},
+    pageContextMatchesQuestion(question, pageContext),
+  );
+  const plans: GenericQueryPlan[] = [];
+  for (const rawQuery of rawQueries) {
+    if (!rawQuery || typeof rawQuery !== "object" || Array.isArray(rawQuery)) continue;
+    const query = rawQuery as JsonRecord;
+    const dataset = cleanText(query.dataset, 40) as BusinessDataset;
+    if (!(dataset in businessCatalog)) continue;
+    const catalog = businessCatalog[dataset];
+    const metrics = (Array.isArray(query.metrics) ? query.metrics : [])
+      .map((item) => cleanText(item, 40))
+      .filter((item) => catalog.metrics.includes(item as never))
+      .slice(0, 6);
+    if (!metrics.length) continue;
+    const dimensions = (Array.isArray(query.dimensions) ? query.dimensions : [])
+      .map((item) => cleanText(item, 40))
+      .filter((item) => catalog.dimensions.includes(item as never))
+      .slice(0, 3);
+    const requestedFilters = query.filters && typeof query.filters === "object" && !Array.isArray(query.filters)
+      ? query.filters as JsonRecord
+      : {};
+    const allowedFilters = new Set(["date_from", "date_to", "sucursal", "sucursales", ...catalog.dimensions]);
+    const filters = Object.fromEntries(
+      Object.entries({ ...explicitFilters, ...requestedFilters }).filter(([key, value]) => allowedFilters.has(key) && value !== "" && value !== null && value !== undefined),
+    );
+    plans.push({
+      dataset,
+      metrics,
+      dimensions,
+      filters,
+      granularity: (["day", "week", "month", "year"].includes(cleanText(query.granularity, 10))
+        ? cleanText(query.granularity, 10)
+        : "month") as GenericQueryPlan["granularity"],
+      order_by: metrics.includes(cleanText(query.order_by, 40)) ? cleanText(query.order_by, 40) : metrics[0],
+      order_direction: cleanText(query.order_direction, 8).toLowerCase() === "asc" ? "asc" : "desc",
+      limit: safeLimit(query.limit, 20, 100),
+    });
+  }
+  return plans;
+}
+
+async function resolveGenericQuestion(
+  client: SupabaseClient,
+  question: string,
+  pageContext: JsonRecord,
+  currentDate: string,
+  history: JsonRecord[],
+  answerMode: "brief" | "analytic",
+  groqKey: string,
+  primaryModel: string,
+  fallbackModel: string,
+  maxTokens: number,
+  timeoutMs: number,
+): Promise<GenericResolution | null> {
+  const rejected = scopeRejection(question);
+  if (rejected) return {
+    content: rejected,
+    sources: [{ tool: "scope_guard", label: sourceLabel("scope_guard"), filters: {} }],
+    results: [],
+    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    model: "scope-guard",
+  };
+  const normalized = normalizedKey(question);
+  if (["QUE DIA ES HOY", "CUAL ES LA FECHA DE HOY", "FECHA DE HOY"].includes(normalized)) {
+    const label = new Intl.DateTimeFormat("es-PY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+      .format(new Date(`${currentDate}T12:00:00Z`));
+    return {
+      content: `Hoy es ${label}.`,
+      sources: [{ tool: "current_date", label: "Fecha del sistema", filters: { current_date: currentDate } }],
+      results: [],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      model: "system-date",
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+  try {
+    const compactHistory = history.slice(-4).map((row) => ({ role: row.role, content: cleanContent(row.content, 1200) }));
+    const plannerPrompt = `Convierte una pregunta de negocio en un plan declarativo de consultas. Fecha actual: ${currentDate}.
+Devuelve SOLO JSON con {"queries":[...]}. Cada query admite dataset, metrics, dimensions, filters, granularity, order_by, order_direction y limit.
+Catalogo: ${JSON.stringify(getDataCatalog())}
+Reglas: usa maximo 3 queries; prefiere una. Para rankings agrega dimension, orden desc y limite. Para evoluciones usa dimension periodo. Para "que mes/semana/anio" usa periodo y la granularidad pedida. OS cerradas usa dataset ordenes_servicio y filtro estado="Cerrada". Productividad sin mencionar jornadas significa OS, horas y tecnico. Horas facturadas usa facturacion, metrica horas y filtro rubro="Servicio". Km facturados usa facturacion, metrica km y rubro="Kilometraje". Chasis/serie usa parque y dimension serie. Conteos son distintos segun la definicion del catalogo. No inventes campos. No copies filtros de pantalla salvo que la pregunta diga visible, filtros actuales o seleccion actual.
+Contexto de pantalla disponible: ${JSON.stringify(pageContext).slice(0, 2500)}
+Conversacion reciente: ${JSON.stringify(compactHistory)}
+Pregunta: ${question}`;
+    const planned = await requestGroq(groqKey, fallbackModel, primaryModel, (model) => ({
+      model,
+      messages: [{ role: "system", content: plannerPrompt }],
+      response_format: { type: "json_object" },
+      max_tokens: 700,
+      temperature: 0,
+      ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
+    }), controller.signal);
+    usage = addUsage(usage, planned.payload.usage ?? {});
+    const planObject = parseJsonObject(planned.payload.choices?.[0]?.message?.content);
+    const plans = validateGenericPlan(planObject, question, pageContext, currentDate);
+    if (!plans.length) return null;
+
+    const results = await Promise.all(plans.map(async (plan) => {
+      const args: JsonRecord = { ...plan, filters: plan.filters };
+      const data = await queryBusinessData(client, args) as JsonRecord;
+      return { args, data };
+    }));
+    const sources = results.map(({ args }) => ({ tool: "query_business_data", label: sourceLabel("query_business_data"), filters: args }));
+    const resultPayload = JSON.stringify(results).slice(0, 18000);
+    const answerPrompt = `Responde como analista de Servicios Tecnicos CDM usando EXCLUSIVAMENTE los resultados entregados. No menciones herramientas ni JSON. No cambies la definicion de la pregunta. Si es ranking, nombra los resultados en orden. Si hay cero, dilo sin inventar. Incluye periodo y filtros aplicados. Formato ${answerMode === "analytic" ? "analitico, con resumen y desglose compacto" : "breve y directo"}. Importes en USD; cantidades y horas no son importes.
+Pregunta: ${question}
+Resultados validados: ${resultPayload}`;
+    const answered = await requestGroq(groqKey, primaryModel, fallbackModel, (model) => ({
+      model,
+      messages: [{ role: "system", content: answerPrompt }],
+      max_tokens: Math.min(maxTokens, answerMode === "analytic" ? 1200 : 700),
+      temperature: 0.1,
+      ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
+    }), controller.signal);
+    usage = addUsage(usage, answered.payload.usage ?? {});
+    const content = cleanContent(answered.payload.choices?.[0]?.message?.content, 12000);
+    return { content: content || "No se pudo redactar la respuesta con los resultados calculados.", sources, results, usage, model: answered.model };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Metodo no permitido" }, 405);
@@ -1780,6 +1990,49 @@ Deno.serve(async (req) => {
     const { data: history } = await userClient.from("ai_messages").select("role,content,sources").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(4);
     const contextText = Object.keys(pageContext).length ? JSON.stringify(pageContext) : "Sin contexto de pantalla";
     const currentDate = new Date().toISOString().slice(0, 10);
+    const genericStartedAt = Date.now();
+    const generic = await resolveGenericQuestion(
+      admin,
+      question,
+      pageContext,
+      currentDate,
+      (history ?? []).reverse() as JsonRecord[],
+      answerMode,
+      groqKey,
+      activeGroqModel,
+      fallbackGroqModel,
+      maxTokens,
+      timeoutMs,
+    );
+    if (generic) {
+      for (const item of generic.results) {
+        await admin.from("ai_tool_runs").insert({
+          conversation_id: conversationId,
+          user_id: userId,
+          tool_name: "query_business_data",
+          filters: item.args,
+          result_count: Number(item.data.result_rows) || 0,
+          duration_ms: Date.now() - genericStartedAt,
+          error: null,
+        });
+      }
+      const { data: assistantMessage, error: assistantError } = await userClient
+        .from("ai_messages")
+        .insert({ conversation_id: conversationId, user_id: userId, role: "assistant", content: generic.content, answer_mode: answerMode, page_context: pageContext, sources: generic.sources })
+        .select("id,created_at")
+        .single();
+      if (assistantError) throw assistantError;
+      await userClient.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+      await admin.from("ai_usage").insert({
+        conversation_id: conversationId,
+        user_id: userId,
+        model: generic.model,
+        ...generic.usage,
+        latency_ms: Date.now() - startedAt,
+        status: "completed",
+      });
+      return json({ conversation_id: conversationId, message: { ...assistantMessage, role: "assistant", content: generic.content, sources: generic.sources }, usage: generic.usage });
+    }
     const semanticStartedAt = Date.now();
     const semantic = await resolveSemanticQuestion(admin, question, pageContext, currentDate, (history ?? []) as JsonRecord[]);
     if (semantic) {
