@@ -336,10 +336,15 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     if (rubro && row.rubro !== rubro) return false;
     return true;
   });
-  const invoices = new Set(rows.map((row) => cleanText(row.factura, 80)).filter(Boolean));
+  const invoiceKey = (row: JsonRecord) => {
+    const invoice = cleanText(row.factura, 80);
+    if (!invoice) return "";
+    return [row.origen, row.sucursal, row.fecha, invoice].map(normalizedKey).join("|");
+  };
+  const invoices = new Set(rows.map(invoiceKey).filter(Boolean));
   const clients = new Set(rows.map((row) => normalizedBillingClient(row.entidad_nombre)).filter(Boolean));
   const byRubro: Record<string, number> = {};
-  const bySucursal: Record<string, number> = {};
+  const bySucursal = new Map<string, { totalUsd: number; facturas: Set<string> }>();
   const byCliente = new Map<string, { cliente: string; totalUsd: number; facturas: Set<string> }>();
   for (const row of rows) {
     const value = Number(row.total_venta) || 0;
@@ -348,15 +353,18 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     const clientName = cleanText(row.entidad_nombre, 160) || "Sin cliente";
     const clientKey = normalizedBillingClient(clientName);
     byRubro[group] = (byRubro[group] ?? 0) + value;
-    bySucursal[branch] = (bySucursal[branch] ?? 0) + value;
+    const branchEntry = bySucursal.get(branch) ?? { totalUsd: 0, facturas: new Set<string>() };
+    branchEntry.totalUsd += value;
+    const stableInvoice = invoiceKey(row);
+    if (stableInvoice) branchEntry.facturas.add(stableInvoice);
+    bySucursal.set(branch, branchEntry);
     const clientEntry = byCliente.get(clientKey) ?? { cliente: clientName, totalUsd: 0, facturas: new Set<string>() };
     clientEntry.totalUsd += value;
-    const invoice = cleanText(row.factura, 80);
-    if (invoice) clientEntry.facturas.add(invoice);
+    if (stableInvoice) clientEntry.facturas.add(stableInvoice);
     byCliente.set(clientKey, clientEntry);
   }
-  const rankingSucursales = Object.entries(bySucursal)
-    .map(([sucursalNombre, total]) => ({ sucursal: sucursalNombre, total_usd: total }))
+  const rankingSucursales = [...bySucursal.entries()]
+    .map(([sucursalNombre, item]) => ({ sucursal: sucursalNombre, total_usd: item.totalUsd, facturas: item.facturas.size }))
     .sort((a, b) => b.total_usd - a.total_usd);
   const rankingRubros = Object.entries(byRubro)
     .map(([rubroNombre, total]) => ({ rubro: rubroNombre, total_usd: total }))
@@ -973,6 +981,9 @@ const tools = [
   },
 ];
 
+const modelToolNames = new Set(["get_data_catalog", "query_business_data", "search_entities", "get_entity_detail"]);
+const modelTools = tools.filter((tool) => modelToolNames.has(tool.function.name));
+
 async function executeTool(client: SupabaseClient, name: string, args: JsonRecord) {
   switch (name) {
     case "get_data_catalog": return getDataCatalog();
@@ -1205,6 +1216,22 @@ async function resolveSemanticQuestion(
       content: leader
         ? `${cleanText(leader.nombre, 160)} fue el tecnico inactivo con mayor productividad por horas registradas: ${Number(leader.horas) || 0} horas en ${Number(leader.jornadas) || 0} jornadas. Periodo consultado: ${period}.`
         : `No hay actividad registrada para tecnicos inactivos en el periodo ${period}.`,
+      resultCount: detail.length,
+    };
+  }
+
+  if (asksTechnician && (asksProductivity || asksTop) && !asksOrders) {
+    const technicianArgs = { ...args, metrics: ["horas"], order_by: "horas" };
+    const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
+    const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
+    const leader = detail.find((row) => Number(row.horas) > 0 || Number(row.jornadas) > 0);
+    const period = `${cleanText(technicianArgs.date_from, 10) || "inicio disponible"} al ${cleanText(technicianArgs.date_to, 10) || "fin disponible"}`;
+    return {
+      tool: "get_technician_summary",
+      args: technicianArgs,
+      content: leader
+        ? `${cleanText(leader.nombre, 160)} fue el tecnico con mayor productividad por horas registradas: ${Number(leader.horas) || 0} horas en ${Number(leader.jornadas) || 0} jornadas. Periodo consultado: ${period}.`
+        : `No hay actividad tecnica registrada en el periodo ${period}.`,
       resultCount: detail.length,
     };
   }
@@ -1451,7 +1478,7 @@ Deno.serve(async (req) => {
     const { error: messageError } = await userClient.from("ai_messages").insert({ conversation_id: conversationId, user_id: userId, role: "user", content: question, answer_mode: answerMode, page_context: pageContext });
     if (messageError) throw messageError;
 
-    const { data: history } = await userClient.from("ai_messages").select("role,content,sources").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(12);
+    const { data: history } = await userClient.from("ai_messages").select("role,content,sources").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(4);
     const contextText = Object.keys(pageContext).length ? JSON.stringify(pageContext) : "Sin contexto de pantalla";
     const currentDate = new Date().toISOString().slice(0, 10);
     const semanticStartedAt = Date.now();
@@ -1509,10 +1536,10 @@ Deno.serve(async (req) => {
         const requestBody = (model: string) => ({
           model,
           messages: providerSafeMessages(messages),
-          tools,
+          tools: modelTools,
           tool_choice: "auto",
           parallel_tool_calls: false,
-          max_tokens: maxTokens,
+          max_tokens: model === fallbackGroqModel ? Math.min(maxTokens, 500) : Math.min(maxTokens, 900),
           temperature: 0.2,
           ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         });
@@ -1585,7 +1612,7 @@ Deno.serve(async (req) => {
             sourceKeys.add(cacheKey);
             sources.push({ tool: name, label: sourceLabel(name), filters: args });
           }
-          messages.push({ role: "tool", tool_call_id: call.id, name, content: JSON.stringify(toolResult).slice(0, 50000) });
+          messages.push({ role: "tool", tool_call_id: call.id, name, content: JSON.stringify(toolResult).slice(0, 4000) });
         }
       }
     } finally {
