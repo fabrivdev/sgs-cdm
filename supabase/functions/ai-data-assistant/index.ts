@@ -97,6 +97,23 @@ async function getOperationalSummary(client: SupabaseClient, args: JsonRecord) {
     checked<JsonRecord[]>(jornadasQuery),
   ]);
 
+  const now = new Date();
+  const openJobs = jobs
+    .filter((row) => !normalizedKey(row.estado_general).includes("COMPLET"))
+    .map((row) => {
+      const created = new Date(cleanText(row.creado_en, 40));
+      const daysOpen = Number.isNaN(created.getTime()) ? 0 : Math.max(0, Math.floor((now.getTime() - created.getTime()) / 86400000));
+      return {
+        codigo: cleanText(row.os_numero ?? row.codigo, 80),
+        descripcion: cleanText(row.descripcion_problema, 180),
+        estado: cleanText(row.estado_general, 60),
+        sucursal: cleanText(row.sucursal, 60),
+        dias_abierto: daysOpen,
+      };
+    })
+    .sort((a, b) => b.dias_abierto - a.dias_abierto)
+    .slice(0, 10);
+
   return {
     trabajos: { total: jobs.length, por_estado: countBy(jobs, "estado_general"), por_sucursal: countBy(jobs, "sucursal") },
     jornadas: {
@@ -104,6 +121,7 @@ async function getOperationalSummary(client: SupabaseClient, args: JsonRecord) {
       por_estado: countBy(jornadas, "estado"),
       horas: sum(jornadas, "horas_trabajadas"),
     },
+    abiertos_mas_antiguos: openJobs,
   };
 }
 
@@ -446,11 +464,23 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     }))
     .sort((a, b) => b.abiertas - a.abiertas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico))
     .slice(0, 50);
+  const closedByTimeType = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const order = orderKey(row);
+    if (!order || !normalizeTechnician(row.situacion_os).includes("CERRAD")) continue;
+    const timeType = canonicalBillingTimeType(row.tipo_tiempo) || "Sin tipo";
+    const keys = closedByTimeType.get(timeType) ?? new Set<string>();
+    keys.add(`${order}|${normalizedKey(timeType)}`);
+    closedByTimeType.set(timeType, keys);
+  }
   return {
     ordenes: orders.size,
     filas: rows.length,
     por_estado: countBy(rows, "situacion_os"),
     por_tipo_tiempo: countBy(rows, "tipo_tiempo"),
+    cerradas_por_tipo_tiempo: Object.fromEntries(
+      [...closedByTimeType.entries()].map(([timeType, keys]) => [timeType, keys.size]),
+    ),
     ranking_tecnicos: rankingTechnicians,
     tecnico_mas_os_abiertas: rankingTechnicians[0] ?? null,
     horas: sum(rows, "servicios_cantidad"),
@@ -492,28 +522,62 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
   let profilesQuery = client.from("profiles").select("id,nombre,sucursal,activo").order("nombre").limit(500);
   const sucursal = cleanText(args.sucursal, 40);
   if (sucursal && sucursal.toLowerCase() !== "todos") profilesQuery = profilesQuery.eq("sucursal", sucursal);
-  const [profiles, roles] = await Promise.all([
+  const [profiles, roles, services] = await Promise.all([
     checked<JsonRecord[]>(profilesQuery),
-    checked<JsonRecord[]>(client.from("user_roles").select("user_id,role").eq("role", "tecnico").limit(500)),
+    checked<JsonRecord[]>(client.from("user_roles").select("user_id,role").limit(1000)),
+    fetchPaged((from, to) => client.from("servicios").select("id,tecnico_responsable_id,auxiliares").range(from, to), 10000),
   ]);
-  const technicianIds = new Set(roles.map((row) => String(row.user_id)));
-  const technicians = profiles.filter((row) => technicianIds.has(String(row.id)) && row.activo !== false);
-  let jornadasQuery = client.from("servicio_jornadas").select("fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares").limit(1000);
+  const technicianRoleIds = new Set(roles.filter((row) => row.role === "tecnico").map((row) => String(row.user_id)));
+  const administrativeIds = new Set(roles.filter((row) => row.role === "admin" || row.role === "cabecilla").map((row) => String(row.user_id)));
+  const referencedIds = new Set<string>();
+  const serviceById = new Map<string, JsonRecord>();
+  for (const service of services) {
+    serviceById.set(String(service.id), service);
+    if (service.tecnico_responsable_id) referencedIds.add(String(service.tecnico_responsable_id));
+    for (const id of (Array.isArray(service.auxiliares) ? service.auxiliares : [])) referencedIds.add(String(id));
+  }
+  let jornadasQuery = client.from("servicio_jornadas").select("servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares").limit(5000);
   jornadasQuery = dateFilter(jornadasQuery, "fecha", args);
   const jornadas = await checked<JsonRecord[]>(jornadasQuery);
-  const activity: Record<string, { jornadas: number; horas: number }> = {};
   for (const row of jornadas) {
-    const crew = [row.tecnico_responsable_id, ...(Array.isArray(row.auxiliares) ? row.auxiliares : [])].filter(Boolean).map(String);
+    if (row.tecnico_responsable_id) referencedIds.add(String(row.tecnico_responsable_id));
+    for (const id of (Array.isArray(row.auxiliares) ? row.auxiliares : [])) referencedIds.add(String(id));
+  }
+  const technicians = profiles.filter((row) => {
+    const id = String(row.id);
+    const name = normalizedKey(row.nombre);
+    const administrativeOnly = administrativeIds.has(id) && !technicianRoleIds.has(id) && !referencedIds.has(id);
+    return row.activo !== false && !name.includes("PASANTE") && !administrativeOnly;
+  });
+  const validIds = new Set(technicians.map((row) => String(row.id)));
+  const activity: Record<string, { jornadas: number; horas: number; pendientes: number; realizadas: number; no_realizadas: number }> = {};
+  for (const row of jornadas) {
+    const service = serviceById.get(String(row.servicio_id)) ?? {};
+    const principal = row.tecnico_responsable_id ?? service.tecnico_responsable_id;
+    const ownAuxiliaries = Array.isArray(row.auxiliares) ? row.auxiliares : [];
+    const inheritedAuxiliaries = Array.isArray(service.auxiliares) ? service.auxiliares : [];
+    const crew = [principal, ...(ownAuxiliaries.length ? ownAuxiliaries : inheritedAuxiliaries)].filter(Boolean).map(String);
     for (const id of new Set(crew)) {
-      activity[id] ??= { jornadas: 0, horas: 0 };
+      if (!validIds.has(id)) continue;
+      activity[id] ??= { jornadas: 0, horas: 0, pendientes: 0, realizadas: 0, no_realizadas: 0 };
       activity[id].jornadas += 1;
       activity[id].horas += Number(row.horas_trabajadas) || 0;
+      const status = normalizedKey(row.estado);
+      if (status === "COMPLETADO") activity[id].realizadas += 1;
+      else if (status === "CANCELADA") activity[id].no_realizadas += 1;
+      else activity[id].pendientes += 1;
     }
   }
+  const detail = technicians
+    .map((row) => ({ ...row, ...(activity[String(row.id)] ?? { jornadas: 0, horas: 0, pendientes: 0, realizadas: 0, no_realizadas: 0 }) }))
+    .sort((a, b) => Number(b.jornadas) - Number(a.jornadas) || cleanText(a.nombre, 160).localeCompare(cleanText(b.nombre, 160)));
   return {
     tecnicos_activos: technicians.length,
-    con_actividad: technicians.filter((row) => activity[String(row.id)]?.jornadas).length,
-    detalle: technicians.map((row) => ({ ...row, ...(activity[String(row.id)] ?? { jornadas: 0, horas: 0 }) })).slice(0, 100),
+    con_actividad: detail.filter((row) => Number(row.jornadas) > 0).length,
+    sin_actividad: detail.filter((row) => Number(row.jornadas) === 0).length,
+    con_carga_detalle: detail.filter((row) => Number(row.jornadas) > 0).slice(0, 100),
+    sin_carga_detalle: detail.filter((row) => Number(row.jornadas) === 0).slice(0, 100),
+    detalle: detail.slice(0, 100),
   };
 }
 
@@ -553,14 +617,14 @@ async function getEntityDetail(client: SupabaseClient, args: JsonRecord) {
 }
 
 const toolSpecs = [
-  ["get_operational_summary", "Resume trabajos y jornadas del periodo."],
+  ["get_operational_summary", "Resume trabajos y jornadas del periodo e incluye los trabajos abiertos mas antiguos."],
   ["get_planning_summary", "Resume jornadas pendientes y tecnicos planificados."],
   ["get_calendar_summary", "Resume calendario y no disponibilidades."],
   ["get_billing_summary", "Resume facturacion importada en USD y devuelve rankings por sucursal, rubro y cliente unico. Usala tambien para responder repreguntas sobre el cliente que mas facturo. Los rubros validos son Servicio, Repuestos, Kilometraje y Otros."],
-  ["get_service_orders_summary", "Resume ordenes de servicio, horas, km y valores. Incluye ranking de tecnicos participantes por OS unicas abiertas, cerradas y anuladas; usala para preguntas sobre quien tiene mas OS."],
+  ["get_service_orders_summary", "Resume ordenes de servicio, horas, km y valores. Incluye ranking de tecnicos participantes y OS cerradas por tipo de tiempo canonico."],
   ["get_park_summary", "Resume parque activo de maquinas y clientes."],
   ["get_commercial_followup", "Resume gestiones de agenda comercial."],
-  ["get_technician_summary", "Resume tecnicos activos y su actividad."],
+  ["get_technician_summary", "Resume tecnicos activos y devuelve listas nominales separadas con carga y sin carga en el periodo."],
 ] as const;
 
 const filterProperties = {
@@ -653,6 +717,24 @@ function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate
   Object.assign(args, inherited);
 
   const normalized = normalizedKey(question);
+  const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+  const current = new Date(`${currentDate}T12:00:00Z`);
+  const monday = new Date(current);
+  const dayFromMonday = (current.getUTCDay() + 6) % 7;
+  monday.setUTCDate(current.getUTCDate() - dayFromMonday);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  if (normalized.includes("SEMANA PASADA") || normalized.includes("SEMANA ANTERIOR")) {
+    const previousMonday = new Date(monday);
+    previousMonday.setUTCDate(monday.getUTCDate() - 7);
+    const previousSunday = new Date(sunday);
+    previousSunday.setUTCDate(sunday.getUTCDate() - 7);
+    args.date_from = isoDate(previousMonday);
+    args.date_to = isoDate(previousSunday);
+  } else if (normalized.includes("ESTA SEMANA") || normalized.includes("SEMANA ACTUAL")) {
+    args.date_from = isoDate(monday);
+    args.date_to = isoDate(sunday);
+  }
   const knownBranches = ["Santa Rita", "Katuete", "Loma Plata", "Misiones", "Santa Rosa", "Campo 9"];
   const explicitBranches = knownBranches.filter((branch) => normalized.includes(normalizedKey(branch)));
   if (explicitBranches.length > 1) {
@@ -719,6 +801,71 @@ async function resolveSemanticQuestion(
   const asksClientRanking = asksClients && (Boolean(topMatch) || asksTop);
   const asksNext = normalized.includes("QUIEN LE SIGUE") || normalized.includes("CUAL LE SIGUE") || normalized.includes("SIGUIENTE");
 
+  if (asksTechnician && (normalized.includes("CARGA") || normalized.includes("ASIGN"))) {
+    const result = await getTechnicianSummary(client, args) as JsonRecord;
+    const withLoad = Array.isArray(result.con_carga_detalle) ? result.con_carga_detalle as JsonRecord[] : [];
+    const withoutLoad = Array.isArray(result.sin_carga_detalle) ? result.sin_carga_detalle as JsonRecord[] : [];
+    const loadedLines = withLoad.map((row) => {
+      const states = [
+        Number(row.realizadas) ? `${Number(row.realizadas)} realizadas` : "",
+        Number(row.pendientes) ? `${Number(row.pendientes)} pendientes` : "",
+        Number(row.no_realizadas) ? `${Number(row.no_realizadas)} no realizadas` : "",
+      ].filter(Boolean).join(", ");
+      return `- ${cleanText(row.nombre, 160)}: ${Number(row.jornadas) || 0} jornadas${states ? ` (${states})` : ""}`;
+    });
+    const noLoadNames = withoutLoad.map((row) => cleanText(row.nombre, 160)).filter(Boolean);
+    const period = `${cleanText(args.date_from, 10) || "inicio disponible"} al ${cleanText(args.date_to, 10) || "fin disponible"}`;
+    return {
+      tool: "get_technician_summary",
+      args,
+      content: [
+        `Con carga (${withLoad.length}):`,
+        loadedLines.length ? loadedLines.join("\n") : "- Ninguno",
+        `\nSin carga (${withoutLoad.length}):`,
+        noLoadNames.length ? noLoadNames.join(", ") : "Ninguno",
+        `\nPeriodo consultado: ${period}.`,
+      ].join("\n"),
+      resultCount: Number(result.tecnicos_activos) || 0,
+    };
+  }
+
+  if ((normalized.includes("TRABAJO") || normalized.includes("JORNADA"))
+    && (normalized.includes("PENDIENT") || normalized.includes("ABIERTO"))
+    && (normalized.includes("TIEMPO") || normalized.includes("ANTIGU"))) {
+    const result = await getOperationalSummary(client, args) as JsonRecord;
+    const jobs = result.trabajos && typeof result.trabajos === "object" ? result.trabajos as JsonRecord : {};
+    const states = jobs.por_estado && typeof jobs.por_estado === "object" ? jobs.por_estado as Record<string, number> : {};
+    const openCount = Object.entries(states)
+      .filter(([state]) => !normalizedKey(state).includes("COMPLET"))
+      .reduce((total, [, amount]) => total + Number(amount || 0), 0);
+    const pendingCount = Object.entries(states)
+      .filter(([state]) => normalizedKey(state).includes("PENDIENT"))
+      .reduce((total, [, amount]) => total + Number(amount || 0), 0);
+    const oldest = Array.isArray(result.abiertos_mas_antiguos) ? result.abiertos_mas_antiguos as JsonRecord[] : [];
+    const lines = oldest.slice(0, 10).map((row, index) => `${index + 1}. ${cleanText(row.codigo, 80)} · ${cleanText(row.descripcion, 100)} · ${Number(row.dias_abierto) || 0} dias`);
+    return {
+      tool: "get_operational_summary",
+      args,
+      content: `Hay ${pendingCount} trabajos en estado Pendiente y ${openCount} trabajos abiertos en total para los filtros actuales.\n\nLos abiertos mas antiguos:\n${lines.length ? lines.join("\n") : "Sin trabajos abiertos."}`,
+      resultCount: Number(jobs.total) || 0,
+    };
+  }
+
+  if (asksOrders && normalized.includes("CERRAD") && normalized.includes("TIPO") && normalized.includes("TIEMPO")) {
+    const result = await getServiceOrdersSummary(client, args) as JsonRecord;
+    const byType = result.cerradas_por_tipo_tiempo && typeof result.cerradas_por_tipo_tiempo === "object"
+      ? result.cerradas_por_tipo_tiempo as Record<string, number>
+      : {};
+    const lines = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, amount]) => `- ${type}: ${amount}`);
+    const total = Object.values(byType).reduce((acc, amount) => acc + Number(amount || 0), 0);
+    return {
+      tool: "get_service_orders_summary",
+      args,
+      content: `Hubo ${total} OS cerradas por tipo de tiempo:\n${lines.length ? lines.join("\n") : "- Sin OS cerradas en el periodo."}`,
+      resultCount: Number(result.filas) || 0,
+    };
+  }
+
   if (asksOrders && asksTechnician && asksTop) {
     const result = await getServiceOrdersSummary(client, args) as JsonRecord;
     const ranking = Array.isArray(result.ranking_tecnicos)
@@ -765,6 +912,18 @@ async function resolveSemanticQuestion(
         tool: "get_billing_summary",
         args,
         content: `${leader.sucursal} fue la sucursal con mayor facturacion, con ${formatUsd(leader.total_usd)}. Periodo consultado: ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
+    if (asksBranch && (normalized.includes("COMPAR") || normalized.includes("POR SUCURSAL"))) {
+      const ranking = Array.isArray(result.ranking_sucursales)
+        ? result.ranking_sucursales as Array<{ sucursal?: string; total_usd?: number; facturas?: number }>
+        : [];
+      const lines = ranking.map((row, index) => `${index + 1}. ${cleanText(row.sucursal, 80)}: ${formatUsd(row.total_usd)} (${Number(row.facturas) || 0} facturas)`);
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `Facturacion por sucursal:\n${lines.length ? lines.join("\n") : "Sin facturacion en el periodo."}\nPeriodo consultado: ${period}.`,
         resultCount: Number(result.lineas) || 0,
       };
     }
