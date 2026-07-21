@@ -224,6 +224,10 @@ function normalizedBillingClient(value: unknown) {
 
 async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   const sucursal = cleanText(args.sucursal, 40);
+  const sucursales = Array.isArray(args.sucursales)
+    ? args.sucursales.map((value) => cleanText(value, 40)).filter(Boolean)
+    : [];
+  const sucursalKeys = new Set(sucursales.map(normalizedKey));
   const marca = cleanText(args.marca, 30);
   const tipo = canonicalBillingTimeType(args.tipo_tiempo);
   const rubro = canonicalBillingRubro(args.rubro);
@@ -305,6 +309,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
       };
     });
   const rows = [...historical, ...imported].filter((row) => {
+    if (sucursalKeys.size > 0 && !sucursalKeys.has(normalizedKey(row.sucursal))) return false;
     if (sucursal && sucursal.toLowerCase() !== "todos" && normalizedKey(row.sucursal) !== normalizedKey(sucursal)) return false;
     if (marca && marca.toLowerCase() !== "todos" && normalizedKey(row.marca) !== normalizedKey(marca)) return false;
     if (tipo && row.tipo_tiempo !== tipo) return false;
@@ -562,6 +567,7 @@ const filterProperties = {
   date_from: { type: "string", description: "Fecha inicial YYYY-MM-DD" },
   date_to: { type: "string", description: "Fecha final YYYY-MM-DD" },
   sucursal: { type: "string" },
+  sucursales: { type: "array", items: { type: "string" }, maxItems: 6, description: "Varias sucursales para comparar o combinar en una sola consulta" },
   marca: { type: "string" },
   tipo_tiempo: { type: "string", description: "Tipo comercial: Cliente, Garantia, Interno o Todos. No usar para dia, semana, mes o anio." },
   rubro: { type: "string", description: "Rubro canonico: Servicio, Repuestos, Kilometraje, Otros o Todos" },
@@ -626,7 +632,7 @@ function firstFilterValue(value: unknown) {
   return cleanText(value, 80);
 }
 
-function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate: string) {
+function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate: string, inherited: JsonRecord = {}) {
   const filters = pageContext.filters && typeof pageContext.filters === "object"
     ? pageContext.filters as JsonRecord
     : {};
@@ -644,8 +650,18 @@ function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate
   if (marca && normalizedKey(marca) !== "TODOS") args.marca = marca;
   if (rubroFiltro) args.rubro = canonicalBillingRubro(rubroFiltro);
   if (tipoTiempo) args.tipo_tiempo = tipoTiempo;
+  Object.assign(args, inherited);
 
   const normalized = normalizedKey(question);
+  const knownBranches = ["Santa Rita", "Katuete", "Loma Plata", "Misiones", "Santa Rosa", "Campo 9"];
+  const explicitBranches = knownBranches.filter((branch) => normalized.includes(normalizedKey(branch)));
+  if (explicitBranches.length > 1) {
+    args.sucursales = explicitBranches;
+    delete args.sucursal;
+  } else if (explicitBranches.length === 1) {
+    args.sucursal = explicitBranches[0];
+    delete args.sucursales;
+  }
   if (normalized.includes("REPUEST")) args.rubro = "Repuestos";
   else if (normalized.includes("KILOMET") || /\bKM\b/.test(normalized)) args.rubro = "Kilometraje";
   else if (normalized.includes("SERVICIO") || normalized.includes("MANO DE OBRA")) args.rubro = "Servicio";
@@ -679,10 +695,18 @@ async function resolveSemanticQuestion(
   question: string,
   pageContext: JsonRecord,
   currentDate: string,
+  history: JsonRecord[] = [],
 ): Promise<SemanticResponse | null> {
   const normalized = normalizedKey(question);
   const moduleName = normalizedKey(pageContext.module);
-  const args = semanticToolArgs(question, pageContext, currentDate);
+  const previousBillingSource = history
+    .filter((row) => row.role === "assistant" && Array.isArray(row.sources))
+    .flatMap((row) => row.sources as JsonRecord[])
+    .find((source) => source.tool === "get_billing_summary");
+  const inheritedBillingFilters = previousBillingSource?.filters && typeof previousBillingSource.filters === "object"
+    ? previousBillingSource.filters as JsonRecord
+    : {};
+  const args = semanticToolArgs(question, pageContext, currentDate, inheritedBillingFilters);
   const asksCount = normalized.includes("CUANT") || normalized.includes("TOTAL");
   const asksTop = normalized.includes(" MAS ") || normalized.startsWith("QUE ") || normalized.includes("MAYOR");
   const asksBilling = normalized.includes("FACTUR") || normalized.includes("VENTA");
@@ -690,6 +714,10 @@ async function resolveSemanticQuestion(
   const asksTechnician = normalized.includes("TECNIC");
   const asksClients = normalized.includes("CLIENT");
   const asksBranch = normalized.includes("SUCURSAL");
+  const topMatch = normalized.match(/\bTOP\s*(\d{1,2})\b/);
+  const topN = Math.min(25, Math.max(1, Number(topMatch?.[1]) || 1));
+  const asksClientRanking = asksClients && (Boolean(topMatch) || asksTop);
+  const asksNext = normalized.includes("QUIEN LE SIGUE") || normalized.includes("CUAL LE SIGUE") || normalized.includes("SIGUIENTE");
 
   if (asksOrders && asksTechnician && asksTop) {
     const result = await getServiceOrdersSummary(client, args) as JsonRecord;
@@ -715,9 +743,20 @@ async function resolveSemanticQuestion(
   }
 
   const dashboardBillingContext = moduleName === "DASHBOARD" && !normalized.includes("PARQUE") && !normalized.includes("MAQUINA");
-  if (asksBilling || (asksClients && asksCount && dashboardBillingContext)) {
+  if (asksBilling || (asksClients && (asksCount || asksClientRanking) && dashboardBillingContext) || (asksNext && Object.keys(inheritedBillingFilters).length > 0)) {
     const result = await getBillingSummary(client, args) as JsonRecord;
     const period = `${cleanText(args.date_from, 10) || "inicio disponible"} al ${cleanText(args.date_to, 10) || "fin disponible"}`;
+    if (asksNext) {
+      const ranking = result.ranking_sucursales as Array<{ sucursal?: string; total_usd?: number }> | undefined;
+      const next = ranking?.[1];
+      if (!next?.sucursal) return null;
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `${next.sucursal} ocupa el segundo lugar, con ${formatUsd(next.total_usd)}. Periodo consultado: ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
     if (asksBranch && asksTop) {
       const ranking = result.ranking_sucursales as Array<{ sucursal?: string; total_usd?: number }> | undefined;
       const leader = ranking?.[0];
@@ -734,6 +773,23 @@ async function resolveSemanticQuestion(
         tool: "get_billing_summary",
         args,
         content: `Hay ${Number(result.clientes) || 0} clientes facturados unicos en el periodo ${period}.`,
+        resultCount: Number(result.lineas) || 0,
+      };
+    }
+    if (asksClientRanking) {
+      const ranking = Array.isArray(result.ranking_clientes)
+        ? result.ranking_clientes as Array<{ cliente?: string; total_usd?: number; facturas?: number }>
+        : [];
+      const selected = ranking.slice(0, topN);
+      if (!selected.length) return null;
+      const branchLabel = Array.isArray(args.sucursales) && args.sucursales.length
+        ? ` entre ${(args.sucursales as string[]).join(" y ")}`
+        : cleanText(args.sucursal, 40) ? ` en ${cleanText(args.sucursal, 40)}` : "";
+      const lines = selected.map((row, index) => `${index + 1}. ${cleanText(row.cliente, 160)}: ${formatUsd(row.total_usd)} (${Number(row.facturas) || 0} facturas)`);
+      return {
+        tool: "get_billing_summary",
+        args,
+        content: `Top ${selected.length} clientes${branchLabel}:\n${lines.join("\n")}\nPeriodo consultado: ${period}.`,
         resultCount: Number(result.lineas) || 0,
       };
     }
@@ -826,11 +882,11 @@ Deno.serve(async (req) => {
     const { error: messageError } = await userClient.from("ai_messages").insert({ conversation_id: conversationId, user_id: userId, role: "user", content: question, answer_mode: answerMode, page_context: pageContext });
     if (messageError) throw messageError;
 
-    const { data: history } = await userClient.from("ai_messages").select("role,content").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(12);
+    const { data: history } = await userClient.from("ai_messages").select("role,content,sources").eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(12);
     const contextText = Object.keys(pageContext).length ? JSON.stringify(pageContext) : "Sin contexto de pantalla";
     const currentDate = new Date().toISOString().slice(0, 10);
     const semanticStartedAt = Date.now();
-    const semantic = await resolveSemanticQuestion(admin, question, pageContext, currentDate);
+    const semantic = await resolveSemanticQuestion(admin, question, pageContext, currentDate, (history ?? []) as JsonRecord[]);
     if (semantic) {
       const sources: ToolSource[] = [{ tool: semantic.tool, label: sourceLabel(semantic.tool), filters: semantic.args }];
       await admin.from("ai_tool_runs").insert({
