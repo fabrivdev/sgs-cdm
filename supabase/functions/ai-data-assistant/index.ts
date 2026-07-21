@@ -198,12 +198,18 @@ const legacyBillingRules: Record<string, { rubro: string; marca: string }> = {
 };
 
 function billingConcept(tipo: unknown, grupoFx: unknown, grupo: unknown) {
+  const normalizedType = normalizedKey(tipo);
   const fx = normalizedKey(grupoFx);
   const combined = `${fx} ${normalizedKey(grupo)}`;
-  if (normalizedKey(tipo) === "REPUESTO" || combined.includes("REPUESTO")) return "Repuestos";
+  if (normalizedType === "REPUESTO" || combined.includes("REPUESTO")) return "Repuestos";
   if (fx === "KILOMETRAJE" || combined.includes("KILOMET")) return "Kilometraje";
   if (fx === "SERVICIO" || combined.includes("MANO DE OBRA") || combined.includes("SERVICE") || combined.includes("SERVICIO")) return "Servicio";
+  if (normalizedType === "SERVICIO" && !combined.includes("COUR")) return "Servicio";
   return "Otros";
+}
+
+function formatUsd(value: unknown) {
+  return new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
 async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
@@ -705,7 +711,8 @@ Deno.serve(async (req) => {
             toolResult = toolCache.get(cacheKey);
           } else {
             try {
-              toolResult = await executeTool(userClient, name, args);
+              const dataClient = name === "get_billing_summary" ? admin : userClient;
+              toolResult = await executeTool(dataClient, name, args);
             } catch (error) {
               toolError = error instanceof Error ? error.message : String(error);
               toolResult = { error: toolError };
@@ -723,6 +730,26 @@ Deno.serve(async (req) => {
       }
     } finally {
       clearTimeout(timeout);
+    }
+
+    const normalizedQuestion = normalizedKey(question);
+    const asksTopBillingBranch = normalizedQuestion.includes("SUCURSAL")
+      && normalizedQuestion.includes("FACTUR")
+      && (normalizedQuestion.includes(" MAS ") || normalizedQuestion.startsWith("QUE SUCURSAL"));
+    if (asksTopBillingBranch) {
+      const billingResult = [...toolCache.entries()]
+        .filter(([key]) => key.startsWith("get_billing_summary:"))
+        .map(([, value]) => value as JsonRecord)
+        .find((value) => Array.isArray(value?.ranking_sucursales) && (value.ranking_sucursales as unknown[]).length > 0);
+      const ranking = billingResult?.ranking_sucursales as Array<{ sucursal?: string; total_usd?: number }> | undefined;
+      const leader = ranking?.[0];
+      if (leader?.sucursal) {
+        const source = sources.find((item) => item.tool === "get_billing_summary");
+        const from = cleanText(source?.filters?.date_from, 10);
+        const to = cleanText(source?.filters?.date_to, 10);
+        const appliedRubro = cleanText(billingResult?.rubro_aplicado, 40) || "Todos";
+        finalContent = `${leader.sucursal} fue la sucursal con mayor facturacion en ${appliedRubro}, con ${formatUsd(leader.total_usd)}. Periodo consultado: ${from || "sin fecha inicial"} al ${to || "sin fecha final"}.`;
+      }
     }
 
     if (!finalContent) finalContent = "No se pudo obtener una respuesta final. Intenta acotar la consulta.";
