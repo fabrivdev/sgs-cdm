@@ -555,11 +555,15 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
     if (row.tecnico_responsable_id) referencedIds.add(String(row.tecnico_responsable_id));
     for (const id of (Array.isArray(row.auxiliares) ? row.auxiliares : [])) referencedIds.add(String(id));
   }
+  const activeFilter = normalizedKey(args.activo);
+  const includeInactive = activeFilter === "INACTIVO" || activeFilter === "INACTIVOS" || activeFilter === "FALSE";
+  const includeAll = activeFilter === "TODOS" || activeFilter === "ALL";
   const technicians = profiles.filter((row) => {
     const id = String(row.id);
     const name = normalizedKey(row.nombre);
     const administrativeOnly = administrativeIds.has(id) && !technicianRoleIds.has(id) && !referencedIds.has(id);
-    return row.activo !== false && !name.includes("PASANTE") && !administrativeOnly;
+    const matchesActivityStatus = includeAll ? true : includeInactive ? row.activo === false : row.activo !== false;
+    return matchesActivityStatus && !name.includes("PASANTE") && !administrativeOnly;
   });
   const validIds = new Set(technicians.map((row) => String(row.id)));
   const activity: Record<string, { jornadas: number; horas: number; pendientes: number; realizadas: number; no_realizadas: number }> = {};
@@ -580,11 +584,17 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
       else activity[id].pendientes += 1;
     }
   }
+  const requestedMetrics = Array.isArray(args.metrics) ? args.metrics.map((metric) => normalizedKey(metric)) : [];
+  const sortByHours = requestedMetrics.includes("HORAS") || normalizedKey(args.order_by) === "HORAS";
   const detail = technicians
     .map((row) => ({ ...row, ...(activity[String(row.id)] ?? { jornadas: 0, horas: 0, pendientes: 0, realizadas: 0, no_realizadas: 0 }) }))
-    .sort((a, b) => Number(b.jornadas) - Number(a.jornadas) || cleanText(a.nombre, 160).localeCompare(cleanText(b.nombre, 160)));
+    .sort((a, b) => Number(sortByHours ? b.horas : b.jornadas) - Number(sortByHours ? a.horas : a.jornadas)
+      || Number(b.jornadas) - Number(a.jornadas)
+      || cleanText(a.nombre, 160).localeCompare(cleanText(b.nombre, 160)));
   return {
-    tecnicos_activos: technicians.length,
+    tecnicos_total: technicians.length,
+    tecnicos_activos: technicians.filter((row) => row.activo !== false).length,
+    tecnicos_inactivos: technicians.filter((row) => row.activo === false).length,
     con_actividad: detail.filter((row) => Number(row.jornadas) > 0).length,
     sin_actividad: detail.filter((row) => Number(row.jornadas) === 0).length,
     con_carga_detalle: detail.filter((row) => Number(row.jornadas) > 0).slice(0, 100),
@@ -650,9 +660,9 @@ const businessCatalog = {
     dimensions: ["periodo", "fecha", "sucursal", "cliente", "marca", "estado", "tecnico", "trabajo"],
   },
   tecnicos: {
-    description: "Tecnicos activos, carga, jornadas, resultados y horas del periodo.",
+    description: "Tecnicos activos o inactivos, carga, jornadas, resultados y horas del periodo.",
     metrics: ["tecnicos", "jornadas", "horas"],
-    dimensions: ["sucursal", "tecnico", "carga"],
+    dimensions: ["sucursal", "tecnico", "carga", "activo"],
   },
   parque: {
     description: "Parque activo de maquinas y clientes.",
@@ -723,7 +733,7 @@ function semanticDimension(row: JsonRecord, dataset: BusinessDataset, dimension:
       trabajo: row.os_numero ?? row.codigo, cliente: row.cliente_id,
     },
     jornadas: { fecha: row.fecha, estado: row.estado, tecnico: row.tecnico_responsable_id, trabajo: row.servicio_id, sucursal: serviceRelation.sucursal, cliente: serviceRelation.cliente_id, marca: serviceRelation.marca },
-    tecnicos: { sucursal: row.sucursal, tecnico: row.nombre, carga: Number(row.jornadas) > 0 ? "Con carga" : "Sin carga" },
+    tecnicos: { sucursal: row.sucursal, tecnico: row.nombre, carga: Number(row.jornadas) > 0 ? "Con carga" : "Sin carga", activo: row.activo === false ? "Inactivo" : "Activo" },
     parque: { sucursal: row.sucursal, cliente: row.cliente_id, marca: row.marca, subgrupo: row.subgrupo, modelo: row.modelo_tipo },
     agenda: { fecha: row.fecha, sucursal: clientRelation.sucursal, cliente: row.cliente_id, resultado: row.resultado },
   };
@@ -862,7 +872,7 @@ const toolSpecs = [
   ["get_service_orders_summary", "Resume ordenes de servicio, horas, km y valores. Incluye ranking de tecnicos participantes y OS cerradas por tipo de tiempo canonico."],
   ["get_park_summary", "Resume parque activo de maquinas y clientes."],
   ["get_commercial_followup", "Resume gestiones de agenda comercial."],
-  ["get_technician_summary", "Resume tecnicos activos y devuelve listas nominales separadas con carga y sin carga en el periodo."],
+  ["get_technician_summary", "Resume tecnicos activos o inactivos y devuelve listas nominales con carga, horas y jornadas. Usa activo=Inactivo para consultar ex tecnicos."],
 ] as const;
 
 const filterProperties = {
@@ -873,6 +883,12 @@ const filterProperties = {
   marca: { type: "string" },
   tipo_tiempo: { type: "string", description: "Tipo comercial: Cliente, Garantia, Interno o Todos. No usar para dia, semana, mes o anio." },
   rubro: { type: "string", description: "Rubro canonico: Servicio, Repuestos, Kilometraje, Otros o Todos" },
+  activo: { type: "string", enum: ["Activo", "Inactivo", "Todos"], description: "Situacion del tecnico" },
+  metrics: { type: "array", items: { type: "string" }, maxItems: 6, description: "Metricas solicitadas; las herramientas resumen ignoran las que no correspondan" },
+  dimensions: { type: "array", items: { type: "string" }, maxItems: 3, description: "Dimensiones solicitadas; las herramientas resumen ignoran las que no correspondan" },
+  granularity: { type: "string", enum: ["day", "week", "month", "year"], description: "Agrupacion temporal solicitada" },
+  order_by: { type: "string", description: "Metrica usada para ordenar" },
+  limit: { type: "integer", minimum: 1, maximum: 100 },
 };
 
 const tools = [
@@ -1035,6 +1051,8 @@ function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate
   if (normalized.includes("GARANT")) args.tipo_tiempo = "Garantia";
   else if (normalized.includes("INTERNO") || normalized.includes("ABSORVE") || normalized.includes("ABSORBE")) args.tipo_tiempo = "Interno";
   else if (normalized.includes("FACTURAR A CLIENTE") || normalized.includes("TIPO CLIENTE") || normalized.includes("A CLIENTE")) args.tipo_tiempo = "Cliente";
+  if (normalized.includes("INACTIV")) args.activo = "Inactivo";
+  else if (normalized.includes("TECNIC") && normalized.includes("ACTIV")) args.activo = "Activo";
 
   const monthNames: Record<string, number> = {
     ENERO: 1, FEBRERO: 2, MARZO: 3, ABRIL: 4, MAYO: 5, JUNIO: 6,
@@ -1097,6 +1115,22 @@ async function resolveSemanticQuestion(
   const topN = Math.min(25, Math.max(1, Number(topMatch?.[1]) || 1));
   const asksClientRanking = asksClients && (Boolean(topMatch) || asksTop);
   const asksNext = normalized.includes("QUIEN LE SIGUE") || normalized.includes("CUAL LE SIGUE") || normalized.includes("SIGUIENTE");
+
+  if (asksTechnician && normalized.includes("INACTIV") && (normalized.includes("PRODUCTIV") || asksTop)) {
+    const technicianArgs = { ...args, activo: "Inactivo", metrics: ["horas"], order_by: "horas" };
+    const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
+    const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
+    const leader = detail.find((row) => Number(row.horas) > 0 || Number(row.jornadas) > 0);
+    const period = `${cleanText(technicianArgs.date_from, 10) || "inicio disponible"} al ${cleanText(technicianArgs.date_to, 10) || "fin disponible"}`;
+    return {
+      tool: "get_technician_summary",
+      args: technicianArgs,
+      content: leader
+        ? `${cleanText(leader.nombre, 160)} fue el tecnico inactivo con mayor productividad por horas registradas: ${Number(leader.horas) || 0} horas en ${Number(leader.jornadas) || 0} jornadas. Periodo consultado: ${period}.`
+        : `No hay actividad registrada para tecnicos inactivos en el periodo ${period}.`,
+      resultCount: detail.length,
+    };
+  }
 
   if (asksTechnician && (normalized.includes("CARGA") || normalized.includes("ASIGN"))) {
     const result = await getTechnicianSummary(client, args) as JsonRecord;
