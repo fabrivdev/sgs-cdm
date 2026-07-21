@@ -888,6 +888,14 @@ export default function Dashboard() {
 
   const validJornadaCrew = (jornada: Jornada) => validTechnicianIds(jornadaCrewIds(jornada));
 
+  // La dotacion activa sirve para la operativa actual, pero no debe borrar la
+  // participacion historica de tecnicos que hoy estan inactivos.
+  const historicalJornadaCrew = (jornada: Jornada) =>
+    Array.from(new Set(jornadaCrewIds(jornada).filter((id) => {
+      const profile = profileById.get(id);
+      return Boolean(profile && !profile.nombre.toLowerCase().includes("pasante"));
+    })));
+
   const query = q.trim().toLowerCase();
   const factFiltered = useMemo(
     () =>
@@ -2349,7 +2357,7 @@ export default function Dashboard() {
       trabajosPorBucketMap.get(key).add(trabajoId);
       // Solo Completado aporta horas reales
       const horasJ = jornada.estado === "Completado" ? Number(jornada.horas_trabajadas || 0) : 0;
-      for (const id of validJornadaCrew(jornada)) {
+      for (const id of historicalJornadaCrew(jornada)) {
         ensureTecnicoRow(id);
         const current = map.get(id) ?? {
           id,
@@ -2898,7 +2906,7 @@ export default function Dashboard() {
               <div className="mb-3 flex items-start justify-between">
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Trabajos por periodo y técnicos activos</p>
+                  <p className="truncate text-xs text-muted-foreground">Trabajos y participación histórica por periodo</p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <CalendarDays className="h-4 w-4" />
@@ -2909,7 +2917,7 @@ export default function Dashboard() {
                   <div className="flex items-start gap-2">
                     <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div className="min-w-0">
-                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Técnicos activos</div>
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Activos actuales con carga</div>
                       <div className="mt-0.5 flex items-baseline gap-2">
                         <span className="text-[18px] font-extrabold leading-none tabular-nums">
                           {técnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>

@@ -1896,7 +1896,7 @@ export function CargaEquipoChart({
         </div>
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400/90" />
-          Técnicos activos
+          Técnicos con actividad
         </div>
         <div className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-400/90" />
