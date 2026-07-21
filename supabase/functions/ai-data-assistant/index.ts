@@ -417,6 +417,9 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     abiertas: Set<string>;
     cerradas: Set<string>;
     otras: Set<string>;
+    horas: number;
+    km: number;
+    valor_os: number;
   }>();
   const technicianAlias: Record<string, string> = {
     "DENNIS BENITEZ": "DENIS DE LA CRUZ BENITEZ ARAUJO",
@@ -435,12 +438,42 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
   const profiles = await checked<JsonRecord[]>(
     client.from("profiles").select("nombre,activo").limit(1000),
   );
-  const technicianStatus = new Map(
-    profiles
-      .map((profile) => [normalizeTechnician(profile.nombre), profile.activo !== false] as const)
-      .filter(([name]) => Boolean(name)),
-  );
-  const participantsFor = (row: JsonRecord) => {
+  const profileRows = profiles
+    .map((profile) => ({
+      nombre: cleanText(profile.nombre, 160),
+      normalized: normalizeTechnician(profile.nombre),
+      activo: profile.activo !== false,
+    }))
+    .filter((profile) => Boolean(profile.normalized));
+  const technicianMatchScore = (source: string, candidate: string) => {
+    if (!source || !candidate) return 0;
+    if (source === candidate) return 1;
+    const sourceTokens = source.split(" ").filter(Boolean);
+    const candidateTokens = candidate.split(" ").filter(Boolean);
+    const sourceSet = new Set(sourceTokens);
+    const candidateSet = new Set(candidateTokens);
+    const intersection = sourceTokens.filter((token) => candidateSet.has(token)).length;
+    const allSourceTokensMatch = sourceTokens.length >= 2 && intersection === sourceTokens.length;
+    const allCandidateTokensMatch = candidateTokens.length >= 2 && candidateTokens.every((token) => sourceSet.has(token));
+    if (allSourceTokensMatch || allCandidateTokensMatch) {
+      return 0.94 - Math.min(Math.abs(sourceTokens.length - candidateTokens.length) * 0.02, 0.12);
+    }
+    if (intersection < 2) return 0;
+    return intersection / Math.max(sourceTokens.length, candidateTokens.length) +
+      (sourceTokens[0] === candidateTokens[0] ? 0.12 : 0);
+  };
+  const matchProfile = (source: string) => {
+    const ranked = profileRows
+      .map((profile) => ({ profile, score: technicianMatchScore(source, profile.normalized) }))
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score || a.profile.nombre.localeCompare(b.profile.nombre));
+    const best = ranked[0];
+    const second = ranked[1];
+    return best && best.score >= 0.72 && (!second || best.score - second.score >= 0.08)
+      ? best.profile
+      : null;
+  };
+  const participantEntriesFor = (row: JsonRecord) => {
     const values: unknown[] = [row.responsable];
     const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {};
     const explicit = raw.tecnicos_participantes;
@@ -449,7 +482,22 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       const normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       if (normalizedKey === "responsable" || /^mec aux [1-6]$/.test(normalizedKey)) values.push(value);
     }
-    return [...new Set(values.map(normalizeTechnician).filter(Boolean))];
+    const entries = new Map<string, { tecnico: string; activo: boolean | null; sources: string[] }>();
+    for (const value of values) {
+      const source = cleanText(value, 160);
+      const normalized = normalizeTechnician(source);
+      if (!normalized) continue;
+      const matched = matchProfile(normalized);
+      const technician = matched?.normalized ?? normalized;
+      const current = entries.get(technician) ?? {
+        tecnico: matched?.nombre ?? normalized,
+        activo: matched?.activo ?? null,
+        sources: [],
+      };
+      current.sources.push(source);
+      entries.set(technician, current);
+    }
+    return [...entries.values()];
   };
   for (const row of rows) {
     const order = orderKey(row);
@@ -460,17 +508,40 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       : status.includes("ANUL") || status.includes("CANCEL")
         ? "otras"
         : "abiertas";
-    for (const technician of participantsFor(row)) {
-      const entry = technicians.get(technician) ?? {
-        tecnico: technician,
+    const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {};
+    const totalsByTechnician = raw.totales_por_tecnico && typeof raw.totales_por_tecnico === "object"
+      ? raw.totales_por_tecnico as Record<string, JsonRecord>
+      : {};
+    const hasParticipantTotals = Object.keys(totalsByTechnician).length > 0;
+    for (const participant of participantEntriesFor(row)) {
+      const entryKey = normalizeTechnician(participant.tecnico);
+      const participantTotals = participant.sources.reduce((totals, sourceName) => {
+        const sourceTotals = totalsByTechnician[sourceName] ?? {};
+        totals.horas += Number(sourceTotals.horas || 0);
+        totals.km += Number(sourceTotals.kilometros || 0);
+        totals.valor += Number(sourceTotals.valor_servicio || 0) + Number(sourceTotals.valor_repuestos || 0) +
+          Number(sourceTotals.valor_kilometraje || 0) + Number(sourceTotals.valor_terceros || 0);
+        return totals;
+      }, { horas: 0, km: 0, valor: 0 });
+      const entry = technicians.get(entryKey) ?? {
+        tecnico: participant.tecnico,
         ordenes: new Set<string>(),
         abiertas: new Set<string>(),
         cerradas: new Set<string>(),
         otras: new Set<string>(),
+        horas: 0,
+        km: 0,
+        valor_os: 0,
       };
       entry.ordenes.add(order);
       entry[state].add(order);
-      technicians.set(technician, entry);
+      entry.horas += hasParticipantTotals ? participantTotals.horas : Number(row.servicios_cantidad || 0);
+      entry.km += hasParticipantTotals ? participantTotals.km : Number(row.km_cantidad || 0);
+      entry.valor_os += hasParticipantTotals
+        ? participantTotals.valor
+        : Number(row.servicios_valor || 0) + Number(row.repuesto_valor || 0) +
+          Number(row.kilometro_valor || 0) + Number(row.terceros_valor || 0);
+      technicians.set(entryKey, entry);
     }
   }
   const requestedActivity = normalizedKey(args.activo);
@@ -482,16 +553,21 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       abiertas: row.abiertas.size,
       cerradas: row.cerradas.size,
       otras: row.otras.size,
-      activo: technicianStatus.get(row.tecnico) ?? null,
+      horas: row.horas,
+      km: row.km,
+      valor_os: row.valor_os,
+      activo: matchProfile(normalizeTechnician(row.tecnico))?.activo ?? null,
     }))
     .filter((row) => requestedActivity === "INACTIVO"
       ? row.activo === false
       : requestedActivity === "ACTIVO"
         ? row.activo === true
         : true)
-    .sort((a, b) => orderTechniciansBy === "ORDENES"
-      ? b.ordenes - a.ordenes || b.cerradas - a.cerradas || a.tecnico.localeCompare(b.tecnico)
-      : b.abiertas - a.abiertas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico))
+    .sort((a, b) => orderTechniciansBy === "HORAS"
+      ? b.horas - a.horas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico)
+      : orderTechniciansBy === "ORDENES"
+        ? b.ordenes - a.ordenes || b.cerradas - a.cerradas || a.tecnico.localeCompare(b.tecnico)
+        : b.abiertas - a.abiertas || b.ordenes - a.ordenes || a.tecnico.localeCompare(b.tecnico))
     .slice(0, 50);
   const closedByTimeType = new Map<string, Set<string>>();
   for (const row of rows) {
@@ -503,7 +579,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     closedByTimeType.set(timeType, keys);
   }
   const participantRows = rows.flatMap((row) => {
-    const participants = participantsFor(row);
+    const participants = participantEntriesFor(row).map((participant) => participant.tecnico);
     return participants.length ? participants.map((participant) => ({ ...row, participante: participant })) : [{ ...row, participante: "Sin tecnico" }];
   });
   return {
@@ -1185,6 +1261,40 @@ async function resolveSemanticQuestion(
 
   const asksInactiveTechnician = normalized.includes("INACTIV") || (asksOrders && conversationalIntent.includes("INACTIV"));
   const asksProductivity = normalized.includes("PRODUCTIV") || (asksOrders && conversationalIntent.includes("PRODUCTIV"));
+  const asksJornadas = normalized.includes("JORNAD") || normalized.includes("PLANIFICADOR") || normalized.includes("CALENDARIO");
+
+  // En esta app, productividad tecnica es una metrica de Ordenes de Servicio.
+  // Las jornadas se usan solo cuando el usuario las pide de forma explicita.
+  if ((asksTechnician || asksProductivity) && asksProductivity && !asksJornadas) {
+    const orderArgs = {
+      ...args,
+      ...(asksInactiveTechnician ? { activo: "Inactivo" } : {}),
+      order_by: "horas",
+    };
+    const result = await getServiceOrdersSummary(client, orderArgs) as JsonRecord;
+    const ranking = Array.isArray(result.ranking_tecnicos)
+      ? result.ranking_tecnicos as Array<{
+        tecnico?: string;
+        ordenes?: number;
+        abiertas?: number;
+        cerradas?: number;
+        horas?: number;
+        km?: number;
+        activo?: boolean | null;
+      }>
+      : [];
+    const leader = ranking.find((row) => Number(row.horas) > 0 || Number(row.ordenes) > 0);
+    const period = `${cleanText(orderArgs.date_from, 10) || "inicio disponible"} al ${cleanText(orderArgs.date_to, 10) || "fin disponible"}`;
+    const activityLabel = asksInactiveTechnician ? " inactivo" : "";
+    return {
+      tool: "get_service_orders_summary",
+      args: orderArgs,
+      content: leader?.tecnico
+        ? `${leader.tecnico} fue el tecnico${activityLabel} con mayor productividad segun Ordenes de Servicio: ${Number(leader.horas) || 0} horas en ${Number(leader.ordenes) || 0} OS (${Number(leader.cerradas) || 0} cerradas y ${Number(leader.abiertas) || 0} abiertas). Periodo consultado: ${period}.`
+        : `No hay horas ni Ordenes de Servicio asociadas a tecnicos${activityLabel}s en el periodo ${period}.`,
+      resultCount: ranking.length,
+    };
+  }
 
   if (asksOrders && asksTechnician && asksInactiveTechnician && (asksProductivity || asksTop || normalized.includes("POR OS"))) {
     const orderArgs = { ...args, activo: "Inactivo", order_by: "ordenes" };
@@ -1204,7 +1314,7 @@ async function resolveSemanticQuestion(
     };
   }
 
-  if (asksTechnician && asksInactiveTechnician && (asksProductivity || asksTop)) {
+  if ((asksTechnician || asksProductivity) && asksInactiveTechnician && asksJornadas && (asksProductivity || asksTop)) {
     const technicianArgs = { ...args, activo: "Inactivo", metrics: ["horas"], order_by: "horas" };
     const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
     const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
@@ -1220,7 +1330,7 @@ async function resolveSemanticQuestion(
     };
   }
 
-  if (asksTechnician && (asksProductivity || asksTop) && !asksOrders) {
+  if ((asksTechnician || asksProductivity) && asksJornadas && (asksProductivity || asksTop) && !asksOrders) {
     const technicianArgs = { ...args, metrics: ["horas"], order_by: "horas" };
     const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
     const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
