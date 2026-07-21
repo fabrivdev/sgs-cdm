@@ -94,6 +94,7 @@ export interface ServicioOSRow {
   fechaApertura: string | null;
   estadoOS: string;
   estadoFacturacion: string;
+  origen: string;
   factura: string;
   problema: string;
   horas: number;

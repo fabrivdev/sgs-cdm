@@ -359,6 +359,13 @@ function normalizeClienteKey(name: string): string {
     .trim();
 }
 
+function sucursalDesdeNombreCliente(name: string): Sucursal | null {
+  const normalized = normalizeOSLookup(name);
+  if (!normalized) return null;
+
+  return SUCURSALES.find((sucursal) => normalized.includes(normalizeOSLookup(sucursal))) ?? null;
+}
+
 function productivityGoalForRange(start: Date, end: Date, monthlyGoal: number): number {
   let cursor = startOfMonth(start);
   let target = 0;
@@ -1005,9 +1012,12 @@ export default function Dashboard() {
       const clienteTrabajo = trabajo?.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre : null;
       const cliente = String(clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente").trim() || "Sin cliente";
       const clienteMatched = clienteByName.get(normalizeClienteKey(cliente));
-      const sucursal = trabajo?.sucursal ?? clienteMatched?.sucursal ?? null;
+      const sucursal = trabajo?.sucursal ?? clienteMatched?.sucursal ?? sucursalDesdeNombreCliente(cliente);
       const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
       const rawData = (row.raw_data ?? {}) as Record<string, any>;
+      const origen = String(
+        rawData.canonical_origin ?? rawData.ORIGEN ?? rawData.Origen ?? "",
+      ).trim();
       const participantSources = importedServiceOrderParticipants(rawData, row.responsable);
       const participantMap = new Map<string, {
         tecnico: string;
@@ -1091,7 +1101,7 @@ export default function Dashboard() {
         if (!matchesRubro) return [];
       }
       if (query) {
-        const searchable = [row.os_numero, row.factura, ...participantNames, cliente, row.problema, estadoOS, tipoTiempo]
+        const searchable = [row.os_numero, row.factura, ...participantNames, cliente, row.problema, estadoOS, tipoTiempo, origen]
           .map((value) => String(value ?? ""))
           .join(" ")
           .toLowerCase();
@@ -1165,6 +1175,7 @@ export default function Dashboard() {
         fechaApertura,
         estadoOS,
         estadoFacturacion: canonicalSituacion(row.situacion_facturacion),
+        origen,
         factura: String(row.factura ?? "").trim(),
         problema: String(row.problema ?? "").trim(),
         horas,

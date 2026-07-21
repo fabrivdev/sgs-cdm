@@ -338,14 +338,14 @@ export function ServiciosDashboard({
               <div className="flex items-start justify-between gap-2"><strong className="font-mono">{row.os}</strong><Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge></div>
               <div className="mt-1 font-medium">{row.cliente}</div>
               <div className="mt-1 text-muted-foreground">{row.tecnico} · {row.sucursal ?? "Sin sucursal"}</div>
-              <div className="mt-2 flex flex-wrap gap-1.5"><Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge><Badge variant="outline">{decimal.format(row.horas)} hs</Badge><Badge variant="outline">{integer.format(row.km)} km</Badge><Badge variant="secondary">USD {usd.format(row.valorOS)}</Badge></div>
+              <div className="mt-2 flex flex-wrap gap-1.5"><Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge>{row.origen && <Badge variant="outline">Origen: {row.origen}</Badge>}<Badge variant="outline">{decimal.format(row.horas)} hs</Badge><Badge variant="outline">{integer.format(row.km)} km</Badge><Badge variant="secondary">USD {usd.format(row.valorOS)}</Badge></div>
             </article>
           ))}
         </div>
         <div className="hidden max-h-[390px] overflow-auto rounded-md border md:block">
           <table className="w-full min-w-[1000px] text-xs">
             <thead className="sticky top-0 bg-muted/95 text-left text-[9px] uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-3 py-2">OS</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Responsable</th><th className="px-3 py-2">Sucursal</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Apertura</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2 text-right">Hs</th><th className="px-3 py-2 text-right">Km</th><th className="px-3 py-2 text-right">Total OS</th></tr>
+              <tr><th className="px-3 py-2">OS</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Responsable</th><th className="px-3 py-2">Sucursal</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Origen</th><th className="px-3 py-2">Apertura</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2 text-right">Hs</th><th className="px-3 py-2 text-right">Km</th><th className="px-3 py-2 text-right">Total OS</th></tr>
             </thead>
             <tbody>
               {data.ordenes.map((row) => (
@@ -355,6 +355,7 @@ export function ServiciosDashboard({
                   <td className="max-w-[210px] truncate px-3 py-2" title={row.tecnico}>{row.tecnico}</td>
                   <td className="px-3 py-2">{row.sucursal ?? "-"}</td>
                   <td className="px-3 py-2"><Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge></td>
+                  <td className="max-w-[150px] truncate px-3 py-2" title={row.origen}>{row.origen || "-"}</td>
                   <td className="px-3 py-2 tabular-nums">{row.fechaApertura || "-"}</td>
                   <td className="px-3 py-2"><Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge></td>
                   <td className="px-3 py-2 text-right tabular-nums">{decimal.format(row.horas)}</td>
