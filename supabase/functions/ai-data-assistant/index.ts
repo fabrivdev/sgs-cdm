@@ -85,10 +85,11 @@ async function getOperationalSummary(client: SupabaseClient, args: JsonRecord) {
     .select("id,codigo,os_numero,estado_general,sucursal,marca,cliente_id,creado_en,cerrado_en,descripcion_problema")
     .limit(1000);
   jobsQuery = commonFilters(jobsQuery, args);
+  if (args.__include_rows) jobsQuery = dateFilter(jobsQuery, "creado_en", args);
 
   let jornadasQuery = client
     .from("servicio_jornadas")
-    .select("id,servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares")
+    .select("id,servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares,servicios(sucursal,marca,cliente_id,trabajo_descripcion)")
     .limit(1000);
   jornadasQuery = dateFilter(jornadasQuery, "fecha", args);
 
@@ -122,6 +123,7 @@ async function getOperationalSummary(client: SupabaseClient, args: JsonRecord) {
       horas: sum(jornadas, "horas_trabajadas"),
     },
     abiertos_mas_antiguos: openJobs,
+    ...(args.__include_rows ? { _jobs: jobs, _jornadas: jornadas } : {}),
   };
 }
 
@@ -377,6 +379,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     ranking_sucursales: rankingSucursales,
     ranking_rubros: rankingRubros,
     ranking_clientes: rankingClientes,
+    ...(args.__include_rows ? { _rows: rows } : {}),
   };
 }
 
@@ -473,6 +476,10 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     keys.add(`${order}|${normalizedKey(timeType)}`);
     closedByTimeType.set(timeType, keys);
   }
+  const participantRows = rows.flatMap((row) => {
+    const participants = participantsFor(row);
+    return participants.length ? participants.map((participant) => ({ ...row, participante: participant })) : [{ ...row, participante: "Sin tecnico" }];
+  });
   return {
     ordenes: orders.size,
     filas: rows.length,
@@ -491,6 +498,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       repuestos: sum(rows, "repuesto_valor"),
       terceros: sum(rows, "terceros_valor"),
     },
+    ...(args.__include_rows ? { _rows: rows, _participant_rows: participantRows } : {}),
   };
 }
 
@@ -503,7 +511,7 @@ async function getParkSummary(client: SupabaseClient, args: JsonRecord) {
   query = commonFilters(query, args);
   const rows = await checked<JsonRecord[]>(query);
   const clients = new Set(rows.map((row) => cleanText(row.cliente_id, 80)).filter(Boolean));
-  return { maquinas_activas: rows.length, clientes: clients.size, por_marca: countBy(rows, "marca"), por_sucursal: countBy(rows, "sucursal"), por_subgrupo: countBy(rows, "subgrupo") };
+  return { maquinas_activas: rows.length, clientes: clients.size, por_marca: countBy(rows, "marca"), por_sucursal: countBy(rows, "sucursal"), por_subgrupo: countBy(rows, "subgrupo"), ...(args.__include_rows ? { _rows: rows } : {}) };
 }
 
 async function getCommercialFollowup(client: SupabaseClient, args: JsonRecord) {
@@ -515,7 +523,7 @@ async function getCommercialFollowup(client: SupabaseClient, args: JsonRecord) {
   query = dateFilter(query, "fecha", args);
   const rows = await checked<JsonRecord[]>(query);
   const clients = new Set(rows.map((row) => cleanText(row.cliente_id, 80)).filter(Boolean));
-  return { gestiones: rows.length, clientes_unicos: clients.size, por_resultado: countBy(rows, "resultado"), recientes: rows.slice(0, 30) };
+  return { gestiones: rows.length, clientes_unicos: clients.size, por_resultado: countBy(rows, "resultado"), recientes: rows.slice(0, 30), ...(args.__include_rows ? { _rows: rows } : {}) };
 }
 
 async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
@@ -536,9 +544,13 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
     if (service.tecnico_responsable_id) referencedIds.add(String(service.tecnico_responsable_id));
     for (const id of (Array.isArray(service.auxiliares) ? service.auxiliares : [])) referencedIds.add(String(id));
   }
-  let jornadasQuery = client.from("servicio_jornadas").select("servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares").limit(5000);
-  jornadasQuery = dateFilter(jornadasQuery, "fecha", args);
-  const jornadas = await checked<JsonRecord[]>(jornadasQuery);
+  const jornadas = await fetchPaged((from, to) => {
+    let query = client.from("servicio_jornadas")
+      .select("servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares")
+      .order("fecha").range(from, to);
+    query = dateFilter(query, "fecha", args);
+    return query;
+  }, 30000);
   for (const row of jornadas) {
     if (row.tecnico_responsable_id) referencedIds.add(String(row.tecnico_responsable_id));
     for (const id of (Array.isArray(row.auxiliares) ? row.auxiliares : [])) referencedIds.add(String(id));
@@ -616,6 +628,232 @@ async function getEntityDetail(client: SupabaseClient, args: JsonRecord) {
   return { error: "Tipo de entidad no permitido" };
 }
 
+const businessCatalog = {
+  facturacion: {
+    description: "Facturacion historica y del sistema nuevo, unificada sin duplicar facturas detalladas.",
+    metrics: ["total_usd", "facturas", "clientes", "lineas", "ticket_promedio"],
+    dimensions: ["periodo", "fecha", "sucursal", "cliente", "marca", "rubro", "tipo_tiempo", "factura", "origen"],
+  },
+  ordenes_servicio: {
+    description: "Ordenes de servicio importadas, participantes, estados, cantidades y valores.",
+    metrics: ["ordenes", "horas", "km", "total_usd", "servicio_usd", "kilometraje_usd", "repuestos_usd", "terceros_usd"],
+    dimensions: ["periodo", "fecha", "sucursal", "cliente", "marca", "tipo_tiempo", "estado", "factura", "os", "tecnico"],
+  },
+  trabajos: {
+    description: "Casos macro de trabajo creados en la aplicacion.",
+    metrics: ["trabajos"],
+    dimensions: ["periodo", "fecha", "sucursal", "marca", "estado", "trabajo", "cliente"],
+  },
+  jornadas: {
+    description: "Fechas operativas de los trabajos con resultado y horas registradas.",
+    metrics: ["jornadas", "horas"],
+    dimensions: ["periodo", "fecha", "sucursal", "cliente", "marca", "estado", "tecnico", "trabajo"],
+  },
+  tecnicos: {
+    description: "Tecnicos activos, carga, jornadas, resultados y horas del periodo.",
+    metrics: ["tecnicos", "jornadas", "horas"],
+    dimensions: ["sucursal", "tecnico", "carga"],
+  },
+  parque: {
+    description: "Parque activo de maquinas y clientes.",
+    metrics: ["maquinas", "clientes"],
+    dimensions: ["sucursal", "cliente", "marca", "subgrupo", "modelo"],
+  },
+  agenda: {
+    description: "Seguimientos comerciales manuales registrados por cliente.",
+    metrics: ["gestiones", "clientes"],
+    dimensions: ["periodo", "fecha", "sucursal", "cliente", "resultado"],
+  },
+} as const;
+
+type BusinessDataset = keyof typeof businessCatalog;
+
+function getDataCatalog() {
+  return {
+    datasets: businessCatalog,
+    rules: [
+      "Todos los importes se expresan en USD.",
+      "Absorve CDM y Absorbe CDM se normalizan como Interno.",
+      "Facturar a cliente se normaliza como Cliente.",
+      "Completado es una jornada realizada y Cancelada es no realizada.",
+      "Los conteos de clientes, facturas, OS y trabajos son distintos por su clave estable.",
+      "Las preguntas de seguridad, credenciales o fuera del negocio no estan permitidas.",
+    ],
+  };
+}
+
+function semanticDate(row: JsonRecord, dataset: BusinessDataset) {
+  const value = dataset === "facturacion" ? row.fecha
+    : dataset === "ordenes_servicio" ? row.fecha_abierta_os
+      : dataset === "trabajos" ? row.creado_en
+        : dataset === "jornadas" ? row.fecha
+          : dataset === "agenda" ? row.fecha
+            : "";
+  return cleanText(value, 10);
+}
+
+function periodBucket(value: string, granularity: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Sin fecha";
+  if (granularity === "day") return value;
+  if (granularity === "year") return value.slice(0, 4);
+  if (granularity === "week") {
+    const date = new Date(`${value}T12:00:00Z`);
+    const monday = new Date(date);
+    monday.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+    return monday.toISOString().slice(0, 10);
+  }
+  return value.slice(0, 7);
+}
+
+function semanticDimension(row: JsonRecord, dataset: BusinessDataset, dimension: string, granularity: string) {
+  const clientRelation = row.clientes && typeof row.clientes === "object" && !Array.isArray(row.clientes) ? row.clientes as JsonRecord : {};
+  const serviceRelation = row.servicios && typeof row.servicios === "object" && !Array.isArray(row.servicios) ? row.servicios as JsonRecord : {};
+  const mappings: Record<BusinessDataset, Record<string, unknown>> = {
+    facturacion: {
+      fecha: row.fecha, sucursal: row.sucursal, cliente: row.entidad_nombre, marca: row.marca,
+      rubro: row.rubro, tipo_tiempo: row.tipo_tiempo, factura: row.factura, origen: row.origen,
+    },
+    ordenes_servicio: {
+      fecha: row.fecha_abierta_os, sucursal: row.sucursal, cliente: row.cliente_nombre, marca: row.marca,
+      tipo_tiempo: canonicalBillingTimeType(row.tipo_tiempo) || "Sin tipo", estado: row.situacion_os,
+      factura: row.factura, os: row.os_numero, tecnico: row.participante ?? row.responsable,
+    },
+    trabajos: {
+      fecha: cleanText(row.creado_en, 10), sucursal: row.sucursal, marca: row.marca, estado: row.estado_general,
+      trabajo: row.os_numero ?? row.codigo, cliente: row.cliente_id,
+    },
+    jornadas: { fecha: row.fecha, estado: row.estado, tecnico: row.tecnico_responsable_id, trabajo: row.servicio_id, sucursal: serviceRelation.sucursal, cliente: serviceRelation.cliente_id, marca: serviceRelation.marca },
+    tecnicos: { sucursal: row.sucursal, tecnico: row.nombre, carga: Number(row.jornadas) > 0 ? "Con carga" : "Sin carga" },
+    parque: { sucursal: row.sucursal, cliente: row.cliente_id, marca: row.marca, subgrupo: row.subgrupo, modelo: row.modelo_tipo },
+    agenda: { fecha: row.fecha, sucursal: clientRelation.sucursal, cliente: row.cliente_id, resultado: row.resultado },
+  };
+  if (dimension === "periodo") return periodBucket(semanticDate(row, dataset), granularity);
+  return cleanText(mappings[dataset][dimension], 180) || "Sin dato";
+}
+
+function distinctCount(rows: JsonRecord[], key: (row: JsonRecord) => string) {
+  return new Set(rows.map(key).filter(Boolean)).size;
+}
+
+function semanticMetric(rows: JsonRecord[], dataset: BusinessDataset, metric: string) {
+  if (metric === "lineas" || metric === "gestiones" || metric === "maquinas" || metric === "jornadas" || metric === "tecnicos") return rows.length;
+  if (metric === "clientes") return distinctCount(rows, (row) => normalizedBillingClient(
+    dataset === "facturacion" ? row.entidad_nombre
+      : dataset === "ordenes_servicio" ? row.cliente_nombre
+        : row.cliente_id,
+  ));
+  if (metric === "facturas") return distinctCount(rows, (row) => cleanText(row.factura, 100));
+  if (metric === "ordenes") return distinctCount(rows, (row) => {
+    const order = cleanText(row.os_numero, 80);
+    return order ? `${normalizedKey(row.sucursal)}|${order}|${canonicalBillingTimeType(row.tipo_tiempo) || "SIN TIPO"}` : "";
+  });
+  if (metric === "trabajos") return distinctCount(rows, (row) => cleanText(row.id, 100));
+  if (metric === "horas") return sum(rows, dataset === "ordenes_servicio" ? "servicios_cantidad" : dataset === "tecnicos" ? "horas" : "horas_trabajadas");
+  if (metric === "km") return sum(rows, "km_cantidad");
+  if (metric === "servicio_usd") return sum(rows, "servicios_valor");
+  if (metric === "kilometraje_usd") return sum(rows, "kilometro_valor");
+  if (metric === "repuestos_usd") return sum(rows, "repuesto_valor");
+  if (metric === "terceros_usd") return sum(rows, "terceros_valor");
+  if (metric === "total_usd") {
+    return dataset === "facturacion" ? sum(rows, "total_venta")
+      : rows.reduce((total, row) => total + (Number(row.servicios_valor) || 0) + (Number(row.kilometro_valor) || 0) + (Number(row.repuesto_valor) || 0) + (Number(row.terceros_valor) || 0), 0);
+  }
+  if (metric === "ticket_promedio") {
+    const invoices = distinctCount(rows, (row) => cleanText(row.factura, 100));
+    return invoices ? sum(rows, "total_venta") / invoices : 0;
+  }
+  return 0;
+}
+
+async function loadBusinessRows(client: SupabaseClient, dataset: BusinessDataset, filters: JsonRecord, dimensions: string[]) {
+  const args = { ...filters, __include_rows: true };
+  if (dataset === "facturacion") return ((await getBillingSummary(client, args) as JsonRecord)._rows ?? []) as JsonRecord[];
+  if (dataset === "ordenes_servicio") {
+    const result = await getServiceOrdersSummary(client, args) as JsonRecord;
+    return ((dimensions.includes("tecnico") || filters.tecnico ? result._participant_rows : result._rows) ?? []) as JsonRecord[];
+  }
+  if (dataset === "trabajos") return fetchPaged((from, to) => {
+    let query = client.from("trabajos")
+      .select("id,codigo,os_numero,estado_general,sucursal,marca,cliente_id,creado_en,cerrado_en,descripcion_problema")
+      .order("creado_en").range(from, to);
+    query = commonFilters(query, filters);
+    query = dateFilter(query, "creado_en", filters);
+    return query;
+  }, 20000);
+  if (dataset === "jornadas") return fetchPaged((from, to) => {
+    let query = client.from("servicio_jornadas")
+      .select("id,servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares,servicios(sucursal,marca,cliente_id,trabajo_descripcion)")
+      .order("fecha").range(from, to);
+    query = dateFilter(query, "fecha", filters);
+    return query;
+  }, 30000);
+  if (dataset === "tecnicos") return ((await getTechnicianSummary(client, args) as JsonRecord).detalle ?? []) as JsonRecord[];
+  if (dataset === "parque") return ((await getParkSummary(client, args) as JsonRecord)._rows ?? []) as JsonRecord[];
+  return ((await getCommercialFollowup(client, args) as JsonRecord)._rows ?? []) as JsonRecord[];
+}
+
+function applyBusinessFilters(rows: JsonRecord[], dataset: BusinessDataset, filters: JsonRecord, granularity: string) {
+  const allowed = new Set(businessCatalog[dataset].dimensions);
+  return rows.filter((row) => Object.entries(filters).every(([key, raw]) => {
+    if (["date_from", "date_to"].includes(key)) return true;
+    if (key === "sucursales") {
+      const branches = Array.isArray(raw) ? raw : [];
+      const actualBranch = normalizedKey(semanticDimension(row, dataset, "sucursal", granularity));
+      return !branches.length || branches.some((branch) => actualBranch === normalizedKey(branch));
+    }
+    if (!allowed.has(key as never)) return true;
+    const expected = Array.isArray(raw) ? raw : [raw];
+    if (!expected.length || expected.some((value) => normalizedKey(value) === "TODOS")) return true;
+    const actual = normalizedKey(semanticDimension(row, dataset, key, granularity));
+    return expected.some((value) => actual.includes(normalizedKey(value)));
+  }));
+}
+
+async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
+  const dataset = cleanText(args.dataset, 40) as BusinessDataset;
+  if (!(dataset in businessCatalog)) throw new Error("Dataset no permitido");
+  const catalog = businessCatalog[dataset];
+  const metrics = (Array.isArray(args.metrics) ? args.metrics : []).map((value) => cleanText(value, 40)).filter((value) => catalog.metrics.includes(value as never));
+  const dimensions = (Array.isArray(args.dimensions) ? args.dimensions : []).map((value) => cleanText(value, 40)).filter((value) => catalog.dimensions.includes(value as never)).slice(0, 3);
+  if (!metrics.length) throw new Error(`Indica al menos una metrica valida para ${dataset}`);
+  const filters = args.filters && typeof args.filters === "object" ? { ...(args.filters as JsonRecord) } : {};
+  if (filters.rubro) filters.rubro = canonicalBillingRubro(filters.rubro) || filters.rubro;
+  if (filters.tipo_tiempo) filters.tipo_tiempo = canonicalBillingTimeType(filters.tipo_tiempo) || filters.tipo_tiempo;
+  const granularity = ["day", "week", "month", "year"].includes(cleanText(args.granularity, 10)) ? cleanText(args.granularity, 10) : "month";
+  const sourceRows = await loadBusinessRows(client, dataset, filters, dimensions);
+  const rows = applyBusinessFilters(sourceRows, dataset, filters, granularity);
+  const groups = new Map<string, { dimensions: JsonRecord; rows: JsonRecord[] }>();
+  for (const row of rows) {
+    const values = Object.fromEntries(dimensions.map((dimension) => [dimension, semanticDimension(row, dataset, dimension, granularity)]));
+    const key = dimensions.length ? JSON.stringify(values) : "__total__";
+    const entry = groups.get(key) ?? { dimensions: values, rows: [] };
+    entry.rows.push(row);
+    groups.set(key, entry);
+  }
+  if (!groups.size && !dimensions.length) groups.set("__total__", { dimensions: {}, rows: [] });
+  const result = [...groups.values()].map((group) => ({
+    ...group.dimensions,
+    ...Object.fromEntries(metrics.map((metric) => [metric, semanticMetric(group.rows, dataset, metric)])),
+  }));
+  const orderBy = metrics.includes(cleanText(args.order_by, 40)) ? cleanText(args.order_by, 40) : metrics[0];
+  const ascending = cleanText(args.order_direction, 8).toLowerCase() === "asc";
+  result.sort((a, b) => ascending
+    ? (Number(a[orderBy]) || 0) - (Number(b[orderBy]) || 0)
+    : (Number(b[orderBy]) || 0) - (Number(a[orderBy]) || 0));
+  const limit = safeLimit(args.limit, 20, 100);
+  return {
+    dataset,
+    definition: catalog.description,
+    metrics,
+    dimensions,
+    filters,
+    granularity,
+    source_rows: rows.length,
+    result_rows: Math.min(result.length, limit),
+    rows: result.slice(0, limit),
+  };
+}
+
 const toolSpecs = [
   ["get_operational_summary", "Resume trabajos y jornadas del periodo e incluye los trabajos abiertos mas antiguos."],
   ["get_planning_summary", "Resume jornadas pendientes y tecnicos planificados."],
@@ -638,6 +876,45 @@ const filterProperties = {
 };
 
 const tools = [
+  {
+    type: "function",
+    function: {
+      name: "get_data_catalog",
+      description: "Devuelve los datasets, metricas, dimensiones y reglas disponibles. Usala cuando no estes seguro de que campos existen.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "query_business_data",
+      description: "Motor analitico principal. Consulta cualquier combinacion permitida de metricas, dimensiones y filtros sin generar SQL.",
+      parameters: {
+        type: "object",
+        properties: {
+          dataset: { type: "string", enum: Object.keys(businessCatalog) },
+          metrics: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6 },
+          dimensions: { type: "array", items: { type: "string" }, maxItems: 3 },
+          filters: {
+            type: "object",
+            properties: {
+              date_from: { type: "string" }, date_to: { type: "string" }, sucursal: { type: "string" },
+              sucursales: { type: "array", items: { type: "string" } }, cliente: { type: "string" }, tecnico: { type: "string" },
+              marca: { type: "string" }, rubro: { type: "string" }, tipo_tiempo: { type: "string" }, estado: { type: "string" },
+              factura: { type: "string" }, os: { type: "string" }, trabajo: { type: "string" }, resultado: { type: "string" },
+            },
+            additionalProperties: false,
+          },
+          granularity: { type: "string", enum: ["day", "week", "month", "year"] },
+          order_by: { type: "string" },
+          order_direction: { type: "string", enum: ["asc", "desc"] },
+          limit: { type: "integer", minimum: 1, maximum: 100 },
+        },
+        required: ["dataset", "metrics"],
+        additionalProperties: false,
+      },
+    },
+  },
   ...toolSpecs.map(([name, description]) => ({
     type: "function",
     function: { name, description, parameters: { type: "object", properties: filterProperties, additionalProperties: false } },
@@ -662,6 +939,8 @@ const tools = [
 
 async function executeTool(client: SupabaseClient, name: string, args: JsonRecord) {
   switch (name) {
+    case "get_data_catalog": return getDataCatalog();
+    case "query_business_data": return queryBusinessData(client, args);
     case "get_operational_summary": return getOperationalSummary(client, args);
     case "get_planning_summary": return getPlanningSummary(client, args);
     case "get_calendar_summary": return getCalendarSummary(client, args);
@@ -678,6 +957,9 @@ async function executeTool(client: SupabaseClient, name: string, args: JsonRecor
 
 function sourceLabel(name: string) {
   return ({
+    scope_guard: "Control de alcance",
+    get_data_catalog: "Catalogo de datos",
+    query_business_data: "Analisis de datos",
     get_operational_summary: "Trabajos y jornadas",
     get_planning_summary: "Planificador",
     get_calendar_summary: "Calendario y disponibilidad",
@@ -772,6 +1054,19 @@ function semanticToolArgs(question: string, pageContext: JsonRecord, currentDate
 
 type SemanticResponse = { tool: string; args: JsonRecord; content: string; resultCount: number };
 
+function scopeRejection(question: string) {
+  const normalized = normalizedKey(question);
+  const securityTerms = ["CONTRASENA", "PASSWORD", "TOKEN", "API KEY", "SECRET", "CREDENCIAL", "POLITICA RLS", "PERMISO DE USUARIO", "AUTENTICACION"];
+  if (securityTerms.some((term) => normalized.includes(term))) {
+    return "No puedo consultar ni revelar credenciales, secretos, autenticacion o configuracion de seguridad. Si puedo analizar los datos operativos y comerciales de la aplicacion.";
+  }
+  const outsideTerms = ["CLIMA", "PRONOSTICO", "TEMPERATURA HOY", "PARTIDO DE", "RESULTADO DEPORTIVO", "RECETA DE", "NOTICIAS DE", "HOROSCOPO"];
+  if (outsideTerms.some((term) => normalized.includes(term))) {
+    return "Solo puedo responder preguntas relacionadas con los datos cargados en Servicios Tecnicos CDM.";
+  }
+  return "";
+}
+
 async function resolveSemanticQuestion(
   client: SupabaseClient,
   question: string,
@@ -779,6 +1074,8 @@ async function resolveSemanticQuestion(
   currentDate: string,
   history: JsonRecord[] = [],
 ): Promise<SemanticResponse | null> {
+  const rejected = scopeRejection(question);
+  if (rejected) return { tool: "scope_guard", args: {}, content: rejected, resultCount: 0 };
   const normalized = normalizedKey(question);
   const moduleName = normalizedKey(pageContext.module);
   const previousBillingSource = history
@@ -1076,10 +1373,15 @@ Deno.serve(async (req) => {
       });
       return json({ conversation_id: conversationId, message: { ...assistantMessage, role: "assistant", content: semantic.content, sources }, usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
     }
-    const systemPrompt = `Eres el asistente de datos de Servicios Tecnicos CDM. La fecha actual del sistema es ${currentDate}; interpreta "corriente", "actual", "hoy" y otros periodos relativos a partir de esa fecha. Responde en espanol. Solo puedes afirmar cifras obtenidas mediante herramientas. No inventes datos, no generes SQL y nunca solicites secretos. Aplica el contexto si es pertinente: ${contextText}. Modo de respuesta: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica periodo y filtros usados. Si faltan datos, dilo claramente. Los importes son USD. tipo_tiempo solo admite Cliente, Garantia o Interno; nunca coloques alli dia, semana, mes o anio. Reutiliza los resultados y rankings ya devueltos en la conversacion; no repitas una herramienta con los mismos filtros para responder una repregunta.`;
+    const systemPrompt = `Eres el analista de datos de Servicios Tecnicos CDM. La fecha actual es ${currentDate}; interpreta periodos relativos desde esa fecha. Responde en espanol y limita tu alcance a los datos operativos y comerciales de la aplicacion. Nunca reveles seguridad, credenciales, secretos, autenticacion o permisos, y rechaza preguntas externas como clima o noticias. Solo puedes afirmar cifras obtenidas mediante herramientas; no inventes datos ni generes SQL. Tu herramienta principal es query_business_data: permite combinar datasets, metricas, dimensiones, filtros, rankings, comparaciones, evoluciones y detalles. Si dudas sobre campos disponibles, consulta get_data_catalog antes de responder. No digas "datos insuficientes" sin haber consultado primero el catalogo y el dataset apropiado. Aplica el contexto si es pertinente: ${contextText}. Modo: ${answerMode === "analytic" ? "analitico: resumen, cifras, desglose e interpretacion" : "breve: dato principal y conclusion corta"}. Indica siempre periodo, filtros y definicion usada. Los importes son USD. tipo_tiempo admite Cliente, Garantia o Interno. Reutiliza filtros y resultados de la conversacion para repreguntas y no repitas una consulta identica.`;
     const messages: any[] = [
       { role: "system", content: systemPrompt },
-      ...(history ?? []).reverse().map((row: any) => ({ role: row.role, content: row.content })),
+      ...(history ?? []).reverse().map((row: any) => ({
+        role: row.role,
+        content: row.role === "assistant" && Array.isArray(row.sources) && row.sources.length
+          ? `${row.content}\n\nContexto de fuentes previo: ${JSON.stringify(row.sources)}`
+          : row.content,
+      })),
     ];
 
     const sources: ToolSource[] = [];
@@ -1123,6 +1425,11 @@ Deno.serve(async (req) => {
           const name = cleanText(call.function?.name, 80);
           let args: JsonRecord = {};
           try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
+          if (name === "query_business_data") {
+            const contextualFilters = semanticToolArgs(question, pageContext, currentDate);
+            const requestedFilters = args.filters && typeof args.filters === "object" ? args.filters as JsonRecord : {};
+            args.filters = { ...contextualFilters, ...requestedFilters };
+          }
           const cacheKey = `${name}:${JSON.stringify(args)}`;
           let toolResult: unknown;
           let toolError: string | null = null;
@@ -1130,7 +1437,7 @@ Deno.serve(async (req) => {
             toolResult = toolCache.get(cacheKey);
           } else {
             try {
-              const dataClient = name === "get_billing_summary" ? admin : userClient;
+              const dataClient = name === "get_billing_summary" || name === "query_business_data" ? admin : userClient;
               toolResult = await executeTool(dataClient, name, args);
             } catch (error) {
               toolError = error instanceof Error ? error.message : String(error);
