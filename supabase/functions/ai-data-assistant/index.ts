@@ -251,11 +251,11 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   const marca = cleanText(args.marca, 30);
   const tipo = canonicalBillingTimeType(args.tipo_tiempo);
   const rubro = canonicalBillingRubro(args.rubro);
-  const [importedRows, historicalRows, clientRows] = await Promise.all([
+  const [importedRows, historicalRows, clientRows, serviceOrdersByOpenDate, serviceOrdersByInvoiceDate] = await Promise.all([
     fetchPaged((from, to) => {
       let query = client
         .from("facturacion_lineas_importadas")
-        .select("factura,codigo_interno_factura,fecha_factura,entidad_nombre,sucursal,marca_normalizada,subgrupo_original,grupo_normalizado,tipo_facturacion,tipo_tiempo,total_venta,origen_sistema")
+        .select("factura,codigo_interno_factura,fecha_factura,entidad_nombre,sucursal,marca_normalizada,subgrupo_original,grupo_normalizado,tipo_facturacion,tipo_tiempo,total_venta,cantidad,origen_sistema,raw_data")
         .order("fecha_factura")
         .range(from, to);
       const dateFrom = cleanText(args.date_from, 10);
@@ -267,7 +267,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     fetchPaged((from, to) => {
       let query = client
         .from("facturacion")
-        .select("fecha,sucursal,tipo,cliente_id,entidad_nombre,total_venta,grupo,grupo_fx,cod_factura")
+        .select("fecha,sucursal,tipo,cliente_id,entidad_nombre,total_venta,cantidad,grupo,grupo_fx,cod_factura")
         .order("fecha")
         .range(from, to);
       query = dateFilter(query, "fecha", args);
@@ -278,6 +278,24 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
       .select("id,nombre")
       .order("id")
       .range(from, to), 30000),
+    fetchPaged((from, to) => {
+      let query = client
+        .from("ordenes_servicio_importadas")
+        .select("os_numero,tipo_tiempo,servicios_cantidad,fecha_abierta_os,fecha_emision_factura")
+        .order("fecha_abierta_os")
+        .range(from, to);
+      query = dateFilter(query, "fecha_abierta_os", args);
+      return query;
+    }, 30000),
+    fetchPaged((from, to) => {
+      let query = client
+        .from("ordenes_servicio_importadas")
+        .select("os_numero,tipo_tiempo,servicios_cantidad,fecha_abierta_os,fecha_emision_factura")
+        .order("fecha_emision_factura")
+        .range(from, to);
+      query = dateFilter(query, "fecha_emision_factura", args);
+      return query;
+    }, 30000),
   ]);
 
   const clientNameById = new Map(
@@ -304,6 +322,8 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     rubro: billingConcept(row.tipo_facturacion, row.grupo_normalizado, row.subgrupo_original),
     tipo_tiempo: canonicalBillingTimeType(row.tipo_tiempo) || "Cliente",
     total_venta: Number(row.total_venta) || 0,
+    cantidad: Number(row.cantidad) || 0,
+    raw_data: row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {},
     origen: "importada",
   }));
   const historical = historicalRows
@@ -325,6 +345,8 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
         rubro: billingConcept(row.tipo, row.grupo_fx, row.grupo),
         tipo_tiempo: "Cliente",
         total_venta: Number(row.total_venta) || 0,
+        cantidad: Number(row.cantidad) || 0,
+        raw_data: {},
         origen: "historica",
       };
     });
@@ -343,6 +365,35 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
   };
   const invoices = new Set(rows.map(invoiceKey).filter(Boolean));
   const clients = new Set(rows.map((row) => normalizedBillingClient(row.entidad_nombre)).filter(Boolean));
+  const serviceOrderRows = [...serviceOrdersByOpenDate, ...serviceOrdersByInvoiceDate];
+  const serviceOrderHours = new Map<string, number>();
+  for (const row of serviceOrderRows) {
+    const order = cleanText(row.os_numero, 80);
+    if (!order) continue;
+    const timeType = canonicalBillingTimeType(row.tipo_tiempo) || "Cliente";
+    const hours = Number(row.servicios_cantidad) || 0;
+    serviceOrderHours.set(`${normalizedKey(order)}|${normalizedKey(timeType)}`, hours);
+    if (!serviceOrderHours.has(normalizedKey(order))) serviceOrderHours.set(normalizedKey(order), hours);
+  }
+  const serviceHoursByTimeType: Record<string, number> = {};
+  const countedServiceOrders = new Set<string>();
+  for (const row of rows) {
+    if (row.rubro !== "Servicio") continue;
+    const timeType = canonicalBillingTimeType(row.tipo_tiempo) || "Cliente";
+    const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {};
+    const linkedOrder = cleanText(raw.linked_service_order, 80);
+    const linkedKey = linkedOrder ? `${normalizedKey(linkedOrder)}|${normalizedKey(timeType)}` : "";
+    const orderHours = linkedKey
+      ? serviceOrderHours.get(linkedKey) ?? serviceOrderHours.get(normalizedKey(linkedOrder)) ?? 0
+      : 0;
+    if (linkedKey && orderHours > 0) {
+      if (countedServiceOrders.has(linkedKey)) continue;
+      countedServiceOrders.add(linkedKey);
+      serviceHoursByTimeType[timeType] = (serviceHoursByTimeType[timeType] ?? 0) + orderHours;
+    } else {
+      serviceHoursByTimeType[timeType] = (serviceHoursByTimeType[timeType] ?? 0) + (Number(row.cantidad) || 0);
+    }
+  }
   const byRubro: Record<string, number> = {};
   const bySucursal = new Map<string, { totalUsd: number; facturas: Set<string> }>();
   const byCliente = new Map<string, { cliente: string; totalUsd: number; facturas: Set<string> }>();
@@ -387,6 +438,8 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
     ranking_sucursales: rankingSucursales,
     ranking_rubros: rankingRubros,
     ranking_clientes: rankingClientes,
+    horas_servicio: Object.values(serviceHoursByTimeType).reduce((total, hours) => total + Number(hours || 0), 0),
+    horas_servicio_por_tipo_tiempo: serviceHoursByTimeType,
     ...(args.__include_rows ? { _rows: rows } : {}),
   };
 }
@@ -1236,6 +1289,22 @@ async function resolveSemanticQuestion(
   const rejected = scopeRejection(question);
   if (rejected) return { tool: "scope_guard", args: {}, content: rejected, resultCount: 0 };
   const normalized = normalizedKey(question);
+  if (normalized === "QUE DIA ES HOY" || normalized === "CUAL ES LA FECHA DE HOY" || normalized === "FECHA DE HOY") {
+    const today = new Date(`${currentDate}T12:00:00Z`);
+    const label = new Intl.DateTimeFormat("es-PY", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(today);
+    return {
+      tool: "current_date",
+      args: { current_date: currentDate },
+      content: `Hoy es ${label}.`,
+      resultCount: 1,
+    };
+  }
   const moduleName = normalizedKey(pageContext.module);
   const previousUserQuestion = history.find((row) => row.role === "user" && normalizedKey(row.content) !== normalized)?.content;
   const conversationalIntent = normalizedKey(`${cleanText(previousUserQuestion, 4000)} ${question}`);
@@ -1262,6 +1331,34 @@ async function resolveSemanticQuestion(
   const asksInactiveTechnician = normalized.includes("INACTIV") || (asksOrders && conversationalIntent.includes("INACTIV"));
   const asksProductivity = normalized.includes("PRODUCTIV") || (asksOrders && conversationalIntent.includes("PRODUCTIV"));
   const asksJornadas = normalized.includes("JORNAD") || normalized.includes("PLANIFICADOR") || normalized.includes("CALENDARIO");
+  const asksHours = normalized.includes("HORA") || /(^|\s)HS($|\s)/.test(normalized);
+  const asksTimeTypeBreakdown = normalized.includes("TIPO DE TIEMPO") ||
+    (conversationalIntent.includes("TIPO DE TIEMPO") && (normalized.includes("DESGLOS") || normalized.includes("HABLO DE")));
+
+  if (asksBilling && asksHours) {
+    const billingArgs = { ...args, rubro: "Servicio" };
+    delete billingArgs.tipo_tiempo;
+    const result = await getBillingSummary(client, billingArgs) as JsonRecord;
+    const byTimeType = result.horas_servicio_por_tipo_tiempo && typeof result.horas_servicio_por_tipo_tiempo === "object"
+      ? result.horas_servicio_por_tipo_tiempo as Record<string, number>
+      : {};
+    const formatHours = (value: unknown) => Number(value || 0).toLocaleString("es-PY", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    const lines = Object.entries(byTimeType)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .map(([timeType, hours]) => `- ${timeType}: ${formatHours(hours)} hs`);
+    const period = `${cleanText(billingArgs.date_from, 10) || "inicio disponible"} al ${cleanText(billingArgs.date_to, 10) || "fin disponible"}`;
+    return {
+      tool: "get_billing_summary",
+      args: billingArgs,
+      content: asksTimeTypeBreakdown
+        ? `Horas facturadas en concepto de Servicio por tipo de tiempo:\n${lines.length ? lines.join("\n") : "- Sin horas facturadas."}\nTotal: ${formatHours(result.horas_servicio)} hs. Periodo consultado: ${period}.`
+        : `Se facturaron ${formatHours(result.horas_servicio)} horas en concepto de Servicio. Periodo consultado: ${period}.`,
+      resultCount: Number(result.lineas) || 0,
+    };
+  }
 
   // En esta app, productividad tecnica es una metrica de Ordenes de Servicio.
   // Las jornadas se usan solo cuando el usuario las pide de forma explicita.
