@@ -47,12 +47,51 @@ export function inferCanonicalBillingType(group: unknown, description?: unknown)
   if (
     sample.includes("SERVIC") ||
     sample.includes("SEVIC") ||
-    /\bSE\d*\b/.test(sample) ||
-    /\bMA\d*\b/.test(sample) ||
-    /\bMO\d*\b/.test(sample)
+    /\bSE\d+\b/.test(sample) ||
+    /\bMA\d+\b/.test(sample) ||
+    /\bMO\d+\b/.test(sample)
   ) return "Servicio";
   if (sample.includes("REPUEST")) return "Repuestos";
   return "Otros";
+}
+
+const isPlaceholderCode = (value: unknown) => {
+  const normalized = normalizeStableKey(value);
+  return !normalized || /^[-.]+$/.test(normalized);
+};
+
+export function inferCanonicalServiceOrderLineType(args: {
+  group?: unknown;
+  productCode?: unknown;
+  manufacturerCode?: unknown;
+  description?: unknown;
+}): CanonicalBillingType {
+  const productCode = normalizeUpper(args.productCode);
+  const manufacturerCode = normalizeUpper(args.manufacturerCode);
+  const description = normalizeUpper(args.description);
+  const lineSample = `${productCode} ${description}`;
+
+  if (
+    lineSample.includes("COURIER") ||
+    lineSample.includes("COURRIER") ||
+    lineSample.includes("CORREO") ||
+    lineSample.includes("FLETE") ||
+    lineSample.includes("ENVIO") ||
+    lineSample.includes("TRANSPORTE")
+  ) {
+    return "Otros";
+  }
+  if (lineSample.includes("KILOMET") || /\bKM\d+\b/.test(lineSample)) return "Kilometraje";
+  if (/\b(?:MA|MO|SE)\d+\b/.test(lineSample)) return "Servicio";
+  if (
+    /\bRE\d+\b/.test(lineSample) ||
+    productCode.startsWith("REP") ||
+    !isPlaceholderCode(manufacturerCode)
+  ) {
+    return "Repuestos";
+  }
+
+  return inferCanonicalBillingType(args.group, args.description);
 }
 
 export function inferProductBrand(group: unknown, manufacturerCode?: unknown, description?: unknown) {

@@ -122,6 +122,54 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(result.rows[0].thirdPartyValue).toBe(0);
   });
 
+  it("no suma cantidades de repuestos del grupo sembradora como horas de servicio", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000016",
+          "Fc Abiert OS": "2026-07-14T00:00:00.000",
+          GRUPO: "SE - SEMBRADORA",
+          CODIGO: "REPIN003344",
+          CODFAB: "24767405",
+          PRODUCTO: "CASQUILLO 24X3.5 6GV 24767405",
+          TECNICO: "JUAN PATINO",
+          CANTIDAD: "72",
+          TOTAL: "38.88",
+        },
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000016",
+          "Fc Abiert OS": "2026-07-14T00:00:00.000",
+          GRUPO: "SE - SEMBRADORA",
+          CODIGO: "-------",
+          CODFAB: "-------",
+          PRODUCTO: "MA01",
+          TECNICO: "JUAN PATINO",
+          CANTIDAD: "2:00 Hs.",
+          TOTAL: "120",
+        },
+      ],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      serviceHours: 0,
+      serviceValue: 0,
+      sparePartsValue: 38.88,
+    });
+    expect(result.rows[1]).toMatchObject({
+      serviceHours: 2,
+      serviceValue: 120,
+      sparePartsValue: 0,
+    });
+
+    const aggregated = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    expect(aggregated[0].servicios_cantidad).toBe(2);
+    expect((aggregated[0].raw_data as any).totales_por_tecnico["JUAN PATINO"].horas).toBe(2);
+  });
+
   it("conserva como terceros el total de una linea realmente no clasificada", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",

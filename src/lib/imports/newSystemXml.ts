@@ -16,6 +16,7 @@ import {
 } from "@/lib/imports/fiscal";
 import {
   inferCanonicalBillingType,
+  inferCanonicalServiceOrderLineType,
   inferCanonicalTimeType,
   inferProductBrand,
   normalizeStableKey,
@@ -181,8 +182,14 @@ export function mapOrdenesServicioSheet(
     const timeTypeRaw = text(row, ["TIPTEM"]);
     const productGroup = text(row, ["GRUPO"]);
     const manufacturerCode = text(row, ["CODFAB"]);
+    const productCode = text(row, ["CODIGO"]);
     const productName = text(row, ["PRODUCTO"]);
-    const lineType = inferCanonicalBillingType(productGroup, productName);
+    const lineType = inferCanonicalServiceOrderLineType({
+      group: productGroup,
+      productCode,
+      manufacturerCode,
+      description: productName,
+    });
     const quantity = number(row, ["CANTIDAD", "CNTFAC"]);
     const lineTotal = number(row, ["TOTAL"]);
 
@@ -211,7 +218,7 @@ export function mapOrdenesServicioSheet(
       documentNumber: text(row, ["DOCUMENTO"]),
       invoiceNumber: text(row, ["DOCUMENTO"]),
       manufacturerCode,
-      productCode: text(row, ["CODIGO"]),
+      productCode,
       productName,
       quantity,
       lineTotal,
