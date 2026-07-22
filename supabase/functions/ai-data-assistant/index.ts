@@ -4,6 +4,7 @@ import {
   buildIntentFallbackPlan,
   compileSemanticPlan,
   detectSemanticAmbiguity,
+  enumeratePeriodBuckets,
   enforceSemanticIntent,
   getDataCatalog,
   getPlannerCatalog,
@@ -1268,6 +1269,7 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     sourceRows = serviceOrderParticipantRows;
   }
   const rows = applyBusinessFilters(sourceRows, dataset, filters, granularity);
+  const chronologicalPeriods = shouldSortTemporalSeriesChronologically(question, dimensions);
   const groups = new Map<string, { dimensions: JsonRecord; rows: JsonRecord[] }>();
   for (const row of rows) {
     const values = Object.fromEntries(dimensions.map((dimension) => [dimension, semanticDimension(row, dataset, dimension, granularity)]));
@@ -1276,13 +1278,24 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     entry.rows.push(row);
     groups.set(key, entry);
   }
+  if (chronologicalPeriods && dimensions.length === 1 && dimensions[0] === "periodo") {
+    const periodBuckets = enumeratePeriodBuckets(
+      filters.date_from,
+      filters.date_to,
+      granularity as "day" | "week" | "month" | "year",
+    );
+    for (const periodo of periodBuckets) {
+      const dimensionsForPeriod = { periodo };
+      const key = JSON.stringify(dimensionsForPeriod);
+      if (!groups.has(key)) groups.set(key, { dimensions: dimensionsForPeriod, rows: [] });
+    }
+  }
   if (!groups.size && !dimensions.length) groups.set("__total__", { dimensions: {}, rows: [] });
   const result = [...groups.values()].map((group) => ({
     ...group.dimensions,
     ...Object.fromEntries(metrics.map((metric) => [metric, semanticMetric(group.rows, dataset, metric)])),
   }));
   const requestedOrder = cleanText(args.order_by, 40);
-  const chronologicalPeriods = shouldSortTemporalSeriesChronologically(question, dimensions);
   const orderBy = chronologicalPeriods
     ? "periodo"
     : metrics.includes(requestedOrder) || dimensions.includes(requestedOrder)
@@ -1296,7 +1309,10 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
       : cleanText(a[orderBy], 180).localeCompare(cleanText(b[orderBy], 180), "es", { numeric: true });
     return ascending ? comparison : -comparison;
   });
-  const limit = safeLimit(args.limit, 20, 100);
+  const requestedLimit = safeLimit(args.limit, 20, 100);
+  const limit = chronologicalPeriods && dimensions.length === 1 && dimensions[0] === "periodo"
+    ? Math.max(requestedLimit, Math.min(result.length, 100))
+    : requestedLimit;
   return {
     dataset,
     definition: catalog.description,

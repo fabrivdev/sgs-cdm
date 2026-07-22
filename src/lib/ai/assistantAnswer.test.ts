@@ -94,6 +94,37 @@ describe("assistant deterministic answer renderer", () => {
     expect(answer).toContain("Situacion del tecnico: Inactivo");
   });
 
+  it("renders complete chronological monthly series including zero months", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["horas", "ordenes"],
+      dimensions: ["periodo"],
+      filters: { estado: "Cerrada", tecnico: "JUAN PATINO", date_from: "2026-01-01", date_to: "2026-07-22" },
+      granularity: "month",
+      order_by: "periodo",
+      order_direction: "asc",
+      limit: 100,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Cuantas horas cerradas en OS tiene Juan Patino por mes este ano",
+      mode: "brief",
+      results: [resultFor(plan, [
+        { periodo: "2026-01", horas: 575.5, ordenes: 10 },
+        { periodo: "2026-02", horas: 0, ordenes: 0 },
+        { periodo: "2026-03", horas: 0, ordenes: 0 },
+        { periodo: "2026-04", horas: 25, ordenes: 7 },
+        { periodo: "2026-05", horas: 95.5, ordenes: 8 },
+        { periodo: "2026-06", horas: 34.5, ordenes: 9 },
+        { periodo: "2026-07", horas: 31.66, ordenes: 5 },
+      ])],
+    });
+
+    expect(answer).toContain("febrero de 2026: Horas OS: 0 hs | Ordenes: 0");
+    expect(answer).toContain("marzo de 2026: Horas OS: 0 hs | Ordenes: 0");
+    expect(answer.indexOf("febrero de 2026")).toBeLessThan(answer.indexOf("marzo de 2026"));
+    expect(answer.indexOf("marzo de 2026")).toBeLessThan(answer.indexOf("abril de 2026"));
+  });
+
   it("returns an explicit empty result instead of asking the model to guess", () => {
     const plan: GenericQueryPlan = {
       dataset: "ordenes_servicio",

@@ -451,6 +451,61 @@ export function shouldSortTemporalSeriesChronologically(question: string, dimens
   ]);
 }
 
+/**
+ * Returns every canonical time bucket intersecting a closed date range.
+ * An empty array means the range is invalid or too large to expand safely.
+ */
+export function enumeratePeriodBuckets(
+  dateFrom: unknown,
+  dateTo: unknown,
+  granularity: QueryGranularity,
+  maxBuckets = 100,
+) {
+  const from = String(dateFrom ?? "").slice(0, 10);
+  const to = String(dateTo ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || maxBuckets < 1) return [];
+
+  const start = new Date(`${from}T12:00:00Z`);
+  const end = new Date(`${to}T12:00:00Z`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start > end) return [];
+
+  const buckets: string[] = [];
+  const push = (value: string) => {
+    buckets.push(value);
+    return buckets.length <= maxBuckets;
+  };
+
+  if (granularity === "year") {
+    for (let year = start.getUTCFullYear(); year <= end.getUTCFullYear(); year += 1) {
+      if (!push(String(year))) return [];
+    }
+    return buckets;
+  }
+
+  if (granularity === "month") {
+    const current = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1, 12));
+    const last = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1, 12));
+    while (current <= last) {
+      if (!push(current.toISOString().slice(0, 7))) return [];
+      current.setUTCMonth(current.getUTCMonth() + 1);
+    }
+    return buckets;
+  }
+
+  const current = new Date(start);
+  const last = new Date(end);
+  const stepDays = granularity === "week" ? 7 : 1;
+  if (granularity === "week") {
+    current.setUTCDate(current.getUTCDate() - ((current.getUTCDay() + 6) % 7));
+    last.setUTCDate(last.getUTCDate() - ((last.getUTCDay() + 6) % 7));
+  }
+  while (current <= last) {
+    if (!push(current.toISOString().slice(0, 10))) return [];
+    current.setUTCDate(current.getUTCDate() + stepDays);
+  }
+  return buckets;
+}
+
 export function detectSemanticIntent(question: string): SemanticIntent | null {
   const text = normalizeText(question);
   const asksInactive = hasAny(text, ["INACTIVO", "INACTIVOS", "EX TECNICO", "SALIO DE LA EMPRESA"]);

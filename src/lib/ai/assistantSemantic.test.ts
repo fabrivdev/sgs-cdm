@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   compileSemanticPlan,
   detectSemanticAmbiguity,
+  enumeratePeriodBuckets,
   getDataCatalog,
   shouldSortTemporalSeriesChronologically,
   validateGenericPlans,
@@ -29,6 +30,18 @@ describe("assistant semantic catalog", () => {
 });
 
 describe("assistant semantic compiler", () => {
+  it("enumerates missing monthly buckets across the requested range", () => {
+    expect(enumeratePeriodBuckets("2026-01-01", "2026-07-22", "month")).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+    ]);
+  });
+
   it("keeps ordinary period breakdowns in chronological order", () => {
     expect(shouldSortTemporalSeriesChronologically(
       "Cuantas horas cerradas en OS tiene Juan Patino por mes este ano",

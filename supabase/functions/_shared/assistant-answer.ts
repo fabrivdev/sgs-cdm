@@ -1,5 +1,6 @@
 import {
   semanticCatalog,
+  shouldSortTemporalSeriesChronologically,
   type BusinessDataset,
   type GenericQueryPlan,
   type SemanticRecord,
@@ -144,7 +145,10 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
   }
 
   const rankedRows = selectedRows(question, rows);
-  const visibleLimit = mode === "analytic" ? 20 : 10;
+  const chronologicalSeries = shouldSortTemporalSeriesChronologically(question, plan.dimensions);
+  const visibleLimit = chronologicalSeries
+    ? plan.granularity === "day" ? 31 : plan.granularity === "week" ? 26 : 24
+    : mode === "analytic" ? 20 : 10;
   const visibleRows = rankedRows.slice(0, visibleLimit);
   const dimensionTitle = plan.dimensions.map((dimension) => dimensionLabel(plan.dataset, dimension)).join(" / ");
   const metricTitle = plan.metrics.map((metric) => metricLabel(plan.dataset, metric)).join(" / ");
