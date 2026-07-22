@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:assistant": "vitest run src/lib/ai",
     "test:watch": "vitest"
   },
   "dependencies": {

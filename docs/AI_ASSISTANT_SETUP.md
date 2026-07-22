@@ -28,7 +28,17 @@ npx supabase functions deploy ai-data-assistant
 ## Seguridad
 
 - Solo los administradores pueden invocar la funcion.
-- Las consultas de datos se ejecutan con el JWT del usuario y respetan RLS.
+- El JWT identifica al usuario y la funcion verifica en servidor que tenga rol `admin` antes de leer datos.
+- Despues de esa verificacion, la funcion usa la service role exclusivamente contra datasets, metricas y filtros incluidos en el catalogo semantico. Esto permite analisis globales de direccion sin depender de la sucursal del usuario.
 - No se acepta SQL ni se exponen tablas arbitrarias.
 - Las conversaciones son privadas por usuario.
-- La service role se usa solo para validar rol, limites y auditoria interna.
+- La API key, la service role y los secretos permanecen en Supabase; nunca se envian al navegador ni al modelo.
+
+## Validacion local
+
+```powershell
+npm run test:assistant
+npm run build
+```
+
+Las pruebas del asistente validan catalogo, compilacion de preguntas, seguimiento conversacional, entidades, calculos y cobertura representativa antes de desplegar una nueva version.
