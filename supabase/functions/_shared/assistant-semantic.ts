@@ -87,7 +87,7 @@ export const semanticCatalog = {
     dimensions: {
       periodo: { label: "Periodo", description: "Apertura agrupada por dia, semana, mes o anio.", source: "fecha_abierta_os" },
       fecha: { label: "Fecha", description: "Fecha de apertura de la OS.", source: "fecha_abierta_os" },
-      sucursal: { label: "Sucursal", description: "Sucursal de la OS.", source: "sucursal" },
+      sucursal: { label: "Sucursal", description: "Sucursal derivada del trabajo vinculado, origen importado, prefijo de OS o cliente.", source: "campo logico derivado; no es una columna fisica de la OS" },
       cliente: { label: "Cliente", description: "Cliente de la OS.", source: "cliente_nombre" },
       marca: { label: "Marca", description: "Marca de la maquina o producto asociado.", source: "marca" },
       tipo_tiempo: { label: "Tipo de tiempo", description: "Cliente, Garantia o Interno.", source: "tipo_tiempo" },

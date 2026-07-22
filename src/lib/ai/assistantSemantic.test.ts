@@ -71,6 +71,17 @@ describe("assistant semantic compiler", () => {
     expect(plan.dimensions).toContain("tecnico");
   });
 
+  it("groups one technician's closed OS hours by month", () => {
+    const plan = planFor("Cuantas horas cerradas en OS tiene Juan Patino por mes este ano");
+    expect(plan).toMatchObject({
+      dataset: "ordenes_servicio",
+      filters: { estado: "Cerrada" },
+      granularity: "month",
+    });
+    expect(plan.metrics).toContain("horas");
+    expect(plan.dimensions).toEqual(["periodo"]);
+  });
+
   it("ranks billing branches for the service category", () => {
     const plan = planFor("Que sucursal facturo mas en el rubro Servicios");
     expect(plan).toMatchObject({

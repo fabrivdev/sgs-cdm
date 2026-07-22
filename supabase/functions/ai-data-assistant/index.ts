@@ -23,6 +23,11 @@ import {
   resolveQuestionDateRange,
   shouldApplyPageContext,
 } from "../_shared/assistant-context.ts";
+import {
+  ASSISTANT_SERVICE_ORDER_SELECT,
+  resolveServiceOrderBranch,
+  serviceOrderClientKey,
+} from "../_shared/assistant-service-orders.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -486,10 +491,10 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
 async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord) {
   const marca = cleanText(args.marca, 30);
   const tipo = cleanText(args.tipo_tiempo, 40);
-  const rows = await fetchPaged((from, to) => {
+  const rawRows = await fetchPaged((from, to) => {
     let query = client
       .from("ordenes_servicio_importadas")
-      .select("os_numero,sucursal,cliente_nombre,fecha_abierta_os,fecha_emision_factura,factura,responsable,marca,problema,tipo_tiempo,servicios_cantidad,servicios_valor,km_cantidad,kilometro_valor,repuesto_valor,terceros_valor,situacion_os,situacion_facturacion,trabajo_id,raw_data")
+      .select(ASSISTANT_SERVICE_ORDER_SELECT)
       .order("fecha_abierta_os")
       .range(from, to);
     query = dateFilter(query, "fecha_abierta_os", args);
@@ -497,6 +502,26 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     if (tipo && tipo.toLowerCase() !== "todos") query = query.ilike("tipo_tiempo", `%${tipo}%`);
     return query;
   }, 30000);
+  const [jobs, clients] = await Promise.all([
+    fetchPaged((from, to) => client
+      .from("trabajos")
+      .select("id,sucursal,cliente_id")
+      .range(from, to), 10000),
+    fetchPaged((from, to) => client
+      .from("clientes")
+      .select("id,nombre,sucursal")
+      .range(from, to), 10000),
+  ]);
+  const jobsById = new Map(jobs.map((row) => [cleanText(row.id, 80), row]));
+  const clientsById = new Map(clients.map((row) => [cleanText(row.id, 80), row]));
+  const clientsByName = new Map(clients
+    .map((row) => [serviceOrderClientKey(row.nombre), row] as const)
+    .filter(([key]) => Boolean(key)));
+  const branchContext = { jobsById, clientsById, clientsByName };
+  const rows = rawRows.map((row) => ({
+    ...row,
+    sucursal: resolveServiceOrderBranch(row, branchContext),
+  }));
   const orderKey = (row: JsonRecord) => {
     const order = cleanText(row.os_numero, 80);
     const branch = cleanText(row.sucursal, 60) || "Sin sucursal";
