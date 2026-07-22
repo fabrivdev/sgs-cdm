@@ -772,7 +772,11 @@ function scoreDatasets(text: string) {
 }
 
 function detectGranularity(text: string): QueryGranularity {
-  if (hasAny(text, ["POR DIA", "CADA DIA", "QUE DIA", "DIARIO"])) return "day";
+  if (hasAny(text, [
+    "POR DIA", "CADA DIA", "QUE DIA", "DIARIO",
+    "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
+    "MAXIMO DIARIO", "MAXIMA DIARIA", "MAYOR FACTURACION DIARIA",
+  ])) return "day";
   if (hasAny(text, ["POR SEMANA", "CADA SEMANA", "QUE SEMANA", "SEMANAL"])) return "week";
   if (hasAny(text, ["POR ANO", "CADA ANO", "QUE ANO", "ANUAL"])) return "year";
   return "month";
@@ -782,7 +786,12 @@ function requestedLimit(text: string) {
   const topMatch = text.match(/\bTOP\s+(\d{1,3})\b/);
   if (topMatch) return safeLimit(topMatch[1], 20, 100);
   if (hasAny(text, ["QUIEN LE SIGUE", "CUAL LE SIGUE", "SEGUNDO LUGAR"])) return 2;
-  if (hasAny(text, ["CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES", "QUE SUCURSAL", "QUE CLIENTE", "QUE TECNICO", "QUE MES", "QUE SEMANA"])) return 1;
+  if (hasAny(text, [
+    "CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES", "QUE SUCURSAL",
+    "QUE CLIENTE", "QUE TECNICO", "QUE MES", "QUE SEMANA", "QUE DIA",
+    "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
+    "MAXIMO DIARIO", "MAXIMA DIARIA",
+  ])) return 1;
   if (hasAny(text, ["DIME LOS", "DIME LAS", "LISTA LOS", "LISTA LAS", "LISTADO DE", "MOSTRA LOS", "MOSTRA LAS", "CUALES SON", "TODOS LOS", "TODAS LAS"])) return 100;
   return 20;
 }
@@ -870,7 +879,12 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
     if (allowed.has(dimension) && hasAny(text, signals) && !dimensions.includes(dimension)) dimensions.push(dimension);
   };
 
-  add("periodo", ["POR DIA", "POR SEMANA", "POR MES", "POR ANO", "QUE DIA", "QUE SEMANA", "QUE MES", "QUE ANO", "EVOLUCION"]);
+  add("periodo", [
+    "POR DIA", "POR SEMANA", "POR MES", "POR ANO", "QUE DIA", "QUE SEMANA",
+    "QUE MES", "QUE ANO", "EVOLUCION", "DIA CON MAYOR", "DIA DE MAYOR",
+    "DIA QUE MAS", "MEJOR DIA", "MAXIMO DIARIO", "MAXIMA DIARIA",
+    "MAYOR FACTURACION DIARIA",
+  ]);
   add("sucursal", ["POR SUCURSAL", "QUE SUCURSAL", "SUCURSALES", "ENTRE SUCURSALES"]);
   add("tecnico", ["POR TECNICO", "QUE TECNICO", "TECNICO MAS", "RESPONSABLE", "AUXILIAR", "PARTICIPANTE", "PRODUCTIV"]);
   add("cliente", ["POR CLIENTE", "DEL CLIENTE", "DE CLIENTE", "QUE CLIENTE", "CLIENTE QUE MAS", "TOP CLIENTES", "RANKING DE CLIENTES", "DUENO", "PROPIETARIO"]);

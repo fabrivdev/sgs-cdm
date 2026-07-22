@@ -27,12 +27,26 @@ export function referencesVisibleContext(question: string) {
   ]);
 }
 
+export function referencesAllHistory(question: string) {
+  const normalized = normalizeContextText(question);
+  return includesAny(normalized, [
+    "TODO EL HISTORICO",
+    "TODO EL HISTORIAL",
+    "HISTORICO COMPLETO",
+    "HISTORIAL COMPLETO",
+    "DE TODOS LOS ANOS",
+    "TODOS LOS ANOS",
+    "DESDE SIEMPRE",
+  ]);
+}
+
 /**
  * El contexto de pantalla es una ayuda, no el universo de datos del asistente.
  * Solo se hereda cuando el usuario lo pide o cuando la pregunta pertenece al
  * mismo dominio operativo de la pantalla actual.
  */
 export function shouldApplyPageContext(question: string, pageContext: AssistantContextRecord) {
+  if (referencesAllHistory(question)) return false;
   if (referencesVisibleContext(question)) return true;
   const normalized = normalizeContextText(question);
   const moduleName = normalizeContextText(pageContext.module);
@@ -112,7 +126,17 @@ export function resolveQuestionDateRange(question: string, currentDate: string) 
     range = { date_from: isoDate(from), date_to: isoDate(to) };
   } else if (includesAny(normalized, ["ESTA SEMANA", "SEMANA ACTUAL", "SEMANA EN CURSO"])) {
     range = { date_from: isoDate(monday), date_to: isoDate(sunday) };
-  } else if (normalized.includes("HOY")) {
+  } else if (
+    normalized.includes("HOY")
+    || includesAny(normalized, [
+      "FACTURACION DEL DIA",
+      "VENTAS DEL DIA",
+      "VENTA DEL DIA",
+      "FACTURADO DEL DIA",
+      "DIA ACTUAL",
+      "EN EL DIA DE HOY",
+    ])
+  ) {
     range = { date_from: currentDate, date_to: currentDate };
   } else if (normalized.includes("AYER")) {
     const yesterday = new Date(current);
@@ -125,7 +149,7 @@ export function resolveQuestionDateRange(question: string, currentDate: string) 
     JULIO: 7, AGOSTO: 8, SEPTIEMBRE: 9, SETIEMBRE: 9, OCTUBRE: 10,
     NOVIEMBRE: 11, DICIEMBRE: 12,
   };
-  const monthEntry = Object.entries(months).find(([name]) => normalized.includes(name));
+  const monthEntry = Object.entries(months).find(([name]) => new RegExp(`\\b${name}\\b`).test(normalized));
   if (monthEntry) {
     const explicitYear = normalized.match(/\b(20\d{2})\b/)?.[1];
     const year = Number(explicitYear ?? currentDate.slice(0, 4));

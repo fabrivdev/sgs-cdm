@@ -118,6 +118,21 @@ describe("assistant semantic compiler", () => {
     });
   });
 
+  it("ranks the highest billing day instead of silently grouping by month", () => {
+    const plan = planFor("Dia con mayor facturacion de todos los anos");
+    expect(plan).toMatchObject({
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      granularity: "day",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    });
+    expect(plan.filters).not.toHaveProperty("date_from");
+    expect(plan.filters).not.toHaveProperty("date_to");
+  });
+
   it("finds the largest invoice without counting invoice lines", () => {
     const plan = planFor("Cual fue la factura mas grande");
     expect(plan).toMatchObject({

@@ -22,6 +22,7 @@ import {
 import { resolveNamedEntityFilters } from "../_shared/assistant-entities.ts";
 import {
   inclusiveOverlapDays,
+  referencesAllHistory,
   resolveQuestionDateRange,
   shouldApplyPageContext,
 } from "../_shared/assistant-context.ts";
@@ -1495,7 +1496,12 @@ function semanticToolArgs(
   Object.assign(args, inherited);
 
   const normalized = normalizedKey(question);
-  Object.assign(args, resolveQuestionDateRange(question, currentDate));
+  if (referencesAllHistory(question)) {
+    delete args.date_from;
+    delete args.date_to;
+  } else {
+    Object.assign(args, resolveQuestionDateRange(question, currentDate));
+  }
   const knownBranches = ["Santa Rita", "Katuete", "Loma Plata", "Misiones", "Santa Rosa", "Campo 9"];
   const explicitBranches = knownBranches.filter((branch) => normalized.includes(normalizedKey(branch)));
   if (explicitBranches.length > 1) {
