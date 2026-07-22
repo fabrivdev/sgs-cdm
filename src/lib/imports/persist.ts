@@ -164,6 +164,7 @@ export function mapCanonicalOsToImportRow(row: CanonicalServiceOrderRow): Servic
       source_branch_code: row.branchCode,
       canonical_group: row.group,
       canonical_model: row.model,
+      canonical_auxiliary_technicians: row.auxiliaryTechnicians,
       canonical_time_type: row.timeType,
       canonical_currency: row.currency,
       import_era: resolveImportEra(row.openDate ?? row.invoiceDate),
@@ -202,12 +203,52 @@ const serviceOrderTechnicianTotals = (row: any) => ({
   valor_terceros: Number(row.terceros_valor || 0),
 });
 
+const cleanTechnician = (value: unknown) => {
+  const normalized = String(value ?? "").trim();
+  return normalized && !/^-+$/.test(normalized) ? normalized : "";
+};
+
+const auxiliaryTechniciansForRow = (row: ServiceOrderInsert) => {
+  const raw = (row.raw_data ?? {}) as Record<string, unknown>;
+  const canonical = Array.isArray(raw.canonical_auxiliary_technicians)
+    ? raw.canonical_auxiliary_technicians
+    : [];
+  return Array.from(
+    new Set(
+      [...canonical, raw.TECAUX001, raw.TECAUX002]
+        .map(cleanTechnician)
+        .filter(Boolean),
+    ),
+  );
+};
+
+const addTechnicianTotals = (
+  totalsByTechnician: Record<string, Record<string, number>>,
+  technician: string,
+  next: Record<string, number>,
+) => {
+  const previous = totalsByTechnician[technician] ?? serviceOrderTechnicianTotals({});
+  totalsByTechnician[technician] = Object.fromEntries(
+    Object.keys(next).map((key) => [
+      key,
+      sumImportNumber(previous[key], next[key], key === "kilometros" || key === "horas" ? 4 : 2),
+    ]),
+  );
+};
+
+const sameTechnicianSet = (left: string[], right: string[]) =>
+  left.length > 0 &&
+  left.length === right.length &&
+  left.every((technician) => right.includes(technician));
+
 export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
   const byOs = new Map<string, any>();
+  const sourceRowsByOs = new Map<string, ServiceOrderInsert[]>();
 
   for (const row of rows) {
     const osNumero = String(row.os_numero ?? "").trim();
     if (!osNumero) continue;
+    sourceRowsByOs.set(osNumero, [...(sourceRowsByOs.get(osNumero) ?? []), row]);
     const current = byOs.get(osNumero);
 
     if (!current) {
@@ -274,37 +315,97 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     );
 
     const currentProducts = Array.isArray(currentRaw.productos_agregados) ? currentRaw.productos_agregados : [];
-    const rowTechnician = String(row.responsable ?? "").trim();
-    const currentTechnicians = Array.isArray(currentRaw.tecnicos_participantes)
-      ? currentRaw.tecnicos_participantes.map(String)
-      : [];
-    const technicians = Array.from(new Set([...currentTechnicians, ...(rowTechnician ? [rowTechnician] : [])]));
-    const totalsByTechnician = { ...(currentRaw.totales_por_tecnico ?? {}) } as Record<string, any>;
-    if (rowTechnician) {
-      const previousTechnicianTotals = totalsByTechnician[rowTechnician] ?? serviceOrderTechnicianTotals({});
-      const nextTechnicianTotals = serviceOrderTechnicianTotals(row);
-      totalsByTechnician[rowTechnician] = Object.fromEntries(
-        Object.keys(nextTechnicianTotals).map((key) => [
-          key,
-          sumImportNumber(
-            previousTechnicianTotals[key],
-            nextTechnicianTotals[key],
-            key === "kilometros" || key === "horas" ? 4 : 2,
-          ),
-        ]),
-      );
-    }
     current.raw_data = {
       ...currentRaw,
       lineas_agregadas: Number(currentRaw.lineas_agregadas ?? 1) + 1,
       tipos_tiempo: timeTypes,
       facturas_por_tipo: invoicesByType,
       totales_por_tipo: totalsByType,
-      tecnicos_participantes: technicians,
-      totales_por_tecnico: totalsByTechnician,
       productos_agregados: Array.from(
         new Set([...currentProducts.map(String), ...(row.problema ? [String(row.problema)] : [])]),
       ).slice(0, 20),
+    };
+  }
+
+  for (const [osNumero, current] of byOs.entries()) {
+    const sourceRows = sourceRowsByOs.get(osNumero) ?? [];
+    const principals = Array.from(
+      new Set(sourceRows.map((row) => cleanTechnician(row.responsable)).filter(Boolean)),
+    );
+    const auxiliaries = Array.from(
+      new Set(sourceRows.flatMap(auxiliaryTechniciansForRow)),
+    );
+    const participants = Array.from(new Set([...principals, ...auxiliaries]));
+    const totalsByTechnician: Record<string, Record<string, number>> = Object.fromEntries(
+      participants.map((technician) => [technician, serviceOrderTechnicianTotals({})]),
+    );
+
+    for (const row of sourceRows) {
+      const lineParticipants = Array.from(
+        new Set([cleanTechnician(row.responsable), ...auxiliaryTechniciansForRow(row)].filter(Boolean)),
+      );
+      const totals = serviceOrderTechnicianTotals(row);
+      const totalsWithoutKilometres = {
+        ...totals,
+        kilometros: 0,
+        valor_kilometraje: 0,
+      };
+      for (const technician of lineParticipants) {
+        addTechnicianTotals(totalsByTechnician, technician, totalsWithoutKilometres);
+      }
+    }
+
+    let unassignedKilometres = 0;
+    let unassignedKilometreValue = 0;
+    for (const row of sourceRows) {
+      const kilometreTotals = serviceOrderTechnicianTotals(row);
+      if (kilometreTotals.kilometros === 0 && kilometreTotals.valor_kilometraje === 0) continue;
+
+      const explicitPrincipal = cleanTechnician(row.responsable);
+      const kilometreAuxiliaries = auxiliaryTechniciansForRow(row);
+      let kilometrePrincipal = explicitPrincipal;
+
+      if (!kilometrePrincipal && kilometreAuxiliaries.length > 0) {
+        const exactMatches = Array.from(
+          new Set(
+            sourceRows
+              .filter((candidate) =>
+                cleanTechnician(candidate.responsable) &&
+                sameTechnicianSet(auxiliaryTechniciansForRow(candidate), kilometreAuxiliaries),
+              )
+              .map((candidate) => cleanTechnician(candidate.responsable)),
+          ),
+        );
+        if (exactMatches.length === 1) kilometrePrincipal = exactMatches[0];
+      }
+
+      if (!kilometrePrincipal && principals.length === 1) kilometrePrincipal = principals[0];
+
+      if (kilometrePrincipal) {
+        addTechnicianTotals(totalsByTechnician, kilometrePrincipal, {
+          ...serviceOrderTechnicianTotals({}),
+          kilometros: kilometreTotals.kilometros,
+          valor_kilometraje: kilometreTotals.valor_kilometraje,
+        });
+      } else {
+        unassignedKilometres = sumImportNumber(unassignedKilometres, kilometreTotals.kilometros, 4);
+        unassignedKilometreValue = sumImportNumber(
+          unassignedKilometreValue,
+          kilometreTotals.valor_kilometraje,
+        );
+      }
+    }
+
+    current.responsable = principals[0] || null;
+    current.raw_data = {
+      ...(current.raw_data ?? {}),
+      tecnicos_responsables: principals,
+      tecnicos_auxiliares: auxiliaries,
+      tecnicos_participantes: participants,
+      totales_por_tecnico: totalsByTechnician,
+      requiere_asignacion_tecnico: principals.length === 0,
+      kilometros_sin_tecnico: unassignedKilometres,
+      valor_kilometraje_sin_tecnico: unassignedKilometreValue,
     };
   }
 

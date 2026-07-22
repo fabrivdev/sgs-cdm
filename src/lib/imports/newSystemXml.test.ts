@@ -170,6 +170,94 @@ describe("importacion XML de ordenes de servicio", () => {
     expect((aggregated[0].raw_data as any).totales_por_tecnico["JUAN PATINO"].horas).toBe(2);
   });
 
+  it("incorpora auxiliares y asigna el kilometraje al responsable principal", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "02",
+          "NÂº OS": "00000002",
+          PRODUCTO: "MA01",
+          TECNICO: "ME0001 - EDER ESQUIVEL",
+          TECAUX001: "ME0006 - ANIBAL VILLALBA",
+          TECAUX002: "ME0005 - HUGO RODAS",
+          CANTIDAD: "2:00 Hs.",
+          TOTAL: "140",
+        },
+        {
+          Sucursal: "02",
+          "NÂº OS": "00000002",
+          PRODUCTO: "KM01",
+          TECNICO: "-------",
+          TECAUX001: "ME0006 - ANIBAL VILLALBA",
+          TECAUX002: "ME0005 - HUGO RODAS",
+          CANTIDAD: "14 Km.",
+          TOTAL: "8.4",
+        },
+      ],
+    });
+
+    expect(result.rows[0].auxiliaryTechnicians).toEqual([
+      "ME0006 - ANIBAL VILLALBA",
+      "ME0005 - HUGO RODAS",
+    ]);
+
+    const [aggregated] = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    const raw = aggregated.raw_data as any;
+    expect(aggregated.responsable).toBe("ME0001 - EDER ESQUIVEL");
+    expect(raw.tecnicos_participantes).toEqual([
+      "ME0001 - EDER ESQUIVEL",
+      "ME0006 - ANIBAL VILLALBA",
+      "ME0005 - HUGO RODAS",
+    ]);
+    expect(raw.totales_por_tecnico["ME0001 - EDER ESQUIVEL"]).toMatchObject({ horas: 2, kilometros: 14 });
+    expect(raw.totales_por_tecnico["ME0006 - ANIBAL VILLALBA"]).toMatchObject({ horas: 2, kilometros: 0 });
+    expect(raw.totales_por_tecnico["ME0005 - HUGO RODAS"]).toMatchObject({ horas: 2, kilometros: 0 });
+    expect(raw.requiere_asignacion_tecnico).toBe(false);
+    expect(raw.kilometros_sin_tecnico).toBe(0);
+  });
+
+  it("mantiene una OS sin responsable aunque tenga auxiliares", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000012",
+          PRODUCTO: "MA01",
+          TECNICO: "-------",
+          TECAUX001: "ME0022 - RUBEN LUGO",
+          TECAUX002: "-------",
+          CANTIDAD: "3:00 Hs.",
+          TOTAL: "180",
+        },
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000012",
+          PRODUCTO: "KM01",
+          TECNICO: "-------",
+          TECAUX001: "ME0022 - RUBEN LUGO",
+          TECAUX002: "-------",
+          CANTIDAD: "696 Km.",
+          TOTAL: "417.6",
+        },
+      ],
+    });
+
+    const [aggregated] = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    const raw = aggregated.raw_data as any;
+    expect(aggregated.responsable).toBeNull();
+    expect(raw.tecnicos_responsables).toEqual([]);
+    expect(raw.tecnicos_auxiliares).toEqual(["ME0022 - RUBEN LUGO"]);
+    expect(raw.tecnicos_participantes).toEqual(["ME0022 - RUBEN LUGO"]);
+    expect(raw.totales_por_tecnico["ME0022 - RUBEN LUGO"]).toMatchObject({ horas: 3, kilometros: 0 });
+    expect(raw.requiere_asignacion_tecnico).toBe(true);
+    expect(raw.kilometros_sin_tecnico).toBe(696);
+    expect(raw.valor_kilometraje_sin_tecnico).toBe(417.6);
+  });
+
   it("conserva como terceros el total de una linea realmente no clasificada", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",

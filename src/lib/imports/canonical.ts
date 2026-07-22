@@ -64,6 +64,7 @@ export interface CanonicalServiceOrderRow {
   group: string | null;
   model: string | null;
   technician: string | null;
+  auxiliaryTechnicians: string[];
   timeType: CanonicalTimeType;
   documentNumber: string | null;
   invoiceNumber: string | null;

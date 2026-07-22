@@ -184,6 +184,9 @@ export function mapOrdenesServicioSheet(
     const manufacturerCode = text(row, ["CODFAB"]);
     const productCode = text(row, ["CODIGO"]);
     const productName = text(row, ["PRODUCTO"]);
+    const auxiliaryTechnicians = Array.from(
+      new Set([text(row, ["TECAUX001"]), text(row, ["TECAUX002"])].filter((value): value is string => Boolean(value))),
+    );
     const lineType = inferCanonicalServiceOrderLineType({
       group: productGroup,
       productCode,
@@ -214,6 +217,7 @@ export function mapOrdenesServicioSheet(
       group: productGroup,
       model: text(row, ["MODELO"]),
       technician: text(row, ["TECNICO"]),
+      auxiliaryTechnicians,
       timeType: inferCanonicalTimeType(timeTypeRaw),
       documentNumber: text(row, ["DOCUMENTO"]),
       invoiceNumber: text(row, ["DOCUMENTO"]),
@@ -238,6 +242,7 @@ export function mapOrdenesServicioSheet(
         canonical_end_time: text(row, ["Hora Final"]),
         canonical_parts_status: text(row, ["PIEZAS"]),
         canonical_origin: text(row, ["ORIGEN"]),
+        canonical_auxiliary_technicians: auxiliaryTechnicians,
       },
     } satisfies CanonicalServiceOrderRow;
   });
