@@ -25,8 +25,11 @@ import {
 } from "../_shared/assistant-context.ts";
 import {
   ASSISTANT_SERVICE_ORDER_SELECT,
+  normalizeServiceOrderTechnician,
   resolveServiceOrderBranch,
   serviceOrderClientKey,
+  serviceOrderTechnicianMatchScore,
+  serviceOrderTechniciansMatch,
 } from "../_shared/assistant-service-orders.ts";
 
 const corsHeaders = {
@@ -538,20 +541,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     km: number;
     valor_os: number;
   }>();
-  const technicianAlias: Record<string, string> = {
-    "DENNIS BENITEZ": "DENIS DE LA CRUZ BENITEZ ARAUJO",
-  };
-  const normalizeTechnician = (value: unknown) => {
-    const normalized = String(value ?? "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toUpperCase()
-      .replace(/^(?:[A-Z]{1,6}[\s-]*)?\d{2,}\s*(?:[-:|/]\s*)?/, "")
-      .replace(/[^A-Z0-9]+/g, " ")
-      .trim()
-      .replace(/\s+/g, " ");
-    return technicianAlias[normalized] ?? normalized;
-  };
+  const normalizeTechnician = normalizeServiceOrderTechnician;
   const profiles = await checked<JsonRecord[]>(
     client.from("profiles").select("nombre,activo").limit(1000),
   );
@@ -562,26 +552,9 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       activo: profile.activo !== false,
     }))
     .filter((profile) => Boolean(profile.normalized));
-  const technicianMatchScore = (source: string, candidate: string) => {
-    if (!source || !candidate) return 0;
-    if (source === candidate) return 1;
-    const sourceTokens = source.split(" ").filter(Boolean);
-    const candidateTokens = candidate.split(" ").filter(Boolean);
-    const sourceSet = new Set(sourceTokens);
-    const candidateSet = new Set(candidateTokens);
-    const intersection = sourceTokens.filter((token) => candidateSet.has(token)).length;
-    const allSourceTokensMatch = sourceTokens.length >= 2 && intersection === sourceTokens.length;
-    const allCandidateTokensMatch = candidateTokens.length >= 2 && candidateTokens.every((token) => sourceSet.has(token));
-    if (allSourceTokensMatch || allCandidateTokensMatch) {
-      return 0.94 - Math.min(Math.abs(sourceTokens.length - candidateTokens.length) * 0.02, 0.12);
-    }
-    if (intersection < 2) return 0;
-    return intersection / Math.max(sourceTokens.length, candidateTokens.length) +
-      (sourceTokens[0] === candidateTokens[0] ? 0.12 : 0);
-  };
   const matchProfile = (source: string) => {
     const ranked = profileRows
-      .map((profile) => ({ profile, score: technicianMatchScore(source, profile.normalized) }))
+      .map((profile) => ({ profile, score: serviceOrderTechnicianMatchScore(source, profile.normalized) }))
       .filter((row) => row.score > 0)
       .sort((a, b) => b.score - a.score || a.profile.nombre.localeCompare(b.profile.nombre));
     const best = ranked[0];
@@ -1237,9 +1210,13 @@ function applyBusinessFilters(rows: JsonRecord[], dataset: BusinessDataset, filt
     if (!allowed.has(key as never)) return true;
     const expected = Array.isArray(raw) ? raw : [raw];
     if (!expected.length || expected.some((value) => normalizedKey(value) === "TODOS")) return true;
-    const actual = normalizedKey(semanticDimension(row, dataset, key, granularity));
+    const actualValue = semanticDimension(row, dataset, key, granularity);
+    const actual = normalizedKey(actualValue);
     if (dataset === "trabajos" && key === "estado" && expected.some((value) => normalizedKey(value) === "ABIERTO")) {
       return ["PENDIENTE", "PROGRAMADO", "INICIADO"].includes(actual);
+    }
+    if (dataset === "ordenes_servicio" && key === "tecnico") {
+      return expected.some((value) => serviceOrderTechniciansMatch(actualValue, value));
     }
     return expected.some((value) => actual.includes(normalizedKey(value)));
   }));
@@ -1256,13 +1233,27 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
   if (filters.rubro) filters.rubro = canonicalBillingRubro(filters.rubro) || filters.rubro;
   if (filters.tipo_tiempo) filters.tipo_tiempo = canonicalBillingTimeType(filters.tipo_tiempo) || filters.tipo_tiempo;
   const granularity = ["day", "week", "month", "year"].includes(cleanText(args.granularity, 10)) ? cleanText(args.granularity, 10) : "month";
-  const sourceRows = await loadBusinessRows(client, dataset, filters, dimensions);
   const question = cleanText(args.__question, 4000);
+  let serviceOrderParticipantRows: JsonRecord[] | null = null;
+  let sourceRows: JsonRecord[];
+  if (dataset === "ordenes_servicio") {
+    const serviceOrderResult = await getServiceOrdersSummary(client, { ...filters, __include_rows: true }) as JsonRecord;
+    const baseRows = (serviceOrderResult._rows ?? []) as JsonRecord[];
+    serviceOrderParticipantRows = (serviceOrderResult._participant_rows ?? []) as JsonRecord[];
+    sourceRows = dimensions.includes("tecnico") || dimensions.includes("activo") || filters.tecnico || filters.activo
+      ? serviceOrderParticipantRows
+      : baseRows;
+  } else {
+    sourceRows = await loadBusinessRows(client, dataset, filters, dimensions);
+  }
   if (question) {
     const entityCandidates: { cliente?: string[]; tecnico?: string[] } = {};
     for (const field of ["cliente", "tecnico"] as const) {
       if (!catalog.dimensions.includes(field as never) || filters[field]) continue;
-      entityCandidates[field] = [...new Set(sourceRows
+      const candidateRows = dataset === "ordenes_servicio" && field === "tecnico" && serviceOrderParticipantRows
+        ? serviceOrderParticipantRows
+        : sourceRows;
+      entityCandidates[field] = [...new Set(candidateRows
         .map((row) => semanticDimension(row, dataset, field, granularity))
         .filter((value) => value && value !== "Sin dato"))];
     }
@@ -1270,6 +1261,9 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
       ? [...new Set(sourceRows.map((row) => semanticDimension(row, dataset, "sucursal", granularity)).filter(Boolean))]
       : [];
     Object.assign(filters, resolveNamedEntityFilters(question, entityCandidates, branchValues));
+  }
+  if (dataset === "ordenes_servicio" && serviceOrderParticipantRows && (dimensions.includes("tecnico") || dimensions.includes("activo") || filters.tecnico || filters.activo)) {
+    sourceRows = serviceOrderParticipantRows;
   }
   const rows = applyBusinessFilters(sourceRows, dataset, filters, granularity);
   const groups = new Map<string, { dimensions: JsonRecord; rows: JsonRecord[] }>();

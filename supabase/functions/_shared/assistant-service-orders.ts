@@ -39,6 +39,12 @@ const BRANCH_BY_CODE: Record<string, string> = {
 
 const BRANCHES = Object.values(BRANCH_BY_CODE);
 
+const TECHNICIAN_CODE_PREFIX = /^(?:[A-Z]{1,6}[\s-]*)?\d{2,}\s*(?:[-:|/]\s*)?/;
+
+const TECHNICIAN_ALIASES: Record<string, string> = {
+  "DENNIS BENITEZ": "DENIS DE LA CRUZ BENITEZ ARAUJO",
+};
+
 export function normalizeServiceOrderText(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
@@ -47,6 +53,40 @@ export function normalizeServiceOrderText(value: unknown) {
     .replace(/[^A-Z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function normalizeServiceOrderTechnician(value: unknown) {
+  const normalized = normalizeServiceOrderText(value)
+    .replace(TECHNICIAN_CODE_PREFIX, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return TECHNICIAN_ALIASES[normalized] ?? normalized;
+}
+
+export function serviceOrderTechnicianMatchScore(left: unknown, right: unknown) {
+  const source = normalizeServiceOrderTechnician(left);
+  const candidate = normalizeServiceOrderTechnician(right);
+  if (!source || !candidate) return 0;
+  if (source === candidate) return 1;
+
+  const sourceTokens = source.split(" ").filter(Boolean);
+  const candidateTokens = candidate.split(" ").filter(Boolean);
+  const sourceSet = new Set(sourceTokens);
+  const candidateSet = new Set(candidateTokens);
+  const intersection = sourceTokens.filter((token) => candidateSet.has(token)).length;
+  const sourceContained = sourceTokens.length >= 2 && intersection === sourceTokens.length;
+  const candidateContained = candidateTokens.length >= 2 && candidateTokens.every((token) => sourceSet.has(token));
+
+  if (sourceContained || candidateContained) {
+    return 0.94 - Math.min(Math.abs(sourceTokens.length - candidateTokens.length) * 0.02, 0.12);
+  }
+  if (intersection < 2) return 0;
+  return intersection / Math.max(sourceTokens.length, candidateTokens.length) +
+    (sourceTokens[0] === candidateTokens[0] ? 0.12 : 0);
+}
+
+export function serviceOrderTechniciansMatch(left: unknown, right: unknown) {
+  return serviceOrderTechnicianMatchScore(left, right) >= 0.72;
 }
 
 export function serviceOrderClientKey(value: unknown) {
