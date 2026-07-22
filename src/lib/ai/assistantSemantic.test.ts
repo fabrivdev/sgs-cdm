@@ -3,6 +3,7 @@ import {
   compileSemanticPlan,
   detectSemanticAmbiguity,
   getDataCatalog,
+  shouldSortTemporalSeriesChronologically,
   validateGenericPlans,
   type GenericQueryPlan,
 } from "../../../supabase/functions/_shared/assistant-semantic";
@@ -28,6 +29,17 @@ describe("assistant semantic catalog", () => {
 });
 
 describe("assistant semantic compiler", () => {
+  it("keeps ordinary period breakdowns in chronological order", () => {
+    expect(shouldSortTemporalSeriesChronologically(
+      "Cuantas horas cerradas en OS tiene Juan Patino por mes este ano",
+      ["periodo"],
+    )).toBe(true);
+    expect(shouldSortTemporalSeriesChronologically(
+      "Que mes tuvo la mayor cantidad de OS cerradas",
+      ["periodo"],
+    )).toBe(false);
+  });
+
   it("uses billing lines for billed hours and breaks them down by time type", () => {
     const plan = planFor("Cuantas horas se facturaron por tipo de tiempo");
     expect(plan).toMatchObject({

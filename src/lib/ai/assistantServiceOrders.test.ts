@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ASSISTANT_SERVICE_ORDER_SELECT,
+  dedupeServiceOrderTechnicianSources,
   normalizeServiceOrderTechnician,
   resolveServiceOrderBranch,
   serviceOrderClientKey,
@@ -50,6 +51,17 @@ describe("assistant service-order branch resolution", () => {
 });
 
 describe("assistant service-order technician identity", () => {
+  it("does not count the same imported technician source twice", () => {
+    expect(dedupeServiceOrderTechnicianSources([
+      "ME0017 - JUAN PATINO",
+      "ME0017 - JUAN PATINO",
+      "JUAN PATINO",
+    ])).toEqual([
+      "ME0017 - JUAN PATINO",
+      "JUAN PATINO",
+    ]);
+  });
+
   it("removes new-system codes from technician names", () => {
     expect(normalizeServiceOrderTechnician("ME0017 - JUAN PATINO")).toBe("JUAN PATINO");
   });

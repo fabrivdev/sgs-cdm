@@ -63,6 +63,17 @@ export function normalizeServiceOrderTechnician(value: unknown) {
   return TECHNICIAN_ALIASES[normalized] ?? normalized;
 }
 
+export function dedupeServiceOrderTechnicianSources(values: unknown[]) {
+  const sources = new Map<string, string>();
+  for (const value of values) {
+    const source = String(value ?? "").trim();
+    const key = normalizeServiceOrderText(source);
+    if (!key || sources.has(key)) continue;
+    sources.set(key, source);
+  }
+  return [...sources.values()];
+}
+
 export function serviceOrderTechnicianMatchScore(left: unknown, right: unknown) {
   const source = normalizeServiceOrderTechnician(left);
   const candidate = normalizeServiceOrderTechnician(right);

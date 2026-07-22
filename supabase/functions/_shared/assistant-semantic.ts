@@ -436,6 +436,21 @@ export function getPlannerCatalog() {
   };
 }
 
+export function shouldSortTemporalSeriesChronologically(question: string, dimensions: readonly string[]) {
+  if (!dimensions.includes("periodo")) return false;
+  const text = normalizeText(question);
+  return !hasAny(text, [
+    "MAYOR",
+    "MENOR",
+    "TOP",
+    "RANKING",
+    "MAS ALTO",
+    "MAS BAJO",
+    "ORDEN DESCENDENTE",
+    "RECIENTE PRIMERO",
+  ]);
+}
+
 export function detectSemanticIntent(question: string): SemanticIntent | null {
   const text = normalizeText(question);
   const asksInactive = hasAny(text, ["INACTIVO", "INACTIVOS", "EX TECNICO", "SALIO DE LA EMPRESA"]);

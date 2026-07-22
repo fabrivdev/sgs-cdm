@@ -8,6 +8,7 @@ import {
   getDataCatalog,
   getPlannerCatalog,
   semanticIntentHint,
+  shouldSortTemporalSeriesChronologically,
   validateGenericPlans,
   type BusinessDataset,
   type GenericQueryPlan,
@@ -25,6 +26,7 @@ import {
 } from "../_shared/assistant-context.ts";
 import {
   ASSISTANT_SERVICE_ORDER_SELECT,
+  dedupeServiceOrderTechnicianSources,
   normalizeServiceOrderTechnician,
   resolveServiceOrderBranch,
   serviceOrderClientKey,
@@ -573,7 +575,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
       if (normalizedKey === "responsable" || /^mec aux [1-6]$/.test(normalizedKey)) values.push(value);
     }
     const entries = new Map<string, { tecnico: string; activo: boolean | null; sources: string[] }>();
-    for (const value of values) {
+    for (const value of dedupeServiceOrderTechnicianSources(values)) {
       const source = cleanText(value, 160);
       const normalized = normalizeTechnician(source);
       if (!normalized) continue;
@@ -1280,10 +1282,13 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     ...Object.fromEntries(metrics.map((metric) => [metric, semanticMetric(group.rows, dataset, metric)])),
   }));
   const requestedOrder = cleanText(args.order_by, 40);
-  const orderBy = metrics.includes(requestedOrder) || dimensions.includes(requestedOrder)
-    ? requestedOrder
-    : metrics[0];
-  const ascending = cleanText(args.order_direction, 8).toLowerCase() === "asc";
+  const chronologicalPeriods = shouldSortTemporalSeriesChronologically(question, dimensions);
+  const orderBy = chronologicalPeriods
+    ? "periodo"
+    : metrics.includes(requestedOrder) || dimensions.includes(requestedOrder)
+      ? requestedOrder
+      : metrics[0];
+  const ascending = chronologicalPeriods || cleanText(args.order_direction, 8).toLowerCase() === "asc";
   const orderIsMetric = metrics.includes(orderBy);
   result.sort((a, b) => {
     const comparison = orderIsMetric
