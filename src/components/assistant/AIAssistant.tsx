@@ -24,10 +24,28 @@ const examples = [
   "¿Cuántas OS cerradas hubo por tipo de tiempo?",
 ];
 
-function friendlyError(message: string) {
-  if (/ai_conversations|schema cache|does not exist/i.test(message)) return "Falta aplicar la migración del asistente en Supabase.";
-  if (/GROQ_API_KEY/i.test(message)) return "Falta configurar GROQ_API_KEY en Lovable Cloud Secrets.";
-  if (/rate limit|limite gratuito|too many requests/i.test(message)) return "Se alcanzó el límite gratuito de Groq. Intentá nuevamente más tarde.";
+type AssistantError = string | {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+};
+
+function friendlyError(error: AssistantError) {
+  const message = typeof error === "string" ? error : error.message ?? "Error desconocido del asistente.";
+  const code = typeof error === "string" ? "" : error.code ?? "";
+  const diagnostic = [code, message, typeof error === "string" ? "" : error.details, typeof error === "string" ? "" : error.hint]
+    .filter(Boolean)
+    .join(" ");
+
+  if (/PGRST205|42P01|relation .* does not exist|could not find the table .*schema cache/i.test(diagnostic)) {
+    return "Falta crear las tablas del asistente en Supabase.";
+  }
+  if (/42501|permission denied|row-level security|violates row-level security/i.test(diagnostic)) {
+    return "Las tablas del asistente existen, pero tu usuario no tiene permiso para usarlas. Aplicá la migración de permisos del asistente.";
+  }
+  if (/GROQ_API_KEY/i.test(diagnostic)) return "Falta configurar GROQ_API_KEY en Lovable Cloud Secrets.";
+  if (/rate limit|limite gratuito|too many requests/i.test(diagnostic)) return "Se alcanzó el límite gratuito de Groq. Intentá nuevamente más tarde.";
   return message;
 }
 
@@ -77,7 +95,7 @@ export function AIAssistant() {
       .limit(30);
     setLoadingHistory(false);
     if (queryError) {
-      setError(friendlyError(queryError.message));
+      setError(friendlyError(queryError));
       return;
     }
     setConversations(data ?? []);
@@ -93,7 +111,7 @@ export function AIAssistant() {
       .order("created_at");
     setLoadingHistory(false);
     if (queryError) {
-      setError(friendlyError(queryError.message));
+      setError(friendlyError(queryError));
       return;
     }
     setConversationId(id);
@@ -122,7 +140,7 @@ export function AIAssistant() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: deleteError } = await (supabase as any).from("ai_conversations").delete().eq("id", conversationId);
     if (deleteError) {
-      setError(friendlyError(deleteError.message));
+      setError(friendlyError(deleteError));
       return;
     }
     newConversation();
