@@ -1047,7 +1047,13 @@ export default function Dashboard() {
       }
       const participants = Array.from(participantMap.values());
       const participantNames = participants.map((participant) => participant.tecnico);
-      const tecnico = participantNames.length > 0 ? participantNames.join(" · ") : "Sin técnico asignado";
+      const responsibleSource = String(row.responsable ?? "").trim();
+      const responsibleMatch = responsibleSource
+        ? matchTechnicianProfile(responsibleSource, allTechnicianProfiles)
+        : null;
+      const tecnico = responsibleSource
+        ? responsibleMatch?.nombre ?? displayImportedTechnicianName(responsibleSource)
+        : "Sin técnico asignado";
       const tiposTiempo = tiposTiempoOS(row);
       const tipoTiempo = tiposTiempo.join(" + ");
       const estadoOS = canonicalSituacion(row.situacion_os);
@@ -1175,7 +1181,7 @@ export default function Dashboard() {
         key: [row.os_numero, fechaApertura, tipoTiempo, tecnico, index].join("||"),
         os: row.os_numero,
         tecnico,
-        tecnicoProfileId: participants[0]?.profileId ?? null,
+        tecnicoProfileId: responsibleMatch?.id ?? null,
         cliente,
         sucursal,
         marca,
