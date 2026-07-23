@@ -18,6 +18,7 @@ import {
 import {
   renderDeterministicAnswer,
   type BusinessQueryResult,
+  type DominantOutlier,
   type ExecutedSemanticQuery,
 } from "../_shared/assistant-answer.ts";
 import { closestTextMatches, resolveNamedEntityFilters } from "../_shared/assistant-entities.ts";
@@ -1298,6 +1299,23 @@ function applyBusinessFilters(rows: JsonRecord[], dataset: BusinessDataset, filt
   }));
 }
 
+/**
+ * Marca cuando el resultado ganador de un ranking es desproporcionado frente al
+ * resto: puede ser un dato cargado mal (ver diagnostico del asistente), no un
+ * maximo real. No filtra ni corrige nada, solo evita presentarlo como un hecho.
+ */
+function detectDominantOutlier(rows: JsonRecord[], metric: string): DominantOutlier | null {
+  const values = rows.map((row) => Number(row[metric]) || 0).filter((value) => value > 0);
+  if (values.length < 4) return null;
+  const sorted = [...values].sort((a, b) => b - a);
+  const [top, ...rest] = sorted;
+  const restSorted = [...rest].sort((a, b) => a - b);
+  const median = restSorted[Math.floor(restSorted.length / 2)];
+  if (median <= 0) return null;
+  const ratio = top / median;
+  return ratio >= 8 ? { metric, top, median, ratio } : null;
+}
+
 async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
   const dataset = cleanText(args.dataset, 40) as BusinessDataset;
   if (!(dataset in businessCatalog)) throw new Error("Dataset no permitido");
@@ -1402,6 +1420,9 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
   const limit = chronologicalPeriods && dimensions.length === 1 && dimensions[0] === "periodo"
     ? Math.max(requestedLimit, Math.min(result.length, 100))
     : requestedLimit;
+  const outlier = dimensions.length && orderIsMetric && !ascending
+    ? detectDominantOutlier(result, orderBy)
+    : null;
   return {
     dataset,
     definition: catalog.description,
@@ -1412,6 +1433,7 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     source_rows: rows.length,
     result_rows: Math.min(result.length, limit),
     rows: result.slice(0, limit),
+    outlier,
   };
 }
 

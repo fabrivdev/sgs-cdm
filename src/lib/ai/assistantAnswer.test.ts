@@ -170,6 +170,47 @@ describe("assistant deterministic answer renderer", () => {
     expect(answer).not.toContain("CLIENTE A");
   });
 
+  it("warns when the winning row dominates the rest of the comparable results", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {},
+      granularity: "day",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    };
+    const result = resultFor(plan, [{ periodo: "2018-03-03", total_usd: 96726043482 }]);
+    (result.data as { outlier?: unknown }).outlier = {
+      metric: "total_usd", top: 96726043482, median: 12000, ratio: 8060503.6,
+    };
+    const answer = renderDeterministicAnswer({ question: "Que dia tuvo mayor facturacion", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Aviso:");
+    expect(answer).toContain("veces mas alto que el resto");
+  });
+
+  it("does not warn when there is no outlier flagged", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {},
+      granularity: "day",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Que dia tuvo mayor facturacion",
+      mode: "brief",
+      results: [resultFor(plan, [{ periodo: "2026-07-20", total_usd: 15000 }])],
+    });
+
+    expect(answer).not.toContain("Aviso:");
+  });
+
   it("renders composite queries without asking a model to reinterpret results", () => {
     const plan: GenericQueryPlan = {
       dataset: "facturacion",

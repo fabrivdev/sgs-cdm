@@ -6,6 +6,8 @@ import {
   type SemanticRecord,
 } from "./assistant-semantic.ts";
 
+export type DominantOutlier = { metric: string; top: number; median: number; ratio: number };
+
 export type BusinessQueryResult = {
   dataset: BusinessDataset;
   definition: string;
@@ -16,6 +18,7 @@ export type BusinessQueryResult = {
   source_rows: number;
   result_rows: number;
   rows: SemanticRecord[];
+  outlier?: DominantOutlier | null;
 };
 
 export type ExecutedSemanticQuery = {
@@ -158,8 +161,20 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
     period,
     appliedFilters.length ? `Filtros: ${appliedFilters.join("; ")}.` : "",
     omitted ? `Se muestran ${visibleRows.length} de ${data.result_rows} resultados.` : "",
+    outlierCaveat(plan.dataset, data.outlier),
   ].filter(Boolean).join(" ");
   return `${metricTitle} por ${dimensionTitle}:\n${lines.join("\n")}\n${footer}`;
+}
+
+/**
+ * Avisa cuando el valor ganador de un ranking domina de forma desproporcionada
+ * al resto de los resultados comparables: puede ser un dato cargado mal, no un
+ * maximo real. Ver convencion "honestidad de datos" del proyecto.
+ */
+function outlierCaveat(dataset: BusinessDataset, outlier: DominantOutlier | null | undefined) {
+  if (!outlier) return "";
+  const metric = metricLabel(dataset, outlier.metric).toLowerCase();
+  return `Aviso: el primer resultado (${metric} ${formatNumber(outlier.top, 2)}) es ${formatNumber(outlier.ratio, 1)} veces mas alto que el resto de los valores comparables; podria ser un dato cargado incorrectamente. Verificalo en la fuente antes de darlo por valido.`;
 }
 
 /**
