@@ -103,9 +103,51 @@ function sum(rows: JsonRecord[], key: string) {
   return rows.reduce((acc, row) => acc + (Number(row[key]) || 0), 0);
 }
 
+const VALID_MARCAS = ["CLAAS", "HORSCH", "OTROS"];
+
+function invalidMarcaValue(marca: unknown) {
+  const value = cleanText(marca, 30);
+  if (!value || value.toLowerCase() === "todos") return null;
+  return VALID_MARCAS.includes(value.toUpperCase()) ? null : value;
+}
+
+function marcaClarificationMessage(value: string) {
+  return `No reconozco "${value}" como marca. Las marcas registradas son CLAAS, HORSCH y Otros. Si te referis a un modelo o serie (por ejemplo Jaguar, Lexion, Axion), decimelo asi para buscarlo como modelo, no como marca.`;
+}
+
+class MarcaClarificationError extends Error {
+  invalidValue: string;
+  constructor(invalidValue: string) {
+    super(marcaClarificationMessage(invalidValue));
+    this.invalidValue = invalidValue;
+  }
+}
+
+/** Errores tecnicos de Postgres/Postgrest que nunca deben llegar tal cual al chat. */
+function isRawDatabaseErrorText(message: string) {
+  return /invalid input value for enum|violates (?:row-level security|check|foreign key|not-null|unique) constraint|duplicate key value|relation ".*" does not exist|column ".*" does not exist|permission denied for|syntax error at or near/i.test(message);
+}
+
+/** Traduce errores tecnicos a mensajes seguros; el detalle crudo solo va a console.error. */
+function sanitizeErrorMessage(message: string) {
+  const enumMatch = /invalid input value for enum (\w+):\s*"?([^".]+)"?/i.exec(message);
+  if (enumMatch) {
+    const [, enumName, invalidValue] = enumMatch;
+    if (enumName === "marca") return marcaClarificationMessage(invalidValue.trim());
+    return "No pude completar la consulta porque uno de los valores no es valido para este dato. Intenta reformular la pregunta.";
+  }
+  if (isRawDatabaseErrorText(message)) {
+    return "No pude completar la consulta por un problema con los datos. Intenta reformular la pregunta o acotar los filtros.";
+  }
+  return message;
+}
+
 async function checked<T = JsonRecord[]>(promise: PromiseLike<{ data: T | null; error: { message: string } | null }>) {
   const { data, error } = await promise;
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("[ai-data-assistant] Postgres error:", error.message);
+    throw new Error(sanitizeErrorMessage(error.message));
+  }
   return data ?? ([] as unknown as T);
 }
 
@@ -124,6 +166,8 @@ async function fetchPaged(
 }
 
 async function getOperationalSummary(client: SupabaseClient, args: JsonRecord) {
+  const invalidMarca = invalidMarcaValue(args.marca);
+  if (invalidMarca) throw new MarcaClarificationError(invalidMarca);
   let jobsQuery = client
     .from("trabajos")
     .select("id,codigo,os_numero,estado_general,sucursal,marca,cliente_id,creado_en,cerrado_en,descripcion_problema")
@@ -734,6 +778,8 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
 }
 
 async function getParkSummary(client: SupabaseClient, args: JsonRecord) {
+  const invalidMarca = invalidMarcaValue(args.marca);
+  if (invalidMarca) throw new MarcaClarificationError(invalidMarca);
   let query = client
     .from("parque_maquinas")
     .select("id,cliente_id,marca,subgrupo,sucursal,modelo_tipo,serie,anio,activo,clientes(nombre)")
@@ -1053,6 +1099,8 @@ async function loadBusinessRows(client: SupabaseClient, dataset: BusinessDataset
       : result._rows) ?? []) as JsonRecord[];
   }
   if (dataset === "trabajos") {
+    const invalidMarca = invalidMarcaValue(filters.marca);
+    if (invalidMarca) throw new MarcaClarificationError(invalidMarca);
     const [rows, clients] = await Promise.all([
       fetchPaged((from, to) => {
         let query = client.from("trabajos")
@@ -2192,11 +2240,25 @@ Corrige el plan y devuelve nuevamente SOLO {"queries":[...]}.`;
       };
     }
 
-    const results: ExecutedSemanticQuery[] = await Promise.all(plans.map(async (plan) => {
-      const args: JsonRecord = { ...plan, filters: plan.filters, __question: question };
-      const data = await queryBusinessData(client, args) as BusinessQueryResult;
-      return { args: { ...plan, filters: data.filters ?? plan.filters }, data };
-    }));
+    let results: ExecutedSemanticQuery[];
+    try {
+      results = await Promise.all(plans.map(async (plan) => {
+        const args: JsonRecord = { ...plan, filters: plan.filters, __question: question };
+        const data = await queryBusinessData(client, args) as BusinessQueryResult;
+        return { args: { ...plan, filters: data.filters ?? plan.filters }, data };
+      }));
+    } catch (error) {
+      if (error instanceof MarcaClarificationError) {
+        return {
+          content: error.message,
+          sources: [{ tool: "semantic_clarification", label: "Definicion de consulta", filters: { marca_no_reconocida: error.invalidValue } }],
+          results: [],
+          usage,
+          model: "semantic-clarifier-v2",
+        };
+      }
+      throw error;
+    }
     const sources = results.map(({ args }) => ({ tool: "query_business_data", label: sourceLabel("query_business_data"), filters: args }));
     const deterministicContent = renderDeterministicAnswer({ question, results, mode: answerMode });
     if (deterministicContent) {
@@ -2527,7 +2589,9 @@ Deno.serve(async (req) => {
 
     return json({ conversation_id: conversationId, message: { ...assistantMessage, role: "assistant", content: finalContent, sources }, usage: totalUsage });
   } catch (error) {
-    const message = error instanceof DOMException && error.name === "AbortError" ? "La consulta supero el tiempo limite" : error instanceof Error ? error.message : String(error);
+    const rawMessage = error instanceof DOMException && error.name === "AbortError" ? "La consulta supero el tiempo limite" : error instanceof Error ? error.message : String(error);
+    const message = sanitizeErrorMessage(rawMessage);
+    if (message !== rawMessage) console.error("[ai-data-assistant] Unhandled error sanitizado:", rawMessage);
     if (userId) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

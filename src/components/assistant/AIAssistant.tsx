@@ -46,6 +46,9 @@ function friendlyError(error: AssistantError) {
   }
   if (/GROQ_API_KEY/i.test(diagnostic)) return "Falta configurar GROQ_API_KEY en Lovable Cloud Secrets.";
   if (/rate limit|limite gratuito|too many requests/i.test(diagnostic)) return "Se alcanzó el límite gratuito de Groq. Intentá nuevamente más tarde.";
+  if (/invalid input value for enum|violates .* constraint|duplicate key value|relation ".*" does not exist|column ".*" does not exist|syntax error at or near/i.test(diagnostic)) {
+    return "No pude completar la consulta por un problema con los datos. Intentá reformular la pregunta.";
+  }
   return message;
 }
 
