@@ -405,6 +405,50 @@ function hasAny(text: string, values: readonly string[]) {
   return values.some((value) => text.includes(value));
 }
 
+const temporalUnits: Array<{
+  granularity: QueryGranularity;
+  nouns: string;
+  adjective: string;
+}> = [
+  { granularity: "day", nouns: "DIA|DIAS", adjective: "DIARI[OA]S?" },
+  { granularity: "week", nouns: "SEMANA|SEMANAS", adjective: "SEMANAL(?:ES)?" },
+  { granularity: "month", nouns: "MES|MESES", adjective: "MENSUAL(?:ES)?" },
+  { granularity: "year", nouns: "ANO|ANOS", adjective: "ANUAL(?:ES)?" },
+];
+
+/**
+ * Detecta cuando una unidad temporal es el eje de la consulta. No alcanza con
+ * mencionar "este ano": debe pedirse un desglose, una comparacion o un periodo
+ * concreto como respuesta ("cual fue el mes...").
+ */
+function requestedTemporalGranularity(text: string): QueryGranularity | null {
+  for (const unit of temporalUnits) {
+    const noun = `(?:${unit.nouns})`;
+    const patterns = [
+      new RegExp(`\\b(?:POR|CADA)\\s+${noun}\\b`),
+      new RegExp(`\\b${unit.adjective}\\b`),
+      new RegExp(`\\b(?:QUE|CUAL(?:\\s+FUE|\\s+ES)?)(?:\\s+(?:EL|LA|MI|NUESTRO|NUESTRA|SU))?\\s+${noun}\\b`),
+      new RegExp(`\\b${noun}\\s+(?:CON|DE)\\s+(?:LA\\s+|EL\\s+)?(?:MAYOR|MENOR|MAS|MEJOR|PEOR)\\b`),
+      new RegExp(`\\b${noun}\\s+QUE\\s+(?:MAS|MENOS)\\b`),
+      new RegExp(`\\b${noun}\\s+MAS\\s+(?:PRODUCTIV[OA]|ALTO|ALTA|BAJO|BAJA)\\b`),
+      new RegExp(`\\b(?:MEJOR|PEOR)\\s+${noun}\\b`),
+    ];
+    if (patterns.some((pattern) => pattern.test(text))) return unit.granularity;
+  }
+  return null;
+}
+
+function isTemporalRankingQuestion(text: string) {
+  return requestedTemporalGranularity(text) !== null && (
+    hasAny(text, [
+      "MAYOR", "MENOR", "MEJOR", "PEOR", "TOP", "RANKING",
+      "MAS PRODUCTIV", "MAS ALTO", "MAS ALTA", "MAS BAJO", "MAS BAJA",
+      "MAXIMO", "MAXIMA", "MINIMO", "MINIMA",
+    ])
+    || /\b(?:QUE|CUAL(?:\s+FUE|\s+ES)?)\b/.test(text)
+  );
+}
+
 export function getDataCatalog() {
   return {
     version: semanticCatalogVersion,
@@ -439,6 +483,7 @@ export function getPlannerCatalog() {
 export function shouldSortTemporalSeriesChronologically(question: string, dimensions: readonly string[]) {
   if (!dimensions.includes("periodo")) return false;
   const text = normalizeText(question);
+  if (isTemporalRankingQuestion(text)) return false;
   return !hasAny(text, [
     "MAYOR",
     "MENOR",
@@ -788,6 +833,8 @@ function scoreDatasets(text: string) {
 }
 
 function detectGranularity(text: string): QueryGranularity {
+  const requested = requestedTemporalGranularity(text);
+  if (requested) return requested;
   if (hasAny(text, [
     "POR DIA", "CADA DIA", "QUE DIA", "DIARIO",
     "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
@@ -807,6 +854,7 @@ function detectGranularity(text: string): QueryGranularity {
 function requestedLimit(text: string) {
   const topMatch = text.match(/\bTOP\s+(\d{1,3})\b/);
   if (topMatch) return safeLimit(topMatch[1], 20, 100);
+  if (isTemporalRankingQuestion(text)) return 1;
   if (hasAny(text, ["QUIEN LE SIGUE", "CUAL LE SIGUE", "SEGUNDO LUGAR"])) return 2;
   if (hasAny(text, [
     "CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES", "QUE SUCURSAL",
@@ -825,7 +873,7 @@ function isFollowUp(text: string) {
   const wordCount = text.split(" ").filter(Boolean).length;
   if (wordCount > 10) return false;
   if (hasAny(text, ["EL MISMO", "LA MISMA", "LOS MISMOS", "LAS MISMAS", "LE SIGUE"])) return true;
-  if (/^Y(?:\s|$)/.test(text)) return true;
+  if (/^(?:Y|PERO|ENTONCES|AHORA|BUENO(?:\s+Y)?)(?:\s|$)/.test(text)) return true;
 
   // Solo una referencia temporal desnuda hereda el plan. Una pregunta completa
   // como "cuanto facturamos este mes" debe iniciar una consulta independiente.
@@ -907,6 +955,7 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
     if (allowed.has(dimension) && hasAny(text, signals) && !dimensions.includes(dimension)) dimensions.push(dimension);
   };
 
+  if (allowed.has("periodo") && requestedTemporalGranularity(text)) dimensions.push("periodo");
   add("periodo", [
     "POR DIA", "POR SEMANA", "POR MES", "POR ANO", "QUE DIA", "QUE SEMANA",
     "QUE MES", "QUE ANO", "CUAL DIA", "CUAL SEMANA", "CUAL MES", "CUAL ANO",

@@ -175,6 +175,55 @@ describe("assistant semantic compiler", () => {
     });
   });
 
+  it("ranks service billing by month for natural comparative wording", () => {
+    const plan = planFor("Cual fue el mes con mayor facturacion en servicios de este ano", {
+      date_from: "2026-01-01",
+      date_to: "2026-12-31",
+    });
+    expect(plan).toMatchObject({
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {
+        date_from: "2026-01-01",
+        date_to: "2026-12-31",
+        rubro: "Servicio",
+      },
+      granularity: "month",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    });
+    expect(shouldSortTemporalSeriesChronologically(
+      "Cual fue el mes con mayor facturacion en servicios de este ano",
+      plan.dimensions,
+    )).toBe(false);
+  });
+
+  it("keeps period, category and metric in a short corrective follow-up", () => {
+    const previous = planFor("Cual fue el mes con mayor facturacion en servicios de este ano", {
+      date_from: "2026-01-01",
+      date_to: "2026-12-31",
+    });
+    const followUp = planFor("Pero cual fue el mejor mes", {}, previous);
+
+    expect(isSemanticFollowUpQuestion("Pero cual fue el mejor mes")).toBe(true);
+    expect(followUp).toMatchObject({
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {
+        date_from: "2026-01-01",
+        date_to: "2026-12-31",
+        rubro: "Servicio",
+      },
+      granularity: "month",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    });
+  });
+
   it("ranks the highest billing day instead of silently grouping by month", () => {
     const plan = planFor("Dia con mayor facturacion de todos los anos");
     expect(plan).toMatchObject({
