@@ -948,6 +948,30 @@ function hasExplicitMetricSignal(dataset: BusinessDataset, text: string) {
   return hasAny(` ${text} `, signals[dataset]);
 }
 
+const MODEL_MENTION_STOPWORDS = new Set([
+  "QUE", "TENGA", "TENGAN", "TIENE", "TIENEN", "EN", "DE", "DEL", "PARA",
+  "CON", "Y", "O", "DESDE", "HASTA", "SEA", "SEAN", "ES", "SON",
+]);
+
+/**
+ * Detecta cuando "modelo" introduce un valor especifico (ej: "modelo jaguar 950")
+ * en vez de pedir un desglose por modelo (ej: "con su modelo y dueno"). Solo se
+ * considera mencion especifica si el texto que sigue trae un numero, como suelen
+ * llevar los modelos reales (Jaguar 950, Lexion 760, Axion 850).
+ */
+export function detectModelMention(text: string): string | null {
+  const match = text.match(/\bMODELO(?:\s+TIPO)?\s+((?:[A-Z0-9]+\s*){1,4})/);
+  if (!match) return null;
+  const tokens = match[1].trim().split(/\s+/);
+  const cut: string[] = [];
+  for (const token of tokens) {
+    if (MODEL_MENTION_STOPWORDS.has(token)) break;
+    cut.push(token);
+  }
+  if (!cut.length || !cut.some((token) => /\d/.test(token))) return null;
+  return cut.join(" ");
+}
+
 function inferDimensions(dataset: BusinessDataset, text: string) {
   const allowed = new Set(Object.keys(semanticCatalog[dataset].dimensions));
   const dimensions: string[] = [];
@@ -978,6 +1002,11 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
     "POR CLIENTE", "DEL CLIENTE", "DE CLIENTE", "QUE CLIENTE", "CUAL CLIENTE",
     "CLIENTE QUE MAS", "CLIENTE MAS", "MEJOR CLIENTE", "TOP CLIENTES",
     "RANKING DE CLIENTES", "DUENO", "PROPIETARIO",
+    "LISTAME LOS CLIENTES", "LISTAME LAS CLIENTES", "LISTA DE CLIENTES", "LISTADO DE CLIENTES",
+    "QUE CLIENTES", "CUALES CLIENTES", "CUALES SON LOS CLIENTES",
+    "CLIENTES QUE TENGAN", "CLIENTES QUE TIENEN", "CLIENTES QUE TIENE", "CLIENTES CON",
+    "DAME LOS CLIENTES", "DIME LOS CLIENTES", "MOSTRA LOS CLIENTES", "MOSTRAME LOS CLIENTES",
+    "NOMBRA LOS CLIENTES", "DECIME LOS CLIENTES",
   ]);
   if (allowed.has("cliente") && /(?:^| )TOP\s+\d+\s+CLIENTES(?: |$)/.test(text) && !dimensions.includes("cliente")) {
     dimensions.push("cliente");
@@ -997,7 +1026,9 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
   add("os", ["POR OS", "CUAL OS", "QUE OS", "DETALLE DE OS"]);
   add("problema", ["PROBLEMA", "MOTIVO DE LA OS", "TRABAJO DE LA OS", "TRABAJO REALIZADO"]);
   add("serie", ["CHASIS", "NUMERO DE SERIE", "POR SERIE"]);
-  add("modelo", ["MODELO", "POR MODELO"]);
+  // "modelo X" con un numero (ej: "el modelo jaguar 950") pide un filtro, no un
+  // desglose por modelo; en ese caso no agregamos la dimension.
+  if (!detectModelMention(text)) add("modelo", ["MODELO", "POR MODELO"]);
   add("resultado", ["POR RESULTADO", "RESULTADOS"]);
   add("tipo", ["POR TIPO", "TIPO DE AUSENCIA", "TIPO DE NO DISPONIBILIDAD", "VACACIONES", "CAPACITACIONES", "PERMISOS"]);
   add("motivo", ["MOTIVO", "OBSERVACION DE LA AUSENCIA"]);
@@ -1116,6 +1147,10 @@ function inferCanonicalFilters(dataset: BusinessDataset, text: string, rawQuesti
     const prefixMatch = rawText.match(/(?:CHASIS|SERIE)(?: QUE)? (?:EMPIEZA|EMPIECEN|COMIENZA|COMIENCEN)(?: POR| CON)? ([A-Z0-9][A-Z0-9-]{1,})/)
       ?? rawText.match(/(?:CHASIS|SERIE) (?:PREFIJO )?([A-Z0-9][A-Z0-9-]{1,})/);
     if (prefixMatch?.[1]) filters.serie = prefixMatch[1];
+  }
+  if (allowed.has("modelo") && !filters.modelo) {
+    const mentionedModel = detectModelMention(rawText);
+    if (mentionedModel) filters.modelo = mentionedModel;
   }
   return filters;
 }

@@ -20,7 +20,7 @@ import {
   type BusinessQueryResult,
   type ExecutedSemanticQuery,
 } from "../_shared/assistant-answer.ts";
-import { resolveNamedEntityFilters } from "../_shared/assistant-entities.ts";
+import { closestTextMatches, resolveNamedEntityFilters } from "../_shared/assistant-entities.ts";
 import {
   inclusiveOverlapDays,
   referencesAllHistory,
@@ -117,11 +117,34 @@ function marcaClarificationMessage(value: string) {
   return `No reconozco "${value}" como marca. Las marcas registradas son CLAAS, HORSCH y Otros. Si te referis a un modelo o serie (por ejemplo Jaguar, Lexion, Axion), decimelo asi para buscarlo como modelo, no como marca.`;
 }
 
-class MarcaClarificationError extends Error {
-  invalidValue: string;
+/** Se atrapa en resolveGenericQuestion y se devuelve como respuesta guiada, sin error HTTP. */
+class AssistantClarificationError extends Error {
+  context: JsonRecord;
+  constructor(message: string, context: JsonRecord = {}) {
+    super(message);
+    this.context = context;
+  }
+}
+
+class MarcaClarificationError extends AssistantClarificationError {
   constructor(invalidValue: string) {
-    super(marcaClarificationMessage(invalidValue));
-    this.invalidValue = invalidValue;
+    super(marcaClarificationMessage(invalidValue), { marca_no_reconocida: invalidValue });
+  }
+}
+
+function modeloClarificationMessage(value: string, suggestions: string[]) {
+  if (!suggestions.length) return `No encontre maquinas con el modelo "${value}" en el parque registrado.`;
+  const list = suggestions.map((item) => `"${item}"`).join(", ");
+  const lead = suggestions.length > 1 ? "Los modelos mas parecidos que si existen son" : "El modelo mas parecido que si existe es";
+  return `No hay maquinas modelo "${value}" registradas. ${lead} ${list}. Decime si te referis a alguno de esos.`;
+}
+
+class ModeloClarificationError extends AssistantClarificationError {
+  constructor(mentionedValue: string, suggestions: string[]) {
+    super(modeloClarificationMessage(mentionedValue, suggestions), {
+      modelo_no_reconocido: mentionedValue,
+      sugerencias: suggestions,
+    });
   }
 }
 
@@ -1319,6 +1342,22 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     sourceRows = serviceOrderParticipantRows;
   }
   const rows = applyBusinessFilters(sourceRows, dataset, filters, granularity);
+  if (dataset === "parque" && !rows.length) {
+    const modeloFilterValue = cleanText(Array.isArray(filters.modelo) ? filters.modelo[0] : filters.modelo, 60);
+    if (modeloFilterValue && modeloFilterValue.toLowerCase() !== "todos") {
+      const normalizedFilter = normalizedKey(modeloFilterValue);
+      const knownModels = [...new Set(sourceRows
+        .map((row) => semanticDimension(row, dataset, "modelo", granularity))
+        .filter((value) => value && value !== "Sin dato"))];
+      // Si el modelo no existe en ningun lado, sugerimos alternativas. Si existe
+      // pero la combinacion con otros filtros (sucursal, marca) da cero filas,
+      // dejamos que el mensaje generico de "sin resultados" lo explique.
+      const modeloExistsAnywhere = knownModels.some((value) => normalizedKey(value).includes(normalizedFilter));
+      if (!modeloExistsAnywhere) {
+        throw new ModeloClarificationError(modeloFilterValue, closestTextMatches(modeloFilterValue, knownModels, 3));
+      }
+    }
+  }
   const chronologicalPeriods = shouldSortTemporalSeriesChronologically(question, dimensions);
   const groups = new Map<string, { dimensions: JsonRecord; rows: JsonRecord[] }>();
   for (const row of rows) {
@@ -2257,10 +2296,10 @@ Corrige el plan y devuelve nuevamente SOLO {"queries":[...]}.`;
         return { args: { ...plan, filters: data.filters ?? plan.filters }, data };
       }));
     } catch (error) {
-      if (error instanceof MarcaClarificationError) {
+      if (error instanceof AssistantClarificationError) {
         return {
           content: error.message,
-          sources: [{ tool: "semantic_clarification", label: "Definicion de consulta", filters: { marca_no_reconocida: error.invalidValue } }],
+          sources: [{ tool: "semantic_clarification", label: "Definicion de consulta", filters: error.context }],
           results: [],
           usage,
           model: "semantic-clarifier-v2",

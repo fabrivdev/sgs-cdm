@@ -110,14 +110,20 @@ export function resolveQuestionDateRange(question: string, currentDate: string) 
   const sunday = new Date(monday);
   sunday.setUTCDate(monday.getUTCDate() + 6);
 
+  const mentionsExplicitYear = /\b(?:19|20)\d{2}\b/.test(normalized);
+
   let range: { date_from?: string; date_to?: string } = {};
   if (includesAny(normalized, ["MES EN CURSO", "MES ACTUAL", "ESTE MES"])) {
     range = { date_from: `${currentDate.slice(0, 7)}-01`, date_to: currentDate };
-  } else if (includesAny(normalized, ["ANO EN CURSO", "ANO ACTUAL", "ESTE ANO"])) {
-    range = { date_from: `${currentDate.slice(0, 4)}-01-01`, date_to: currentDate };
   } else if (includesAny(normalized, ["ANO PASADO", "ANO ANTERIOR"])) {
     const year = Number(currentDate.slice(0, 4)) - 1;
     range = { date_from: `${year}-01-01`, date_to: `${year}-12-31` };
+  } else if (!mentionsExplicitYear && includesAny(normalized, [
+    "ANO EN CURSO", "ANO ACTUAL", "ESTE ANO",
+    "DEL ANO", "EN EL ANO", "EN LO QUE VA DEL ANO", "LO QUE VA DEL ANO",
+    "ESTE EJERCICIO", "EN LO QUE VA DEL EJERCICIO",
+  ])) {
+    range = { date_from: `${currentDate.slice(0, 4)}-01-01`, date_to: currentDate };
   } else if (includesAny(normalized, ["SEMANA PASADA", "SEMANA ANTERIOR"])) {
     const from = new Date(monday);
     const to = new Date(sunday);
