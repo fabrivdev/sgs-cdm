@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   compileSemanticPlan,
   detectSemanticAmbiguity,
+  enforceSemanticIntent,
   enumeratePeriodBuckets,
   getDataCatalog,
+  isSemanticFollowUpQuestion,
   shouldSortTemporalSeriesChronologically,
   validateGenericPlans,
   type GenericQueryPlan,
@@ -72,6 +74,61 @@ describe("assistant semantic compiler", () => {
     expect(plan.order_by).toBe("horas");
   });
 
+  it("uses the requested month as the productivity axis instead of forcing technician", () => {
+    const plan = planFor("Quiero saber cual fue mi mes mas productivo");
+    expect(plan).toMatchObject({
+      dataset: "ordenes_servicio",
+      metrics: ["horas", "ordenes"],
+      dimensions: ["periodo"],
+      granularity: "month",
+      order_by: "horas",
+      order_direction: "desc",
+      limit: 1,
+    });
+    expect(plan.dimensions).not.toContain("tecnico");
+    expect(shouldSortTemporalSeriesChronologically(
+      "Quiero saber cual fue mi mes mas productivo",
+      plan.dimensions,
+    )).toBe(false);
+  });
+
+  it("keeps productivity metric independent from an explicitly requested branch axis", () => {
+    const plan = planFor("Cual fue la sucursal mas productiva");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.metrics).toEqual(["horas", "ordenes"]);
+    expect(plan.dimensions).toEqual(["sucursal"]);
+    expect(plan.dimensions).not.toContain("tecnico");
+  });
+
+  it("supports a productivity matrix when both technician and month are explicit", () => {
+    const plan = planFor("Productividad por tecnico por mes");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.dimensions).toEqual(["periodo", "tecnico"]);
+    expect(plan.granularity).toBe("month");
+  });
+
+  it("does not inherit a previous technician axis for a complete productivity question", () => {
+    const previous = planFor("Productividad por tecnico");
+    const plan = planFor("Quiero saber cual fue mi mes mas productivo", {}, previous);
+
+    expect(plan).toMatchObject({
+      dataset: "ordenes_servicio",
+      dimensions: ["periodo"],
+      granularity: "month",
+      limit: 1,
+    });
+    expect(plan.dimensions).not.toContain("tecnico");
+  });
+
+  it("keeps an explicit productivity axis when repairing a model plan", () => {
+    const modelPlan = planFor("Productividad por tecnico");
+    const [plan] = enforceSemanticIntent("Quiero saber cual fue mi mes mas productivo", [modelPlan]);
+
+    expect(plan.dimensions).toEqual(["periodo"]);
+    expect(plan.granularity).toBe("month");
+    expect(plan.limit).toBe(1);
+  });
+
   it("ranks closed service orders by month", () => {
     const plan = planFor("Que mes tuvo la mayor cantidad de OS cerradas");
     expect(plan).toMatchObject({
@@ -118,6 +175,70 @@ describe("assistant semantic compiler", () => {
     });
   });
 
+  it("ranks service billing by month for natural comparative wording", () => {
+    const plan = planFor("Cual fue el mes con mayor facturacion en servicios de este ano", {
+      date_from: "2026-01-01",
+      date_to: "2026-12-31",
+    });
+    expect(plan).toMatchObject({
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {
+        date_from: "2026-01-01",
+        date_to: "2026-12-31",
+        rubro: "Servicio",
+      },
+      granularity: "month",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    });
+    expect(shouldSortTemporalSeriesChronologically(
+      "Cual fue el mes con mayor facturacion en servicios de este ano",
+      plan.dimensions,
+    )).toBe(false);
+  });
+
+  it("keeps period, category and metric in a short corrective follow-up", () => {
+    const previous = planFor("Cual fue el mes con mayor facturacion en servicios de este ano", {
+      date_from: "2026-01-01",
+      date_to: "2026-12-31",
+    });
+    const followUp = planFor("Pero cual fue el mejor mes", {}, previous);
+
+    expect(isSemanticFollowUpQuestion("Pero cual fue el mejor mes")).toBe(true);
+    expect(followUp).toMatchObject({
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {
+        date_from: "2026-01-01",
+        date_to: "2026-12-31",
+        rubro: "Servicio",
+      },
+      granularity: "month",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    });
+  });
+
+  it("ranks the highest billing day instead of silently grouping by month", () => {
+    const plan = planFor("Dia con mayor facturacion de todos los anos");
+    expect(plan).toMatchObject({
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      granularity: "day",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 1,
+    });
+    expect(plan.filters).not.toHaveProperty("date_from");
+    expect(plan.filters).not.toHaveProperty("date_to");
+  });
+
   it("finds the largest invoice without counting invoice lines", () => {
     const plan = planFor("Cual fue la factura mas grande");
     expect(plan).toMatchObject({
@@ -156,6 +277,20 @@ describe("assistant semantic compiler", () => {
       date_to: "2026-07-31",
       rubro: "Servicio",
     });
+  });
+
+  it("does not treat a complete question with a current period as a follow-up", () => {
+    const previous = planFor("Cuantas horas cerradas en OS tiene Juan Patino por mes este ano");
+    const plan = planFor("Cuanto se facturo este mes", {
+      date_from: "2026-07-01",
+      date_to: "2026-07-31",
+    }, previous);
+
+    expect(isSemanticFollowUpQuestion("Cuanto se facturo este mes")).toBe(false);
+    expect(isSemanticFollowUpQuestion("Y en el mes en curso?")).toBe(true);
+    expect(plan.dataset).toBe("facturacion");
+    expect(plan.metrics).toEqual(["total_usd"]);
+    expect(plan.dimensions).not.toContain("tecnico");
   });
 
   it("lists technician workload instead of returning one aggregate", () => {

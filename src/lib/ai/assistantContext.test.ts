@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   inclusiveOverlapDays,
+  referencesAllHistory,
   referencesVisibleContext,
   resolveQuestionDateRange,
   shouldApplyPageContext,
@@ -32,6 +33,14 @@ describe("assistant page context", () => {
   it("does not inherit Dashboard filters unless they are explicitly referenced", () => {
     expect(shouldApplyPageContext("Cuantas maquinas CLAAS hay", { module: "Dashboard" })).toBe(false);
     expect(shouldApplyPageContext("Cuantas maquinas hay con estos filtros", { module: "Dashboard" })).toBe(true);
+  });
+
+  it("never inherits a visible range when the user asks for all history", () => {
+    expect(referencesAllHistory("dia con mayor facturacion de todos los anos")).toBe(true);
+    expect(shouldApplyPageContext(
+      "dia con mayor facturacion de todos los anos",
+      { module: "Dashboard", filters: { fecha_desde: "2026-05-01", fecha_hasta: "2026-05-31" } },
+    )).toBe(false);
   });
 });
 
@@ -75,5 +84,15 @@ describe("assistant relative dates", () => {
 
   it("returns no implicit dates when the question does not name a period", () => {
     expect(resolveQuestionDateRange("Que tecnico tiene mas OS", currentDate)).toEqual({});
+    expect(resolveQuestionDateRange("Que dia tuvo la mayor facturacion", currentDate)).toEqual({});
+    expect(resolveQuestionDateRange("Cuales son los clientes mayores", currentDate)).toEqual({});
+  });
+
+  it("resolves billing del dia as today without confusing a daily maximum", () => {
+    expect(resolveQuestionDateRange("dime la facturacion del dia", currentDate)).toEqual({
+      date_from: currentDate,
+      date_to: currentDate,
+    });
+    expect(resolveQuestionDateRange("dia con mayor facturacion de todos los anos", currentDate)).toEqual({});
   });
 });

@@ -8,6 +8,7 @@ import {
   enforceSemanticIntent,
   getDataCatalog,
   getPlannerCatalog,
+  isSemanticFollowUpQuestion,
   semanticIntentHint,
   shouldSortTemporalSeriesChronologically,
   validateGenericPlans,
@@ -22,6 +23,7 @@ import {
 import { resolveNamedEntityFilters } from "../_shared/assistant-entities.ts";
 import {
   inclusiveOverlapDays,
+  referencesAllHistory,
   resolveQuestionDateRange,
   shouldApplyPageContext,
 } from "../_shared/assistant-context.ts";
@@ -1543,7 +1545,12 @@ function semanticToolArgs(
   Object.assign(args, inherited);
 
   const normalized = normalizedKey(question);
-  Object.assign(args, resolveQuestionDateRange(question, currentDate));
+  if (referencesAllHistory(question)) {
+    delete args.date_from;
+    delete args.date_to;
+  } else {
+    Object.assign(args, resolveQuestionDateRange(question, currentDate));
+  }
   const knownBranches = ["Santa Rita", "Katuete", "Loma Plata", "Misiones", "Santa Rosa", "Campo 9"];
   const explicitBranches = knownBranches.filter((branch) => normalized.includes(normalizedKey(branch)));
   if (explicitBranches.length > 1) {
@@ -2139,10 +2146,12 @@ async function resolveGenericQuestion(
   let usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
   try {
     const priorPlans = previousGenericPlans(history);
+    const isContextualFollowUp = isSemanticFollowUpQuestion(question);
     const explicitFilters = explicitGenericFilters(question, pageContext, currentDate);
     const intentHint = semanticIntentHint(question);
     const validatedPriorPlans = validateGenericPlans({ queries: priorPlans }, {}, 3).plans;
-    const clarification = detectSemanticAmbiguity(question, validatedPriorPlans[0]);
+    const contextualPriorPlans = isContextualFollowUp ? validatedPriorPlans : [];
+    const clarification = detectSemanticAmbiguity(question, contextualPriorPlans[0]);
     if (clarification) {
       return {
         content: [
@@ -2159,8 +2168,8 @@ async function resolveGenericQuestion(
         model: "semantic-clarifier-v2",
       };
     }
-    const compiled = compileSemanticPlan(question, explicitFilters, validatedPriorPlans[0]);
-    const compactHistory = history.slice(-6).map((row) => ({
+    const compiled = compileSemanticPlan(question, explicitFilters, contextualPriorPlans[0]);
+    const compactHistory = (isContextualFollowUp ? history.slice(-6) : []).map((row) => ({
       role: row.role,
       content: cleanContent(row.content, 1000),
       plans: row.role === "assistant" && Array.isArray(row.sources)
@@ -2177,7 +2186,7 @@ Catalogo permitido: ${JSON.stringify(getPlannerCatalog())}
 Reglas de planificacion: usa maximo 3 consultas y prefiere una. Para rankings agrega la dimension solicitada, orden descendente y limite. Para evoluciones agrega dimension periodo. Nunca inventes datasets, metricas, dimensiones o filtros. Respeta grano, unidad, clave estable y filtros obligatorios del catalogo. Una repregunta breve debe transformar el plan anterior, no cambiar de fuente sin motivo. Los filtros de pantalla solo aplican si el usuario habla del periodo visible, filtros actuales o seleccion actual.
 Interpretacion semantica detectada: ${JSON.stringify(intentHint)}
 Filtros explicitos detectados en la pregunta: ${JSON.stringify(explicitFilters)}
-Planes validos de la respuesta anterior: ${JSON.stringify(priorPlans)}
+Planes validos de la respuesta anterior: ${JSON.stringify(contextualPriorPlans)}
 Contexto de pantalla disponible: ${JSON.stringify(pageContext).slice(0, 2500)}
 Conversacion reciente: ${JSON.stringify(compactHistory)}
 Pregunta: ${question}`;
@@ -2222,8 +2231,8 @@ Corrige el plan y devuelve nuevamente SOLO {"queries":[...]}.`;
     }
 
     plans = enforceSemanticIntent(question, plans, explicitFilters);
-    if (!plans.length && priorPlans.length) {
-      const inherited = validateGenericPlans({ queries: priorPlans }, explicitFilters, 3);
+    if (!plans.length && contextualPriorPlans.length) {
+      const inherited = validateGenericPlans({ queries: contextualPriorPlans }, explicitFilters, 3);
       plans = inherited.plans;
     }
     if (!plans.length) {

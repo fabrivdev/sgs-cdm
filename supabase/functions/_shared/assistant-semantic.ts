@@ -405,6 +405,50 @@ function hasAny(text: string, values: readonly string[]) {
   return values.some((value) => text.includes(value));
 }
 
+const temporalUnits: Array<{
+  granularity: QueryGranularity;
+  nouns: string;
+  adjective: string;
+}> = [
+  { granularity: "day", nouns: "DIA|DIAS", adjective: "DIARI[OA]S?" },
+  { granularity: "week", nouns: "SEMANA|SEMANAS", adjective: "SEMANAL(?:ES)?" },
+  { granularity: "month", nouns: "MES|MESES", adjective: "MENSUAL(?:ES)?" },
+  { granularity: "year", nouns: "ANO|ANOS", adjective: "ANUAL(?:ES)?" },
+];
+
+/**
+ * Detecta cuando una unidad temporal es el eje de la consulta. No alcanza con
+ * mencionar "este ano": debe pedirse un desglose, una comparacion o un periodo
+ * concreto como respuesta ("cual fue el mes...").
+ */
+function requestedTemporalGranularity(text: string): QueryGranularity | null {
+  for (const unit of temporalUnits) {
+    const noun = `(?:${unit.nouns})`;
+    const patterns = [
+      new RegExp(`\\b(?:POR|CADA)\\s+${noun}\\b`),
+      new RegExp(`\\b${unit.adjective}\\b`),
+      new RegExp(`\\b(?:QUE|CUAL(?:\\s+FUE|\\s+ES)?)(?:\\s+(?:EL|LA|MI|NUESTRO|NUESTRA|SU))?\\s+${noun}\\b`),
+      new RegExp(`\\b${noun}\\s+(?:CON|DE)\\s+(?:LA\\s+|EL\\s+)?(?:MAYOR|MENOR|MAS|MEJOR|PEOR)\\b`),
+      new RegExp(`\\b${noun}\\s+QUE\\s+(?:MAS|MENOS)\\b`),
+      new RegExp(`\\b${noun}\\s+MAS\\s+(?:PRODUCTIV[OA]|ALTO|ALTA|BAJO|BAJA)\\b`),
+      new RegExp(`\\b(?:MEJOR|PEOR)\\s+${noun}\\b`),
+    ];
+    if (patterns.some((pattern) => pattern.test(text))) return unit.granularity;
+  }
+  return null;
+}
+
+function isTemporalRankingQuestion(text: string) {
+  return requestedTemporalGranularity(text) !== null && (
+    hasAny(text, [
+      "MAYOR", "MENOR", "MEJOR", "PEOR", "TOP", "RANKING",
+      "MAS PRODUCTIV", "MAS ALTO", "MAS ALTA", "MAS BAJO", "MAS BAJA",
+      "MAXIMO", "MAXIMA", "MINIMO", "MINIMA",
+    ])
+    || /\b(?:QUE|CUAL(?:\s+FUE|\s+ES)?)\b/.test(text)
+  );
+}
+
 export function getDataCatalog() {
   return {
     version: semanticCatalogVersion,
@@ -439,6 +483,7 @@ export function getPlannerCatalog() {
 export function shouldSortTemporalSeriesChronologically(question: string, dimensions: readonly string[]) {
   if (!dimensions.includes("periodo")) return false;
   const text = normalizeText(question);
+  if (isTemporalRankingQuestion(text)) return false;
   return !hasAny(text, [
     "MAYOR",
     "MENOR",
@@ -446,6 +491,11 @@ export function shouldSortTemporalSeriesChronologically(question: string, dimens
     "RANKING",
     "MAS ALTO",
     "MAS BAJO",
+    "MAS PRODUCTIV",
+    "MEJOR PERIODO",
+    "MEJOR MES",
+    "MEJOR SEMANA",
+    "MEJOR ANO",
     "ORDEN DESCENDENTE",
     "RECIENTE PRIMERO",
   ]);
@@ -513,15 +563,21 @@ export function detectSemanticIntent(question: string): SemanticIntent | null {
   const explicitlyAsksJourneys = hasAny(text, ["JORNADA", "JORNADAS", "PLANIFICADOR", "CALENDARIO"]);
 
   if (asksProductivity && !explicitlyAsksJourneys) {
+    const requestedDimensions = inferDimensions("ordenes_servicio", text);
+    const dimensions = requestedDimensions.length
+      ? requestedDimensions
+      : asksInactive || hasAny(text, ["QUIEN", "TECNICO", "RESPONSABLE", "AUXILIAR", "PARTICIPANTE"])
+        ? ["tecnico"]
+        : [];
     return {
       id: "productividad_tecnica_os",
-      description: "Productividad tecnica medida por horas y cantidad de OS, incluyendo responsables y auxiliares.",
+      description: "Productividad medida por horas y cantidad de OS; el eje lo define explicitamente la pregunta.",
       plan: {
         dataset: "ordenes_servicio",
         metrics: ["horas", "ordenes"],
-        dimensions: ["tecnico"],
+        dimensions,
         filters: asksInactive ? { activo: "Inactivo" } : {},
-        granularity: "month",
+        granularity: dimensions.includes("periodo") ? detectGranularity(text) : "month",
         order_by: "horas",
         order_direction: "desc",
         limit: 20,
@@ -707,13 +763,18 @@ export function enforceSemanticIntent(
   const inheritedFilters = Object.fromEntries(
     Object.entries(first.filters).filter(([key]) => allowedFilters.has(key)),
   );
+  const dimensions = preferred.dimensions.length ? preferred.dimensions : inheritedDimensions;
 
   return [{
     ...preferred,
-    dimensions: inheritedDimensions.length ? inheritedDimensions : preferred.dimensions,
+    dimensions,
     filters: { ...inheritedFilters, ...preferred.filters },
-    granularity: inheritedDimensions.includes("periodo") ? first.granularity : preferred.granularity,
-    limit: first.limit,
+    granularity: preferred.dimensions.includes("periodo")
+      ? preferred.granularity
+      : dimensions.includes("periodo")
+        ? first.granularity
+        : preferred.granularity,
+    limit: preferred.limit,
   }, ...plans.slice(1)];
 }
 
@@ -772,31 +833,55 @@ function scoreDatasets(text: string) {
 }
 
 function detectGranularity(text: string): QueryGranularity {
-  if (hasAny(text, ["POR DIA", "CADA DIA", "QUE DIA", "DIARIO"])) return "day";
-  if (hasAny(text, ["POR SEMANA", "CADA SEMANA", "QUE SEMANA", "SEMANAL"])) return "week";
-  if (hasAny(text, ["POR ANO", "CADA ANO", "QUE ANO", "ANUAL"])) return "year";
+  const requested = requestedTemporalGranularity(text);
+  if (requested) return requested;
+  if (hasAny(text, [
+    "POR DIA", "CADA DIA", "QUE DIA", "DIARIO",
+    "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
+    "MAXIMO DIARIO", "MAXIMA DIARIA", "MAYOR FACTURACION DIARIA",
+  ])) return "day";
+  if (hasAny(text, [
+    "POR SEMANA", "CADA SEMANA", "QUE SEMANA", "SEMANAL",
+    "SEMANA MAS PRODUCTIV", "MEJOR SEMANA", "SEMANA DE MAYOR", "SEMANA QUE MAS",
+  ])) return "week";
+  if (hasAny(text, [
+    "POR ANO", "CADA ANO", "QUE ANO", "ANUAL",
+    "ANO MAS PRODUCTIV", "MEJOR ANO", "ANO DE MAYOR", "ANO QUE MAS",
+  ])) return "year";
   return "month";
 }
 
 function requestedLimit(text: string) {
   const topMatch = text.match(/\bTOP\s+(\d{1,3})\b/);
   if (topMatch) return safeLimit(topMatch[1], 20, 100);
+  if (isTemporalRankingQuestion(text)) return 1;
   if (hasAny(text, ["QUIEN LE SIGUE", "CUAL LE SIGUE", "SEGUNDO LUGAR"])) return 2;
-  if (hasAny(text, ["CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES", "QUE SUCURSAL", "QUE CLIENTE", "QUE TECNICO", "QUE MES", "QUE SEMANA"])) return 1;
+  if (hasAny(text, [
+    "CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES", "QUE SUCURSAL",
+    "QUE CLIENTE", "QUE TECNICO", "QUE MES", "QUE SEMANA", "QUE DIA",
+    "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
+    "MES MAS PRODUCTIV", "MEJOR MES", "MES DE MAYOR", "MES QUE MAS",
+    "SEMANA MAS PRODUCTIV", "MEJOR SEMANA", "SEMANA DE MAYOR", "SEMANA QUE MAS",
+    "ANO MAS PRODUCTIV", "MEJOR ANO", "ANO DE MAYOR", "ANO QUE MAS",
+    "MAXIMO DIARIO", "MAXIMA DIARIA",
+  ])) return 1;
   if (hasAny(text, ["DIME LOS", "DIME LAS", "LISTA LOS", "LISTA LAS", "LISTADO DE", "MOSTRA LOS", "MOSTRA LAS", "CUALES SON", "TODOS LOS", "TODAS LAS"])) return 100;
   return 20;
 }
 
 function isFollowUp(text: string) {
   const wordCount = text.split(" ").filter(Boolean).length;
-  return wordCount <= 10 && (
-    hasAny(text, ["Y EN ", "Y QUIEN", "Y CUAL", "Y CUANTO", "Y CUANTOS", "Y CUANTAS", "Y AHORA", "Y ESTE", "Y ESTA", "EL MISMO", "LA MISMA", "LE SIGUE"])
-    || hasAny(text, [
-      "ESTE MES", "MES EN CURSO", "MES ACTUAL",
-      "ESTA SEMANA", "SEMANA EN CURSO", "SEMANA ACTUAL",
-      "ESTE ANO", "ANO EN CURSO", "ANO ACTUAL",
-    ])
-  );
+  if (wordCount > 10) return false;
+  if (hasAny(text, ["EL MISMO", "LA MISMA", "LOS MISMOS", "LAS MISMAS", "LE SIGUE"])) return true;
+  if (/^(?:Y|PERO|ENTONCES|AHORA|BUENO(?:\s+Y)?)(?:\s|$)/.test(text)) return true;
+
+  // Solo una referencia temporal desnuda hereda el plan. Una pregunta completa
+  // como "cuanto facturamos este mes" debe iniciar una consulta independiente.
+  return /^(?:EN\s+)?(?:EL\s+|LA\s+)?(?:ESTE|ESTA)?\s*(?:MES|SEMANA|ANO)(?:\s+(?:EN\s+CURSO|ACTUAL))?$/.test(text);
+}
+
+export function isSemanticFollowUpQuestion(question: string) {
+  return isFollowUp(normalizeText(question));
 }
 
 function inferDatasetMetrics(dataset: BusinessDataset, text: string) {
@@ -870,10 +955,30 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
     if (allowed.has(dimension) && hasAny(text, signals) && !dimensions.includes(dimension)) dimensions.push(dimension);
   };
 
-  add("periodo", ["POR DIA", "POR SEMANA", "POR MES", "POR ANO", "QUE DIA", "QUE SEMANA", "QUE MES", "QUE ANO", "EVOLUCION"]);
-  add("sucursal", ["POR SUCURSAL", "QUE SUCURSAL", "SUCURSALES", "ENTRE SUCURSALES"]);
-  add("tecnico", ["POR TECNICO", "QUE TECNICO", "TECNICO MAS", "RESPONSABLE", "AUXILIAR", "PARTICIPANTE", "PRODUCTIV"]);
-  add("cliente", ["POR CLIENTE", "DEL CLIENTE", "DE CLIENTE", "QUE CLIENTE", "CLIENTE QUE MAS", "TOP CLIENTES", "RANKING DE CLIENTES", "DUENO", "PROPIETARIO"]);
+  if (allowed.has("periodo") && requestedTemporalGranularity(text)) dimensions.push("periodo");
+  add("periodo", [
+    "POR DIA", "POR SEMANA", "POR MES", "POR ANO", "QUE DIA", "QUE SEMANA",
+    "QUE MES", "QUE ANO", "CUAL DIA", "CUAL SEMANA", "CUAL MES", "CUAL ANO",
+    "EVOLUCION", "DIA CON MAYOR", "DIA DE MAYOR",
+    "DIA QUE MAS", "MEJOR DIA", "MAXIMO DIARIO", "MAXIMA DIARIA",
+    "MES MAS PRODUCTIV", "MEJOR MES", "MES DE MAYOR", "MES QUE MAS", "MENSUAL",
+    "SEMANA MAS PRODUCTIV", "MEJOR SEMANA", "SEMANA DE MAYOR", "SEMANA QUE MAS", "SEMANAL",
+    "ANO MAS PRODUCTIV", "MEJOR ANO", "ANO DE MAYOR", "ANO QUE MAS", "ANUAL",
+    "MAYOR FACTURACION DIARIA",
+  ]);
+  add("sucursal", [
+    "POR SUCURSAL", "QUE SUCURSAL", "CUAL SUCURSAL", "SUCURSAL MAS",
+    "MEJOR SUCURSAL", "SUCURSALES", "ENTRE SUCURSALES",
+  ]);
+  add("tecnico", [
+    "POR TECNICO", "QUE TECNICO", "CUAL TECNICO", "TECNICO MAS",
+    "MEJOR TECNICO", "RESPONSABLE", "AUXILIAR", "PARTICIPANTE",
+  ]);
+  add("cliente", [
+    "POR CLIENTE", "DEL CLIENTE", "DE CLIENTE", "QUE CLIENTE", "CUAL CLIENTE",
+    "CLIENTE QUE MAS", "CLIENTE MAS", "MEJOR CLIENTE", "TOP CLIENTES",
+    "RANKING DE CLIENTES", "DUENO", "PROPIETARIO",
+  ]);
   if (allowed.has("cliente") && /(?:^| )TOP\s+\d+\s+CLIENTES(?: |$)/.test(text) && !dimensions.includes("cliente")) {
     dimensions.push("cliente");
   }
@@ -1072,17 +1177,18 @@ function planFromParts(
   explicitFilters: SemanticRecord,
   inheritedPlan?: GenericQueryPlan,
 ) {
-  const metrics = inheritedPlan && isFollowUp(text) && !hasExplicitMetricSignal(dataset, text)
-    ? inheritedPlan.metrics
+  const followUpPlan = inheritedPlan && isFollowUp(text) ? inheritedPlan : undefined;
+  const metrics = followUpPlan && !hasExplicitMetricSignal(dataset, text)
+    ? followUpPlan.metrics
     : inferDatasetMetrics(dataset, text);
   const inferredDimensions = inferDimensions(dataset, text);
-  const dimensions = inferredDimensions.length ? inferredDimensions : inheritedPlan?.dimensions ?? [];
+  const dimensions = inferredDimensions.length ? inferredDimensions : followUpPlan?.dimensions ?? [];
   const filters = {
-    ...(inheritedPlan?.filters ?? {}),
+    ...(followUpPlan?.filters ?? {}),
     ...inferCanonicalFilters(dataset, text, rawQuestion),
     ...explicitFilters,
   };
-  const granularity = dimensions.includes("periodo") ? detectGranularity(text) : inheritedPlan?.granularity ?? "month";
+  const granularity = dimensions.includes("periodo") ? detectGranularity(text) : followUpPlan?.granularity ?? "month";
   const limit = requestedLimit(text);
   const ordersByLatestDate = dataset === "importaciones" && hasAny(text, ["ULTIMA IMPORTACION", "ULTIMA CARGA", "ARCHIVO MAS RECIENTE"]);
   return validateGenericPlans({ queries: [{
@@ -1093,7 +1199,7 @@ function planFromParts(
     granularity,
     order_by: ordersByLatestDate ? "fecha" : metrics[0],
     order_direction: ordersByLatestDate ? "desc" : hasAny(text, ["MENOR", "MENOS", "ULTIMO"]) ? "asc" : "desc",
-    limit: ordersByLatestDate ? 1 : inheritedPlan && isFollowUp(text) ? Math.max(inheritedPlan.limit, limit) : limit,
+    limit: ordersByLatestDate ? 1 : followUpPlan ? Math.max(followUpPlan.limit, limit) : limit,
   }] }, explicitFilters, 1).plans[0] ?? null;
 }
 
