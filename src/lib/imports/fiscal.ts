@@ -115,3 +115,19 @@ export function normalizeDateLike(value: unknown): string | null {
 
   return null;
 }
+
+/** Parsea el formato compacto yyyymmdd (ej "20260708") usado por FCHCIERRE; valida que sea una fecha real. */
+export function normalizeCompactDate(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!/^\d{8}$/.test(raw)) return null;
+
+  const year = Number(raw.slice(0, 4));
+  const month = Number(raw.slice(4, 6));
+  const day = Number(raw.slice(6, 8));
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+}

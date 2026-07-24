@@ -76,6 +76,33 @@ function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+const CLOSED_JOB_STATES = new Set(["completado", "cerrado", "terminado_pendiente_validar"]);
+
+/** El estado canonico Completado agrupa completado, cerrado y terminado_pendiente_validar. */
+export function isTrabajoCerrado(estadoGeneral: unknown) {
+  return CLOSED_JOB_STATES.has(String(estadoGeneral ?? "").trim().toLowerCase());
+}
+
+/** Dias enteros entre dos fechas/timestamps; null si son invalidos o el fin es anterior al inicio. */
+export function daysBetween(startValue: unknown, endValue: unknown) {
+  const start = new Date(String(startValue ?? ""));
+  const end = new Date(String(endValue ?? ""));
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
+  const diff = Math.floor((end.getTime() - start.getTime()) / 86_400_000);
+  return diff >= 0 ? diff : null;
+}
+
+export function average(values: readonly number[]) {
+  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+}
+
+export function median(values: readonly number[]) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 /** Cuenta los dias inclusivos donde un intervalo se solapa con el rango consultado. */
 export function inclusiveOverlapDays(
   intervalStart: unknown,

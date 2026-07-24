@@ -145,6 +145,7 @@ export function mapCanonicalOsToImportRow(row: CanonicalServiceOrderRow): Servic
     factura: row.invoiceNumber,
     cod_interno: row.ownerCode ?? row.billedClientCode,
     fecha_abierta_os: row.openDate,
+    fecha_cierre_os: row.closeDate,
     fecha_emision_factura: row.invoiceDate,
     nro_chasis: row.chassis,
     marca: row.brand,
@@ -287,6 +288,7 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     current.factura = appendDistinctText(current.factura, row.factura, 20);
     current.cod_interno = current.cod_interno ?? row.cod_interno;
     current.fecha_abierta_os = current.fecha_abierta_os ?? row.fecha_abierta_os;
+    current.fecha_cierre_os = current.fecha_cierre_os ?? row.fecha_cierre_os;
     current.fecha_emision_factura = current.fecha_emision_factura ?? row.fecha_emision_factura;
     current.nro_chasis = current.nro_chasis ?? row.nro_chasis;
     current.marca = current.marca ?? row.marca;

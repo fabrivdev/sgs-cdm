@@ -19,12 +19,19 @@ import {
 import {
   renderDeterministicAnswer,
   type BusinessQueryResult,
+  type CycleTimeCaveat,
   type DominantOutlier,
+  type ExecutionCoverageCaveat,
+  type OsCycleTimeCaveat,
   type ExecutedSemanticQuery,
 } from "../_shared/assistant-answer.ts";
 import { closestTextMatches, resolveNamedEntityFilters } from "../_shared/assistant-entities.ts";
 import {
+  average,
+  daysBetween,
   inclusiveOverlapDays,
+  isTrabajoCerrado,
+  median,
   referencesAllHistory,
   resolveQuestionDateRange,
   shouldApplyPageContext,
@@ -1113,7 +1120,86 @@ function semanticMetric(rows: JsonRecord[], dataset: BusinessDataset, metric: st
     });
     return invoices ? sum(rows, "total_venta") / invoices : 0;
   }
+  if (metric === "dias_ciclo" && dataset === "trabajos") {
+    const durations = rows
+      .map((row) => daysBetween(row.creado_en, row.cerrado_en))
+      .filter((value): value is number => value !== null);
+    return median(durations);
+  }
+  if (metric === "dias_ciclo" && dataset === "ordenes_servicio") return median(closedServiceOrderCycleDurations(rows));
+  if (metric === "tasa_cierre" && dataset === "trabajos") {
+    return rows.length ? rows.filter((row) => isTrabajoCerrado(row.estado_general)).length / rows.length : 0;
+  }
+  if (metric === "tasa_cierre" && dataset === "ordenes_servicio") {
+    const orderKey = (row: JsonRecord) => {
+      const order = cleanText(row.os_numero, 80);
+      return order ? `${normalizedKey(row.sucursal)}|${order}|${canonicalBillingTimeType(row.tipo_tiempo) || "SIN TIPO"}` : "";
+    };
+    const total = distinctCount(rows, orderKey);
+    const closed = distinctCount(rows.filter((row) => normalizedKey(row.situacion_os).includes("CERRAD")), orderKey);
+    return total ? closed / total : 0;
+  }
+  if (metric === "dias_abierto_promedio" && dataset === "trabajos") return average(openTrabajoDurations(rows));
+  if (metric === "dias_abierto_mediana" && dataset === "trabajos") return median(openTrabajoDurations(rows));
+  if (metric === "horas_ejecucion" && dataset === "ordenes_servicio") return median(serviceOrderExecutionDurations(rows));
   return 0;
+}
+
+function openTrabajoDurations(rows: JsonRecord[]) {
+  const now = new Date().toISOString();
+  return rows
+    .filter((row) => !isTrabajoCerrado(row.estado_general))
+    .map((row) => daysBetween(row.creado_en, now))
+    .filter((value): value is number => value !== null);
+}
+
+/**
+ * Fch. Inicial/Final del sistema nuevo de importacion: ventana de la visita
+ * tecnica, no el cierre administrativo de la OS. Solo llega en raw_data y
+ * solo para OS importadas por ese formato.
+ */
+function serviceOrderExecutionHours(row: JsonRecord) {
+  const raw = row.raw_data && typeof row.raw_data === "object" ? row.raw_data as JsonRecord : {};
+  const startDate = cleanText(raw.canonical_start_date, 10);
+  const startTime = cleanText(raw.canonical_start_time, 5).padStart(5, "0");
+  const endDate = cleanText(raw.canonical_end_date, 10);
+  const endTime = cleanText(raw.canonical_end_time, 5).padStart(5, "0");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return null;
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return null;
+  const start = new Date(`${startDate}T${startTime}:00`);
+  const end = new Date(`${endDate}T${endTime}:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
+  const hours = (end.getTime() - start.getTime()) / 3_600_000;
+  return hours >= 0 ? hours : null;
+}
+
+function serviceOrderOrderKey(row: JsonRecord) {
+  const order = cleanText(row.os_numero, 80);
+  return order ? `${normalizedKey(row.sucursal)}|${order}` : "";
+}
+
+/** Mediana de dias entre apertura y cierre, solo OS cerradas con fecha_cierre_os poblada. Dedupe por OS. */
+function closedServiceOrderCycleDurations(rows: JsonRecord[]) {
+  const durationByOrder = new Map<string, number>();
+  for (const row of rows) {
+    const key = serviceOrderOrderKey(row);
+    if (!key || durationByOrder.has(key)) continue;
+    if (!normalizedKey(row.situacion_os).includes("CERRAD")) continue;
+    const days = daysBetween(row.fecha_abierta_os, row.fecha_cierre_os);
+    if (days !== null) durationByOrder.set(key, days);
+  }
+  return [...durationByOrder.values()];
+}
+
+function serviceOrderExecutionDurations(rows: JsonRecord[]) {
+  const durationByOrder = new Map<string, number>();
+  for (const row of rows) {
+    const key = serviceOrderOrderKey(row);
+    if (!key || durationByOrder.has(key)) continue;
+    const hours = serviceOrderExecutionHours(row);
+    if (hours !== null) durationByOrder.set(key, hours);
+  }
+  return [...durationByOrder.values()];
 }
 
 async function loadBusinessRows(client: SupabaseClient, dataset: BusinessDataset, filters: JsonRecord, dimensions: string[]) {
@@ -1383,6 +1469,31 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
       return pendingJornadas > 0 ? { pendingJornadas } : null;
     })()
     : null;
+  const cycleTimeCaveat: CycleTimeCaveat | null = dataset === "trabajos" && metrics.includes("dias_ciclo")
+    ? (() => {
+      const durations = rows
+        .map((row) => daysBetween(row.creado_en, row.cerrado_en))
+        .filter((value): value is number => value !== null);
+      return { closedCount: durations.length, median: median(durations), average: average(durations) };
+    })()
+    : null;
+  const executionCoverageCaveat: ExecutionCoverageCaveat | null = dataset === "ordenes_servicio" && metrics.includes("horas_ejecucion")
+    ? (() => {
+      const totalCount = distinctCount(rows, serviceOrderOrderKey);
+      const durations = serviceOrderExecutionDurations(rows);
+      return { withDataCount: durations.length, totalCount, median: median(durations), average: average(durations) };
+    })()
+    : null;
+  const osCycleTimeCaveat: OsCycleTimeCaveat | null = dataset === "ordenes_servicio" && metrics.includes("dias_ciclo")
+    ? (() => {
+      const totalCount = distinctCount(
+        rows.filter((row) => normalizedKey(row.situacion_os).includes("CERRAD")),
+        serviceOrderOrderKey,
+      );
+      const durations = closedServiceOrderCycleDurations(rows);
+      return { withDataCount: durations.length, totalCount, median: median(durations), average: average(durations) };
+    })()
+    : null;
   const chronologicalPeriods = shouldSortTemporalSeriesChronologically(question, dimensions);
   const groups = new Map<string, { dimensions: JsonRecord; rows: JsonRecord[] }>();
   for (const row of rows) {
@@ -1442,6 +1553,9 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     rows: result.slice(0, limit),
     outlier,
     pending_hours_caveat: pendingHoursCaveat,
+    cycle_time_caveat: cycleTimeCaveat,
+    execution_coverage_caveat: executionCoverageCaveat,
+    os_cycle_time_caveat: osCycleTimeCaveat,
   };
 }
 

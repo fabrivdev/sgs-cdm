@@ -429,6 +429,80 @@ describe("assistant semantic compiler", () => {
     });
     expect(plan.dimensions).toEqual(expect.arrayContaining(["fecha", "motivo"]));
   });
+
+  it("computes cycle time as median days between creation and closing for app jobs", () => {
+    const plan = planFor("Cual es el tiempo promedio en dias en que se cierra un trabajo");
+    expect(plan).toMatchObject({
+      dataset: "trabajos",
+      metrics: ["dias_ciclo"],
+    });
+    // Regresion: la palabra "trabajo" en la pregunta tambien matchea la
+    // dimension "trabajo" (desglose por codigo individual). Combinada con el
+    // patron "cual es" (limite 1), armaba sin querer un ranking del trabajo
+    // con mayor tiempo de ciclo en vez de la mediana agregada.
+    expect(plan.dimensions).toEqual([]);
+  });
+
+  it("computes closure rate for app jobs", () => {
+    const plan = planFor("Que tasa de cierre tienen los trabajos");
+    expect(plan).toMatchObject({
+      dataset: "trabajos",
+      metrics: ["tasa_cierre"],
+    });
+  });
+
+  it("computes closure rate for service orders", () => {
+    const plan = planFor("Que tasa de cierre tienen las OS este mes");
+    expect(plan).toMatchObject({
+      dataset: "ordenes_servicio",
+      metrics: ["tasa_cierre"],
+    });
+  });
+
+  it("returns both average and median age for open app jobs", () => {
+    const plan = planFor("Que antiguedad tienen los trabajos abiertos");
+    expect(plan.dataset).toBe("trabajos");
+    expect(plan.metrics).toEqual(expect.arrayContaining(["dias_abierto_promedio", "dias_abierto_mediana"]));
+  });
+
+  it("computes technician visit execution duration for service orders, not OS closing time", () => {
+    const plan = planFor("Cuanto dura la visita de una OS");
+    expect(plan).toMatchObject({
+      dataset: "ordenes_servicio",
+      metrics: ["horas_ejecucion"],
+    });
+    expect(plan.dimensions).toEqual([]);
+  });
+});
+
+describe("assistant OS vs app-job cycle time routing", () => {
+  it("computes OS cycle time (open to close) when the question names OS, not app jobs", () => {
+    const plan = planFor("Cual es el tiempo promedio en dias en que se cierra una OS");
+    expect(plan).toMatchObject({
+      dataset: "ordenes_servicio",
+      metrics: ["dias_ciclo"],
+    });
+    // Misma regresion que con "trabajo": "OS" tambien matchea la dimension "os".
+    expect(plan.dimensions).toEqual([]);
+  });
+
+  it("keeps app-job cycle time separate from OS cycle time when trabajo is named", () => {
+    const plan = planFor("Cual es el tiempo promedio en dias en que se cierra un trabajo");
+    expect(plan.dataset).toBe("trabajos");
+    expect(plan.metrics).toEqual(["dias_ciclo"]);
+  });
+
+  it("does not confuse OS cycle time with technician visit execution duration", () => {
+    const cycleTime = planFor("Cual es el tiempo promedio en dias en que se cierra una OS");
+    const execution = planFor("Cuanto dura la visita de una OS");
+    expect(cycleTime.metrics).toEqual(["dias_ciclo"]);
+    expect(execution.metrics).toEqual(["horas_ejecucion"]);
+  });
+
+  it("does not misroute a plain closed-orders count question as a cycle-time question", () => {
+    const plan = planFor("Cuantas OS cerradas hubo por mes");
+    expect(plan.metrics).toEqual(["ordenes"]);
+  });
 });
 
 describe("assistant semantic clarifications", () => {

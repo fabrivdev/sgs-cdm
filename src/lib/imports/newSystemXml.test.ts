@@ -100,6 +100,71 @@ describe("importacion XML de ordenes de servicio", () => {
     });
   });
 
+  it("parsea FCHCIERRE en formato compacto yyyymmdd, distinto del ISO de Fc Abiert OS", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "01",
+        "Nº OS": "00000001",
+        ESTADO: "Cerrada",
+        "Fc Abiert OS": "2026-06-22T00:00:00.000",
+        FCHCIERRE: "20260708",
+        Propietario: "SILONORTE E.A.S",
+      }],
+    });
+
+    expect(result.rows[0].openDate).toBe("2026-06-22");
+    expect(result.rows[0].closeDate).toBe("2026-07-08");
+  });
+
+  it("deja closeDate en null cuando FCHCIERRE viene vacio (OS todavia abierta)", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "02",
+        "Nº OS": "00000021",
+        ESTADO: "Abierta",
+        "Fc Abiert OS": "2026-07-10T00:00:00.000",
+        FCHCIERRE: "",
+      }],
+    });
+
+    expect(result.rows[0].closeDate).toBeNull();
+  });
+
+  it("deduplica FCHCIERRE por numero de OS al agregar varias lineas: se queda con el primer valor no nulo", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "01",
+          "Nº OS": "00000030",
+          ESTADO: "Cerrada",
+          "Fc Abiert OS": "2026-06-01T00:00:00.000",
+          FCHCIERRE: "",
+          PRODUCTO: "MA01",
+          TOTAL: "10",
+        },
+        {
+          Sucursal: "01",
+          "Nº OS": "00000030",
+          ESTADO: "Cerrada",
+          "Fc Abiert OS": "2026-06-01T00:00:00.000",
+          FCHCIERRE: "20260615",
+          PRODUCTO: "SE01",
+          TOTAL: "20",
+        },
+      ],
+    });
+
+    const aggregated = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    expect(aggregated).toHaveLength(1);
+    expect(aggregated[0].fecha_cierre_os).toBe("2026-06-15");
+  });
+
   it("conserva el total de una linea SE como servicio", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",

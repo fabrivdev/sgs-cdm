@@ -1,7 +1,7 @@
 export type SemanticRecord = Record<string, unknown>;
 
-export type SemanticUnit = "count" | "usd" | "hours" | "km" | "ratio";
-export type SemanticAggregation = "count" | "count_distinct" | "sum" | "average";
+export type SemanticUnit = "count" | "usd" | "hours" | "km" | "ratio" | "days";
+export type SemanticAggregation = "count" | "count_distinct" | "sum" | "average" | "median";
 export type QueryGranularity = "day" | "week" | "month" | "year";
 
 export type MetricDefinition = {
@@ -83,6 +83,9 @@ export const semanticCatalog = {
       kilometraje_usd: { label: "Kilometraje OS", description: "Valor de kilometraje de las OS.", unit: "usd", aggregation: "sum" },
       repuestos_usd: { label: "Repuestos OS", description: "Valor de repuestos de las OS.", unit: "usd", aggregation: "sum" },
       terceros_usd: { label: "Terceros OS", description: "Valor de terceros de las OS.", unit: "usd", aggregation: "sum" },
+      tasa_cierre: { label: "Tasa de cierre", description: "Porcentaje de OS unicas (sucursal + OS + tipo de tiempo) en estado Cerrada sobre el total de OS consultadas.", unit: "ratio", aggregation: "average" },
+      dias_ciclo: { label: "Tiempo de cierre de OS (mediana)", description: "Mediana de dias entre apertura (fecha_abierta_os) y cierre (fecha_cierre_os), solo OS cerradas con fecha de cierre importada. No es la duracion de la visita tecnica (ver horas_ejecucion). Fecha_cierre_os solo llega por el sistema nuevo de importacion: OS importadas antes de que se agregara este campo no lo tienen hasta que se reimporten. Si se filtra por fecha, el filtro aplica sobre la apertura de la OS, no el cierre.", unit: "days", aggregation: "median" },
+      horas_ejecucion: { label: "Duracion de ejecucion (mediana)", description: "Mediana de horas entre inicio y fin de la visita tecnica (Fch. Inicial/Final del sistema nuevo de importacion). No es el cierre administrativo de la OS (ver dias_ciclo): una OS puede seguir Abierta y ya tener una visita ejecutada. Solo disponible para OS importadas por el sistema nuevo; las importadas por el sistema anterior no tienen este dato.", unit: "hours", aggregation: "median" },
     },
     dimensions: {
       periodo: { label: "Periodo", description: "Apertura agrupada por dia, semana, mes o anio.", source: "fecha_abierta_os" },
@@ -109,6 +112,10 @@ export const semanticCatalog = {
     aliases: ["trabajos", "casos", "tr"],
     metrics: {
       trabajos: { label: "Trabajos", description: "Trabajos unicos por id.", unit: "count", aggregation: "count_distinct", distinctBy: "trabajo.id" },
+      dias_ciclo: { label: "Tiempo de ciclo (mediana)", description: "Mediana de dias entre creacion y cierre, solo trabajos con fecha de cierre registrada. La mediana es la cifra principal porque unos pocos trabajos con cierre muy tardio distorsionan el promedio; si difieren mucho se informan ambos. Si se filtra por fecha, el filtro aplica sobre la fecha de creacion del trabajo, no la de cierre.", unit: "days", aggregation: "median" },
+      tasa_cierre: { label: "Tasa de cierre", description: "Porcentaje de trabajos en estado canonico Completado (agrupa completado, cerrado y terminado_pendiente_validar) sobre el total de trabajos consultados.", unit: "ratio", aggregation: "average" },
+      dias_abierto_promedio: { label: "Antiguedad de abiertos (promedio)", description: "Promedio de dias desde la creacion de los trabajos que hoy no estan en estado Completado. Mide cuanto llevan abiertos a la fecha actual, no un tiempo de cierre.", unit: "days", aggregation: "average" },
+      dias_abierto_mediana: { label: "Antiguedad de abiertos (mediana)", description: "Mediana de dias desde la creacion de los trabajos que hoy no estan en estado Completado.", unit: "days", aggregation: "median" },
     },
     dimensions: {
       periodo: { label: "Periodo", description: "Creacion agrupada por dia, semana, mes o anio.", source: "creado_en" },
@@ -384,6 +391,9 @@ const canonicalRules = [
   "Los dias no laborales son fechas globales; las no disponibilidades pertenecen a tecnicos concretos.",
   "El contexto visual se aplica solo cuando la pregunta se refiere al periodo visible, filtros actuales o seleccion actual.",
   "Las preguntas de seguridad, credenciales o fuera del negocio no estan permitidas.",
+  "Un trabajo Cerrado (para tasa de cierre, tiempo de ciclo y antiguedad de abiertos) es el estado canonico Completado, que agrupa completado, cerrado y terminado_pendiente_validar.",
+  "La fecha de cierre de OS (fecha_cierre_os) solo llega por el sistema nuevo de importacion: OS importadas antes de que se agregara ese campo, o por el sistema anterior, no lo tienen hasta que se reimporten.",
+  "La duracion de ejecucion de una OS (Fch. Inicial/Final del sistema nuevo) es la ventana de la visita tecnica, no el cierre administrativo de la OS: una OS puede seguir Abierta y ya tener una visita ejecutada.",
 ];
 
 function normalizeText(value: unknown) {
@@ -413,6 +423,24 @@ function hasAny(text: string, values: readonly string[]) {
 function hasAnyWholePhrase(text: string, phrases: readonly string[]) {
   const padded = ` ${text} `;
   return phrases.some((phrase) => padded.includes(` ${phrase} `));
+}
+
+const CYCLE_TIME_PATTERNS = [
+  /\bTIEMPO\b[\s\S]{0,40}\b(?:CIERR\w*|CERRA\w*)\b/,
+  /\b(?:CUANTO|CUANTOS)\b[\s\S]{0,20}\b(?:TARDA|TARDAN|DEMORA|DEMORAN)\b[\s\S]{0,25}\b(?:CIERR\w*|CERRA\w*)\b/,
+  /\bDIAS\b[\s\S]{0,20}\b(?:PARA CERRAR|EN CERRAR|DE CIERRE|PROMEDIO DE CIERRE|DE CICLO)\b/,
+  /\bCICLO\b[\s\S]{0,20}\b(?:OS|ORDEN|ORDENES|TRABAJO|TRABAJOS)\b/,
+];
+
+function isCycleTimeQuestion(text: string) {
+  return CYCLE_TIME_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/** Distingue "tiempo de cierre de una OS" de "tiempo de cierre de un trabajo": son datasets y metricas distintos. */
+function mentionsOsExclusively(text: string) {
+  const mentionsOs = hasAnyWholePhrase(text, ["OS"]) || hasAny(text, ["ORDEN DE SERVICIO", "ORDENES DE SERVICIO"]);
+  const mentionsTrabajo = hasAny(text, ["TRABAJO", "TRABAJOS", "CASO", "CASOS", "CODIGO TR"]);
+  return mentionsOs && !mentionsTrabajo;
 }
 
 const temporalUnits: Array<{
@@ -663,6 +691,96 @@ export function detectSemanticIntent(question: string): SemanticIntent | null {
         filters: { estado: "Cerrada" },
         granularity: text.includes("SEMANA") ? "week" : text.includes("DIA") ? "day" : text.includes("ANO") ? "year" : "month",
         order_by: "ordenes",
+        order_direction: "desc",
+        limit: 20,
+      },
+    };
+  }
+
+  // Estas cuatro metricas son intents canonicos, no composicion generica de
+  // inferDatasetMetrics/inferDimensions: la palabra "trabajo"/"os" que
+  // dispara la pregunta tambien matchea su propia dimension (desglose por
+  // codigo individual), y combinada con el patron "cual es" (que fuerza
+  // limite 1) arma sin querer un ranking "top 1" en vez de un agregado. Se
+  // filtra esa dimension explicitamente.
+  if (isCycleTimeQuestion(text)) {
+    const os = mentionsOsExclusively(text);
+    const dataset: BusinessDataset = os ? "ordenes_servicio" : "trabajos";
+    const dimensions = inferDimensions(dataset, text).filter((dimension) => dimension !== "trabajo" && dimension !== "os");
+    return {
+      id: os ? "tiempo_ciclo_os" : "tiempo_ciclo_trabajos",
+      description: os
+        ? "Mediana de dias entre apertura y cierre de OS con fecha de cierre importada; no es la duracion de la visita tecnica."
+        : "Mediana de dias entre creacion y cierre de trabajos de la app.",
+      plan: {
+        dataset,
+        metrics: ["dias_ciclo"],
+        dimensions,
+        filters: {},
+        granularity: dimensions.includes("periodo") ? detectGranularity(text) : "month",
+        order_by: "dias_ciclo",
+        order_direction: "desc",
+        limit: 20,
+      },
+    };
+  }
+
+  const asksClosureRate = hasAny(text, ["TASA DE CIERRE", "PORCENTAJE CERRADO", "PORCENTAJE DE CIERRE", "QUE PORCENTAJE"]);
+  if (asksClosureRate) {
+    const os = mentionsOsExclusively(text);
+    const dataset: BusinessDataset = os ? "ordenes_servicio" : "trabajos";
+    const dimensions = inferDimensions(dataset, text).filter((dimension) => dimension !== "trabajo" && dimension !== "os");
+    return {
+      id: os ? "tasa_cierre_os" : "tasa_cierre_trabajos",
+      description: "Porcentaje de casos cerrados sobre el total consultado.",
+      plan: {
+        dataset,
+        metrics: ["tasa_cierre"],
+        dimensions,
+        filters: {},
+        granularity: dimensions.includes("periodo") ? detectGranularity(text) : "month",
+        order_by: "tasa_cierre",
+        order_direction: "desc",
+        limit: 20,
+      },
+    };
+  }
+
+  if (hasAny(text, [
+    "DURACION DE LA VISITA", "CUANTO DURA LA VISITA", "DURACION DE LA INTERVENCION",
+    "TIEMPO DE EJECUCION", "DURACION DE EJECUCION", "DURACION DEL TRABAJO EN CAMPO",
+    "CUANTO DURA EL TRABAJO", "CUANTO DURA UNA OS", "CUANTO DURAN LAS OS",
+    "TIEMPO QUE TARDA EL TECNICO", "TIEMPO QUE TARDA LA VISITA",
+  ])) {
+    const dimensions = inferDimensions("ordenes_servicio", text).filter((dimension) => dimension !== "os");
+    return {
+      id: "duracion_ejecucion_os",
+      description: "Mediana de horas entre inicio y fin de la visita tecnica registrada en OS importadas por el sistema nuevo; no es el cierre administrativo de la OS.",
+      plan: {
+        dataset: "ordenes_servicio",
+        metrics: ["horas_ejecucion"],
+        dimensions,
+        filters: {},
+        granularity: dimensions.includes("periodo") ? detectGranularity(text) : "month",
+        order_by: "horas_ejecucion",
+        order_direction: "desc",
+        limit: 20,
+      },
+    };
+  }
+
+  if (hasAny(text, ["ANTIGUEDAD", "CUANTO LLEVA ABIERTO", "CUANTO LLEVAN ABIERTOS", "HACE CUANTO ESTA ABIERTO", "HACE CUANTO ESTAN ABIERTOS"])) {
+    const dimensions = inferDimensions("trabajos", text).filter((dimension) => dimension !== "trabajo");
+    return {
+      id: "antiguedad_abiertos_trabajos",
+      description: "Promedio y mediana de dias desde la creacion de los trabajos que hoy no estan en estado Completado.",
+      plan: {
+        dataset: "trabajos",
+        metrics: ["dias_abierto_promedio", "dias_abierto_mediana"],
+        dimensions,
+        filters: {},
+        granularity: dimensions.includes("periodo") ? detectGranularity(text) : "month",
+        order_by: "dias_abierto_promedio",
         order_direction: "desc",
         limit: 20,
       },

@@ -8,6 +8,9 @@ import {
 
 export type DominantOutlier = { metric: string; top: number; median: number; ratio: number };
 export type PendingHoursCaveat = { pendingJornadas: number };
+export type CycleTimeCaveat = { closedCount: number; median: number; average: number };
+export type ExecutionCoverageCaveat = { withDataCount: number; totalCount: number; median: number; average: number };
+export type OsCycleTimeCaveat = { withDataCount: number; totalCount: number; median: number; average: number };
 
 export type BusinessQueryResult = {
   dataset: BusinessDataset;
@@ -21,6 +24,9 @@ export type BusinessQueryResult = {
   rows: SemanticRecord[];
   outlier?: DominantOutlier | null;
   pending_hours_caveat?: PendingHoursCaveat | null;
+  cycle_time_caveat?: CycleTimeCaveat | null;
+  execution_coverage_caveat?: ExecutionCoverageCaveat | null;
+  os_cycle_time_caveat?: OsCycleTimeCaveat | null;
 };
 
 export type ExecutedSemanticQuery = {
@@ -63,6 +69,7 @@ function metricValue(dataset: BusinessDataset, metric: string, value: unknown) {
   if (unit === "hours") return `${formatNumber(value, 2)} hs`;
   if (unit === "km") return `${formatNumber(value, 2)} km`;
   if (unit === "ratio") return `${formatNumber(numberValue(value) * 100, 1)}%`;
+  if (unit === "days") return `${formatNumber(value, 1)} dias`;
   return formatNumber(value, 2);
 }
 
@@ -146,8 +153,13 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
     const row = rows[0] ?? {};
     const values = plan.metrics.map((metric) => `${metricLabel(plan.dataset, metric)}: ${metricValue(plan.dataset, metric, row[metric])}`);
     const filterText = appliedFilters.length ? ` Filtros: ${appliedFilters.join("; ")}.` : "";
-    const caveat = pendingHoursCaveat(data.pending_hours_caveat);
-    return `${values.join(" | ")}. ${period}${filterText}${caveat ? ` ${caveat}` : ""}`;
+    const caveats = [
+      pendingHoursCaveat(data.pending_hours_caveat),
+      cycleTimeCaveat(data.cycle_time_caveat),
+      executionCoverageCaveat(data.execution_coverage_caveat),
+      osCycleTimeCaveat(data.os_cycle_time_caveat),
+    ].filter(Boolean).join(" ");
+    return `${values.join(" | ")}. ${period}${filterText}${caveats ? ` ${caveats}` : ""}`;
   }
 
   const rankedRows = selectedRows(question, rows);
@@ -166,6 +178,9 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
     omitted ? `Se muestran ${visibleRows.length} de ${data.result_rows} resultados.` : "",
     outlierCaveat(plan.dataset, data.outlier),
     pendingHoursCaveat(data.pending_hours_caveat),
+    cycleTimeCaveat(data.cycle_time_caveat),
+    executionCoverageCaveat(data.execution_coverage_caveat),
+    osCycleTimeCaveat(data.os_cycle_time_caveat),
   ].filter(Boolean).join(" ");
   return `${metricTitle} por ${dimensionTitle}:\n${lines.join("\n")}\n${footer}`;
 }
@@ -190,6 +205,61 @@ function pendingHoursCaveat(caveat: PendingHoursCaveat | null | undefined) {
   if (!caveat || !caveat.pendingJornadas) return "";
   const plural = caveat.pendingJornadas === 1 ? "jornada pendiente" : "jornadas pendientes";
   return `Nota: hay ${caveat.pendingJornadas} ${plural} en el resultado; las horas solo se registran al completarla, por eso pueden figurar en 0 sin que signifique que no trabajaron.`;
+}
+
+/**
+ * La mediana es la cifra principal del tiempo de ciclo porque unos pocos
+ * trabajos con cierre muy tardio distorsionan el promedio. Si no hay
+ * trabajos cerrados en el resultado, o si promedio y mediana difieren mucho,
+ * hay que decirlo en vez de mostrar un numero sin contexto.
+ */
+function cycleTimeCaveat(caveat: CycleTimeCaveat | null | undefined) {
+  if (!caveat) return "";
+  if (!caveat.closedCount) {
+    return "Nota: no hay trabajos cerrados en el resultado para calcular el tiempo de ciclo; el valor mostrado no es representativo.";
+  }
+  if (caveat.median <= 0) return "";
+  const ratio = caveat.average / caveat.median;
+  if (ratio < 1.3 && ratio > 0.7) return "";
+  return `Nota: el promedio (${formatNumber(caveat.average, 1)} dias) difiere bastante de la mediana (${formatNumber(caveat.median, 1)} dias) mostrada como cifra principal; puede haber trabajos con tiempos de cierre atipicos.`;
+}
+
+/**
+ * La fecha de inicio/fin de visita solo llega por el importador del sistema
+ * nuevo; las OS del sistema anterior no la tienen. Sin esta nota, un valor
+ * calculado sobre un subconjunto pequeno podria leerse como el total.
+ */
+function executionCoverageCaveat(caveat: ExecutionCoverageCaveat | null | undefined) {
+  if (!caveat) return "";
+  if (!caveat.withDataCount) {
+    return "Nota: ninguna de las OS consultadas tiene fecha de inicio/fin de visita registrada (ese dato solo llega por el sistema nuevo de importacion); no se puede calcular este valor para esta consulta.";
+  }
+  if (caveat.withDataCount < caveat.totalCount) {
+    const pct = formatNumber((caveat.withDataCount / caveat.totalCount) * 100, 1);
+    return `Nota: este dato solo esta disponible en ${caveat.withDataCount} de ${caveat.totalCount} OS consultadas (${pct}%); las importadas por el sistema anterior no lo tienen. El valor mostrado es sobre esas ${caveat.withDataCount}, no sobre el total.`;
+  }
+  return "";
+}
+
+/**
+ * La fecha de cierre de OS solo llega por el sistema nuevo de importacion.
+ * totalCount son las OS cerradas del resultado (las abiertas nunca la tienen
+ * y no cuentan como "falta el dato"); withDataCount son las que ademas
+ * tienen fecha_cierre_os poblada.
+ */
+function osCycleTimeCaveat(caveat: OsCycleTimeCaveat | null | undefined) {
+  if (!caveat) return "";
+  if (!caveat.totalCount) {
+    return "Nota: no hay OS cerradas en el resultado para calcular el tiempo de cierre.";
+  }
+  if (!caveat.withDataCount) {
+    return "Nota: ninguna de las OS cerradas consultadas tiene fecha de cierre importada (fecha_cierre_os); ese dato solo llega por el sistema nuevo de importacion. El valor mostrado no es representativo.";
+  }
+  if (caveat.withDataCount < caveat.totalCount) {
+    const pct = formatNumber((caveat.withDataCount / caveat.totalCount) * 100, 1);
+    return `Nota: la fecha de cierre solo esta disponible en ${caveat.withDataCount} de ${caveat.totalCount} OS cerradas consultadas (${pct}%) -- el resto se importo antes de que se agregara este dato. El valor mostrado es sobre esas ${caveat.withDataCount}, no sobre el total de cerradas.`;
+  }
+  return "";
 }
 
 /**

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  average,
+  daysBetween,
   inclusiveOverlapDays,
+  isTrabajoCerrado,
+  median,
   referencesAllHistory,
   referencesVisibleContext,
   resolveQuestionDateRange,
@@ -94,5 +98,37 @@ describe("assistant relative dates", () => {
       date_to: currentDate,
     });
     expect(resolveQuestionDateRange("dia con mayor facturacion de todos los anos", currentDate)).toEqual({});
+  });
+});
+
+describe("assistant cycle-time helpers", () => {
+  it("counts whole days between two timestamps", () => {
+    expect(daysBetween("2026-07-01T08:00:00Z", "2026-07-05T10:00:00Z")).toBe(4);
+  });
+
+  it("returns null for invalid or reversed dates", () => {
+    expect(daysBetween("not-a-date", "2026-07-05")).toBeNull();
+    expect(daysBetween("2026-07-05", "2026-07-01")).toBeNull();
+  });
+
+  it("computes average and median with the median resistant to a single outlier", () => {
+    expect(average([2, 4, 6])).toBe(4);
+    expect(median([2, 4, 6])).toBe(4);
+    expect(average([1, 2, 3, 400])).toBe(101.5);
+    expect(median([1, 2, 3, 400])).toBe(2.5);
+  });
+
+  it("returns zero for empty inputs instead of NaN", () => {
+    expect(average([])).toBe(0);
+    expect(median([])).toBe(0);
+  });
+
+  it("treats completado, cerrado and terminado_pendiente_validar as closed", () => {
+    expect(isTrabajoCerrado("completado")).toBe(true);
+    expect(isTrabajoCerrado("cerrado")).toBe(true);
+    expect(isTrabajoCerrado("terminado_pendiente_validar")).toBe(true);
+    expect(isTrabajoCerrado("pendiente")).toBe(false);
+    expect(isTrabajoCerrado("en_pausa")).toBe(false);
+    expect(isTrabajoCerrado(null)).toBe(false);
   });
 });

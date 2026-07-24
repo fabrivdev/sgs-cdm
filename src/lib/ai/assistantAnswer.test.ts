@@ -251,6 +251,237 @@ describe("assistant deterministic answer renderer", () => {
     expect(answer).not.toContain("Nota:");
   });
 
+  it("renders cycle time in days using the median as the headline figure", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 5.5 }]);
+    (result.data as { cycle_time_caveat?: unknown }).cycle_time_caveat = { closedCount: 12, median: 5.5, average: 6 };
+    const answer = renderDeterministicAnswer({ question: "Tiempo de ciclo de los trabajos", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Tiempo de ciclo (mediana): 5,5 dias");
+    expect(answer).not.toContain("Nota:");
+  });
+
+  it("warns when there are no closed jobs to compute cycle time from", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 0 }]);
+    (result.data as { cycle_time_caveat?: unknown }).cycle_time_caveat = { closedCount: 0, median: 0, average: 0 };
+    const answer = renderDeterministicAnswer({ question: "Tiempo de ciclo de los trabajos", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("no hay trabajos cerrados");
+  });
+
+  it("warns when the average diverges a lot from the median cycle time", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 4 }]);
+    (result.data as { cycle_time_caveat?: unknown }).cycle_time_caveat = { closedCount: 10, median: 4, average: 20 };
+    const answer = renderDeterministicAnswer({ question: "Tiempo de ciclo de los trabajos", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("difiere bastante de la mediana");
+  });
+
+  it("renders closure rate as a percentage", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["tasa_cierre"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "tasa_cierre",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Que tasa de cierre tienen los trabajos",
+      mode: "brief",
+      results: [resultFor(plan, [{ tasa_cierre: 0.6 }])],
+    });
+
+    expect(answer).toContain("Tasa de cierre: 60%");
+  });
+
+  it("renders average and median age of open jobs together", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["dias_abierto_promedio", "dias_abierto_mediana"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_abierto_promedio",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Que antiguedad tienen los trabajos abiertos",
+      mode: "brief",
+      results: [resultFor(plan, [{ dias_abierto_promedio: 12.4, dias_abierto_mediana: 9 }])],
+    });
+
+    expect(answer).toContain("Antiguedad de abiertos (promedio): 12,4 dias");
+    expect(answer).toContain("Antiguedad de abiertos (mediana): 9 dias");
+  });
+
+  it("warns when no OS in the result has execution-window data", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["horas_ejecucion"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "horas_ejecucion",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ horas_ejecucion: 0 }]);
+    (result.data as { execution_coverage_caveat?: unknown }).execution_coverage_caveat = { withDataCount: 0, totalCount: 8, median: 0, average: 0 };
+    const answer = renderDeterministicAnswer({ question: "Cuanto dura la visita de una OS", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("ninguna de las OS consultadas");
+  });
+
+  it("discloses partial coverage when only some OS have execution-window data", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["horas_ejecucion"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "horas_ejecucion",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ horas_ejecucion: 1.75 }]);
+    (result.data as { execution_coverage_caveat?: unknown }).execution_coverage_caveat = { withDataCount: 3, totalCount: 10, median: 1.75, average: 2 };
+    const answer = renderDeterministicAnswer({ question: "Cuanto dura la visita de una OS", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Duracion de ejecucion (mediana): 1,75 hs");
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("3 de 10 OS consultadas");
+  });
+
+  it("does not warn about coverage when every OS in the result has execution data", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["horas_ejecucion"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "horas_ejecucion",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ horas_ejecucion: 1.75 }]);
+    (result.data as { execution_coverage_caveat?: unknown }).execution_coverage_caveat = { withDataCount: 5, totalCount: 5, median: 1.75, average: 1.8 };
+    const answer = renderDeterministicAnswer({ question: "Cuanto dura la visita de una OS", mode: "brief", results: [result] });
+
+    expect(answer).not.toContain("Nota:");
+  });
+
+  it("renders OS cycle time in days using the median as the headline figure", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 16 }]);
+    (result.data as { os_cycle_time_caveat?: unknown }).os_cycle_time_caveat = { withDataCount: 8, totalCount: 8, median: 16, average: 15 };
+    const answer = renderDeterministicAnswer({ question: "Cual es el tiempo promedio en dias en que se cierra una OS", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Tiempo de cierre de OS (mediana): 16 dias");
+    expect(answer).not.toContain("Nota:");
+  });
+
+  it("warns when there are no closed OS in the result", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 0 }]);
+    (result.data as { os_cycle_time_caveat?: unknown }).os_cycle_time_caveat = { withDataCount: 0, totalCount: 0, median: 0, average: 0 };
+    const answer = renderDeterministicAnswer({ question: "Cual es el tiempo promedio en dias en que se cierra una OS", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("no hay OS cerradas");
+  });
+
+  it("warns when closed OS exist but none have an imported closing date", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 0 }]);
+    (result.data as { os_cycle_time_caveat?: unknown }).os_cycle_time_caveat = { withDataCount: 0, totalCount: 5, median: 0, average: 0 };
+    const answer = renderDeterministicAnswer({ question: "Cual es el tiempo promedio en dias en que se cierra una OS", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("ninguna de las OS cerradas consultadas tiene fecha de cierre importada");
+  });
+
+  it("discloses partial coverage when only some closed OS have an imported closing date", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "ordenes_servicio",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ dias_ciclo: 16 }]);
+    (result.data as { os_cycle_time_caveat?: unknown }).os_cycle_time_caveat = { withDataCount: 3, totalCount: 10, median: 16, average: 15 };
+    const answer = renderDeterministicAnswer({ question: "Cual es el tiempo promedio en dias en que se cierra una OS", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("3 de 10 OS cerradas consultadas");
+  });
+
   it("renders composite queries without asking a model to reinterpret results", () => {
     const plan: GenericQueryPlan = {
       dataset: "facturacion",

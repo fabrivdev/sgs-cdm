@@ -10,6 +10,7 @@ export const ASSISTANT_SERVICE_ORDER_SELECT = [
   "os_numero",
   "cliente_nombre",
   "fecha_abierta_os",
+  "fecha_cierre_os",
   "fecha_emision_factura",
   "factura",
   "responsable",

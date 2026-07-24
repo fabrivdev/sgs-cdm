@@ -54,6 +54,7 @@ export interface CanonicalServiceOrderRow {
   status: string | null;
   billingStatus: string | null;
   openDate: string | null;
+  closeDate: string | null;
   invoiceDate: string | null;
   ownerCode: string | null;
   ownerName: string | null;
