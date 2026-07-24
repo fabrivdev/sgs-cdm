@@ -211,6 +211,46 @@ describe("assistant deterministic answer renderer", () => {
     expect(answer).not.toContain("Aviso:");
   });
 
+  it("warns when technician hours include pending journeys that have not been completed", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "tecnicos",
+      metrics: ["jornadas", "horas"],
+      dimensions: ["tecnico", "carga"],
+      filters: { date_from: "2026-07-20", date_to: "2026-07-26" },
+      granularity: "month",
+      order_by: "jornadas",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ tecnico: "JUAN PEREZ", carga: "Con carga", jornadas: 1, horas: 0 }]);
+    (result.data as { pending_hours_caveat?: unknown }).pending_hours_caveat = { pendingJornadas: 1 };
+    const answer = renderDeterministicAnswer({ question: "Que tecnicos tienen carga esta semana", mode: "brief", results: [result] });
+
+    expect(answer).toContain("Nota:");
+    expect(answer).toContain("jornada pendiente");
+    expect(answer).toContain("que no trabajaron");
+  });
+
+  it("does not warn about pending hours when there is nothing pending", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "tecnicos",
+      metrics: ["jornadas", "horas"],
+      dimensions: ["tecnico", "carga"],
+      filters: { date_from: "2026-07-20", date_to: "2026-07-26" },
+      granularity: "month",
+      order_by: "jornadas",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Que tecnicos tienen carga esta semana",
+      mode: "brief",
+      results: [resultFor(plan, [{ tecnico: "JUAN PEREZ", carga: "Con carga", jornadas: 3, horas: 12 }])],
+    });
+
+    expect(answer).not.toContain("Nota:");
+  });
+
   it("renders composite queries without asking a model to reinterpret results", () => {
     const plan: GenericQueryPlan = {
       dataset: "facturacion",

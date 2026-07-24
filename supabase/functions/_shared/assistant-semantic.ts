@@ -405,6 +405,16 @@ function hasAny(text: string, values: readonly string[]) {
   return values.some((value) => text.includes(value));
 }
 
+/**
+ * Como hasAny, pero exige que la frase termine en un limite de palabra. Evita
+ * que un singular como "QUE TECNICO" matchee por substring dentro de su
+ * plural ("QUE TECNICOS"), que pide una lista, no un unico ganador.
+ */
+function hasAnyWholePhrase(text: string, phrases: readonly string[]) {
+  const padded = ` ${text} `;
+  return phrases.some((phrase) => padded.includes(` ${phrase} `));
+}
+
 const temporalUnits: Array<{
   granularity: QueryGranularity;
   nouns: string;
@@ -499,6 +509,27 @@ export function shouldSortTemporalSeriesChronologically(question: string, dimens
     "ORDEN DESCENDENTE",
     "RECIENTE PRIMERO",
   ]);
+}
+
+const UNADDRESSED_COMPLEMENT_SIGNALS = [
+  "Y QUIENES NO", "Y QUIEN NO", "Y CUALES NO", "Y CUAL NO",
+  "Y LOS QUE NO", "Y LAS QUE NO", "QUIENES NO TIENEN", "QUIENES NO",
+  "CUALES NO", "Y QUE CLIENTES NO", "Y QUE TECNICOS NO",
+];
+
+/**
+ * Detecta preguntas que piden el complemento ("y quienes no", "y cuales no")
+ * de una condicion. Solo tecnicos agrupado por carga resuelve hoy ambos lados
+ * en el mismo resultado (roster completo activo, con y sin jornadas); para
+ * cualquier otro dataset/dimension no hay forma de calcular el universo
+ * completo para restarle los que cumplen, asi que hay que avisarlo en vez de
+ * responder solo la mitad con tono de respuesta completa.
+ */
+export function asksUnaddressedComplement(question: string, dataset: BusinessDataset, dimensions: readonly string[]) {
+  const text = normalizeText(question);
+  if (!hasAny(text, UNADDRESSED_COMPLEMENT_SIGNALS)) return false;
+  if (dataset === "tecnicos" && dimensions.includes("carga")) return false;
+  return true;
 }
 
 /**
@@ -856,15 +887,20 @@ function requestedLimit(text: string) {
   if (topMatch) return safeLimit(topMatch[1], 20, 100);
   if (isTemporalRankingQuestion(text)) return 1;
   if (hasAny(text, ["QUIEN LE SIGUE", "CUAL LE SIGUE", "SEGUNDO LUGAR"])) return 2;
-  if (hasAny(text, [
-    "CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES", "QUE SUCURSAL",
-    "QUE CLIENTE", "QUE TECNICO", "QUE MES", "QUE SEMANA", "QUE DIA",
-    "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
-    "MES MAS PRODUCTIV", "MEJOR MES", "MES DE MAYOR", "MES QUE MAS",
-    "SEMANA MAS PRODUCTIV", "MEJOR SEMANA", "SEMANA DE MAYOR", "SEMANA QUE MAS",
-    "ANO MAS PRODUCTIV", "MEJOR ANO", "ANO DE MAYOR", "ANO QUE MAS",
-    "MAXIMO DIARIO", "MAXIMA DIARIA",
-  ])) return 1;
+  if (
+    hasAny(text, [
+      "CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES",
+      "DIA CON MAYOR", "DIA DE MAYOR", "DIA QUE MAS", "MEJOR DIA",
+      "MES MAS PRODUCTIV", "MEJOR MES", "MES DE MAYOR", "MES QUE MAS",
+      "SEMANA MAS PRODUCTIV", "MEJOR SEMANA", "SEMANA DE MAYOR", "SEMANA QUE MAS",
+      "ANO MAS PRODUCTIV", "MEJOR ANO", "ANO DE MAYOR", "ANO QUE MAS",
+      "MAXIMO DIARIO", "MAXIMA DIARIA",
+    ])
+    // Frases de 2 palabras terminadas en el sustantivo: necesitan limite de
+    // palabra para no matchear el plural ("QUE TECNICOS" pide una lista, no
+    // un unico ganador).
+    || hasAnyWholePhrase(text, ["QUE SUCURSAL", "QUE CLIENTE", "QUE TECNICO", "QUE MES", "QUE SEMANA", "QUE DIA"])
+  ) return 1;
   if (hasAny(text, ["DIME LOS", "DIME LAS", "LISTA LOS", "LISTA LAS", "LISTADO DE", "MOSTRA LOS", "MOSTRA LAS", "CUALES SON", "TODOS LOS", "TODAS LAS"])) return 100;
   return 20;
 }

@@ -7,6 +7,7 @@ import {
 } from "./assistant-semantic.ts";
 
 export type DominantOutlier = { metric: string; top: number; median: number; ratio: number };
+export type PendingHoursCaveat = { pendingJornadas: number };
 
 export type BusinessQueryResult = {
   dataset: BusinessDataset;
@@ -19,6 +20,7 @@ export type BusinessQueryResult = {
   result_rows: number;
   rows: SemanticRecord[];
   outlier?: DominantOutlier | null;
+  pending_hours_caveat?: PendingHoursCaveat | null;
 };
 
 export type ExecutedSemanticQuery = {
@@ -144,7 +146,8 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
     const row = rows[0] ?? {};
     const values = plan.metrics.map((metric) => `${metricLabel(plan.dataset, metric)}: ${metricValue(plan.dataset, metric, row[metric])}`);
     const filterText = appliedFilters.length ? ` Filtros: ${appliedFilters.join("; ")}.` : "";
-    return `${values.join(" | ")}. ${period}${filterText}`;
+    const caveat = pendingHoursCaveat(data.pending_hours_caveat);
+    return `${values.join(" | ")}. ${period}${filterText}${caveat ? ` ${caveat}` : ""}`;
   }
 
   const rankedRows = selectedRows(question, rows);
@@ -162,6 +165,7 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
     appliedFilters.length ? `Filtros: ${appliedFilters.join("; ")}.` : "",
     omitted ? `Se muestran ${visibleRows.length} de ${data.result_rows} resultados.` : "",
     outlierCaveat(plan.dataset, data.outlier),
+    pendingHoursCaveat(data.pending_hours_caveat),
   ].filter(Boolean).join(" ");
   return `${metricTitle} por ${dimensionTitle}:\n${lines.join("\n")}\n${footer}`;
 }
@@ -175,6 +179,17 @@ function outlierCaveat(dataset: BusinessDataset, outlier: DominantOutlier | null
   if (!outlier) return "";
   const metric = metricLabel(dataset, outlier.metric).toLowerCase();
   return `Aviso: el primer resultado (${metric} ${formatNumber(outlier.top, 2)}) es ${formatNumber(outlier.ratio, 1)} veces mas alto que el resto de los valores comparables; podria ser un dato cargado incorrectamente. Verificalo en la fuente antes de darlo por valido.`;
+}
+
+/**
+ * Las horas de tecnicos solo se acumulan en jornadas Completadas. Si el
+ * resultado incluye jornadas Pendientes, "0 hs" no significa que no trabajaron
+ * sino que todavia no se cerro la jornada; hay que decirlo, no dejarlo implicito.
+ */
+function pendingHoursCaveat(caveat: PendingHoursCaveat | null | undefined) {
+  if (!caveat || !caveat.pendingJornadas) return "";
+  const plural = caveat.pendingJornadas === 1 ? "jornada pendiente" : "jornadas pendientes";
+  return `Nota: hay ${caveat.pendingJornadas} ${plural} en el resultado; las horas solo se registran al completarla, por eso pueden figurar en 0 sin que signifique que no trabajaron.`;
 }
 
 /**

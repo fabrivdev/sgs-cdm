@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  asksUnaddressedComplement,
   businessCatalog,
   buildIntentFallbackPlan,
   compileSemanticPlan,
@@ -1376,6 +1377,12 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
       }
     }
   }
+  const pendingHoursCaveat = dataset === "tecnicos" && metrics.includes("horas")
+    ? (() => {
+      const pendingJornadas = sum(rows, "pendientes");
+      return pendingJornadas > 0 ? { pendingJornadas } : null;
+    })()
+    : null;
   const chronologicalPeriods = shouldSortTemporalSeriesChronologically(question, dimensions);
   const groups = new Map<string, { dimensions: JsonRecord; rows: JsonRecord[] }>();
   for (const row of rows) {
@@ -1434,6 +1441,7 @@ async function queryBusinessData(client: SupabaseClient, args: JsonRecord) {
     result_rows: Math.min(result.length, limit),
     rows: result.slice(0, limit),
     outlier,
+    pending_hours_caveat: pendingHoursCaveat,
   };
 }
 
@@ -2330,10 +2338,16 @@ Corrige el plan y devuelve nuevamente SOLO {"queries":[...]}.`;
       throw error;
     }
     const sources = results.map(({ args }) => ({ tool: "query_business_data", label: sourceLabel("query_business_data"), filters: args }));
+    // "Y quienes no" solo se resuelve completo para tecnicos agrupado por
+    // carga (roster activo con y sin jornadas). Para cualquier otro caso,
+    // avisamos en vez de responder solo la mitad con tono de respuesta completa.
+    const complementCaveat = plans.length === 1 && asksUnaddressedComplement(question, plans[0].dataset, plans[0].dimensions)
+      ? "Nota: esta consulta no me permite calcular quienes NO cumplen la condicion (necesitaria comparar contra el universo completo de esa fuente); solo puedo mostrarte quienes si."
+      : "";
     const deterministicContent = renderDeterministicAnswer({ question, results, mode: answerMode });
     if (deterministicContent) {
       return {
-        content: deterministicContent,
+        content: complementCaveat ? `${deterministicContent}\n\n${complementCaveat}` : deterministicContent,
         sources,
         results: results as unknown as Array<{ args: JsonRecord; data: JsonRecord }>,
         usage,
@@ -2363,8 +2377,8 @@ Resultados validados: ${resultPayload}`;
       ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
     }), controller.signal);
     usage = addUsage(usage, answered.payload.usage ?? {});
-    const content = cleanContent(answered.payload.choices?.[0]?.message?.content, 12000);
-    return { content: content || "No se pudo redactar la respuesta con los resultados calculados.", sources, results, usage, model: answered.model };
+    const content = cleanContent(answered.payload.choices?.[0]?.message?.content, 12000) || "No se pudo redactar la respuesta con los resultados calculados.";
+    return { content: complementCaveat ? `${content}\n\n${complementCaveat}` : content, sources, results, usage, model: answered.model };
   } finally {
     clearTimeout(timeout);
   }

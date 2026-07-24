@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  asksUnaddressedComplement,
   compileSemanticPlan,
   detectSemanticAmbiguity,
   enforceSemanticIntent,
@@ -493,5 +494,44 @@ describe("assistant plan validation", () => {
     }] });
 
     expect(result.plans[0].filters.rubro).toBe("Servicio");
+  });
+
+  it("does not truncate a plural technician roster question to a single winner", () => {
+    const plan = planFor("Que tecnicos tienen carga esta semana y quienes no?");
+    expect(plan.dataset).toBe("tecnicos");
+    expect(plan.dimensions).toEqual(["tecnico", "carga"]);
+    expect(plan.limit).toBeGreaterThan(1);
+  });
+
+  it("still returns a single winner for the singular form of the same question", () => {
+    const plan = planFor("Que tecnico tuvo mas horas este mes?");
+    expect(plan.limit).toBe(1);
+  });
+
+  it("keeps other singular-noun ranking questions returning a single winner", () => {
+    expect(planFor("Que sucursal facturo mas este mes").limit).toBe(1);
+    expect(planFor("Que cliente facturo mas este mes").limit).toBe(1);
+  });
+});
+
+describe("assistant unaddressed complement detection", () => {
+  it("does not flag technicians grouped by carga, since it already answers both sides", () => {
+    expect(asksUnaddressedComplement(
+      "Que tecnicos tienen carga esta semana y quienes no?",
+      "tecnicos",
+      ["tecnico", "carga"],
+    )).toBe(false);
+  });
+
+  it("flags a complement question when the dataset cannot compute the full universe", () => {
+    expect(asksUnaddressedComplement(
+      "Que clientes facturaron este mes y cuales no?",
+      "facturacion",
+      ["cliente"],
+    )).toBe(true);
+  });
+
+  it("does not flag questions without a complement clause", () => {
+    expect(asksUnaddressedComplement("Que tecnicos tienen carga esta semana?", "tecnicos", ["tecnico"])).toBe(false);
   });
 });
