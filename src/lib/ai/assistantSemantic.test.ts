@@ -505,6 +505,40 @@ describe("assistant OS vs app-job cycle time routing", () => {
   });
 });
 
+describe("assistant metric-specificity confidence (Etapa 2 finding)", () => {
+  // Antes de este fix, una parafrasis razonable de tiempo/tasa de cierre que
+  // no matcheaba los intents canonicos caia en el conteo por defecto de
+  // trabajos/ordenes_servicio con confianza >= 0.84 -- el umbral de
+  // produccion que evita consultar a Groq -- devolviendo un conteo en vez de
+  // la duracion/tasa pedida, con confianza alta y sin que Groq llegara a
+  // intervenir nunca.
+  const ambiguousParaphrases = [
+    "Cuanto tiempo lleva completar un trabajo en promedio",
+    "Que tan rapido cerramos los trabajos",
+    "Que fraccion de los trabajos ya completamos",
+    "En promedio cuanto tarda una OS desde que se abre hasta que se cierra",
+    "Que tan rapido se resuelven las OS",
+  ];
+
+  it.each(ambiguousParaphrases)("keeps confidence below the auto-resolve threshold for '%s'", (question) => {
+    const compiled = compileSemanticPlan(question);
+    expect(compiled).not.toBeNull();
+    expect(compiled!.confidence).toBeLessThan(0.84);
+  });
+
+  const plainCountQuestions = [
+    "Cuantos trabajos hay",
+    "Cuantos trabajos abiertos hay por sucursal",
+    "Cuantas OS hay por marca",
+  ];
+
+  it.each(plainCountQuestions)("keeps a plain count question resolving locally with high confidence for '%s'", (question) => {
+    const compiled = compileSemanticPlan(question);
+    expect(compiled).not.toBeNull();
+    expect(compiled!.confidence).toBeGreaterThanOrEqual(0.84);
+  });
+});
+
 describe("assistant semantic clarifications", () => {
   it("asks for the client universe only when the source is ambiguous", () => {
     expect(detectSemanticAmbiguity("Cuantos clientes hay")?.id).toBe("clientes_sin_universo");

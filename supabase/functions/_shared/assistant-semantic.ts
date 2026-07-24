@@ -1038,50 +1038,90 @@ export function isSemanticFollowUpQuestion(question: string) {
   return isFollowUp(normalizeText(question));
 }
 
-function inferDatasetMetrics(dataset: BusinessDataset, text: string) {
+/**
+ * Vocabulario que sugiere duracion/tasa/promedio sin matchear los intents
+ * canonicos exactos (ver isCycleTimeQuestion y los triggers de tasa_cierre).
+ * Solo se usa para bajar la confianza del fallback de conteo en trabajos y
+ * ordenes_servicio -- no dispara ningun plan por si sola.
+ */
+const AMBIGUOUS_METRIC_SMELL = [
+  "PROMEDIO", "MEDIANA", "TARDA", "TARDAN", "DEMORA", "DEMORAN", "RAPIDO", "RAPIDA",
+  "LENTO", "LENTA", "FRACCION", "PORCION", "PORCENTAJE", "TASA", "ANTIGUEDAD",
+  "COMPLETAMOS", "TERMINAMOS", "CICLO", "DURACION", "CUANTO TIEMPO", "CUANTOS DIAS",
+];
+
+/**
+ * specific=false marca un fallback generico ante vocabulario ambiguo, no una
+ * senal de contenido real. trabajos y ordenes_servicio ahora tienen metricas
+ * de duracion/tasa que solo se resuelven por intent canonico (ver
+ * detectSemanticIntent); si el intent no matcheo pero el texto igual "huele"
+ * a duracion/tasa/promedio, no hay que confiar en el conteo por defecto con
+ * la misma confianza que si de verdad supieramos que piden un conteo -- eso
+ * permitia que una parafrasis razonable de "tiempo de cierre" cayera en un
+ * conteo incorrecto con confianza alta, sin llegar nunca a Groq. Una
+ * pregunta de conteo llana ("cuantos trabajos hay") no tiene ese vocabulario
+ * y sigue resolviendose local, gratis e instantanea como siempre.
+ */
+function inferDatasetMetrics(dataset: BusinessDataset, text: string): { metrics: string[]; specific: boolean } {
   if (dataset === "facturacion") {
-    if (hasAny(text, ["HORA", "HORAS", " HS "])) return ["horas"];
-    if (hasAny(text, ["KILOMETRO", "KILOMETROS", " KM "])) return ["km"];
-    if (text.includes("TICKET")) return ["ticket_promedio"];
-    if (hasAny(text, ["CUANTAS FACTURAS", "CANTIDAD DE FACTURAS", "NUMERO DE FACTURAS"])) return ["facturas"];
-    if (hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES", "CLIENTES UNICOS"])) return ["clientes"];
-    return ["total_usd"];
+    if (hasAny(text, ["HORA", "HORAS", " HS "])) return { metrics: ["horas"], specific: true };
+    if (hasAny(text, ["KILOMETRO", "KILOMETROS", " KM "])) return { metrics: ["km"], specific: true };
+    if (text.includes("TICKET")) return { metrics: ["ticket_promedio"], specific: true };
+    if (hasAny(text, ["CUANTAS FACTURAS", "CANTIDAD DE FACTURAS", "NUMERO DE FACTURAS"])) return { metrics: ["facturas"], specific: true };
+    if (hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES", "CLIENTES UNICOS"])) return { metrics: ["clientes"], specific: true };
+    return { metrics: ["total_usd"], specific: true };
   }
   if (dataset === "ordenes_servicio") {
-    if (hasAny(text, ["VALOR", "MONTO", "IMPORTE", "TOTAL USD", "COSTO"])) return ["total_usd"];
-    if (hasAny(text, ["KILOMETRO", "KILOMETROS", " KM "])) return ["km", "ordenes"];
-    if (hasAny(text, ["HORA", "HORAS", "PRODUCTIV", "PRODUCCION TECNICA"])) return ["horas", "ordenes"];
-    return ["ordenes"];
+    if (hasAny(text, ["VALOR", "MONTO", "IMPORTE", "TOTAL USD", "COSTO"])) return { metrics: ["total_usd"], specific: true };
+    if (hasAny(text, ["KILOMETRO", "KILOMETROS", " KM "])) return { metrics: ["km", "ordenes"], specific: true };
+    if (hasAny(text, ["HORA", "HORAS", "PRODUCTIV", "PRODUCCION TECNICA"])) return { metrics: ["horas", "ordenes"], specific: true };
+    return { metrics: ["ordenes"], specific: !hasAny(text, AMBIGUOUS_METRIC_SMELL) };
   }
-  if (dataset === "trabajos") return ["trabajos"];
-  if (dataset === "jornadas") return hasAny(text, ["HORA", "HORAS", " HS "]) ? ["horas", "jornadas"] : ["jornadas"];
+  if (dataset === "trabajos") return { metrics: ["trabajos"], specific: !hasAny(text, AMBIGUOUS_METRIC_SMELL) };
+  if (dataset === "jornadas") {
+    return hasAny(text, ["HORA", "HORAS", " HS "])
+      ? { metrics: ["horas", "jornadas"], specific: true }
+      : { metrics: ["jornadas"], specific: true };
+  }
   if (dataset === "tecnicos") {
     if (hasAny(text, ["CARGA", "ASIGNAD", "JORNADA", "HORA", "HORAS", "DISPONIB"])) {
-      return ["jornadas", "horas"];
+      return { metrics: ["jornadas", "horas"], specific: true };
     }
-    return ["tecnicos"];
+    return { metrics: ["tecnicos"], specific: true };
   }
   if (dataset === "disponibilidades") {
-    if (hasAny(text, ["CUANTOS TECNICOS", "CANTIDAD DE TECNICOS", "QUIENES", "QUE TECNICOS"])) return ["tecnicos"];
-    if (hasAny(text, ["CUANTOS DIAS", "CANTIDAD DE DIAS", "DIAS NO DISPONIBLES"])) return ["dias"];
-    return ["registros"];
+    if (hasAny(text, ["CUANTOS TECNICOS", "CANTIDAD DE TECNICOS", "QUIENES", "QUE TECNICOS"])) return { metrics: ["tecnicos"], specific: true };
+    if (hasAny(text, ["CUANTOS DIAS", "CANTIDAD DE DIAS", "DIAS NO DISPONIBLES"])) return { metrics: ["dias"], specific: true };
+    return { metrics: ["registros"], specific: true };
   }
-  if (dataset === "parque") return hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES", "PROPIETARIOS"]) ? ["clientes"] : ["maquinas"];
-  if (dataset === "agenda") return hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES"]) ? ["clientes"] : ["gestiones"];
-  if (dataset === "contactos") return hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES"]) ? ["clientes"] : ["contactos"];
+  if (dataset === "parque") {
+    return hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES", "PROPIETARIOS"])
+      ? { metrics: ["clientes"], specific: true }
+      : { metrics: ["maquinas"], specific: true };
+  }
+  if (dataset === "agenda") {
+    return hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES"])
+      ? { metrics: ["clientes"], specific: true }
+      : { metrics: ["gestiones"], specific: true };
+  }
+  if (dataset === "contactos") {
+    return hasAny(text, ["CUANTOS CLIENTES", "CANTIDAD DE CLIENTES"])
+      ? { metrics: ["clientes"], specific: true }
+      : { metrics: ["contactos"], specific: true };
+  }
   if (dataset === "historial_trabajos") {
-    if (hasAny(text, ["CUANTOS TRABAJOS", "CANTIDAD DE TRABAJOS"])) return ["trabajos"];
-    if (hasAny(text, ["CUANTOS USUARIOS", "CANTIDAD DE USUARIOS"])) return ["usuarios"];
-    return ["eventos"];
+    if (hasAny(text, ["CUANTOS TRABAJOS", "CANTIDAD DE TRABAJOS"])) return { metrics: ["trabajos"], specific: true };
+    if (hasAny(text, ["CUANTOS USUARIOS", "CANTIDAD DE USUARIOS"])) return { metrics: ["usuarios"], specific: true };
+    return { metrics: ["eventos"], specific: true };
   }
   if (dataset === "importaciones") {
     const metrics: string[] = [];
     if (hasAny(text, ["FILA", "FILAS", "REGISTROS PROCESADOS"])) metrics.push("filas");
     if (hasAny(text, ["INSERTADO", "INSERTADOS", "REGISTROS NUEVOS"])) metrics.push("insertados");
     if (hasAny(text, ["DUPLICADO", "DUPLICADOS"])) metrics.push("duplicados");
-    return metrics.length ? metrics : ["importaciones"];
+    return { metrics: metrics.length ? metrics : ["importaciones"], specific: true };
   }
-  return ["dias"];
+  return { metrics: ["dias"], specific: true };
 }
 
 function hasExplicitMetricSignal(dataset: BusinessDataset, text: string) {
@@ -1369,7 +1409,7 @@ function planFromParts(
   const followUpPlan = inheritedPlan && isFollowUp(text) ? inheritedPlan : undefined;
   const metrics = followUpPlan && !hasExplicitMetricSignal(dataset, text)
     ? followUpPlan.metrics
-    : inferDatasetMetrics(dataset, text);
+    : inferDatasetMetrics(dataset, text).metrics;
   const inferredDimensions = inferDimensions(dataset, text);
   const dimensions = inferredDimensions.length ? inferredDimensions : followUpPlan?.dimensions ?? [];
   const filters = {
@@ -1417,7 +1457,15 @@ export function compileSemanticPlan(
   const plan = planFromParts(best.dataset, text, question, explicitFilters);
   if (!plan) return null;
   const hasDimension = plan.dimensions.length > 0;
-  const confidence = Math.min(0.96, 0.68 + best.score * 0.09 + (hasDimension ? 0.08 : 0));
+  const rawConfidence = Math.min(0.96, 0.68 + best.score * 0.09 + (hasDimension ? 0.08 : 0));
+  // Un dataset bien identificado no implica que la metrica lo este: si nadie
+  // matcheo una senal especifica de metrica (fallback generico, ver
+  // inferDatasetMetrics), no hay que responder con la misma confianza que si
+  // supieramos que es un conteo -- eso dejaba parafrasis razonables de
+  // "tiempo de cierre"/"tasa de cierre" respondidas con el conteo por
+  // defecto, con confianza alta, sin llegar nunca a Groq.
+  const metricIsSpecific = inferDatasetMetrics(best.dataset, text).specific;
+  const confidence = metricIsSpecific ? rawConfidence : Math.min(rawConfidence, 0.75);
   return {
     plan,
     confidence,
