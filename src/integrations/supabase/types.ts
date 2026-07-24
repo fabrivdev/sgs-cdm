@@ -594,6 +594,7 @@ export type Database = {
           cod_mecanico: string | null
           factura: string | null
           fecha_abierta_os: string | null
+          fecha_cierre_os: string | null
           fecha_emision_factura: string | null
           importado_en: string
           kilometro_valor: number | null
@@ -622,6 +623,7 @@ export type Database = {
           cod_mecanico?: string | null
           factura?: string | null
           fecha_abierta_os?: string | null
+          fecha_cierre_os?: string | null
           fecha_emision_factura?: string | null
           importado_en?: string
           kilometro_valor?: number | null
@@ -650,6 +652,7 @@ export type Database = {
           cod_mecanico?: string | null
           factura?: string | null
           fecha_abierta_os?: string | null
+          fecha_cierre_os?: string | null
           fecha_emision_factura?: string | null
           importado_en?: string
           kilometro_valor?: number | null
