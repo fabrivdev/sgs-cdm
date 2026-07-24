@@ -309,6 +309,7 @@ export type Database = {
           cod_entidad: string | null
           cod_factura: string
           entidad_nombre: string
+          excluido_de_reportes: boolean
           fecha: string
           grupo: string | null
           grupo_fx: string | null
@@ -324,6 +325,7 @@ export type Database = {
           cod_entidad?: string | null
           cod_factura: string
           entidad_nombre: string
+          excluido_de_reportes?: boolean
           fecha: string
           grupo?: string | null
           grupo_fx?: string | null
@@ -339,6 +341,7 @@ export type Database = {
           cod_entidad?: string | null
           cod_factura?: string
           entidad_nombre?: string
+          excluido_de_reportes?: boolean
           fecha?: string
           grupo?: string | null
           grupo_fx?: string | null
