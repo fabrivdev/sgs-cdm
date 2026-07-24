@@ -181,14 +181,109 @@ describe("assistant deterministic answer renderer", () => {
       order_direction: "desc",
       limit: 1,
     };
-    const result = resultFor(plan, [{ periodo: "2018-03-03", total_usd: 96726043482 }]);
+    // Un outlier moderado (no un error de escala de miles de millones) sigue
+    // usando el aviso comparativo de siempre.
+    const result = resultFor(plan, [{ periodo: "2018-03-03", total_usd: 96000 }]);
     (result.data as { outlier?: unknown }).outlier = {
-      metric: "total_usd", top: 96726043482, median: 12000, ratio: 8060503.6,
+      metric: "total_usd", top: 96000, median: 12000, ratio: 8,
     };
     const answer = renderDeterministicAnswer({ question: "Que dia tuvo mayor facturacion", mode: "brief", results: [result] });
 
     expect(answer).toContain("Aviso:");
     expect(answer).toContain("veces mas alto que el resto");
+    expect(answer).toContain("USD 96.000");
+  });
+
+  it("masks an implausible USD amount instead of showing it, even without dimensions or an outlier", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Cuanto facturamos",
+      mode: "brief",
+      results: [resultFor(plan, [{ total_usd: 96726043482 }])],
+    });
+
+    expect(answer).toContain("El resultado incluye un valor fuera de rango esperado");
+    expect(answer).not.toContain("96726043482");
+    expect(answer).not.toContain("96.726.043.482");
+  });
+
+  it("masks an implausible USD amount inside a ranking row, keeping the rest of the row intact", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "facturacion",
+      metrics: ["total_usd"],
+      dimensions: ["periodo"],
+      filters: {},
+      granularity: "day",
+      order_by: "total_usd",
+      order_direction: "desc",
+      limit: 2,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Que dia tuvo mayor facturacion",
+      mode: "brief",
+      results: [resultFor(plan, [
+        { periodo: "2018-03-03", total_usd: 96726043482 },
+        { periodo: "2026-05-01", total_usd: 45000 },
+      ])],
+    });
+
+    expect(answer).toContain("2018-03-03");
+    expect(answer).toContain("El resultado incluye un valor fuera de rango esperado");
+    expect(answer).not.toContain("96726043482");
+    expect(answer).toContain("2026-05-01");
+    expect(answer).toContain("USD 45.000");
+  });
+
+  it("does not mask the outlier warning's own figure when it is not an implausible USD amount", () => {
+    // El guardrail es especifico de montos USD fuera de rango; un outlier de
+    // una metrica sin unidad USD (o un monto USD dentro de rango) sigue
+    // usando el aviso comparativo normal, no el mensaje de "fuera de rango".
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["trabajos"],
+      dimensions: ["sucursal"],
+      filters: {},
+      granularity: "month",
+      order_by: "trabajos",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const result = resultFor(plan, [{ sucursal: "Santa Rita", trabajos: 500 }]);
+    (result.data as { outlier?: unknown }).outlier = { metric: "trabajos", top: 500, median: 20, ratio: 25 };
+    const answer = renderDeterministicAnswer({ question: "Que sucursal tiene mas trabajos", mode: "brief", results: [result] });
+
+    expect(answer).toContain("veces mas alto que el resto");
+    expect(answer).not.toContain("fuera de rango esperado");
+  });
+
+  it("does not mask non-USD units regardless of magnitude", () => {
+    const plan: GenericQueryPlan = {
+      dataset: "trabajos",
+      metrics: ["dias_ciclo"],
+      dimensions: [],
+      filters: {},
+      granularity: "month",
+      order_by: "dias_ciclo",
+      order_direction: "desc",
+      limit: 20,
+    };
+    const answer = renderDeterministicAnswer({
+      question: "Tiempo de ciclo",
+      mode: "brief",
+      results: [resultFor(plan, [{ dias_ciclo: 999999999 }])],
+    });
+
+    expect(answer).not.toContain("fuera de rango esperado");
+    expect(answer).toContain("999.999.999 dias");
   });
 
   it("does not warn when there is no outlier flagged", () => {

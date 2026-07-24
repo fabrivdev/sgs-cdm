@@ -390,6 +390,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
       let query = client
         .from("facturacion")
         .select("fecha,sucursal,tipo,cliente_id,entidad_nombre,total_venta,cantidad,grupo,grupo_fx,cod_factura")
+        .eq("excluido_de_reportes", false)
         .order("fecha")
         .range(from, to);
       query = dateFilter(query, "fecha", args);

@@ -62,9 +62,25 @@ function formatNumber(value: unknown, maximumFractionDigits = 2) {
   });
 }
 
+/**
+ * Guardrail temporal mientras se audita y limpia facturacion historica: hubo
+ * un error de escala real (ver commit "Fix x1,000,000 scale error in legacy
+ * Santa Rita billing import") que hizo que el asistente mostrara cifras de
+ * miles de millones de USD como si fueran validas. Ningun monto individual de
+ * este negocio deberia superar este umbral; si aparece, es mas probable que
+ * sea un dato mal cargado que un hecho real, asi que no se muestra.
+ */
+export const IMPLAUSIBLE_USD_THRESHOLD = 50_000_000;
+export const IMPLAUSIBLE_USD_MESSAGE = "El resultado incluye un valor fuera de rango esperado (posible error de datos), no lo muestro hasta verificarlo.";
+
+function isImplausibleUsd(unit: string | undefined, value: unknown) {
+  return unit === "usd" && Math.abs(numberValue(value)) > IMPLAUSIBLE_USD_THRESHOLD;
+}
+
 function metricValue(dataset: BusinessDataset, metric: string, value: unknown) {
   const definition = semanticCatalog[dataset].metrics[metric as keyof typeof semanticCatalog[typeof dataset]["metrics"]];
   const unit = definition?.unit;
+  if (isImplausibleUsd(unit, value)) return IMPLAUSIBLE_USD_MESSAGE;
   if (unit === "usd") return `USD ${formatNumber(value, 2)}`;
   if (unit === "hours") return `${formatNumber(value, 2)} hs`;
   if (unit === "km") return `${formatNumber(value, 2)} km`;
@@ -193,6 +209,10 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
 function outlierCaveat(dataset: BusinessDataset, outlier: DominantOutlier | null | undefined) {
   if (!outlier) return "";
   const metric = metricLabel(dataset, outlier.metric).toLowerCase();
+  const unit = semanticCatalog[dataset].metrics[outlier.metric as keyof typeof semanticCatalog[typeof dataset]["metrics"]]?.unit;
+  if (isImplausibleUsd(unit, outlier.top)) {
+    return `Aviso: el primer resultado de ${metric} esta fuera de rango esperado (posible error de datos); no lo muestro ni lo comparo hasta verificarlo en la fuente.`;
+  }
   return `Aviso: el primer resultado (${metric} ${formatNumber(outlier.top, 2)}) es ${formatNumber(outlier.ratio, 1)} veces mas alto que el resto de los valores comparables; podria ser un dato cargado incorrectamente. Verificalo en la fuente antes de darlo por valido.`;
 }
 

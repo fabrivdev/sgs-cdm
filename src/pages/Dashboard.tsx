@@ -668,6 +668,7 @@ export default function Dashboard() {
             supabase
               .from("facturacion")
               .select(cols)
+              .eq("excluido_de_reportes", false)
               .gte("fecha", dateKey(queryStart))
               .lte("fecha", dateKey(queryEnd))
               .order("fecha", { ascending: false });

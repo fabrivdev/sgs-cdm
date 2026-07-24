@@ -195,7 +195,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       supabase.from("contactos_cliente").select("*").eq("cliente_id", id).order("es_principal", { ascending: false }),
       supabase.from("parque_maquinas").select("*").eq("cliente_id", id),
       supabase.from("seguimiento_comercial").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
-      supabase.from("facturacion").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
+      supabase.from("facturacion").select("*").eq("cliente_id", id).eq("excluido_de_reportes", false).order("fecha", { ascending: false }),
       supabase
         .from("trabajos")
         .select("id, cliente_id, codigo, os_numero, creado_en, estado_general, descripcion_problema")
