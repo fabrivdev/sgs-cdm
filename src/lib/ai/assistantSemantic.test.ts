@@ -643,3 +643,99 @@ describe("assistant unaddressed complement detection", () => {
     expect(asksUnaddressedComplement("Que tecnicos tienen carga esta semana?", "tecnicos", ["tecnico"])).toBe(false);
   });
 });
+
+describe("assistant superlative dimension pattern (generalized from periodo)", () => {
+  // El patron "X con mayor/menor Y", "X que mas Y", "mejor/peor X" ya
+  // funcionaba para nouns temporales (dia/semana/mes/ano) via
+  // requestedTemporalGranularity, pero las demas dimensiones agrupables solo
+  // tenian una lista de frases literales ("QUE TECNICO", "TECNICO MAS",
+  // "MEJOR TECNICO") que no cubre "TECNICO CON MAYOR X" ni "TECNICO QUE MAS
+  // X". Estos casos usan a proposito construcciones que esa lista no
+  // contenia, para probar el patron generalizado y no solo re-confirmar lo
+  // que ya andaba.
+  it("groups by tecnico for 'el tecnico con mayor X' on a dataset that has that dimension", () => {
+    const plan = planFor("El tecnico con mayor facturacion de OS este mes");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.dimensions).toContain("tecnico");
+  });
+
+  it("groups by cliente for 'el cliente con mayor X'", () => {
+    const plan = planFor("El cliente con mayor facturacion este ano");
+    expect(plan.dataset).toBe("facturacion");
+    expect(plan.dimensions).toContain("cliente");
+  });
+
+  it("groups by sucursal for 'la sucursal con mayor X' (SUCURSAL pluralizes irregularly as +ES, not +S)", () => {
+    const plan = planFor("La sucursal con mayor facturacion este mes");
+    expect(plan.dataset).toBe("facturacion");
+    expect(plan.dimensions).toContain("sucursal");
+  });
+
+  it("groups by marca for 'la marca con mas X'", () => {
+    const plan = planFor("La marca con mas facturacion este ano");
+    expect(plan.dataset).toBe("facturacion");
+    expect(plan.dimensions).toContain("marca");
+  });
+
+  it("groups by modelo for 'el modelo con mas X', without confusing it with a specific model filter", () => {
+    const plan = planFor("El modelo con mas maquinas en el parque");
+    expect(plan.dataset).toBe("parque");
+    expect(plan.dimensions).toContain("modelo");
+  });
+
+  it("groups by rubro for 'el rubro con mayor X'", () => {
+    const plan = planFor("El rubro con mayor facturacion este mes");
+    expect(plan.dataset).toBe("facturacion");
+    expect(plan.dimensions).toContain("rubro");
+  });
+});
+
+describe("assistant tecnico+facturacion routes to ordenes_servicio (facturacion has no tecnico attribution)", () => {
+  // facturacion no tiene dimension tecnico en el catalogo: las lineas
+  // facturadas son de cliente/producto/fecha, nunca de tecnico. Antes de
+  // este fix, "que tecnico produjo la mayor facturacion" ganaba el dataset
+  // facturacion (el score de "FACTUR" le gana a cualquier otro), y como
+  // facturacion no tiene esa dimension, el plan quedaba con dimensions: []
+  // -- un total plano sin ningun nombre de tecnico.
+  it("routes the exact reported question to ordenes_servicio with a real tecnico breakdown", () => {
+    const plan = planFor("Que tecnico produjo la mayor facturacion en servicios");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.dimensions).toContain("tecnico");
+    expect(plan.limit).toBe(1);
+  });
+
+  it("uses the servicio_usd metric specifically when the question names the Servicio rubro, not the broader total_usd", () => {
+    // facturacion tiene un filtro de rubro que se perdia al enrutar a
+    // ordenes_servicio (que no tiene ese filtro); en vez de perderlo, la
+    // metrica de rubro especifica lo reemplaza.
+    const plan = planFor("Que tecnico produjo la mayor facturacion en servicios");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.metrics).toEqual(["servicio_usd"]);
+  });
+
+  it("falls back to total_usd when no specific rubro is named", () => {
+    const plan = planFor("Que tecnico produjo la mayor facturacion");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.metrics).toEqual(["total_usd"]);
+  });
+
+  it("uses repuestos_usd when the question names the Repuestos rubro", () => {
+    const plan = planFor("Que tecnico genero mas valor en repuestos");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.metrics).toEqual(["repuestos_usd"]);
+  });
+
+  it("also routes when the question says facturo instead of produjo", () => {
+    const plan = planFor("Que tecnico factura mas");
+    expect(plan.dataset).toBe("ordenes_servicio");
+    expect(plan.dimensions).toContain("tecnico");
+  });
+
+  it("does not divert a plain technician roster question that has nothing to do with billing", () => {
+    // Guarda contra el riesgo de que el bonus nuevo capture preguntas de
+    // dotacion ("cuantos tecnicos activos hay") que no mencionan nada
+    // monetario y deben seguir yendo al dataset tecnicos.
+    const plan = planFor("Cuantos tecnicos activos hay");
+    expect(plan.dataset).toBe("tecnicos");
+  });
+});

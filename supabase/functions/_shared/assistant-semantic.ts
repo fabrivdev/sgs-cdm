@@ -487,6 +487,28 @@ function isTemporalRankingQuestion(text: string) {
   );
 }
 
+/**
+ * Generaliza el patron superlativo que requestedTemporalGranularity ya
+ * aplicaba solo a nouns temporales (dia/semana/mes/ano) para cualquier noun
+ * de dimension agrupable (tecnico, cliente, sucursal, marca, modelo, rubro).
+ * La lista de frases literales de add() no cubre construcciones como
+ * "tecnico con mayor facturacion" o "tecnico que mas factura" -- solo
+ * "que tecnico"/"tecnico mas"/"mejor tecnico" -- y ese es el mismo hueco que
+ * ya se habia cerrado para periodo.
+ */
+function matchesSuperlativeConstruction(text: string, nounPattern: string): boolean {
+  const noun = `(?:${nounPattern})`;
+  const patterns = [
+    new RegExp(`\\b(?:POR|CADA)\\s+${noun}\\b`),
+    new RegExp(`\\b(?:QUE|CUAL(?:\\s+FUE|\\s+ES)?)(?:\\s+(?:EL|LA|LOS|LAS|MI|NUESTRO|NUESTRA|SU))?\\s+${noun}\\b`),
+    new RegExp(`\\b${noun}\\s+(?:CON|DE)\\s+(?:LA\\s+|EL\\s+)?(?:MAYOR|MENOR|MAS|MEJOR|PEOR)\\b`),
+    new RegExp(`\\b${noun}\\s+QUE\\s+(?:MAS|MENOS)\\b`),
+    new RegExp(`\\b${noun}\\s+MAS\\s+(?:PRODUCTIV[OA]|ALTO|ALTA|BAJO|BAJA|VENDI[OD][OA]|FACTURAD[OA]|GENERAD[OA])\\b`),
+    new RegExp(`\\b(?:MEJOR|PEOR)\\s+${noun}\\b`),
+  ];
+  return patterns.some((pattern) => pattern.test(text));
+}
+
 export function getDataCatalog() {
   return {
     version: semanticCatalogVersion,
@@ -968,6 +990,13 @@ function scoreDatasets(text: string) {
       dataset,
       score: datasetSignals[dataset].reduce((score, signal) => score + (signalMatches(text, signal) ? 1 : 0), 0)
         + (dataset === "ordenes_servicio" && hasAny(text, [" ORDEN DE SERVICIO ", " ORDENES DE SERVICIO ", " OS ", "PRODUCTIV"]) ? 3 : 0)
+        // Facturacion no tiene atribucion por tecnico (las lineas facturadas
+        // son de cliente/producto/fecha, no de tecnico): "que tecnico
+        // facturo/produjo/genero mas" nunca es respondible desde facturacion
+        // por mas que la palabra "facturacion" este presente y le gane el
+        // puntaje. Ver canonicalRules: "productividad tecnica significa OS y
+        // horas de OS".
+        + (dataset === "ordenes_servicio" && text.includes("TECNICO") && hasAny(text, ["FACTUR", "VALOR", "COSTO", "PRODUJO", "GENERO", "VENDIO"]) ? 5 : 0)
         + (dataset === "tecnicos" && text.includes("TECNIC") && hasAny(text, ["CARGA", "ASIGNAD", "DOTACION"]) ? 3 : 0)
         + (dataset === "disponibilidades" && hasAny(text, ["NO DISPONIB", "VACACION", "CAPACITACION", "PERMISO", "AUSENCIA", "TALLER INTERNO"]) ? 4 : 0)
         + (dataset === "jornadas" && hasAny(text, ["JORNADA", "PLANIFICADOR", "CALENDARIO"]) ? 3 : 0)
@@ -1072,7 +1101,17 @@ function inferDatasetMetrics(dataset: BusinessDataset, text: string): { metrics:
     return { metrics: ["total_usd"], specific: true };
   }
   if (dataset === "ordenes_servicio") {
-    if (hasAny(text, ["VALOR", "MONTO", "IMPORTE", "TOTAL USD", "COSTO"])) return { metrics: ["total_usd"], specific: true };
+    if (hasAny(text, ["VALOR", "MONTO", "IMPORTE", "TOTAL USD", "COSTO", "FACTUR", "VENDIO", "GENERO"])) {
+      // Facturacion tiene un filtro de rubro que ordenes_servicio no tiene
+      // (ver dias_ciclo/tasa_cierre): en vez de perder esa acotacion al
+      // enrutar por tecnico, se elige la metrica de rubro especifica si la
+      // pregunta la menciona.
+      if (hasAny(text, ["SERVICIO", "SERVICIOS"])) return { metrics: ["servicio_usd"], specific: true };
+      if (hasAny(text, ["REPUESTO", "REPUESTOS"])) return { metrics: ["repuestos_usd"], specific: true };
+      if (hasAny(text, ["KILOMETRAJE", "KILOMETRO", "KILOMETROS"])) return { metrics: ["kilometraje_usd"], specific: true };
+      if (hasAny(text, ["TERCERO", "TERCEROS"])) return { metrics: ["terceros_usd"], specific: true };
+      return { metrics: ["total_usd"], specific: true };
+    }
     if (hasAny(text, ["KILOMETRO", "KILOMETROS", " KM "])) return { metrics: ["km", "ordenes"], specific: true };
     if (hasAny(text, ["HORA", "HORAS", "PRODUCTIV", "PRODUCCION TECNICA"])) return { metrics: ["horas", "ordenes"], specific: true };
     return { metrics: ["ordenes"], specific: !hasAny(text, AMBIGUOUS_METRIC_SMELL) };
@@ -1172,6 +1211,14 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
   const add = (dimension: string, signals: readonly string[]) => {
     if (allowed.has(dimension) && hasAny(text, signals) && !dimensions.includes(dimension)) dimensions.push(dimension);
   };
+  // Cubre construcciones superlativas ("X con mayor Y", "X que mas Y") que la
+  // lista de frases literales de add() no enumera una por una. No pisa nada:
+  // add() ya intento primero, esto es un segundo intento mas generico.
+  const addSuperlative = (dimension: string, nounPattern: string) => {
+    if (allowed.has(dimension) && !dimensions.includes(dimension) && matchesSuperlativeConstruction(text, nounPattern)) {
+      dimensions.push(dimension);
+    }
+  };
 
   if (allowed.has("periodo") && requestedTemporalGranularity(text)) dimensions.push("periodo");
   add("periodo", [
@@ -1188,10 +1235,12 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
     "POR SUCURSAL", "QUE SUCURSAL", "CUAL SUCURSAL", "SUCURSAL MAS",
     "MEJOR SUCURSAL", "SUCURSALES", "ENTRE SUCURSALES",
   ]);
+  addSuperlative("sucursal", "SUCURSAL(?:ES)?");
   add("tecnico", [
     "POR TECNICO", "QUE TECNICO", "CUAL TECNICO", "TECNICO MAS",
     "MEJOR TECNICO", "RESPONSABLE", "AUXILIAR", "PARTICIPANTE",
   ]);
+  addSuperlative("tecnico", "TECNICOS?");
   add("cliente", [
     "POR CLIENTE", "DEL CLIENTE", "DE CLIENTE", "QUE CLIENTE", "CUAL CLIENTE",
     "CLIENTE QUE MAS", "CLIENTE MAS", "MEJOR CLIENTE", "TOP CLIENTES",
@@ -1202,12 +1251,15 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
     "DAME LOS CLIENTES", "DIME LOS CLIENTES", "MOSTRA LOS CLIENTES", "MOSTRAME LOS CLIENTES",
     "NOMBRA LOS CLIENTES", "DECIME LOS CLIENTES",
   ]);
+  addSuperlative("cliente", "CLIENTES?");
   if (allowed.has("cliente") && /(?:^| )TOP\s+\d+\s+CLIENTES(?: |$)/.test(text) && !dimensions.includes("cliente")) {
     dimensions.push("cliente");
   }
   add("tipo_tiempo", ["POR TIPO DE TIEMPO", "TIPO DE TIEMPO", "CLIENTE GARANTIA INTERNO", "CLIENTE INTERNO GARANTIA"]);
   add("rubro", ["POR RUBRO", "RUBROS", "COMPOSICION DE RUBROS"]);
+  addSuperlative("rubro", "RUBROS?");
   add("marca", ["POR MARCA", "QUE MARCA", "MARCAS"]);
+  addSuperlative("marca", "MARCAS?");
   add("estado", ["POR ESTADO", "ESTADOS", "COMPOSICION DE ESTADOS"]);
   if (allowed.has("factura") && (
     /(?:^| )POR FACTURA(?: |$)/.test(text)
@@ -1222,7 +1274,10 @@ function inferDimensions(dataset: BusinessDataset, text: string) {
   add("serie", ["CHASIS", "NUMERO DE SERIE", "POR SERIE"]);
   // "modelo X" con un numero (ej: "el modelo jaguar 950") pide un filtro, no un
   // desglose por modelo; en ese caso no agregamos la dimension.
-  if (!detectModelMention(text)) add("modelo", ["MODELO", "POR MODELO"]);
+  if (!detectModelMention(text)) {
+    add("modelo", ["MODELO", "POR MODELO"]);
+    addSuperlative("modelo", "MODELOS?");
+  }
   add("resultado", ["POR RESULTADO", "RESULTADOS"]);
   add("tipo", ["POR TIPO", "TIPO DE AUSENCIA", "TIPO DE NO DISPONIBILIDAD", "VACACIONES", "CAPACITACIONES", "PERMISOS"]);
   add("motivo", ["MOTIVO", "OBSERVACION DE LA AUSENCIA"]);
