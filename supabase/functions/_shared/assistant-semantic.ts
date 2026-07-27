@@ -509,6 +509,27 @@ function matchesSuperlativeConstruction(text: string, nounPattern: string): bool
   return patterns.some((pattern) => pattern.test(text));
 }
 
+/**
+ * Detecta una pregunta que pide un unico ganador entre dimensiones no
+ * temporales. Se mantiene separado de matchesSuperlativeConstruction porque
+ * ese helper tambien reconoce "por/cada X", que pide un desglose y no un
+ * limite de una sola fila.
+ */
+function matchesDimensionWinnerConstruction(text: string): boolean {
+  const noun = "(?:SUCURSAL|TECNICO|CLIENTE|RUBRO|MARCA|MODELO)";
+  const comparative = "(?:MAYOR|MENOR|MAS|MENOS|MEJOR|PEOR)";
+  const patterns = [
+    new RegExp(`\\b(?:EL|LA|UN|UNA)?\\s*${noun}\\s+(?:CON|DE)\\s+(?:LA\\s+|EL\\s+)?${comparative}\\b`),
+    new RegExp(`\\b${noun}\\s+QUE\\s+(?:MAS|MENOS)\\b`),
+    new RegExp(`\\b${noun}\\s+MAS\\s+(?:PRODUCTIV[OA]|ALTO|ALTA|BAJO|BAJA|VENDI[OD][OA]|FACTURAD[OA]|GENERAD[OA])\\b`),
+    new RegExp(`\\b(?:MEJOR|PEOR)\\s+${noun}\\b`),
+    new RegExp(
+      `\\b(?:QUE|CUAL(?:\\s+FUE|\\s+ES)?)(?:\\s+(?:EL|LA|MI|NUESTRO|NUESTRA|SU))?\\s+${noun}\\b(?:\\s+\\w+){0,5}\\s+(?:LA\\s+|EL\\s+)?${comparative}\\b`,
+    ),
+  ];
+  return patterns.some((pattern) => pattern.test(text));
+}
+
 export function getDataCatalog() {
   return {
     version: semanticCatalogVersion,
@@ -1034,6 +1055,7 @@ function requestedLimit(text: string) {
   if (topMatch) return safeLimit(topMatch[1], 20, 100);
   if (isTemporalRankingQuestion(text)) return 1;
   if (hasAny(text, ["QUIEN LE SIGUE", "CUAL LE SIGUE", "SEGUNDO LUGAR"])) return 2;
+  if (matchesDimensionWinnerConstruction(text)) return 1;
   if (
     hasAny(text, [
       "CUAL FUE", "CUAL ES", "QUIEN FUE", "QUIEN ES",

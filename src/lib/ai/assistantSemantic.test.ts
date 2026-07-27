@@ -657,36 +657,60 @@ describe("assistant superlative dimension pattern (generalized from periodo)", (
     const plan = planFor("El tecnico con mayor facturacion de OS este mes");
     expect(plan.dataset).toBe("ordenes_servicio");
     expect(plan.dimensions).toContain("tecnico");
+    expect(plan.limit).toBe(1);
   });
 
   it("groups by cliente for 'el cliente con mayor X'", () => {
     const plan = planFor("El cliente con mayor facturacion este ano");
     expect(plan.dataset).toBe("facturacion");
     expect(plan.dimensions).toContain("cliente");
+    expect(plan.limit).toBe(1);
   });
 
   it("groups by sucursal for 'la sucursal con mayor X' (SUCURSAL pluralizes irregularly as +ES, not +S)", () => {
     const plan = planFor("La sucursal con mayor facturacion este mes");
     expect(plan.dataset).toBe("facturacion");
     expect(plan.dimensions).toContain("sucursal");
+    expect(plan.limit).toBe(1);
   });
 
   it("groups by marca for 'la marca con mas X'", () => {
     const plan = planFor("La marca con mas facturacion este ano");
     expect(plan.dataset).toBe("facturacion");
     expect(plan.dimensions).toContain("marca");
+    expect(plan.limit).toBe(1);
   });
 
   it("groups by modelo for 'el modelo con mas X', without confusing it with a specific model filter", () => {
     const plan = planFor("El modelo con mas maquinas en el parque");
     expect(plan.dataset).toBe("parque");
     expect(plan.dimensions).toContain("modelo");
+    expect(plan.limit).toBe(1);
   });
 
   it("groups by rubro for 'el rubro con mayor X'", () => {
     const plan = planFor("El rubro con mayor facturacion este mes");
     expect(plan.dataset).toBe("facturacion");
     expect(plan.dimensions).toContain("rubro");
+    expect(plan.limit).toBe(1);
+  });
+
+  it("does not turn a regular grouped breakdown into a single winner", () => {
+    const plan = planFor("Facturacion por cliente este ano");
+    expect(plan.dimensions).toContain("cliente");
+    expect(plan.limit).toBeGreaterThan(1);
+  });
+
+  it("keeps plural roster questions as lists", () => {
+    const plan = planFor("Que tecnicos tuvieron actividad este mes");
+    expect(plan.dimensions).toContain("tecnico");
+    expect(plan.limit).toBeGreaterThan(1);
+  });
+
+  it("keeps an explicit Top N limit", () => {
+    const plan = planFor("Top 5 clientes con mayor facturacion este ano");
+    expect(plan.dimensions).toContain("cliente");
+    expect(plan.limit).toBe(5);
   });
 });
 
