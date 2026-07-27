@@ -1,42 +1,50 @@
--- Excluye de reportes (dashboard, KPIs, asistente) las filas de facturacion
--- historica con montos implausibles, sin corregirlas ni borrarlas. No hay un
--- factor de escala unico reconstruible para todo el lote (ver el fix previo
--- de Santa Rita, que corrigio 70 filas con un factor exacto x1.000.000 y dejo
--- 12 sin tocar a proposito): mas seguro marcarlas y conservarlas intactas
--- para auditoria que adivinar un factor de correccion.
+-- Excluye de reportes (dashboard, KPIs y asistente) las filas de facturacion
+-- historica con montos implausibles, sin corregirlas ni borrarlas.
 --
--- Alcance verificado: 82 filas con total_venta > 50.000.000 en public.facturacion,
--- todas dentro de 2017-11 a 2018-03, todas sucursal Santa Rita. Ningun otro
--- año ni sucursal tiene filas por encima del umbral (confirmado por analisis
--- previo). public.facturacion_lineas_importadas (import del sistema nuevo) no
--- tiene ninguna fila por encima del umbral, no se toca.
+-- La migracion anterior corrigio 70 filas con factor exacto x1.000.000.
+-- Despues de esa correccion quedan 12 filas sin un factor reconstruible:
+-- Santa Rita, Servicio, nov/2017 a mar/2018. Una base sin ese historico puede
+-- tener 0. Cualquier otro total aborta para no marcar datos por heuristica.
 --
--- Si la cantidad de filas afectadas cambio desde el diagnostico, esta
--- migracion aborta en vez de marcar un conjunto distinto al revisado.
+-- public.facturacion_lineas_importadas (sistema nuevo) no se toca.
 
 alter table public.facturacion
   add column if not exists excluido_de_reportes boolean not null default false;
 
 do $$
 declare
-  filas_afectadas integer;
-  filas_esperadas constant integer := 82;
+  filas_pendientes integer;
+  filas_lote integer;
+  filas_esperadas constant integer := 12;
 begin
-  select count(*) into filas_afectadas
+  select
+    count(*),
+    count(*) filter (where excluido_de_reportes = false)
+  into filas_lote, filas_pendientes
   from public.facturacion
-  where total_venta > 50000000
-    and excluido_de_reportes = false;
+  where sucursal = 'Santa Rita'::public.sucursal
+    and tipo = 'Servicio'::public.tipo_facturacion
+    and fecha >= date '2017-11-01'
+    and fecha < date '2018-04-01'
+    and total_venta > 50000000;
 
-  if filas_afectadas <> filas_esperadas then
+  if filas_lote not in (0, filas_esperadas) then
     raise exception
-      'Se esperaban % filas con total_venta > 50.000.000 sin marcar y se encontraron %. Revisar antes de marcar: los datos cambiaron desde el diagnostico.',
-      filas_esperadas, filas_afectadas;
+      'Se esperaban 0 o % filas remanentes implausibles dentro de Santa Rita/Servicio/nov-2017 a mar-2018 y se encontraron %.',
+      filas_esperadas,
+      filas_lote;
   end if;
 
   update public.facturacion
   set excluido_de_reportes = true
-  where total_venta > 50000000
+  where sucursal = 'Santa Rita'::public.sucursal
+    and tipo = 'Servicio'::public.tipo_facturacion
+    and fecha >= date '2017-11-01'
+    and fecha < date '2018-04-01'
+    and total_venta > 50000000
     and excluido_de_reportes = false;
 
-  raise notice 'Marcadas % filas de facturacion con excluido_de_reportes = true (montos implausibles, Santa Rita 2017-2018).', filas_afectadas;
+  raise notice
+    'Marcadas % filas pendientes como excluido_de_reportes dentro del lote auditado.',
+    filas_pendientes;
 end $$;
