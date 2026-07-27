@@ -64,7 +64,23 @@ import { TrabajoEstadoBadge } from "@/components/StatusBadges";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode, ServiciosDashboardData } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
 import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
-import { WeeklyBars, SucursalBars, MixRubros, EstadoCompacto, CargaSucursalTabla, CargaEquipoChart, ClientesCompacto, OSImpactSection, TrabajoChip, DistribucionMarca, FacturacionExplorer, MatrizTécnicosDías, TrabajosAbiertosList } from "@/components/dashboard/DashboardCharts";
+import {
+  WeeklyBars,
+  SucursalBars,
+  MixRubros,
+  EstadoCompacto,
+  CargaSucursalTabla,
+  CargaEquipoChart,
+  ClientesCompacto,
+  OSImpactSection,
+  TrabajoChip,
+  DistribucionMarca,
+  FacturacionExplorer,
+  MatrizTécnicosDías,
+  TrabajosAbiertosList,
+  CumplimientoAgendaChart,
+  TecnicosNoRealizadosRanking,
+} from "@/components/dashboard/DashboardCharts";
 import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
@@ -227,6 +243,62 @@ function inRange(date: string, start: Date, end: Date) {
   if (!date) return false;
   const key = date.slice(0, 10);
   return key >= dateKey(start) && key <= dateKey(end);
+}
+
+function agendaBucketKey(iso: string, mode: PeriodMode) {
+  if (mode === "dia") return iso.slice(0, 10);
+  const date = parseISO(iso.slice(0, 10));
+  if (mode === "mes") return format(date, "yyyy-MM");
+  if (mode === "anio") return format(date, "yyyy");
+  return `${getISOWeekYear(date)}-W${String(getISOWeek(date)).padStart(2, "0")}`;
+}
+
+function agendaBucketLabel(key: string, mode: PeriodMode) {
+  if (mode === "dia") {
+    const date = parseISO(key);
+    const weekday = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][getDay(date)];
+    return `${weekday} ${format(date, "dd/MM")}`;
+  }
+  if (mode === "mes") {
+    const [year, month] = key.split("-").map(Number);
+    const monthLabel = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][month - 1];
+    return `${monthLabel} ${String(year).slice(-2)}`;
+  }
+  if (mode === "anio") return key;
+  const [year, week] = key.split("-W");
+  return `Sem ${Number(week)} · ${String(year).slice(-2)}`;
+}
+
+function agendaBuckets(start: Date, end: Date, mode: PeriodMode) {
+  const keys: string[] = [];
+  if (mode === "dia") {
+    for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) {
+      keys.push(format(cursor, "yyyy-MM-dd"));
+    }
+    return keys;
+  }
+  if (mode === "semana") {
+    const rangeStart = startOfWeek(start, { weekStartsOn: 1 });
+    const rangeEnd = startOfWeek(end, { weekStartsOn: 1 });
+    for (let cursor = rangeStart; cursor <= rangeEnd; cursor = addWeeks(cursor, 1)) {
+      keys.push(`${getISOWeekYear(cursor)}-W${String(getISOWeek(cursor)).padStart(2, "0")}`);
+    }
+    return keys;
+  }
+  if (mode === "mes") {
+    const rangeStart = startOfMonth(start);
+    const rangeEnd = startOfMonth(end);
+    for (let cursor = rangeStart; cursor <= rangeEnd; cursor = addMonths(cursor, 1)) {
+      keys.push(format(cursor, "yyyy-MM"));
+    }
+    return keys;
+  }
+  const rangeStart = startOfYear(start);
+  const rangeEnd = startOfYear(end);
+  for (let cursor = rangeStart; cursor <= rangeEnd; cursor = addYears(cursor, 1)) {
+    keys.push(format(cursor, "yyyy"));
+  }
+  return keys;
 }
 
 function parseQuantity(value: unknown) {
@@ -2167,28 +2239,34 @@ export default function Dashboard() {
     return { total, culminados, abiertos, pausados, pendiente, programado, iniciado, pct };
   }, [trabajosResumen]);
 
-  const jornadasResultadoResumen = useMemo(() => {
+  const jornadasResultadoPeriodo = useMemo(() => {
     const trabajoIds = new Set(trabajosResumen.map((row) => row.id));
-    let programadas = 0;
-    let realizadas = 0;
-    let noRealizadas = 0;
-    let pendientes = 0;
+    const rows: Jornada[] = [];
 
     for (const trabajoId of trabajoIds) {
       const trabajoJornadas = (jornadasByTrabajo.get(trabajoId) ?? []).filter((jornada) => {
         if (!inRange(jornada.fecha, periodStart, periodEnd)) return false;
         if (fTécnicos.length === 0) return true;
-        return validJornadaCrew(jornada).some((id) => fTécnicos.includes(id));
+        return jornadaCrewIds(jornada).some((id) => fTécnicos.includes(id));
       });
-
-      for (const jornada of trabajoJornadas) {
-        programadas += 1;
-        if (jornada.estado === "Completado") realizadas += 1;
-        else if (jornada.estado === "Cancelada") noRealizadas += 1;
-        else if (jornada.estado === "Pendiente") pendientes += 1;
-      }
+      rows.push(...trabajoJornadas);
     }
 
+    return rows;
+  }, [fTécnicos, jornadasByTrabajo, periodEnd, periodStart, servicioById, trabajosResumen]);
+
+  const jornadasResultadoResumen = useMemo(() => {
+    let realizadas = 0;
+    let noRealizadas = 0;
+    let pendientes = 0;
+
+    for (const jornada of jornadasResultadoPeriodo) {
+      if (jornada.estado === "Completado") realizadas += 1;
+      else if (jornada.estado === "Cancelada") noRealizadas += 1;
+      else if (jornada.estado === "Pendiente") pendientes += 1;
+    }
+
+    const programadas = jornadasResultadoPeriodo.length;
     const cerradas = realizadas + noRealizadas;
     const pct = (value: number) => (programadas > 0 ? Math.round((value / programadas) * 100) : 0);
 
@@ -2203,7 +2281,93 @@ export default function Dashboard() {
       pctPendientes: pct(pendientes),
       pctCerradas: pct(cerradas),
     };
-  }, [fTécnicos, jornadasByTrabajo, periodEnd, periodStart, trabajosResumen]);
+  }, [jornadasResultadoPeriodo]);
+
+  const cumplimientoAgenda = useMemo(() => {
+    const buckets = agendaBuckets(periodStart, periodEnd, periodMode);
+    const rowsByKey = new Map(
+      buckets.map((key) => [
+        key,
+        {
+          key,
+          label: agendaBucketLabel(key, periodMode),
+          programadas: 0,
+          realizadas: 0,
+          noRealizadas: 0,
+          pendientes: 0,
+          porcentaje: 0,
+        },
+      ]),
+    );
+
+    for (const jornada of jornadasResultadoPeriodo) {
+      const key = agendaBucketKey(jornada.fecha, periodMode);
+      const row = rowsByKey.get(key);
+      if (!row) continue;
+      row.programadas += 1;
+      if (jornada.estado === "Completado") row.realizadas += 1;
+      else if (jornada.estado === "Cancelada") row.noRealizadas += 1;
+      else if (jornada.estado === "Pendiente") row.pendientes += 1;
+    }
+
+    return buckets.map((key) => {
+      const row = rowsByKey.get(key)!;
+      return {
+        ...row,
+        porcentaje: row.programadas > 0 ? Math.round((row.realizadas / row.programadas) * 100) : 0,
+      };
+    });
+  }, [jornadasResultadoPeriodo, periodEnd, periodMode, periodStart]);
+
+  const tecnicosNoRealizados = useMemo(() => {
+    const rowsById = new Map<string, {
+      id: string;
+      nombre: string;
+      programadas: number;
+      realizadas: number;
+      noRealizadas: number;
+      pendientes: number;
+      porcentaje: number;
+      activo: boolean;
+    }>();
+    const selectedTechnicians = fTécnicos.length > 0 ? new Set(fTécnicos) : null;
+
+    for (const jornada of jornadasResultadoPeriodo) {
+      const crew = historicalJornadaCrew(jornada).filter((id) => !selectedTechnicians || selectedTechnicians.has(id));
+      for (const id of crew) {
+        const profile = profileById.get(id);
+        const row = rowsById.get(id) ?? {
+          id,
+          nombre: profile?.nombre ?? "Sin técnico",
+          programadas: 0,
+          realizadas: 0,
+          noRealizadas: 0,
+          pendientes: 0,
+          porcentaje: 0,
+          activo: profile?.activo !== false,
+        };
+        row.programadas += 1;
+        if (jornada.estado === "Completado") row.realizadas += 1;
+        else if (jornada.estado === "Cancelada") row.noRealizadas += 1;
+        else if (jornada.estado === "Pendiente") row.pendientes += 1;
+        rowsById.set(id, row);
+      }
+    }
+
+    return Array.from(rowsById.values())
+      .map((row) => ({
+        ...row,
+        porcentaje: row.programadas > 0 ? Math.round((row.noRealizadas / row.programadas) * 100) : 0,
+      }))
+      .filter((row) => row.noRealizadas > 0)
+      .sort(
+        (a, b) =>
+          b.porcentaje - a.porcentaje ||
+          b.noRealizadas - a.noRealizadas ||
+          b.programadas - a.programadas ||
+          a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }),
+      );
+  }, [fTécnicos, jornadasResultadoPeriodo, profileById, servicioById]);
 
   const trabajosPorEstado = useMemo(() => {
     const estados: Array<EstadoTrabajo | "pendiente" | "programado" | "iniciado" | "pausado" | "completado"> = [
@@ -3122,6 +3286,30 @@ export default function Dashboard() {
               </div>
             </div>
           </Card>
+
+          <section className="grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
+            <Card className="flex min-w-0 flex-col p-3">
+              <PanelTitle
+                icon={BarChart3}
+                title="Cumplimiento de agenda"
+                subtitle="% de jornadas realizadas sobre el total programado"
+              />
+              <CumplimientoAgendaChart rows={cumplimientoAgenda} />
+            </Card>
+            <Card className="flex min-w-0 flex-col p-3">
+              <PanelTitle
+                icon={Users}
+                title="No realizadas por técnico"
+                subtitle="Top 5 por porcentaje sobre su agenda"
+              />
+              <TecnicosNoRealizadosRanking
+                rows={tecnicosNoRealizados}
+                onSelect={(tecnicoId) =>
+                  setFTécnicos((prev) => (prev.length === 1 && prev[0] === tecnicoId ? [] : [tecnicoId]))
+                }
+              />
+            </Card>
+          </section>
 
 
 

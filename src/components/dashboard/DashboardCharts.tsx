@@ -579,6 +579,201 @@ export function WeeklyBars({
   );
 }
 
+export function CumplimientoAgendaChart({
+  rows,
+}: {
+  rows: Array<{
+    key: string;
+    label: string;
+    programadas: number;
+    realizadas: number;
+    noRealizadas: number;
+    pendientes: number;
+    porcentaje: number;
+  }>;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">
+        Sin agenda para los filtros seleccionados.
+      </div>
+    );
+  }
+
+  const labelEvery = rows.length > 18 ? Math.ceil(rows.length / 8) : rows.length > 12 ? 2 : 1;
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <div className="min-w-0 overflow-x-auto overflow-y-hidden pb-1">
+        <div
+          className="relative grid min-h-[214px] shrink-0 items-end gap-1 border-b px-1 pt-7 sm:gap-2 sm:px-2"
+          style={barGridStyle(rows.length, 58)}
+        >
+          <div className="pointer-events-none absolute inset-x-1 top-7 h-[140px] sm:inset-x-2">
+            {[100, 75, 50, 25].map((value) => (
+              <div
+                key={value}
+                className="absolute inset-x-0 border-t border-dashed border-border/70"
+                style={{ bottom: `${value}%` }}
+              >
+                <span className="absolute -top-3 left-0 text-[9px] tabular-nums text-muted-foreground">
+                  {value}%
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {rows.map((row, index) => {
+            const hasAgenda = row.programadas > 0;
+            const barHeight = hasAgenda ? Math.max(row.porcentaje > 0 ? 6 : 2, Math.round((row.porcentaje / 100) * 140)) : 0;
+            const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
+            const details = [
+              `${row.realizadas} realizadas`,
+              `${row.noRealizadas} no realizadas`,
+              `${row.pendientes} pendientes`,
+              `${row.programadas} agendadas`,
+            ];
+
+            return (
+              <Tooltip key={row.key}>
+                <TooltipTrigger asChild>
+                  <div
+                    tabIndex={0}
+                    className="relative z-10 flex min-w-0 flex-col items-center gap-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                    aria-label={`${row.label}: ${hasAgenda ? `${row.porcentaje}% de cumplimiento` : "sin agenda"}`}
+                  >
+                    <span
+                      className={cn(
+                        "max-w-full truncate text-[10px] font-semibold tabular-nums",
+                        hasAgenda ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {hasAgenda ? `${row.porcentaje}%` : "—"}
+                    </span>
+                    <span className="flex h-[140px] w-full items-end justify-center">
+                      <span className="relative h-full w-full max-w-[42px] overflow-hidden rounded-t-md bg-muted/60">
+                        {hasAgenda ? (
+                          <span
+                            className={cn(
+                              "absolute inset-x-0 bottom-0 rounded-t-md transition-[height]",
+                              row.porcentaje >= 80
+                                ? "bg-emerald-600"
+                                : row.porcentaje >= 60
+                                  ? "bg-primary"
+                                  : "bg-amber-500",
+                            )}
+                            style={{ height: `${barHeight}px` }}
+                          />
+                        ) : null}
+                      </span>
+                    </span>
+                    <span className="min-h-7 max-w-full truncate text-[9px] leading-3 text-muted-foreground sm:text-[10px]">
+                      {showLabel ? row.label : ""}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px]">
+                  <div className="font-semibold">{row.label}</div>
+                  <div className="mt-1 text-xs">
+                    {hasAgenda ? `${row.porcentaje}% de cumplimiento` : "Sin agenda programada"}
+                  </div>
+                  {hasAgenda ? (
+                    <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                      {details.map((detail) => <div key={detail}>{detail}</div>)}
+                    </div>
+                  ) : null}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" />
+            80% o más
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
+            60–79%
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />
+            Menos de 60%
+          </span>
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+export function TecnicosNoRealizadosRanking({
+  rows,
+  onSelect,
+}: {
+  rows: Array<{
+    id: string;
+    nombre: string;
+    programadas: number;
+    realizadas: number;
+    noRealizadas: number;
+    pendientes: number;
+    porcentaje: number;
+    activo: boolean;
+  }>;
+  onSelect: (id: string) => void;
+}) {
+  const visibleRows = rows.slice(0, 5);
+
+  if (visibleRows.length === 0) {
+    return (
+      <div className="flex min-h-[214px] items-center justify-center rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">
+        Sin jornadas no realizadas para los filtros actuales.
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y rounded-md border">
+      {visibleRows.map((row, index) => (
+        <button
+          key={row.id}
+          type="button"
+          onClick={() => onSelect(row.id)}
+          className="w-full px-3 py-2.5 text-left transition-colors hover:bg-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+          title={`Filtrar por ${row.nombre}`}
+        >
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-[10px] font-bold tabular-nums text-amber-700">
+              {index + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 truncate text-xs font-semibold">{row.nombre}</div>
+                <div className="shrink-0 text-sm font-bold tabular-nums text-amber-700">{row.porcentaje}%</div>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
+                <span>{row.noRealizadas} de {row.programadas} agendadas</span>
+                {!row.activo ? <Badge variant="secondary" className="h-4 px-1.5 text-[9px]">Inactivo</Badge> : null}
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-amber-500"
+                  style={{ width: `${Math.max(row.porcentaje > 0 ? 3 : 0, row.porcentaje)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </button>
+      ))}
+      {rows.length > visibleRows.length ? (
+        <div className="px-3 py-2 text-center text-[10px] text-muted-foreground">
+          Mostrando 5 de {rows.length} técnicos con no realizadas
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SucursalBars({
   rows,
   totalValue,
