@@ -581,6 +581,7 @@ export function WeeklyBars({
 
 export function CumplimientoAgendaChart({
   rows,
+  insights,
 }: {
   rows: Array<{
     key: string;
@@ -590,7 +591,20 @@ export function CumplimientoAgendaChart({
     noRealizadas: number;
     pendientes: number;
     porcentaje: number;
+    estadoPeriodo: "cerrado" | "actual" | "futuro";
   }>;
+  insights: {
+    efectividad: number | null;
+    tendencia: {
+      delta: number;
+      desde: string;
+      hasta: string;
+    } | null;
+    mayorDesvio: {
+      label: string;
+      porcentaje: number;
+    } | null;
+  };
 }) {
   if (rows.length === 0) {
     return (
@@ -601,91 +615,128 @@ export function CumplimientoAgendaChart({
   }
 
   const labelEvery = rows.length > 18 ? Math.ceil(rows.length / 8) : rows.length > 12 ? 2 : 1;
+  const tendenciaLabel = insights.tendencia
+    ? `${insights.tendencia.delta > 0 ? "+" : ""}${insights.tendencia.delta} pp`
+    : "Sin comparación";
+  const tendenciaDetail = insights.tendencia
+    ? `${insights.tendencia.desde} a ${insights.tendencia.hasta}`
+    : "Se requieren dos periodos cerrados";
 
   return (
     <TooltipProvider delayDuration={100}>
-      <div className="min-w-0 overflow-x-auto overflow-y-hidden pb-1">
-        <div
-          className="relative grid min-h-[214px] shrink-0 items-end gap-1 border-b px-1 pt-7 sm:gap-2 sm:px-2"
-          style={barGridStyle(rows.length, 58)}
-        >
-          <div className="pointer-events-none absolute inset-x-1 top-7 h-[140px] sm:inset-x-2">
-            {[100, 75, 50, 25].map((value) => (
-              <div
-                key={value}
-                className="absolute inset-x-0 border-t border-dashed border-border/70"
-                style={{ bottom: `${value}%` }}
-              >
-                <span className="absolute -top-3 left-0 text-[9px] tabular-nums text-muted-foreground">
-                  {value}%
-                </span>
-              </div>
-            ))}
-          </div>
+      <div className="min-w-0 pb-1">
+        <div className="min-w-0 overflow-x-auto overflow-y-hidden">
+          <div
+            className="relative grid min-h-[259px] shrink-0 items-end gap-1 border-b px-1 pt-7 sm:gap-2 sm:px-2"
+            style={barGridStyle(rows.length, 58)}
+          >
+            <div className="pointer-events-none absolute inset-x-1 top-7 h-[185px] sm:inset-x-2">
+              {[100, 75, 50, 25].map((value) => (
+                <div
+                  key={value}
+                  className="absolute inset-x-0 border-t border-dashed border-border/70"
+                  style={{ bottom: `${value}%` }}
+                >
+                  <span className="absolute -top-3 left-0 text-[9px] tabular-nums text-muted-foreground">
+                    {value}%
+                  </span>
+                </div>
+              ))}
+            </div>
 
-          {rows.map((row, index) => {
-            const hasAgenda = row.programadas > 0;
-            const barHeight = hasAgenda ? Math.max(row.porcentaje > 0 ? 6 : 2, Math.round((row.porcentaje / 100) * 140)) : 0;
-            const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
-            const details = [
-              `${row.realizadas} realizadas`,
-              `${row.noRealizadas} no realizadas`,
-              `${row.pendientes} pendientes`,
-              `${row.programadas} agendadas`,
-            ];
+            {rows.map((row, index) => {
+              const hasAgenda = row.programadas > 0;
+              const hasClosedResult = row.realizadas + row.noRealizadas > 0;
+              const isCurrent = row.estadoPeriodo === "actual";
+              const isFuture = row.estadoPeriodo === "futuro";
+              const barHeight = hasAgenda && row.porcentaje > 0
+                ? Math.max(6, Math.round((row.porcentaje / 100) * 185))
+                : 0;
+              const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
+              const valueLabel = !hasAgenda
+                ? "—"
+                : isFuture && !hasClosedResult
+                  ? "Próx."
+                  : isCurrent && !hasClosedResult
+                    ? "En curso"
+                    : `${row.porcentaje}%`;
+              const statusLabel = isFuture
+                ? "Periodo por ejecutar"
+                : isCurrent
+                  ? "Periodo en curso"
+                  : `${row.porcentaje}% de cumplimiento`;
+              const details = [
+                `${row.realizadas} realizadas`,
+                `${row.noRealizadas} no realizadas`,
+                `${row.pendientes} pendientes`,
+                `${row.programadas} agendadas`,
+              ];
 
-            return (
-              <Tooltip key={row.key}>
-                <TooltipTrigger asChild>
-                  <div
-                    tabIndex={0}
-                    className="relative z-10 flex min-w-0 flex-col items-center gap-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label={`${row.label}: ${hasAgenda ? `${row.porcentaje}% de cumplimiento` : "sin agenda"}`}
-                  >
-                    <span
-                      className={cn(
-                        "max-w-full truncate text-[10px] font-semibold tabular-nums",
-                        hasAgenda ? "text-foreground" : "text-muted-foreground",
-                      )}
+              return (
+                <Tooltip key={row.key}>
+                  <TooltipTrigger asChild>
+                    <div
+                      tabIndex={0}
+                      className="relative z-10 flex min-w-0 flex-col items-center gap-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                      aria-label={`${row.label}: ${hasAgenda ? statusLabel : "sin agenda"}`}
                     >
-                      {hasAgenda ? `${row.porcentaje}%` : "—"}
-                    </span>
-                    <span className="flex h-[140px] w-full items-end justify-center">
-                      <span className="relative h-full w-full max-w-[42px] overflow-hidden rounded-t-md bg-muted/60">
-                        {hasAgenda ? (
-                          <span
-                            className={cn(
-                              "absolute inset-x-0 bottom-0 rounded-t-md transition-[height]",
-                              row.porcentaje >= 80
-                                ? "bg-emerald-600"
-                                : row.porcentaje >= 60
-                                  ? "bg-primary"
-                                  : "bg-amber-500",
-                            )}
-                            style={{ height: `${barHeight}px` }}
-                          />
-                        ) : null}
+                      <span
+                        className={cn(
+                          "max-w-full truncate text-[10px] font-semibold tabular-nums",
+                          isCurrent || isFuture
+                            ? "text-sky-700"
+                            : hasAgenda
+                              ? "text-foreground"
+                              : "text-muted-foreground",
+                        )}
+                      >
+                        {valueLabel}
                       </span>
-                    </span>
-                    <span className="min-h-7 max-w-full truncate text-[9px] leading-3 text-muted-foreground sm:text-[10px]">
-                      {showLabel ? row.label : ""}
-                    </span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[220px]">
-                  <div className="font-semibold">{row.label}</div>
-                  <div className="mt-1 text-xs">
-                    {hasAgenda ? `${row.porcentaje}% de cumplimiento` : "Sin agenda programada"}
-                  </div>
-                  {hasAgenda ? (
-                    <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-                      {details.map((detail) => <div key={detail}>{detail}</div>)}
+                      <span className="flex h-[185px] w-full items-end justify-center">
+                        <span
+                          className={cn(
+                            "relative h-full w-full max-w-[42px] overflow-hidden rounded-t-md bg-muted/60",
+                            isCurrent && "border border-sky-300 bg-sky-50",
+                            isFuture && "border border-dashed border-sky-200 bg-sky-50/60",
+                          )}
+                        >
+                          {barHeight > 0 ? (
+                            <span
+                              className={cn(
+                                "absolute inset-x-0 bottom-0 rounded-t-md transition-[height]",
+                                isCurrent || isFuture
+                                  ? "bg-sky-500"
+                                  : row.porcentaje >= 80
+                                    ? "bg-emerald-600"
+                                    : row.porcentaje >= 60
+                                      ? "bg-primary"
+                                      : "bg-amber-500",
+                              )}
+                              style={{ height: `${barHeight}px` }}
+                            />
+                          ) : null}
+                        </span>
+                      </span>
+                      <span className="min-h-7 max-w-full truncate text-[9px] leading-3 text-muted-foreground sm:text-[10px]">
+                        {showLabel ? row.label : ""}
+                      </span>
                     </div>
-                  ) : null}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[220px]">
+                    <div className="font-semibold">{row.label}</div>
+                    <div className="mt-1 text-xs">
+                      {hasAgenda ? statusLabel : "Sin agenda programada"}
+                    </div>
+                    {hasAgenda ? (
+                      <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                        {details.map((detail) => <div key={detail}>{detail}</div>)}
+                      </div>
+                    ) : null}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground sm:text-[11px]">
           <span className="inline-flex items-center gap-1.5">
@@ -700,6 +751,51 @@ export function CumplimientoAgendaChart({
             <span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />
             Menos de 60%
           </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm border border-sky-300 bg-sky-50" />
+            En curso / por ejecutar
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-3 border-t pt-3">
+          <div className="min-w-0 pr-2">
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Efectividad de cierre
+            </div>
+            <div className="mt-1 truncate text-lg font-extrabold tabular-nums">
+              {insights.efectividad === null ? "—" : `${insights.efectividad}%`}
+            </div>
+            <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
+              Solo resultados registrados
+            </div>
+          </div>
+          <div className="min-w-0 border-l px-2 sm:px-3">
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Tendencia reciente
+            </div>
+            <div
+              className={cn(
+                "mt-1 truncate text-lg font-extrabold tabular-nums",
+                insights.tendencia && insights.tendencia.delta > 0 && "text-emerald-600",
+                insights.tendencia && insights.tendencia.delta < 0 && "text-red-600",
+              )}
+            >
+              {tendenciaLabel}
+            </div>
+            <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]" title={tendenciaDetail}>
+              {tendenciaDetail}
+            </div>
+          </div>
+          <div className="min-w-0 border-l pl-2 sm:pl-3">
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Mayor desvío
+            </div>
+            <div className="mt-1 truncate text-lg font-extrabold tabular-nums">
+              {insights.mayorDesvio?.label ?? "Sin desvíos"}
+            </div>
+            <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
+              {insights.mayorDesvio ? `${insights.mayorDesvio.porcentaje}% no realizadas` : "Sin desvíos cerrados"}
+            </div>
+          </div>
         </div>
       </div>
     </TooltipProvider>

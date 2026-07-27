@@ -2285,6 +2285,7 @@ export default function Dashboard() {
 
   const cumplimientoAgenda = useMemo(() => {
     const buckets = agendaBuckets(periodStart, periodEnd, periodMode);
+    const currentBucketKey = agendaBucketKey(todayStr, periodMode);
     const rowsByKey = new Map(
       buckets.map((key) => [
         key,
@@ -2312,12 +2313,52 @@ export default function Dashboard() {
 
     return buckets.map((key) => {
       const row = rowsByKey.get(key)!;
+      const estadoPeriodo: "cerrado" | "actual" | "futuro" =
+        key < currentBucketKey ? "cerrado" : key === currentBucketKey ? "actual" : "futuro";
       return {
         ...row,
         porcentaje: row.programadas > 0 ? Math.round((row.realizadas / row.programadas) * 100) : 0,
+        estadoPeriodo,
       };
     });
   }, [jornadasResultadoPeriodo, periodEnd, periodMode, periodStart]);
+
+  const cumplimientoAgendaInsights = useMemo(() => {
+    const resultadosCerrados = cumplimientoAgenda.reduce(
+      (acc, row) => {
+        acc.realizadas += row.realizadas;
+        acc.noRealizadas += row.noRealizadas;
+        return acc;
+      },
+      { realizadas: 0, noRealizadas: 0 },
+    );
+    const totalResultados = resultadosCerrados.realizadas + resultadosCerrados.noRealizadas;
+    const efectividad = totalResultados > 0
+      ? Math.round((resultadosCerrados.realizadas / totalResultados) * 100)
+      : null;
+
+    const periodosCerrados = cumplimientoAgenda.filter(
+      (row) => row.estadoPeriodo === "cerrado" && row.programadas > 0,
+    );
+    const ultimosPeriodos = periodosCerrados.slice(-2);
+    const tendencia = ultimosPeriodos.length === 2
+      ? {
+          delta: ultimosPeriodos[1].porcentaje - ultimosPeriodos[0].porcentaje,
+          desde: ultimosPeriodos[0].label,
+          hasta: ultimosPeriodos[1].label,
+        }
+      : null;
+
+    const mayorDesvio = periodosCerrados
+      .map((row) => ({
+        label: row.label,
+        porcentaje: row.programadas > 0 ? Math.round((row.noRealizadas / row.programadas) * 100) : 0,
+      }))
+      .filter((row) => row.porcentaje > 0)
+      .sort((a, b) => b.porcentaje - a.porcentaje)[0] ?? null;
+
+    return { efectividad, tendencia, mayorDesvio };
+  }, [cumplimientoAgenda]);
 
   const tecnicosNoRealizados = useMemo(() => {
     const rowsById = new Map<string, {
@@ -3294,7 +3335,10 @@ export default function Dashboard() {
                 title="Cumplimiento de agenda"
                 subtitle="% de jornadas realizadas sobre el total programado"
               />
-              <CumplimientoAgendaChart rows={cumplimientoAgenda} />
+              <CumplimientoAgendaChart
+                rows={cumplimientoAgenda}
+                insights={cumplimientoAgendaInsights}
+              />
             </Card>
             <Card className="flex min-w-0 flex-col p-3">
               <PanelTitle
