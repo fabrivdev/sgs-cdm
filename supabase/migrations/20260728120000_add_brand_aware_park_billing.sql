@@ -29,7 +29,18 @@ AS $$
       lower(trim(coalesce(f.grupo_fx, ''))) AS grupo_fx,
       coalesce(
         nullif(to_jsonb(f) ->> 'marca_normalizada', ''),
-        public.facturacion_marca_por_grupo(f.grupo)::text
+        CASE upper(trim(coalesce(f.grupo, '')))
+          WHEN 'SERVICE - CLAAS' THEN 'CLAAS'
+          WHEN 'REPUESTOS - CLAAS' THEN 'CLAAS'
+          WHEN 'REPUESTOS CLAAS - PROMOCION' THEN 'CLAAS'
+          WHEN 'REPUESTOS - CABEZALES/PLATAFOR' THEN 'CLAAS'
+          WHEN 'REPUESTOS TRACTOR' THEN 'CLAAS'
+          WHEN 'REPUESTOS DIVERSOS --' THEN 'CLAAS'
+          WHEN 'SERVICE - HORSCH' THEN 'HORSCH'
+          WHEN 'REPUESTOS PLANTADORA' THEN 'HORSCH'
+          WHEN 'REPUESTOS PULVERIZADORAS' THEN 'HORSCH'
+          ELSE 'OTROS'
+        END
       ) AS marca
     FROM public.facturacion f
     WHERE f.cliente_id IS NOT NULL
@@ -143,7 +154,18 @@ AS $$
       lower(trim(coalesce(f.grupo_fx, ''))) AS grupo_fx,
       coalesce(
         nullif(to_jsonb(f) ->> 'marca_normalizada', ''),
-        public.facturacion_marca_por_grupo(f.grupo)::text
+        CASE upper(trim(coalesce(f.grupo, '')))
+          WHEN 'SERVICE - CLAAS' THEN 'CLAAS'
+          WHEN 'REPUESTOS - CLAAS' THEN 'CLAAS'
+          WHEN 'REPUESTOS CLAAS - PROMOCION' THEN 'CLAAS'
+          WHEN 'REPUESTOS - CABEZALES/PLATAFOR' THEN 'CLAAS'
+          WHEN 'REPUESTOS TRACTOR' THEN 'CLAAS'
+          WHEN 'REPUESTOS DIVERSOS --' THEN 'CLAAS'
+          WHEN 'SERVICE - HORSCH' THEN 'HORSCH'
+          WHEN 'REPUESTOS PLANTADORA' THEN 'HORSCH'
+          WHEN 'REPUESTOS PULVERIZADORAS' THEN 'HORSCH'
+          ELSE 'OTROS'
+        END
       ) AS marca
     FROM public.facturacion f
     WHERE f.cliente_id IS NOT NULL
