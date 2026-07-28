@@ -197,10 +197,10 @@ export function crosswalkBillingRow(args: {
       serviceOrder?.timeType ?? billingTimeType ?? inferCanonicalTimeType(productGroup ?? description),
     inferredLineType,
     productBrand:
-      product?.brand ??
       (serviceOrder && (inferredLineType === "Servicio" || inferredLineType === "Kilometraje")
         ? serviceOrder.brand
         : null) ??
+      product?.brand ??
       inferProductBrand(productGroup, manufacturerCode, description),
     productGroup: product?.group ?? (normalizeText(productGroup) || null),
     productFamily: product?.family ?? null,

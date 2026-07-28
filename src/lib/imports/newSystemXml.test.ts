@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateNewSystemServiceOrders,
+  buildProductLookup,
   buildServiceOrderLookup,
   crosswalkBillingRow,
   mapFacturaVentasSheet,
@@ -377,6 +378,84 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(classify("0010010004798")).toBe("Cliente");
     expect(classify("0010010004797")).toBe("Garantia");
     expect(classify("0010000000013")).toBe("Interno");
+  });
+
+  it("prioriza la marca de la OS para Servicio y conserva la del producto para Repuestos", () => {
+    const serviceOrders = buildServiceOrderLookup(mapOrdenesServicioSheet("ordenes.xml", sheet).rows);
+    const products = buildProductLookup([
+      {
+        rowId: "product-service",
+        internalCode: "SRV000006",
+        manufacturerCode: null,
+        description: "SERV. DE MANO DE OBRA - CLAAS",
+        brand: "CLAAS",
+        group: "SERVICIOS",
+        family: null,
+        unit: "HS",
+        isActive: true,
+        raw: {},
+      },
+      {
+        rowId: "product-part",
+        internalCode: "REP000001",
+        manufacturerCode: "CLAAS-001",
+        description: "REPUESTO CLAAS",
+        brand: "CLAAS",
+        group: "REPUESTOS",
+        family: null,
+        unit: "UN",
+        isActive: true,
+        raw: {},
+      },
+      {
+        rowId: "product-km",
+        internalCode: "KM000001",
+        manufacturerCode: null,
+        description: "KILOMETRAJE CLAAS",
+        brand: "CLAAS",
+        group: "KILOMETRAJE",
+        family: null,
+        unit: "KM",
+        isActive: true,
+        raw: {},
+      },
+    ]);
+
+    const service = crosswalkBillingRow({
+      billingRowId: "billing-service",
+      documentNumber: "0010000000013",
+      productCode: "SRV000006",
+      productGroup: "SERVICIOS",
+      description: "SERV. DE MANO DE OBRA - CLAAS",
+      serviceOrders,
+      products,
+    });
+    const sparePart = crosswalkBillingRow({
+      billingRowId: "billing-part",
+      documentNumber: "0010000000013",
+      productCode: "REP000001",
+      manufacturerCode: "CLAAS-001",
+      productGroup: "REPUESTOS",
+      description: "REPUESTO CLAAS",
+      serviceOrders,
+      products,
+    });
+    const kilometre = crosswalkBillingRow({
+      billingRowId: "billing-km",
+      documentNumber: "0010000000013",
+      productCode: "KM000001",
+      productGroup: "KILOMETRAJE",
+      description: "KILOMETRAJE CLAAS",
+      serviceOrders,
+      products,
+    });
+
+    expect(service.inferredLineType).toBe("Servicio");
+    expect(service.productBrand).toBe("HORSCH");
+    expect(kilometre.inferredLineType).toBe("Kilometraje");
+    expect(kilometre.productBrand).toBe("HORSCH");
+    expect(sparePart.inferredLineType).toBe("Repuestos");
+    expect(sparePart.productBrand).toBe("CLAAS");
   });
 });
 
