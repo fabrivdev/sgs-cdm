@@ -28,13 +28,16 @@ AS $$
       f.total_venta,
       lower(trim(coalesce(f.grupo_fx, ''))) AS grupo_fx,
       coalesce(
-        f.marca_normalizada::text,
+        nullif(to_jsonb(f) ->> 'marca_normalizada', ''),
         public.facturacion_marca_por_grupo(f.grupo)::text
       ) AS marca
     FROM public.facturacion f
     WHERE f.cliente_id IS NOT NULL
       AND f.fecha < date '2026-07-01'
-      AND NOT f.excluido_de_reportes
+      AND NOT coalesce(
+        (to_jsonb(f) ->> 'excluido_de_reportes')::boolean,
+        false
+      )
       AND lower(trim(coalesce(f.grupo_fx, ''))) IN (
         'repuestos',
         'mano de obra',
@@ -139,13 +142,16 @@ AS $$
       f.fecha,
       lower(trim(coalesce(f.grupo_fx, ''))) AS grupo_fx,
       coalesce(
-        f.marca_normalizada::text,
+        nullif(to_jsonb(f) ->> 'marca_normalizada', ''),
         public.facturacion_marca_por_grupo(f.grupo)::text
       ) AS marca
     FROM public.facturacion f
     WHERE f.cliente_id IS NOT NULL
       AND f.fecha < date '2026-07-01'
-      AND NOT f.excluido_de_reportes
+      AND NOT coalesce(
+        (to_jsonb(f) ->> 'excluido_de_reportes')::boolean,
+        false
+      )
       AND lower(trim(coalesce(f.grupo_fx, ''))) IN (
         'repuestos',
         'mano de obra',
