@@ -345,14 +345,30 @@ export function ParqueTab({
       setFactLoading(true);
       try {
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        const marcaFacturacion =
+          fMarca === MARCA_AMBAS ? "AMBAS" : fMarca === "all" ? null : fMarca;
+        const resumenPromise = marcaFacturacion
+          ? supabase.rpc("parque_resumen_facturacion_marca", {
+              p_desde: fmt(desdeDate),
+              p_hasta: fmt(hastaDate),
+              p_prev_desde: fmt(prevDesdeDate),
+              p_prev_hasta: fmt(prevHastaDate),
+              p_marca: marcaFacturacion,
+            })
+          : supabase.rpc("parque_resumen_facturacion", {
+              p_desde: fmt(desdeDate),
+              p_hasta: fmt(hastaDate),
+              p_prev_desde: fmt(prevDesdeDate),
+              p_prev_hasta: fmt(prevHastaDate),
+            });
+        const ultimasPromise = marcaFacturacion
+          ? supabase.rpc("parque_ultimas_facturas_marca", {
+              p_marca: marcaFacturacion,
+            })
+          : supabase.rpc("parque_ultimas_facturas");
         const [resumen, ultimas] = await Promise.all([
-          supabase.rpc("parque_resumen_facturacion", {
-            p_desde: fmt(desdeDate),
-            p_hasta: fmt(hastaDate),
-            p_prev_desde: fmt(prevDesdeDate),
-            p_prev_hasta: fmt(prevHastaDate),
-          }),
-          supabase.rpc("parque_ultimas_facturas"),
+          resumenPromise,
+          ultimasPromise,
         ]);
         if (cancelado) return;
         const map = new Map<string, FactAgregado>();
@@ -400,7 +416,7 @@ export function ParqueTab({
     return () => {
       cancelado = true;
     };
-  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate]);
+  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca]);
 
   const rows: Row[] = useMemo(() => {
     const hoy = new Date();
