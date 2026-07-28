@@ -58,6 +58,13 @@ const MARCA_OPTIONS = [
   ...MARCAS.map((m) => ({ value: m, label: m })),
 ];
 
+const RUBRO_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: "Repuestos", label: "Repuestos" },
+  { value: "Servicio", label: "Servicios" },
+  { value: "Kilometraje", label: "Kilometraje" },
+];
+
 type Cliente = {
   id: string;
   nombre: string;
@@ -191,6 +198,7 @@ export function ParqueTab({
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState<string>("all");
   const [fMarca, setFMarca] = useState<string>("all");
+  const [fRubro, setFRubro] = useState<string>("all");
   const [fSubgrupo, setFSubgrupo] = useState<string>("all");
   const [fSeguimiento, setFSeguimiento] = useState<string>("all");
 
@@ -207,6 +215,7 @@ export function ParqueTab({
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
     (fMarca !== "all" ? 1 : 0) +
+    (fRubro !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) +
     (fSeguimiento !== "all" ? 1 : 0) +
     (rango !== "365d" ? 1 : 0) +
@@ -215,6 +224,7 @@ export function ParqueTab({
   const limpiarFiltros = () => {
     setFSucursal("all");
     setFMarca("all");
+    setFRubro("all");
     setFSubgrupo("all");
     setFSeguimiento("all");
     setRango("365d");
@@ -346,26 +356,19 @@ export function ParqueTab({
       try {
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
         const marcaFacturacion =
-          fMarca === MARCA_AMBAS ? "AMBAS" : fMarca === "all" ? null : fMarca;
-        const resumenPromise = marcaFacturacion
-          ? supabase.rpc("parque_resumen_facturacion_marca", {
-              p_desde: fmt(desdeDate),
-              p_hasta: fmt(hastaDate),
-              p_prev_desde: fmt(prevDesdeDate),
-              p_prev_hasta: fmt(prevHastaDate),
-              p_marca: marcaFacturacion,
-            })
-          : supabase.rpc("parque_resumen_facturacion", {
-              p_desde: fmt(desdeDate),
-              p_hasta: fmt(hastaDate),
-              p_prev_desde: fmt(prevDesdeDate),
-              p_prev_hasta: fmt(prevHastaDate),
-            });
-        const ultimasPromise = marcaFacturacion
-          ? supabase.rpc("parque_ultimas_facturas_marca", {
-              p_marca: marcaFacturacion,
-            })
-          : supabase.rpc("parque_ultimas_facturas");
+          fMarca === MARCA_AMBAS ? "AMBAS" : fMarca === "all" ? "ALL" : fMarca;
+        const rubroFacturacion = fRubro === "all" ? "ALL" : fRubro;
+        const resumenPromise = supabase.rpc("parque_resumen_facturacion_filtros", {
+          p_desde: fmt(desdeDate),
+          p_hasta: fmt(hastaDate),
+          p_prev_desde: fmt(prevDesdeDate),
+          p_prev_hasta: fmt(prevHastaDate),
+          p_marca: marcaFacturacion,
+          p_rubro: rubroFacturacion,
+        });
+        const ultimasPromise = supabase.rpc("parque_ultimas_facturas_marca", {
+          p_marca: marcaFacturacion,
+        });
         const [resumen, ultimas] = await Promise.all([
           resumenPromise,
           ultimasPromise,
@@ -416,7 +419,7 @@ export function ParqueTab({
     return () => {
       cancelado = true;
     };
-  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca]);
+  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro]);
 
   const rows: Row[] = useMemo(() => {
     const hoy = new Date();
@@ -644,6 +647,10 @@ export function ParqueTab({
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[135px]"
           options={MARCA_OPTIONS}
+        />
+        <FilterSelect
+          label="Rubro" value={fRubro} onChange={setFRubro} placeholder="Rubro" width="w-[140px]"
+          options={RUBRO_OPTIONS}
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"

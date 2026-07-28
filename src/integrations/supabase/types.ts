@@ -1329,6 +1329,23 @@ export type Database = {
           tiene_srv_rango: boolean
         }[]
       }
+      parque_resumen_facturacion_filtros: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_prev_desde: string
+          p_prev_hasta: string
+          p_marca: string
+          p_rubro: string
+        }
+        Returns: {
+          cliente_id: string
+          fact_actual: number
+          fact_prev: number
+          tiene_rep_rango: boolean
+          tiene_srv_rango: boolean
+        }[]
+      }
       parque_ultimas_facturas: {
         Args: never
         Returns: {
