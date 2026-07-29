@@ -65,7 +65,7 @@ function normalizeXmlSucursal(value: unknown) {
 
 function normalizeXmlMarca(value: unknown) {
   const upper = normalizeText(value).toUpperCase();
-  if (!upper) return null;
+  if (!upper || /^[-.\s]+$/.test(upper)) return null;
   if (upper.includes("CLAAS") || upper.startsWith("CLA")) return "CLAAS";
   if (upper.includes("HORSCH") || upper.startsWith("HOR")) return "HORSCH";
   return "OTROS";
@@ -91,11 +91,16 @@ export function mapFacturaVentasSheet(
   sheet: SpreadsheetXmlSheet,
 ): CanonicalImportEnvelope<CanonicalBillingRow> {
   const rows = sheet.rows.map((row, index) => {
-    const emissionDate = normalizeDateLike(firstValue(row, ["EMISION"]));
-    const dueDate = normalizeDateLike(firstValue(row, ["FCHVEN"]));
+    const emissionRaw = firstValue(row, ["EMISION"]);
+    const dueRaw = firstValue(row, ["FCHVEN"]);
+    const emissionDate = normalizeDateLike(emissionRaw) ?? normalizeCompactDate(emissionRaw);
+    const dueDate = normalizeDateLike(dueRaw) ?? normalizeCompactDate(dueRaw);
     const invoiceLongNumber = text(row, ["DOCUMENTO"]);
     const invoiceShortNumber = extractShortInvoiceNumber(firstValue(row, ["DOCUMENTO"]));
     const productCode = text(row, ["CODIGO"]);
+    const manufacturerCode = text(row, ["CODFAB"]);
+    const productGroup = text(row, ["GRUPO"]);
+    const sourceBrand = firstValue(row, ["MARCA"]);
     const productName = text(row, ["PRODUCTO"]);
     const quantity = number(row, ["CANTIDAD"]);
     const totalUsd = number(row, ["TOTALUSD"]);
@@ -113,7 +118,8 @@ export function mapFacturaVentasSheet(
     );
     const documentNumber = text(row, ["DOCUMENTO"]);
     const isCreditNote = normalizeUpper(firstValue(row, ["ESPECIE"])).includes("NCC");
-    const sign = isCreditNote ? -1 : 1;
+    const signedUnitBase = isCreditNote ? -Math.abs(unitBase) : unitBase;
+    const signedTotalBase = isCreditNote ? -Math.abs(totalBase) : totalBase;
 
     return {
       rowId:
@@ -133,22 +139,24 @@ export function mapFacturaVentasSheet(
       documentNumber,
       itemNumber: text(row, ["ITEM"]),
       productCode,
-      manufacturerCode: null,
+      manufacturerCode,
       productName,
       quantity,
-      unitValueBase: unitBase * sign,
-      totalValueBase: totalBase * sign,
+      unitValueBase: signedUnitBase,
+      totalValueBase: signedTotalBase,
       ivaRate,
-      unitValueWithIva: applyIva(unitBase * sign, ivaRate),
-      totalValueWithIva: applyIva(totalBase * sign, ivaRate),
+      unitValueWithIva: applyIva(signedUnitBase, ivaRate),
+      totalValueWithIva: applyIva(signedTotalBase, ivaRate),
       currency,
       exchangeRate: number(row, ["TIPCAM"]) || null,
       paymentCondition: text(row, ["CNDPAG"]),
-      lineType: inferCanonicalBillingType(null, productName),
+      lineType: inferCanonicalBillingType(productGroup, productName, productCode),
       timeType: "Cliente",
-      productGroup: null,
+      productGroup,
       productFamily: null,
-      productBrand: null,
+      productBrand:
+        normalizeXmlMarca(sourceBrand) ??
+        inferProductBrand(productGroup, manufacturerCode, productName),
       linkedServiceOrder: null,
       linkedTrabajo: null,
       isDirectSale: true,

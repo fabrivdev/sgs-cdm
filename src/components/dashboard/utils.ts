@@ -14,6 +14,7 @@ export function pct(current: number, previous: number) {
 export function concept(row: Facturacion): Concepto {
   const grupoFx = String(row.grupo_fx ?? "").toLowerCase();
   const group = `${row.grupo_fx ?? ""} ${row.grupo ?? ""}`.toLowerCase();
+  if (grupoFx === "maquinarias" || group.includes("002 - picadoras")) return "Maquinarias";
   if (row.tipo === "Repuesto" || group.includes("repuesto")) return "Repuestos";
   if (grupoFx === "kilometraje" || group.includes("kilomet")) return "Kilometraje";
   if (grupoFx === "servicio" || group.includes("mano de obra") || group.includes("service") || group.includes("servicio")) return "Servicio";

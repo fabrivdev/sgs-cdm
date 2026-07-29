@@ -1,7 +1,7 @@
 import type { Marca } from "@/lib/constants";
 
 export type TipoTiempoFacturacion = "Cliente" | "Garantia" | "Interno";
-export type GrupoNormalizadoFacturacion = "Servicio" | "Repuestos" | "Kilometraje" | "Otros";
+export type GrupoNormalizadoFacturacion = "Servicio" | "Repuestos" | "Kilometraje" | "Maquinarias" | "Otros";
 
 export interface FacturacionGrupoRegla {
   grupo: string;
@@ -10,6 +10,7 @@ export interface FacturacionGrupoRegla {
 }
 
 export const FACTURACION_GRUPO_REGLAS: FacturacionGrupoRegla[] = [
+  { grupo: "002 - PICADORAS", grupoNormalizado: "Maquinarias", marca: "CLAAS" },
   { grupo: "SERVICE - CLAAS", grupoNormalizado: "Servicio", marca: "CLAAS" },
   { grupo: "REPUESTOS - CLAAS", grupoNormalizado: "Repuestos", marca: "CLAAS" },
   { grupo: "REPUESTOS CLAAS - PROMOCION", grupoNormalizado: "Repuestos", marca: "CLAAS" },

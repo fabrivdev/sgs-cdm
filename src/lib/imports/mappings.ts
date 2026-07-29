@@ -25,13 +25,30 @@ export function inferCanonicalTimeType(value: unknown): CanonicalTimeType {
   return "Desconocido";
 }
 
-export function inferCanonicalBillingType(group: unknown, description?: unknown): CanonicalBillingType {
+export function inferCanonicalBillingType(
+  group: unknown,
+  description?: unknown,
+  productCode?: unknown,
+): CanonicalBillingType {
   const normalizedGroup = clasificarGrupoFacturacion(group);
+  const normalizedProductCode = normalizeUpper(productCode);
+  const sample = `${normalizeUpper(group)} ${normalizeUpper(description)}`;
+  const isStructuredMachine =
+    sample.includes("TIPO:") &&
+    sample.includes("MODELO:") &&
+    (sample.includes("CASIS:") || sample.includes("CHASIS:"));
+
+  if (
+    normalizedGroup === "Maquinarias" ||
+    normalizedProductCode.startsWith("VEIC_") ||
+    isStructuredMachine
+  ) {
+    return "Maquinarias";
+  }
   if (normalizedGroup === "Servicio" || normalizedGroup === "Repuestos" || normalizedGroup === "Kilometraje") {
     return normalizedGroup;
   }
 
-  const sample = `${normalizeUpper(group)} ${normalizeUpper(description)}`;
   if (
     sample.includes("COURIER") ||
     sample.includes("COURRIER") ||
@@ -91,7 +108,7 @@ export function inferCanonicalServiceOrderLineType(args: {
     return "Repuestos";
   }
 
-  return inferCanonicalBillingType(args.group, args.description);
+  return inferCanonicalBillingType(args.group, args.description, args.productCode);
 }
 
 export function inferProductBrand(group: unknown, manufacturerCode?: unknown, description?: unknown) {
@@ -171,10 +188,14 @@ export function crosswalkBillingRow(args: {
     (productCodeKey ? products.byInternalCode.get(productCodeKey) : null) ??
     (manufacturerCodeKey ? products.byManufacturerCode.get(manufacturerCodeKey) : null) ??
     null;
-  const rowLineType = inferCanonicalBillingType(productGroup, description);
-  const productLineType = product ? inferCanonicalBillingType(product.group, product.description) : null;
+  const rowLineType = inferCanonicalBillingType(productGroup, description, productCode);
+  const productLineType = product
+    ? inferCanonicalBillingType(product.group, product.description, product.internalCode)
+    : null;
   const inferredLineType =
-    rowLineType === "Servicio" || rowLineType === "Kilometraje"
+    rowLineType === "Servicio" ||
+    rowLineType === "Kilometraje" ||
+    rowLineType === "Maquinarias"
       ? rowLineType
       : productLineType ?? rowLineType;
 

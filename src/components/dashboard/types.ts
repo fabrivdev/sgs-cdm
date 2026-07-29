@@ -6,7 +6,7 @@ export type FactMetric = "usd" | "horasServicio" | "kmFacturados";
 export type OSMetric = "usd" | "horas" | "km";
 export type OSSucursalMetric = "interno" | "garantia" | "total";
 export type OSRubro = "Servicio" | "Repuestos" | "Kilometraje";
-export type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Otros";
+export type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Maquinarias" | "Otros";
 
 export interface Facturacion {
   fecha: string;
@@ -56,6 +56,7 @@ export interface WeekRow {
   repuestos: number;
   servicio: number;
   kilometraje: number;
+  maquinarias: number;
   otros: number;
   horasServicio: number;
   kmFacturados: number;

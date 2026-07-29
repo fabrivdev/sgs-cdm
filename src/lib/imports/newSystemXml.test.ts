@@ -508,4 +508,39 @@ describe("importacion XML de facturacion", () => {
     expect(result.rows[0].totalValueBase).toBe(138.04);
     expect(result.rows[0].totalValueWithIva).toBe(151.84);
   });
+
+  it("preserva fechas compactas, notas de credito negativas y clasifica maquinarias", () => {
+    const result = mapFacturaVentasSheet("facturas.xml", {
+      name: "Facturas",
+      headers: [],
+      rows: [{
+        FILIAL: "01",
+        EMISION: "20260720",
+        FCHVEN: "20260820",
+        ESPECIE: "NCC",
+        DOCUMENTO: "0010010004900",
+        NOMBRE: "CLIENTE",
+        MONORI: "Dolares",
+        MARCA: "-",
+        GRUPO: "002 - PICADORAS",
+        CODIGO: "VEIC_000001",
+        CODFAB: "JAGUAR-001",
+        PRODUCTO: "Tipo: PICADORA Marca: CLAAS Modelo: JAGUAR Casis: 123456",
+        TOTALUSD: "-100",
+        VUNITUSD: "-100",
+        TIPOES: "IVA 10%",
+      }],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      emissionDate: "2026-07-20",
+      dueDate: "2026-08-20",
+      lineType: "Maquinarias",
+      productGroup: "002 - PICADORAS",
+      productBrand: "CLAAS",
+      manufacturerCode: "JAGUAR-001",
+      totalValueBase: -100,
+      totalValueWithIva: -110,
+    });
+  });
 });

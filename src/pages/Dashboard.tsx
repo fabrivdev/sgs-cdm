@@ -92,6 +92,16 @@ const todayStr = format(today, "yyyy-MM-dd");
 const initialDateFrom = format(startOfMonth(subMonths(today, 11)), "yyyy-MM-dd");
 const initialDateTo = format(today, "yyyy-MM-dd");
 const DASHBOARD_FILTERS_STORAGE_KEY = "sgs-cdm.dashboard.filters.v1";
+const DEFAULT_FACTURACION_RUBROS = ["Servicio", "Repuestos", "Kilometraje"] as const;
+
+function createDefaultFacturacionRubros() {
+  return [...DEFAULT_FACTURACION_RUBROS];
+}
+
+function isDefaultFacturacionRubros(rubros: string[]) {
+  return rubros.length === DEFAULT_FACTURACION_RUBROS.length &&
+    DEFAULT_FACTURACION_RUBROS.every((rubro) => rubros.includes(rubro));
+}
 
 type DashboardStoredFilters = {
   dateFrom?: string;
@@ -523,7 +533,7 @@ export default function Dashboard() {
   const [dateTo, setDateTo] = useState(initialFilters.dateTo);
   const [selectedWeekKey, setSelectedWeekKey] = useState<string | null>(null);
   const [fSucursales, setFSucursales] = useState<string[]>([]);
-  const [fRubros, setFRubros] = useState<string[]>([]);
+  const [fRubros, setFRubros] = useState<string[]>(createDefaultFacturacionRubros);
   const [fOSRubros, setFOSRubros] = useState<OSRubro[]>([]);
   const [fMarcas, setFMarcas] = useState<string[]>([]);
   const [fTiposTiempo, setFTiposTiempo] = useState<string[]>([]);
@@ -1651,7 +1661,7 @@ export default function Dashboard() {
       const compStart = subYears(start, 1);
       const compEnd = subYears(end, 1);
       const comparisonFacts = factFiltered.filter((row) => inRange(row.fecha, compStart, compEnd));
-      const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
+      const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Maquinarias: 0, Otros: 0 };
 
       for (const row of weekFacts) {
         const rowConcept = concept(row);
@@ -1678,6 +1688,7 @@ export default function Dashboard() {
         repuestos: byConcept.Repuestos,
         servicio: byConcept.Servicio,
         kilometraje: byConcept.Kilometraje,
+        maquinarias: byConcept.Maquinarias,
         otros: byConcept.Otros,
         horasServicio,
         kmFacturados,
@@ -2021,7 +2032,7 @@ export default function Dashboard() {
 
   // Fila sintetica con la agregaci-n del rango completo para MixRubros
   const periodRow = useMemo<WeekRow>(() => {
-    const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Otros: 0 };
+    const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Maquinarias: 0, Otros: 0 };
     for (const row of allPeriodFacts) {
       const rowConcept = concept(row);
       byConcept[rowConcept] += Number(row.total_venta || 0);
@@ -2036,6 +2047,7 @@ export default function Dashboard() {
       repuestos: byConcept.Repuestos,
       servicio: byConcept.Servicio,
       kilometraje: byConcept.Kilometraje,
+      maquinarias: byConcept.Maquinarias,
       otros: byConcept.Otros,
       horasServicio,
       kmFacturados,
@@ -2884,7 +2896,7 @@ export default function Dashboard() {
     setDateTo(initialDateTo);
     setSelectedWeekKey(null);
     setFSucursales([]);
-    setFRubros([]);
+    setFRubros(createDefaultFacturacionRubros());
     setFOSRubros([]);
     setFMarcas([]);
     setFTiposTiempo([]);
@@ -2896,11 +2908,12 @@ export default function Dashboard() {
     setQ("");
   };
 
+  const rubrosFacturacionPersonalizados = !isDefaultFacturacionRubros(fRubros);
   const filtrosActivos =
     (dateFrom !== initialDateFrom ? 1 : 0) +
     (dateTo !== initialDateTo ? 1 : 0) +
     (fSucursales.length > 0 ? 1 : 0) +
-    (!filtrosOSActivos && fRubros.length > 0 ? 1 : 0) +
+    (!filtrosOSActivos && rubrosFacturacionPersonalizados ? 1 : 0) +
     (filtrosOSActivos && fOSRubros.length > 0 ? 1 : 0) +
     (fMarcas.length > 0 ? 1 : 0) +
     (fTiposTiempo.length > 0 ? 1 : 0) +
@@ -2911,7 +2924,7 @@ export default function Dashboard() {
     (periodMode !== "mes" ? 1 : 0) +
     (q.trim() ? 1 : 0);
   const filtrosAvanzadosActivos =
-    (!filtrosOSActivos && fRubros.length > 0 ? 1 : 0) +
+    (!filtrosOSActivos && rubrosFacturacionPersonalizados ? 1 : 0) +
     (filtrosOSActivos && fOSRubros.length > 0 ? 1 : 0) +
     (fMarcas.length > 0 ? 1 : 0) +
     (fTiposTiempo.length > 0 ? 1 : 0) +
@@ -2971,6 +2984,7 @@ export default function Dashboard() {
                   { value: "Servicio", label: "Servicios" },
                   { value: "Repuestos", label: "Repuestos" },
                   { value: "Kilometraje", label: "Kilometraje" },
+                  { value: "Maquinarias", label: "Maquinarias" },
                   { value: "Otros", label: "Otros" },
                 ]}
               />
