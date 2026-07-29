@@ -78,6 +78,8 @@ export interface ServicioTecnicoRow {
   abiertas: number;
   otras: number;
   horas: number;
+  horasDesdeDetalle: number;
+  horasDesdeOS: number;
   km: number;
   valorOS: number;
 }
@@ -108,7 +110,14 @@ export interface ServiciosDashboardData {
   abiertas: number;
   otras: number;
   sinResponsable: number;
+  /** Duración total de las OS, contada una sola vez por orden. */
   horas: number;
+  /** Horas atribuidas a participantes; una OS de 10 h con dos técnicos suma 20 h-persona. */
+  horasPersona: number;
+  /** Parte de las horas-persona tomada de detalle individual de TOTVS. */
+  horasPersonaDesdeDetalle: number;
+  /** Parte de las horas-persona heredada del total de la OS. */
+  horasPersonaDesdeOS: number;
   km: number;
   valorOS: number;
   metaHorasMensual: number;
@@ -117,7 +126,17 @@ export interface ServiciosDashboardData {
   ordenes: ServicioOSRow[];
   estados: Array<{ label: string; total: number }>;
   mixTiempo: Array<{ label: string; total: number }>;
-  evolucion: Array<{ key: string; label: string; dateFrom: string; dateTo: string; cerradas: number; abiertas: number; otras: number }>;
+  evolucion: Array<{
+    key: string;
+    label: string;
+    dateFrom: string;
+    dateTo: string;
+    cerradas: number;
+    abiertas: number;
+    otras: number;
+    horasOS: number;
+    horasPersona: number;
+  }>;
   sucursales: Array<{ sucursal: string; cerradas: number; abiertas: number; otras: number; total: number }>;
 }
 

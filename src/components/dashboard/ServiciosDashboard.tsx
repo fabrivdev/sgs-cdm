@@ -62,6 +62,7 @@ export function ServiciosDashboard({
   onSelectSucursal: (sucursal: string) => void;
 }) {
   const [showAllTechnicians, setShowAllTechnicians] = useState(false);
+  const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "osHours" | "personHours">("orders");
 
   if (loading) {
     return <div className="rounded-md border px-3 py-12 text-center text-xs text-muted-foreground">Cargando servicios...</div>;
@@ -71,7 +72,14 @@ export function ServiciosDashboard({
   const openRate = data.totalOS > 0 ? Math.round((data.abiertas / data.totalOS) * 100) : 0;
   const otherRate = Math.max(100 - closeRate - openRate, 0);
   const attention = data.sinResponsable + data.otras;
-  const evolutionMax = Math.max(...data.evolucion.map((row) => row.cerradas + row.abiertas + row.otras), 1);
+  const evolutionMax = Math.max(
+    ...data.evolucion.map((row) => {
+      if (evolutionMetric === "osHours") return row.horasOS;
+      if (evolutionMetric === "personHours") return row.horasPersona;
+      return row.cerradas + row.abiertas + row.otras;
+    }),
+    1,
+  );
   const branchMax = Math.max(...data.sucursales.map((row) => row.total), 1);
   const timeTotal = data.mixTiempo.reduce((sum, row) => sum + row.total, 0);
   const allTecnicos = data.tecnicos;
@@ -95,9 +103,9 @@ export function ServiciosDashboard({
       tone: "text-emerald-600",
     },
     {
-      label: "Horas registradas",
+      label: "Horas OS",
       value: `${decimal.format(data.horas)} hs`,
-      detail: `Meta individual del período: ${decimal.format(data.metaHorasPeriodo)} hs`,
+      detail: `${decimal.format(data.horasPersona)} hs-persona · meta individual ${decimal.format(data.metaHorasPeriodo)} hs`,
       icon: Clock3,
       border: "border-t-blue-500",
       tone: "text-blue-600",
@@ -132,9 +140,36 @@ export function ServiciosDashboard({
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <section className="min-w-0 overflow-hidden rounded-md border bg-card p-3.5">
-          <div>
-            <h2 className="text-sm font-semibold">Evolución de órdenes</h2>
-            <p className="text-xs text-muted-foreground">Aperturas y cierres por período</p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">Evolución de órdenes</h2>
+              <p className="text-xs text-muted-foreground">
+                {evolutionMetric === "orders"
+                  ? "Aperturas y cierres por período"
+                  : evolutionMetric === "osHours"
+                    ? "Duración de las OS, sin duplicar participantes"
+                    : "Horas atribuidas a cada participante"}
+              </p>
+            </div>
+            <div className="inline-flex h-8 overflow-hidden rounded-md border bg-muted/40 text-[10px] font-medium">
+              {([
+                ["orders", "OS"],
+                ["osHours", "Horas OS"],
+                ["personHours", "Hs-persona"],
+              ] as const).map(([metric, label]) => (
+                <button
+                  type="button"
+                  key={metric}
+                  onClick={() => setEvolutionMetric(metric)}
+                  className={cn(
+                    "border-r px-2.5 last:border-r-0 hover:bg-accent",
+                    evolutionMetric === metric && "bg-primary text-primary-foreground hover:bg-primary",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           {data.evolucion.length === 0 ? (
             <div className="flex h-52 items-center justify-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>
@@ -151,29 +186,52 @@ export function ServiciosDashboard({
                 {data.evolucion.map((row) => (
                   <div key={row.key} className="flex h-full flex-col justify-end">
                     <div className="flex flex-1 items-end justify-center gap-1">
-                      {(["cerradas", "abiertas", "otras"] as const).map((state) => {
-                        const value = row[state];
-                        const filterState = state === "cerradas" ? "cerrada" : state === "abiertas" ? "abierta" : "otra";
-                        return (
-                          <button
-                            type="button"
-                            key={state}
-                            disabled={value === 0}
-                            onClick={() => {
-                              onSelectPeriodo(row);
-                              onSelectEstado(filterState);
+                      {evolutionMetric === "orders" ? (
+                        (["cerradas", "abiertas", "otras"] as const).map((state) => {
+                          const value = row[state];
+                          const filterState = state === "cerradas" ? "cerrada" : state === "abiertas" ? "abierta" : "otra";
+                          return (
+                            <button
+                              type="button"
+                              key={state}
+                              disabled={value === 0}
+                              onClick={() => {
+                                onSelectPeriodo(row);
+                                onSelectEstado(filterState);
+                              }}
+                              className="group relative flex h-full flex-1 items-end justify-center disabled:pointer-events-none"
+                              aria-label={`${row.label}: ${value} ${state}`}
+                            >
+                              <span
+                                className={cn("w-full max-w-7 rounded-t-sm transition-opacity hover:opacity-80", selectedEstados.includes(filterState) && "ring-2 ring-foreground/20")}
+                                style={{ height: `${Math.max((value / evolutionMax) * 100, value > 0 ? 4 : 0)}%`, backgroundColor: stateColor(state) }}
+                                title={`${value} ${state}`}
+                              />
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onSelectPeriodo(row)}
+                          className="relative flex h-full w-full items-end justify-center"
+                          aria-label={`${row.label}: ${decimal.format(evolutionMetric === "osHours" ? row.horasOS : row.horasPersona)} horas`}
+                        >
+                          <span
+                            className={cn(
+                              "w-full max-w-12 rounded-t-sm transition-opacity hover:opacity-80",
+                              evolutionMetric === "osHours" ? "bg-primary" : "bg-blue-500",
+                            )}
+                            style={{
+                              height: `${Math.max(
+                                ((evolutionMetric === "osHours" ? row.horasOS : row.horasPersona) / evolutionMax) * 100,
+                                (evolutionMetric === "osHours" ? row.horasOS : row.horasPersona) > 0 ? 4 : 0,
+                              )}%`,
                             }}
-                            className="group relative flex h-full flex-1 items-end justify-center disabled:pointer-events-none"
-                            aria-label={`${row.label}: ${value} ${state}`}
-                          >
-                            <span
-                              className={cn("w-full max-w-7 rounded-t-sm transition-opacity hover:opacity-80", selectedEstados.includes(filterState) && "ring-2 ring-foreground/20")}
-                              style={{ height: `${Math.max((value / evolutionMax) * 100, value > 0 ? 4 : 0)}%`, backgroundColor: stateColor(state) }}
-                              title={`${value} ${state}`}
-                            />
-                          </button>
-                        );
-                      })}
+                            title={`${decimal.format(evolutionMetric === "osHours" ? row.horasOS : row.horasPersona)} hs`}
+                          />
+                        </button>
+                      )}
                     </div>
                     <button type="button" onClick={() => onSelectPeriodo(row)} className="h-7 truncate pt-1 text-center text-[10px] text-muted-foreground hover:text-foreground" title={`Filtrar ${row.label}`}>{row.label}</button>
                   </div>
@@ -182,9 +240,17 @@ export function ServiciosDashboard({
             </div>
           )}
           <div className="mt-3 flex flex-wrap justify-center gap-5 text-[10px] text-muted-foreground">
-            <Legend color="#8eaa38" label="Cerradas" />
-            <Legend color="#2f7dcc" label="Abiertas" />
-            <Legend color="#ef8b18" label="Anuladas" />
+            {evolutionMetric === "orders" ? (
+              <>
+                <Legend color="#8eaa38" label="Cerradas" />
+                <Legend color="#2f7dcc" label="Abiertas" />
+                <Legend color="#ef8b18" label="Anuladas" />
+              </>
+            ) : evolutionMetric === "osHours" ? (
+              <Legend color="#8eaa38" label="Horas OS" />
+            ) : (
+              <Legend color="#2f7dcc" label="Horas-persona" />
+            )}
           </div>
         </section>
 
@@ -236,7 +302,7 @@ export function ServiciosDashboard({
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Carga por responsable</h2>
-              <p className="text-xs text-muted-foreground">Productividad sobre una meta de {decimal.format(data.metaHorasMensual)} hs mensuales</p>
+              <p className="text-xs text-muted-foreground">Productividad por horas-persona sobre una meta de {decimal.format(data.metaHorasMensual)} hs mensuales</p>
             </div>
             <div className="flex items-center gap-2">
               {allTecnicos.length > 8 && (
@@ -255,7 +321,7 @@ export function ServiciosDashboard({
           <div className="max-h-[460px] overflow-auto">
             <div className="min-w-[640px]">
               <div className="grid grid-cols-[minmax(210px,1fr)_54px_64px_64px_70px_150px] gap-2 border-b px-2 pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                <span>Responsable</span><span className="text-right">OS</span><span className="text-right">Cerradas</span><span className="text-right">Abiertas</span><span className="text-right">Horas</span><span>Productividad</span>
+                <span>Responsable</span><span className="text-right">OS</span><span className="text-right">Cerradas</span><span className="text-right">Abiertas</span><span className="text-right" title="Cada participante recibe las horas completas de la OS, salvo que TOTVS informe horas individuales.">Hs-persona</span><span>Productividad</span>
               </div>
               {visibleTecnicos.map((row) => {
                 const productivity = data.metaHorasPeriodo > 0 ? (row.horas / data.metaHorasPeriodo) * 100 : 0;

@@ -58,6 +58,7 @@ import {
   importedServiceOrderParticipants,
   matchTechnicianProfile,
 } from "@/lib/technicianMatching";
+import { attributeServiceOrderMetrics } from "@/lib/serviceOrderMetrics";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
@@ -1060,12 +1061,24 @@ export default function Dashboard() {
       abiertas: number;
       otras: number;
       horas: number;
+      horasDesdeDetalle: number;
+      horasDesdeOS: number;
       km: number;
       valorOS: number;
     }>();
     const estadosMap = new Map<string, number>();
     const mixTiempoMap = new Map<string, number>();
-    const evolucionMap = new Map<string, { key: string; label: string; dateFrom: string; dateTo: string; cerradas: number; abiertas: number; otras: number }>();
+    const evolucionMap = new Map<string, {
+      key: string;
+      label: string;
+      dateFrom: string;
+      dateTo: string;
+      cerradas: number;
+      abiertas: number;
+      otras: number;
+      horasOS: number;
+      horasPersona: number;
+    }>();
     const sucursalMap = new Map<string, { sucursal: string; cerradas: number; abiertas: number; otras: number; total: number }>();
 
     for (const profile of technicianOptions) {
@@ -1080,6 +1093,8 @@ export default function Dashboard() {
         abiertas: 0,
         otras: 0,
         horas: 0,
+        horasDesdeDetalle: 0,
+        horasDesdeOS: 0,
         km: 0,
         valorOS: 0,
       });
@@ -1199,12 +1214,34 @@ export default function Dashboard() {
       const km = Number(row.km_cantidad || 0);
       const valorOS = Number(row.servicios_valor || 0) + Number(row.repuesto_valor || 0) +
         Number(row.kilometro_valor || 0) + Number(row.terceros_valor || 0);
+      const totalsByTechnician = (rawData.totales_por_tecnico ?? {}) as Record<string, Record<string, unknown>>;
+      const participantMetrics = attributeServiceOrderMetrics(
+        participants.map((participant) => ({
+          key: participant.tecnico,
+          sources: participant.sources,
+        })),
+        totalsByTechnician,
+        { hours: horas, kilometers: km, value: valorOS },
+      );
+      const participantMetricsByTechnician = new Map(
+        participantMetrics.map((metrics) => [metrics.key, metrics]),
+      );
+      const horasPersonaOS = participantMetrics.reduce((sum, metrics) => sum + metrics.hours, 0);
 
       estadosMap.set(estadoOS, (estadosMap.get(estadoOS) ?? 0) + 1);
       tiposTiempo.forEach((tipo) => mixTiempoMap.set(tipo, (mixTiempoMap.get(tipo) ?? 0) + 1));
 
-      const evolucionRow = evolucionMap.get(bucket.key) ?? { ...bucket, cerradas: 0, abiertas: 0, otras: 0 };
+      const evolucionRow = evolucionMap.get(bucket.key) ?? {
+        ...bucket,
+        cerradas: 0,
+        abiertas: 0,
+        otras: 0,
+        horasOS: 0,
+        horasPersona: 0,
+      };
       evolucionRow[estadoGrupo === "cerrada" ? "cerradas" : estadoGrupo === "abierta" ? "abiertas" : "otras"] += 1;
+      evolucionRow.horasOS += horas;
+      evolucionRow.horasPersona += horasPersonaOS;
       evolucionMap.set(bucket.key, evolucionRow);
 
       const sucursalLabel = sucursal ?? "Sin sucursal";
@@ -1213,21 +1250,14 @@ export default function Dashboard() {
       sucursalRow.total += 1;
       sucursalMap.set(sucursalLabel, sucursalRow);
 
-      const totalsByTechnician = (rawData.totales_por_tecnico ?? {}) as Record<string, Record<string, unknown>>;
-      const hasParticipantTotals = Object.keys(totalsByTechnician).length > 0;
       participants.forEach((participant) => {
-        const participantTotals = participant.sources.reduce(
-          (totals, sourceName) => {
-            const sourceTotals = totalsByTechnician[sourceName] ?? {};
-            totals.horas += Number(sourceTotals.horas || 0);
-            totals.km += Number(sourceTotals.kilometros || 0);
-            totals.valor += Number(sourceTotals.valor_servicio || 0) + Number(sourceTotals.valor_repuestos || 0) +
-              Number(sourceTotals.valor_kilometraje || 0) + Number(sourceTotals.valor_terceros || 0);
-            return totals;
-          },
-          { horas: 0, km: 0, valor: 0 },
-        );
-        const useLegacyTotals = !hasParticipantTotals;
+        const metrics = participantMetricsByTechnician.get(participant.tecnico) ?? {
+          key: participant.tecnico,
+          hours: horas,
+          kilometers: km,
+          value: valorOS,
+          source: "order" as const,
+        };
         const tecnicoRow = tecnicoMap.get(participant.tecnico) ?? {
           profileId: participant.profileId,
           tecnico: participant.tecnico,
@@ -1237,6 +1267,8 @@ export default function Dashboard() {
           abiertas: 0,
           otras: 0,
           horas: 0,
+          horasDesdeDetalle: 0,
+          horasDesdeOS: 0,
           km: 0,
           valorOS: 0,
         };
@@ -1244,9 +1276,11 @@ export default function Dashboard() {
         if (estadoGrupo === "cerrada") tecnicoRow.cerradas += 1;
         else if (estadoGrupo === "abierta") tecnicoRow.abiertas += 1;
         else tecnicoRow.otras += 1;
-        tecnicoRow.horas += useLegacyTotals ? horas : participantTotals.horas;
-        tecnicoRow.km += useLegacyTotals ? km : participantTotals.km;
-        tecnicoRow.valorOS += useLegacyTotals ? valorOS : participantTotals.valor;
+        tecnicoRow.horas += metrics.hours;
+        tecnicoRow.km += metrics.kilometers;
+        tecnicoRow.valorOS += metrics.value;
+        if (metrics.source === "individual") tecnicoRow.horasDesdeDetalle += metrics.hours;
+        else tecnicoRow.horasDesdeOS += metrics.hours;
         tecnicoMap.set(participant.tecnico, tecnicoRow);
       });
 
@@ -1274,6 +1308,9 @@ export default function Dashboard() {
     const cerradas = ordenes.filter((row) => row.estadoOS === "Cerrada").length;
     const otras = ordenes.filter((row) => row.estadoOS === "Cancelada" || row.estadoOS === "Anulada").length;
     const metaHorasPeriodo = productivityGoalForRange(periodStart, periodEnd, metaHorasMensual);
+    const tecnicos = Array.from(tecnicoMap.values()).sort(
+      (a, b) => b.horas - a.horas || b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico),
+    );
 
     return {
       totalOS: ordenes.length,
@@ -1282,13 +1319,14 @@ export default function Dashboard() {
       otras,
       sinResponsable: ordenes.filter((row) => row.tecnico === "Sin técnico asignado").length,
       horas: ordenes.reduce((sum, row) => sum + row.horas, 0),
+      horasPersona: tecnicos.reduce((sum, row) => sum + row.horas, 0),
+      horasPersonaDesdeDetalle: tecnicos.reduce((sum, row) => sum + row.horasDesdeDetalle, 0),
+      horasPersonaDesdeOS: tecnicos.reduce((sum, row) => sum + row.horasDesdeOS, 0),
       km: ordenes.reduce((sum, row) => sum + row.km, 0),
       valorOS: ordenes.reduce((sum, row) => sum + row.valorOS, 0),
       metaHorasMensual,
       metaHorasPeriodo,
-      tecnicos: Array.from(tecnicoMap.values()).sort(
-        (a, b) => b.horas - a.horas || b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico),
-      ),
+      tecnicos,
       ordenes,
       estados: Array.from(estadosMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
       mixTiempo: Array.from(mixTiempoMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
