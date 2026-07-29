@@ -78,7 +78,7 @@ function isImplausibleUsd(unit: string | undefined, value: unknown) {
 }
 
 function metricValue(dataset: BusinessDataset, metric: string, value: unknown) {
-  const definition = semanticCatalog[dataset].metrics[metric as keyof typeof semanticCatalog[typeof dataset]["metrics"]];
+  const definition = (semanticCatalog[dataset].metrics as Record<string, { unit?: string; label?: string }>)[metric];
   const unit = definition?.unit;
   if (isImplausibleUsd(unit, value)) return IMPLAUSIBLE_USD_MESSAGE;
   if (unit === "usd") return `USD ${formatNumber(value, 2)}`;
@@ -90,11 +90,11 @@ function metricValue(dataset: BusinessDataset, metric: string, value: unknown) {
 }
 
 function metricLabel(dataset: BusinessDataset, metric: string) {
-  return semanticCatalog[dataset].metrics[metric as keyof typeof semanticCatalog[typeof dataset]["metrics"]]?.label ?? metric;
+  return (semanticCatalog[dataset].metrics as Record<string, { unit?: string; label?: string }>)[metric]?.label ?? metric;
 }
 
 function dimensionLabel(dataset: BusinessDataset, dimension: string) {
-  return semanticCatalog[dataset].dimensions[dimension as keyof typeof semanticCatalog[typeof dataset]["dimensions"]]?.label ?? dimension;
+  return (semanticCatalog[dataset].dimensions as Record<string, { label?: string }>)[dimension]?.label ?? dimension;
 }
 
 function formatPeriodValue(value: unknown, granularity: string) {
@@ -209,7 +209,7 @@ function renderSingleResult(question: string, result: ExecutedSemanticQuery, mod
 function outlierCaveat(dataset: BusinessDataset, outlier: DominantOutlier | null | undefined) {
   if (!outlier) return "";
   const metric = metricLabel(dataset, outlier.metric).toLowerCase();
-  const unit = semanticCatalog[dataset].metrics[outlier.metric as keyof typeof semanticCatalog[typeof dataset]["metrics"]]?.unit;
+  const unit = (semanticCatalog[dataset].metrics as Record<string, { unit?: string }>)[outlier.metric]?.unit;
   if (isImplausibleUsd(unit, outlier.top)) {
     return `Aviso: el primer resultado de ${metric} esta fuera de rango esperado (posible error de datos); no lo muestro ni lo comparo hasta verificarlo en la fuente.`;
   }

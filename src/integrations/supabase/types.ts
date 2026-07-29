@@ -1313,13 +1313,14 @@ export type Database = {
           tiene_srv_rango: boolean
         }[]
       }
-      parque_resumen_facturacion_marca: {
+      parque_resumen_facturacion_filtros: {
         Args: {
           p_desde: string
           p_hasta: string
+          p_marca: string
           p_prev_desde: string
           p_prev_hasta: string
-          p_marca: string
+          p_rubro: string
         }
         Returns: {
           cliente_id: string
@@ -1329,14 +1330,13 @@ export type Database = {
           tiene_srv_rango: boolean
         }[]
       }
-      parque_resumen_facturacion_filtros: {
+      parque_resumen_facturacion_marca: {
         Args: {
           p_desde: string
           p_hasta: string
+          p_marca: string
           p_prev_desde: string
           p_prev_hasta: string
-          p_marca: string
-          p_rubro: string
         }
         Returns: {
           cliente_id: string
@@ -1355,9 +1355,7 @@ export type Database = {
         }[]
       }
       parque_ultimas_facturas_marca: {
-        Args: {
-          p_marca: string
-        }
+        Args: { p_marca: string }
         Returns: {
           cliente_id: string
           ult_repuesto: string

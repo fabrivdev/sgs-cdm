@@ -1482,6 +1482,7 @@ export default function Dashboard() {
         horasDisponibles: capacidad.hoursAvailable,
         horasUtilizadas: capacidad.hoursUsed,
         porcentaje: capacidad.percentage,
+        base: capacidad.base,
       },
       tecnicos,
       ordenes,
