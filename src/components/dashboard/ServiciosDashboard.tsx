@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Clock3, Users, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Clock3, Users, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ServiciosDashboardData } from "./types";
@@ -62,7 +62,8 @@ export function ServiciosDashboard({
   onSelectSucursal: (sucursal: string) => void;
 }) {
   const [showAllTechnicians, setShowAllTechnicians] = useState(false);
-  const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "osHours" | "personHours">("orders");
+  const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "osHours" | "personHours" | "capacity">("orders");
+  const [selectedTrendTechnician, setSelectedTrendTechnician] = useState("");
 
   if (loading) {
     return <div className="rounded-md border px-3 py-12 text-center text-xs text-muted-foreground">Cargando servicios...</div>;
@@ -76,14 +77,21 @@ export function ServiciosDashboard({
     ...data.evolucion.map((row) => {
       if (evolutionMetric === "osHours") return row.horasOS;
       if (evolutionMetric === "personHours") return row.horasPersona;
+      if (evolutionMetric === "capacity") return row.utilizacion;
       return row.cerradas + row.abiertas + row.otras;
     }),
-    1,
+    evolutionMetric === "capacity" ? 100 : 1,
   );
   const branchMax = Math.max(...data.sucursales.map((row) => row.total), 1);
   const timeTotal = data.mixTiempo.reduce((sum, row) => sum + row.total, 0);
   const allTecnicos = data.tecnicos;
   const visibleTecnicos = showAllTechnicians ? allTecnicos : allTecnicos.slice(0, 8);
+  const trendTechnician = allTecnicos.find((row) => row.tecnico === selectedTrendTechnician) ?? allTecnicos[0] ?? null;
+  const trendMax = Math.max(
+    ...(trendTechnician?.evolucion.map((row) => Math.max(row.horas, row.metaHoras)) ?? []),
+    1,
+  );
+  const capacityPercent = Math.round(data.capacidad.porcentaje);
 
   const kpis = [
     {
@@ -138,6 +146,55 @@ export function ServiciosDashboard({
         })}
       </div>
 
+      <section className="rounded-md border bg-card px-3.5 py-3">
+        <div className="grid gap-3 md:grid-cols-[minmax(210px,0.8fr)_minmax(260px,1.4fr)_auto] md:items-center">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Activity className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold">Capacidad estimada</h2>
+              <p className="text-[11px] text-muted-foreground">Horas-persona utilizadas sobre la meta del período</p>
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="mb-1.5 flex items-baseline justify-between gap-3 text-xs">
+              <span>
+                <strong className="text-base tabular-nums">{decimal.format(data.capacidad.horasUtilizadas)} hs</strong>
+                <span className="text-muted-foreground"> de {decimal.format(data.capacidad.horasDisponibles)} hs</span>
+              </span>
+              <strong className="tabular-nums text-primary">{capacityPercent}%</strong>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full",
+                  capacityPercent >= 100 ? "bg-emerald-500" : capacityPercent >= 75 ? "bg-primary" : "bg-amber-500",
+                )}
+                style={{ width: `${Math.min(Math.max(capacityPercent, 0), 100)}%` }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 border-t pt-2 text-xs md:border-l md:border-t-0 md:pl-4 md:pt-0">
+            <Users className="h-4 w-4 text-primary" />
+            <span><strong className="tabular-nums">{data.capacidad.tecnicosBase}</strong> técnicos considerados</span>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+          <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+            Detalle individual TOTVS: {decimal.format(data.horasPersonaDesdeDetalle)} hs
+          </span>
+          <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
+            Atribución completa por OS: {decimal.format(data.horasPersonaDesdeOS)} hs
+          </span>
+        </div>
+        <p className="mt-1.5 text-[10px] text-muted-foreground">
+          {data.capacidad.base === "participantes_filtrados"
+            ? "Base: participantes con actividad dentro de los filtros actuales."
+            : "Base: técnicos activos actuales más participantes históricos del período."} Cada participante recibe las horas completas de la OS; si TOTVS informa horas individuales, ese detalle prevalece.
+        </p>
+      </section>
+
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <section className="min-w-0 overflow-hidden rounded-md border bg-card p-3.5">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -148,7 +205,9 @@ export function ServiciosDashboard({
                   ? "Aperturas y cierres por período"
                   : evolutionMetric === "osHours"
                     ? "Duración de las OS, sin duplicar participantes"
-                    : "Horas atribuidas a cada participante"}
+                    : evolutionMetric === "personHours"
+                      ? "Horas atribuidas a cada participante"
+                      : "Horas-persona utilizadas sobre capacidad estimada"}
               </p>
             </div>
             <div className="inline-flex h-8 overflow-hidden rounded-md border bg-muted/40 text-[10px] font-medium">
@@ -156,6 +215,7 @@ export function ServiciosDashboard({
                 ["orders", "OS"],
                 ["osHours", "Horas OS"],
                 ["personHours", "Hs-persona"],
+                ["capacity", "% capacidad"],
               ] as const).map(([metric, label]) => (
                 <button
                   type="button"
@@ -180,7 +240,12 @@ export function ServiciosDashboard({
                 style={{
                   gridTemplateColumns: `repeat(${Math.max(data.evolucion.length, 1)}, minmax(0, 1fr))`,
                   width: data.evolucion.length > 12 ? `${data.evolucion.length * 58}px` : "100%",
-                  minWidth: data.evolucion.length > 12 ? `${data.evolucion.length * 58}px` : "520px",
+                  minWidth:
+                    data.evolucion.length > 12
+                      ? `${data.evolucion.length * 58}px`
+                      : data.evolucion.length > 8
+                        ? "520px"
+                        : "100%",
                 }}
               >
                 {data.evolucion.map((row) => (
@@ -210,28 +275,52 @@ export function ServiciosDashboard({
                             </button>
                           );
                         })
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onSelectPeriodo(row)}
-                          className="relative flex h-full w-full items-end justify-center"
-                          aria-label={`${row.label}: ${decimal.format(evolutionMetric === "osHours" ? row.horasOS : row.horasPersona)} horas`}
-                        >
-                          <span
-                            className={cn(
-                              "w-full max-w-12 rounded-t-sm transition-opacity hover:opacity-80",
-                              evolutionMetric === "osHours" ? "bg-primary" : "bg-blue-500",
-                            )}
-                            style={{
-                              height: `${Math.max(
-                                ((evolutionMetric === "osHours" ? row.horasOS : row.horasPersona) / evolutionMax) * 100,
-                                (evolutionMetric === "osHours" ? row.horasOS : row.horasPersona) > 0 ? 4 : 0,
-                              )}%`,
-                            }}
-                            title={`${decimal.format(evolutionMetric === "osHours" ? row.horasOS : row.horasPersona)} hs`}
-                          />
-                        </button>
-                      )}
+                      ) : (() => {
+                        const value = evolutionMetric === "osHours"
+                          ? row.horasOS
+                          : evolutionMetric === "personHours"
+                            ? row.horasPersona
+                            : row.utilizacion;
+                        const unit = evolutionMetric === "capacity" ? "%" : " hs";
+                        const barTone = evolutionMetric === "osHours"
+                          ? "bg-primary"
+                          : evolutionMetric === "personHours"
+                            ? "bg-blue-500"
+                            : row.utilizacion >= 100
+                              ? "bg-emerald-500"
+                              : row.utilizacion >= 75
+                                ? "bg-primary"
+                                : "bg-amber-500";
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onSelectPeriodo(row)}
+                            className="relative flex h-full w-full items-end justify-center"
+                            aria-label={`${row.label}: ${decimal.format(value)}${unit}`}
+                          >
+                            <span
+                              className={cn(
+                                "relative w-full max-w-12 rounded-t-sm transition-opacity hover:opacity-80",
+                                barTone,
+                              )}
+                              style={{
+                                height: `${Math.max(
+                                  (value / evolutionMax) * 100,
+                                  value > 0 ? 4 : 0,
+                                )}%`,
+                              }}
+                              title={`${decimal.format(value)}${unit}`}
+                            >
+                              {value > 0 && (
+                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold tabular-nums text-foreground">
+                                  {decimal.format(value)}{evolutionMetric === "capacity" ? "%" : ""}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })()}
                     </div>
                     <button type="button" onClick={() => onSelectPeriodo(row)} className="h-7 truncate pt-1 text-center text-[10px] text-muted-foreground hover:text-foreground" title={`Filtrar ${row.label}`}>{row.label}</button>
                   </div>
@@ -248,8 +337,10 @@ export function ServiciosDashboard({
               </>
             ) : evolutionMetric === "osHours" ? (
               <Legend color="#8eaa38" label="Horas OS" />
-            ) : (
+            ) : evolutionMetric === "personHours" ? (
               <Legend color="#2f7dcc" label="Horas-persona" />
+            ) : (
+              <Legend color="#8eaa38" label="Uso de capacidad" />
             )}
           </div>
         </section>
@@ -318,6 +409,81 @@ export function ServiciosDashboard({
               <Users className="h-4 w-4 text-primary" />
             </div>
           </div>
+          {trendTechnician && (
+            <div className="mb-3 rounded-md border bg-muted/20 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Evolución individual</div>
+                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+                    <strong>{decimal.format(trendTechnician.horas)} hs-persona</strong>
+                    <span className="text-muted-foreground">{trendTechnician.totalOS} OS en el período</span>
+                    <span className="font-semibold text-primary">
+                      {data.metaHorasPeriodo > 0 ? Math.round((trendTechnician.horas / data.metaHorasPeriodo) * 100) : 0}% de meta
+                    </span>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <span className="sr-only">Técnico para evolución</span>
+                  <select
+                    value={trendTechnician.tecnico}
+                    onChange={(event) => setSelectedTrendTechnician(event.target.value)}
+                    className="h-8 max-w-full rounded-md border bg-background px-2 text-xs font-medium outline-none focus:ring-2 focus:ring-primary/30 sm:w-[260px]"
+                  >
+                    {allTecnicos.map((row) => (
+                      <option key={row.tecnico} value={row.tecnico}>
+                        {row.tecnico}{row.activo ? "" : " · Inactivo"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 overflow-x-auto pb-1">
+                <div
+                  className="grid h-36 items-end gap-2"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(trendTechnician.evolucion.length, 1)}, minmax(48px, 1fr))`,
+                    minWidth: trendTechnician.evolucion.length > 8 ? `${trendTechnician.evolucion.length * 56}px` : "100%",
+                  }}
+                >
+                  {trendTechnician.evolucion.map((row) => {
+                    const usedHeight = Math.max((row.horas / trendMax) * 100, row.horas > 0 ? 3 : 0);
+                    const targetHeight = Math.min((row.metaHoras / trendMax) * 100, 100);
+                    return (
+                      <button
+                        type="button"
+                        key={row.key}
+                        onClick={() => onSelectPeriodo(row)}
+                        className="group flex h-full min-w-0 flex-col justify-end rounded px-0.5 pt-5 hover:bg-accent/60"
+                        title={`${row.label}: ${decimal.format(row.horas)} hs-persona · meta ${decimal.format(row.metaHoras)} hs`}
+                      >
+                        <div className="relative flex min-h-0 flex-1 items-end justify-center">
+                          <span
+                            className="absolute inset-x-1 border-t border-dashed border-orange-500"
+                            style={{ bottom: `${targetHeight}%` }}
+                          />
+                          <span
+                            className="relative w-6 rounded-t bg-primary/80 transition-colors group-hover:bg-primary"
+                            style={{ height: `${usedHeight}%` }}
+                          >
+                            {row.horas > 0 && (
+                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold tabular-nums">
+                                {decimal.format(row.horas)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <span className="mt-1 truncate text-center text-[9px] text-muted-foreground" title={row.label}>{row.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-1 flex flex-wrap justify-center gap-4 border-t pt-2 text-[10px] text-muted-foreground">
+                <Legend color="#8eaa38" label="Hs-persona" />
+                <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-orange-500" />Meta estimada</span>
+              </div>
+            </div>
+          )}
           <div className="max-h-[460px] overflow-auto">
             <div className="min-w-[640px]">
               <div className="grid grid-cols-[minmax(210px,1fr)_54px_64px_64px_70px_150px] gap-2 border-b px-2 pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -429,7 +595,7 @@ export function ServiciosDashboard({
                   <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">USD {usd.format(row.valorOS)}</td>
                 </tr>
               ))}
-              {data.ordenes.length === 0 && <tr><td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
+              {data.ordenes.length === 0 && <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
             </tbody>
           </table>
         </div>

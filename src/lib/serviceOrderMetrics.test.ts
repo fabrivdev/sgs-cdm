@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeServiceOrderMetrics } from "./serviceOrderMetrics";
+import { attributeServiceOrderMetrics, calculateTeamCapacity } from "./serviceOrderMetrics";
 
 const orderTotals = {
   hours: 10,
@@ -96,5 +96,25 @@ describe("service order participant metrics", () => {
     );
 
     expect(result).toMatchObject({ hours: 7.5, kilometers: 15, value: 200, source: "individual" });
+  });
+});
+
+describe("service team capacity", () => {
+  it("compares person-hours against the target of every technician", () => {
+    const result = calculateTeamCapacity(20, 132, 2);
+
+    expect(result.technicians).toBe(2);
+    expect(result.hoursAvailable).toBe(264);
+    expect(result.hoursUsed).toBe(20);
+    expect(result.percentage).toBeCloseTo(7.5758, 3);
+  });
+
+  it("returns a safe zero percentage when the team has no capacity base", () => {
+    expect(calculateTeamCapacity(10, 132, 0)).toEqual({
+      technicians: 0,
+      hoursAvailable: 0,
+      hoursUsed: 10,
+      percentage: 0,
+    });
   });
 });

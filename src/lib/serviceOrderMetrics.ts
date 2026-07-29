@@ -16,6 +16,13 @@ export interface ServiceOrderParticipantMetrics extends ServiceOrderMetricTotals
   source: "individual" | "order";
 }
 
+export interface TeamCapacityMetrics {
+  technicians: number;
+  hoursAvailable: number;
+  hoursUsed: number;
+  percentage: number;
+}
+
 type ImportedTechnicianTotals = Record<string, Record<string, unknown>>;
 
 const individualValueKeys = [
@@ -98,4 +105,22 @@ export function attributeServiceOrderMetrics(
       source: hasIndividualHours ? "individual" : "order",
     };
   });
+}
+
+export function calculateTeamCapacity(
+  hoursUsed: number,
+  individualTarget: number,
+  technicians: number,
+): TeamCapacityMetrics {
+  const safeTechnicians = Math.max(Math.trunc(Number(technicians) || 0), 0);
+  const safeTarget = Math.max(Number(individualTarget) || 0, 0);
+  const safeHoursUsed = Math.max(Number(hoursUsed) || 0, 0);
+  const hoursAvailable = safeTarget * safeTechnicians;
+
+  return {
+    technicians: safeTechnicians,
+    hoursAvailable,
+    hoursUsed: safeHoursUsed,
+    percentage: hoursAvailable > 0 ? (safeHoursUsed / hoursAvailable) * 100 : 0,
+  };
 }

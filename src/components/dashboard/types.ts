@@ -69,6 +69,20 @@ export interface WeekRow {
   rows: Facturacion[];
 }
 
+export interface ServicioTecnicoPeriodoRow {
+  key: string;
+  label: string;
+  dateFrom: string;
+  dateTo: string;
+  totalOS: number;
+  cerradas: number;
+  abiertas: number;
+  otras: number;
+  horas: number;
+  metaHoras: number;
+  productividad: number;
+}
+
 export interface ServicioTecnicoRow {
   profileId: string | null;
   tecnico: string;
@@ -82,6 +96,7 @@ export interface ServicioTecnicoRow {
   horasDesdeOS: number;
   km: number;
   valorOS: number;
+  evolucion: ServicioTecnicoPeriodoRow[];
 }
 
 export interface ServicioOSRow {
@@ -122,6 +137,13 @@ export interface ServiciosDashboardData {
   valorOS: number;
   metaHorasMensual: number;
   metaHorasPeriodo: number;
+  capacidad: {
+    tecnicosBase: number;
+    horasDisponibles: number;
+    horasUtilizadas: number;
+    porcentaje: number;
+    base: "equipo_activo" | "participantes_filtrados";
+  };
   tecnicos: ServicioTecnicoRow[];
   ordenes: ServicioOSRow[];
   estados: Array<{ label: string; total: number }>;
@@ -136,6 +158,9 @@ export interface ServiciosDashboardData {
     otras: number;
     horasOS: number;
     horasPersona: number;
+    tecnicosBase: number;
+    horasDisponibles: number;
+    utilizacion: number;
   }>;
   sucursales: Array<{ sucursal: string; cerradas: number; abiertas: number; otras: number; total: number }>;
 }

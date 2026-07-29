@@ -58,7 +58,7 @@ import {
   importedServiceOrderParticipants,
   matchTechnicianProfile,
 } from "@/lib/technicianMatching";
-import { attributeServiceOrderMetrics } from "@/lib/serviceOrderMetrics";
+import { attributeServiceOrderMetrics, calculateTeamCapacity } from "@/lib/serviceOrderMetrics";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
@@ -300,6 +300,52 @@ function agendaBuckets(start: Date, end: Date, mode: PeriodMode) {
     keys.push(format(cursor, "yyyy"));
   }
   return keys;
+}
+
+function servicePeriodBuckets(start: Date, end: Date, mode: PeriodMode) {
+  const cursors: Date[] = [];
+
+  if (mode === "dia") {
+    for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) cursors.push(cursor);
+  } else if (mode === "semana") {
+    const rangeStart = startOfWeek(start, { weekStartsOn: 1 });
+    const rangeEnd = startOfWeek(end, { weekStartsOn: 1 });
+    for (let cursor = rangeStart; cursor <= rangeEnd; cursor = addWeeks(cursor, 1)) cursors.push(cursor);
+  } else if (mode === "mes") {
+    const rangeStart = startOfMonth(start);
+    const rangeEnd = startOfMonth(end);
+    for (let cursor = rangeStart; cursor <= rangeEnd; cursor = addMonths(cursor, 1)) cursors.push(cursor);
+  } else {
+    const rangeStart = startOfYear(start);
+    const rangeEnd = startOfYear(end);
+    for (let cursor = rangeStart; cursor <= rangeEnd; cursor = addYears(cursor, 1)) cursors.push(cursor);
+  }
+
+  return cursors.map((cursor) => {
+    const rawStart = mode === "dia"
+      ? cursor
+      : mode === "semana"
+        ? startOfWeek(cursor, { weekStartsOn: 1 })
+        : mode === "mes"
+          ? startOfMonth(cursor)
+          : startOfYear(cursor);
+    const rawEnd = mode === "dia"
+      ? cursor
+      : mode === "semana"
+        ? endOfWeek(cursor, { weekStartsOn: 1 })
+        : mode === "mes"
+          ? endOfMonth(cursor)
+          : endOfYear(cursor);
+    const iso = format(cursor, "yyyy-MM-dd");
+    const key = agendaBucketKey(iso, mode);
+
+    return {
+      key,
+      label: agendaBucketLabel(key, mode),
+      dateFrom: format(rawStart < start ? start : rawStart, "yyyy-MM-dd"),
+      dateTo: format(rawEnd > end ? end : rawEnd, "yyyy-MM-dd"),
+    };
+  });
 }
 
 function parseQuantity(value: unknown) {
@@ -1065,6 +1111,17 @@ export default function Dashboard() {
       horasDesdeOS: number;
       km: number;
       valorOS: number;
+      periodos: Map<string, {
+        key: string;
+        label: string;
+        dateFrom: string;
+        dateTo: string;
+        totalOS: number;
+        cerradas: number;
+        abiertas: number;
+        otras: number;
+        horas: number;
+      }>;
     }>();
     const estadosMap = new Map<string, number>();
     const mixTiempoMap = new Map<string, number>();
@@ -1080,6 +1137,17 @@ export default function Dashboard() {
       horasPersona: number;
     }>();
     const sucursalMap = new Map<string, { sucursal: string; cerradas: number; abiertas: number; otras: number; total: number }>();
+
+    servicePeriodBuckets(periodStart, periodEnd, periodMode).forEach((bucket) => {
+      evolucionMap.set(bucket.key, {
+        ...bucket,
+        cerradas: 0,
+        abiertas: 0,
+        otras: 0,
+        horasOS: 0,
+        horasPersona: 0,
+      });
+    });
 
     for (const profile of technicianOptions) {
       const profileSucursal = profileById.get(profile.id)?.sucursal ?? null;
@@ -1097,6 +1165,7 @@ export default function Dashboard() {
         horasDesdeOS: 0,
         km: 0,
         valorOS: 0,
+        periodos: new Map(),
       });
     }
 
@@ -1271,6 +1340,7 @@ export default function Dashboard() {
           horasDesdeOS: 0,
           km: 0,
           valorOS: 0,
+          periodos: new Map(),
         };
         tecnicoRow.totalOS += 1;
         if (estadoGrupo === "cerrada") tecnicoRow.cerradas += 1;
@@ -1281,6 +1351,21 @@ export default function Dashboard() {
         tecnicoRow.valorOS += metrics.value;
         if (metrics.source === "individual") tecnicoRow.horasDesdeDetalle += metrics.hours;
         else tecnicoRow.horasDesdeOS += metrics.hours;
+
+        const tecnicoPeriodo = tecnicoRow.periodos.get(bucket.key) ?? {
+          ...bucket,
+          totalOS: 0,
+          cerradas: 0,
+          abiertas: 0,
+          otras: 0,
+          horas: 0,
+        };
+        tecnicoPeriodo.totalOS += 1;
+        if (estadoGrupo === "cerrada") tecnicoPeriodo.cerradas += 1;
+        else if (estadoGrupo === "abierta") tecnicoPeriodo.abiertas += 1;
+        else tecnicoPeriodo.otras += 1;
+        tecnicoPeriodo.horas += metrics.hours;
+        tecnicoRow.periodos.set(bucket.key, tecnicoPeriodo);
         tecnicoMap.set(participant.tecnico, tecnicoRow);
       });
 
@@ -1308,7 +1393,73 @@ export default function Dashboard() {
     const cerradas = ordenes.filter((row) => row.estadoOS === "Cerrada").length;
     const otras = ordenes.filter((row) => row.estadoOS === "Cancelada" || row.estadoOS === "Anulada").length;
     const metaHorasPeriodo = productivityGoalForRange(periodStart, periodEnd, metaHorasMensual);
-    const tecnicos = Array.from(tecnicoMap.values()).sort(
+    const evolucionBase = Array.from(evolucionMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+    const tecnicosBase = Array.from(tecnicoMap.values());
+    const capacidadRestringidaAParticipantes =
+      fMarcas.length > 0 ||
+      fResponsablesOS.length > 0 ||
+      fEstadosOS.length > 0 ||
+      fTiposTiempo.length > 0 ||
+      fOSRubros.length > 0 ||
+      Boolean(query.trim());
+    const tecnicosCapacidad = tecnicosBase.filter((row) =>
+      capacidadRestringidaAParticipantes ? row.totalOS > 0 : row.activo || row.totalOS > 0,
+    );
+    const capacidadCalculada = calculateTeamCapacity(
+      tecnicosBase.reduce((sum, row) => sum + row.horas, 0),
+      metaHorasPeriodo,
+      tecnicosCapacidad.length,
+    );
+    const capacidad = {
+      ...capacidadCalculada,
+      base: capacidadRestringidaAParticipantes
+        ? ("participantes_filtrados" as const)
+        : ("equipo_activo" as const),
+    };
+    const evolucion = evolucionBase.map((row) => {
+      const tecnicosPeriodo = tecnicosBase.filter(
+        (tecnicoRow) =>
+          capacidadRestringidaAParticipantes
+            ? (tecnicoRow.periodos.get(row.key)?.totalOS ?? 0) > 0
+            : tecnicoRow.activo || (tecnicoRow.periodos.get(row.key)?.totalOS ?? 0) > 0,
+      ).length;
+      const capacidadPeriodo = calculateTeamCapacity(
+        row.horasPersona,
+        productivityGoalForRange(parseISO(row.dateFrom), parseISO(row.dateTo), metaHorasMensual),
+        tecnicosPeriodo,
+      );
+      return {
+        ...row,
+        tecnicosBase: capacidadPeriodo.technicians,
+        horasDisponibles: capacidadPeriodo.hoursAvailable,
+        utilizacion: capacidadPeriodo.percentage,
+      };
+    });
+    const tecnicos = tecnicosBase.map(({ periodos, ...row }) => ({
+      ...row,
+      evolucion: evolucionBase.map((periodo) => {
+        const tecnicoPeriodo = periodos.get(periodo.key);
+        const metaHoras = productivityGoalForRange(
+          parseISO(periodo.dateFrom),
+          parseISO(periodo.dateTo),
+          metaHorasMensual,
+        );
+        const horas = tecnicoPeriodo?.horas ?? 0;
+        return {
+          key: periodo.key,
+          label: periodo.label,
+          dateFrom: periodo.dateFrom,
+          dateTo: periodo.dateTo,
+          totalOS: tecnicoPeriodo?.totalOS ?? 0,
+          cerradas: tecnicoPeriodo?.cerradas ?? 0,
+          abiertas: tecnicoPeriodo?.abiertas ?? 0,
+          otras: tecnicoPeriodo?.otras ?? 0,
+          horas,
+          metaHoras,
+          productividad: metaHoras > 0 ? (horas / metaHoras) * 100 : 0,
+        };
+      }),
+    })).sort(
       (a, b) => b.horas - a.horas || b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico),
     );
 
@@ -1326,11 +1477,17 @@ export default function Dashboard() {
       valorOS: ordenes.reduce((sum, row) => sum + row.valorOS, 0),
       metaHorasMensual,
       metaHorasPeriodo,
+      capacidad: {
+        tecnicosBase: capacidad.technicians,
+        horasDisponibles: capacidad.hoursAvailable,
+        horasUtilizadas: capacidad.hoursUsed,
+        porcentaje: capacidad.percentage,
+      },
       tecnicos,
       ordenes,
       estados: Array.from(estadosMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
       mixTiempo: Array.from(mixTiempoMap, ([label, rowTotal]) => ({ label, total: rowTotal })).sort((a, b) => b.total - a.total),
-      evolucion: Array.from(evolucionMap.values()).sort((a, b) => a.key.localeCompare(b.key)),
+      evolucion,
       sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
   }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, trabajoById]);
