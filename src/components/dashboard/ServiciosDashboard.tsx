@@ -56,7 +56,7 @@ export function ServiciosDashboard({
   selectedTiposTiempo: string[];
   selectedSucursales: string[];
   onSelectTecnico: (tecnico: string) => void;
-  onSelectPeriodo: (periodo: ServiciosDashboardData["evolucion"][number]) => void;
+  onSelectPeriodo: (periodo: Pick<ServiciosDashboardData["evolucion"][number], "key" | "label" | "dateFrom" | "dateTo">) => void;
   onSelectEstado: (estado: "cerrada" | "abierta" | "otra") => void;
   onSelectTipoTiempo: (tipo: string) => void;
   onSelectSucursal: (sucursal: string) => void;
