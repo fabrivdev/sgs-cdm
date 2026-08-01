@@ -1402,6 +1402,9 @@ export default function Dashboard() {
 
     const cerradas = ordenes.filter((row) => row.estadoOS === "Cerrada").length;
     const otras = ordenes.filter((row) => row.estadoOS === "Cancelada" || row.estadoOS === "Anulada").length;
+    const horasCerradas = ordenes
+      .filter((row) => row.estadoOS === "Cerrada")
+      .reduce((sum, row) => sum + row.horas, 0);
     const metaHorasPeriodo = productivityGoalForRange(periodStart, periodEnd, metaHorasMensual);
     const evolucionBase = Array.from(evolucionMap.values()).sort((a, b) => a.key.localeCompare(b.key));
     const tecnicosBase = Array.from(tecnicoMap.values());
@@ -1480,6 +1483,7 @@ export default function Dashboard() {
       otras,
       sinResponsable: ordenes.filter((row) => row.tecnico === "Sin técnico asignado").length,
       horas: ordenes.reduce((sum, row) => sum + row.horas, 0),
+      horasCerradas,
       horasPersona: tecnicos.reduce((sum, row) => sum + row.horas, 0),
       horasPersonaDesdeDetalle: tecnicos.reduce((sum, row) => sum + row.horasDesdeDetalle, 0),
       horasPersonaDesdeOS: tecnicos.reduce((sum, row) => sum + row.horasDesdeOS, 0),

@@ -128,6 +128,8 @@ export interface ServiciosDashboardData {
   sinResponsable: number;
   /** Duración total de las OS, contada una sola vez por orden. */
   horas: number;
+  /** Duración de las OS cerradas, contada una sola vez por orden. */
+  horasCerradas: number;
   /** Horas atribuidas a participantes; una OS de 10 h con dos técnicos suma 20 h-persona. */
   horasPersona: number;
   /** Parte de las horas-persona tomada de detalle individual de TOTVS. */

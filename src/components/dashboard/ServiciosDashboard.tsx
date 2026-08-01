@@ -1,5 +1,18 @@
 import { useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Clock3, Users, Wrench } from "lucide-react";
+import {
+  BarChart3,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ClipboardCheck,
+  Gauge,
+  MapPin,
+  Timer,
+  UserRound,
+  Wrench,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ServiciosDashboardData } from "./types";
@@ -8,11 +21,11 @@ const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const usd = new Intl.NumberFormat("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-function stateColor(state: "cerradas" | "abiertas" | "otras") {
-  if (state === "cerradas") return "#8eaa38";
-  if (state === "abiertas") return "#2f7dcc";
-  return "#ef8b18";
-}
+const STATE_COLORS = {
+  cerradas: "#8eaa38",
+  abiertas: "#2f7dcc",
+  otras: "#ef8b18",
+} as const;
 
 function timeLabel(label: string) {
   const normalized = label.toLowerCase();
@@ -32,7 +45,7 @@ function timeColor(label: string) {
 function statusTone(status: string) {
   const normalized = status.toLowerCase();
   if (normalized.includes("cerrad")) return "border-primary/30 bg-primary/10 text-primary";
-  if (normalized.includes("anulad") || normalized.includes("cancel")) return "border-muted bg-muted text-muted-foreground";
+  if (normalized.includes("anulad") || normalized.includes("cancel")) return "border-orange-200 bg-orange-50 text-orange-700";
   return "border-blue-200 bg-blue-50 text-blue-700";
 }
 
@@ -62,69 +75,77 @@ export function ServiciosDashboard({
   onSelectSucursal: (sucursal: string) => void;
 }) {
   const [showAllTechnicians, setShowAllTechnicians] = useState(false);
-  const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "osHours" | "personHours" | "capacity">("orders");
-  const [selectedTrendTechnician, setSelectedTrendTechnician] = useState("");
+  const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "hours">("orders");
+  const [orderPage, setOrderPage] = useState(0);
 
   if (loading) {
-    return <div className="rounded-md border px-3 py-12 text-center text-xs text-muted-foreground">Cargando servicios...</div>;
+    return (
+      <div className="grid gap-3">
+        <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-28 animate-pulse rounded-md border bg-muted/40" />
+          ))}
+        </div>
+        <div className="h-72 animate-pulse rounded-md border bg-muted/30" />
+      </div>
+    );
   }
 
   const closeRate = data.totalOS > 0 ? Math.round((data.cerradas / data.totalOS) * 100) : 0;
   const openRate = data.totalOS > 0 ? Math.round((data.abiertas / data.totalOS) * 100) : 0;
   const otherRate = Math.max(100 - closeRate - openRate, 0);
-  const attention = data.sinResponsable + data.otras;
+  const capacityPercent = Math.round(data.capacidad.porcentaje);
+  const hoursCloseRate = data.horas > 0 ? Math.round((data.horasCerradas / data.horas) * 100) : 0;
   const evolutionMax = Math.max(
-    ...data.evolucion.map((row) => {
-      if (evolutionMetric === "osHours") return row.horasOS;
-      if (evolutionMetric === "personHours") return row.horasPersona;
-      if (evolutionMetric === "capacity") return row.utilizacion;
-      return row.cerradas + row.abiertas + row.otras;
-    }),
-    evolutionMetric === "capacity" ? 100 : 1,
+    ...data.evolucion.map((row) => evolutionMetric === "hours" ? row.horasOS : row.cerradas + row.abiertas + row.otras),
+    1,
   );
   const branchMax = Math.max(...data.sucursales.map((row) => row.total), 1);
   const timeTotal = data.mixTiempo.reduce((sum, row) => sum + row.total, 0);
-  const allTecnicos = data.tecnicos;
-  const visibleTecnicos = showAllTechnicians ? allTecnicos : allTecnicos.slice(0, 8);
-  const trendTechnician = allTecnicos.find((row) => row.tecnico === selectedTrendTechnician) ?? allTecnicos[0] ?? null;
-  const trendMax = Math.max(
-    ...(trendTechnician?.evolucion.map((row) => Math.max(row.horas, row.metaHoras)) ?? []),
-    1,
-  );
-  const capacityPercent = Math.round(data.capacidad.porcentaje);
+  const visibleTecnicos = showAllTechnicians ? data.tecnicos : data.tecnicos.slice(0, 5);
+  const pageSize = 5;
+  const pageCount = Math.max(1, Math.ceil(data.ordenes.length / pageSize));
+  const safePage = Math.min(orderPage, pageCount - 1);
+  const visibleOrders = data.ordenes.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const pageStart = data.ordenes.length === 0 ? 0 : safePage * pageSize + 1;
+  const pageEnd = Math.min((safePage + 1) * pageSize, data.ordenes.length);
 
   const kpis = [
     {
       label: "Órdenes del período",
       value: integer.format(data.totalOS),
       detail: `${data.cerradas} cerradas · ${data.abiertas} abiertas · ${data.otras} anuladas`,
-      icon: ClipboardList,
-      border: "border-t-primary",
+      icon: ClipboardCheck,
       tone: "text-primary",
+      iconBg: "bg-primary/10",
+      border: "border-t-primary",
     },
     {
       label: "Cierre operativo",
       value: `${closeRate}%`,
       detail: `${data.cerradas} de ${data.totalOS} OS cerradas`,
       icon: CheckCircle2,
+      tone: "text-emerald-700",
+      iconBg: "bg-emerald-50",
       border: "border-t-emerald-500",
-      tone: "text-emerald-600",
     },
     {
-      label: "Horas OS",
-      value: `${decimal.format(data.horas)} hs`,
-      detail: `${decimal.format(data.horasPersona)} hs-persona · meta individual ${decimal.format(data.metaHorasPeriodo)} hs`,
-      icon: Clock3,
+      label: "Productividad",
+      value: `${capacityPercent}%`,
+      detail: `${decimal.format(data.capacidad.horasUtilizadas)} de ${decimal.format(data.capacidad.horasDisponibles)} hs disponibles`,
+      icon: BarChart3,
+      tone: "text-blue-700",
+      iconBg: "bg-blue-50",
       border: "border-t-blue-500",
-      tone: "text-blue-600",
     },
     {
-      label: "Requieren atención",
-      value: integer.format(attention),
-      detail: `${data.sinResponsable} sin responsable · ${data.otras} anuladas`,
-      icon: AlertTriangle,
+      label: "Cierre por horas",
+      value: `${hoursCloseRate}%`,
+      detail: `${decimal.format(data.horasCerradas)} de ${decimal.format(data.horas)} hs en OS cerradas`,
+      icon: Gauge,
+      tone: "text-orange-700",
+      iconBg: "bg-orange-50",
       border: "border-t-orange-500",
-      tone: "text-orange-600",
     },
   ];
 
@@ -134,238 +155,126 @@ export function ServiciosDashboard({
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className={cn("relative min-h-[108px] rounded-md border border-t-2 bg-card p-3.5", kpi.border)}>
-              <div className={cn("absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-muted/70", kpi.tone)}>
+            <section key={kpi.label} className={cn("relative min-h-[110px] rounded-md border border-t-2 bg-card p-3.5", kpi.border)}>
+              <span className={cn("absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-md", kpi.iconBg, kpi.tone)}>
                 <Icon className="h-4 w-4" />
-              </div>
-              <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
-              <div className="mt-2 text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{kpi.value}</div>
-              <div className="mt-2 truncate text-[11px] text-muted-foreground" title={kpi.detail}>{kpi.detail}</div>
-            </div>
+              </span>
+              <div className="pr-11 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
+              <div className="mt-2 text-[25px] font-extrabold leading-none tabular-nums">{kpi.value}</div>
+              <div className="mt-2 line-clamp-2 text-[10px] text-muted-foreground" title={kpi.detail}>{kpi.detail}</div>
+            </section>
           );
         })}
       </div>
 
-      <section className="rounded-md border bg-card px-3.5 py-3">
-        <div className="grid gap-3 md:grid-cols-[minmax(210px,0.8fr)_minmax(260px,1.4fr)_auto] md:items-center">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Activity className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold">Capacidad estimada</h2>
-              <p className="text-[11px] text-muted-foreground">Horas-persona utilizadas sobre la meta del período</p>
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="mb-1.5 flex items-baseline justify-between gap-3 text-xs">
-              <span>
-                <strong className="text-base tabular-nums">{decimal.format(data.capacidad.horasUtilizadas)} hs</strong>
-                <span className="text-muted-foreground"> de {decimal.format(data.capacidad.horasDisponibles)} hs</span>
-              </span>
-              <strong className="tabular-nums text-primary">{capacityPercent}%</strong>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  capacityPercent >= 100 ? "bg-emerald-500" : capacityPercent >= 75 ? "bg-primary" : "bg-amber-500",
-                )}
-                style={{ width: `${Math.min(Math.max(capacityPercent, 0), 100)}%` }}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 border-t pt-2 text-xs md:border-l md:border-t-0 md:pl-4 md:pt-0">
-            <Users className="h-4 w-4 text-primary" />
-            <span><strong className="tabular-nums">{data.capacidad.tecnicosBase}</strong> técnicos considerados</span>
-          </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
-          <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-            Detalle individual TOTVS: {decimal.format(data.horasPersonaDesdeDetalle)} hs
-          </span>
-          <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">
-            Atribución completa por OS: {decimal.format(data.horasPersonaDesdeOS)} hs
-          </span>
-        </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">
-          {data.capacidad.base === "participantes_filtrados"
-            ? "Base: participantes con actividad dentro de los filtros actuales."
-            : "Base: técnicos activos actuales más participantes históricos del período."} Cada participante recibe las horas completas de la OS; si TOTVS informa horas individuales, ese detalle prevalece.
-        </p>
-      </section>
-
-      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
         <section className="min-w-0 overflow-hidden rounded-md border bg-card p-3.5">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Evolución de órdenes</h2>
-              <p className="text-xs text-muted-foreground">
-                {evolutionMetric === "orders"
-                  ? "Aperturas y cierres por período"
-                  : evolutionMetric === "osHours"
-                    ? "Duración de las OS, sin duplicar participantes"
-                    : evolutionMetric === "personHours"
-                      ? "Horas atribuidas a cada participante"
-                      : "Horas-persona utilizadas sobre capacidad estimada"}
+              <p className="text-[11px] text-muted-foreground">
+                {evolutionMetric === "orders" ? "Órdenes por estado y período" : "Horas registradas por período"}
               </p>
             </div>
-            <div className="inline-flex h-8 overflow-hidden rounded-md border bg-muted/40 text-[10px] font-medium">
-              {([
-                ["orders", "OS"],
-                ["osHours", "Horas OS"],
-                ["personHours", "Hs-persona"],
-                ["capacity", "% capacidad"],
-              ] as const).map(([metric, label]) => (
-                <button
-                  type="button"
-                  key={metric}
-                  onClick={() => setEvolutionMetric(metric)}
-                  className={cn(
-                    "border-r px-2.5 last:border-r-0 hover:bg-accent",
-                    evolutionMetric === metric && "bg-primary text-primary-foreground hover:bg-primary",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="inline-flex h-8 shrink-0 overflow-hidden rounded-md border bg-muted/30 text-[10px] font-semibold">
+              <button type="button" onClick={() => setEvolutionMetric("orders")} className={cn("px-4 hover:bg-accent", evolutionMetric === "orders" && "bg-primary text-primary-foreground hover:bg-primary")}>OS</button>
+              <button type="button" onClick={() => setEvolutionMetric("hours")} className={cn("border-l px-4 hover:bg-accent", evolutionMetric === "hours" && "bg-primary text-primary-foreground hover:bg-primary")}>Horas</button>
             </div>
           </div>
+
           {data.evolucion.length === 0 ? (
-            <div className="flex h-52 items-center justify-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>
+            <div className="flex h-56 items-center justify-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>
           ) : (
-            <div className="mt-4 w-full max-w-full overflow-x-auto overflow-y-hidden pb-1">
+            <div className="mt-3 max-w-full overflow-x-auto overflow-y-hidden pb-1">
               <div
-                className="grid h-52 shrink-0 items-end gap-3 border-b px-2"
+                className="grid h-[220px] shrink-0 items-end gap-2 border-b px-2"
                 style={{
-                  gridTemplateColumns: `repeat(${Math.max(data.evolucion.length, 1)}, minmax(0, 1fr))`,
+                  gridTemplateColumns: `repeat(${Math.max(data.evolucion.length, 1)}, minmax(42px, 1fr))`,
                   width: data.evolucion.length > 12 ? `${data.evolucion.length * 58}px` : "100%",
-                  minWidth:
-                    data.evolucion.length > 12
-                      ? `${data.evolucion.length * 58}px`
-                      : data.evolucion.length > 8
-                        ? "520px"
-                        : "100%",
+                  minWidth: data.evolucion.length > 8 ? "560px" : "100%",
                 }}
               >
-                {data.evolucion.map((row) => (
-                  <div key={row.key} className="flex h-full flex-col justify-end">
-                    <div className="flex flex-1 items-end justify-center gap-1">
-                      {evolutionMetric === "orders" ? (
-                        (["cerradas", "abiertas", "otras"] as const).map((state) => {
-                          const value = row[state];
-                          const filterState = state === "cerradas" ? "cerrada" : state === "abiertas" ? "abierta" : "otra";
-                          return (
-                            <button
-                              type="button"
-                              key={state}
-                              disabled={value === 0}
-                              onClick={() => {
-                                onSelectPeriodo(row);
-                                onSelectEstado(filterState);
-                              }}
-                              className="group relative flex h-full flex-1 items-end justify-center disabled:pointer-events-none"
-                              aria-label={`${row.label}: ${value} ${state}`}
-                            >
-                              <span
-                                className={cn("w-full max-w-7 rounded-t-sm transition-opacity hover:opacity-80", selectedEstados.includes(filterState) && "ring-2 ring-foreground/20")}
-                                style={{ height: `${Math.max((value / evolutionMax) * 100, value > 0 ? 4 : 0)}%`, backgroundColor: stateColor(state) }}
-                                title={`${value} ${state}`}
-                              />
-                            </button>
-                          );
-                        })
-                      ) : (() => {
-                        const value = evolutionMetric === "osHours"
-                          ? row.horasOS
-                          : evolutionMetric === "personHours"
-                            ? row.horasPersona
-                            : row.utilizacion;
-                        const unit = evolutionMetric === "capacity" ? "%" : " hs";
-                        const barTone = evolutionMetric === "osHours"
-                          ? "bg-primary"
-                          : evolutionMetric === "personHours"
-                            ? "bg-blue-500"
-                            : row.utilizacion >= 100
-                              ? "bg-emerald-500"
-                              : row.utilizacion >= 75
-                                ? "bg-primary"
-                                : "bg-amber-500";
-
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => onSelectPeriodo(row)}
-                            className="relative flex h-full w-full items-end justify-center"
-                            aria-label={`${row.label}: ${decimal.format(value)}${unit}`}
-                          >
-                            <span
-                              className={cn(
-                                "relative w-full max-w-12 rounded-t-sm transition-opacity hover:opacity-80",
-                                barTone,
-                              )}
-                              style={{
-                                height: `${Math.max(
-                                  (value / evolutionMax) * 100,
-                                  value > 0 ? 4 : 0,
-                                )}%`,
-                              }}
-                              title={`${decimal.format(value)}${unit}`}
-                            >
-                              {value > 0 && (
-                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold tabular-nums text-foreground">
-                                  {decimal.format(value)}{evolutionMetric === "capacity" ? "%" : ""}
-                                </span>
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })()}
-                    </div>
-                    <button type="button" onClick={() => onSelectPeriodo(row)} className="h-7 truncate pt-1 text-center text-[10px] text-muted-foreground hover:text-foreground" title={`Filtrar ${row.label}`}>{row.label}</button>
-                  </div>
-                ))}
+                {data.evolucion.map((row) => {
+                  const total = row.cerradas + row.abiertas + row.otras;
+                  const value = evolutionMetric === "hours" ? row.horasOS : total;
+                  const height = value > 0 ? Math.max((value / evolutionMax) * 100, 4) : 0;
+                  return (
+                    <button
+                      type="button"
+                      key={row.key}
+                      onClick={() => onSelectPeriodo(row)}
+                      className="group flex h-full min-w-0 flex-col justify-end"
+                      title={`Filtrar ${row.label}`}
+                    >
+                      <div className="relative flex min-h-0 flex-1 items-end justify-center">
+                        {value > 0 && (
+                          <span className="absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold tabular-nums" style={{ bottom: `calc(${height}% + 4px)` }}>
+                            {evolutionMetric === "hours" ? `${decimal.format(value)} hs` : integer.format(value)}
+                          </span>
+                        )}
+                        {evolutionMetric === "orders" ? (
+                          <span className="flex w-full max-w-9 flex-col-reverse overflow-hidden rounded-t-sm transition-opacity group-hover:opacity-80" style={{ height: `${height}%` }}>
+                            <span className="bg-primary" style={{ height: `${total > 0 ? (row.cerradas / total) * 100 : 0}%` }} />
+                            <span className="bg-blue-500" style={{ height: `${total > 0 ? (row.abiertas / total) * 100 : 0}%` }} />
+                            <span className="bg-orange-500" style={{ height: `${total > 0 ? (row.otras / total) * 100 : 0}%` }} />
+                          </span>
+                        ) : (
+                          <span className="w-full max-w-9 rounded-t-sm bg-primary transition-opacity group-hover:opacity-80" style={{ height: `${height}%` }} />
+                        )}
+                      </div>
+                      <span className="h-7 truncate pt-1 text-center text-[9px] text-muted-foreground">{row.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
+
           <div className="mt-3 flex flex-wrap justify-center gap-5 text-[10px] text-muted-foreground">
             {evolutionMetric === "orders" ? (
               <>
-                <Legend color="#8eaa38" label="Cerradas" />
-                <Legend color="#2f7dcc" label="Abiertas" />
-                <Legend color="#ef8b18" label="Anuladas" />
+                <Legend color={STATE_COLORS.cerradas} label="Cerradas" />
+                <Legend color={STATE_COLORS.abiertas} label="Abiertas" />
+                <Legend color={STATE_COLORS.otras} label="Anuladas" />
               </>
-            ) : evolutionMetric === "osHours" ? (
-              <Legend color="#8eaa38" label="Horas OS" />
-            ) : evolutionMetric === "personHours" ? (
-              <Legend color="#2f7dcc" label="Horas-persona" />
             ) : (
-              <Legend color="#8eaa38" label="Uso de capacidad" />
+              <Legend color={STATE_COLORS.cerradas} label="Horas registradas" />
             )}
           </div>
         </section>
 
         <section className="min-w-0 rounded-md border bg-card p-3.5">
-          <h2 className="text-sm font-semibold">Composición operativa</h2>
-          <div className="mt-3 grid grid-cols-[130px_1fr] items-center gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Estado actual de OS</h2>
+              <p className="text-[11px] text-muted-foreground">Composición del período filtrado</p>
+            </div>
+            <Wrench className="h-4 w-4 text-primary" />
+          </div>
+
+          <div className="mt-3 grid grid-cols-[118px_1fr] items-center gap-4">
             <div
               className="relative mx-auto h-28 w-28 rounded-full"
-              style={{ background: `conic-gradient(#8eaa38 0 ${closeRate}%, #2f7dcc ${closeRate}% ${closeRate + openRate}%, #ef8b18 ${closeRate + openRate}% 100%)` }}
+              style={{ background: `conic-gradient(${STATE_COLORS.cerradas} 0 ${closeRate}%, ${STATE_COLORS.abiertas} ${closeRate}% ${closeRate + openRate}%, ${STATE_COLORS.otras} ${closeRate + openRate}% 100%)` }}
             >
               <div className="absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-card">
-                <strong className="text-xl tabular-nums">{data.totalOS}</strong>
+                <strong className="text-xl tabular-nums">{integer.format(data.totalOS)}</strong>
                 <span className="text-[9px] uppercase text-muted-foreground">OS</span>
               </div>
             </div>
             <div className="divide-y text-xs">
-              <CompositionRow color="#8eaa38" label="Cerradas" value={data.cerradas} percent={closeRate} selected={selectedEstados.includes("cerrada")} onClick={() => onSelectEstado("cerrada")} />
-              <CompositionRow color="#2f7dcc" label="Abiertas" value={data.abiertas} percent={openRate} selected={selectedEstados.includes("abierta")} onClick={() => onSelectEstado("abierta")} />
-              <CompositionRow color="#ef8b18" label="Anuladas" value={data.otras} percent={otherRate} selected={selectedEstados.includes("otra")} onClick={() => onSelectEstado("otra")} />
+              <CompositionRow color={STATE_COLORS.cerradas} label="Cerradas" value={data.cerradas} percent={closeRate} selected={selectedEstados.includes("cerrada")} onClick={() => onSelectEstado("cerrada")} />
+              <CompositionRow color={STATE_COLORS.abiertas} label="Abiertas" value={data.abiertas} percent={openRate} selected={selectedEstados.includes("abierta")} onClick={() => onSelectEstado("abierta")} />
+              <CompositionRow color={STATE_COLORS.otras} label="Anuladas" value={data.otras} percent={otherRate} selected={selectedEstados.includes("otra")} onClick={() => onSelectEstado("otra")} />
             </div>
           </div>
+
           <div className="mt-4 border-t pt-3">
-            <h3 className="text-xs font-semibold">Tipo de tiempo</h3>
-            <div className="mt-2 flex h-4 overflow-hidden rounded-sm bg-muted">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xs font-semibold">Tipo de tiempo</h3>
+              <span className="text-[10px] text-muted-foreground">{integer.format(timeTotal)} OS clasificadas</span>
+            </div>
+            <div className="mt-2 flex h-3 overflow-hidden rounded-sm bg-muted">
               {data.mixTiempo.map((row) => (
                 <button
                   type="button"
@@ -379,8 +288,9 @@ export function ServiciosDashboard({
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
               {data.mixTiempo.map((row) => (
-                <button type="button" key={row.label} onClick={() => onSelectTipoTiempo(row.label)} className={cn("rounded px-1 hover:bg-accent", selectedTiposTiempo.some((tipo) => timeLabel(tipo) === timeLabel(row.label)) && "bg-accent font-semibold text-foreground")}>
-                  <Legend color={timeColor(row.label)} label={`${timeLabel(row.label)} ${timeTotal > 0 ? Math.round((row.total / timeTotal) * 100) : 0}%`} />
+                <button type="button" key={row.label} onClick={() => onSelectTipoTiempo(row.label)} className="inline-flex items-center gap-1.5 hover:text-foreground">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: timeColor(row.label) }} />
+                  {timeLabel(row.label)} {timeTotal > 0 ? Math.round((row.total / timeTotal) * 100) : 0}%
                 </button>
               ))}
             </div>
@@ -388,131 +298,78 @@ export function ServiciosDashboard({
         </section>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-[1.08fr_0.92fr]">
-        <section className="rounded-md border bg-card p-3.5">
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
+        <section className="min-w-0 rounded-md border bg-card p-3.5">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Carga por responsable</h2>
-              <p className="text-xs text-muted-foreground">Productividad por horas-persona sobre una meta de {decimal.format(data.metaHorasMensual)} hs mensuales</p>
+              <p className="text-[11px] text-muted-foreground">Horas-persona sobre la meta del período</p>
             </div>
-            <div className="flex items-center gap-2">
-              {allTecnicos.length > 8 && (
+            <UserRound className="h-4 w-4 text-primary" />
+          </div>
+
+          <div className="space-y-2 md:hidden">
+            {visibleTecnicos.map((row, index) => {
+              const productivity = data.metaHorasPeriodo > 0 ? (row.horas / data.metaHorasPeriodo) * 100 : 0;
+              return (
                 <button
                   type="button"
-                  onClick={() => setShowAllTechnicians((current) => !current)}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border bg-background px-2.5 text-xs font-medium hover:bg-accent"
+                  key={row.tecnico}
+                  onClick={() => onSelectTecnico(row.tecnico)}
+                  className={cn(
+                    "w-full rounded-md border p-3 text-left text-xs hover:bg-accent",
+                    !row.activo && "bg-muted/60 text-muted-foreground",
+                    selectedTecnicos.includes(row.tecnico) && "bg-primary/5 ring-1 ring-primary/20",
+                  )}
                 >
-                  {showAllTechnicians ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                  {showAllTechnicians ? "Ver menos" : `Ver todos (${allTecnicos.length})`}
-                </button>
-              )}
-              <Users className="h-4 w-4 text-primary" />
-            </div>
-          </div>
-          {trendTechnician && (
-            <div className="mb-3 rounded-md border bg-muted/20 p-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Evolución individual</div>
-                  <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
-                    <strong>{decimal.format(trendTechnician.horas)} hs-persona</strong>
-                    <span className="text-muted-foreground">{trendTechnician.totalOS} OS en el período</span>
-                    <span className="font-semibold text-primary">
-                      {data.metaHorasPeriodo > 0 ? Math.round((trendTechnician.horas / data.metaHorasPeriodo) * 100) : 0}% de meta
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="text-muted-foreground">{index + 1}</span>
+                      <span className="truncate font-semibold" title={row.tecnico}>{row.tecnico}</span>
                     </span>
-                  </div>
-                </div>
-                <label className="flex items-center gap-2 text-xs">
-                  <span className="sr-only">Técnico para evolución</span>
-                  <select
-                    value={trendTechnician.tecnico}
-                    onChange={(event) => setSelectedTrendTechnician(event.target.value)}
-                    className="h-8 max-w-full rounded-md border bg-background px-2 text-xs font-medium outline-none focus:ring-2 focus:ring-primary/30 sm:w-[260px]"
-                  >
-                    {allTecnicos.map((row) => (
-                      <option key={row.tecnico} value={row.tecnico}>
-                        {row.tecnico}{row.activo ? "" : " · Inactivo"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    {!row.activo && <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px]">Inactivo</Badge>}
+                  </span>
+                  <span className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+                    <span><strong className="block text-sm text-foreground">{row.totalOS}</strong>OS</span>
+                    <span><strong className="block text-sm text-foreground">{decimal.format(row.horas)}</strong>Horas</span>
+                    <span><strong className="block text-sm text-foreground">{Math.round(productivity)}%</strong>Productividad</span>
+                  </span>
+                  <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted">
+                    <span className={cn("block h-full rounded-full", productivity >= 100 ? "bg-emerald-500" : productivity >= 75 ? "bg-primary" : "bg-amber-500")} style={{ width: `${Math.min(productivity, 100)}%` }} />
+                  </span>
+                </button>
+              );
+            })}
+            {data.tecnicos.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para los filtros actuales.</div>}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <div className="min-w-[620px]">
+              <div className="grid grid-cols-[30px_minmax(190px,1fr)_52px_82px_minmax(150px,0.8fr)] gap-2 border-b px-2 pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                <span>#</span><span>Responsable</span><span className="text-right">OS</span><span className="text-right">Horas</span><span>Productividad</span>
               </div>
-              <div className="mt-3 overflow-x-auto pb-1">
-                <div
-                  className="grid h-36 items-end gap-2"
-                  style={{
-                    gridTemplateColumns: `repeat(${Math.max(trendTechnician.evolucion.length, 1)}, minmax(48px, 1fr))`,
-                    minWidth: trendTechnician.evolucion.length > 8 ? `${trendTechnician.evolucion.length * 56}px` : "100%",
-                  }}
-                >
-                  {trendTechnician.evolucion.map((row) => {
-                    const usedHeight = Math.max((row.horas / trendMax) * 100, row.horas > 0 ? 3 : 0);
-                    const targetHeight = Math.min((row.metaHoras / trendMax) * 100, 100);
-                    return (
-                      <button
-                        type="button"
-                        key={row.key}
-                        onClick={() => onSelectPeriodo(row)}
-                        className="group flex h-full min-w-0 flex-col justify-end rounded px-0.5 pt-5 hover:bg-accent/60"
-                        title={`${row.label}: ${decimal.format(row.horas)} hs-persona · meta ${decimal.format(row.metaHoras)} hs`}
-                      >
-                        <div className="relative flex min-h-0 flex-1 items-end justify-center">
-                          <span
-                            className="absolute inset-x-1 border-t border-dashed border-orange-500"
-                            style={{ bottom: `${targetHeight}%` }}
-                          />
-                          <span
-                            className="relative w-6 rounded-t bg-primary/80 transition-colors group-hover:bg-primary"
-                            style={{ height: `${usedHeight}%` }}
-                          >
-                            {row.horas > 0 && (
-                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold tabular-nums">
-                                {decimal.format(row.horas)}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <span className="mt-1 truncate text-center text-[9px] text-muted-foreground" title={row.label}>{row.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-1 flex flex-wrap justify-center gap-4 border-t pt-2 text-[10px] text-muted-foreground">
-                <Legend color="#8eaa38" label="Hs-persona" />
-                <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-orange-500" />Meta estimada</span>
-              </div>
-            </div>
-          )}
-          <div className="max-h-[460px] overflow-auto">
-            <div className="min-w-[640px]">
-              <div className="grid grid-cols-[minmax(210px,1fr)_54px_64px_64px_70px_150px] gap-2 border-b px-2 pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                <span>Responsable</span><span className="text-right">OS</span><span className="text-right">Cerradas</span><span className="text-right">Abiertas</span><span className="text-right" title="Cada participante recibe las horas completas de la OS, salvo que TOTVS informe horas individuales.">Hs-persona</span><span>Productividad</span>
-              </div>
-              {visibleTecnicos.map((row) => {
+              {visibleTecnicos.map((row, index) => {
                 const productivity = data.metaHorasPeriodo > 0 ? (row.horas / data.metaHorasPeriodo) * 100 : 0;
-                const selected = selectedTecnicos.includes(row.tecnico);
                 return (
                   <button
                     type="button"
                     key={row.tecnico}
                     onClick={() => onSelectTecnico(row.tecnico)}
                     className={cn(
-                      "grid w-full grid-cols-[minmax(210px,1fr)_54px_64px_64px_70px_150px] items-center gap-2 border-b px-2 py-2 text-left text-xs last:border-b-0 hover:bg-accent",
+                      "grid w-full grid-cols-[30px_minmax(190px,1fr)_52px_82px_minmax(150px,0.8fr)] items-center gap-2 border-b px-2 py-2 text-left text-xs last:border-b-0 hover:bg-accent",
                       !row.activo && "bg-muted/60 text-muted-foreground",
-                      selected && "bg-primary/5",
+                      selectedTecnicos.includes(row.tecnico) && "bg-primary/5 ring-1 ring-inset ring-primary/20",
                     )}
                   >
+                    <span className="text-muted-foreground">{index + 1}</span>
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate font-medium" title={row.tecnico}>{row.tecnico}</span>
-                      {!row.activo && <Badge variant="outline" className="shrink-0 bg-muted px-1.5 py-0 text-[9px] text-muted-foreground">Inactivo</Badge>}
+                      {!row.activo && <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px]">Inactivo</Badge>}
                     </span>
                     <span className="text-right tabular-nums">{row.totalOS}</span>
-                    <span className="text-right tabular-nums">{row.cerradas}</span>
-                    <span className="text-right tabular-nums">{row.abiertas}</span>
-                    <span className="text-right tabular-nums">{decimal.format(row.horas)}</span>
+                    <span className="text-right tabular-nums">{decimal.format(row.horas)} hs</span>
                     <span className="flex items-center gap-2">
-                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                         <span className={cn("block h-full rounded-full", productivity >= 100 ? "bg-emerald-500" : productivity >= 75 ? "bg-primary" : "bg-amber-500")} style={{ width: `${Math.min(productivity, 100)}%` }} />
                       </span>
                       <strong className="w-10 text-right tabular-nums">{Math.round(productivity)}%</strong>
@@ -520,38 +377,51 @@ export function ServiciosDashboard({
                   </button>
                 );
               })}
-              {allTecnicos.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para los filtros actuales.</div>}
+              {data.tecnicos.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para los filtros actuales.</div>}
             </div>
           </div>
+
+          {data.tecnicos.length > 5 && (
+            <button type="button" onClick={() => setShowAllTechnicians((value) => !value)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+              {showAllTechnicians ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {showAllTechnicians ? "Ver los 5 principales" : `Ver todos los responsables (${data.tecnicos.length})`}
+            </button>
+          )}
         </section>
 
-        <section className="flex h-full min-w-0 flex-col rounded-md border bg-card p-3.5">
+        <section className="min-w-0 rounded-md border bg-card p-3.5">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">OS por sucursal</h2>
-              <p className="text-xs text-muted-foreground">Distribución por estado</p>
+              <p className="text-[11px] text-muted-foreground">Distribución por estado</p>
             </div>
-            <Wrench className="h-4 w-4 text-primary" />
+            <MapPin className="h-4 w-4 text-primary" />
           </div>
-          <div className="flex flex-1 flex-col justify-evenly gap-4 py-2">
+          <div className="space-y-3">
             {data.sucursales.slice(0, 7).map((row) => (
-              <button type="button" key={row.sucursal} onClick={() => onSelectSucursal(row.sucursal)} className={cn("grid grid-cols-[90px_1fr_38px] items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-accent", selectedSucursales.includes(row.sucursal) && "bg-primary/5 ring-1 ring-primary/20")}>
+              <button
+                type="button"
+                key={row.sucursal}
+                onClick={() => onSelectSucursal(row.sucursal)}
+                className={cn("grid w-full grid-cols-[92px_1fr_42px] items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-accent", selectedSucursales.includes(row.sucursal) && "bg-primary/5 ring-1 ring-primary/20")}
+              >
                 <span className="truncate font-medium" title={row.sucursal}>{row.sucursal}</span>
-                <div className="h-4 overflow-hidden rounded-sm bg-muted" style={{ width: `${Math.max((row.total / branchMax) * 100, 4)}%` }}>
-                  <div className="flex h-full w-full">
+                <span className="h-3 overflow-hidden rounded-sm bg-muted" style={{ width: `${Math.max((row.total / branchMax) * 100, 4)}%` }}>
+                  <span className="flex h-full w-full">
                     <span className="h-full bg-primary" style={{ width: `${row.total > 0 ? (row.cerradas / row.total) * 100 : 0}%` }} />
                     <span className="h-full bg-blue-500" style={{ width: `${row.total > 0 ? (row.abiertas / row.total) * 100 : 0}%` }} />
                     <span className="h-full bg-orange-500" style={{ width: `${row.total > 0 ? (row.otras / row.total) * 100 : 0}%` }} />
-                  </div>
-                </div>
+                  </span>
+                </span>
                 <strong className="text-right tabular-nums">{row.total}</strong>
               </button>
             ))}
+            {data.sucursales.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin sucursales para los filtros actuales.</div>}
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-4 border-t pt-3 text-[10px] text-muted-foreground">
-            <Legend color="#8eaa38" label="Cerradas" />
-            <Legend color="#2f7dcc" label="Abiertas" />
-            <Legend color="#ef8b18" label="Anuladas" />
+            <Legend color={STATE_COLORS.cerradas} label="Cerradas" />
+            <Legend color={STATE_COLORS.abiertas} label="Abiertas" />
+            <Legend color={STATE_COLORS.otras} label="Anuladas" />
           </div>
         </section>
       </div>
@@ -560,44 +430,78 @@ export function ServiciosDashboard({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">Detalle de órdenes de servicio</h2>
-            <p className="text-xs text-muted-foreground">Casos recientes del período</p>
+            <p className="text-[11px] text-muted-foreground">Casos del período filtrado</p>
           </div>
           <Badge variant="secondary">{data.ordenes.length} OS</Badge>
         </div>
+
         <div className="space-y-2 md:hidden">
-          {data.ordenes.slice(0, 12).map((row) => (
+          {visibleOrders.map((row) => (
             <article key={row.key} className="rounded-md border p-3 text-xs">
-              <div className="flex items-start justify-between gap-2"><strong className="font-mono">{row.os}</strong><Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge></div>
+              <div className="flex items-start justify-between gap-2">
+                <strong className="font-mono">{row.os}</strong>
+                <Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge>
+              </div>
               <div className="mt-1 font-medium">{row.cliente}</div>
               <div className="mt-1 text-muted-foreground">{row.tecnico} · {row.sucursal ?? "Sin sucursal"}</div>
-              <div className="mt-2 flex flex-wrap gap-1.5"><Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge>{row.origen && <Badge variant="outline">Origen: {row.origen}</Badge>}<Badge variant="outline">{decimal.format(row.horas)} hs</Badge><Badge variant="outline">{integer.format(row.km)} km</Badge><Badge variant="secondary">USD {usd.format(row.valorOS)}</Badge></div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge>
+                {row.origen && <Badge variant="outline">Origen: {row.origen}</Badge>}
+                <Badge variant="outline"><Timer className="mr-1 h-3 w-3" />{decimal.format(row.horas)} hs</Badge>
+                <Badge variant="secondary">USD {usd.format(row.valorOS)}</Badge>
+              </div>
             </article>
           ))}
+          {visibleOrders.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>}
         </div>
-        <div className="hidden max-h-[390px] overflow-auto rounded-md border md:block">
-          <table className="w-full min-w-[1000px] text-xs">
-            <thead className="sticky top-0 bg-muted/95 text-left text-[9px] uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-3 py-2">OS</th><th className="px-3 py-2">Cliente</th><th className="px-3 py-2">Responsable</th><th className="px-3 py-2">Sucursal</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Origen</th><th className="px-3 py-2">Apertura</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2 text-right">Hs</th><th className="px-3 py-2 text-right">Km</th><th className="px-3 py-2 text-right">Total OS</th></tr>
+
+        <div className="hidden overflow-x-auto rounded-md border md:block">
+          <table className="w-full min-w-[1040px] text-xs">
+            <thead className="bg-muted/75 text-left text-[9px] uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">OS</th>
+                <th className="px-3 py-2">Cliente</th>
+                <th className="px-3 py-2">Responsable</th>
+                <th className="px-3 py-2">Sucursal</th>
+                <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2">Origen</th>
+                <th className="px-3 py-2">Estado</th>
+                <th className="px-3 py-2">Apertura</th>
+                <th className="px-3 py-2 text-right">Hs</th>
+                <th className="px-3 py-2 text-right">Total OS</th>
+              </tr>
             </thead>
             <tbody>
-              {data.ordenes.map((row) => (
+              {visibleOrders.map((row) => (
                 <tr key={row.key} className="border-t hover:bg-muted/30">
                   <td className="px-3 py-2 font-mono font-semibold">{row.os}</td>
-                  <td className="max-w-[220px] truncate px-3 py-2" title={row.cliente}>{row.cliente}</td>
-                  <td className="max-w-[210px] truncate px-3 py-2" title={row.tecnico}>{row.tecnico}</td>
+                  <td className="max-w-[210px] truncate px-3 py-2" title={row.cliente}>{row.cliente}</td>
+                  <td className="max-w-[190px] truncate px-3 py-2" title={row.tecnico}>{row.tecnico}</td>
                   <td className="px-3 py-2">{row.sucursal ?? "-"}</td>
                   <td className="px-3 py-2"><Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge></td>
-                  <td className="max-w-[150px] truncate px-3 py-2" title={row.origen}>{row.origen || "-"}</td>
-                  <td className="px-3 py-2 tabular-nums">{row.fechaApertura || "-"}</td>
+                  <td className="max-w-[130px] truncate px-3 py-2" title={row.origen}>{row.origen || "-"}</td>
                   <td className="px-3 py-2"><Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge></td>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">{row.fechaApertura || "-"}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{decimal.format(row.horas)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{integer.format(row.km)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">USD {usd.format(row.valorOS)}</td>
                 </tr>
               ))}
-              {data.ordenes.length === 0 && <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
+              {visibleOrders.length === 0 && <tr><td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
+          <span>Mostrando {pageStart} a {pageEnd} de {data.ordenes.length}</span>
+          <div className="flex items-center gap-1">
+            <button type="button" aria-label="Página anterior" disabled={safePage === 0} onClick={() => setOrderPage(Math.max(safePage - 1, 0))} className="flex h-8 w-8 items-center justify-center rounded-md border text-foreground hover:bg-accent disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-16 text-center tabular-nums">{safePage + 1} / {pageCount}</span>
+            <button type="button" aria-label="Página siguiente" disabled={safePage >= pageCount - 1} onClick={() => setOrderPage(Math.min(safePage + 1, pageCount - 1))} className="flex h-8 w-8 items-center justify-center rounded-md border text-foreground hover:bg-accent disabled:opacity-40">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </section>
     </div>
