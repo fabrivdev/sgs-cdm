@@ -769,6 +769,7 @@ export type Database = {
           actualizado_en: string
           auth_user_id: string | null
           creado_en: string
+          desactivado_en: string | null
           id: string
           nombre: string
           sucursal: Database["public"]["Enums"]["sucursal"] | null
@@ -778,6 +779,7 @@ export type Database = {
           actualizado_en?: string
           auth_user_id?: string | null
           creado_en?: string
+          desactivado_en?: string | null
           id: string
           nombre: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
@@ -787,6 +789,7 @@ export type Database = {
           actualizado_en?: string
           auth_user_id?: string | null
           creado_en?: string
+          desactivado_en?: string | null
           id?: string
           nombre?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null

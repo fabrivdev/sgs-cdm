@@ -58,7 +58,7 @@ import {
   importedServiceOrderParticipants,
   matchTechnicianProfile,
 } from "@/lib/technicianMatching";
-import { attributeServiceOrderMetrics, calculateTeamCapacity } from "@/lib/serviceOrderMetrics";
+import { attributeServiceOrderMetrics } from "@/lib/serviceOrderMetrics";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
 import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
@@ -192,6 +192,8 @@ interface Profile {
   nombre: string;
   sucursal: Sucursal | null;
   activo: boolean | null;
+  actualizado_en: string | null;
+  desactivado_en: string | null;
 }
 
 interface UserRole {
@@ -244,6 +246,27 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
   }
 
   return all;
+}
+
+async function cargarProfilesDashboard(): Promise<Profile[]> {
+  try {
+    return await cargarTodo<Profile>(
+      (supabase as any)
+        .from("profiles")
+        .select("id, nombre, sucursal, activo, actualizado_en, desactivado_en"),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/desactivado_en/i.test(message)) throw error;
+
+    const rows = await cargarTodo<Omit<Profile, "desactivado_en">>(
+      supabase.from("profiles").select("id, nombre, sucursal, activo, actualizado_en"),
+    );
+    return rows.map((row) => ({
+      ...row,
+      desactivado_en: row.activo === false ? row.actualizado_en : null,
+    }));
+  }
 }
 
 function dateKey(date: Date) {
@@ -510,6 +533,30 @@ function productivityGoalForRange(start: Date, end: Date, monthlyGoal: number): 
   return Math.max(target, 0);
 }
 
+function technicianGoalForRange(
+  start: Date,
+  end: Date,
+  monthlyGoal: number,
+  profileId: string | null,
+  active: boolean,
+  deactivatedAt: string | null,
+): number {
+  if (!profileId) return 0;
+  if (active) return productivityGoalForRange(start, end, monthlyGoal);
+  if (!deactivatedAt) return 0;
+
+  const parsed = parseISO(deactivatedAt.slice(0, 10));
+  if (Number.isNaN(parsed.getTime())) return 0;
+
+  const lastAvailableDay = addDays(parsed, -1);
+  if (lastAvailableDay < start) return 0;
+  return productivityGoalForRange(
+    start,
+    lastAvailableDay < end ? lastAvailableDay : end,
+    monthlyGoal,
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
@@ -722,7 +769,7 @@ export default function Dashboard() {
               .select("id, codigo, estado_general, legacy_servicio_id, sucursal, marca, cliente_id, descripcion_problema, motivo_bloqueo, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
-          cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal, activo")),
+          cargarProfilesDashboard(),
           cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
         ]);
 
@@ -1112,6 +1159,7 @@ export default function Dashboard() {
       profileId: string | null;
       tecnico: string;
       activo: boolean;
+      desactivadoEn: string | null;
       totalOS: number;
       cerradas: number;
       abiertas: number;
@@ -1166,6 +1214,7 @@ export default function Dashboard() {
         profileId: profile.id,
         tecnico: profile.nombre,
         activo: true,
+        desactivadoEn: null,
         totalOS: 0,
         cerradas: 0,
         abiertas: 0,
@@ -1198,15 +1247,19 @@ export default function Dashboard() {
         tecnico: string;
         profileId: string | null;
         activo: boolean;
+        desactivadoEn: string | null;
         sources: string[];
       }>();
       for (const sourceName of participantSources) {
         const matched = matchTechnicianProfile(sourceName, allTechnicianProfiles);
+        const matchedProfile = matched ? profileById.get(matched.id) : undefined;
         const tecnicoName = matched?.nombre ?? displayImportedTechnicianName(sourceName);
         const currentParticipant = participantMap.get(tecnicoName) ?? {
           tecnico: tecnicoName,
           profileId: matched?.id ?? null,
           activo: matched ? activeTechnicianIds.has(matched.id) : false,
+          desactivadoEn: matchedProfile?.desactivado_en ??
+            (matchedProfile?.activo === false ? matchedProfile.actualizado_en : null),
           sources: [],
         };
         currentParticipant.sources.push(sourceName);
@@ -1341,6 +1394,7 @@ export default function Dashboard() {
           profileId: participant.profileId,
           tecnico: participant.tecnico,
           activo: participant.activo,
+          desactivadoEn: participant.desactivadoEn,
           totalOS: 0,
           cerradas: 0,
           abiertas: 0,
@@ -1415,47 +1469,74 @@ export default function Dashboard() {
       fTiposTiempo.length > 0 ||
       fOSRubros.length > 0 ||
       Boolean(query.trim());
-    const tecnicosCapacidad = tecnicosBase.filter((row) =>
-      capacidadRestringidaAParticipantes ? row.totalOS > 0 : row.activo || row.totalOS > 0,
+    const targetForTechnician = (
+      row: Pick<(typeof tecnicosBase)[number], "profileId" | "activo" | "desactivadoEn">,
+      start: Date,
+      end: Date,
+    ) => technicianGoalForRange(
+      start,
+      end,
+      metaHorasMensual,
+      row.profileId,
+      row.activo,
+      row.desactivadoEn,
     );
-    const capacidadCalculada = calculateTeamCapacity(
-      tecnicosBase.reduce((sum, row) => sum + row.horas, 0),
-      metaHorasPeriodo,
-      tecnicosCapacidad.length,
+    const tecnicosCapacidad = tecnicosBase.filter((row) => {
+      const available = targetForTechnician(row, periodStart, periodEnd);
+      return capacidadRestringidaAParticipantes
+        ? row.totalOS > 0 && available > 0
+        : available > 0;
+    });
+    const horasUtilizadas = tecnicosBase.reduce((sum, row) => sum + row.horas, 0);
+    const horasDisponibles = tecnicosCapacidad.reduce(
+      (sum, row) => sum + targetForTechnician(row, periodStart, periodEnd),
+      0,
     );
     const capacidad = {
-      ...capacidadCalculada,
+      technicians: tecnicosCapacidad.length,
+      hoursAvailable: horasDisponibles,
+      hoursUsed: horasUtilizadas,
+      percentage: horasDisponibles > 0 ? (horasUtilizadas / horasDisponibles) * 100 : 0,
       base: capacidadRestringidaAParticipantes
         ? ("participantes_filtrados" as const)
         : ("equipo_activo" as const),
     };
     const evolucion = evolucionBase.map((row) => {
-      const tecnicosPeriodo = tecnicosBase.filter(
-        (tecnicoRow) =>
-          capacidadRestringidaAParticipantes
-            ? (tecnicoRow.periodos.get(row.key)?.totalOS ?? 0) > 0
-            : tecnicoRow.activo || (tecnicoRow.periodos.get(row.key)?.totalOS ?? 0) > 0,
-      ).length;
-      const capacidadPeriodo = calculateTeamCapacity(
-        row.horasPersona,
-        productivityGoalForRange(parseISO(row.dateFrom), parseISO(row.dateTo), metaHorasMensual),
-        tecnicosPeriodo,
+      const start = parseISO(row.dateFrom);
+      const end = parseISO(row.dateTo);
+      const tecnicosPeriodo = tecnicosBase.filter((tecnicoRow) => {
+        const available = targetForTechnician(tecnicoRow, start, end);
+        return capacidadRestringidaAParticipantes
+          ? (tecnicoRow.periodos.get(row.key)?.totalOS ?? 0) > 0 && available > 0
+          : available > 0;
+      });
+      const horasDisponiblesPeriodo = tecnicosPeriodo.reduce(
+        (sum, tecnicoRow) => sum + targetForTechnician(tecnicoRow, start, end),
+        0,
       );
       return {
         ...row,
-        tecnicosBase: capacidadPeriodo.technicians,
-        horasDisponibles: capacidadPeriodo.hoursAvailable,
-        utilizacion: capacidadPeriodo.percentage,
+        tecnicosBase: tecnicosPeriodo.length,
+        horasDisponibles: horasDisponiblesPeriodo,
+        utilizacion: horasDisponiblesPeriodo > 0
+          ? (row.horasPersona / horasDisponiblesPeriodo) * 100
+          : 0,
       };
     });
-    const tecnicos = tecnicosBase.map(({ periodos, ...row }) => ({
-      ...row,
-      evolucion: evolucionBase.map((periodo) => {
+    const tecnicos = tecnicosBase.map(({ periodos, ...row }) => {
+      const horasDisponiblesTecnico = targetForTechnician(row, periodStart, periodEnd);
+      return {
+        ...row,
+        horasDisponibles: horasDisponiblesTecnico,
+        productividad: horasDisponiblesTecnico > 0
+          ? (row.horas / horasDisponiblesTecnico) * 100
+          : 0,
+        evolucion: evolucionBase.map((periodo) => {
         const tecnicoPeriodo = periodos.get(periodo.key);
-        const metaHoras = productivityGoalForRange(
+        const metaHoras = targetForTechnician(
+          row,
           parseISO(periodo.dateFrom),
           parseISO(periodo.dateTo),
-          metaHorasMensual,
         );
         const horas = tecnicoPeriodo?.horas ?? 0;
         return {
@@ -1471,8 +1552,9 @@ export default function Dashboard() {
           metaHoras,
           productividad: metaHoras > 0 ? (horas / metaHoras) * 100 : 0,
         };
-      }),
-    })).sort(
+        }),
+      };
+    }).sort(
       (a, b) => b.horas - a.horas || b.totalOS - a.totalOS || a.tecnico.localeCompare(b.tecnico),
     );
 

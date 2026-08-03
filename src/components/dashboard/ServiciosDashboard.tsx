@@ -3,8 +3,6 @@ import {
   BarChart3,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   ClipboardCheck,
   Gauge,
@@ -26,6 +24,8 @@ const STATE_COLORS = {
   abiertas: "#2f7dcc",
   otras: "#ef8b18",
 } as const;
+
+type TechnicianStatusFilter = "active" | "inactive" | "all";
 
 function timeLabel(label: string) {
   const normalized = label.toLowerCase();
@@ -76,7 +76,7 @@ export function ServiciosDashboard({
 }) {
   const [showAllTechnicians, setShowAllTechnicians] = useState(false);
   const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "hours">("orders");
-  const [orderPage, setOrderPage] = useState(0);
+  const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatusFilter>("active");
 
   if (loading) {
     return (
@@ -102,13 +102,11 @@ export function ServiciosDashboard({
   );
   const branchMax = Math.max(...data.sucursales.map((row) => row.total), 1);
   const timeTotal = data.mixTiempo.reduce((sum, row) => sum + row.total, 0);
-  const visibleTecnicos = showAllTechnicians ? data.tecnicos : data.tecnicos.slice(0, 5);
-  const pageSize = 5;
-  const pageCount = Math.max(1, Math.ceil(data.ordenes.length / pageSize));
-  const safePage = Math.min(orderPage, pageCount - 1);
-  const visibleOrders = data.ordenes.slice(safePage * pageSize, safePage * pageSize + pageSize);
-  const pageStart = data.ordenes.length === 0 ? 0 : safePage * pageSize + 1;
-  const pageEnd = Math.min((safePage + 1) * pageSize, data.ordenes.length);
+  const filteredTechnicians = data.tecnicos.filter((row) =>
+    technicianStatus === "all" || (technicianStatus === "active" ? row.activo : !row.activo),
+  );
+  const visibleTecnicos = showAllTechnicians ? filteredTechnicians : filteredTechnicians.slice(0, 5);
+  const visibleOrders = data.ordenes;
 
   const kpis = [
     {
@@ -300,17 +298,41 @@ export function ServiciosDashboard({
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
         <section className="min-w-0 rounded-md border bg-card p-3.5">
-          <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold">Carga por responsable</h2>
               <p className="text-[11px] text-muted-foreground">Horas-persona sobre la meta del período</p>
             </div>
-            <UserRound className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-md bg-muted p-0.5" aria-label="Filtrar responsables por estado">
+                {([
+                  ["active", "Activos"],
+                  ["inactive", "Inactivos"],
+                  ["all", "Todos"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setTechnicianStatus(value);
+                      setShowAllTechnicians(false);
+                    }}
+                    className={cn(
+                      "h-7 rounded px-2.5 text-[10px] font-medium transition-colors",
+                      technicianStatus === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <UserRound className="h-4 w-4 shrink-0 text-primary" />
+            </div>
           </div>
 
-          <div className="space-y-2 md:hidden">
+          <div className={cn("space-y-2 md:hidden", showAllTechnicians && "max-h-[360px] overflow-y-auto overscroll-contain pr-1")}>
             {visibleTecnicos.map((row, index) => {
-              const productivity = data.metaHorasPeriodo > 0 ? (row.horas / data.metaHorasPeriodo) * 100 : 0;
+              const productivity = row.productividad;
               return (
                 <button
                   type="button"
@@ -332,7 +354,7 @@ export function ServiciosDashboard({
                   <span className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
                     <span><strong className="block text-sm text-foreground">{row.totalOS}</strong>OS</span>
                     <span><strong className="block text-sm text-foreground">{decimal.format(row.horas)}</strong>Horas</span>
-                    <span><strong className="block text-sm text-foreground">{Math.round(productivity)}%</strong>Productividad</span>
+                    <span title={`Meta disponible: ${decimal.format(row.horasDisponibles)} hs`}><strong className="block text-sm text-foreground">{Math.round(productivity)}%</strong>Productividad</span>
                   </span>
                   <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted">
                     <span className={cn("block h-full rounded-full", productivity >= 100 ? "bg-emerald-500" : productivity >= 75 ? "bg-primary" : "bg-amber-500")} style={{ width: `${Math.min(productivity, 100)}%` }} />
@@ -340,16 +362,16 @@ export function ServiciosDashboard({
                 </button>
               );
             })}
-            {data.tecnicos.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para los filtros actuales.</div>}
+            {filteredTechnicians.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para este estado.</div>}
           </div>
 
-          <div className="hidden overflow-x-auto md:block">
+          <div className={cn("hidden overflow-x-auto md:block", showAllTechnicians && "max-h-[360px] overflow-y-auto overscroll-contain pr-1")}>
             <div className="min-w-[620px]">
-              <div className="grid grid-cols-[30px_minmax(190px,1fr)_52px_82px_minmax(150px,0.8fr)] gap-2 border-b px-2 pb-2 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+              <div className="sticky top-0 z-10 grid grid-cols-[30px_minmax(190px,1fr)_52px_82px_minmax(150px,0.8fr)] gap-2 border-b bg-card px-2 pb-2 pt-1 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
                 <span>#</span><span>Responsable</span><span className="text-right">OS</span><span className="text-right">Horas</span><span>Productividad</span>
               </div>
               {visibleTecnicos.map((row, index) => {
-                const productivity = data.metaHorasPeriodo > 0 ? (row.horas / data.metaHorasPeriodo) * 100 : 0;
+                const productivity = row.productividad;
                 return (
                   <button
                     type="button"
@@ -372,19 +394,19 @@ export function ServiciosDashboard({
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                         <span className={cn("block h-full rounded-full", productivity >= 100 ? "bg-emerald-500" : productivity >= 75 ? "bg-primary" : "bg-amber-500")} style={{ width: `${Math.min(productivity, 100)}%` }} />
                       </span>
-                      <strong className="w-10 text-right tabular-nums">{Math.round(productivity)}%</strong>
+                      <strong className="w-10 text-right tabular-nums" title={`Meta disponible: ${decimal.format(row.horasDisponibles)} hs`}>{Math.round(productivity)}%</strong>
                     </span>
                   </button>
                 );
               })}
-              {data.tecnicos.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para los filtros actuales.</div>}
+              {filteredTechnicians.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para este estado.</div>}
             </div>
           </div>
 
-          {data.tecnicos.length > 5 && (
+          {filteredTechnicians.length > 5 && (
             <button type="button" onClick={() => setShowAllTechnicians((value) => !value)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
               {showAllTechnicians ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              {showAllTechnicians ? "Ver los 5 principales" : `Ver todos los responsables (${data.tecnicos.length})`}
+              {showAllTechnicians ? "Ver los 5 principales" : `Ver todos los responsables (${filteredTechnicians.length})`}
             </button>
           )}
         </section>
@@ -435,7 +457,7 @@ export function ServiciosDashboard({
           <Badge variant="secondary">{data.ordenes.length} OS</Badge>
         </div>
 
-        <div className="space-y-2 md:hidden">
+        <div className="max-h-[620px] space-y-2 overflow-y-auto overscroll-contain pr-1 md:hidden">
           {visibleOrders.map((row) => (
             <article key={row.key} className="rounded-md border p-3 text-xs">
               <div className="flex items-start justify-between gap-2">
@@ -455,9 +477,9 @@ export function ServiciosDashboard({
           {visibleOrders.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>}
         </div>
 
-        <div className="hidden overflow-x-auto rounded-md border md:block">
+        <div className="hidden max-h-[480px] overflow-auto rounded-md border md:block">
           <table className="w-full min-w-[1040px] text-xs">
-            <thead className="bg-muted/75 text-left text-[9px] uppercase tracking-wide text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-muted text-left text-[9px] uppercase tracking-wide text-muted-foreground shadow-sm">
               <tr>
                 <th className="px-3 py-2">OS</th>
                 <th className="px-3 py-2">Cliente</th>
@@ -491,17 +513,8 @@ export function ServiciosDashboard({
           </table>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
-          <span>Mostrando {pageStart} a {pageEnd} de {data.ordenes.length}</span>
-          <div className="flex items-center gap-1">
-            <button type="button" aria-label="Página anterior" disabled={safePage === 0} onClick={() => setOrderPage(Math.max(safePage - 1, 0))} className="flex h-8 w-8 items-center justify-center rounded-md border text-foreground hover:bg-accent disabled:opacity-40">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="min-w-16 text-center tabular-nums">{safePage + 1} / {pageCount}</span>
-            <button type="button" aria-label="Página siguiente" disabled={safePage >= pageCount - 1} onClick={() => setOrderPage(Math.min(safePage + 1, pageCount - 1))} className="flex h-8 w-8 items-center justify-center rounded-md border text-foreground hover:bg-accent disabled:opacity-40">
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+        <div className="mt-3 text-[10px] text-muted-foreground">
+          {data.ordenes.length} órdenes · desplazá para ver todas
         </div>
       </section>
     </div>

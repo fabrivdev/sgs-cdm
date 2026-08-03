@@ -88,6 +88,7 @@ export interface ServicioTecnicoRow {
   profileId: string | null;
   tecnico: string;
   activo: boolean;
+  desactivadoEn: string | null;
   totalOS: number;
   cerradas: number;
   abiertas: number;
@@ -97,6 +98,8 @@ export interface ServicioTecnicoRow {
   horasDesdeOS: number;
   km: number;
   valorOS: number;
+  horasDisponibles: number;
+  productividad: number;
   evolucion: ServicioTecnicoPeriodoRow[];
 }
 

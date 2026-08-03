@@ -179,16 +179,35 @@ export default function Admin() {
     load();
   };
 
+  const updateProfileActive = async (id: string, activo: boolean) => {
+    const payload = {
+      activo,
+      desactivado_en: activo ? null : new Date().toISOString(),
+    };
+    const primary = await (supabase as any).from("profiles").update(payload).eq("id", id);
+    const message = primary.error?.message ?? "";
+
+    if (
+      primary.error &&
+      /desactivado_en/i.test(message) &&
+      /(does not exist|schema cache)/i.test(message)
+    ) {
+      return supabase.from("profiles").update({ activo }).eq("id", id);
+    }
+
+    return primary;
+  };
+
   const toggleActivo = async (profile: Profile) => {
     if (profile.activo) { setToggleActivoPending(profile); return; }
-    const { error } = await supabase.from("profiles").update({ activo: true }).eq("id", profile.id);
+    const { error } = await updateProfileActive(profile.id, true);
     if (error) toast.error(error.message);
     else { toast.success("Usuario reactivado"); load(); }
   };
 
   const confirmarToggleActivo = async () => {
     if (!toggleActivoPending) return;
-    const { error } = await supabase.from("profiles").update({ activo: false }).eq("id", toggleActivoPending.id);
+    const { error } = await updateProfileActive(toggleActivoPending.id, false);
     if (error) toast.error(error.message);
     else { toast.success("Usuario desactivado"); load(); }
     setToggleActivoPending(null);
