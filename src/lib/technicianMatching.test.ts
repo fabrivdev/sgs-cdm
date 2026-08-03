@@ -28,6 +28,14 @@ describe("technician matching", () => {
     expect(normalizeTechnicianName("ME0019 - DENNIS BENITEZ")).toBe("DENIS DE LA CRUZ BENITEZ ARAUJO");
   });
 
+  it("unifies Daniel Molinas and Evaristo Daniel as the same technician", () => {
+    const evaristo = { id: "5", nombre: "EVARISTO DANIEL MOLINAS" };
+    expect(matchTechnicianProfile("DANIEL MOLINAS", [...profiles, evaristo])?.id).toBe("5");
+    expect(matchTechnicianProfile("EVARISTO DANIEL", [...profiles, evaristo])?.id).toBe("5");
+    expect(normalizeTechnicianName("DANIEL MOLINAS")).toBe("EVARISTO DANIEL MOLINAS");
+    expect(normalizeTechnicianName("EVARISTO DANIEL")).toBe("EVARISTO DANIEL MOLINAS");
+  });
+
   it("does not force ambiguous or weak associations", () => {
     expect(matchTechnicianProfile("Juan", profiles)).toBeNull();
     expect(displayImportedTechnicianName("ME0042 - Técnico Nuevo")).toBe("TECNICO NUEVO");

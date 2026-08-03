@@ -44,6 +44,8 @@ const TECHNICIAN_CODE_PREFIX = /^(?:[A-Z]{1,6}[\s-]*)?\d{2,}\s*(?:[-:|/]\s*)?/;
 
 const TECHNICIAN_ALIASES: Record<string, string> = {
   "DENNIS BENITEZ": "DENIS DE LA CRUZ BENITEZ ARAUJO",
+  "DANIEL MOLINAS": "EVARISTO DANIEL MOLINAS",
+  "EVARISTO DANIEL": "EVARISTO DANIEL MOLINAS",
 };
 
 export function normalizeServiceOrderText(value: unknown) {

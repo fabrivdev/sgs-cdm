@@ -66,6 +66,12 @@ describe("assistant service-order technician identity", () => {
     expect(normalizeServiceOrderTechnician("ME0017 - JUAN PATINO")).toBe("JUAN PATINO");
   });
 
+  it("unifies Daniel Molinas and Evaristo Daniel under one identity", () => {
+    expect(normalizeServiceOrderTechnician("DANIEL MOLINAS")).toBe("EVARISTO DANIEL MOLINAS");
+    expect(normalizeServiceOrderTechnician("EVARISTO DANIEL")).toBe("EVARISTO DANIEL MOLINAS");
+    expect(serviceOrderTechniciansMatch("DANIEL MOLINAS", "EVARISTO DANIEL")).toBe(true);
+  });
+
   it("unifies abbreviated new-system names with the legacy full name", () => {
     expect(serviceOrderTechniciansMatch(
       "ME0017 - JUAN PATINO",
