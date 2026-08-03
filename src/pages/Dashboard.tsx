@@ -249,24 +249,34 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
 }
 
 async function cargarProfilesDashboard(): Promise<Profile[]> {
-  try {
-    return await cargarTodo<Profile>(
-      (supabase as any)
-        .from("profiles")
-        .select("id, nombre, sucursal, activo, actualizado_en, desactivado_en"),
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/desactivado_en/i.test(message)) throw error;
+  const selectVariants = [
+    "id, nombre, sucursal, activo, actualizado_en, desactivado_en",
+    "id, nombre, sucursal, activo, actualizado_en",
+    "id, nombre, sucursal, activo",
+  ];
+  let lastError: unknown;
 
-    const rows = await cargarTodo<Omit<Profile, "desactivado_en">>(
-      supabase.from("profiles").select("id, nombre, sucursal, activo, actualizado_en"),
-    );
-    return rows.map((row) => ({
-      ...row,
-      desactivado_en: row.activo === false ? row.actualizado_en : null,
-    }));
+  for (const columns of selectVariants) {
+    try {
+      const rows = await cargarTodo<Partial<Profile> & Pick<Profile, "id" | "nombre">>(
+        (supabase as any).from("profiles").select(columns),
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        nombre: row.nombre,
+        sucursal: row.sucursal ?? null,
+        activo: row.activo ?? true,
+        actualizado_en: row.actualizado_en ?? null,
+        desactivado_en:
+          row.desactivado_en ??
+          (row.activo === false ? row.actualizado_en ?? null : null),
+      }));
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  throw lastError ?? new Error("No se pudieron cargar los perfiles");
 }
 
 function dateKey(date: Date) {
@@ -757,7 +767,7 @@ export default function Dashboard() {
     (async () => {
       setBaseLoading(true);
       try {
-        const [serviciosRows, trabajosRows, clientesRows, profilesRows, roleRows] = await Promise.all([
+        const [serviciosRows, trabajosRows, clientesRows] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
               .from("servicios")
@@ -769,16 +779,29 @@ export default function Dashboard() {
               .select("id, codigo, estado_general, legacy_servicio_id, sucursal, marca, cliente_id, descripcion_problema, motivo_bloqueo, creado_en, actualizado_en"),
           ),
           cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal")),
-          cargarProfilesDashboard(),
-          cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
         ]);
 
         if (!alive) return;
         setServicios(serviciosRows);
         setTrabajos(trabajosRows);
         setClientes(clientesRows);
-        setProfiles(profilesRows);
-        setUserRoles(roleRows);
+
+        const [profilesResult, rolesResult] = await Promise.allSettled([
+          cargarProfilesDashboard(),
+          cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
+        ]);
+
+        if (!alive) return;
+        if (profilesResult.status === "fulfilled") {
+          setProfiles(profilesResult.value);
+        } else {
+          console.error("Error cargando perfiles del dashboard", profilesResult.reason);
+        }
+        if (rolesResult.status === "fulfilled") {
+          setUserRoles(rolesResult.value);
+        } else {
+          console.error("Error cargando roles del dashboard", rolesResult.reason);
+        }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         toast.error(`Error cargando datos del dashboard: ${msg}`);
