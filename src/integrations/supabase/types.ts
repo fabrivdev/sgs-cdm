@@ -1288,6 +1288,25 @@ export type Database = {
         }
         Returns: boolean
       }
+      parque_facturacion_atribuida: {
+        Args: never
+        Returns: {
+          cliente_id: string
+          fecha: string
+          grupo_fx: string
+          marca: string
+          rubro: string
+          total_venta: number
+        }[]
+      }
+      parque_facturas_chasis_atribuidas: {
+        Args: never
+        Returns: {
+          cliente_id: string
+          factura_clave: string
+          marca: string
+        }[]
+      }
       parque_kpis: {
         Args: never
         Returns: {
@@ -1298,6 +1317,7 @@ export type Database = {
           total_maquinas: number
         }[]
       }
+      parque_normalizar_clave: { Args: { p_valor: string }; Returns: string }
       parque_resumen_facturacion: {
         Args: {
           p_desde: string
