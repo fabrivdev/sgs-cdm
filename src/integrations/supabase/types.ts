@@ -1288,6 +1288,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      parque_actividad_os_chasis: {
+        Args: never
+        Returns: {
+          cliente_id: string
+          fecha: string
+          marca: string
+          os_numero: string
+        }[]
+      }
       parque_facturacion_atribuida: {
         Args: never
         Returns: {
