@@ -208,6 +208,7 @@ interface DisponibilidadTecnico {
   fecha_fin: string;
   tipo: string | null;
   observacion: string | null;
+  bloquea_agenda: boolean | null;
 }
 
 interface OrdenServicioImportada {
@@ -550,21 +551,47 @@ function technicianGoalForRange(
   profileId: string | null,
   active: boolean,
   deactivatedAt: string | null,
+  unavailableRanges: DisponibilidadTecnico[],
 ): number {
   if (!profileId) return 0;
-  if (active) return productivityGoalForRange(start, end, monthlyGoal);
-  if (!deactivatedAt) return 0;
+  let effectiveEnd = end;
 
-  const parsed = parseISO(deactivatedAt.slice(0, 10));
-  if (Number.isNaN(parsed.getTime())) return 0;
+  if (!active) {
+    if (!deactivatedAt) return 0;
+    const parsed = parseISO(deactivatedAt.slice(0, 10));
+    if (Number.isNaN(parsed.getTime())) return 0;
+    effectiveEnd = addDays(parsed, -1) < end ? addDays(parsed, -1) : end;
+  }
 
-  const lastAvailableDay = addDays(parsed, -1);
-  if (lastAvailableDay < start) return 0;
-  return productivityGoalForRange(
-    start,
-    lastAvailableDay < end ? lastAvailableDay : end,
-    monthlyGoal,
-  );
+  if (effectiveEnd < start) return 0;
+
+  const baseGoal = productivityGoalForRange(start, effectiveEnd, monthlyGoal);
+  const unavailableDays = new Set<string>();
+
+  for (const range of unavailableRanges) {
+    if (range.bloquea_agenda === false) continue;
+
+    const rangeStart = parseISO(range.fecha_inicio.slice(0, 10));
+    const rangeEnd = parseISO(range.fecha_fin.slice(0, 10));
+    if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) continue;
+
+    let cursor = rangeStart > start ? rangeStart : start;
+    const lastDay = rangeEnd < effectiveEnd ? rangeEnd : effectiveEnd;
+    while (cursor <= lastDay) {
+      unavailableDays.add(dateKey(cursor));
+      cursor = addDays(cursor, 1);
+    }
+  }
+
+  const unavailableGoal = Array.from(unavailableDays).reduce((sum, key) => {
+    const day = parseISO(key);
+    const monthStart = startOfMonth(day);
+    const monthEnd = endOfMonth(day);
+    const monthDays = differenceInCalendarDays(monthEnd, monthStart) + 1;
+    return sum + (monthDays > 0 ? monthlyGoal / monthDays : 0);
+  }, 0);
+
+  return Math.max(baseGoal - unavailableGoal, 0);
 }
 
 export default function Dashboard() {
@@ -833,7 +860,7 @@ export default function Dashboard() {
           cargarTodo<DisponibilidadTecnico>(
             supabase
               .from("tecnico_disponibilidad")
-              .select("id, tecnico_id, fecha_inicio, fecha_fin, tipo, observacion")
+              .select("id, tecnico_id, fecha_inicio, fecha_fin, tipo, observacion, bloquea_agenda")
               .lte("fecha_inicio", dateKey(periodEnd))
               .gte("fecha_fin", dateKey(periodStart)),
           ),
@@ -1497,6 +1524,12 @@ export default function Dashboard() {
       fTiposTiempo.length > 0 ||
       fOSRubros.length > 0 ||
       Boolean(query.trim());
+    const disponibilidadesPorTecnico = new Map<string, DisponibilidadTecnico[]>();
+    for (const disponibilidad of disponibilidades) {
+      const rows = disponibilidadesPorTecnico.get(disponibilidad.tecnico_id) ?? [];
+      rows.push(disponibilidad);
+      disponibilidadesPorTecnico.set(disponibilidad.tecnico_id, rows);
+    }
     const targetForTechnician = (
       row: Pick<(typeof tecnicosBase)[number], "profileId" | "activo" | "desactivadoEn">,
       start: Date,
@@ -1508,6 +1541,7 @@ export default function Dashboard() {
       row.profileId,
       row.activo,
       row.desactivadoEn,
+      row.profileId ? (disponibilidadesPorTecnico.get(row.profileId) ?? []) : [],
     );
     const tecnicosCapacidad = tecnicosBase.filter((row) => {
       const available = targetForTechnician(row, periodStart, periodEnd);
@@ -1615,7 +1649,7 @@ export default function Dashboard() {
       evolucion,
       sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
-  }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, trabajoById]);
+  }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, trabajoById]);
 
   const factMetricQuantities = (rows: Facturacion[]) => {
     let horasServicio = 0;
