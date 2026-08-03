@@ -1178,6 +1178,7 @@ export default function Dashboard() {
   );
 
   const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
+    const responsablesSeleccionados = new Set(fResponsablesOS);
     const tecnicoMap = new Map<string, {
       profileId: string | null;
       tecnico: string;
@@ -1233,6 +1234,7 @@ export default function Dashboard() {
     for (const profile of technicianOptions) {
       const profileSucursal = profileById.get(profile.id)?.sucursal ?? null;
       if (fSucursales.length > 0 && (!profileSucursal || !fSucursales.includes(profileSucursal))) continue;
+      if (responsablesSeleccionados.size > 0 && !responsablesSeleccionados.has(profile.nombre)) continue;
       tecnicoMap.set(profile.nombre, {
         profileId: profile.id,
         tecnico: profile.nombre,
@@ -1343,7 +1345,7 @@ export default function Dashboard() {
 
       if (fSucursales.length > 0 && (!sucursal || !fSucursales.includes(sucursal))) return [];
       if (fMarcas.length > 0 && !fMarcas.includes(marca)) return [];
-      if (fResponsablesOS.length > 0 && !fResponsablesOS.some((name) => participantNames.includes(name))) return [];
+      if (responsablesSeleccionados.size > 0 && !participantNames.some((name) => responsablesSeleccionados.has(name))) return [];
       if (fEstadosOS.length > 0 && !fEstadosOS.includes(estadoGrupo)) return [];
       if (
         fTiposTiempo.length > 0 &&
@@ -1370,8 +1372,11 @@ export default function Dashboard() {
       const valorOS = Number(row.servicios_valor || 0) + Number(row.repuesto_valor || 0) +
         Number(row.kilometro_valor || 0) + Number(row.terceros_valor || 0);
       const totalsByTechnician = (rawData.totales_por_tecnico ?? {}) as Record<string, Record<string, unknown>>;
+      const participantsForMetrics = responsablesSeleccionados.size > 0
+        ? participants.filter((participant) => responsablesSeleccionados.has(participant.tecnico))
+        : participants;
       const participantMetrics = attributeServiceOrderMetrics(
-        participants.map((participant) => ({
+        participantsForMetrics.map((participant) => ({
           key: participant.tecnico,
           sources: participant.sources,
         })),
@@ -1405,7 +1410,7 @@ export default function Dashboard() {
       sucursalRow.total += 1;
       sucursalMap.set(sucursalLabel, sucursalRow);
 
-      participants.forEach((participant) => {
+      participantsForMetrics.forEach((participant) => {
         const metrics = participantMetricsByTechnician.get(participant.tecnico) ?? {
           key: participant.tecnico,
           hours: horas,
