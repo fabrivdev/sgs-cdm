@@ -17,6 +17,8 @@ const Historial = lazy(() => import("./pages/Historial"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
 const Agenda = lazy(() => import("./pages/Agenda"));
 const Trabajos = lazy(() => import("./pages/Trabajos"));
+const Repuestos = lazy(() => import("./pages/Repuestos"));
+const RepuestosCompras = lazy(() => import("./pages/RepuestosCompras"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -67,6 +69,22 @@ const App = () => (
                   element={
                     <ProtectedRoute requireRoles={["admin"]}>
                       <Agenda />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/repuestos"
+                  element={
+                    <ProtectedRoute requireModulo="repuestos">
+                      <Repuestos />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/repuestos/compras"
+                  element={
+                    <ProtectedRoute requireModulo="repuestos">
+                      <RepuestosCompras />
                     </ProtectedRoute>
                   }
                 />
