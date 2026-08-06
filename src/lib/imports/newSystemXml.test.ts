@@ -4,9 +4,18 @@ import {
   buildProductLookup,
   buildServiceOrderLookup,
   crosswalkBillingRow,
-  mapFacturaVentasSheet,
   mapCanonicalOsToImportRow,
+  mapCanonicalPedidoCompraToRow,
+  mapCanonicalProductToRow,
+  mapCanonicalSolicitudCompraToRow,
+  mapCanonicalStockToRow,
+  mapClienteSheet,
+  mapFacturaVentasSheet,
   mapOrdenesServicioSheet,
+  mapPedidoCompraSheet,
+  mapProductosSheet,
+  mapSolicitudCompraSheet,
+  mapStockSheet,
 } from "@/lib/imports";
 
 const sheet = {
@@ -542,5 +551,277 @@ describe("importacion XML de facturacion", () => {
       totalValueBase: -100,
       totalValueWithIva: -110,
     });
+  });
+});
+
+describe("importacion XML de catalogo de productos", () => {
+  it("parsea el maestro de productos y clasifica marca por grupo", () => {
+    const result = mapProductosSheet("productos.xml", {
+      name: "Maestro de Productos",
+      headers: [],
+      rows: [{
+        Codigo: "REPIN000001           ",
+        Descripcion: "ABDECKBLECH 1234430",
+        Unidad: "UN",
+        CODFAB: "1234430",
+        GRUPO: "009 - REPUESTOS",
+        ESTADO: "Nuevo",
+        MARCA: "CLA - CLAAS",
+        FAMILIA: "15 - MECANICA GENERAL",
+      }],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      internalCode: "REPIN000001",
+      manufacturerCode: "1234430",
+      brand: "CLAAS",
+      group: "009 - REPUESTOS",
+      family: "15 - MECANICA GENERAL",
+      isActive: true,
+    });
+  });
+
+  it("marca como inactivo un producto con ESTADO Inactivo", () => {
+    const result = mapProductosSheet("productos.xml", {
+      name: "Maestro de Productos",
+      headers: [],
+      rows: [{ Codigo: "MER000099", Descripcion: "ARTICULO DISCONTINUADO", ESTADO: "Inactivo" }],
+    });
+
+    expect(result.rows[0].isActive).toBe(false);
+  });
+
+  it("mapCanonicalProductToRow descarta filas sin codigo interno", () => {
+    const result = mapProductosSheet("productos.xml", {
+      name: "Maestro de Productos",
+      headers: [],
+      rows: [{ Descripcion: "SIN CODIGO" }],
+    });
+
+    expect(mapCanonicalProductToRow(result.rows[0])).toBeNull();
+  });
+});
+
+describe("importacion XML de maestro de clientes", () => {
+  const filaBase = {
+    Codigo: "80001340-9",
+    Nombre: "AUTOMOTOR S.A.",
+    RUC: "80001340-9",
+    Direccion: "RUTA 6",
+    Municipio: "SANTA RITA",
+    "E-Mail": "cliente@ejemplo.com",
+    Telefono: "0981123456",
+    DISTRI: "SANTA RITA",
+    ESTATUS: "ACTIVO",
+  };
+
+  it("mapea el telefono del cliente", () => {
+    const result = mapClienteSheet("clientes.xml", { name: "Maestro de Clientes", headers: [], rows: [filaBase] });
+
+    expect(result.rows[0].telefono).toBe("0981123456");
+  });
+
+  it("mapea un cliente activo con sucursal derivada de DISTRI", () => {
+    const result = mapClienteSheet("clientes.xml", { name: "Maestro de Clientes", headers: [], rows: [filaBase] });
+
+    expect(result.rows[0]).toMatchObject({
+      codEntidad: "80001340-9",
+      nombre: "AUTOMOTOR S.A.",
+      sucursal: "Santa Rita",
+      activo: true,
+    });
+  });
+
+  it("marca como inactivo un cliente con ESTATUS Inactivo", () => {
+    const result = mapClienteSheet("clientes.xml", {
+      name: "Maestro de Clientes",
+      headers: [],
+      rows: [{ ...filaBase, ESTATUS: "INACTIVO" }],
+    });
+
+    expect(result.rows[0].activo).toBe(false);
+  });
+
+  it("reconoce San Juan Bautista como alias de Misiones tambien en clientes", () => {
+    const result = mapClienteSheet("clientes.xml", {
+      name: "Maestro de Clientes",
+      headers: [],
+      rows: [{ ...filaBase, DISTRI: "SAN JUAN BAUTISTA", Municipio: "SAN JUAN BAUTISTA" }],
+    });
+
+    expect(result.rows[0].sucursal).toBe("Misiones");
+  });
+
+  it("se queda con la primera fila cuando el mismo codigo aparece una vez por sucursal", () => {
+    const result = mapClienteSheet("clientes.xml", {
+      name: "Maestro de Clientes",
+      headers: [],
+      rows: [
+        { ...filaBase, Codigo: "80056738-2", Nombre: "CDM - SANTA RITA", DISTRI: "SANTA RITA" },
+        { ...filaBase, Codigo: "80056738-2", Nombre: "CDM - KATUETE", DISTRI: "KATUETE" },
+      ],
+    });
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].nombre).toBe("CDM - SANTA RITA");
+  });
+
+  it("descarta filas sin codigo", () => {
+    const result = mapClienteSheet("clientes.xml", {
+      name: "Maestro de Clientes",
+      headers: [],
+      rows: [{ Nombre: "SIN CODIGO" }],
+    });
+
+    expect(result.rows).toHaveLength(0);
+  });
+});
+
+describe("importacion XML de stock de repuestos", () => {
+  it("parsea el reporte de stock por sucursal y deposito", () => {
+    const result = mapStockSheet("stock.xml", {
+      name: "Reporte de Stock",
+      headers: [],
+      rows: [{
+        FILIAL: "04 - San Juan Bautista",
+        LOCAL: "01 - DEPOSITO GENERAL",
+        Producto: "MER000002           ",
+        Descripcion: "ABREBOTELLAS 02564630",
+        Unidad: "UN",
+        "Cod Faricant": "2564630",
+        "Saldo Actual": "4",
+      }],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      productCode: "MER000002",
+      description: "ABREBOTELLAS 02564630",
+      manufacturerCode: "2564630",
+      warehouse: "01 - DEPOSITO GENERAL",
+      balance: 4,
+    });
+  });
+
+  it("mapCanonicalStockToRow descarta filas sin codigo de producto", () => {
+    const result = mapStockSheet("stock.xml", {
+      name: "Reporte de Stock",
+      headers: [],
+      rows: [{ Descripcion: "SIN PRODUCTO", "Saldo Actual": "1" }],
+    });
+
+    expect(mapCanonicalStockToRow(result.rows[0])).toBeNull();
+  });
+});
+
+describe("importacion XML de pedidos de compra", () => {
+  it("parsea una linea de pedido con proveedor, cantidades y pendiente", () => {
+    const result = mapPedidoCompraSheet("pedidos.xml", {
+      name: "Pedidos de Compra",
+      headers: [],
+      rows: [{
+        FILIAL: "01 - Santa Rita",
+        "Nr.PedCompra": "000004",
+        "Fch Emision": "2026-07-01T00:00:00.000",
+        Proveedor: "55000004382  ",
+        "Razon Social": "CLAAS SERVICE AND PARTS GMBH",
+        MONEDA: "USD",
+        Item: "0002",
+        Producto: "REPIN003187         ",
+        Descripcion: "CASQUILLO COJINETE 06673230",
+        Unidad: "UN",
+        Cantidad: "4",
+        "Prc.Unitario": "22.45",
+        "Valor Total": "89.8",
+        "Ctd. Entrega": "4",
+        PENDIENTE: "0",
+      }],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      nroPedido: "000004",
+      item: "0002",
+      supplierName: "CLAAS SERVICE AND PARTS GMBH",
+      currency: "USD",
+      productCode: "REPIN003187",
+      quantity: 4,
+      total: 89.8,
+      pendingQuantity: 0,
+    });
+  });
+
+  it("reconoce GRS como moneda distinta de USD, sin confundirla con GS por substring", () => {
+    const result = mapPedidoCompraSheet("pedidos.xml", {
+      name: "Pedidos de Compra",
+      headers: [],
+      rows: [{ "Nr.PedCompra": "000010", Item: "0001", MONEDA: "GRS" }],
+    });
+
+    expect(result.rows[0].currency).toBe("GS");
+  });
+
+  it("reconoce San Juan Bautista como alias de localidad de la sucursal Misiones", () => {
+    const result = mapPedidoCompraSheet("pedidos.xml", {
+      name: "Pedidos de Compra",
+      headers: [],
+      rows: [{ FILIAL: "04 - San Juan Bautista", "Nr.PedCompra": "000020", Item: "0001" }],
+    });
+
+    expect(result.rows[0].branch).toBe("Misiones");
+  });
+
+  it("mapCanonicalPedidoCompraToRow descarta filas sin nro de pedido o item", () => {
+    const result = mapPedidoCompraSheet("pedidos.xml", {
+      name: "Pedidos de Compra",
+      headers: [],
+      rows: [{ Producto: "REPIN000001" }],
+    });
+
+    expect(mapCanonicalPedidoCompraToRow(result.rows[0])).toBeNull();
+  });
+});
+
+describe("importacion XML de solicitudes de compra", () => {
+  it("parsea una linea de solicitud con marca propia y solicitante", () => {
+    const result = mapSolicitudCompraSheet("solicitudes.xml", {
+      name: "Solicitudes de Compra",
+      headers: [],
+      rows: [{
+        FILIAL: "01 - Santa Rita",
+        "Fch Emision": "2026-07-07T00:00:00.000",
+        Solicitante: "lmauger",
+        MONEDA: "Dolares",
+        "Nro.Solc.Com": "000005",
+        "Item Sl.Comp": "0001",
+        Producto: "REPIN000406         ",
+        "Cod Faricant": "2181800",
+        MARCA: "CLA - CLAAS",
+        Descripcion: "ANILLO DE JUNTA 2181800",
+        "Unid. Medida": "UN",
+        Cantidad: "5",
+        "Prc Unitario": "0",
+        "Val.Total": "0",
+        Observacion: "STOCK",
+      }],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      nroSolicitud: "000005",
+      item: "0001",
+      requester: "lmauger",
+      currency: "USD",
+      productCode: "REPIN000406",
+      requestedBrand: "CLAAS",
+      quantity: 5,
+    });
+  });
+
+  it("mapCanonicalSolicitudCompraToRow descarta filas sin nro de solicitud o item", () => {
+    const result = mapSolicitudCompraSheet("solicitudes.xml", {
+      name: "Solicitudes de Compra",
+      headers: [],
+      rows: [{ Producto: "REPIN000001" }],
+    });
+
+    expect(mapCanonicalSolicitudCompraToRow(result.rows[0])).toBeNull();
   });
 });

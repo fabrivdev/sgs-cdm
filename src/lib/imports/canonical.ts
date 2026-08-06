@@ -97,6 +97,76 @@ export interface CanonicalProductRow {
   raw: Record<string, unknown>;
 }
 
+export interface CanonicalStockRow {
+  rowId: string;
+  productCode: string | null;
+  description: string | null;
+  unit: string | null;
+  manufacturerCode: string | null;
+  branch: string | null;
+  warehouse: string | null;
+  balance: number;
+  raw: Record<string, unknown>;
+}
+
+export interface CanonicalPedidoCompraRow {
+  rowId: string;
+  nroPedido: string | null;
+  item: string | null;
+  emissionDate: string | null;
+  branch: string | null;
+  supplierCode: string | null;
+  supplierName: string | null;
+  currency: string | null;
+  paymentCondition: string | null;
+  naturaleza: string | null;
+  productCode: string | null;
+  description: string | null;
+  unit: string | null;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  deliveredQuantity: number;
+  pendingQuantity: number;
+  deliveryType: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CanonicalSolicitudCompraRow {
+  rowId: string;
+  nroSolicitud: string | null;
+  item: string | null;
+  emissionDate: string | null;
+  branch: string | null;
+  requester: string | null;
+  currency: string | null;
+  productCode: string | null;
+  manufacturerCode: string | null;
+  requestedBrand: string | null;
+  description: string | null;
+  unit: string | null;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  observation: string | null;
+  raw: Record<string, unknown>;
+}
+
+export interface CanonicalClienteRow {
+  rowId: string;
+  codEntidad: string;
+  nombre: string;
+  ruc: string | null;
+  direccion: string | null;
+  localidad: string | null;
+  correoPrincipal: string | null;
+  telefono: string | null;
+  region: string | null;
+  sucursal: string | null;
+  activo: boolean;
+  raw: Record<string, unknown>;
+}
+
 export interface CanonicalBillingCrosswalk {
   billingRowId: string;
   matchedBy: "document" | "invoice" | "product_code" | "manufacturer_code" | "none";

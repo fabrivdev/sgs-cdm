@@ -2,8 +2,13 @@ import type { Database } from "@/integrations/supabase/types";
 import type {
   CanonicalBillingCrosswalk,
   CanonicalBillingRow,
+  CanonicalClienteRow,
   CanonicalImportEnvelope,
+  CanonicalPedidoCompraRow,
+  CanonicalProductRow,
   CanonicalServiceOrderRow,
+  CanonicalSolicitudCompraRow,
+  CanonicalStockRow,
 } from "@/lib/imports/canonical";
 import {
   compareIsoDate,
@@ -170,6 +175,183 @@ export function mapCanonicalOsToImportRow(row: CanonicalServiceOrderRow): Servic
       canonical_currency: row.currency,
       import_era: resolveImportEra(row.openDate ?? row.invoiceDate),
     } as any,
+  };
+}
+
+// clientes ya existe en el Database generado, pero el Insert no incluye
+// nada especifico del import -- se tipa suelta igual que las demas de este
+// archivo, por consistencia.
+export interface ClienteInsert {
+  cod_entidad: string;
+  nombre: string;
+  ruc: string | null;
+  direccion: string | null;
+  localidad: string | null;
+  correo_principal: string | null;
+  telefono: string | null;
+  region: string | null;
+  sucursal: string | null;
+  activo: boolean;
+}
+
+export function mapCanonicalClienteToRow(row: CanonicalClienteRow): ClienteInsert {
+  return {
+    cod_entidad: row.codEntidad,
+    nombre: row.nombre,
+    ruc: row.ruc,
+    direccion: row.direccion,
+    localidad: row.localidad,
+    correo_principal: row.correoPrincipal,
+    telefono: row.telefono,
+    region: row.region,
+    sucursal: row.sucursal,
+    activo: row.activo,
+  };
+}
+
+// productos/repuestos_stock todavia no existen en el Database generado
+// (falta aplicar la migracion + regenerar types.ts), asi que se tipan
+// sueltas en vez de vs Database["public"]["Tables"][...] - mismo gap
+// conocido que el resto de tablas nuevas de esta sesion.
+export interface ProductoInsert {
+  codigo_interno: string;
+  codigo_fabricante: string | null;
+  descripcion: string;
+  unidad: string | null;
+  grupo: string | null;
+  familia: string | null;
+  marca: string;
+  activo: boolean;
+}
+
+export function mapCanonicalProductToRow(row: CanonicalProductRow): ProductoInsert | null {
+  const codigoInterno = row.internalCode?.trim();
+  if (!codigoInterno) return null;
+
+  return {
+    codigo_interno: codigoInterno,
+    codigo_fabricante: row.manufacturerCode,
+    descripcion: row.description,
+    unidad: row.unit,
+    grupo: row.group,
+    familia: row.family,
+    marca: row.brand ?? "OTROS",
+    activo: row.isActive,
+  };
+}
+
+export interface RepuestoStockInsert {
+  producto_codigo: string;
+  descripcion: string | null;
+  unidad: string | null;
+  codigo_fabricante: string | null;
+  sucursal: string | null;
+  deposito: string | null;
+  saldo_actual: number;
+}
+
+export function mapCanonicalStockToRow(row: CanonicalStockRow): RepuestoStockInsert | null {
+  const productoCodigo = row.productCode?.trim();
+  if (!productoCodigo) return null;
+
+  return {
+    producto_codigo: productoCodigo,
+    descripcion: row.description,
+    unidad: row.unit,
+    codigo_fabricante: row.manufacturerCode,
+    sucursal: row.branch,
+    deposito: row.warehouse,
+    saldo_actual: row.balance,
+  };
+}
+
+export interface CompraPedidoInsert {
+  nro_pedido: string;
+  item: string;
+  fecha_emision: string | null;
+  sucursal: string | null;
+  proveedor_codigo: string | null;
+  proveedor_nombre: string | null;
+  moneda: string | null;
+  condicion_pago: string | null;
+  naturaleza: string | null;
+  producto_codigo: string | null;
+  descripcion: string | null;
+  unidad: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  valor_total: number;
+  cantidad_entregada: number;
+  cantidad_pendiente: number;
+  tipo_entrega: string | null;
+}
+
+export function mapCanonicalPedidoCompraToRow(row: CanonicalPedidoCompraRow): CompraPedidoInsert | null {
+  const nroPedido = row.nroPedido?.trim();
+  const item = row.item?.trim();
+  if (!nroPedido || !item) return null;
+
+  return {
+    nro_pedido: nroPedido,
+    item,
+    fecha_emision: row.emissionDate,
+    sucursal: row.branch,
+    proveedor_codigo: row.supplierCode,
+    proveedor_nombre: row.supplierName,
+    moneda: row.currency,
+    condicion_pago: row.paymentCondition,
+    naturaleza: row.naturaleza,
+    producto_codigo: row.productCode,
+    descripcion: row.description,
+    unidad: row.unit,
+    cantidad: row.quantity,
+    precio_unitario: row.unitPrice,
+    valor_total: row.total,
+    cantidad_entregada: row.deliveredQuantity,
+    cantidad_pendiente: row.pendingQuantity,
+    tipo_entrega: row.deliveryType,
+  };
+}
+
+export interface CompraSolicitudInsert {
+  nro_solicitud: string;
+  item: string;
+  fecha_emision: string | null;
+  sucursal: string | null;
+  solicitante: string | null;
+  moneda: string | null;
+  producto_codigo: string | null;
+  codigo_fabricante: string | null;
+  marca_solicitada: string | null;
+  descripcion: string | null;
+  unidad: string | null;
+  cantidad: number;
+  precio_unitario: number;
+  valor_total: number;
+  observacion: string | null;
+}
+
+export function mapCanonicalSolicitudCompraToRow(row: CanonicalSolicitudCompraRow): CompraSolicitudInsert | null {
+  const nroSolicitud = row.nroSolicitud?.trim();
+  const item = row.item?.trim();
+  if (!nroSolicitud || !item) return null;
+
+  return {
+    nro_solicitud: nroSolicitud,
+    item,
+    fecha_emision: row.emissionDate,
+    sucursal: row.branch,
+    solicitante: row.requester,
+    moneda: row.currency,
+    producto_codigo: row.productCode,
+    codigo_fabricante: row.manufacturerCode,
+    marca_solicitada: row.requestedBrand,
+    descripcion: row.description,
+    unidad: row.unit,
+    cantidad: row.quantity,
+    precio_unitario: row.unitPrice,
+    valor_total: row.total,
+    observacion: row.observation,
   };
 }
 

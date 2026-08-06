@@ -1,8 +1,12 @@
 import type {
   CanonicalBillingRow,
+  CanonicalClienteRow,
   CanonicalImportEnvelope,
+  CanonicalPedidoCompraRow,
   CanonicalProductRow,
   CanonicalServiceOrderRow,
+  CanonicalSolicitudCompraRow,
+  CanonicalStockRow,
 } from "@/lib/imports/canonical";
 import {
   applyIva,
@@ -57,7 +61,11 @@ function normalizeXmlSucursal(value: unknown) {
   if (upper.includes("SANTA RITA") || sample === "01") return "Santa Rita";
   if (upper.includes("SANTA ROSA") || sample === "02") return "Santa Rosa";
   if (upper.includes("CAMPO 9") || upper.includes("CAMPO NUEVE") || sample === "03") return "Campo 9";
-  if (upper.includes("MISIONES") || sample === "04") return "Misiones";
+  // "San Juan Bautista" es la localidad cabecera del departamento de
+  // Misiones -- TOTVS a veces manda la localidad en vez del nombre de
+  // sucursal que usa el resto de la app. Verificado: es la misma sucursal,
+  // no una nueva (confirmado en pedidos/solicitudes de compra).
+  if (upper.includes("MISIONES") || upper.includes("SAN JUAN BAUTISTA") || sample === "04") return "Misiones";
   if (upper.includes("LOMA PLATA") || sample === "05") return "Loma Plata";
   if (upper.includes("KATUETE") || upper.includes("KATUETÉ") || sample === "06") return "Katuete";
   return null;
@@ -293,6 +301,171 @@ export function mapProductosSheet(
 
   return {
     sourceSystem: "new_xml_productos",
+    sourceFileName,
+    worksheetName: sheet.name,
+    importedAt: new Date().toISOString(),
+    rows,
+  };
+}
+
+function normalizeXmlMonedaCompras(value: unknown): string | null {
+  const sample = normalizeUpper(value);
+  if (!sample) return null;
+  if (sample.includes("USD") || sample.includes("DOLAR")) return "USD";
+  if (sample.includes("GRS") || sample.includes("GS") || sample.includes("PYG") || sample.includes("GUARANI")) return "GS";
+  return sample;
+}
+
+export function mapPedidoCompraSheet(
+  sourceFileName: string,
+  sheet: SpreadsheetXmlSheet,
+): CanonicalImportEnvelope<CanonicalPedidoCompraRow> {
+  const rows = sheet.rows.map((row, index) => {
+    const nroPedido = text(row, ["Nr.PedCompra"]);
+    const item = text(row, ["Item"]);
+
+    return {
+      rowId: buildRowId(nroPedido, item, String(index + 1)) || `pedido-compra-row-${index + 1}`,
+      nroPedido,
+      item,
+      emissionDate: normalizeDateLike(firstValue(row, ["Fch Emision"])),
+      branch: normalizeXmlSucursal(firstValue(row, ["FILIAL"])),
+      supplierCode: text(row, ["Proveedor"]),
+      supplierName: text(row, ["Razon Social"]),
+      currency: normalizeXmlMonedaCompras(firstValue(row, ["MONEDA"])),
+      paymentCondition: text(row, ["CNDPAG"]),
+      naturaleza: text(row, ["NATURALEZA"]),
+      productCode: text(row, ["Producto"]),
+      description: text(row, ["Descripcion"]),
+      unit: text(row, ["Unidad"]),
+      quantity: number(row, ["Cantidad"]) ?? 0,
+      unitPrice: number(row, ["Prc.Unitario"]) ?? 0,
+      total: number(row, ["Valor Total"]) ?? 0,
+      deliveredQuantity: number(row, ["Ctd. Entrega"]) ?? 0,
+      pendingQuantity: number(row, ["PENDIENTE"]) ?? 0,
+      deliveryType: text(row, ["TIPENT"]),
+      raw: row,
+    } satisfies CanonicalPedidoCompraRow;
+  });
+
+  return {
+    sourceSystem: "new_xml_pedidos_compra",
+    sourceFileName,
+    worksheetName: sheet.name,
+    importedAt: new Date().toISOString(),
+    rows,
+  };
+}
+
+export function mapSolicitudCompraSheet(
+  sourceFileName: string,
+  sheet: SpreadsheetXmlSheet,
+): CanonicalImportEnvelope<CanonicalSolicitudCompraRow> {
+  const rows = sheet.rows.map((row, index) => {
+    const nroSolicitud = text(row, ["Nro.Solc.Com"]);
+    const item = text(row, ["Item Sl.Comp"]);
+
+    return {
+      rowId: buildRowId(nroSolicitud, item, String(index + 1)) || `solicitud-compra-row-${index + 1}`,
+      nroSolicitud,
+      item,
+      emissionDate: normalizeDateLike(firstValue(row, ["Fch Emision"])),
+      branch: normalizeXmlSucursal(firstValue(row, ["FILIAL"])),
+      requester: text(row, ["Solicitante"]),
+      currency: normalizeXmlMonedaCompras(firstValue(row, ["MONEDA"])),
+      productCode: text(row, ["Producto"]),
+      manufacturerCode: text(row, ["Cod Faricant", "Cod Fabricant"]),
+      requestedBrand: normalizeXmlMarca(firstValue(row, ["MARCA"])),
+      description: text(row, ["Descripcion"]),
+      unit: text(row, ["Unid. Medida"]),
+      quantity: number(row, ["Cantidad"]) ?? 0,
+      unitPrice: number(row, ["Prc Unitario"]) ?? 0,
+      total: number(row, ["Val.Total"]) ?? 0,
+      observation: text(row, ["Observacion"]),
+      raw: row,
+    } satisfies CanonicalSolicitudCompraRow;
+  });
+
+  return {
+    sourceSystem: "new_xml_solicitudes_compra",
+    sourceFileName,
+    worksheetName: sheet.name,
+    importedAt: new Date().toISOString(),
+    rows,
+  };
+}
+
+export function mapClienteSheet(
+  sourceFileName: string,
+  sheet: SpreadsheetXmlSheet,
+): CanonicalImportEnvelope<CanonicalClienteRow> {
+  const vistos = new Set<string>();
+  const rows: CanonicalClienteRow[] = [];
+
+  sheet.rows.forEach((row, index) => {
+    const codEntidad = text(row, ["Codigo"]);
+    if (!codEntidad) return;
+
+    // Un mismo cliente puede aparecer una vez por sucursal (ej. la propia
+    // CDM, dada de alta en TOTVS 6 veces, una por Tienda) -- nos quedamos
+    // con la primera fila que aparece para ese codigo, decision explicita
+    // del usuario en vez de crear un registro separado por sucursal.
+    const key = normalizeStableKey(codEntidad);
+    if (vistos.has(key)) return;
+    vistos.add(key);
+
+    const region = text(row, ["DISTRI"]);
+    const localidad = text(row, ["Municipio"]);
+
+    rows.push({
+      rowId: buildRowId(codEntidad, String(index + 1)) || `cliente-row-${index + 1}`,
+      codEntidad,
+      nombre: text(row, ["Nombre"]) || `Cliente ${index + 1}`,
+      ruc: text(row, ["RUC"]),
+      direccion: text(row, ["Direccion"]),
+      localidad,
+      correoPrincipal: text(row, ["E-Mail"]),
+      telefono: text(row, ["Telefono"]),
+      region,
+      sucursal: normalizeXmlSucursal(region) ?? normalizeXmlSucursal(localidad),
+      activo: normalizeUpper(firstValue(row, ["ESTATUS"])) !== "INACTIVO",
+      raw: row,
+    });
+  });
+
+  return {
+    sourceSystem: "new_xml_clientes",
+    sourceFileName,
+    worksheetName: sheet.name,
+    importedAt: new Date().toISOString(),
+    rows,
+  };
+}
+
+export function mapStockSheet(
+  sourceFileName: string,
+  sheet: SpreadsheetXmlSheet,
+): CanonicalImportEnvelope<CanonicalStockRow> {
+  const rows = sheet.rows.map((row, index) => {
+    const productCode = text(row, ["Producto"]);
+    const branch = normalizeXmlSucursal(firstValue(row, ["FILIAL"]));
+    const warehouse = text(row, ["LOCAL"]);
+
+    return {
+      rowId: buildRowId(productCode, branch, warehouse, String(index + 1)) || `stock-row-${index + 1}`,
+      productCode,
+      description: text(row, ["Descripcion"]),
+      unit: text(row, ["Unidad"]),
+      manufacturerCode: text(row, ["Cod Faricant", "Cod Fabricant"]),
+      branch,
+      warehouse,
+      balance: number(row, ["Saldo Actual"]) ?? 0,
+      raw: row,
+    } satisfies CanonicalStockRow;
+  });
+
+  return {
+    sourceSystem: "new_xml_stock",
     sourceFileName,
     worksheetName: sheet.name,
     importedAt: new Date().toISOString(),

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAGE = 1000;
 
-async function cargarTodo<T>(qb: any): Promise<T[]> {
+export async function cargarTodo<T>(qb: any): Promise<T[]> {
   let from = 0;
   const all: T[] = [];
 
