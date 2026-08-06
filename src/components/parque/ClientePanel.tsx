@@ -65,6 +65,7 @@ type Cliente = {
   direccion: string | null;
   localidad: string | null;
   correo_principal: string | null;
+  telefono: string | null;
   sucursal: Sucursal | null;
 };
 type Contacto = {
@@ -189,7 +190,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     const [c, ct, m, s, f, t, p] = await Promise.all([
       supabase
         .from("clientes")
-        .select("id, nombre, ruc, region, direccion, localidad, correo_principal, sucursal")
+        .select("id, nombre, ruc, region, direccion, localidad, correo_principal, telefono, sucursal")
         .eq("id", id)
         .maybeSingle(),
       supabase.from("contactos_cliente").select("*").eq("cliente_id", id).order("es_principal", { ascending: false }),
@@ -242,6 +243,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         direccion: cForm.direccion ?? null,
         localidad: cForm.localidad ?? null,
         correo_principal: cForm.correo_principal ?? null,
+        telefono: cForm.telefono ?? null,
       })
       .eq("id", cliente.id);
     if (error) return toast.error(error.message);
@@ -515,7 +517,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
               <div><span className="text-muted-foreground">Región:</span> {cliente?.region ?? "—"}</div>
               <div><span className="text-muted-foreground">Localidad:</span> {cliente?.localidad ?? "—"}</div>
               <div className="col-span-2"><span className="text-muted-foreground">Dirección:</span> {cliente?.direccion ?? "—"}</div>
-              <div className="col-span-2"><span className="text-muted-foreground">Correo:</span> {cliente?.correo_principal ?? "—"}</div>
+              <div><span className="text-muted-foreground">Correo:</span> {cliente?.correo_principal ?? "—"}</div>
+              <div><span className="text-muted-foreground">Teléfono:</span> {cliente?.telefono ?? "—"}</div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -524,7 +527,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
               <div><Label className="text-[11px]">Región</Label><Input value={cForm.region ?? ""} onChange={(e) => setCForm({ ...cForm, region: e.target.value })} /></div>
               <div><Label className="text-[11px]">Localidad</Label><Input value={cForm.localidad ?? ""} onChange={(e) => setCForm({ ...cForm, localidad: e.target.value })} /></div>
               <div className="col-span-2"><Label className="text-[11px]">Dirección</Label><Input value={cForm.direccion ?? ""} onChange={(e) => setCForm({ ...cForm, direccion: e.target.value })} /></div>
-              <div className="col-span-2"><Label className="text-[11px]">Correo principal</Label><Input value={cForm.correo_principal ?? ""} onChange={(e) => setCForm({ ...cForm, correo_principal: e.target.value })} /></div>
+              <div><Label className="text-[11px]">Correo principal</Label><Input value={cForm.correo_principal ?? ""} onChange={(e) => setCForm({ ...cForm, correo_principal: e.target.value })} /></div>
+              <div><Label className="text-[11px]">Teléfono</Label><Input value={cForm.telefono ?? ""} onChange={(e) => setCForm({ ...cForm, telefono: e.target.value })} /></div>
             </div>
           )}
         </section>
