@@ -20,20 +20,50 @@ export const ESTADO_LABELS: Record<(typeof ESTADOS)[number], string> = {
   Completado: "Realizada",
   Cancelada: "No realizada",
 };
-export const ROLES = ["admin", "cabecilla", "tecnico"] as const;
+/**
+ * Nivel jerarquico global (no por modulo). "Cabecilla" y "tecnico" ya no son
+ * valores guardados: son un nombre de presentacion para operativo/jefatura
+ * cuando el usuario tiene acceso al modulo Servicios (ver nivelLabel() mas
+ * abajo). Para cualquier otro modulo, o sin Servicios habilitado, se
+ * muestra el nombre generico del nivel.
+ */
+export const ROLES = ["admin", "gerencia", "jefatura", "operativo"] as const;
 export const TIPOS_TRABAJO = ["Visita de campo", "Máquina en taller"] as const;
+
+/** Modulos habilitables por usuario (independiente del nivel). Espejo de la tabla public.modulos. */
+export const MODULOS = ["servicios", "repuestos"] as const;
+export const MODULO_LABELS: Record<(typeof MODULOS)[number], string> = {
+  servicios: "Servicios",
+  repuestos: "Repuestos",
+};
 
 export type Sucursal = (typeof SUCURSALES)[number];
 export type Marca = (typeof MARCAS)[number];
 export type Estado = (typeof ESTADOS)[number];
 export type Role = (typeof ROLES)[number];
+export type Modulo = (typeof MODULOS)[number];
 export type TipoTrabajo = (typeof TIPOS_TRABAJO)[number];
 
+/** Nombres genericos del nivel. Para el alias usado en Servicios, ver nivelLabel() abajo. */
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrador",
-  cabecilla: "Cabecilla",
-  tecnico: "Técnico",
+  gerencia: "Gerencia",
+  jefatura: "Jefatura",
+  operativo: "Operativo",
 };
+
+/**
+ * Nombre a mostrar para un nivel: "Tecnico"/"Cabecilla" solo cuando el
+ * usuario tiene acceso al modulo Servicios, si no el nombre generico del
+ * nivel. No hay alias especial para otros modulos todavia.
+ */
+export function nivelLabel(nivel: Role | null | undefined, moduloAccess: readonly string[] = []): string {
+  if (!nivel) return "—";
+  const tieneServicios = moduloAccess.includes("servicios");
+  if (nivel === "operativo" && tieneServicios) return "Técnico";
+  if (nivel === "jefatura" && tieneServicios) return "Cabecilla";
+  return ROLE_LABELS[nivel];
+}
 
 export const FMT_DATE = "dd/MM/yyyy";
 export const FMT_DATE_SHORT = "dd/MM";

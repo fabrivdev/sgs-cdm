@@ -16,11 +16,18 @@ interface AuthCtx {
   session: Session | null;
   profile: Profile | null;
   roles: Role[];
+  moduloAccess: string[];
   loading: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isGerencia: boolean;
+  isJefatura: boolean;
+  isOperativo: boolean;
+  /** @deprecated alias de isJefatura, valido solo dentro del contexto de Servicios */
   isCabecilla: boolean;
+  /** @deprecated alias de isOperativo, valido solo dentro del contexto de Servicios */
   isTecnico: boolean;
+  hasModuloAccess: (moduloId: string) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -33,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [moduloAccess, setModuloAccess] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const loadedUserRef = useRef<string | null>(null);
   const loadingUserRef = useRef<string | null>(null);
@@ -43,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setModuloAccess([]);
     loadedUserRef.current = null;
     loadingUserRef.current = null;
     loadingPromiseRef.current = null;
@@ -111,10 +120,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const roleOwnerId = loadedProfile?.id ?? uid;
-      const { data: roleRows } = await supabase.from("user_roles").select("role").eq("user_id", roleOwnerId);
+      const [{ data: roleRows }, { data: moduloRows }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", roleOwnerId),
+        (supabase as any).from("user_modulo_acceso").select("modulo_id").eq("user_id", roleOwnerId),
+      ]);
 
       setProfile(loadedProfile);
       setRoles((roleRows ?? []).map((row: { role: Role }) => row.role));
+      setModuloAccess(((moduloRows ?? []) as { modulo_id: string }[]).map((row) => row.modulo_id));
       loadedUserRef.current = uid;
     })();
 
@@ -190,6 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await loadUserData(user.id, true);
   };
 
+  const isJefatura = roles.includes("jefatura");
+  const isOperativo = roles.includes("operativo");
+
   return (
     <Ctx.Provider
       value={{
@@ -197,11 +213,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         roles,
+        moduloAccess,
         loading,
         isAdmin: roles.includes("admin"),
         isSuperAdmin: (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py",
-        isCabecilla: roles.includes("cabecilla"),
-        isTecnico: roles.includes("tecnico"),
+        isGerencia: roles.includes("gerencia"),
+        isJefatura,
+        isOperativo,
+        isCabecilla: isJefatura,
+        isTecnico: isOperativo,
+        // Admin ve todos los modulos sin necesitar un grant explicito, igual
+        // que ya bypassea el resto de los gates de rol en la app.
+        hasModuloAccess: (moduloId: string) => roles.includes("admin") || moduloAccess.includes(moduloId),
         signIn,
         signOut,
         refresh,

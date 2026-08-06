@@ -9,9 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ROLES, ROLE_LABELS, SUCURSALES, type Role, type Sucursal } from "@/lib/constants";
+import { MODULOS, MODULO_LABELS, ROLES, ROLE_LABELS, SUCURSALES, nivelLabel, type Modulo, type Role, type Sucursal } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Database, Eye, EyeOff, KeyRound, Save, Settings2, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
+import { ChevronDown, Database, Eye, EyeOff, KeyRound, Save, Settings2, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +25,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { ImportarTab } from "@/components/parque/ImportarTab";
+import { ImportarTotvsTab } from "@/components/parque/ImportarTotvsTab";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 
 interface Profile {
@@ -39,17 +42,59 @@ interface UserRole {
   role: Role;
 }
 
+interface UserModuloAcceso {
+  user_id: string;
+  modulo_id: Modulo;
+}
+
+function ModuloChips({
+  activos,
+  editable,
+  onToggle,
+}: {
+  activos: Modulo[];
+  editable: boolean;
+  onToggle: (modulo: Modulo, activo: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {MODULOS.map((modulo) => {
+        const checked = activos.includes(modulo);
+        return (
+          <button
+            key={modulo}
+            type="button"
+            disabled={!editable}
+            onClick={() => onToggle(modulo, !checked)}
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+              checked
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-muted-foreground/25 text-muted-foreground",
+              editable && !checked && "hover:border-muted-foreground/50 hover:text-foreground",
+              !editable && "cursor-default",
+            )}
+          >
+            {MODULO_LABELS[modulo]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Admin() {
   const { isSuperAdmin } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [moduloAcceso, setModuloAcceso] = useState<UserModuloAcceso[]>([]);
   const [emails, setEmails] = useState<Record<string, string>>({});
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
   const [nuSucursal, setNuSucursal] = useState<Sucursal>(SUCURSALES[0]);
-  const [nuRol, setNuRol] = useState<Role>("tecnico");
+  const [nuRol, setNuRol] = useState<Role>("operativo");
   const [busy, setBusy] = useState(false);
 
   const [credUser, setCredUser] = useState<Profile | null>(null);
@@ -74,6 +119,15 @@ export default function Admin() {
     [roles],
   );
 
+  const moduloAccesoByUser = useMemo(
+    () =>
+      moduloAcceso.reduce<Record<string, Modulo[]>>((acc, item) => {
+        (acc[item.user_id] ??= []).push(item.modulo_id);
+        return acc;
+      }, {}),
+    [moduloAcceso],
+  );
+
   const hasLinkedSchema = profiles.some((profile) => typeof profile.auth_user_id !== "undefined");
 
   const emailByProfile = (profile: Profile) => {
@@ -95,9 +149,10 @@ export default function Admin() {
   );
 
   const load = async () => {
-    const [profileResult, roleResult] = await Promise.all([
+    const [profileResult, roleResult, moduloAccesoResult] = await Promise.all([
       (supabase as any).from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
       supabase.from("user_roles").select("user_id, role"),
+      (supabase as any).from("user_modulo_acceso").select("user_id, modulo_id"),
     ]);
 
     let loadedProfiles = (profileResult.data ?? []) as Profile[];
@@ -123,6 +178,7 @@ export default function Admin() {
 
     setProfiles(loadedProfiles);
     setRoles((roleResult.data ?? []) as UserRole[]);
+    setModuloAcceso((moduloAccesoResult.data ?? []) as UserModuloAcceso[]);
 
     const { data: emailData, error: emailErr } = await supabase.functions.invoke("admin-list-users");
     if (!emailErr && emailData?.users) {
@@ -221,6 +277,15 @@ export default function Admin() {
       toast.success("Rol actualizado");
       load();
     }
+  };
+
+  const cambiarModuloAcceso = async (userId: string, moduloId: Modulo, activo: boolean) => {
+    const query = activo
+      ? (supabase as any).from("user_modulo_acceso").insert({ user_id: userId, modulo_id: moduloId })
+      : (supabase as any).from("user_modulo_acceso").delete().eq("user_id", userId).eq("modulo_id", moduloId);
+    const { error } = await query;
+    if (error) toast.error(error.message);
+    else load();
   };
 
   const cambiarSucursal = async (id: string, sucursal: Sucursal) => {
@@ -363,7 +428,7 @@ export default function Admin() {
                   <TableHead>Técnico</TableHead>
                   <TableHead>Acceso</TableHead>
                   <TableHead>Sucursal</TableHead>
-                  <TableHead>Rol</TableHead>
+                  <TableHead>Nivel</TableHead>
                   <TableHead>Activo</TableHead>
                   {isSuperAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
                 </TableRow>
@@ -386,14 +451,7 @@ export default function Admin() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isSuperAdmin ? (
-                        <Select value={rolesByUser[profile.id]?.[0] ?? ""} onValueChange={(value) => cambiarRol(profile.id, value as Role)}>
-                          <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge variant="outline">{ROLE_LABELS[rolesByUser[profile.id]?.[0] as Role] ?? "—"}</Badge>
-                      )}
+                      <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</Badge>
                     </TableCell>
                     <TableCell>
                       {isSuperAdmin ? (
@@ -476,15 +534,8 @@ export default function Admin() {
                     )}
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Rol</Label>
-                    {isSuperAdmin ? (
-                      <Select value={rolesByUser[profile.id]?.[0] ?? ""} onValueChange={(value) => cambiarRol(profile.id, value as Role)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="py-1.5 text-xs">{ROLE_LABELS[rolesByUser[profile.id]?.[0] as Role] ?? "—"}</div>
-                    )}
+                    <Label className="text-[10px] text-muted-foreground">Nivel</Label>
+                    <div className="py-1.5 text-xs">{nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</div>
                   </div>
                 </div>
               </Card>
@@ -563,7 +614,8 @@ export default function Admin() {
                   <TableRow>
                     <TableHead>Persona</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Rol</TableHead>
+                    <TableHead>Nivel</TableHead>
+                    <TableHead>Módulos</TableHead>
                     <TableHead>Sucursal</TableHead>
                     <TableHead>Estado</TableHead>
                     {isSuperAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
@@ -574,7 +626,23 @@ export default function Admin() {
                     <TableRow key={profile.id}>
                       <TableCell className="font-medium">{profile.nombre}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{emailByProfile(profile)}</TableCell>
-                      <TableCell><Badge variant="outline">{ROLE_LABELS[rolesByUser[profile.id]?.[0] as Role] ?? "-"}</Badge></TableCell>
+                      <TableCell>
+                        {isSuperAdmin ? (
+                          <Select value={rolesByUser[profile.id]?.[0] ?? ""} onValueChange={(value) => cambiarRol(profile.id, value as Role)}>
+                            <SelectTrigger className="h-8 w-36"><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <ModuloChips
+                          activos={moduloAccesoByUser[profile.id] ?? []}
+                          editable={isSuperAdmin}
+                          onToggle={(modulo, activo) => cambiarModuloAcceso(profile.id, modulo, activo)}
+                        />
+                      </TableCell>
                       <TableCell className="text-xs">{profile.sucursal ?? "-"}</TableCell>
                       <TableCell><Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
                       {isSuperAdmin && (
@@ -605,7 +673,7 @@ export default function Admin() {
                 <div key={profile.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{profile.nombre}</div>
-                    <div className="truncate text-xs text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {ROLE_LABELS[rolesByUser[profile.id]?.[0] as Role] ?? "Sin rol"}</div>
+                    <div className="truncate text-xs text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</div>
                   </div>
                   {isSuperAdmin && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
                 </div>
@@ -618,7 +686,17 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="importar" className="space-y-4">
-          <ImportarTab onChanged={load} />
+          <ImportarTotvsTab onChanged={load} />
+
+          <Collapsible>
+            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-xs font-medium text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-180">
+              <ChevronDown className="h-3.5 w-3.5 transition-transform" />
+              Importadores anteriores e historial
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <ImportarTab onChanged={load} />
+            </CollapsibleContent>
+          </Collapsible>
         </TabsContent>
 
         <TabsContent value="parametros" className="space-y-4">

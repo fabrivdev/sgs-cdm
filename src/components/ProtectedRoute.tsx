@@ -5,10 +5,12 @@ import type { Role } from "@/lib/constants";
 interface Props {
   children: React.ReactNode;
   requireRoles?: Role[];
+  /** Modulo requerido (independiente del nivel/rol), ej. "servicios" | "repuestos". */
+  requireModulo?: string;
 }
 
-export function ProtectedRoute({ children, requireRoles }: Props) {
-  const { user, roles, loading } = useAuth();
+export function ProtectedRoute({ children, requireRoles, requireModulo }: Props) {
+  const { user, roles, hasModuloAccess, loading } = useAuth();
 
   if (loading) {
     return (
@@ -21,6 +23,10 @@ export function ProtectedRoute({ children, requireRoles }: Props) {
   if (!user) return <Navigate to="/auth" replace />;
 
   if (requireRoles && !requireRoles.some((r) => roles.includes(r))) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (requireModulo && !hasModuloAccess(requireModulo)) {
     return <Navigate to="/" replace />;
   }
 
