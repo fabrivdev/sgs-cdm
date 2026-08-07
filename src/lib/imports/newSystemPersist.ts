@@ -69,10 +69,15 @@ export async function persistNewSystemBundle({
         grupo: crosswalk?.productGroup ?? row.productGroup,
         grupo_fx: crosswalk?.inferredLineType ?? row.lineType,
         cod_factura: row.invoiceShortNumber ?? row.invoiceLongNumber ?? row.documentNumber ?? `XML-${row.rowId.slice(0, 12)}`,
+        moneda: row.currency,
       };
     })
     .filter(Boolean) as any[];
 
+  // La moneda entra en la clave de agrupacion para que una fila de
+  // "facturacion" nunca sume lineas en USD y en GS bajo un mismo total --
+  // sin esto, agrupar solo por factura/tipo/fecha/etc podria mezclar dos
+  // monedas distintas en un mismo total_venta.
   const facturacionResumenByKey = new Map<string, any>();
   for (const row of facturacionResumenRows) {
     const key = [
@@ -84,6 +89,7 @@ export async function persistNewSystemBundle({
       row.sucursal ?? "",
       row.grupo ?? "",
       row.grupo_fx ?? "",
+      row.moneda ?? "",
     ].join("||");
     const current = facturacionResumenByKey.get(key);
     if (!current) {
@@ -116,6 +122,7 @@ export async function persistNewSystemBundle({
       cantidad: Number((row.quantity || 0).toFixed(4)),
       valor_unitario: Number((row.unitValueWithIva || row.unitValueBase || 0).toFixed(2)),
       total_venta: Number((row.totalValueWithIva || row.totalValueBase || 0).toFixed(2)),
+      moneda: row.currency,
       raw_data: {
         ...row.raw,
         linked_service_order: crosswalk?.serviceOrderNumber ?? null,
@@ -215,7 +222,7 @@ export async function persistNewSystemBundle({
   for (let i = 0; i < facturacionResumen.length; i += 500) {
     const chunk = facturacionResumen.slice(i, i + 500);
     const { error } = await supabase.from("facturacion").upsert(chunk as any, {
-      onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx",
+      onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx,moneda",
     });
     if (error) throw error;
   }

@@ -1055,6 +1055,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         grupo: r.grupo,
         grupo_fx: r.grupo_fx,
         cod_factura: r.cod_factura,
+        // Este importador viejo (grillas/Excel) no trae ninguna columna de
+        // moneda -- se marca "UNKNOWN" en vez de dejarlo null para que el
+        // indice unico de mas abajo siga detectando reimportaciones del
+        // mismo archivo (Postgres nunca matchea NULL contra NULL).
+        moneda: "UNKNOWN",
       }));
 
       let insertadosReal = 0;
@@ -1063,7 +1068,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         const { error, count } = await supabase
           .from("facturacion")
           .upsert(chunk as any, {
-            onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx",
+            onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx,moneda",
             count: "exact",
           });
         if (error) throw error;
