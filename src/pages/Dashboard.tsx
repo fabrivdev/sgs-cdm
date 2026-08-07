@@ -604,6 +604,7 @@ export default function Dashboard() {
   const [baseLoading, setBaseLoading] = useState(true);
   const [jornadasLoading, setJornadasLoading] = useState(true);
   const [facturaciónLoading, setFacturacionLoading] = useState(true);
+  const [excluidasGsCount, setExcluidasGsCount] = useState(0);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
   const [metaHorasMensual, setMetaHorasMensual] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
 
@@ -889,6 +890,12 @@ export default function Dashboard() {
               .from("facturacion")
               .select(cols)
               .eq("excluido_de_reportes", false)
+              // Todos los montos del Dashboard son solo USD. No se filtra
+              // moneda="USD" estricto porque la facturacion importada antes
+              // de que existiera esta columna quedo con moneda=null (no
+              // "GS") -- filtrar estricto tiraria tambien todo ese historico.
+              // Se excluye unicamente lo confirmado en guaranies.
+              .or("moneda.neq.GS,moneda.is.null")
               .gte("fecha", dateKey(queryStart))
               .lte("fecha", dateKey(queryEnd))
               .order("fecha", { ascending: false });
@@ -913,6 +920,7 @@ export default function Dashboard() {
           .select(
             "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, cod_mercaderia, codigo_fabricante, mercaderia, observacion, raw_data, subgrupo_original, grupo_normalizado, marca_normalizada, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
           )
+          .or("moneda.neq.GS,moneda.is.null")
           .gte("fecha_factura", dateKey(queryStart))
           .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
           .order("fecha_factura", { ascending: false }) as any);
@@ -987,6 +995,43 @@ export default function Dashboard() {
       alive = false;
     };
   }, [queryEnd, queryStart]);
+
+  // Nota de honestidad: cuanta (sin traer filas) cuantas facturas del
+  // periodo visible quedaron afuera de los totales por estar en guaranies,
+  // para no esconder que existen aunque no se sumen ni se conviertan.
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const [facturacionGs, lineasGs] = await Promise.all([
+          supabase
+            .from("facturacion")
+            .select("*", { count: "exact", head: true })
+            .eq("excluido_de_reportes", false)
+            .eq("moneda", "GS")
+            .gte("fecha", dateKey(periodStart))
+            .lte("fecha", dateKey(periodEnd)),
+          supabase
+            .from("facturacion_lineas_importadas" as any)
+            .select("*", { count: "exact", head: true })
+            .eq("moneda", "GS")
+            .gte("fecha_factura", dateKey(periodStart))
+            .lte("fecha_factura", `${dateKey(periodEnd)}T23:59:59`),
+        ]);
+
+        if (!alive) return;
+        setExcluidasGsCount((facturacionGs.count ?? 0) + (lineasGs.count ?? 0));
+      } catch {
+        // Es solo una nota informativa -- si falla no debe romper el resto del dashboard.
+        if (alive) setExcluidasGsCount(0);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [periodStart, periodEnd]);
 
   useEffect(() => {
     let alive = true;
@@ -3244,6 +3289,13 @@ export default function Dashboard() {
           </Button>
         </FilterCustom>
       </FiltersBar>
+
+        {excluidasGsCount > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            Los montos de este período no incluyen {excluidasGsCount} factura{excluidasGsCount !== 1 ? "s" : ""} en
+            guaraníes (no se suman ni se convierten).
+          </p>
+        )}
 
         <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
         <TabsList className="inline-flex h-auto min-w-max">
