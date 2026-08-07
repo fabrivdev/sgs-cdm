@@ -20,6 +20,7 @@ import { ChevronDown, ChevronRight, Link2, X } from "lucide-react";
 import { toast } from "sonner";
 import { resolverSolicitudes, type PedidoCandidato } from "@/lib/imports";
 import { SUCURSALES } from "@/lib/constants";
+import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,8 @@ interface Filtros {
   nroSolicitud: string;
   solicitante: string;
 }
+
+type SolicitudSortKey = "sucursal" | "nroSolicitud" | "fechaEmision" | "solicitante" | "itemsCount";
 
 const FILTROS_VACIOS: Filtros = { busqueda: "", sucursal: "", nroSolicitud: "", solicitante: "" };
 
@@ -50,6 +53,7 @@ export function SolicitudesCompraTab() {
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VACIOS);
+  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<SolicitudSortKey>("fechaEmision", "desc");
   const [vinculando, setVinculando] = useState<{
     sucursal: string;
     nroSolicitud: string;
@@ -129,6 +133,26 @@ export function SolicitudesCompraTab() {
       return true;
     });
   }, [solicitudesAgrupadas, filtros, filtrosActivos]);
+
+  const gruposOrdenados = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...gruposFiltrados].sort((a, b) => {
+      switch (sortKey) {
+        case "sucursal":
+          return a.sucursal.localeCompare(b.sucursal) * dir;
+        case "nroSolicitud":
+          return a.nroSolicitud.localeCompare(b.nroSolicitud) * dir;
+        case "fechaEmision":
+          return (a.fechaEmision ?? "").localeCompare(b.fechaEmision ?? "") * dir;
+        case "solicitante":
+          return (a.solicitante ?? "").localeCompare(b.solicitante ?? "") * dir;
+        case "itemsCount":
+          return (a.lineas.length - b.lineas.length) * dir;
+        default:
+          return 0;
+      }
+    });
+  }, [gruposFiltrados, sortKey, sortDir]);
 
   const guardarVinculo = async (pedido: PedidoCandidato) => {
     if (!vinculando || !user) return;
@@ -229,22 +253,35 @@ export function SolicitudesCompraTab() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8" />
-                <TableHead>Sucursal</TableHead>
-                <TableHead>N° Solicitud</TableHead>
-                <TableHead className="hidden sm:table-cell">Fecha</TableHead>
-                <TableHead>Solicitante</TableHead>
-                <TableHead className="text-right">Ítems</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("sucursal")}>
+                  <div className="flex items-center gap-1">Sucursal {sortIcon("sucursal")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("nroSolicitud")}>
+                  <div className="flex items-center gap-1">N° Solicitud {sortIcon("nroSolicitud")}</div>
+                </TableHead>
+                <TableHead
+                  className="hidden cursor-pointer select-none sm:table-cell"
+                  onClick={() => toggleSort("fechaEmision")}
+                >
+                  <div className="flex items-center gap-1">Fecha {sortIcon("fechaEmision")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("solicitante")}>
+                  <div className="flex items-center gap-1">Solicitante {sortIcon("solicitante")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("itemsCount")}>
+                  <div className="flex items-center justify-end gap-1">Ítems {sortIcon("itemsCount")}</div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {gruposFiltrados.length === 0 && (
+              {gruposOrdenados.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className={cn(metaText, "p-4 text-center")}>
                     Sin solicitudes para este filtro.
                   </TableCell>
                 </TableRow>
               )}
-              {gruposFiltrados.map((grupo) => {
+              {gruposOrdenados.map((grupo) => {
                 const key = rowKey(grupo);
                 const isOpen = filtrosActivos ? true : expanded.has(key);
                 const busquedaActiva = filtros.busqueda.trim().toLowerCase();

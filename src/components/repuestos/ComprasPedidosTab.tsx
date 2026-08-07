@@ -34,8 +34,18 @@ import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { resolverSolicitudes, solicitudesPorPedido } from "@/lib/imports";
 import { SUCURSALES } from "@/lib/constants";
+import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
+
+type PedidoSortKey =
+  | "sucursal"
+  | "nro_pedido"
+  | "fecha_emision"
+  | "proveedor_nombre"
+  | "cantidad_items"
+  | "valor_total"
+  | "estado_seguimiento";
 
 const ESTADOS_SEGUIMIENTO = ["Sin gestionar", "Solicitado a fabrica", "En transito", "Recibido"] as const;
 
@@ -120,6 +130,7 @@ export function ComprasPedidosTab() {
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VACIOS);
+  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<PedidoSortKey>("fecha_emision", "desc");
 
   const lineasPorPedido = useMemo(() => {
     const map = new Map<string, PedidoLinea[]>();
@@ -161,6 +172,30 @@ export function ComprasPedidosTab() {
       return true;
     });
   }, [resumenQuery.data, filtros, filtrosActivos, lineasPorPedido, fabricanteMapQuery.data]);
+
+  const filasOrdenadas = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filasFiltradas].sort((a, b) => {
+      switch (sortKey) {
+        case "sucursal":
+          return (a.sucursal ?? "").localeCompare(b.sucursal ?? "") * dir;
+        case "nro_pedido":
+          return a.nro_pedido.localeCompare(b.nro_pedido) * dir;
+        case "fecha_emision":
+          return (a.fecha_emision ?? "").localeCompare(b.fecha_emision ?? "") * dir;
+        case "proveedor_nombre":
+          return (a.proveedor_nombre ?? "").localeCompare(b.proveedor_nombre ?? "") * dir;
+        case "cantidad_items":
+          return (a.cantidad_items - b.cantidad_items) * dir;
+        case "valor_total":
+          return (a.valor_total - b.valor_total) * dir;
+        case "estado_seguimiento":
+          return a.estado_seguimiento.localeCompare(b.estado_seguimiento) * dir;
+        default:
+          return 0;
+      }
+    });
+  }, [filasFiltradas, sortKey, sortDir]);
 
   const abrirEdicion = (row: PedidoResumenRow) => {
     setEditing(row);
@@ -272,25 +307,42 @@ export function ComprasPedidosTab() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8" />
-                <TableHead>Sucursal</TableHead>
-                <TableHead>N° Pedido</TableHead>
-                <TableHead className="hidden sm:table-cell">Fecha</TableHead>
-                <TableHead>Proveedor</TableHead>
-                <TableHead className="text-right">Ítems</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Seguimiento</TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("sucursal")}>
+                  <div className="flex items-center gap-1">Sucursal {sortIcon("sucursal")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("nro_pedido")}>
+                  <div className="flex items-center gap-1">N° Pedido {sortIcon("nro_pedido")}</div>
+                </TableHead>
+                <TableHead
+                  className="hidden cursor-pointer select-none sm:table-cell"
+                  onClick={() => toggleSort("fecha_emision")}
+                >
+                  <div className="flex items-center gap-1">Fecha {sortIcon("fecha_emision")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("proveedor_nombre")}>
+                  <div className="flex items-center gap-1">Proveedor {sortIcon("proveedor_nombre")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("cantidad_items")}>
+                  <div className="flex items-center justify-end gap-1">Ítems {sortIcon("cantidad_items")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("valor_total")}>
+                  <div className="flex items-center justify-end gap-1">Total {sortIcon("valor_total")}</div>
+                </TableHead>
+                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("estado_seguimiento")}>
+                  <div className="flex items-center gap-1">Seguimiento {sortIcon("estado_seguimiento")}</div>
+                </TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filasFiltradas.length === 0 && (
+              {filasOrdenadas.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} className={cn(metaText, "p-4 text-center")}>
                     Sin pedidos para este filtro.
                   </TableCell>
                 </TableRow>
               )}
-              {filasFiltradas.map((row) => {
+              {filasOrdenadas.map((row) => {
                 const key = rowKey(row);
                 const isOpen = filtrosActivos ? true : expanded.has(key);
                 const busquedaActiva = filtros.busqueda.trim().toLowerCase();
