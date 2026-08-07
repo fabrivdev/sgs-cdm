@@ -1,41 +1,80 @@
-import { useEffect, useState } from "react";
-import { History, PackageSearch, Search, Warehouse } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  DollarSign,
+  Download,
+  History,
+  Package,
+  Tag,
+  Warehouse,
+  X,
+} from "lucide-react";
+import * as XLSX from "xlsx";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { metaText, pageDescription, pageShell, pageTitle } from "@/lib/ui-classes";
+import { useSortable } from "@/hooks/useSortable";
+import {
+  fetchStockMatrizCompleto,
+  STOCK_FILTROS_VACIOS,
+  STOCK_PAGE_SIZE,
+  useFamiliasStock,
+  useStockKpis,
+  useStockMatriz,
+  type StockFiltros,
+  type StockMatrizRow,
+  type StockSortKey,
+} from "@/hooks/useRepuestos";
+import { MARCAS } from "@/lib/constants";
+import { metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
-import type { Marca } from "@/lib/constants";
 
-interface ProductoRow {
-  codigo_interno: string;
-  codigo_fabricante: string | null;
-  descripcion: string;
-  unidad: string | null;
-  grupo: string | null;
-  familia: string | null;
-  marca: Marca;
-  activo: boolean;
-}
-
-interface StockRow {
-  id: string;
+interface VentaLinea {
+  fecha_factura: string;
+  cantidad: number;
+  total_venta: number;
+  entidad_nombre: string | null;
   sucursal: string | null;
-  deposito: string | null;
-  saldo_actual: number;
 }
 
-interface VentaPorPeriodo {
+interface VentaMensual {
   mes: string;
   cantidad: number;
-  total: number;
 }
 
-const MIN_SEARCH_LENGTH = 2;
-const MAX_RESULTS = 30;
+const MESES_KPI = 12;
+const MESES_EVOLUCION = 6;
+const MAX_ULTIMAS_VENTAS = 8;
+
+function fechaHaceMeses(meses: number) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - meses);
+  return d.toISOString().slice(0, 10);
+}
+
+const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
+  { key: "santa_rita", label: "Santa Rita" },
+  { key: "santa_rosa", label: "Santa Rosa" },
+  { key: "campo_9", label: "Campo 9" },
+  { key: "misiones", label: "Misiones" },
+  { key: "loma_plata", label: "Loma Plata" },
+  { key: "katuete", label: "Katuete" },
+];
+
+const th = "px-2 py-1.5 text-[11px] font-medium";
+const td = "px-2 py-1.5 text-xs";
 
 const formatMes = (mes: string) => {
   const [anio, mesNum] = mes.split("-");
@@ -46,298 +85,246 @@ const formatMes = (mes: string) => {
   return nombre.charAt(0).toUpperCase() + nombre.slice(1);
 };
 
-export default function Repuestos() {
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const [resultados, setResultados] = useState<ProductoRow[] | null>(null);
-  const [stockPorCodigo, setStockPorCodigo] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(false);
-  const [seleccionado, setSeleccionado] = useState<ProductoRow | null>(null);
-  const [stock, setStock] = useState<StockRow[] | null>(null);
-  const [stockLoading, setStockLoading] = useState(false);
-  const [ventas, setVentas] = useState<VentaPorPeriodo[] | null>(null);
+function KpiCard({
+  icon: Icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: typeof Package;
+  value: string;
+  label: string;
+  tone?: "warn";
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-3">
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+            tone === "warn" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-base font-bold leading-tight">{value}</div>
+          <div className={metaText}>{label}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
+  const [ventasLineas, setVentasLineas] = useState<VentaLinea[] | null>(null);
   const [ventasLoading, setVentasLoading] = useState(false);
 
   useEffect(() => {
-    const term = debouncedSearch.trim();
-    if (term.length < MIN_SEARCH_LENGTH) {
-      setResultados(null);
-      setStockPorCodigo({});
+    if (!producto) {
+      setVentasLineas(null);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
-
-    (supabase.from("productos" as any) as any)
-      .select("codigo_interno, codigo_fabricante, descripcion, unidad, grupo, familia, marca, activo")
-      // Este catálogo es de Repuestos: el maestro de TOTVS trae también activos
-      // fijos, mercadería y otros rubros con otros prefijos de código — se
-      // dejan afuera acá, no son repuestos.
-      .ilike("codigo_interno", "REP%")
-      .or(`codigo_interno.ilike.%${term}%,descripcion.ilike.%${term}%,codigo_fabricante.ilike.%${term}%`)
-      .order("descripcion")
-      .limit(MAX_RESULTS)
-      .then(({ data, error }: any) => {
-        if (cancelled) return;
-        const rows = error ? [] : ((data ?? []) as ProductoRow[]);
-        setResultados(rows);
-        setLoading(false);
-
-        if (rows.length === 0) {
-          setStockPorCodigo({});
-          return;
-        }
-
-        // Stock total por producto, para verlo de un vistazo sin tener que abrir cada uno.
-        (supabase.from("repuestos_stock" as any) as any)
-          .select("producto_codigo, saldo_actual")
-          .in("producto_codigo", rows.map((r) => r.codigo_interno))
-          .then(({ data: stockData, error: stockError }: any) => {
-            if (cancelled || stockError) return;
-            const totals: Record<string, number> = {};
-            for (const row of (stockData ?? []) as { producto_codigo: string; saldo_actual: number }[]) {
-              totals[row.producto_codigo] = (totals[row.producto_codigo] ?? 0) + Number(row.saldo_actual || 0);
-            }
-            setStockPorCodigo(totals);
-          });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    if (!seleccionado) {
-      setStock(null);
-      setVentas(null);
-      return;
-    }
-
-    let cancelled = false;
-    setStockLoading(true);
-
-    (supabase.from("repuestos_stock" as any) as any)
-      .select("id, sucursal, deposito, saldo_actual")
-      .eq("producto_codigo", seleccionado.codigo_interno)
-      .order("sucursal")
-      .then(({ data, error }: any) => {
-        if (cancelled) return;
-        setStock(error ? [] : ((data ?? []) as StockRow[]));
-        setStockLoading(false);
-      });
-
     setVentasLoading(true);
+
     (supabase.from("facturacion_lineas_importadas" as any) as any)
-      .select("fecha_factura, cantidad, total_venta")
-      .eq("cod_mercaderia", seleccionado.codigo_interno)
+      .select("fecha_factura, cantidad, total_venta, entidad_nombre, sucursal")
+      .eq("cod_mercaderia", producto.codigo_interno)
       .eq("grupo_normalizado", "Repuestos")
-      .order("fecha_factura", { ascending: true })
+      // Igual que en el Dashboard: se excluye solo lo confirmado en
+      // guaranies, no lo que no tiene moneda cargada (historico previo a
+      // la migracion de moneda).
+      .or("moneda.neq.GS,moneda.is.null")
+      .order("fecha_factura", { ascending: false })
       .then(({ data, error }: any) => {
         if (cancelled) return;
-        if (error || !data) {
-          setVentas([]);
-          setVentasLoading(false);
-          return;
-        }
-
-        const porMes = new Map<string, { cantidad: number; total: number }>();
-        for (const row of data as { fecha_factura: string | null; cantidad: number | null; total_venta: number | null }[]) {
-          if (!row.fecha_factura) continue;
-          const mes = row.fecha_factura.slice(0, 7);
-          const actual = porMes.get(mes) ?? { cantidad: 0, total: 0 };
-          actual.cantidad += Number(row.cantidad || 0);
-          actual.total += Number(row.total_venta || 0);
-          porMes.set(mes, actual);
-        }
-
-        const filas = Array.from(porMes.entries())
-          .map(([mes, v]) => ({ mes, ...v }))
-          .sort((a, b) => a.mes.localeCompare(b.mes));
-        setVentas(filas);
+        setVentasLineas(error ? [] : ((data ?? []) as VentaLinea[]));
         setVentasLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [seleccionado]);
+  }, [producto]);
 
-  const totalStock = (stock ?? []).reduce((sum, row) => sum + Number(row.saldo_actual || 0), 0);
+  const cutoffKpi = useMemo(() => fechaHaceMeses(MESES_KPI), []);
+  const cutoffEvolucion = useMemo(() => fechaHaceMeses(MESES_EVOLUCION), []);
+
+  const ventas12m = useMemo(
+    () => (ventasLineas ?? []).filter((l) => l.fecha_factura && l.fecha_factura >= cutoffKpi),
+    [ventasLineas, cutoffKpi],
+  );
+
+  const unidadesVendidas12m = useMemo(() => ventas12m.reduce((sum, l) => sum + Number(l.cantidad || 0), 0), [ventas12m]);
+  const facturadoUsd12m = useMemo(() => ventas12m.reduce((sum, l) => sum + Number(l.total_venta || 0), 0), [ventas12m]);
+  const precioPromedio = unidadesVendidas12m > 0 ? facturadoUsd12m / unidadesVendidas12m : 0;
+
+  const vendidoPorSucursal = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of ventas12m) {
+      if (!l.sucursal) continue;
+      map.set(l.sucursal, (map.get(l.sucursal) ?? 0) + Number(l.cantidad || 0));
+    }
+    return map;
+  }, [ventas12m]);
+
+  const ultimasVentas = useMemo(() => (ventasLineas ?? []).slice(0, MAX_ULTIMAS_VENTAS), [ventasLineas]);
+
+  const evolucionMensual = useMemo<VentaMensual[]>(() => {
+    const porMes = new Map<string, number>();
+    for (const l of ventasLineas ?? []) {
+      if (!l.fecha_factura || l.fecha_factura < cutoffEvolucion) continue;
+      const mes = l.fecha_factura.slice(0, 7);
+      porMes.set(mes, (porMes.get(mes) ?? 0) + Number(l.cantidad || 0));
+    }
+    return Array.from(porMes.entries())
+      .map(([mes, cantidad]) => ({ mes, cantidad }))
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+  }, [ventasLineas, cutoffEvolucion]);
 
   return (
-    <div className={pageShell}>
-      <div>
-        <h1 className={pageTitle}>Catálogo y Stock</h1>
-        <p className={pageDescription}>Catálogo de repuestos y stock por sucursal, importados desde TOTVS.</p>
-      </div>
+    <Dialog open={producto !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] w-[70vw] max-w-[70vw] overflow-y-auto">
+        {producto && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-start justify-between gap-2 pr-6">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{producto.descripcion}</span>
+                  <span className={metaText}>
+                    {producto.codigo_interno}
+                    {producto.codigo_fabricante ? ` · Fabricante: ${producto.codigo_fabricante}` : ""}
+                  </span>
+                </span>
+                <MarcaBadge marca={producto.marca} />
+              </DialogTitle>
+            </DialogHeader>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setSeleccionado(null);
-              }}
-              placeholder="Buscar por código o descripción…"
-              className="pl-8"
-            />
-          </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <KpiCard
+                icon={Warehouse}
+                value={`${producto.total.toLocaleString("es-PY")} ${producto.unidad ?? ""}`.trim()}
+                label="Stock total"
+              />
+              <KpiCard
+                icon={Package}
+                value={ventasLoading ? "…" : unidadesVendidas12m.toLocaleString("es-PY")}
+                label="Vendido (12 meses)"
+              />
+              <KpiCard
+                icon={DollarSign}
+                value={ventasLoading ? "…" : `$ ${facturadoUsd12m.toLocaleString("es-PY", { maximumFractionDigits: 0 })}`}
+                label="Facturado USD (12 meses)"
+              />
+              <KpiCard
+                icon={Tag}
+                value={ventasLoading ? "…" : `$ ${precioPromedio.toLocaleString("es-PY", { maximumFractionDigits: 2 })}`}
+                label="Precio promedio (USD)"
+              />
+            </div>
 
-          {search.trim().length > 0 && search.trim().length < MIN_SEARCH_LENGTH && (
-            <p className={metaText}>Escribí al menos {MIN_SEARCH_LENGTH} caracteres.</p>
-          )}
-
-          {loading && <p className={metaText}>Buscando…</p>}
-
-          {!loading && resultados && resultados.length === 0 && (
-            <p className={metaText}>Sin resultados para "{debouncedSearch}".</p>
-          )}
-
-          {!loading && resultados && resultados.length > 0 && (
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Marca</TableHead>
-                    <TableHead className="hidden sm:table-cell">Familia</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {resultados.map((producto) => {
-                    const stockTotal = stockPorCodigo[producto.codigo_interno] ?? 0;
-                    return (
-                      <TableRow
-                        key={producto.codigo_interno}
-                        className={cn(
-                          "cursor-pointer",
-                          seleccionado?.codigo_interno === producto.codigo_interno && "bg-muted/60",
-                        )}
-                        onClick={() => setSeleccionado(producto)}
-                      >
-                        <TableCell className="font-mono text-xs">{producto.codigo_interno}</TableCell>
-                        <TableCell className="max-w-[280px] truncate">{producto.descripcion}</TableCell>
-                        <TableCell>
-                          <MarcaBadge marca={producto.marca} />
-                        </TableCell>
-                        <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
-                          {producto.familia ?? "—"}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            "text-right font-medium",
-                            stockTotal === 0 && "text-destructive",
-                          )}
-                        >
-                          {stockTotal}
-                        </TableCell>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                  <Warehouse className="h-4 w-4 text-muted-foreground" />
+                  Stock y ventas por sucursal
+                </div>
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Sucursal</TableHead>
+                        <TableHead className="text-right">Stock</TableHead>
+                        <TableHead className="text-right">Vendido (12m)</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          {resultados === null && search.trim().length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-              <PackageSearch className="h-8 w-8" />
-              <p className="text-sm">Buscá un producto para ver su stock y su historial de ventas.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {seleccionado && (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold">{seleccionado.descripcion}</div>
-                <div className={metaText}>
-                  {seleccionado.codigo_interno}
-                  {seleccionado.codigo_fabricante ? ` · Fabricante: ${seleccionado.codigo_fabricante}` : ""}
+                    </TableHeader>
+                    <TableBody>
+                      {SUCURSAL_COLUMNAS.map((c) => (
+                        <TableRow key={c.key}>
+                          <TableCell>{c.label}</TableCell>
+                          <TableCell className="text-right">{Number(producto[c.key] ?? 0).toLocaleString("es-PY")}</TableCell>
+                          <TableCell className="text-right">{(vendidoPorSucursal.get(c.label) ?? 0).toLocaleString("es-PY")}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
-              <MarcaBadge marca={seleccionado.marca} />
-            </div>
 
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Warehouse className="h-4 w-4 text-muted-foreground" />
-              Stock total: {totalStock.toLocaleString("es-PY")} {seleccionado.unidad ?? ""}
-            </div>
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                  <History className="h-4 w-4 text-muted-foreground" />
+                  Últimas ventas
+                </div>
 
-            {stockLoading && <p className={metaText}>Cargando stock…</p>}
+                {ventasLoading && <p className={metaText}>Cargando…</p>}
 
-            {!stockLoading && stock && stock.length === 0 && (
-              <p className={metaText}>Sin stock registrado para este producto en ninguna sucursal.</p>
-            )}
+                {!ventasLoading && ultimasVentas.length === 0 && (
+                  <p className={metaText}>
+                    Sin ventas registradas todavía para este producto. Se va a ir completando con cada importación de
+                    facturación.
+                  </p>
+                )}
 
-            {!stockLoading && stock && stock.length > 0 && (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Sucursal</TableHead>
-                      <TableHead className="hidden sm:table-cell">Depósito</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {stock.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>{row.sucursal ?? "Sin sucursal"}</TableCell>
-                        <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
-                          {row.deposito ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{row.saldo_actual}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                {!ventasLoading && ultimasVentas.length > 0 && (
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead className="text-right">Cant.</TableHead>
+                          <TableHead className="text-right">USD</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ultimasVentas.map((l, i) => (
+                          <TableRow key={`${l.fecha_factura}-${i}`}>
+                            <TableCell className="max-w-[120px] truncate text-xs">{l.entidad_nombre ?? "—"}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {l.fecha_factura ? new Date(l.fecha_factura).toLocaleDateString("es-PY") : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-xs">{l.cantidad}</TableCell>
+                            <TableCell className="text-right text-xs">
+                              $ {Number(l.total_venta || 0).toLocaleString("es-PY", { maximumFractionDigits: 0 })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="border-t pt-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <History className="h-4 w-4 text-muted-foreground" />
-                Historial de ventas por período
+                Evolución mensual — unidades vendidas (últimos {MESES_EVOLUCION} meses)
               </div>
 
-              {ventasLoading && <p className={metaText}>Cargando historial…</p>}
+              {ventasLoading && <p className={metaText}>Cargando…</p>}
 
-              {!ventasLoading && ventas && ventas.length === 0 && (
-                <p className={metaText}>
-                  Sin historial de ventas registrado todavía para este producto. Se va a ir completando con cada
-                  importación de facturación de Servicios.
-                </p>
+              {!ventasLoading && evolucionMensual.length === 0 && (
+                <p className={metaText}>Sin ventas registradas en los últimos {MESES_EVOLUCION} meses.</p>
               )}
 
-              {!ventasLoading && ventas && ventas.length > 0 && (
+              {!ventasLoading && evolucionMensual.length > 0 && (
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Período</TableHead>
-                        <TableHead className="text-right">Cantidad vendida</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Unidades</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ventas.map((fila) => (
+                      {evolucionMensual.map((fila) => (
                         <TableRow key={fila.mes}>
                           <TableCell>{formatMes(fila.mes)}</TableCell>
-                          <TableCell className="text-right">{fila.cantidad}</TableCell>
-                          <TableCell className="text-right font-medium">
-                            {fila.total.toLocaleString("es-PY", { maximumFractionDigits: 0 })}
-                          </TableCell>
+                          <TableCell className="text-right font-medium">{fila.cantidad}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -345,9 +332,269 @@ export default function Repuestos() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function Repuestos() {
+  const [busquedaInput, setBusquedaInput] = useState("");
+  const debouncedBusqueda = useDebouncedValue(busquedaInput, 300);
+  const [filtros, setFiltros] = useState<StockFiltros>(STOCK_FILTROS_VACIOS);
+  const [page, setPage] = useState(0);
+  const [seleccionado, setSeleccionado] = useState<StockMatrizRow | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<StockSortKey>("descripcion", "asc");
+
+  useEffect(() => {
+    setFiltros((f) => ({ ...f, busqueda: debouncedBusqueda }));
+  }, [debouncedBusqueda]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [filtros, sortKey, sortDir]);
+
+  const kpisQuery = useStockKpis();
+  const familiasQuery = useFamiliasStock();
+  const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
+
+  const filtrosActivos = Boolean(filtros.busqueda || filtros.marca || filtros.familia || !filtros.soloConStock);
+
+  const limpiarFiltros = () => {
+    setBusquedaInput("");
+    setFiltros(STOCK_FILTROS_VACIOS);
+  };
+
+  const exportar = async () => {
+    setExporting(true);
+    try {
+      const rows = await fetchStockMatrizCompleto(filtros, sortKey, sortDir);
+      const data = rows.map((r) => ({
+        Código: r.codigo_interno,
+        Descripción: r.descripcion,
+        Fabricante: r.codigo_fabricante ?? "",
+        Marca: r.marca,
+        Familia: r.familia ?? "",
+        "Santa Rita": r.santa_rita,
+        "Santa Rosa": r.santa_rosa,
+        "Campo 9": r.campo_9,
+        Misiones: r.misiones,
+        "Loma Plata": r.loma_plata,
+        Katuete: r.katuete,
+        Total: r.total,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Stock");
+      XLSX.writeFile(wb, `stock-repuestos-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      toast.error("Error exportando: " + (e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const rows = matrizQuery.data?.rows ?? [];
+  const count = matrizQuery.data?.count ?? 0;
+  const totalPages = Math.max(Math.ceil(count / STOCK_PAGE_SIZE), 1);
+
+  const kpis = kpisQuery.data;
+  const ultimaImportacionTexto = kpis?.ultimaImportacion
+    ? new Date(kpis.ultimaImportacion).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })
+    : "—";
+
+  return (
+    <div className={pageShellWide}>
+      <div>
+        <h1 className={pageTitle}>Catálogo y Stock</h1>
+        <p className={pageDescription}>Matriz de existencias por sucursal, importada desde TOTVS.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <KpiCard
+          icon={Package}
+          value={kpisQuery.isLoading ? "…" : `${(kpis?.conStock ?? 0).toLocaleString("es-PY")} de ${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")}`}
+          label="productos con stock registrado"
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          value={kpisQuery.isLoading ? "…" : (kpis?.enCero ?? 0).toLocaleString("es-PY")}
+          label="productos en cero (ninguna sucursal)"
+          tone={kpis && kpis.enCero > 0 ? "warn" : undefined}
+        />
+        <KpiCard icon={Clock} value={kpisQuery.isLoading ? "…" : ultimaImportacionTexto} label="Última importación de stock" />
+      </div>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[220px] flex-1 space-y-1">
+              <Label className="text-[11px]">Buscar (código, fabricante, descripción)</Label>
+              <Input
+                value={busquedaInput}
+                onChange={(e) => setBusquedaInput(e.target.value)}
+                placeholder="REPIN003187, 06673230, casquillo…"
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="w-40 space-y-1">
+              <Label className="text-[11px]">Marca</Label>
+              <Select
+                value={filtros.marca || "todas"}
+                onValueChange={(v) => setFiltros((f) => ({ ...f, marca: v === "todas" ? "" : v }))}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {MARCAS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-44 space-y-1">
+              <Label className="text-[11px]">Familia</Label>
+              <Select
+                value={filtros.familia || "todas"}
+                onValueChange={(v) => setFiltros((f) => ({ ...f, familia: v === "todas" ? "" : v }))}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[320px]">
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {(familiasQuery.data ?? []).map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {f}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 pb-1.5">
+              <Switch
+                checked={filtros.soloConStock}
+                onCheckedChange={(checked) => setFiltros((f) => ({ ...f, soloConStock: checked }))}
+                id="solo-con-stock"
+              />
+              <Label htmlFor="solo-con-stock" className="text-xs">
+                Solo con stock
+              </Label>
+            </div>
+            {filtrosActivos && (
+              <Button type="button" variant="ghost" size="sm" className="h-8" onClick={limpiarFiltros}>
+                <X className="mr-1 h-3.5 w-3.5" />
+                Limpiar
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" className="h-8 sm:ml-auto" onClick={exportar} disabled={exporting}>
+              <Download className="mr-1 h-3.5 w-3.5" />
+              {exporting ? "Exportando…" : "Exportar"}
+            </Button>
+          </div>
+
+          {matrizQuery.isLoading && <p className={metaText}>Cargando matriz de stock…</p>}
+
+          {!matrizQuery.isLoading && rows.length === 0 && (
+            <p className={metaText}>Sin productos para este filtro.</p>
+          )}
+
+          {!matrizQuery.isLoading && rows.length > 0 && (
+            <>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={cn(th, "cursor-pointer select-none")} onClick={() => toggleSort("codigo_interno")}>
+                        <div className="flex items-center gap-1">Código {sortIcon("codigo_interno")}</div>
+                      </TableHead>
+                      <TableHead className={cn(th, "cursor-pointer select-none")} onClick={() => toggleSort("descripcion")}>
+                        <div className="flex items-center gap-1">Descripción {sortIcon("descripcion")}</div>
+                      </TableHead>
+                      {SUCURSAL_COLUMNAS.map((c) => (
+                        <TableHead
+                          key={c.key}
+                          className={cn(th, "cursor-pointer select-none text-right")}
+                          onClick={() => toggleSort(c.key as StockSortKey)}
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            {c.label} {sortIcon(c.key as StockSortKey)}
+                          </div>
+                        </TableHead>
+                      ))}
+                      <TableHead className={cn(th, "cursor-pointer select-none text-right")} onClick={() => toggleSort("total")}>
+                        <div className="flex items-center justify-end gap-1">Total {sortIcon("total")}</div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => (
+                      <TableRow
+                        key={row.codigo_interno}
+                        className={cn("cursor-pointer", row.total === 0 && "bg-destructive/5")}
+                        onClick={() => setSeleccionado(row)}
+                      >
+                        <TableCell className={cn(td, "font-mono")}>{row.codigo_interno}</TableCell>
+                        <TableCell className={cn(td, "max-w-[280px] truncate")}>{row.descripcion}</TableCell>
+                        {SUCURSAL_COLUMNAS.map((c) => {
+                          const valor = Number(row[c.key] ?? 0);
+                          return (
+                            <TableCell
+                              key={c.key}
+                              className={cn(td, "text-right tabular-nums", valor === 0 && "text-destructive/70")}
+                            >
+                              {valor.toLocaleString("es-PY")}
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className={cn(td, "text-right font-semibold tabular-nums")}>
+                          {row.total.toLocaleString("es-PY")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <p className={metaText}>
+                  Página {page + 1} de {totalPages} ({count.toLocaleString("es-PY")} productos)
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => Math.max(p - 1, 0))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={page + 1 >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <DetalleProductoDialog producto={seleccionado} onClose={() => setSeleccionado(null)} />
     </div>
   );
 }
