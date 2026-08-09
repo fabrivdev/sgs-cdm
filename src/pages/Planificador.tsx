@@ -196,7 +196,7 @@ export default function Planificador() {
       ]);
       const adminCab = new Set<string>();
       for (const r of (rls ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "admin" || r.role === "cabecilla") adminCab.add(r.user_id);
+        if (r.role === "admin" || r.role === "jefatura") adminCab.add(r.user_id);
       }
       setAdminCabIds(adminCab);
 

@@ -133,7 +133,7 @@ export function ServicioDetalleDialog({
     supabase.from("user_roles").select("user_id, role").then(({ data }) => {
       const s = new Set<string>();
       for (const r of (data ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "admin" || r.role === "cabecilla") s.add(r.user_id);
+        if (r.role === "admin" || r.role === "jefatura") s.add(r.user_id);
       }
       setAdminCabIds(s);
     });

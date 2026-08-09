@@ -847,8 +847,8 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
     checked<JsonRecord[]>(client.from("user_roles").select("user_id,role").limit(1000)),
     fetchPaged((from, to) => client.from("servicios").select("id,tecnico_responsable_id,auxiliares").range(from, to), 10000),
   ]);
-  const technicianRoleIds = new Set(roles.filter((row) => row.role === "tecnico").map((row) => String(row.user_id)));
-  const administrativeIds = new Set(roles.filter((row) => row.role === "admin" || row.role === "cabecilla").map((row) => String(row.user_id)));
+  const technicianRoleIds = new Set(roles.filter((row) => row.role === "operativo").map((row) => String(row.user_id)));
+  const administrativeIds = new Set(roles.filter((row) => row.role === "admin" || row.role === "jefatura").map((row) => String(row.user_id)));
   const referencedIds = new Set<string>();
   const serviceById = new Map<string, JsonRecord>();
   for (const service of services) {

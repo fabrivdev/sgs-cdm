@@ -222,7 +222,7 @@ export default function Calendario() {
       setProfiles((prof ?? []) as Profile[]);
       const adminCabSet = new Set<string>();
       for (const r of (roles ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "admin" || r.role === "cabecilla") adminCabSet.add(r.user_id);
+        if (r.role === "admin" || r.role === "jefatura") adminCabSet.add(r.user_id);
       }
       setAdminCabecillaIds(adminCabSet);
       const nlMap = new Map<string, { id: string; motivo: string | null }>();

@@ -172,7 +172,7 @@ export function ServicioFormDialog({
       roles
         .filter((r) => {
           const role = String(r.role ?? "").trim().toLowerCase();
-          return role === "admin" || role === "cabecilla";
+          return role === "admin" || role === "jefatura";
         })
         .map((r) => r.user_id),
     );

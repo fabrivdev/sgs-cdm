@@ -199,7 +199,7 @@ interface Profile {
 
 interface UserRole {
   user_id: string;
-  role: "admin" | "cabecilla" | "tecnico";
+  role: "admin" | "gerencia" | "jefatura" | "operativo";
 }
 
 interface DisponibilidadTecnico {
@@ -1106,9 +1106,9 @@ export default function Dashboard() {
   };
 
   const activeTechnicianIds = useMemo(() => {
-    const roleIds = new Set(userRoles.filter((row) => row.role === "tecnico").map((row) => row.user_id));
+    const roleIds = new Set(userRoles.filter((row) => row.role === "operativo").map((row) => row.user_id));
     const administrativeRoleIds = new Set(
-      userRoles.filter((row) => row.role === "admin" || row.role === "cabecilla").map((row) => row.user_id),
+      userRoles.filter((row) => row.role === "admin" || row.role === "jefatura").map((row) => row.user_id),
     );
     const referencedTechIds = new Set<string>();
     for (const jornada of jornadas) {
