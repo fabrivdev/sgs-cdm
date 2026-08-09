@@ -189,6 +189,7 @@ export type Database = {
           region: string | null
           ruc: string | null
           sucursal: Database["public"]["Enums"]["sucursal"] | null
+          telefono: string | null
         }
         Insert: {
           activo?: boolean
@@ -202,6 +203,7 @@ export type Database = {
           region?: string | null
           ruc?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          telefono?: string | null
         }
         Update: {
           activo?: boolean
@@ -215,6 +217,160 @@ export type Database = {
           region?: string | null
           ruc?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          telefono?: string | null
+        }
+        Relationships: []
+      }
+      compras_pedidos: {
+        Row: {
+          cantidad: number | null
+          cantidad_entregada: number | null
+          cantidad_pendiente: number | null
+          condicion_pago: string | null
+          descripcion: string | null
+          fecha_emision: string | null
+          importado_en: string
+          item: string
+          moneda: string | null
+          naturaleza: string | null
+          nro_pedido: string
+          precio_unitario: number | null
+          producto_codigo: string | null
+          proveedor_codigo: string | null
+          proveedor_nombre: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_entrega: string | null
+          unidad: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          cantidad?: number | null
+          cantidad_entregada?: number | null
+          cantidad_pendiente?: number | null
+          condicion_pago?: string | null
+          descripcion?: string | null
+          fecha_emision?: string | null
+          importado_en?: string
+          item: string
+          moneda?: string | null
+          naturaleza?: string | null
+          nro_pedido: string
+          precio_unitario?: number | null
+          producto_codigo?: string | null
+          proveedor_codigo?: string | null
+          proveedor_nombre?: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_entrega?: string | null
+          unidad?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          cantidad?: number | null
+          cantidad_entregada?: number | null
+          cantidad_pendiente?: number | null
+          condicion_pago?: string | null
+          descripcion?: string | null
+          fecha_emision?: string | null
+          importado_en?: string
+          item?: string
+          moneda?: string | null
+          naturaleza?: string | null
+          nro_pedido?: string
+          precio_unitario?: number | null
+          producto_codigo?: string | null
+          proveedor_codigo?: string | null
+          proveedor_nombre?: string | null
+          sucursal?: Database["public"]["Enums"]["sucursal"]
+          tipo_entrega?: string | null
+          unidad?: string | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
+      compras_solicitud_pedido_vinculo: {
+        Row: {
+          item: string
+          nro_solicitud: string
+          pedido_nro_pedido: string
+          pedido_sucursal: Database["public"]["Enums"]["sucursal"]
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          vinculado_en: string
+          vinculado_por: string | null
+        }
+        Insert: {
+          item: string
+          nro_solicitud: string
+          pedido_nro_pedido: string
+          pedido_sucursal: Database["public"]["Enums"]["sucursal"]
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          vinculado_en?: string
+          vinculado_por?: string | null
+        }
+        Update: {
+          item?: string
+          nro_solicitud?: string
+          pedido_nro_pedido?: string
+          pedido_sucursal?: Database["public"]["Enums"]["sucursal"]
+          sucursal?: Database["public"]["Enums"]["sucursal"]
+          vinculado_en?: string
+          vinculado_por?: string | null
+        }
+        Relationships: []
+      }
+      compras_solicitudes: {
+        Row: {
+          cantidad: number | null
+          codigo_fabricante: string | null
+          descripcion: string | null
+          fecha_emision: string | null
+          importado_en: string
+          item: string
+          marca_solicitada: string | null
+          moneda: string | null
+          nro_solicitud: string
+          observacion: string | null
+          precio_unitario: number | null
+          producto_codigo: string | null
+          solicitante: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          unidad: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          cantidad?: number | null
+          codigo_fabricante?: string | null
+          descripcion?: string | null
+          fecha_emision?: string | null
+          importado_en?: string
+          item: string
+          marca_solicitada?: string | null
+          moneda?: string | null
+          nro_solicitud: string
+          observacion?: string | null
+          precio_unitario?: number | null
+          producto_codigo?: string | null
+          solicitante?: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          unidad?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          cantidad?: number | null
+          codigo_fabricante?: string | null
+          descripcion?: string | null
+          fecha_emision?: string | null
+          importado_en?: string
+          item?: string
+          marca_solicitada?: string | null
+          moneda?: string | null
+          nro_solicitud?: string
+          observacion?: string | null
+          precio_unitario?: number | null
+          producto_codigo?: string | null
+          solicitante?: string | null
+          sucursal?: Database["public"]["Enums"]["sucursal"]
+          unidad?: string | null
+          valor_total?: number | null
         }
         Relationships: []
       }
@@ -315,6 +471,7 @@ export type Database = {
           grupo_fx: string | null
           id: string
           importado_en: string
+          moneda: string | null
           sucursal: Database["public"]["Enums"]["sucursal"] | null
           tipo: Database["public"]["Enums"]["tipo_facturacion"]
           total_venta: number
@@ -331,6 +488,7 @@ export type Database = {
           grupo_fx?: string | null
           id?: string
           importado_en?: string
+          moneda?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           tipo: Database["public"]["Enums"]["tipo_facturacion"]
           total_venta?: number
@@ -347,6 +505,7 @@ export type Database = {
           grupo_fx?: string | null
           id?: string
           importado_en?: string
+          moneda?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           tipo?: Database["public"]["Enums"]["tipo_facturacion"]
           total_venta?: number
@@ -385,6 +544,7 @@ export type Database = {
           linea_hash: string
           marca_normalizada: Database["public"]["Enums"]["marca"]
           mercaderia: string | null
+          moneda: string | null
           observacion: string | null
           origen_sistema: string
           raw_data: Json
@@ -413,6 +573,7 @@ export type Database = {
           linea_hash?: string
           marca_normalizada?: Database["public"]["Enums"]["marca"]
           mercaderia?: string | null
+          moneda?: string | null
           observacion?: string | null
           origen_sistema?: string
           raw_data?: Json
@@ -441,6 +602,7 @@ export type Database = {
           linea_hash?: string
           marca_normalizada?: Database["public"]["Enums"]["marca"]
           mercaderia?: string | null
+          moneda?: string | null
           observacion?: string | null
           origen_sistema?: string
           raw_data?: Json
@@ -588,6 +750,24 @@ export type Database = {
             referencedColumns: ["trabajo_id"]
           },
         ]
+      }
+      modulos: {
+        Row: {
+          activo: boolean
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean
+          id: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
       }
       ordenes_servicio_importadas: {
         Row: {
@@ -763,6 +943,42 @@ export type Database = {
           },
         ]
       }
+      productos: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          codigo_fabricante: string | null
+          codigo_interno: string
+          descripcion: string
+          familia: string | null
+          grupo: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          unidad: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          codigo_fabricante?: string | null
+          codigo_interno: string
+          descripcion: string
+          familia?: string | null
+          grupo?: string | null
+          marca?: Database["public"]["Enums"]["marca"]
+          unidad?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          codigo_fabricante?: string | null
+          codigo_interno?: string
+          descripcion?: string
+          familia?: string | null
+          grupo?: string | null
+          marca?: Database["public"]["Enums"]["marca"]
+          unidad?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           activo: boolean
@@ -866,6 +1082,42 @@ export type Database = {
           },
         ]
       }
+      repuestos_stock: {
+        Row: {
+          codigo_fabricante: string | null
+          deposito: string | null
+          descripcion: string | null
+          id: string
+          importado_en: string
+          producto_codigo: string
+          saldo_actual: number
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          unidad: string | null
+        }
+        Insert: {
+          codigo_fabricante?: string | null
+          deposito?: string | null
+          descripcion?: string | null
+          id?: string
+          importado_en?: string
+          producto_codigo: string
+          saldo_actual?: number
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          unidad?: string | null
+        }
+        Update: {
+          codigo_fabricante?: string | null
+          deposito?: string | null
+          descripcion?: string | null
+          id?: string
+          importado_en?: string
+          producto_codigo?: string
+          saldo_actual?: number
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          unidad?: string | null
+        }
+        Relationships: []
+      }
       seguimiento_comercial: {
         Row: {
           cliente_id: string
@@ -917,6 +1169,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seguimiento_pedidos: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          estado_seguimiento: string
+          fecha_estimada_llegada: string | null
+          notas: string | null
+          nro_pedido: string
+          nro_seguimiento: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          estado_seguimiento?: string
+          fecha_estimada_llegada?: string | null
+          notas?: string | null
+          nro_pedido: string
+          nro_seguimiento?: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"]
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          estado_seguimiento?: string
+          fecha_estimada_llegada?: string | null
+          notas?: string | null
+          nro_pedido?: string
+          nro_seguimiento?: string | null
+          sucursal?: Database["public"]["Enums"]["sucursal"]
+        }
+        Relationships: []
       }
       servicio_jornadas: {
         Row: {
@@ -1228,6 +1513,32 @@ export type Database = {
         }
         Relationships: []
       }
+      user_modulo_acceso: {
+        Row: {
+          modulo_id: string
+          otorgado_en: string
+          user_id: string
+        }
+        Insert: {
+          modulo_id: string
+          otorgado_en?: string
+          user_id: string
+        }
+        Update: {
+          modulo_id?: string
+          otorgado_en?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_modulo_acceso_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           creado_en: string
@@ -1268,6 +1579,55 @@ export type Database = {
           nombre: string | null
           ult_rep: string | null
           ult_serv: string | null
+        }
+        Relationships: []
+      }
+      v_compras_pedidos_resumen: {
+        Row: {
+          cantidad_items: number | null
+          cantidad_pendiente_total: number | null
+          estado_seguimiento: string | null
+          fecha_emision: string | null
+          fecha_estimada_llegada: string | null
+          moneda: string | null
+          notas: string | null
+          nro_pedido: string | null
+          nro_seguimiento: string | null
+          proveedor_codigo: string | null
+          proveedor_nombre: string | null
+          seguimiento_actualizado_en: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          valor_total: number | null
+        }
+        Relationships: []
+      }
+      v_compras_solicitudes_resumen: {
+        Row: {
+          cantidad_items: number | null
+          fecha_emision: string | null
+          moneda: string | null
+          nro_solicitud: string | null
+          solicitante: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          valor_total: number | null
+        }
+        Relationships: []
+      }
+      v_repuestos_stock_matriz: {
+        Row: {
+          campo_9: number | null
+          codigo_fabricante: string | null
+          codigo_interno: string | null
+          descripcion: string | null
+          familia: string | null
+          katuete: number | null
+          loma_plata: number | null
+          marca: Database["public"]["Enums"]["marca"] | null
+          misiones: number | null
+          santa_rita: number | null
+          santa_rosa: number | null
+          total: number | null
+          unidad: string | null
         }
         Relationships: []
       }
@@ -1407,7 +1767,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "gerencia" | "jefatura" | "operativo"
+      app_role: "admin" | "jefatura" | "operativo" | "gerencia"
       estado_jornada: "en_curso" | "completada" | "incompleta"
       estado_programacion:
         | "programada"
@@ -1465,7 +1825,7 @@ export type Database = {
         | "cierre"
         | "observacion"
       tipo_facturacion: "Repuesto" | "Servicio"
-      tipo_importacion: "parque" | "facturacion"
+      tipo_importacion: "parque" | "facturacion" | "repuestos"
       tipo_trabajo: "Visita de campo" | "Máquina en taller"
     }
     CompositeTypes: {
@@ -1594,7 +1954,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "gerencia", "jefatura", "operativo"],
+      app_role: ["admin", "jefatura", "operativo", "gerencia"],
       estado_jornada: ["en_curso", "completada", "incompleta"],
       estado_programacion: [
         "programada",
@@ -1658,7 +2018,7 @@ export const Constants = {
         "observacion",
       ],
       tipo_facturacion: ["Repuesto", "Servicio"],
-      tipo_importacion: ["parque", "facturacion"],
+      tipo_importacion: ["parque", "facturacion", "repuestos"],
       tipo_trabajo: ["Visita de campo", "Máquina en taller"],
     },
   },
