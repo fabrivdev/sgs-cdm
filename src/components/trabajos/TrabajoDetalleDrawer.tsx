@@ -161,7 +161,7 @@ export function TrabajoDetalleDrawer({
 
       const [{ data: t, error }, { data: roles }] = await Promise.all([
         supabase.from("trabajos").select("*").eq("id", trabajoId).single(),
-        supabase.from("user_roles").select("user_id, role").eq("role", "tecnico"),
+        supabase.from("user_roles").select("user_id, role").eq("role", "operativo"),
       ]);
       if (error) throw error;
       setTrabajo(t);
