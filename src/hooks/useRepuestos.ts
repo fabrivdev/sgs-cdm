@@ -45,7 +45,8 @@ export interface VentaRepuestoHistorial {
     | "codigo_facturado_fabricante"
     | "descripcion_facturada_codigo_fabricante"
     | "descripcion_descripcion"
-    | "descripcion_codigo_fabricante";
+    | "descripcion_codigo_fabricante"
+    | "descripcion_codigo_facturado";
 }
 
 export interface StockFiltros {
@@ -191,14 +192,21 @@ export function useVentasRepuesto(productoCodigo: string | null) {
     queryFn: async () => {
       if (!productoCodigo) return [];
 
-      return cargarTodo<VentaRepuestoHistorial>(
-        (supabase.from("v_repuestos_ventas_unificadas" as any) as any)
-          .select(
-            "linea_id, producto_codigo, producto_codigo_fabricante, fecha_factura, cantidad, total_venta_usd, cliente, sucursal, factura, codigo_facturado, codigo_fabricante_facturado, descripcion_facturada, origen_sistema, metodo_vinculo",
-          )
-          .eq("producto_codigo", productoCodigo)
-          .order("fecha_factura", { ascending: false }),
-      );
+      const { data, error } = await (supabase.rpc as any)("repuesto_ventas_historial", {
+        p_producto_codigo: productoCodigo,
+      });
+
+      if (error) {
+        const details = [
+          error.message,
+          error.details,
+          error.hint,
+          error.code ? `Codigo ${error.code}` : null,
+        ].filter(Boolean);
+
+        throw new Error(details.join(" | ") || "No se pudo cargar el historial unificado.");
+      }
+      return (Array.isArray(data) ? data : []) as VentaRepuestoHistorial[];
     },
   });
 }

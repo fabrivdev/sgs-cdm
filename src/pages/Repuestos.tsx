@@ -57,6 +57,23 @@ function normalizarSucursal(value: string | null | undefined) {
     .toLowerCase();
 }
 
+function mensajeError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const candidate = error as Record<string, unknown>;
+    const details = [
+      candidate.message,
+      candidate.details,
+      candidate.hint,
+      candidate.code ? `Codigo ${String(candidate.code)}` : null,
+    ].filter((value): value is string => typeof value === "string" && value.length > 0);
+
+    return details.join(" | ") || "Error desconocido";
+  }
+  return "Error desconocido";
+}
+
 function ultimosMeses(cantidad: number) {
   const hoy = new Date();
   return Array.from({ length: cantidad }, (_, index) => {
@@ -470,7 +487,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                   <p>No se pudo cargar el historial unificado. Verificá que la migración de ventas históricas esté aplicada.</p>
                   <p className="mt-1 break-words text-xs opacity-80">
-                    {ventasQuery.error instanceof Error ? ventasQuery.error.message : "Error desconocido"}
+                    {mensajeError(ventasQuery.error)}
                   </p>
                 </div>
               )}
