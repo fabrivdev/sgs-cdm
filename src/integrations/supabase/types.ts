@@ -1631,6 +1631,28 @@ export type Database = {
         }
         Relationships: []
       }
+      v_repuestos_ventas_unificadas: {
+        Row: {
+          cantidad: number | null
+          cliente: string | null
+          codigo_fabricante_facturado: string | null
+          codigo_facturado: string | null
+          descripcion_facturada: string | null
+          factura: string | null
+          fecha_factura: string | null
+          linea_id: string | null
+          metodo_vinculo: string | null
+          origen_sistema: string | null
+          producto_codigo: string | null
+          producto_codigo_fabricante: string | null
+          producto_descripcion: string | null
+          producto_familia: string | null
+          producto_marca: Database["public"]["Enums"]["marca"] | null
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          total_venta_usd: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       facturacion_tipo_tiempo_campos: {
@@ -1647,6 +1669,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      normalizar_codigo_repuesto: {
+        Args: { p_codigo: string }
+        Returns: string
       }
       parque_actividad_os_chasis: {
         Args: never
