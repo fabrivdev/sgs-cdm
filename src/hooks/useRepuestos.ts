@@ -39,7 +39,11 @@ export interface VentaRepuestoHistorial {
   codigo_fabricante_facturado: string | null;
   descripcion_facturada: string | null;
   origen_sistema: string;
-  metodo_vinculo: "codigo_fabricante" | "codigo_interno" | "codigo_facturado_fabricante";
+  metodo_vinculo:
+    | "codigo_fabricante"
+    | "codigo_interno"
+    | "codigo_facturado_fabricante"
+    | "descripcion_codigo_fabricante";
 }
 
 export interface StockFiltros {

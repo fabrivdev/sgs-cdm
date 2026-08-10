@@ -67,8 +67,9 @@ function ultimosMeses(cantidad: number) {
 
 const VINCULO_LABEL = {
   codigo_fabricante: "Código fabricante",
-  codigo_interno: "Codigo interno",
-  codigo_facturado_fabricante: "Codigo facturado",
+  codigo_interno: "Código interno",
+  codigo_facturado_fabricante: "Código facturado",
+  descripcion_codigo_fabricante: "Código desde descripción",
 } as const;
 
 function etiquetaOrigen(origen: string) {
@@ -421,7 +422,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
 
   return (
     <Sheet open={producto !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl">
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:w-[min(1120px,94vw)] sm:max-w-none">
         {producto && (
           <>
             <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
@@ -459,7 +460,10 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
 
               {ventasQuery.isError && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  No se pudo cargar el historial unificado. Verificá que la migración de ventas históricas esté aplicada.
+                  <p>No se pudo cargar el historial unificado. Verificá que la migración de ventas históricas esté aplicada.</p>
+                  <p className="mt-1 break-words text-xs opacity-80">
+                    {ventasQuery.error instanceof Error ? ventasQuery.error.message : "Error desconocido"}
+                  </p>
                 </div>
               )}
 
@@ -522,9 +526,9 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     ))}
                   </div>
                 )}
-                <div className="overflow-x-auto rounded-md border">
+                <div className="max-h-[360px] overflow-auto rounded-md border">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Fecha / factura</TableHead>
                         <TableHead>Cliente</TableHead>
@@ -534,7 +538,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ventas.slice(0, 20).map((linea) => (
+                      {ventas.map((linea) => (
                         <TableRow key={linea.linea_id}>
                           <TableCell className="whitespace-nowrap text-xs">
                             <div>{fechaLocal(linea.fecha_factura).toLocaleDateString("es-PY")}</div>
@@ -552,12 +556,16 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                         </TableRow>
                       ))}
                       {!ventasQuery.isLoading && ventas.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">Sin ventas históricas vinculadas.</TableCell></TableRow>
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                            No se encontraron ventas vinculadas a {producto.codigo_interno}
+                            {producto.codigo_fabricante ? ` / fabricante ${producto.codigo_fabricante}` : ""}.
+                          </TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
                 </div>
-                {ventas.length > 20 && <p className="mt-2 text-right text-xs text-muted-foreground">Mostrando las 20 líneas más recientes de {ventas.length.toLocaleString("es-PY")}.</p>}
               </section>
             </div>
           </>
@@ -574,7 +582,7 @@ export default function Repuestos() {
   const [page, setPage] = useState(0);
   const [seleccionado, setSeleccionado] = useState<StockMatrizRow | null>(null);
   const [exporting, setExporting] = useState(false);
-  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<StockSortKey>("descripcion", "asc");
+  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<StockSortKey>("total", "desc");
 
   useEffect(() => {
     setFiltros((f) => ({ ...f, busqueda: debouncedBusqueda }));
