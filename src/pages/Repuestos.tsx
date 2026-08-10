@@ -538,9 +538,9 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     <Warehouse className="h-4 w-4 text-primary" />
                     Disponibilidad por sucursal
                   </div>
-                  <div className="overflow-hidden rounded-md border">
+                  <div className="flex h-64 flex-col divide-y rounded-md border">
                     {SUCURSAL_COLUMNAS.map((columna) => (
-                      <div key={columna.key} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-b px-3 py-2 text-xs last:border-0">
+                      <div key={columna.key} className="grid flex-1 grid-cols-[1fr_auto_auto] items-center gap-3 px-3 text-xs">
                         <span>{columna.label}</span>
                         <span className="text-muted-foreground">
                           Vend. 12m: {historialCargando ? "..." : historialError ? "—" : (vendidoPorSucursal.get(normalizarSucursal(columna.label)) ?? 0).toLocaleString("es-PY")}
@@ -558,7 +558,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     </span>
                     <span className={metaText}>Últimos 12 meses</span>
                   </div>
-                  <div className="flex h-52 items-end gap-2 rounded-md border px-3 pb-7 pt-8">
+                  <div className="flex h-64 items-end gap-2 rounded-md border px-3 pb-7 pt-8">
                     {historialCargando && <p className="m-auto text-xs text-muted-foreground">Cargando consumo...</p>}
                     {historialError && <p className="m-auto text-xs text-muted-foreground">Consumo no disponible.</p>}
                     {!historialCargando && !historialError && ventas12m.length === 0 && (
@@ -612,48 +612,41 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead>Fecha / factura</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Origen</TableHead>
-                        <TableHead className="text-right">Cant.</TableHead>
-                        <TableHead className="text-right">USD</TableHead>
+                        <TableHead className={th}>Fecha / factura</TableHead>
+                        <TableHead className={th}>Cliente</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Cant.</TableHead>
+                        <TableHead className={cn(th, "text-right")}>USD</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {historialCargando && (
                         <TableRow>
-                          <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
                             Cargando historial de ventas...
                           </TableCell>
                         </TableRow>
                       )}
                       {historialError && (
                         <TableRow>
-                          <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
                             El historial no está disponible.
                           </TableCell>
                         </TableRow>
                       )}
                       {!historialCargando && !historialError && ventas.map((linea) => (
                         <TableRow key={linea.linea_id}>
-                          <TableCell className="whitespace-nowrap text-xs">
-                            <div>{fechaVentaLabel(linea.fecha_factura)}</div>
-                            <div className="font-mono text-[10px] text-muted-foreground">{linea.factura || "Sin número"}</div>
+                          <TableCell className={cn(td, "whitespace-nowrap")}>
+                            {fechaVentaLabel(linea.fecha_factura)}{" "}
+                            <span className="font-mono text-[10px] text-muted-foreground">{linea.factura || "Sin número"}</span>
                           </TableCell>
-                          <TableCell className="max-w-48 truncate text-xs">{linea.cliente || "Sin cliente"}</TableCell>
-                          <TableCell className="text-xs">
-                            <div>{etiquetaOrigen(linea.origen_sistema)}</div>
-                            <div className="text-[10px] text-muted-foreground">
-                              Vinculo: {VINCULO_LABEL[linea.metodo_vinculo as keyof typeof VINCULO_LABEL] ?? linea.metodo_vinculo}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right text-xs tabular-nums">{Number(linea.cantidad).toLocaleString("es-PY")}</TableCell>
-                          <TableCell className="text-right text-xs tabular-nums">{Number(linea.total_venta_usd).toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
+                          <TableCell className={cn(td, "max-w-48 truncate")}>{linea.cliente || "Sin cliente"}</TableCell>
+                          <TableCell className={cn(td, "text-right tabular-nums")}>{Number(linea.cantidad).toLocaleString("es-PY")}</TableCell>
+                          <TableCell className={cn(td, "text-right tabular-nums")}>{Number(linea.total_venta_usd).toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
                         </TableRow>
                       ))}
                       {!historialCargando && !historialError && ventas.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
                             No se encontraron ventas vinculadas a {producto.codigo_interno}
                             {producto.codigo_fabricante ? ` / fabricante ${producto.codigo_fabricante}` : ""}.
                           </TableCell>
