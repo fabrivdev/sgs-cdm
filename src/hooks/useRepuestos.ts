@@ -25,18 +25,35 @@ export interface StockMatrizRow {
   total: number;
 }
 
+export interface VentaRepuestoHistorial {
+  linea_id: string;
+  producto_codigo: string;
+  producto_codigo_fabricante: string | null;
+  fecha_factura: string;
+  cantidad: number;
+  total_venta_usd: number;
+  cliente: string | null;
+  sucursal: string | null;
+  factura: string | null;
+  codigo_facturado: string | null;
+  codigo_fabricante_facturado: string | null;
+  descripcion_facturada: string | null;
+  origen_sistema: string;
+  metodo_vinculo: "codigo_fabricante" | "codigo_interno" | "codigo_facturado_fabricante";
+}
+
 export interface StockFiltros {
   busqueda: string;
   marca: string;
   familia: string;
-  soloConStock: boolean;
+  estadoStock: "con_stock" | "sin_stock" | "todos";
 }
 
 export const STOCK_FILTROS_VACIOS: StockFiltros = {
   busqueda: "",
   marca: "",
   familia: "",
-  soloConStock: true,
+  estadoStock: "con_stock",
 };
 
 export type StockSortKey =
@@ -59,7 +76,8 @@ function aplicarFiltrosStock(qb: any, filtros: StockFiltros) {
   }
   if (filtros.marca) query = query.eq("marca", filtros.marca);
   if (filtros.familia) query = query.eq("familia", filtros.familia);
-  if (filtros.soloConStock) query = query.gt("total", 0);
+  if (filtros.estadoStock === "con_stock") query = query.gt("total", 0);
+  if (filtros.estadoStock === "sin_stock") query = query.eq("total", 0);
   return query;
 }
 
@@ -155,6 +173,26 @@ export function useFamiliasStock() {
       const familias = Array.from(new Set(rows.map((r) => r.familia).filter((f): f is string => !!f)));
       familias.sort((a, b) => a.localeCompare(b, "es"));
       return familias;
+    },
+  });
+}
+
+export function useVentasRepuesto(productoCodigo: string | null) {
+  return useQuery({
+    queryKey: ["repuestos", "ventas_unificadas", productoCodigo],
+    enabled: Boolean(productoCodigo),
+    staleTime: STALE_TIME,
+    queryFn: async () => {
+      if (!productoCodigo) return [];
+
+      return cargarTodo<VentaRepuestoHistorial>(
+        (supabase.from("v_repuestos_ventas_unificadas" as any) as any)
+          .select(
+            "linea_id, producto_codigo, producto_codigo_fabricante, fecha_factura, cantidad, total_venta_usd, cliente, sucursal, factura, codigo_facturado, codigo_fabricante_facturado, descripcion_facturada, origen_sistema, metodo_vinculo",
+          )
+          .eq("producto_codigo", productoCodigo)
+          .order("fecha_factura", { ascending: false }),
+      );
     },
   });
 }

@@ -8,20 +8,16 @@ import {
   Download,
   History,
   Package,
-  Tag,
   Warehouse,
   X,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -33,6 +29,7 @@ import {
   useFamiliasStock,
   useStockKpis,
   useStockMatriz,
+  useVentasRepuesto,
   type StockFiltros,
   type StockMatrizRow,
   type StockSortKey,
@@ -41,27 +38,41 @@ import { MARCAS } from "@/lib/constants";
 import { metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
-interface VentaLinea {
-  fecha_factura: string;
-  cantidad: number;
-  total_venta: number;
-  entidad_nombre: string | null;
-  sucursal: string | null;
-}
-
 interface VentaMensual {
   mes: string;
   cantidad: number;
 }
 
 const MESES_KPI = 12;
-const MESES_EVOLUCION = 6;
-const MAX_ULTIMAS_VENTAS = 8;
 
-function fechaHaceMeses(meses: number) {
-  const d = new Date();
-  d.setMonth(d.getMonth() - meses);
-  return d.toISOString().slice(0, 10);
+function fechaLocal(fecha: string) {
+  return new Date(`${fecha}T12:00:00`);
+}
+
+function normalizarSucursal(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function ultimosMeses(cantidad: number) {
+  const hoy = new Date();
+  return Array.from({ length: cantidad }, (_, index) => {
+    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - (cantidad - 1 - index), 1);
+    return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
+  });
+}
+
+const VINCULO_LABEL = {
+  codigo_fabricante: "Código fabricante",
+  codigo_interno: "Codigo interno",
+  codigo_facturado_fabricante: "Codigo facturado",
+} as const;
+
+function etiquetaOrigen(origen: string) {
+  return origen.startsWith("new_xml_") ? "Nuevo sistema" : "Histórico";
 }
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
@@ -116,6 +127,7 @@ function KpiCard({
   );
 }
 
+/* Legacy modal kept temporarily in source history while the side panel is validated.
 function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
   const [ventasLineas, setVentasLineas] = useState<VentaLinea[] | null>(null);
   const [ventasLoading, setVentasLoading] = useState(false);
@@ -231,6 +243,20 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
                   <Warehouse className="h-4 w-4 text-muted-foreground" />
                   Stock y ventas por sucursal
                 </div>
+                {ventas.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+                    {fuentes.map((fuente) => (
+                      <span key={fuente} className="rounded border px-2 py-1">
+                        {fuente === "legacy" ? "Histórico" : "Nuevo sistema"}
+                      </span>
+                    ))}
+                    {vinculos.map(({ metodo, cantidad }) => (
+                      <span key={metodo} className="rounded border px-2 py-1">
+                        {VINCULO_LABEL[metodo as keyof typeof VINCULO_LABEL] ?? metodo}: {cantidad.toLocaleString("es-PY")}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
@@ -338,6 +364,208 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
     </Dialog>
   );
 }
+*/
+
+function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
+  const ventasQuery = useVentasRepuesto(producto?.codigo_interno ?? null);
+  const ventas = ventasQuery.data ?? [];
+  const meses12 = useMemo(() => ultimosMeses(MESES_KPI), []);
+  const cutoffKpi = `${meses12[0]}-01`;
+  const ventas12m = useMemo(
+    () => ventas.filter((linea) => linea.fecha_factura && linea.fecha_factura >= cutoffKpi),
+    [ventas, cutoffKpi],
+  );
+
+  const unidades12m = useMemo(
+    () => ventas12m.reduce((total, linea) => total + Number(linea.cantidad || 0), 0),
+    [ventas12m],
+  );
+  const facturado12m = useMemo(
+    () => ventas12m.reduce((total, linea) => total + Number(linea.total_venta_usd || 0), 0),
+    [ventas12m],
+  );
+  const promedioMensual = unidades12m / MESES_KPI;
+
+  const vendidoPorSucursal = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const linea of ventas12m) {
+      const sucursal = normalizarSucursal(linea.sucursal || "Sin sucursal");
+      map.set(sucursal, (map.get(sucursal) ?? 0) + Number(linea.cantidad || 0));
+    }
+    return map;
+  }, [ventas12m]);
+
+  const evolucionMensual = useMemo<VentaMensual[]>(() => {
+    const porMes = new Map<string, number>(meses12.map((mes) => [mes, 0]));
+    for (const linea of ventas12m) {
+      const mes = linea.fecha_factura.slice(0, 7);
+      if (porMes.has(mes)) {
+        porMes.set(mes, (porMes.get(mes) ?? 0) + Number(linea.cantidad || 0));
+      }
+    }
+    return meses12.map((mes) => ({ mes, cantidad: porMes.get(mes) ?? 0 }));
+  }, [meses12, ventas12m]);
+
+  const maxMensual = Math.max(...evolucionMensual.map((item) => item.cantidad), 1);
+  const cobertura = ventas.length
+    ? `${fechaLocal(ventas[ventas.length - 1].fecha_factura).toLocaleDateString("es-PY")} - ${fechaLocal(ventas[0].fecha_factura).toLocaleDateString("es-PY")}`
+    : "Sin historial vinculado";
+  const fuentes = Array.from(new Set(ventas.map((linea) => etiquetaOrigen(linea.origen_sistema))));
+  const vinculos = useMemo(() => {
+    const conteo = new Map<string, number>();
+    for (const linea of ventas) {
+      conteo.set(linea.metodo_vinculo, (conteo.get(linea.metodo_vinculo) ?? 0) + 1);
+    }
+    return Array.from(conteo, ([metodo, cantidad]) => ({ metodo, cantidad }));
+  }, [ventas]);
+
+  return (
+    <Sheet open={producto !== null} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl">
+        {producto && (
+          <>
+            <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <SheetTitle className="text-base">{producto.descripcion}</SheetTitle>
+                  <SheetDescription className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-mono">{producto.codigo_interno}</span>
+                    {producto.codigo_fabricante && <span>Fabricante: {producto.codigo_fabricante}</span>}
+                  </SheetDescription>
+                </div>
+                <MarcaBadge marca={producto.marca} />
+              </div>
+            </SheetHeader>
+
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+              <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                <KpiCard icon={Warehouse} value={producto.total.toLocaleString("es-PY")} label="Stock total" />
+                <KpiCard
+                  icon={Package}
+                  value={ventasQuery.isLoading ? "..." : unidades12m.toLocaleString("es-PY")}
+                  label="Unidades vendidas 12m"
+                />
+                <KpiCard
+                  icon={DollarSign}
+                  value={ventasQuery.isLoading ? "..." : `USD ${facturado12m.toLocaleString("es-PY", { maximumFractionDigits: 0 })}`}
+                  label="Facturación 12m"
+                />
+                <KpiCard
+                  icon={History}
+                  value={ventasQuery.isLoading ? "..." : promedioMensual.toLocaleString("es-PY", { maximumFractionDigits: 1 })}
+                  label="Promedio unidades/mes"
+                />
+              </section>
+
+              {ventasQuery.isError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  No se pudo cargar el historial unificado. Verificá que la migración de ventas históricas esté aplicada.
+                </div>
+              )}
+
+              <section className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                    <Warehouse className="h-4 w-4 text-primary" />
+                    Disponibilidad por sucursal
+                  </div>
+                  <div className="overflow-hidden rounded-md border">
+                    {SUCURSAL_COLUMNAS.map((columna) => (
+                      <div key={columna.key} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-b px-3 py-2 text-xs last:border-0">
+                        <span>{columna.label}</span>
+                        <span className="text-muted-foreground">Vend. 12m: {(vendidoPorSucursal.get(normalizarSucursal(columna.label)) ?? 0).toLocaleString("es-PY")}</span>
+                        <span className="min-w-12 text-right font-semibold tabular-nums">{Number(producto[columna.key] ?? 0).toLocaleString("es-PY")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold">
+                    <span className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-primary" /> Evolución de consumo
+                    </span>
+                    <span className={metaText}>Últimos 12 meses</span>
+                  </div>
+                  <div className="flex h-44 items-end gap-2 rounded-md border px-3 pb-7 pt-4">
+                    {evolucionMensual.length === 0 && <p className="m-auto text-xs text-muted-foreground">Sin consumo vinculado.</p>}
+                    {evolucionMensual.map((item) => (
+                      <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
+                        <div className="w-full rounded-t bg-primary/75" style={{ height: item.cantidad > 0 ? `${Math.max((item.cantidad / maxMensual) * 100, 4)}%` : "0%" }} />
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
+                          {item.mes.slice(5)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    <History className="h-4 w-4 text-primary" /> Historial de ventas
+                  </h3>
+                  <span className={metaText}>{cobertura} · {fuentes.length} fuente{fuentes.length === 1 ? "" : "s"}</span>
+                </div>
+                {ventas.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+                    {fuentes.map((fuente) => (
+                      <span key={fuente} className="rounded border px-2 py-1">
+                        {fuente}
+                      </span>
+                    ))}
+                    {vinculos.map(({ metodo, cantidad }) => (
+                      <span key={metodo} className="rounded border px-2 py-1">
+                        {VINCULO_LABEL[metodo as keyof typeof VINCULO_LABEL] ?? metodo}: {cantidad.toLocaleString("es-PY")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha / factura</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Origen</TableHead>
+                        <TableHead className="text-right">Cant.</TableHead>
+                        <TableHead className="text-right">USD</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ventas.slice(0, 20).map((linea) => (
+                        <TableRow key={linea.linea_id}>
+                          <TableCell className="whitespace-nowrap text-xs">
+                            <div>{fechaLocal(linea.fecha_factura).toLocaleDateString("es-PY")}</div>
+                            <div className="font-mono text-[10px] text-muted-foreground">{linea.factura || "Sin número"}</div>
+                          </TableCell>
+                          <TableCell className="max-w-48 truncate text-xs">{linea.cliente || "Sin cliente"}</TableCell>
+                          <TableCell className="text-xs">
+                            <div>{etiquetaOrigen(linea.origen_sistema)}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              Vinculo: {VINCULO_LABEL[linea.metodo_vinculo as keyof typeof VINCULO_LABEL] ?? linea.metodo_vinculo}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{Number(linea.cantidad).toLocaleString("es-PY")}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{Number(linea.total_venta_usd).toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
+                        </TableRow>
+                      ))}
+                      {!ventasQuery.isLoading && ventas.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">Sin ventas históricas vinculadas.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                {ventas.length > 20 && <p className="mt-2 text-right text-xs text-muted-foreground">Mostrando las 20 líneas más recientes de {ventas.length.toLocaleString("es-PY")}.</p>}
+              </section>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 export default function Repuestos() {
   const [busquedaInput, setBusquedaInput] = useState("");
@@ -360,7 +588,9 @@ export default function Repuestos() {
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
 
-  const filtrosActivos = Boolean(filtros.busqueda || filtros.marca || filtros.familia || !filtros.soloConStock);
+  const filtrosActivos = Boolean(
+    filtros.busqueda || filtros.marca || filtros.familia || filtros.estadoStock !== "con_stock",
+  );
 
   const limpiarFiltros = () => {
     setBusquedaInput("");
@@ -370,6 +600,7 @@ export default function Repuestos() {
   const exportar = async () => {
     setExporting(true);
     try {
+      const XLSX = await import("xlsx");
       const rows = await fetchStockMatrizCompleto(filtros, sortKey, sortDir);
       const data = rows.map((r) => ({
         Código: r.codigo_interno,
@@ -477,15 +708,21 @@ export default function Repuestos() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2 pb-1.5">
-              <Switch
-                checked={filtros.soloConStock}
-                onCheckedChange={(checked) => setFiltros((f) => ({ ...f, soloConStock: checked }))}
-                id="solo-con-stock"
-              />
-              <Label htmlFor="solo-con-stock" className="text-xs">
-                Solo con stock
-              </Label>
+            <div className="w-36 space-y-1">
+              <Label className="text-[11px]">Existencia</Label>
+              <Select
+                value={filtros.estadoStock}
+                onValueChange={(value: StockFiltros["estadoStock"]) =>
+                  setFiltros((f) => ({ ...f, estadoStock: value }))
+                }
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="con_stock">Con stock</SelectItem>
+                  <SelectItem value="sin_stock">Sin stock</SelectItem>
+                  <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {filtrosActivos && (
               <Button type="button" variant="ghost" size="sm" className="h-8" onClick={limpiarFiltros}>
@@ -540,8 +777,19 @@ export default function Repuestos() {
                         className={cn("cursor-pointer", row.total === 0 && "bg-destructive/5")}
                         onClick={() => setSeleccionado(row)}
                       >
-                        <TableCell className={cn(td, "font-mono")}>{row.codigo_interno}</TableCell>
-                        <TableCell className={cn(td, "max-w-[280px] truncate")}>{row.descripcion}</TableCell>
+                        <TableCell className={cn(td, "font-mono")}>
+                          <div>{row.codigo_interno}</div>
+                          {row.codigo_fabricante && (
+                            <div className="text-[10px] text-muted-foreground">Fab. {row.codigo_fabricante}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className={cn(td, "max-w-[320px]")}>
+                          <div className="truncate font-medium">{row.descripcion}</div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <MarcaBadge marca={row.marca} />
+                            {row.familia && <span className="truncate">{row.familia}</span>}
+                          </div>
+                        </TableCell>
                         {SUCURSAL_COLUMNAS.map((c) => {
                           const valor = Number(row[c.key] ?? 0);
                           return (
@@ -594,7 +842,7 @@ export default function Repuestos() {
         </CardContent>
       </Card>
 
-      <DetalleProductoDialog producto={seleccionado} onClose={() => setSeleccionado(null)} />
+      <DetalleProductoSheet producto={seleccionado} onClose={() => setSeleccionado(null)} />
     </div>
   );
 }
