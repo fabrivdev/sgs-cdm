@@ -1674,6 +1674,10 @@ export type Database = {
         Args: { p_codigo: string }
         Returns: string
       }
+      normalizar_codigo_repuesto_flexible: {
+        Args: { p_codigo: string }
+        Returns: string
+      }
       parque_actividad_os_chasis: {
         Args: never
         Returns: {
