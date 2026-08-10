@@ -43,6 +43,8 @@ export interface VentaRepuestoHistorial {
     | "codigo_fabricante"
     | "codigo_interno"
     | "codigo_facturado_fabricante"
+    | "descripcion_facturada_codigo_fabricante"
+    | "descripcion_descripcion"
     | "descripcion_codigo_fabricante";
 }
 

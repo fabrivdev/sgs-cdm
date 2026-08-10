@@ -69,6 +69,8 @@ const VINCULO_LABEL = {
   codigo_fabricante: "Código fabricante",
   codigo_interno: "Código interno",
   codigo_facturado_fabricante: "Código facturado",
+  descripcion_facturada_codigo_fabricante: "Descripción facturada / fabricante",
+  descripcion_descripcion: "Descripción facturada / catálogo",
   descripcion_codigo_fabricante: "Código desde descripción",
 } as const;
 
@@ -370,6 +372,8 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
 function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
   const ventasQuery = useVentasRepuesto(producto?.codigo_interno ?? null);
   const ventas = ventasQuery.data ?? [];
+  const historialCargando = ventasQuery.isLoading || ventasQuery.isFetching;
+  const historialError = ventasQuery.isError;
   const meses12 = useMemo(() => ultimosMeses(MESES_KPI), []);
   const cutoffKpi = `${meses12[0]}-01`;
   const ventas12m = useMemo(
@@ -408,9 +412,13 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
   }, [meses12, ventas12m]);
 
   const maxMensual = Math.max(...evolucionMensual.map((item) => item.cantidad), 1);
-  const cobertura = ventas.length
-    ? `${fechaLocal(ventas[ventas.length - 1].fecha_factura).toLocaleDateString("es-PY")} - ${fechaLocal(ventas[0].fecha_factura).toLocaleDateString("es-PY")}`
-    : "Sin historial vinculado";
+  const cobertura = historialCargando
+    ? "Cargando historial..."
+    : historialError
+      ? "Historial no disponible"
+      : ventas.length
+        ? `${fechaLocal(ventas[ventas.length - 1].fecha_factura).toLocaleDateString("es-PY")} - ${fechaLocal(ventas[0].fecha_factura).toLocaleDateString("es-PY")}`
+        : "Sin historial vinculado";
   const fuentes = Array.from(new Set(ventas.map((linea) => etiquetaOrigen(linea.origen_sistema))));
   const vinculos = useMemo(() => {
     const conteo = new Map<string, number>();
@@ -443,22 +451,22 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                 <KpiCard icon={Warehouse} value={producto.total.toLocaleString("es-PY")} label="Stock total" />
                 <KpiCard
                   icon={Package}
-                  value={ventasQuery.isLoading ? "..." : unidades12m.toLocaleString("es-PY")}
+                  value={historialCargando ? "..." : historialError ? "—" : unidades12m.toLocaleString("es-PY")}
                   label="Unidades vendidas 12m"
                 />
                 <KpiCard
                   icon={DollarSign}
-                  value={ventasQuery.isLoading ? "..." : `USD ${facturado12m.toLocaleString("es-PY", { maximumFractionDigits: 0 })}`}
+                  value={historialCargando ? "..." : historialError ? "—" : `USD ${facturado12m.toLocaleString("es-PY", { maximumFractionDigits: 0 })}`}
                   label="Facturación 12m"
                 />
                 <KpiCard
                   icon={History}
-                  value={ventasQuery.isLoading ? "..." : promedioMensual.toLocaleString("es-PY", { maximumFractionDigits: 1 })}
+                  value={historialCargando ? "..." : historialError ? "—" : promedioMensual.toLocaleString("es-PY", { maximumFractionDigits: 1 })}
                   label="Promedio unidades/mes"
                 />
               </section>
 
-              {ventasQuery.isError && (
+              {historialError && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                   <p>No se pudo cargar el historial unificado. Verificá que la migración de ventas históricas esté aplicada.</p>
                   <p className="mt-1 break-words text-xs opacity-80">
@@ -477,7 +485,9 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     {SUCURSAL_COLUMNAS.map((columna) => (
                       <div key={columna.key} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-b px-3 py-2 text-xs last:border-0">
                         <span>{columna.label}</span>
-                        <span className="text-muted-foreground">Vend. 12m: {(vendidoPorSucursal.get(normalizarSucursal(columna.label)) ?? 0).toLocaleString("es-PY")}</span>
+                        <span className="text-muted-foreground">
+                          Vend. 12m: {historialCargando ? "..." : historialError ? "—" : (vendidoPorSucursal.get(normalizarSucursal(columna.label)) ?? 0).toLocaleString("es-PY")}
+                        </span>
                         <span className="min-w-12 text-right font-semibold tabular-nums">{Number(producto[columna.key] ?? 0).toLocaleString("es-PY")}</span>
                       </div>
                     ))}
@@ -492,8 +502,12 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     <span className={metaText}>Últimos 12 meses</span>
                   </div>
                   <div className="flex h-44 items-end gap-2 rounded-md border px-3 pb-7 pt-4">
-                    {evolucionMensual.length === 0 && <p className="m-auto text-xs text-muted-foreground">Sin consumo vinculado.</p>}
-                    {evolucionMensual.map((item) => (
+                    {historialCargando && <p className="m-auto text-xs text-muted-foreground">Cargando consumo...</p>}
+                    {historialError && <p className="m-auto text-xs text-muted-foreground">Consumo no disponible.</p>}
+                    {!historialCargando && !historialError && ventas12m.length === 0 && (
+                      <p className="m-auto text-xs text-muted-foreground">Sin consumo vinculado.</p>
+                    )}
+                    {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => (
                       <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
                         <div className="w-full rounded-t bg-primary/75" style={{ height: item.cantidad > 0 ? `${Math.max((item.cantidad / maxMensual) * 100, 4)}%` : "0%" }} />
                         <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
@@ -538,7 +552,21 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ventas.map((linea) => (
+                      {historialCargando && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                            Cargando historial de ventas...
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {historialError && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                            El historial no está disponible.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!historialCargando && !historialError && ventas.map((linea) => (
                         <TableRow key={linea.linea_id}>
                           <TableCell className="whitespace-nowrap text-xs">
                             <div>{fechaLocal(linea.fecha_factura).toLocaleDateString("es-PY")}</div>
@@ -555,7 +583,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                           <TableCell className="text-right text-xs tabular-nums">{Number(linea.total_venta_usd).toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
                         </TableRow>
                       ))}
-                      {!ventasQuery.isLoading && ventas.length === 0 && (
+                      {!historialCargando && !historialError && ventas.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
                             No se encontraron ventas vinculadas a {producto.codigo_interno}
