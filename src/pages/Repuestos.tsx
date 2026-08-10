@@ -44,6 +44,7 @@ interface VentaMensual {
 }
 
 const MESES_KPI = 12;
+const MESES_KPI_LARGO = 24;
 
 function fechaLocal(fecha: string | null | undefined): Date | null {
   const valor = String(fecha ?? "").trim();
@@ -428,6 +429,16 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
     [ventas, cutoffKpiDate],
   );
 
+  const cutoffKpi24 = `${ultimosMeses(MESES_KPI_LARGO)[0]}-01`;
+  const cutoffKpi24Date = useMemo(() => fechaLocal(cutoffKpi24), [cutoffKpi24]);
+  const ventas24m = useMemo(
+    () => ventas.filter((linea) => {
+      const fecha = fechaLocal(linea.fecha_factura);
+      return Boolean(fecha && cutoffKpi24Date && fecha >= cutoffKpi24Date);
+    }),
+    [ventas, cutoffKpi24Date],
+  );
+
   const unidades12m = useMemo(
     () => ventas12m.reduce((total, linea) => total + Number(linea.cantidad || 0), 0),
     [ventas12m],
@@ -446,6 +457,15 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
     }
     return map;
   }, [ventas12m]);
+
+  const vendidoPorSucursal24m = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const linea of ventas24m) {
+      const sucursal = normalizarSucursal(linea.sucursal || "Sin sucursal");
+      map.set(sucursal, (map.get(sucursal) ?? 0) + Number(linea.cantidad || 0));
+    }
+    return map;
+  }, [ventas24m]);
 
   const evolucionMensual = useMemo<VentaMensual[]>(() => {
     const porMes = new Map<string, number>(meses12.map((mes) => [mes, 0]));
@@ -538,16 +558,36 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     <Warehouse className="h-4 w-4 text-primary" />
                     Disponibilidad por sucursal
                   </div>
-                  <div className="flex h-64 flex-col divide-y rounded-md border">
-                    {SUCURSAL_COLUMNAS.map((columna) => (
-                      <div key={columna.key} className="grid flex-1 grid-cols-[1fr_auto_auto] items-center gap-3 px-3 text-xs">
-                        <span>{columna.label}</span>
-                        <span className="text-muted-foreground">
-                          Vend. 12m: {historialCargando ? "..." : historialError ? "—" : (vendidoPorSucursal.get(normalizarSucursal(columna.label)) ?? 0).toLocaleString("es-PY")}
-                        </span>
-                        <span className="min-w-12 text-right font-semibold tabular-nums">{Number(producto[columna.key] ?? 0).toLocaleString("es-PY")}</span>
-                      </div>
-                    ))}
+                  <div className="h-64 overflow-y-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className={th}>Sucursal</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Ventas 12M</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Ventas 24M</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Disponible</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {SUCURSAL_COLUMNAS.map((columna) => {
+                          const clave = normalizarSucursal(columna.label);
+                          return (
+                            <TableRow key={columna.key}>
+                              <TableCell className={td}>{columna.label}</TableCell>
+                              <TableCell className={cn(td, "text-right tabular-nums")}>
+                                {historialCargando ? "…" : historialError ? "—" : (vendidoPorSucursal.get(clave) ?? 0).toLocaleString("es-PY")}
+                              </TableCell>
+                              <TableCell className={cn(td, "text-right tabular-nums")}>
+                                {historialCargando ? "…" : historialError ? "—" : (vendidoPorSucursal24m.get(clave) ?? 0).toLocaleString("es-PY")}
+                              </TableCell>
+                              <TableCell className={cn(td, "text-right font-semibold tabular-nums")}>
+                                {Number(producto[columna.key] ?? 0).toLocaleString("es-PY")}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
 
