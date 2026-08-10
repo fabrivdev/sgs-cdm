@@ -45,8 +45,34 @@ interface VentaMensual {
 
 const MESES_KPI = 12;
 
-function fechaLocal(fecha: string) {
-  return new Date(`${fecha}T12:00:00`);
+function fechaLocal(fecha: string | null | undefined): Date | null {
+  const valor = String(fecha ?? "").trim();
+  if (!valor) return null;
+
+  const iso = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const resultado = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12);
+    return Number.isNaN(resultado.getTime()) ? null : resultado;
+  }
+
+  const local = valor.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  if (local) {
+    const resultado = new Date(Number(local[3]), Number(local[2]) - 1, Number(local[1]), 12);
+    return Number.isNaN(resultado.getTime()) ? null : resultado;
+  }
+
+  const resultado = new Date(valor);
+  return Number.isNaN(resultado.getTime()) ? null : resultado;
+}
+
+function fechaVentaLabel(fecha: string | null | undefined) {
+  return fechaLocal(fecha)?.toLocaleDateString("es-PY") ?? "Sin fecha";
+}
+
+function mesVenta(fecha: string | null | undefined) {
+  const resultado = fechaLocal(fecha);
+  if (!resultado) return null;
+  return `${resultado.getFullYear()}-${String(resultado.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function normalizarSucursal(value: string | null | undefined) {
@@ -330,7 +356,7 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
                           <TableRow key={`${l.fecha_factura}-${i}`}>
                             <TableCell className="max-w-[120px] truncate text-xs">{l.entidad_nombre ?? "—"}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {l.fecha_factura ? new Date(l.fecha_factura).toLocaleDateString("es-PY") : "—"}
+                              {fechaVentaLabel(l.fecha_factura)}
                             </TableCell>
                             <TableCell className="text-right text-xs">{l.cantidad}</TableCell>
                             <TableCell className="text-right text-xs">
@@ -393,9 +419,13 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
   const historialError = ventasQuery.isError;
   const meses12 = useMemo(() => ultimosMeses(MESES_KPI), []);
   const cutoffKpi = `${meses12[0]}-01`;
+  const cutoffKpiDate = useMemo(() => fechaLocal(cutoffKpi), [cutoffKpi]);
   const ventas12m = useMemo(
-    () => ventas.filter((linea) => linea.fecha_factura && linea.fecha_factura >= cutoffKpi),
-    [ventas, cutoffKpi],
+    () => ventas.filter((linea) => {
+      const fecha = fechaLocal(linea.fecha_factura);
+      return Boolean(fecha && cutoffKpiDate && fecha >= cutoffKpiDate);
+    }),
+    [ventas, cutoffKpiDate],
   );
 
   const unidades12m = useMemo(
@@ -420,7 +450,8 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
   const evolucionMensual = useMemo<VentaMensual[]>(() => {
     const porMes = new Map<string, number>(meses12.map((mes) => [mes, 0]));
     for (const linea of ventas12m) {
-      const mes = linea.fecha_factura.slice(0, 7);
+      const mes = mesVenta(linea.fecha_factura);
+      if (!mes) continue;
       if (porMes.has(mes)) {
         porMes.set(mes, (porMes.get(mes) ?? 0) + Number(linea.cantidad || 0));
       }
@@ -429,13 +460,22 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
   }, [meses12, ventas12m]);
 
   const maxMensual = Math.max(...evolucionMensual.map((item) => item.cantidad), 1);
+  const fechasVentas = useMemo(
+    () => ventas
+      .map((linea) => fechaLocal(linea.fecha_factura))
+      .filter((fecha): fecha is Date => fecha !== null)
+      .sort((a, b) => a.getTime() - b.getTime()),
+    [ventas],
+  );
   const cobertura = historialCargando
     ? "Cargando historial..."
     : historialError
       ? "Historial no disponible"
-      : ventas.length
-        ? `${fechaLocal(ventas[ventas.length - 1].fecha_factura).toLocaleDateString("es-PY")} - ${fechaLocal(ventas[0].fecha_factura).toLocaleDateString("es-PY")}`
-        : "Sin historial vinculado";
+      : fechasVentas.length
+        ? `${fechasVentas[0].toLocaleDateString("es-PY")} - ${fechasVentas[fechasVentas.length - 1].toLocaleDateString("es-PY")}`
+        : ventas.length
+          ? "Sin fechas validas"
+          : "Sin historial vinculado";
   const fuentes = Array.from(new Set(ventas.map((linea) => etiquetaOrigen(linea.origen_sistema))));
   const vinculos = useMemo(() => {
     const conteo = new Map<string, number>();
@@ -518,20 +558,31 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     </span>
                     <span className={metaText}>Últimos 12 meses</span>
                   </div>
-                  <div className="flex h-44 items-end gap-2 rounded-md border px-3 pb-7 pt-4">
+                  <div className="flex h-52 items-end gap-2 rounded-md border px-3 pb-7 pt-8">
                     {historialCargando && <p className="m-auto text-xs text-muted-foreground">Cargando consumo...</p>}
                     {historialError && <p className="m-auto text-xs text-muted-foreground">Consumo no disponible.</p>}
                     {!historialCargando && !historialError && ventas12m.length === 0 && (
                       <p className="m-auto text-xs text-muted-foreground">Sin consumo vinculado.</p>
                     )}
-                    {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => (
-                      <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
-                        <div className="w-full rounded-t bg-primary/75" style={{ height: item.cantidad > 0 ? `${Math.max((item.cantidad / maxMensual) * 100, 4)}%` : "0%" }} />
-                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
-                          {item.mes.slice(5)}
-                        </span>
-                      </div>
-                    ))}
+                    {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => {
+                      const altura = item.cantidad > 0 ? Math.max((item.cantidad / maxMensual) * 78, 4) : 0;
+                      return (
+                        <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
+                          {item.cantidad > 0 && (
+                            <span
+                              className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
+                              style={{ bottom: `calc(${altura}% + 5px)` }}
+                            >
+                              {Number(item.cantidad).toLocaleString("es-PY", { maximumFractionDigits: 1 })}
+                            </span>
+                          )}
+                          <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
+                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
+                            {item.mes.slice(5)}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </section>
@@ -586,7 +637,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                       {!historialCargando && !historialError && ventas.map((linea) => (
                         <TableRow key={linea.linea_id}>
                           <TableCell className="whitespace-nowrap text-xs">
-                            <div>{fechaLocal(linea.fecha_factura).toLocaleDateString("es-PY")}</div>
+                            <div>{fechaVentaLabel(linea.fecha_factura)}</div>
                             <div className="font-mono text-[10px] text-muted-foreground">{linea.factura || "Sin número"}</div>
                           </TableCell>
                           <TableCell className="max-w-48 truncate text-xs">{linea.cliente || "Sin cliente"}</TableCell>
