@@ -100,6 +100,19 @@ function normalizarSucursal(value: string | null | undefined) {
     .toLowerCase();
 }
 
+// Mismo cliente puede quedar facturado con variantes de tilde/mayusculas/
+// espacios distintas segun la sucursal que emitio (ej. "CAMPOS DEL MA\u00d1ANA
+// S.A." vs "CAMPOS DEL MANANA S.A.") -- se agrupa por esta clave para que
+// no aparezca como un cliente distinto por cada variante.
+function normalizarClienteClave(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+}
+
 function mensajeError(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -502,17 +515,18 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
           : "Sin historial vinculado";
 
   const ventasPorCliente = useMemo<VentaAgrupada[]>(() => {
-    const map = new Map<string, { cantidad: number; total: number; facturas: Set<string> }>();
+    const map = new Map<string, { etiqueta: string; cantidad: number; total: number; facturas: Set<string> }>();
     for (const linea of ventas) {
-      const clave = linea.cliente || "Sin cliente";
-      const actual = map.get(clave) ?? { cantidad: 0, total: 0, facturas: new Set<string>() };
+      const nombre = linea.cliente || "Sin cliente";
+      const clave = normalizarClienteClave(nombre) || "SIN CLIENTE";
+      const actual = map.get(clave) ?? { etiqueta: nombre, cantidad: 0, total: 0, facturas: new Set<string>() };
       actual.cantidad += Number(linea.cantidad || 0);
       actual.total += Number(linea.total_venta_usd || 0);
       if (linea.factura) actual.facturas.add(linea.factura);
       map.set(clave, actual);
     }
     return Array.from(map.entries())
-      .map(([clave, v]) => ({ clave, etiqueta: clave, cantidad: v.cantidad, facturas: v.facturas.size, total: v.total }))
+      .map(([clave, v]) => ({ clave, etiqueta: v.etiqueta, cantidad: v.cantidad, facturas: v.facturas.size, total: v.total }))
       .sort((a, b) => b.total - a.total);
   }, [ventas]);
 
