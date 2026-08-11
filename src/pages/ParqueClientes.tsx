@@ -4,7 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ParqueTab } from "@/components/parque/ParqueTab";
 import { MaquinasTab } from "@/components/parque/MaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { Tractor, CheckCircle2, PhoneCall, AlertTriangle, Users, Wrench } from "lucide-react";
+import { Tractor, CheckCircle2, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { pageShell, pageTitle } from "@/lib/ui-classes";
 import type { KpiResult } from "@/lib/contacto-utils";
@@ -47,23 +47,16 @@ export default function ParqueClientes() {
         accent: "text-primary",
       },
       {
-        label: "% con servicio último año",
-        value: `${metricasMostradas.pctConServicioUltimoAnio}%`,
-        icon: CheckCircle2,
-        accent: "text-emerald-600",
-      },
-      {
-        label: "% contactados este período",
-        value: `${metricasMostradas.pctContactadosRango}%`,
-        icon: PhoneCall,
+        label: "Clientes con máquinas",
+        value: metricasMostradas.totalClientes.toLocaleString(),
+        icon: Users,
         accent: "text-blue-600",
       },
       {
-        label: "Para contactar",
-        value: metricasMostradas.sinContacto60d.toLocaleString(),
-        icon: AlertTriangle,
-        accent: metricasMostradas.sinContacto60d > 0 ? "text-destructive" : "text-muted-foreground",
-        critical: metricasMostradas.sinContacto60d > 0,
+        label: "Cobertura de servicio 12 meses",
+        value: `${metricasMostradas.pctConServicioUltimoAnio}%`,
+        icon: CheckCircle2,
+        accent: "text-emerald-600",
       },
     ],
     [metricasMostradas],
@@ -75,15 +68,9 @@ export default function ParqueClientes() {
         <h1 className={pageTitle}>Parque de máquinas</h1>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
         {cards.map((c) => (
-          <Card
-            key={c.label}
-            className={cn(
-              "border",
-              c.critical && "border-destructive/40 bg-destructive/5",
-            )}
-          >
+          <Card key={c.label} className="border">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">

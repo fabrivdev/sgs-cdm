@@ -6,12 +6,10 @@ import {
   ChevronDown,
   LayoutDashboard,
   ListChecks,
-  History,
   Users,
   LogOut,
   Wrench,
   Tractor,
-  TrendingUp,
   MoreHorizontal,
   Package,
   ShoppingCart,
@@ -47,6 +45,7 @@ import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { cn } from "@/lib/utils";
 import { AIAssistant } from "@/components/assistant/AIAssistant";
 import { nivelLabel } from "@/lib/constants";
+import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 
 type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; adminOnly?: boolean };
 type NavGroup = { modulo: string; label: string; items: NavItem[] };
@@ -60,9 +59,13 @@ const navGroups: NavGroup[] = [
       { to: "/trabajos", label: "Trabajos", icon: Wrench },
       { to: "/calendario", label: "Calendario", icon: CalendarDays },
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: true },
-      { to: "/historial", label: "Historial", icon: History },
-      { to: "/parque-clientes", label: "Parque", icon: Tractor, adminOnly: true },
-      { to: "/agenda", label: "Agenda", icon: TrendingUp, adminOnly: true },
+    ],
+  },
+  {
+    modulo: "parque",
+    label: "Parque",
+    items: [
+      { to: "/parque-clientes", label: "Clientes y máquinas", icon: Tractor, end: true },
     ],
   },
   {
@@ -144,8 +147,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   const navigate = useNavigate();
 
   // Un grupo solo aparece si el usuario tiene acceso a ese modulo; adminOnly
-  // sigue siendo un filtro aparte, solo dentro de Servicios (sin relacion
-  // con el eje de modulos).
+  // sigue siendo un filtro adicional para vistas ejecutivas o administrativas.
   const visibleGroups = navGroups
     .filter((group) => hasModuloAccess(group.modulo))
     .map((group) => ({
@@ -196,12 +198,10 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
       <Sidebar collapsible="icon" className="hidden md:flex">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Wrench className="h-4 w-4" />
-            </div>
+            <AppLogo className="h-8 w-8 rounded-md" />
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-sm font-bold leading-tight">Servicios Técnicos</div>
-              <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">CLAAS · HORSCH</div>
+              <div className="truncate text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
+              <div className="truncate text-[10px] text-muted-foreground">{APP_NAME}</div>
             </div>
           </div>
         </SidebarHeader>
@@ -223,12 +223,10 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b bg-card/95 px-3 shadow-sm backdrop-blur sm:h-14 sm:px-4">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="hidden md:flex" />
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground md:hidden">
-              <Wrench className="h-4 w-4" />
-            </div>
+            <AppLogo className="h-8 w-8 rounded-md md:hidden" />
             <div className="hidden sm:block md:hidden">
-              <div className="text-sm font-bold leading-tight">Servicios Técnicos</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">CLAAS · HORSCH</div>
+              <div className="text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
+              <div className="text-[10px] text-muted-foreground">{APP_NAME}</div>
             </div>
           </div>
 

@@ -1,10 +1,17 @@
 {
-  "name": "Servicios Tecnicos CDM",
-  "short_name": "SGS CDM",
-  "description": "Planificador operativo de servicios tecnicos CDM.",
+  "name": "SIG - Sistema Integrado de Gestión",
+  "short_name": "SIG",
+  "description": "Sistema Integrado de Gestión de CDM.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8faf7",
   "theme_color": "#86a536",
-  "icons": []
+  "icons": [
+    {
+      "src": "/sig-cdm-logo.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
 }

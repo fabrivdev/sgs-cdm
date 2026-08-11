@@ -31,9 +31,10 @@ export const ROLES = ["admin", "gerencia", "jefatura", "operativo"] as const;
 export const TIPOS_TRABAJO = ["Visita de campo", "Máquina en taller"] as const;
 
 /** Modulos habilitables por usuario (independiente del nivel). Espejo de la tabla public.modulos. */
-export const MODULOS = ["servicios", "repuestos"] as const;
+export const MODULOS = ["servicios", "parque", "repuestos"] as const;
 export const MODULO_LABELS: Record<(typeof MODULOS)[number], string> = {
   servicios: "Servicios",
+  parque: "Parque",
   repuestos: "Repuestos",
 };
 

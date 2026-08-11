@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Wrench } from "lucide-react";
+import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 
 export default function Auth() {
   const { user, signIn, loading } = useAuth();
@@ -29,11 +29,9 @@ export default function Auth() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-background p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Wrench className="h-6 w-6" />
-          </div>
-          <CardTitle className="text-2xl">Sistema Gestión de Servicios</CardTitle>
-          <CardDescription>Acceso interno</CardDescription>
+          <AppLogo className="mx-auto h-16 w-16" />
+          <CardTitle className="text-2xl">{APP_SHORT_NAME}</CardTitle>
+          <CardDescription>{APP_NAME} · Acceso interno</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
