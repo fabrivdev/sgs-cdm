@@ -210,3 +210,34 @@ export function useVentasRepuesto(productoCodigo: string | null) {
     },
   });
 }
+
+export interface RepuestoHermano {
+  codigo_interno: string;
+  descripcion: string;
+}
+
+/**
+ * SKU con el mismo codigo de fabricante o codigo de descripcion que este
+ * producto (misma pieza fisica, distinta fila de origen/condicion --
+ * Importado Nuevo / Nacional Nuevo / Nacional Usado). La factura de venta
+ * solo registra el codigo de fabricante compartido, no cual de las
+ * variantes se vendio -- no se puede resolver con matching, se avisa en
+ * vez de adivinar.
+ */
+export function useRepuestoHermanos(productoCodigo: string | null) {
+  return useQuery({
+    queryKey: ["repuestos", "hermanos", productoCodigo],
+    enabled: Boolean(productoCodigo),
+    staleTime: STALE_TIME,
+    queryFn: async () => {
+      if (!productoCodigo) return [];
+
+      const { data, error } = await (supabase.rpc as any)("repuesto_hermanos", {
+        p_producto_codigo: productoCodigo,
+      });
+
+      if (error) return [];
+      return (Array.isArray(data) ? data : []) as RepuestoHermano[];
+    },
+  });
+}

@@ -27,6 +27,7 @@ import {
   STOCK_FILTROS_VACIOS,
   STOCK_PAGE_SIZE,
   useFamiliasStock,
+  useRepuestoHermanos,
   useStockKpis,
   useStockMatriz,
   useVentasRepuesto,
@@ -441,6 +442,8 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
 function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
   const ventasQuery = useVentasRepuesto(producto?.codigo_interno ?? null);
   const ventas = ventasQuery.data ?? [];
+  const hermanosQuery = useRepuestoHermanos(producto?.codigo_interno ?? null);
+  const hermanos = hermanosQuery.data ?? [];
   const [vistaHistorial, setVistaHistorial] = useState<VistaHistorial>("facturas");
   const historialCargando = ventasQuery.isLoading || ventasQuery.isFetching;
   const historialError = ventasQuery.isError;
@@ -597,6 +600,23 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                   label="Promedio unidades/mes"
                 />
               </section>
+
+              {hermanos.length > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Mismo código de fabricante que{" "}
+                    {hermanos.map((h, i) => (
+                      <span key={h.codigo_interno}>
+                        {i > 0 && ", "}
+                        <span className="font-mono font-medium">{h.codigo_interno}</span> ({h.descripcion})
+                      </span>
+                    ))}
+                    . La factura no distingue cuál se vendió realmente, así que las ventas de acá abajo podrían
+                    corresponder a cualquiera de estos códigos.
+                  </p>
+                </div>
+              )}
 
               {historialError && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
