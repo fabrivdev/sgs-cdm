@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
   LayoutDashboard,
   ListChecks,
   Users,
@@ -29,8 +31,8 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
+  SidebarFooter,
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
@@ -48,7 +50,7 @@ import { nivelLabel } from "@/lib/constants";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 
 type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; adminOnly?: boolean };
-type NavGroup = { modulo: string; label: string; items: NavItem[] };
+type NavGroup = { modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
 
 // Temporary kill switch: preserves the assistant configuration and history for a future re-enable.
 const AI_ASSISTANT_ENABLED = false;
@@ -57,6 +59,7 @@ const navGroups: NavGroup[] = [
   {
     modulo: "servicios",
     label: "Servicios",
+    icon: BriefcaseBusiness,
     items: [
       { to: "/", label: "Planificador", icon: ListChecks, end: true },
       { to: "/trabajos", label: "Trabajos", icon: Wrench },
@@ -67,6 +70,7 @@ const navGroups: NavGroup[] = [
   {
     modulo: "parque",
     label: "Parque",
+    icon: Tractor,
     items: [
       { to: "/parque-clientes", label: "Clientes y máquinas", icon: Tractor, end: true },
     ],
@@ -74,6 +78,7 @@ const navGroups: NavGroup[] = [
   {
     modulo: "repuestos",
     label: "Repuestos",
+    icon: Package,
     items: [
       { to: "/repuestos", label: "Catálogo y Stock", icon: Package, end: true },
       { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, end: true },
@@ -98,37 +103,51 @@ function ModuloNavGroup({
   onOpenChange: (open: boolean) => void;
   isItemActive: (it: NavItem) => boolean;
 }) {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const iconRail = state === "collapsed";
-  const effectiveOpen = iconRail || open;
+  const effectiveOpen = !iconRail && open;
+  const groupActive = group.items.some(isItemActive);
+  const GroupIcon = group.icon;
 
   return (
-    <Collapsible open={effectiveOpen} onOpenChange={iconRail ? undefined : onOpenChange}>
-      {/* p-0: el padding vertical por defecto de SidebarGroup se reserva aunque el
-          contenido este colapsado, dejando un hueco entre grupos cerrados. Lo movemos
-          al label y al content para que un grupo cerrado ocupe solo su fila. */}
+    <Collapsible open={effectiveOpen} onOpenChange={onOpenChange}>
       <SidebarGroup className="p-0">
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="mx-2 flex cursor-pointer items-center justify-between rounded-md pr-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-            <span>{group.label}</span>
+          <button
+            type="button"
+            onClick={() => iconRail && toggleSidebar()}
+            className={cn(
+              "group/module mx-2 flex h-14 w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-3 text-left outline-none transition-[background-color,color,box-shadow,transform] duration-200 ease-spring hover:bg-sidebar-accent/80 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2",
+              groupActive && "bg-sidebar-accent/70 text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-border)/0.55)]",
+              "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:px-0",
+            )}
+            aria-label={group.label}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/[0.08] text-primary transition-[transform,background-color] duration-200 group-hover/module:scale-105 group-hover/module:bg-primary/[0.12]">
+              <GroupIcon className="h-[18px] w-[18px]" />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
             <ChevronDown
-              className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+              className={cn(
+                "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-spring group-data-[collapsible=icon]:hidden",
+                open && "rotate-180",
+              )}
             />
-          </SidebarGroupLabel>
+          </button>
         </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarGroupContent className="px-2 pb-2 pt-1">
-            <SidebarMenu>
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+          <SidebarGroupContent className="relative mx-5 mb-2 ml-[3.25rem] border-l border-primary/25 pb-2 pl-3 pt-1 group-data-[collapsible=icon]:hidden">
+            <SidebarMenu className="gap-0.5">
               {group.items.map((it) => (
                 <SidebarMenuItem key={it.to}>
                   <SidebarMenuButton
                     asChild
                     isActive={isItemActive(it)}
                     tooltip={it.label}
-                    className="transition-[width,height,padding,background-color,color] duration-300 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground"
+                    className="h-9 rounded-xl px-2.5 text-[13px] transition-[background-color,color,transform] duration-200 ease-spring hover:translate-x-0.5 data-[active=true]:bg-primary/[0.10] data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/[0.14]"
                   >
                     <NavLink to={it.to} end={it.end as boolean | undefined} className="group/nav">
-                      <it.icon className="transition-transform duration-300 group-hover/nav:scale-110" />
+                      <it.icon className="transition-transform duration-200 group-hover/nav:scale-110" />
                       <span className="group-data-[collapsible=icon]:hidden">{it.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -198,17 +217,23 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
       </a>
 
       {/* Sidebar desktop: colapsable a rail de iconos, agrupado por modulo. No se muestra en mobile (el bottom-nav sigue siendo la navegacion mobile). */}
-      <Sidebar collapsible="icon" className="hidden md:flex">
-        <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0">
-            <AppLogo className="h-8 w-8 rounded-md" />
+      <Sidebar collapsible="icon" variant="floating" className="hidden md:flex">
+        <SidebarHeader className="border-b border-sidebar-border/70 p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+          <div className="flex h-14 items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
+            <AppLogo className="h-10 w-10 rounded-xl transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02] group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9" />
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
-              <div className="truncate text-[10px] text-muted-foreground">{APP_NAME}</div>
+              <div className="truncate text-base font-bold leading-tight">{APP_SHORT_NAME}</div>
+              <div className="truncate text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
             </div>
+            <SidebarTrigger className="ml-auto h-9 w-9 rounded-xl border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.25rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-5">
+              <ChevronLeft className="transition-transform duration-300 ease-spring group-data-[collapsible=icon]:rotate-180" />
+            </SidebarTrigger>
           </div>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="gap-1 px-1 py-4">
+          <div className="px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">
+            Módulos
+          </div>
           {visibleGroups.map((group) => (
             <ModuloNavGroup
               key={group.modulo}
@@ -219,13 +244,21 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
             />
           ))}
         </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border/70 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
+          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+            <AppLogo className="h-7 w-7 opacity-80 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8" />
+            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+              <div className="truncate text-[11px] font-semibold text-sidebar-foreground">CAMPOS DEL MAÑANA S.A.</div>
+              <div className="mt-0.5 truncate text-[11px] italic text-primary">“El mañana es HOY”</div>
+            </div>
+          </div>
+        </SidebarFooter>
       </Sidebar>
 
       <SidebarInset className="min-h-screen bg-background">
         {/* Top header */}
         <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b bg-card/95 px-3 shadow-sm backdrop-blur sm:h-14 sm:px-4">
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="hidden md:flex" />
             <AppLogo className="h-8 w-8 rounded-md md:hidden" />
             <div className="hidden sm:block md:hidden">
               <div className="text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
@@ -283,7 +316,9 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           </div>
         )}
 
-        <main id="main-content" className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">{children ?? <Outlet />}</main>
+        <main id="main-content" className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
+          <div key={location.pathname} className="app-page-enter">{children ?? <Outlet />}</div>
+        </main>
 
         {AI_ASSISTANT_ENABLED && <AIAssistant />}
 

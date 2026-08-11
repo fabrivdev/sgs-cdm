@@ -1,41 +1,56 @@
-# Design QA — inicio de sesión SIG
+# Design QA — menú lateral y microanimaciones
 
 ## Resultado
 
 **final result: passed**
 
-## Fuente y alcance
+## Evidencia
 
-- Referencia visual: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-50a22262-dbd9-4f88-afeb-965809556a05.png`
-- Implementación: `src/pages/Auth.tsx`
-- Fondo raster: `public/sig-login-background.png`
-- Estado validado: pantalla de inicio de sesión sin sesión activa.
-- Viewports: escritorio 1536 × 1024 y móvil 390 × 844.
+- Fuente visual principal: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-a3a0b4e1-1781-49b7-9aea-3e2b20740d69.png`
+- Fuente visual secundaria: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-358413e9-070c-4d73-bcfc-b53f9e789379.png`
+- Captura renderizada: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-expanded-latest.png`
+- Comparación conjunta: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-comparison.png`
+- Captura colapsada: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-collapsed.png`
+- Captura móvil: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-mobile.png`
+- Viewport principal: 1536 × 1024 CSS px, densidad reportada 1.
+- Estado: Planificador activo, módulo Servicios expandido.
 
-## Comparación visual
+## Comparación completa
 
-- Se conservó la composición central de la referencia: encabezado institucional, lema, tarjeta de acceso, logo, nombre de producto, formulario y mensaje de protección.
-- La paleta marfil, verde oliva y gris azulado mantiene el carácter sobrio de la referencia.
-- El fondo usa una imagen raster con ondas orgánicas suaves y la marca de agua usa el logo oficial de CDM.
-- Los controles tienen jerarquía, espaciado, bordes y estados de foco coherentes con el diseño objetivo.
-- En móvil la tarjeta se adapta al ancho disponible sin scroll horizontal; la información crítica permanece visible y ordenada.
+- La implementación mantiene la identidad SIG existente y limita el rediseño al menú lateral.
+- La jerarquía visual coincide con la referencia: marca, rótulo de módulos, bloques de módulo, acordeón contextual y pie institucional.
+- Se preservaron las rutas, permisos y agrupaciones reales. No se incorporaron los destinos ficticios de las referencias.
+- El ancho es deliberadamente más compacto que el mock para proteger el espacio de trabajo de tablas y planificadores.
 
-## Interacciones verificadas
+## Comparación enfocada del menú
 
-- Campo de email con autocompletado y validación requerida.
-- Campo de contraseña con autocompletado y validación requerida.
-- El botón de visibilidad cambia correctamente el tipo del campo entre `password` y `text`.
-- El envío sigue usando el flujo existente de autenticación y conserva sus mensajes de éxito/error.
+- Tipografía: Inter y pesos 500–700 reproducen correctamente la jerarquía; títulos, módulos y páginas mantienen legibilidad.
+- Espaciado: cabecera, tarjetas de módulo, sangría de submenú y separación vertical siguen el ritmo del ejemplo.
+- Color: se reutilizaron los tokens oliva de SIG, con superficies blancas y acentos verdes suaves.
+- Activos: el módulo y la ruta actual se distinguen sin usar un bloque verde excesivamente pesado.
+- Iconos e imágenes: se reutilizó el logo oficial y la biblioteca Lucide existente; no hay recursos aproximados ni placeholders.
+- Contenido: las etiquetas corresponden a los módulos y páginas reales de SIG.
+
+## Interacciones probadas
+
+- Expansión exclusiva de Servicios, Parque y Repuestos.
+- Sincronización automática del acordeón con la ruta activa.
+- Navegación desde Catálogo y Stock a `/repuestos`.
+- Colapso a rail de 50 px y restauración del menú expandido.
+- Aparición del contenido de ruta, presión de botones, tabs, selectores, diálogos, sheets y menús.
+- `prefers-reduced-motion` desactiva las transiciones no esenciales.
+- En 390 × 844 el sidebar permanece oculto y la navegación inferior existente continúa activa, sin overflow horizontal.
+- Consola sin errores. Permanecen únicamente dos avisos futuros preexistentes de React Router.
 
 ## Hallazgos
 
 - P0: ninguno.
 - P1: ninguno.
 - P2: ninguno.
-- P3: React Router informa dos avisos de compatibilidad futura ya existentes; no afectan el render ni el inicio de sesión.
+- P3: el mock incluye destinos que no existen en SIG; se omitieron intencionalmente para mantener la arquitectura del producto.
 
 ## Historial de comparación
 
-1. Comparación completa lado a lado a 1536 × 1024: composición y estilo aprobados.
-2. Revisión enfocada del formulario: inputs, iconos, botón y mensaje de seguridad aprobados.
-3. Revisión móvil a 390 × 844: adaptación y ausencia de overflow aprobadas.
+1. Primera captura: el botón colapsado se superponía visualmente con el logo y el subtítulo podía truncarse.
+2. Corrección: el botón se desplazó fuera del rail colapsado y se ajustó el tamaño del subtítulo.
+3. Segunda comparación conjunta: composición, jerarquía y estados aprobados sin hallazgos P0/P1/P2.

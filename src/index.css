@@ -6,6 +6,10 @@
 
 @layer base {
   :root {
+    --motion-fast: 160ms;
+    --motion-base: 220ms;
+    --motion-slow: 320ms;
+    --motion-spring: cubic-bezier(0.22, 1, 0.36, 1);
     /* Core colors - Clean iOS whites */
     --background: 0 0% 98%;
     --foreground: 0 0% 10%;
@@ -108,6 +112,32 @@
   .row-pendiente { @apply bg-[hsl(var(--estado-pendiente-bg))]; }
   .row-iniciado { @apply bg-[hsl(var(--estado-iniciado-bg))]; }
   .row-completado { @apply bg-[hsl(var(--estado-completado-bg))]; }
+
+  .app-page-enter {
+    animation: app-page-enter var(--motion-base) var(--motion-spring) both;
+  }
+}
+
+@keyframes app-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media print {

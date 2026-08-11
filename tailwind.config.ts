@@ -8,6 +8,7 @@ export default {
     container: { center: true, padding: "1rem", screens: { "2xl": "1400px" } },
     extend: {
       fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+      transitionTimingFunction: { spring: "cubic-bezier(0.22, 1, 0.36, 1)" },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
