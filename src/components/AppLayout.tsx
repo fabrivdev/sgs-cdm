@@ -50,6 +50,9 @@ import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; adminOnly?: boolean };
 type NavGroup = { modulo: string; label: string; items: NavItem[] };
 
+// Temporary kill switch: preserves the assistant configuration and history for a future re-enable.
+const AI_ASSISTANT_ENABLED = false;
+
 const navGroups: NavGroup[] = [
   {
     modulo: "servicios",
@@ -282,7 +285,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
         <main id="main-content" className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">{children ?? <Outlet />}</main>
 
-        <AIAssistant />
+        {AI_ASSISTANT_ENABLED && <AIAssistant />}
 
         {/* Bottom nav (mobile) */}
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:hidden">
