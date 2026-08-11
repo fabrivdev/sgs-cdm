@@ -217,15 +217,15 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
       </a>
 
       {/* Sidebar desktop: colapsable a rail de iconos, agrupado por modulo. No se muestra en mobile (el bottom-nav sigue siendo la navegacion mobile). */}
-      <Sidebar collapsible="icon" variant="floating" className="hidden md:flex">
-        <SidebarHeader className="border-b border-sidebar-border/70 p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
-          <div className="flex h-14 items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-            <AppLogo className="h-10 w-10 rounded-xl transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02] group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9" />
+      <Sidebar collapsible="icon" className="z-50 hidden md:flex">
+        <SidebarHeader className="h-14 justify-center border-b border-sidebar-border/70 p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+          <div className="flex h-full w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
+            <AppLogo className="h-8 w-8 rounded-lg transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02]" />
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-base font-bold leading-tight">{APP_SHORT_NAME}</div>
+              <div className="truncate text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
               <div className="truncate text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
             </div>
-            <SidebarTrigger className="ml-auto h-9 w-9 rounded-xl border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.25rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-5">
+            <SidebarTrigger className="ml-auto h-8 w-8 rounded-lg border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.375rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-3">
               <ChevronLeft className="transition-transform duration-300 ease-spring group-data-[collapsible=icon]:rotate-180" />
             </SidebarTrigger>
           </div>
@@ -244,9 +244,8 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
             />
           ))}
         </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border/70 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
-          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-            <AppLogo className="h-7 w-7 opacity-80 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8" />
+        <SidebarFooter className="border-t border-sidebar-border/70 px-5 py-4 group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center">
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <div className="truncate text-[11px] font-semibold text-sidebar-foreground">CAMPOS DEL MAÑANA S.A.</div>
               <div className="mt-0.5 truncate text-[11px] italic text-primary">“El mañana es HOY”</div>
@@ -257,7 +256,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
       <SidebarInset className="min-h-screen bg-background">
         {/* Top header */}
-        <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b bg-card/95 px-3 shadow-sm backdrop-blur sm:h-14 sm:px-4">
+        <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b border-border/70 bg-card/95 px-3 backdrop-blur sm:h-14 sm:px-4">
           <div className="flex items-center gap-2">
             <AppLogo className="h-8 w-8 rounded-md md:hidden" />
             <div className="hidden sm:block md:hidden">
