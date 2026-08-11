@@ -33,7 +33,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Cargando vista...</div>}>
+            <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route
