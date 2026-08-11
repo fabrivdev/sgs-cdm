@@ -109,19 +109,6 @@ function ultimosMeses(cantidad: number) {
   });
 }
 
-const VINCULO_LABEL = {
-  codigo_fabricante: "Código fabricante",
-  codigo_interno: "Código interno",
-  codigo_facturado_fabricante: "Código facturado",
-  descripcion_facturada_codigo_fabricante: "Descripción facturada / fabricante",
-  descripcion_descripcion: "Descripción facturada / catálogo",
-  descripcion_codigo_fabricante: "Código desde descripción",
-} as const;
-
-function etiquetaOrigen(origen: string) {
-  return origen.startsWith("new_xml_") ? "Nuevo sistema" : "Histórico";
-}
-
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
   { key: "santa_rosa", label: "Santa Rosa" },
@@ -496,14 +483,6 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
         : ventas.length
           ? "Sin fechas validas"
           : "Sin historial vinculado";
-  const fuentes = Array.from(new Set(ventas.map((linea) => etiquetaOrigen(linea.origen_sistema))));
-  const vinculos = useMemo(() => {
-    const conteo = new Map<string, number>();
-    for (const linea of ventas) {
-      conteo.set(linea.metodo_vinculo, (conteo.get(linea.metodo_vinculo) ?? 0) + 1);
-    }
-    return Array.from(conteo, ([metodo, cantidad]) => ({ metodo, cantidad }));
-  }, [ventas]);
 
   return (
     <Sheet open={producto !== null} onOpenChange={(open) => !open && onClose()}>
@@ -632,22 +611,8 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     <History className="h-4 w-4 text-primary" /> Historial de ventas
                   </h3>
-                  <span className={metaText}>{cobertura} · {fuentes.length} fuente{fuentes.length === 1 ? "" : "s"}</span>
+                  <span className={metaText}>{cobertura}</span>
                 </div>
-                {ventas.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
-                    {fuentes.map((fuente) => (
-                      <span key={fuente} className="rounded border px-2 py-1">
-                        {fuente}
-                      </span>
-                    ))}
-                    {vinculos.map(({ metodo, cantidad }) => (
-                      <span key={metodo} className="rounded border px-2 py-1">
-                        {VINCULO_LABEL[metodo as keyof typeof VINCULO_LABEL] ?? metodo}: {cantidad.toLocaleString("es-PY")}
-                      </span>
-                    ))}
-                  </div>
-                )}
                 <div className="max-h-[360px] overflow-auto rounded-md border">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
