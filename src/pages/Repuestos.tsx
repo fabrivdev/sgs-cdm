@@ -43,6 +43,22 @@ interface VentaMensual {
   cantidad: number;
 }
 
+interface VentaAgrupada {
+  clave: string;
+  etiqueta: string;
+  cantidad: number;
+  facturas: number;
+  total: number;
+}
+
+type VistaHistorial = "facturas" | "clientes" | "meses";
+
+const VISTAS_HISTORIAL: { value: VistaHistorial; label: string }[] = [
+  { value: "facturas", label: "Facturas" },
+  { value: "clientes", label: "Por cliente" },
+  { value: "meses", label: "Por mes" },
+];
+
 const MESES_KPI = 12;
 const MESES_KPI_LARGO = 24;
 
@@ -403,6 +419,7 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
 function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
   const ventasQuery = useVentasRepuesto(producto?.codigo_interno ?? null);
   const ventas = ventasQuery.data ?? [];
+  const [vistaHistorial, setVistaHistorial] = useState<VistaHistorial>("facturas");
   const historialCargando = ventasQuery.isLoading || ventasQuery.isFetching;
   const historialError = ventasQuery.isError;
   const meses12 = useMemo(() => ultimosMeses(MESES_KPI), []);
@@ -483,6 +500,42 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
         : ventas.length
           ? "Sin fechas validas"
           : "Sin historial vinculado";
+
+  const ventasPorCliente = useMemo<VentaAgrupada[]>(() => {
+    const map = new Map<string, { cantidad: number; total: number; facturas: Set<string> }>();
+    for (const linea of ventas) {
+      const clave = linea.cliente || "Sin cliente";
+      const actual = map.get(clave) ?? { cantidad: 0, total: 0, facturas: new Set<string>() };
+      actual.cantidad += Number(linea.cantidad || 0);
+      actual.total += Number(linea.total_venta_usd || 0);
+      if (linea.factura) actual.facturas.add(linea.factura);
+      map.set(clave, actual);
+    }
+    return Array.from(map.entries())
+      .map(([clave, v]) => ({ clave, etiqueta: clave, cantidad: v.cantidad, facturas: v.facturas.size, total: v.total }))
+      .sort((a, b) => b.total - a.total);
+  }, [ventas]);
+
+  const ventasPorMes = useMemo<VentaAgrupada[]>(() => {
+    const map = new Map<string, { cantidad: number; total: number; facturas: Set<string> }>();
+    for (const linea of ventas) {
+      const mes = mesVenta(linea.fecha_factura) ?? "Sin fecha";
+      const actual = map.get(mes) ?? { cantidad: 0, total: 0, facturas: new Set<string>() };
+      actual.cantidad += Number(linea.cantidad || 0);
+      actual.total += Number(linea.total_venta_usd || 0);
+      if (linea.factura) actual.facturas.add(linea.factura);
+      map.set(mes, actual);
+    }
+    return Array.from(map.entries())
+      .map(([clave, v]) => ({
+        clave,
+        etiqueta: clave === "Sin fecha" ? clave : formatMes(clave),
+        cantidad: v.cantidad,
+        facturas: v.facturas.size,
+        total: v.total,
+      }))
+      .sort((a, b) => b.clave.localeCompare(a.clave));
+  }, [ventas]);
 
   return (
     <Sheet open={producto !== null} onOpenChange={(open) => !open && onClose()}>
@@ -611,47 +664,90 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     <History className="h-4 w-4 text-primary" /> Historial de ventas
                   </h3>
-                  <span className={metaText}>{cobertura}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={metaText}>{cobertura}</span>
+                    <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
+                      {VISTAS_HISTORIAL.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setVistaHistorial(value)}
+                          className={cn(
+                            "px-3 hover:bg-accent",
+                            vistaHistorial === value && "bg-primary text-primary-foreground hover:bg-primary",
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div className="max-h-[360px] overflow-auto rounded-md border">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
-                      <TableRow>
-                        <TableHead className={th}>Fecha / factura</TableHead>
-                        <TableHead className={th}>Cliente</TableHead>
-                        <TableHead className={cn(th, "text-right")}>Cant.</TableHead>
-                        <TableHead className={cn(th, "text-right")}>USD</TableHead>
-                      </TableRow>
+                      {vistaHistorial === "facturas" ? (
+                        <TableRow>
+                          <TableHead className={th}>Fecha</TableHead>
+                          <TableHead className={th}>Factura</TableHead>
+                          <TableHead className={th}>Cliente</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Cantidad</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Precio Unit.</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Precio Total</TableHead>
+                        </TableRow>
+                      ) : (
+                        <TableRow>
+                          <TableHead className={th}>{vistaHistorial === "clientes" ? "Cliente" : "Período"}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Cantidad</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Facturas</TableHead>
+                          <TableHead className={cn(th, "text-right")}>Total USD</TableHead>
+                        </TableRow>
+                      )}
                     </TableHeader>
                     <TableBody>
                       {historialCargando && (
                         <TableRow>
-                          <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
                             Cargando historial de ventas...
                           </TableCell>
                         </TableRow>
                       )}
                       {historialError && (
                         <TableRow>
-                          <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
                             El historial no está disponible.
                           </TableCell>
                         </TableRow>
                       )}
-                      {!historialCargando && !historialError && ventas.map((linea) => (
-                        <TableRow key={linea.linea_id}>
-                          <TableCell className={cn(td, "whitespace-nowrap")}>
-                            {fechaVentaLabel(linea.fecha_factura)}{" "}
-                            <span className="font-mono text-[10px] text-muted-foreground">{linea.factura || "Sin número"}</span>
-                          </TableCell>
-                          <TableCell className={cn(td, "max-w-48 truncate")}>{linea.cliente || "Sin cliente"}</TableCell>
-                          <TableCell className={cn(td, "text-right tabular-nums")}>{Number(linea.cantidad).toLocaleString("es-PY")}</TableCell>
-                          <TableCell className={cn(td, "text-right tabular-nums")}>{Number(linea.total_venta_usd).toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
-                        </TableRow>
-                      ))}
+                      {!historialCargando && !historialError && vistaHistorial === "facturas" && ventas.map((linea) => {
+                        const cantidad = Number(linea.cantidad || 0);
+                        const total = Number(linea.total_venta_usd || 0);
+                        const precioUnitario = cantidad > 0 ? total / cantidad : null;
+                        return (
+                          <TableRow key={linea.linea_id}>
+                            <TableCell className={cn(td, "whitespace-nowrap")}>{fechaVentaLabel(linea.fecha_factura)}</TableCell>
+                            <TableCell className={cn(td, "whitespace-nowrap font-mono text-[10px]")}>{linea.factura || "Sin número"}</TableCell>
+                            <TableCell className={cn(td, "max-w-48 truncate")}>{linea.cliente || "Sin cliente"}</TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>{cantidad.toLocaleString("es-PY")}</TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>
+                              {precioUnitario === null ? "—" : precioUnitario.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>{total.toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {!historialCargando && !historialError && vistaHistorial !== "facturas" &&
+                        (vistaHistorial === "clientes" ? ventasPorCliente : ventasPorMes).map((fila) => (
+                          <TableRow key={fila.clave}>
+                            <TableCell className={cn(td, "max-w-48 truncate")}>{fila.etiqueta}</TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>{fila.cantidad.toLocaleString("es-PY")}</TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>{fila.facturas.toLocaleString("es-PY")}</TableCell>
+                            <TableCell className={cn(td, "text-right font-medium tabular-nums")}>{fila.total.toLocaleString("es-PY", { maximumFractionDigits: 0 })}</TableCell>
+                          </TableRow>
+                        ))}
                       {!historialCargando && !historialError && ventas.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
                             No se encontraron ventas vinculadas a {producto.codigo_interno}
                             {producto.codigo_fabricante ? ` / fabricante ${producto.codigo_fabricante}` : ""}.
                           </TableCell>
