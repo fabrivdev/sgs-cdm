@@ -34,7 +34,7 @@ import {
   type StockMatrizRow,
   type StockSortKey,
 } from "@/hooks/useRepuestos";
-import { MARCAS } from "@/lib/constants";
+import { MARCAS, SUCURSALES } from "@/lib/constants";
 import { metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
@@ -100,15 +100,24 @@ function normalizarSucursal(value: string | null | undefined) {
     .toLowerCase();
 }
 
+// Al menos un cliente (Campos del Manana) viene facturado con la sucursal
+// pegada al nombre en algunas lineas ("CAMPOS DEL MANANA S.A. - SANTA RITA")
+// y sin pegar en otras ("CAMPOS DEL MA\u00d1ANA S.A.") -- ese sufijo no lo saca
+// normalizar tildes/mayusculas, hay que sacarlo aparte antes de comparar.
+const SUFIJO_SUCURSAL_RE = new RegExp(`\\s*-\\s*(${SUCURSALES.join("|")})\\s*$`, "i");
+
+function limpiarNombreCliente(value: string | null | undefined) {
+  return (value ?? "").trim().replace(SUFIJO_SUCURSAL_RE, "").trim();
+}
+
 // Mismo cliente puede quedar facturado con variantes de tilde/mayusculas/
-// espacios distintas segun la sucursal que emitio (ej. "CAMPOS DEL MA\u00d1ANA
-// S.A." vs "CAMPOS DEL MANANA S.A.") -- se agrupa por esta clave para que
-// no aparezca como un cliente distinto por cada variante.
+// espacios/sucursal-pegada-al-nombre distintas segun quien emitio -- se
+// agrupa por esta clave para que no aparezca como un cliente distinto por
+// cada variante.
 function normalizarClienteClave(value: string | null | undefined) {
-  return (value ?? "")
+  return limpiarNombreCliente(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .trim()
     .toUpperCase()
     .replace(/\s+/g, " ");
 }
@@ -517,8 +526,8 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
   const ventasPorCliente = useMemo<VentaAgrupada[]>(() => {
     const map = new Map<string, { etiqueta: string; cantidad: number; total: number; facturas: Set<string> }>();
     for (const linea of ventas) {
-      const nombre = linea.cliente || "Sin cliente";
-      const clave = normalizarClienteClave(nombre) || "SIN CLIENTE";
+      const nombre = limpiarNombreCliente(linea.cliente) || "Sin cliente";
+      const clave = normalizarClienteClave(linea.cliente) || "SIN CLIENTE";
       const actual = map.get(clave) ?? { etiqueta: nombre, cantidad: 0, total: 0, facturas: new Set<string>() };
       actual.cantidad += Number(linea.cantidad || 0);
       actual.total += Number(linea.total_venta_usd || 0);
