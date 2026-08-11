@@ -29,7 +29,7 @@ export default function Auth() {
 
   return (
     <main
-      className="relative flex min-h-screen flex-col items-center overflow-hidden bg-[#fbfbf7] bg-cover bg-bottom bg-no-repeat px-4 py-6 sm:px-6 sm:py-8"
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#fbfbf7] bg-cover bg-bottom bg-no-repeat px-4 py-6 sm:px-6 sm:py-8"
       style={{ backgroundImage: "url('/sig-login-background.png')" }}
     >
       <img
