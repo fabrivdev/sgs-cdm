@@ -244,14 +244,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
             />
           ))}
         </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border/70 px-5 py-4 group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center">
-            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-[11px] font-semibold text-sidebar-foreground">CAMPOS DEL MAÑANA S.A.</div>
-              <div className="mt-0.5 truncate text-[11px] italic text-primary">“El mañana es HOY”</div>
-            </div>
-          </div>
-        </SidebarFooter>
+        <SidebarFooter className="border-t border-sidebar-border/70 px-5 py-4 group-data-[collapsible=icon]:hidden" />
       </Sidebar>
 
       <SidebarInset className="min-h-screen bg-background">
