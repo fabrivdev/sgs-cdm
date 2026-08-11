@@ -1655,6 +1655,10 @@ export type Database = {
       }
     }
     Functions: {
+      extraer_codigo_repuesto_descripcion: {
+        Args: { p_descripcion: string }
+        Returns: string
+      }
       facturacion_tipo_tiempo_campos: {
         Args: { p_entidad: string; p_observacion: string }
         Returns: string
@@ -1794,6 +1798,11 @@ export type Database = {
       recalcular_estado_trabajo: {
         Args: { p_trabajo_id: string }
         Returns: undefined
+      }
+      repuesto_hermanos: { Args: { p_producto_codigo: string }; Returns: Json }
+      repuesto_ventas_historial: {
+        Args: { p_producto_codigo: string }
+        Returns: Json
       }
     }
     Enums: {

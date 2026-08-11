@@ -39,17 +39,6 @@ export default function Auth() {
         className="pointer-events-none absolute -right-20 -top-24 hidden h-[430px] w-[430px] select-none opacity-[0.045] md:block"
       />
 
-      <header className="relative z-10 text-center text-[#587b24]">
-        <div className="text-sm font-medium uppercase tracking-[0.14em] sm:text-lg">
-          Campos del Mañana S.A.
-        </div>
-        <div className="mt-2 flex items-center justify-center gap-4 text-sm sm:mt-3 sm:text-lg">
-          <span className="h-px w-9 bg-[#9ab96a]/60" />
-          <span className="font-serif italic">El mañana es <strong>HOY</strong></span>
-          <span className="h-px w-9 bg-[#9ab96a]/60" />
-        </div>
-      </header>
-
       <Card className="relative z-10 mt-6 w-full max-w-[532px] border-white/80 bg-white/90 shadow-[0_20px_55px_rgba(40,52,31,0.14)] backdrop-blur-sm sm:mt-8">
         <CardContent className="px-5 py-7 sm:px-8 sm:py-9">
           <div className="text-center">
