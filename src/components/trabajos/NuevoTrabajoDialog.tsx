@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveDrawer,
   ResponsiveDrawerHeader,
@@ -32,6 +32,13 @@ const isMissingOsColumnError = (error: unknown) => {
   return code === "PGRST204" && message.includes("os_numero");
 };
 
+const clienteNombreKey = (nombre: string) => nombre
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, " ");
+
 /**
  * Caso madre = solo registra el problema. NO se asignan fechas ni técnicos acá.
  * Toda la programación se hace después desde el Planificador / Calendario.
@@ -51,6 +58,19 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
     prioridad: "media" as Prioridad,
   });
   const [busy, setBusy] = useState(false);
+
+  const clientesUnicos = useMemo(() => {
+    const porNombre = new Map<string, Cliente>();
+    for (const cliente of clientes) {
+      const key = clienteNombreKey(cliente.nombre);
+      if (!key) continue;
+      const actual = porNombre.get(key);
+      if (!actual || (cliente.sucursal === form.sucursal && actual.sucursal !== form.sucursal)) {
+        porNombre.set(key, cliente);
+      }
+    }
+    return Array.from(porNombre.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [clientes, form.sucursal]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,7 +104,8 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
     try {
       let clienteId: string | null = form.cliente_id || null;
       if (!clienteId && form.cliente_text.trim()) {
-        const ex = clientes.find(c => c.nombre.toLowerCase() === form.cliente_text.trim().toLowerCase());
+        const key = clienteNombreKey(form.cliente_text);
+        const ex = clientesUnicos.find(c => clienteNombreKey(c.nombre) === key);
         if (ex) clienteId = ex.id;
         else {
           const { data, error } = await supabase.from("clientes")
@@ -152,9 +173,9 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
   };
 
   const clientesFiltrados = (() => {
-    const q = form.cliente_text.trim().toLowerCase();
-    if (!q) return clientes.slice(0, 100);
-    return clientes.filter(c => c.nombre.toLowerCase().includes(q)).slice(0, 100);
+    const q = clienteNombreKey(form.cliente_text);
+    if (!q) return clientesUnicos.slice(0, 100);
+    return clientesUnicos.filter(c => clienteNombreKey(c.nombre).includes(q)).slice(0, 100);
   })();
 
   return (
@@ -174,7 +195,8 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
               value={form.cliente_text}
               onChange={(e) => {
                 const v = e.target.value;
-                const m = clientes.find(c => c.nombre.toLowerCase() === v.toLowerCase());
+                const key = clienteNombreKey(v);
+                const m = clientesUnicos.find(c => clienteNombreKey(c.nombre) === key);
                 setForm(f => ({ ...f, cliente_text: v, cliente_id: m?.id ?? "" }));
               }}
               placeholder="Buscar o escribir cliente..."
