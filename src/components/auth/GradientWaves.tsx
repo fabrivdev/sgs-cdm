@@ -145,20 +145,29 @@ void main() {
   float layerB = 1.0 - smoothstep(surfaceB - 0.02, surfaceB + 0.02, screenUv.y);
   float layerC = 1.0 - smoothstep(surfaceC - 0.018, surfaceC + 0.018, screenUv.y);
 
-  vec3 middleGreen = mix(uWaveColor, uHorizonColor, 0.22);
-  vec3 deepGreen = mix(uWaveColor, vec3(0.08, 0.18, 0.10), 0.34);
-  vec3 color = mix(uHorizonColor, middleGreen, layerA * 0.78);
-  color = mix(color, uWaveColor, layerB * 0.86);
-  color = mix(color, deepGreen, layerC * 0.92);
+  vec3 white = vec3(1.0);
+  vec3 softGreen = mix(uWaveColor, white, 0.68);
+  vec3 middleGreen = mix(uWaveColor, white, 0.52);
+  vec3 baseGreen = mix(uWaveColor, uHorizonColor, 0.38);
+  vec3 color = mix(uHorizonColor, softGreen, layerA * 0.58);
+  color = mix(color, middleGreen, layerB * 0.64);
+  color = mix(color, baseGreen, layerC * 0.68);
 
   float crestA = exp(-abs(screenUv.y - surfaceA) * 72.0);
   float crestB = exp(-abs(screenUv.y - surfaceB) * 90.0);
   float crestC = exp(-abs(screenUv.y - surfaceC) * 105.0);
   float crest = clamp(crestA * 0.72 + crestB * 0.52 + crestC * 0.38, 0.0, 1.0);
-  color = mix(color, uCrestColor, crest * 0.82);
+  color = mix(color, uCrestColor, crest * 0.9);
 
-  float glow = 1.0 - length((screenUv - vec2(0.5, 0.62)) * vec2(0.82, 1.0));
-  color += max(glow, 0.0) * 0.07;
+  vec2 lightOnePosition = vec2(0.22 + 0.07 * sin(T * 0.72), 0.68 + 0.04 * cos(T * 0.48));
+  vec2 lightTwoPosition = vec2(0.78 + 0.06 * cos(T * 0.58), 0.42 + 0.05 * sin(T * 0.64));
+  vec2 lightOneDelta = (screenUv - lightOnePosition) * vec2(1.05, 1.55);
+  vec2 lightTwoDelta = (screenUv - lightTwoPosition) * vec2(1.2, 1.7);
+  float lightOne = exp(-dot(lightOneDelta, lightOneDelta) * 4.2);
+  float lightTwo = exp(-dot(lightTwoDelta, lightTwoDelta) * 5.0);
+  float ambientLight = max(1.0 - length((screenUv - vec2(0.5, 0.62)) * vec2(0.72, 1.0)), 0.0);
+  color = mix(color, white, lightOne * 0.3 + lightTwo * 0.24);
+  color += ambientLight * 0.06;
   color = clamp(color * uBrightness, 0.0, 1.0);
   float alpha = uOpacity;
   if (uGrain > 0.5) {
@@ -173,8 +182,8 @@ void main() {
 const contexts = new WeakMap<HTMLDivElement, Program>();
 
 export default function GradientWaves({
-  horizonColor = "#dcebbf",
-  waveColor = "#668634",
+  horizonColor = "#f5f8ee",
+  waveColor = "#93ad61",
   crestColor = "#ffffff",
   speed = 0.22,
   amplitude = 2.5,
@@ -187,8 +196,8 @@ export default function GradientWaves({
   height = 5.5,
   fogDepth = 15,
   detail = "medium",
-  brightness = 0.92,
-  opacity = 0.9,
+  brightness = 1,
+  opacity = 0.96,
   mouseInteraction = true,
   parallaxStrength = 0.35,
   grain = true,

@@ -29,14 +29,14 @@ export default function Auth() {
   };
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef3e6] px-4 py-6 sm:px-6 sm:py-8">
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#f8faf5] px-4 py-6 sm:px-6 sm:py-8">
       <div className="absolute inset-0" aria-hidden="true">
         <GradientWaves />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(255,255,255,0.34),transparent_48%,rgba(26,54,30,0.1)_100%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.5),transparent_46%,rgba(255,255,255,0.12)_100%)]" />
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),transparent_35%,rgba(255,255,255,0.1))] motion-reduce:bg-[#eef3e6]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.4),transparent_38%,rgba(255,255,255,0.2))] motion-reduce:bg-[#f8faf5]"
       />
 
       <Card className="relative z-10 mt-6 w-full max-w-[532px] border-white/80 bg-white/[0.88] shadow-[0_24px_70px_rgba(31,46,20,0.22)] backdrop-blur-xl sm:mt-8">
