@@ -8,6 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -151,7 +161,7 @@ const initials = (s: string) =>
     .toUpperCase();
 
 export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrearServicio }: Props) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -172,6 +182,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [maquinaForm, setMaquinaForm] = useState<Partial<Maquina>>({});
   const [mostrarInactivas, setMostrarInactivas] = useState(false);
   const [transferMaquina, setTransferMaquina] = useState<MaquinaParaTransferir | null>(null);
+  const [maquinaAEliminar, setMaquinaAEliminar] = useState<Maquina | null>(null);
+  const [eliminandoMaquina, setEliminandoMaquina] = useState(false);
 
   // Seguimiento form
   const [segResultado, setSegResultado] = useState<string>("Contactado");
@@ -356,6 +368,40 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     toast.success("Máquina reactivada");
     if (cliente) await cargar(cliente.id);
     onChanged();
+  };
+
+  const eliminarMaquina = async () => {
+    if (!maquinaAEliminar || !cliente || eliminandoMaquina) return;
+    setEliminandoMaquina(true);
+
+    try {
+      const { count, error: trabajosError } = await supabase
+        .from("trabajos")
+        .select("id", { count: "exact", head: true })
+        .eq("maquina_id", maquinaAEliminar.id);
+
+      if (trabajosError) throw trabajosError;
+      if ((count ?? 0) > 0) {
+        toast.error("No se puede eliminar porque la máquina tiene trabajos vinculados. Podés inactivarla para conservar el historial.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("parque_maquinas")
+        .delete()
+        .eq("id", maquinaAEliminar.id);
+
+      if (error) throw error;
+
+      toast.success("Máquina eliminada definitivamente");
+      setMaquinaAEliminar(null);
+      await cargar(cliente.id);
+      onChanged();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar la máquina");
+    } finally {
+      setEliminandoMaquina(false);
+    }
   };
 
   const seguimientosCompletos = useMemo(() => {
@@ -677,6 +723,17 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                 Reactivar
                               </Button>
                             )}
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setMaquinaAEliminar(m)}
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                title="Eliminar definitivamente"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -824,6 +881,36 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         onChanged();
       }}
     />
+
+    <AlertDialog
+      open={!!maquinaAEliminar}
+      onOpenChange={(dialogOpen) => {
+        if (!dialogOpen && !eliminandoMaquina) setMaquinaAEliminar(null);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar esta máquina definitivamente?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se eliminará {maquinaAEliminar?.modelo_tipo || maquinaAEliminar?.subgrupo} · serie {maquinaAEliminar?.serie}.
+            Esta acción no se puede deshacer. Si tiene trabajos vinculados, la eliminación será bloqueada para preservar el historial.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={eliminandoMaquina}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault();
+              eliminarMaquina();
+            }}
+            disabled={eliminandoMaquina}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {eliminandoMaquina ? "Eliminando..." : "Eliminar definitivamente"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
