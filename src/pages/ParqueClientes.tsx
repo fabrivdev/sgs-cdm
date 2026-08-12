@@ -27,7 +27,12 @@ export default function ParqueClientes() {
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [parqueMetricas, setParqueMetricas] = useState<KpiResult | null>(null);
-  const [maquinasResumen, setMaquinasResumen] = useState<MaquinasResumen>({ totalMaquinas: 0, totalClientes: 0, totalModelos: 0 });
+  const [maquinasResumen, setMaquinasResumen] = useState<MaquinasResumen>({
+    totalMaquinas: 0,
+    totalClientes: 0,
+    totalHorsch: 0,
+    totalClaas: 0,
+  });
   const [stockResumen, setStockResumen] = useState<StockMaquinasResumen>({ total: 0, nuevas: 0, usadas: 0, marcas: 0 });
   const [refreshCounter, setRefreshCounter] = useState(0);
   const vistaParque = location.pathname === "/parque-stock" ? "stock" : location.pathname === "/parque-maquinas" ? "maquinas" : "clientes";
@@ -73,7 +78,8 @@ export default function ParqueClientes() {
     ] : vistaParque === "maquinas" ? [
       { label: "Máquinas activas", value: maquinasResumen.totalMaquinas.toLocaleString(), icon: Tractor, accent: "text-primary" },
       { label: "Clientes con máquinas", value: maquinasResumen.totalClientes.toLocaleString(), icon: Users, accent: "text-blue-600" },
-      { label: "Modelos unificados", value: maquinasResumen.totalModelos.toLocaleString(), icon: CheckCircle2, accent: "text-emerald-600" },
+      { label: "Máquinas HORSCH", value: maquinasResumen.totalHorsch.toLocaleString(), icon: Tractor, accent: "text-red-600" },
+      { label: "Máquinas CLAAS", value: maquinasResumen.totalClaas.toLocaleString(), icon: Tractor, accent: "text-emerald-600" },
     ] : [
       { label: "Unidades en stock", value: stockResumen.total.toLocaleString(), icon: Tractor, accent: "text-primary" },
       { label: "Máquinas nuevas", value: stockResumen.nuevas.toLocaleString(), icon: Sparkles, accent: "text-emerald-600" },
@@ -91,7 +97,7 @@ export default function ParqueClientes() {
 
       <div className={cn(
         "mb-4 grid grid-cols-1 gap-2 sm:gap-3",
-        vistaParque === "clientes" || vistaParque === "stock" ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3",
+        "sm:grid-cols-2 xl:grid-cols-4",
       )}>
         {cards.map((c) => (
           <Card key={c.label} className="border">

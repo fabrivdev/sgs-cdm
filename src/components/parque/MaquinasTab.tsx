@@ -11,7 +11,7 @@ import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/Fil
 import { cn } from "@/lib/utils";
 import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
-import { MACHINE_SUBGROUPS, normalizeMachineModelKey } from "@/lib/machineModels";
+import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -86,7 +86,8 @@ async function cargarTodo<T>(queryBuilder: PaginableQuery<T>): Promise<T[]> {
 export type MaquinasResumen = {
   totalMaquinas: number;
   totalClientes: number;
-  totalModelos: number;
+  totalHorsch: number;
+  totalClaas: number;
 };
 
 export function MaquinasTab({
@@ -140,11 +141,8 @@ export function MaquinasTab({
       onResumenChange?.({
         totalMaquinas: activas.length,
         totalClientes: new Set(activas.map((maquina) => maquina.cliente_id).filter(Boolean)).size,
-        totalModelos: new Set(
-          activas
-            .map((maquina) => `${maquina.marca}|${maquina.subgrupo}|${normalizeMachineModelKey(maquina.modelo_tipo)}`)
-            .filter((key) => !key.endsWith("|")),
-        ).size,
+        totalHorsch: activas.filter((maquina) => maquina.marca === "HORSCH").length,
+        totalClaas: activas.filter((maquina) => maquina.marca === "CLAAS").length,
       });
     } catch (e) {
       console.error(e);
