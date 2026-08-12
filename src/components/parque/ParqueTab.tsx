@@ -135,9 +135,12 @@ const dias = (d: string | null | undefined) => {
 const fmtMoney = (n: number) => formatGuaranies(n);
 
 async function cargarRpcConReintento<T>(
-  requests: Array<() => PromiseLike<{ data: T | null; error: { message?: string } | null }>>,
+  requests: Array<() => PromiseLike<{
+    data: T | null;
+    error: { code?: string; details?: string; hint?: string; message?: string } | null;
+  }>>,
 ) {
-  let ultimoError: { message?: string } | null = null;
+  let ultimoError: { code?: string; details?: string; hint?: string; message?: string } | null = null;
 
   for (let intento = 0; intento < requests.length; intento += 1) {
     const resultado = await requests[intento]();
@@ -146,7 +149,11 @@ async function cargarRpcConReintento<T>(
     if (intento < requests.length - 1) await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
-  throw new Error(ultimoError?.message || "No se pudo cargar la facturación");
+  const detalle = [ultimoError?.code, ultimoError?.message, ultimoError?.details, ultimoError?.hint]
+    .filter(Boolean)
+    .filter((valor, indice, valores) => valores.indexOf(valor) === indice)
+    .join(" · ");
+  throw new Error(detalle || "No se pudo cargar la facturación");
 }
 
 const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -449,7 +456,12 @@ export function ParqueTab({
       } catch (e) {
         console.error("No se pudo cargar la facturación del parque", e);
         if (!cancelado) {
-          setFactError("No se pudo cargar la facturación. Reintentá sin perder los datos ya visibles.");
+          const detalle = e instanceof Error ? e.message.trim() : "";
+          setFactError(
+            detalle
+              ? `No se pudo cargar la facturación: ${detalle}`
+              : "No se pudo cargar la facturación. Reintentá sin perder los datos ya visibles.",
+          );
         }
       } finally {
         if (!cancelado) setFactLoading(false);
