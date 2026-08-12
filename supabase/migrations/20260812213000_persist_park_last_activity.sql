@@ -70,8 +70,8 @@ BEGIN
     SELECT
       f.cliente_id,
       CASE
-        WHEN upper(trim(coalesce(f.marca_normalizada::text, ''))) IN ('CLAAS', 'HORSCH')
-          THEN upper(trim(f.marca_normalizada::text))
+          WHEN upper(trim(coalesce(to_jsonb(f) ->> 'marca_normalizada', ''))) IN ('CLAAS', 'HORSCH')
+            THEN upper(trim(to_jsonb(f) ->> 'marca_normalizada'))
         WHEN upper(trim(coalesce(f.grupo, ''))) IN (
           'SERVICE - CLAAS', 'REPUESTOS - CLAAS', 'REPUESTOS CLAAS - PROMOCION',
           'REPUESTOS - CABEZALES/PLATAFOR', 'REPUESTOS TRACTOR', 'REPUESTOS DIVERSOS --'
@@ -182,8 +182,8 @@ BEGIN
   END IF;
 
   v_marca := CASE
-    WHEN upper(trim(coalesce(NEW.marca_normalizada::text, ''))) IN ('CLAAS', 'HORSCH')
-      THEN upper(trim(NEW.marca_normalizada::text))
+      WHEN upper(trim(coalesce(to_jsonb(NEW) ->> 'marca_normalizada', ''))) IN ('CLAAS', 'HORSCH')
+        THEN upper(trim(to_jsonb(NEW) ->> 'marca_normalizada'))
     WHEN upper(trim(coalesce(NEW.grupo, ''))) IN (
       'SERVICE - CLAAS', 'REPUESTOS - CLAAS', 'REPUESTOS CLAAS - PROMOCION',
       'REPUESTOS - CABEZALES/PLATAFOR', 'REPUESTOS TRACTOR', 'REPUESTOS DIVERSOS --'
@@ -282,7 +282,7 @@ $$;
 DROP TRIGGER IF EXISTS actualizar_parque_actividad_facturacion_trigger
   ON public.facturacion;
 CREATE TRIGGER actualizar_parque_actividad_facturacion_trigger
-AFTER INSERT OR UPDATE OF cliente_id, fecha, grupo, grupo_fx, marca_normalizada, excluido_de_reportes
+AFTER INSERT OR UPDATE OF cliente_id, fecha, grupo, grupo_fx, excluido_de_reportes
 ON public.facturacion
 FOR EACH ROW EXECUTE FUNCTION public.actualizar_parque_actividad_facturacion();
 
