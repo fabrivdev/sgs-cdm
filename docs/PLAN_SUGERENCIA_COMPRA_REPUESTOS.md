@@ -26,7 +26,7 @@ Los tres libros comparten el mismo modelo analítico:
 6. Stock en tránsito, cuando está disponible.
 7. Políticas por segmento y tabla de equivalencias entre el mix analítico y el segmento final.
 
-### Parámetros generales observados
+### Parámetros iniciales del motor
 
 | Parámetro | CLAAS | HORSCH |
 |---|---:|---:|
@@ -35,9 +35,9 @@ Los tres libros comparten el mismo modelo analítico:
 | Lead time base | 3 meses | 4 meses |
 | Ciclo de planificación | 1 mes | 1 mes |
 | Horizonte base | 4 meses | 5 meses |
-| Origen principal | Alemania | Brasil |
+| Origen por defecto | Alemania | Alemania |
 
-Estos valores deben ser configurables por marca y vigencia, nunca constantes en código.
+Estos valores deben ser configurables por marca y vigencia, nunca constantes en código. Aunque el archivo HORSCH de ejemplo identifica Brasil, para la primera versión todas las piezas partirán con **Alemania** como origen y podrán corregirse manualmente.
 
 ### Segmentos y políticas observadas
 
@@ -58,8 +58,11 @@ Cada corrida utilizará una fecha de análisis, una marca y una versión de par�
 
 - Unificar código interno, código de fabricante y código incluido en la descripción.
 - Resolver duplicados y variantes comerciales de una misma pieza física.
-- Identificar piezas sin maestro, sin marca, sin criticidad, sin costo o con vínculos ambiguos.
-- Excluir o marcar devoluciones, documentos anulados, movimientos internos y cantidades anómalas según reglas configurables.
+- Tomar la familia analítica del maestro de productos.
+- Mantener la criticidad como un dato manual por código. Los códigos nuevos quedarán pendientes de clasificación hasta que el usuario les asigne Vital, Esencial o Deseable.
+- Asignar Alemania como origen predeterminado, con edición manual por pieza.
+- Identificar piezas sin maestro, sin marca, sin criticidad o con vínculos ambiguos.
+- En la primera versión, utilizar los movimientos de venta importados sin tratamiento especial de devoluciones, garantías, consumos internos o ventas extraordinarias. La interfaz deberá advertir esta limitación.
 
 ### Paso B — Histórico de demanda
 
@@ -78,7 +81,7 @@ La fuente operativa será el histórico persistido en la app, no los Excel. Los 
 
 ### Paso C — Clasificación ABC–FSN–XYZ–VED
 
-- **ABC:** participación acumulada del importe/costo: A hasta 80%, B hasta 95%, C el resto.
+- **ABC económico:** participación acumulada del total vendido en los últimos 12 meses: A hasta 80%, B hasta 95%, C el resto. No dependerá todavía de listas de precios ni costos logísticos.
 - **FSN:** N sin pedidos, sin última venta o con más de 365 días; F con al menos 6 pedidos y venta en los últimos 90 días; S en los demás casos.
 - **XYZ:** X con CV ≤ 0,5 y al menos 9 meses con venta; Y con 0,5 < CV ≤ 1 y entre 4 y 8 meses; Z el resto.
 - **VED:** inicial de la criticidad Vital, Esencial o Deseable.
@@ -102,22 +105,21 @@ Todos los umbrales anteriores serán editables con valores iniciales iguales a l
 - Desviación estacional = diferencia de las ventanas históricas / raíz de 2.
 - Seleccionar la desviación aplicable y evitar seguridad cero en piezas con demanda.
 - Stock de seguridad = Z del segmento × desviación, con los límites especiales definidos en los Excel.
-- Stock proyectado = stock actual + compras abiertas/en tránsito − compromisos confirmados.
+- En la primera versión, stock proyectado = stock actual global. El tránsito se mantendrá previsto en el modelo, pero será cero hasta implementar su importador específico.
 - Stock objetivo = demanda ajustada del horizonte + seguridad, con límites específicos por segmento.
 - Necesidad neta = stock objetivo − stock proyectado.
 
-Antes de comprar, el motor deberá señalar una **transferencia entre sucursales** cuando exista exceso utilizable en otra ubicación. La compra sugerida será la necesidad neta de toda la compañía después de esas transferencias.
+La planificación y la compra serán **globales a nivel empresa**. El motor sumará el stock y la demanda de todas las sucursales y calculará una única necesidad de compra por pieza. La distribución posterior entre sucursales quedará fuera de la primera versión.
 
 ### Paso F — Cantidad y costo sugeridos
 
 - Cero si la pieza no corresponde a revisión, pertenece a Bajo pedido o no cumple la actividad mínima.
 - Para Vitales con demanda: garantizar al menos una unidad cuando exista necesidad positiva.
-- Para piezas no vitales: no reponer con cero ventas recientes o una sola operación, salvo excepción aprobada.
+- Para piezas no vitales: no reponer con cero ventas recientes o una sola operación, salvo excepción configurada.
 - Sumar pedidos especiales confirmados.
-- Aplicar múltiplo de empaque, MOQ, mínimo por proveedor y redondeo configurables.
-- Determinar costo desde lista marítima/aérea; como respaldo, costo medio histórico y luego costo de stock.
-- Calcular inversión total, moneda y modalidad logística.
-- Aplicar un límite presupuestario opcional, priorizando criticidad, riesgo de rotura y retorno esperado.
+- Redondear la sugerencia siempre a **unidades enteras**, elevando una necesidad positiva a la unidad completa siguiente.
+- Mostrar como referencia económica el total vendido histórico. La valorización real de la compra se incorporará cuando exista un importador periódico de precios CLAAS/HORSCH y costos logísticos.
+- No aplicar todavía MOQ, múltiplos de empaque, mínimos de proveedor ni límites presupuestarios.
 
 ## 4. Arquitectura de datos propuesta
 
@@ -126,7 +128,7 @@ Antes de comprar, el motor deberá señalar una **transferencia entre sucursales
 - `productos`: maestro, marca, familia y códigos.
 - `repuestos_stock`: existencia vigente por sucursal y depósito.
 - `facturacion_lineas_importadas`: cantidades, fechas, facturas y ventas por pieza.
-- `compras_pedidos`: cantidades pedidas, entregadas y pendientes.
+- `compras_pedidos`: disponible para una futura definición de tránsito, pero no se utilizará como tránsito en la primera versión.
 - `compras_solicitudes`: necesidades todavía no convertidas en pedido.
 - Funciones actuales de normalización y vinculación de códigos de repuesto.
 
@@ -135,13 +137,12 @@ Antes de comprar, el motor deberá señalar una **transferencia entre sucursales
 1. `repuestos_modelo_versiones`: versión, marca, vigencia, estado borrador/publicado y parámetros generales.
 2. `repuestos_modelo_segmentos`: nivel de servicio, Z, frecuencia y límites por segmento.
 3. `repuestos_modelo_reglas_mix`: equivalencias ABC–FSN–XYZ–VED y excepciones.
-4. `repuestos_articulo_planificacion`: criticidad, origen, MOQ, múltiplo, proveedor, mínimos/máximos y overrides por pieza.
-5. `repuestos_precios_proveedor`: precios, moneda, transporte, peso, vigencia y modalidad.
+4. `repuestos_articulo_planificacion`: criticidad manual, origen editable con Alemania por defecto y overrides por pieza.
+5. `repuestos_precios_proveedor`: estructura reservada para una fase posterior; precios, moneda, transporte, peso, vigencia y modalidad.
 6. `repuestos_stock_cargas` y `repuestos_stock_historico`: conservar cada foto de stock; la importación actual solo reemplaza el saldo.
 7. `repuestos_ventas_mensuales`: agregado persistido por pieza, sucursal y mes para evitar recalcular todas las facturas.
 8. `repuestos_corridas`: cabecera de simulación con fecha, marca, versión, fuentes, usuario y parámetros congelados.
 9. `repuestos_corrida_resultados`: métricas intermedias, clasificación, demanda, seguridad, stock, necesidad, cantidad y costo por pieza.
-10. `repuestos_decisiones_compra`: cantidad propuesta, cantidad ajustada, motivo, estado, aprobador y vínculo futuro con solicitud/pedido.
 
 La configuración publicada debe ser inmutable. Cualquier cambio crea una versión nueva para poder reproducir corridas históricas.
 
@@ -153,9 +154,9 @@ Agregar **Sugerencia de compra** dentro de Repuestos, separada de Catálogo y st
 
 ### Vista principal
 
-- Selector CLAAS/HORSCH y alcance compañía/sucursal.
-- Estado de actualización de ventas, stock, pedidos, precios y criticidad.
-- Tarjetas: inversión sugerida, piezas a pedir, Vitales en riesgo, transferencias posibles, piezas sin datos y cobertura estimada.
+- Selector CLAAS/HORSCH. El alcance de cálculo será siempre la compañía completa.
+- Estado de actualización de ventas, stock, maestro y criticidad.
+- Tarjetas: piezas a pedir, unidades sugeridas, Vitales en riesgo, piezas sin datos y cobertura estimada.
 - Comparación con la corrida anterior: inversión, unidades y piezas añadidas/retiradas.
 - Botón **Nueva simulación** y acceso a corridas guardadas.
 
@@ -166,38 +167,37 @@ Columnas principales:
 - pieza, descripción, marca y familia;
 - clasificación ABC, FSN, XYZ, VED y segmento;
 - ventas 12M/24M y última venta;
-- stock, tránsito, transferible y stock proyectado;
+- stock global, tránsito futuro y stock proyectado;
 - demanda del horizonte, seguridad y stock objetivo;
 - necesidad, cantidad sugerida, costo unitario e inversión;
 - estado de datos, nivel de confianza y motivo principal.
 
-Filtros por marca, segmento, criticidad, familia, sucursal, pedir/no pedir, riesgo y calidad de datos.
+Filtros por marca, segmento, criticidad, familia, pedir/no pedir, riesgo y calidad de datos.
 
 ### Explicación por pieza
 
 Un panel lateral mostrará un recorrido verificable:
 
-`Histórico → Clasificación → Horizonte → Demanda → Seguridad → Stock/Tránsito → Necesidad → Redondeos → Sugerencia final`
+`Histórico → Clasificación → Horizonte → Demanda → Seguridad → Stock global → Necesidad → Redondeo entero → Sugerencia final`
 
-Incluirá evolución mensual, parámetros aplicados, alertas y la posibilidad de ajustar la cantidad con un motivo obligatorio. Nunca se ocultará el valor calculado original.
+Incluirá evolución mensual, parámetros aplicados, alertas y el detalle de la fórmula. La sección emitirá una sugerencia; no habrá aprobación ni modificación operativa de pedidos en la primera versión.
 
 ### Flujo operativo
 
-1. Jefatura ejecuta una simulación.
+1. El usuario ejecuta una simulación global para CLAAS o HORSCH.
 2. Revisa excepciones y artículos con datos incompletos.
-3. Ajusta cantidades justificadas.
-4. Aprueba la corrida.
-5. Exporta a Excel o genera solicitudes de compra.
-6. En una fase posterior, convierte las solicitudes aprobadas en pedidos y mide el resultado.
+3. Consulta la explicación de cada sugerencia.
+4. Compara escenarios de parámetros.
+5. Exporta la sugerencia a Excel.
 
 ## 6. Permisos
 
-- **Administrador:** importar fuentes, administrar reglas/versiones y corregir maestros.
-- **Jefatura de Repuestos:** ejecutar simulaciones, ajustar y aprobar recomendaciones.
-- **Operativo de Repuestos:** consultar resultados y detalle, sin publicar parámetros ni aprobar.
+- **Administrador:** importar fuentes, administrar reglas/versiones y corregir maestro, criticidad y origen.
+- **Jefatura de Repuestos:** ejecutar simulaciones, guardar escenarios y exportar sugerencias.
+- **Operativo de Repuestos:** consultar resultados y detalle.
 - Otros módulos no tendrán acceso salvo autorización explícita.
 
-Las políticas deben aplicarse en base de datos, no solo ocultando botones.
+Las políticas deben aplicarse en base de datos, no solo ocultando botones. No existirá un flujo de aprobación en la primera versión.
 
 ## 7. Validación antes de confiar en el motor
 
@@ -214,7 +214,7 @@ Objetivos iniciales:
 
 - 100% de diferencias rastreables a una regla o dato;
 - al menos 99% de coincidencia de clasificación;
-- al menos 98% de coincidencia de cantidad sugerida antes de redondeos operativos;
+- al menos 98% de coincidencia de cantidad sugerida antes del redondeo a unidad entera;
 - tolerancia monetaria menor a 0,5%.
 
 ### Backtest CLAAS
@@ -225,15 +225,15 @@ Usar el corte de enero para generar la recomendación y contrastarla con el comp
 
 - fecha y cobertura real del histórico;
 - facturas sin fecha completadas o excluidas;
-- devoluciones y cantidades negativas;
+- devoluciones y cantidades negativas, inicialmente solo como indicadores de calidad sin modificar el cálculo;
 - duplicados y vínculos ambiguos;
 - monedas y tipos de cambio;
 - piezas sin criticidad, costo, familia u origen;
-- antigüedad del stock, precios y pedidos abiertos;
-- pedidos pendientes realmente en tránsito;
+- antigüedad del stock y del histórico de ventas;
+- disponibilidad futura del importador de tránsito, sin bloquear la primera versión;
 - diferencias entre stock global y por sucursal.
 
-Una corrida con una fuente crítica vencida debe quedar bloqueada o marcada como simulación no aprobable.
+Una corrida con ventas, stock o maestro vencidos debe quedar bloqueada o marcada como simulación no confiable.
 
 ## 8. Fases de implementación
 
@@ -241,7 +241,7 @@ Una corrida con una fuente crítica vencida debe quedar bloqueada o marcada como
 
 - Documentar todas las fórmulas como reglas con nombre y ejemplos.
 - Auditar cobertura y calidad de las fuentes actuales.
-- Definir qué movimiento cuenta como venta, pedido y tránsito.
+- Documentar que la primera versión usa las ventas importadas sin excepciones y tránsito cero.
 - Preparar casos dorados de ambos CLAAS y HORSCH.
 
 **Salida:** especificación congelada del motor v1 y reporte de brechas de datos.
@@ -250,7 +250,7 @@ Una corrida con una fuente crítica vencida debe quedar bloqueada o marcada como
 
 - Crear tablas versionadas y políticas RLS.
 - Persistir snapshots de stock en lugar de borrar el anterior.
-- Incorporar criticidad/origen, precios y parámetros.
+- Incorporar criticidad manual, Alemania como origen predeterminado y parámetros versionados.
 - Crear agregados mensuales e índices.
 
 **Salida:** fuentes completas, trazables y eficientes.
@@ -260,30 +260,31 @@ Una corrida con una fuente crítica vencida debe quedar bloqueada o marcada como
 - Implementar el cálculo set-based en PostgreSQL.
 - Guardar corridas y resultados intermedios.
 - Ejecutar paridad enero/junio y backtest.
-- Corregir diferencias antes de construir la aprobación.
+- Corregir diferencias antes de habilitar la sección para uso real.
 
 **Salida:** motor CLAAS validado y reproducible.
 
 ### Fase 3 — Interfaz y flujo de revisión
 
 - Dashboard, tabla, simulador de parámetros y detalle explicativo.
-- Ajustes con motivo, aprobación y exportación.
+- Comparación de escenarios y exportación de la sugerencia.
 - Alertas de calidad/frescura y comparación de escenarios.
 
 **Salida:** piloto usable por Jefatura de Repuestos.
 
-### Fase 4 — HORSCH y restricciones comerciales
+### Fase 4 — HORSCH
 
-- Activar configuración HORSCH con lead time y origen propios.
-- Incorporar MOQ, múltiplos, modalidad logística y presupuesto.
+- Activar configuración HORSCH con lead time propio y Alemania como origen inicial editable.
 - Validar con el libro HORSCH.
 
 **Salida:** operación multi-marca.
 
-### Fase 5 — Cierre del ciclo
+### Fase 5 — Ampliaciones posteriores
 
-- Crear solicitudes desde la corrida aprobada.
-- Vincular solicitudes, pedidos y recepciones.
+- Incorporar el importador de tránsito y listas de precios/costos logísticos.
+- Incorporar MOQ, múltiplos de empaque, modalidad logística y presupuesto.
+- Definir el tratamiento de devoluciones, garantías, consumos internos y ventas extraordinarias.
+- Vincular sugerencias, solicitudes, pedidos y recepciones si se decide cerrar el ciclo operativo.
 - Medir exactitud, roturas, exceso y ahorro por transferencias.
 - Ajustar parámetros mediante versiones nuevas.
 
@@ -293,19 +294,21 @@ Una corrida con una fuente crítica vencida debe quedar bloqueada o marcada como
 
 - Una corrida normal debe terminar en menos de 30 segundos y la tabla debe responder en menos de 3 segundos.
 - Cada cantidad debe poder explicarse con datos, reglas y parámetros visibles.
-- Ninguna corrida aprobada puede cambiar si posteriormente se modifican parámetros o fuentes.
-- Las recomendaciones deben distinguir compra, transferencia y pedido especial.
-- Debe existir comparación contra Excel antes de habilitar aprobaciones reales.
+- Ninguna corrida guardada puede cambiar si posteriormente se modifican parámetros o fuentes.
+- Las recomendaciones deben ser globales por empresa y expresarse en unidades enteras.
+- Debe existir comparación contra Excel antes de habilitar el uso real.
 - Después del piloto se medirán nivel de servicio, roturas, inventario inmovilizado, precisión de demanda y aceptación/ajuste de sugerencias.
 
-## 10. Decisiones pendientes antes de programar
+## 10. Decisiones confirmadas para la primera versión
 
-1. Confirmar si la compra se planifica primero a nivel compañía o directamente por sucursal. Se recomienda compañía con transferencias previas y distribución posterior.
-2. Definir la fuente oficial de criticidad, familia analítica y origen.
-3. Definir la fuente periódica de precios CLAAS/HORSCH y costos logísticos.
-4. Confirmar qué estados de `compras_pedidos` representan tránsito real.
-5. Definir tratamiento de devoluciones, garantías, consumos internos y ventas extraordinarias.
-6. Confirmar redondeo: unidad entera, decimal, empaque o MOQ por pieza.
-7. Definir quién aprueba y qué límite presupuestario puede manejar cada nivel.
+1. La planificación se realiza a nivel empresa y genera una compra global por pieza.
+2. La familia proviene del maestro de productos.
+3. La criticidad se asigna manualmente; los códigos nuevos deben clasificarse desde la app.
+4. Todas las piezas parten con Alemania como origen y permiten edición manual.
+5. El ABC económico se calcula con el total vendido histórico, sin depender de precios de proveedor.
+6. El tránsito queda previsto pero en cero hasta implementar su importador específico.
+7. Devoluciones, garantías, consumos internos y ventas extraordinarias no reciben tratamiento especial inicialmente.
+8. La sugerencia se redondea siempre a unidad entera.
+9. No existe aprobación ni límite presupuestario: el resultado es informativo y exportable.
 
-La implementación debe comenzar únicamente después de cerrar las decisiones 1–6 y aprobar los casos dorados de la Fase 0.
+Con estas decisiones existe alcance suficiente para comenzar la Fase 0 y preparar los casos dorados de validación.
