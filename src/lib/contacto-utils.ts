@@ -17,6 +17,8 @@ export interface KpiResult {
   totalClientes: number;
   conServicioAnio: number;
   pctConServicioUltimoAnio: number;
+  conRepuestosAnio: number;
+  pctConRepuestosUltimoAnio: number;
   contactadosRango: number;
   pctContactadosRango: number;
   sinContacto60d: number;
@@ -58,18 +60,25 @@ export function tieneServicioUltimoAnio(ultServicioFecha: string | null): boolea
   return d != null && d <= 365;
 }
 
+export function tieneRepuestosUltimoAnio(ultRepuestoFecha: string | null): boolean {
+  const d = diasDesde(ultRepuestoFecha);
+  return d != null && d <= 365;
+}
+
 export function calcularKpis(
   inputs: (ClienteContactoInput & { cantMaquinas: number })[],
   rangoDesde: Date,
 ): KpiResult {
   let totalMaquinas = 0;
   let conServicioAnio = 0;
+  let conRepuestosAnio = 0;
   let contactadosRango = 0;
   let sinContacto = 0;
 
   for (const input of inputs) {
     totalMaquinas += input.cantMaquinas;
     if (tieneServicioUltimoAnio(input.ultServicioFecha)) conServicioAnio++;
+    if (tieneRepuestosUltimoAnio(input.ultRepuestoFecha)) conRepuestosAnio++;
     if (esContactadoEnRango(input, rangoDesde)) contactadosRango++;
     if (esParaContactar(input)) sinContacto++;
   }
@@ -81,6 +90,8 @@ export function calcularKpis(
     totalClientes,
     conServicioAnio,
     pctConServicioUltimoAnio: totalClientes > 0 ? Math.round((conServicioAnio / totalClientes) * 100) : 0,
+    conRepuestosAnio,
+    pctConRepuestosUltimoAnio: totalClientes > 0 ? Math.round((conRepuestosAnio / totalClientes) * 100) : 0,
     contactadosRango,
     pctContactadosRango: totalClientes > 0 ? Math.round((contactadosRango / totalClientes) * 100) : 0,
     sinContacto60d: sinContacto,

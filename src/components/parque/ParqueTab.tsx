@@ -33,14 +33,6 @@ import {
 } from "@/lib/contacto-utils";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
-const RESULTADOS = [
-  "Contactado",
-  "No contesta",
-  "Rechazó",
-  "Agendó servicio",
-  "Pendiente llamar",
-] as const;
-
 const MARCA_AMBAS = "ambas";
 const MARCA_OPTIONS = [
   { value: "all", label: "Todos" },
@@ -208,8 +200,6 @@ export function ParqueTab({
   const [fMarca, setFMarca] = useState<string>("all");
   const [fRubro, setFRubro] = useState<string>("all");
   const [fSubgrupo, setFSubgrupo] = useState<string>("all");
-  const [fSeguimiento, setFSeguimiento] = useState<string>("all");
-
   const [rango, setRango] = useState<RangoPreset>("365d");
   const [customDesde, setCustomDesde] = useState<Date | undefined>();
   const [customHasta, setCustomHasta] = useState<Date | undefined>();
@@ -224,7 +214,6 @@ export function ParqueTab({
     (fMarca !== "all" ? 1 : 0) +
     (fRubro !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) +
-    (fSeguimiento !== "all" ? 1 : 0) +
     (rango !== "365d" ? 1 : 0) +
     (incluirPlataformas ? 1 : 0);
 
@@ -233,7 +222,6 @@ export function ParqueTab({
     setFMarca("all");
     setFRubro("all");
     setFSubgrupo("all");
-    setFSeguimiento("all");
     setRango("365d");
     setCustomDesde(undefined);
     setCustomHasta(undefined);
@@ -527,14 +515,9 @@ export function ParqueTab({
 
       if (fSubgrupo !== "all" && !r.subgrupos.includes(fSubgrupo)) return false;
 
-      if (fSeguimiento !== "all") {
-        if (fSeguimiento === "sin_seguimiento" && r.ultSeg) return false;
-        if (fSeguimiento !== "sin_seguimiento" && r.ultSeg?.resultado !== fSeguimiento) return false;
-      }
-
       return true;
     });
-  }, [rows, q, fSucursal, fMarca, fSubgrupo, fSeguimiento]);
+  }, [rows, q, fSucursal, fMarca, fSubgrupo]);
 
   const clientesConTrabajoAbierto = useMemo(
     () => buildClientesConTrabajoAbierto(trabajos),
@@ -665,14 +648,6 @@ export function ParqueTab({
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"
           options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
-        />
-        <FilterSelect
-          label="Seguimiento" value={fSeguimiento} onChange={setFSeguimiento} placeholder="Seguimiento" width="w-[170px]"
-          options={[
-            { value: "all", label: "Cualquier seguimiento" },
-            { value: "sin_seguimiento", label: "Sin seguimiento" },
-            ...RESULTADOS.map(r => ({ value: r, label: r })),
-          ]}
         />
         <FilterSelect
           label="Período" value={rango} onChange={(v) => setRango(v as RangoPreset)} placeholder="Período" width="w-[160px]"

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ParqueTab } from "@/components/parque/ParqueTab";
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { Tractor, CheckCircle2, Users } from "lucide-react";
+import { Tractor, CheckCircle2, PackageCheck, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { pageShell, pageTitle } from "@/lib/ui-classes";
 import type { KpiResult } from "@/lib/contacto-utils";
@@ -14,6 +14,8 @@ const METRICAS_VACIAS: KpiResult = {
   totalClientes: 0,
   conServicioAnio: 0,
   pctConServicioUltimoAnio: 0,
+  conRepuestosAnio: 0,
+  pctConRepuestosUltimoAnio: 0,
   contactadosRango: 0,
   pctContactadosRango: 0,
   sinContacto60d: 0,
@@ -60,6 +62,12 @@ export default function ParqueClientes() {
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
+      {
+        label: "Cobertura de repuestos 12 meses",
+        value: `${metricasMostradas.pctConRepuestosUltimoAnio}%`,
+        icon: PackageCheck,
+        accent: "text-amber-600",
+      },
     ] : [
       { label: "Máquinas activas", value: maquinasResumen.totalMaquinas.toLocaleString(), icon: Tractor, accent: "text-primary" },
       { label: "Clientes con máquinas", value: maquinasResumen.totalClientes.toLocaleString(), icon: Users, accent: "text-blue-600" },
@@ -74,7 +82,10 @@ export default function ParqueClientes() {
         <h1 className={pageTitle}>{vistaParque === "clientes" ? "Clientes del parque" : "Máquinas del parque"}</h1>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+      <div className={cn(
+        "mb-4 grid grid-cols-1 gap-2 sm:gap-3",
+        vistaParque === "clientes" ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3",
+      )}>
         {cards.map((c) => (
           <Card key={c.label} className="border">
             <CardContent className="p-3 sm:p-4">
