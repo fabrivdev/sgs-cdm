@@ -38,16 +38,8 @@ import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
 import { cn, formatGuaranies } from "@/lib/utils";
 import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
-
-const SUBGRUPOS = [
-  "COSECHADORAS",
-  "SEMBRADORAS",
-  "PICADORAS",
-  "PLATAFORMAS",
-  "PULVERIZADORAS",
-  "TRACTORES",
-  "OTRO",
-] as const;
+import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
 
 const RESULTADOS = [
   "Contactado",
@@ -425,7 +417,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       ...(trabajoAsociado ? { trabajo_id: trabajoAsociado.id } : {}),
     };
 
-    let { error } = await (supabase as any).from("seguimiento_comercial").insert(payload);
+    let { error } = await supabase.from("seguimiento_comercial").insert(payload);
     if (error && trabajoAsociado && /trabajo_id|schema cache|column/i.test(error.message ?? "")) {
       const { trabajo_id: _trabajoId, ...payloadSinTrabajo } = payload as typeof payload & { trabajo_id?: string };
       const retry = await supabase.from("seguimiento_comercial").insert(payloadSinTrabajo);
@@ -893,21 +885,26 @@ function MaquinaForm({
         </div>
         <div>
           <Label className="text-[11px]">Marca</Label>
-          <Select value={form.marca ?? "CLAAS"} onValueChange={(v) => setForm({ ...form, marca: v as Marca })}>
+          <Select value={form.marca ?? "CLAAS"} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: null })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
           <Label className="text-[11px]">Subgrupo</Label>
-          <Select value={form.subgrupo ?? "OTRO"} onValueChange={(v) => setForm({ ...form, subgrupo: v })}>
+          <Select value={form.subgrupo ?? "OTRO"} onValueChange={(v) => setForm({ ...form, subgrupo: v, modelo_tipo: null })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{SUBGRUPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+            <SelectContent>{MACHINE_SUBGROUPS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
-          <Label className="text-[11px]">Modelo / tipo</Label>
-          <Input value={form.modelo_tipo ?? ""} onChange={(e) => setForm({ ...form, modelo_tipo: e.target.value })} />
+          <Label className="text-[11px]">Modelo</Label>
+          <ModeloMaquinaSelect
+            marca={form.marca ?? "CLAAS"}
+            subgrupo={form.subgrupo ?? "OTRO"}
+            value={form.modelo_tipo}
+            onValueChange={(modelo_tipo) => setForm({ ...form, modelo_tipo })}
+          />
         </div>
         <div>
           <Label className="text-[11px]">N° Serie *</Label>

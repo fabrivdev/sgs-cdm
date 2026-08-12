@@ -4,24 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Download } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Download, Plus } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
+import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
+import { MACHINE_SUBGROUPS, normalizeMachineModelKey } from "@/lib/machineModels";
 import * as XLSX from "xlsx";
-
-const SUBGRUPOS = [
-  "COSECHADORAS",
-  "SEMBRADORAS",
-  "PICADORAS",
-  "PLATAFORMAS",
-  "PLATAFORMAS/CABEZALES",
-  "PULVERIZADORAS",
-  "TRACTORES",
-  "SUELO",
-  "OTRO",
-] as const;
 
 const MARCA_AMBAS = "ambas";
 const MARCA_OPTIONS = [
@@ -65,7 +55,14 @@ type SortKey = "cliente" | "marca" | "subgrupo" | "año" | "serie" | "sucursal";
 
 const PAGE = 1000;
 
-async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
+type PaginableQuery<T> = {
+  range: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: { message?: string } | null;
+  }>;
+};
+
+async function cargarTodo<T>(queryBuilder: PaginableQuery<T>): Promise<T[]> {
   let from = 0;
   const all: T[] = [];
 
@@ -84,11 +81,24 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
   return all;
 }
 
-export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) => void }) {
+export type MaquinasResumen = {
+  totalMaquinas: number;
+  totalClientes: number;
+  totalModelos: number;
+};
+
+export function MaquinasTab({
+  onOpenCliente,
+  onResumenChange,
+}: {
+  onOpenCliente?: (id: string) => void;
+  onResumenChange?: (resumen: MaquinasResumen) => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [transferMaquina, setTransferMaquina] = useState<MaquinaParaTransferir | null>(null);
+  const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState("all");
@@ -121,12 +131,22 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
 
       setMaquinas(m);
       setClientes(c);
+      const activas = m.filter((maquina) => maquina.activo !== false);
+      onResumenChange?.({
+        totalMaquinas: activas.length,
+        totalClientes: new Set(activas.map((maquina) => maquina.cliente_id).filter(Boolean)).size,
+        totalModelos: new Set(
+          activas
+            .map((maquina) => `${maquina.marca}|${maquina.subgrupo}|${normalizeMachineModelKey(maquina.modelo_tipo)}`)
+            .filter((key) => !key.endsWith("|")),
+        ).size,
+      });
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onResumenChange]);
 
   useEffect(() => {
     cargar();
@@ -250,7 +270,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         Localidad: m.localidad ?? "",
         Marca: m.marca,
         Subgrupo: m.subgrupo,
-        "Modelo/Tipo": m.modelo_tipo ?? "",
+        Modelo: m.modelo_tipo ?? "",
         Año: m.anio ?? "",
         "Antig.": m.anio ? hoy - m.anio : "",
         Serie: m.serie,
@@ -291,9 +311,14 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         onClear={limpiar}
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
         actions={
-          <Button variant="outline" size="sm" onClick={exportar} className="hidden h-9 sm:inline-flex">
-            <Download className="mr-1 h-4 w-4" /> Exportar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportar} className="hidden h-9 sm:inline-flex">
+              <Download className="mr-1 h-4 w-4" /> Exportar
+            </Button>
+            <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9">
+              <Plus className="mr-1 h-4 w-4" /> Nueva máquina
+            </Button>
+          </div>
         }
       >
         <FilterSelect
@@ -306,7 +331,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[170px]"
-          options={[{ value: "all", label: "Todos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
         />
         <FilterCustom label="Año desde" width="w-[100px]">
           <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
@@ -342,7 +367,7 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
               <TableHead className="cursor-pointer" onClick={() => toggleSort("subgrupo")}>
                 <div className="flex items-center gap-1">Subgrupo {sortIcon("subgrupo")}</div>
               </TableHead>
-              <TableHead>Modelo/Tipo</TableHead>
+              <TableHead>Modelo</TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("año")}>
                 <div className="flex items-center justify-center gap-1">Año {sortIcon("año")}</div>
               </TableHead>
@@ -445,6 +470,11 @@ export function MaquinasTab({ onOpenCliente }: { onOpenCliente?: (id: string) =>
           setTransferMaquina(null);
           await cargar();
         }}
+      />
+      <NuevaMaquinaDialog
+        open={nuevaMaquinaOpen}
+        onOpenChange={setNuevaMaquinaOpen}
+        onCreated={cargar}
       />
     </div>
   );

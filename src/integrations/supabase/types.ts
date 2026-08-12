@@ -874,6 +874,39 @@ export type Database = {
           },
         ]
       }
+      parque_modelos_catalogo: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          clave_normalizada: string
+          creado_en: string
+          id: string
+          marca: Database["public"]["Enums"]["marca"]
+          nombre: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          clave_normalizada: string
+          creado_en?: string
+          id?: string
+          marca: Database["public"]["Enums"]["marca"]
+          nombre: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          clave_normalizada?: string
+          creado_en?: string
+          id?: string
+          marca?: Database["public"]["Enums"]["marca"]
+          nombre?: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Relationships: []
+      }
       parque_maquinas: {
         Row: {
           activo: boolean

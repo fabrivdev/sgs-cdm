@@ -17,12 +17,11 @@ import {
   Download,
   Flag,
   Phone,
+  RefreshCw,
   X,
 } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
-import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
-import { Plus } from "lucide-react";
 import { cn, formatGuaranies } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
@@ -32,16 +31,7 @@ import {
   calcularKpis,
   buildClientesConTrabajoAbierto,
 } from "@/lib/contacto-utils";
-
-const SUBGRUPOS = [
-  "COSECHADORAS",
-  "SEMBRADORAS",
-  "PICADORAS",
-  "PLATAFORMAS",
-  "PULVERIZADORAS",
-  "TRACTORES",
-  "OTRO",
-] as const;
+import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
 const RESULTADOS = [
   "Contactado",
@@ -151,6 +141,22 @@ const dias = (d: string | null | undefined) => {
 
 const fmtMoney = (n: number) => formatGuaranies(n);
 
+async function cargarRpcConReintento<T>(
+  request: () => PromiseLike<{ data: T | null; error: { message?: string } | null }>,
+  intentos = 2,
+) {
+  let ultimoError: { message?: string } | null = null;
+
+  for (let intento = 0; intento < intentos; intento += 1) {
+    const resultado = await request();
+    if (!resultado.error) return resultado.data;
+    ultimoError = resultado.error;
+    if (intento < intentos - 1) await new Promise((resolve) => setTimeout(resolve, 350));
+  }
+
+  throw new Error(ultimoError?.message || "No se pudo cargar la facturación");
+}
+
 const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
 const esPlataformaOCabezal = (subgrupo: string | null | undefined) => {
@@ -188,6 +194,8 @@ export function ParqueTab({
 }) {
   const [loading, setLoading] = useState(true);
   const [factLoading, setFactLoading] = useState(true);
+  const [factError, setFactError] = useState<string | null>(null);
+  const [factReloadKey, setFactReloadKey] = useState(0);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
@@ -210,7 +218,6 @@ export function ParqueTab({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [incluirPlataformas, setIncluirPlataformas] = useState(false);
-  const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
@@ -353,29 +360,26 @@ export function ParqueTab({
     let cancelado = false;
     const cargarFact = async () => {
       setFactLoading(true);
+      setFactError(null);
       try {
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
         const marcaFacturacion =
           fMarca === MARCA_AMBAS ? "AMBAS" : fMarca === "all" ? "ALL" : fMarca;
         const rubroFacturacion = fRubro === "all" ? "ALL" : fRubro;
-        const resumenPromise = supabase.rpc("parque_resumen_facturacion_filtros", {
-          p_desde: fmt(desdeDate),
-          p_hasta: fmt(hastaDate),
-          p_prev_desde: fmt(prevDesdeDate),
-          p_prev_hasta: fmt(prevHastaDate),
-          p_marca: marcaFacturacion,
-          p_rubro: rubroFacturacion,
-        });
-        const ultimasPromise = supabase.rpc("parque_ultimas_facturas_marca", {
-          p_marca: marcaFacturacion,
-        });
-        const [resumen, ultimas] = await Promise.all([
-          resumenPromise,
-          ultimasPromise,
-        ]);
+        const resumen = await cargarRpcConReintento(() =>
+          supabase.rpc("parque_resumen_facturacion_filtros", {
+            p_desde: fmt(desdeDate),
+            p_hasta: fmt(hastaDate),
+            p_prev_desde: fmt(prevDesdeDate),
+            p_prev_hasta: fmt(prevHastaDate),
+            p_marca: marcaFacturacion,
+            p_rubro: rubroFacturacion,
+          }),
+        );
         if (cancelado) return;
+
         const map = new Map<string, FactAgregado>();
-        for (const r of (resumen.data ?? []) as Array<{
+        for (const r of (resumen ?? []) as Array<{
           cliente_id: string;
           fact_actual: number | string;
           fact_prev: number | string;
@@ -391,26 +395,43 @@ export function ParqueTab({
             ult_servicio: null,
           });
         }
-        for (const r of (ultimas.data ?? []) as Array<{
-          cliente_id: string;
-          ult_repuesto: string | null;
-          ult_servicio: string | null;
-        }>) {
-          const prev = map.get(r.cliente_id) ?? {
-            fact_actual: 0,
-            fact_prev: 0,
-            tiene_rep_rango: false,
-            tiene_srv_rango: false,
-            ult_repuesto: null,
-            ult_servicio: null,
-          };
-          prev.ult_repuesto = r.ult_repuesto;
-          prev.ult_servicio = r.ult_servicio;
-          map.set(r.cliente_id, prev);
+        setFactAgregados(new Map(map));
+
+        try {
+          const ultimas = await cargarRpcConReintento(() =>
+            supabase.rpc("parque_ultimas_facturas_marca", {
+              p_marca: marcaFacturacion,
+            }),
+          );
+          if (cancelado) return;
+
+          for (const r of (ultimas ?? []) as Array<{
+            cliente_id: string;
+            ult_repuesto: string | null;
+            ult_servicio: string | null;
+          }>) {
+            const prev = map.get(r.cliente_id) ?? {
+              fact_actual: 0,
+              fact_prev: 0,
+              tiene_rep_rango: false,
+              tiene_srv_rango: false,
+              ult_repuesto: null,
+              ult_servicio: null,
+            };
+            prev.ult_repuesto = r.ult_repuesto;
+            prev.ult_servicio = r.ult_servicio;
+            map.set(r.cliente_id, prev);
+          }
+          setFactAgregados(new Map(map));
+        } catch (error) {
+          console.error("No se pudieron cargar las últimas facturas", error);
+          if (!cancelado) setFactError("La facturación cargó, pero faltan las fechas de última actividad.");
         }
-        setFactAgregados(map);
       } catch (e) {
-        console.error(e);
+        console.error("No se pudo cargar la facturación del parque", e);
+        if (!cancelado) {
+          setFactError("No se pudo cargar la facturación. Reintentá sin perder los datos ya visibles.");
+        }
       } finally {
         if (!cancelado) setFactLoading(false);
       }
@@ -419,7 +440,7 @@ export function ParqueTab({
     return () => {
       cancelado = true;
     };
-  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro]);
+  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro, factReloadKey]);
 
   const rows: Row[] = useMemo(() => {
     const hoy = new Date();
@@ -628,17 +649,6 @@ export function ParqueTab({
         search={{ value: q, onChange: setQ, placeholder: "Nombre del cliente…", label: "Buscar" }}
         activeCount={filtrosActivos + (q ? 1 : 0)}
         onClear={() => { setQ(""); limpiarFiltros(); }}
-        
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="hidden">
-              <Plus className="mr-1 h-4 w-4" /> Nueva máquina
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportar} className="hidden">
-              <Download className="mr-1 h-4 w-4" /> Exportar
-            </Button>
-          </div>
-        }
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
@@ -654,7 +664,7 @@ export function ParqueTab({
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...SUBGRUPOS.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Seguimiento" value={fSeguimiento} onChange={setFSeguimiento} placeholder="Seguimiento" width="w-[170px]"
@@ -726,14 +736,26 @@ export function ParqueTab({
           )}
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Button variant="default" size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-8">
-            <Plus className="mr-1 h-3.5 w-3.5" /> Nueva máquina
-          </Button>
           <Button variant="outline" size="sm" onClick={exportar} className="hidden h-8 sm:inline-flex">
             <Download className="mr-1 h-3.5 w-3.5" /> Exportar
           </Button>
         </div>
       </div>
+
+      {factError && !factLoading && (
+        <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <span>{factError}</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setFactReloadKey((value) => value + 1)}
+          >
+            <RefreshCw className="mr-1 h-3.5 w-3.5" /> Reintentar
+          </Button>
+        </div>
+      )}
 
 
       {!loading && !factLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
@@ -939,14 +961,6 @@ export function ParqueTab({
           </TableBody>
         </Table>
       </div>
-      <NuevaMaquinaDialog
-        open={nuevaMaquinaOpen}
-        onOpenChange={setNuevaMaquinaOpen}
-        onCreated={() => {
-          cargar();
-          _onChanged?.();
-        }}
-      />
     </div>
   );
 }

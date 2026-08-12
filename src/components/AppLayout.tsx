@@ -72,7 +72,8 @@ const navGroups: NavGroup[] = [
     label: "Parque",
     icon: Tractor,
     items: [
-      { to: "/parque-clientes", label: "Clientes y máquinas", icon: Tractor, end: true },
+      { to: "/parque-clientes", label: "Clientes", icon: Users, end: true },
+      { to: "/parque-maquinas", label: "Máquinas", icon: Tractor, end: true },
     ],
   },
   {

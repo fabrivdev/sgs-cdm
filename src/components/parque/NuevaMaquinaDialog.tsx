@@ -18,11 +18,8 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
-
-const SUBGRUPOS = [
-  "COSECHADORAS", "SEMBRADORAS", "PICADORAS", "PLATAFORMAS",
-  "PULVERIZADORAS", "TRACTORES", "OTRO",
-] as const;
+import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
 
 type Cliente = { id: string; nombre: string };
 
@@ -172,7 +169,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label className="text-xs">Marca *</Label>
-                <Select value={form.marca} onValueChange={(v) => setForm({ ...form, marca: v as Marca })}>
+                <Select value={form.marca} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: "" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -181,10 +178,10 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-xs">Subgrupo</Label>
-                <Select value={form.subgrupo} onValueChange={(v) => setForm({ ...form, subgrupo: v })}>
+                <Select value={form.subgrupo} onValueChange={(v) => setForm({ ...form, subgrupo: v, modelo_tipo: "" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {SUBGRUPOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {MACHINE_SUBGROUPS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -204,8 +201,13 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Modelo / Tipo</Label>
-              <Input value={form.modelo_tipo} onChange={(e) => setForm({ ...form, modelo_tipo: e.target.value })} />
+              <Label className="text-xs">Modelo</Label>
+              <ModeloMaquinaSelect
+                marca={form.marca}
+                subgrupo={form.subgrupo}
+                value={form.modelo_tipo}
+                onValueChange={(modelo_tipo) => setForm({ ...form, modelo_tipo })}
+              />
             </div>
           </section>
 
