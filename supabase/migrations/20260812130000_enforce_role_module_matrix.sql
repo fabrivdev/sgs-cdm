@@ -241,4 +241,18 @@ with check (
   or public.has_role(auth.uid(), 'jefatura'::public.app_role)
 );
 
+-- Las sesiones abiertas reciben los cambios de rol/modulo sin volver a
+-- iniciar sesion. Los bloques son seguros si las tablas ya estan publicadas.
+do $$
+begin
+  alter publication supabase_realtime add table public.user_modulo_acceso;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.user_roles;
+exception when duplicate_object then null;
+end $$;
+
 notify pgrst, 'reload schema';
