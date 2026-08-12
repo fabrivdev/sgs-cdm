@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
+import GradientWaves from "@/components/auth/GradientWaves";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 
 export default function Auth() {
@@ -28,18 +29,17 @@ export default function Auth() {
   };
 
   return (
-    <main
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#fbfbf7] bg-cover bg-bottom bg-no-repeat px-4 py-6 sm:px-6 sm:py-8"
-      style={{ backgroundImage: "url('/sig-login-background.png')" }}
-    >
-      <img
-        src="/sig-cdm-logo.png"
-        alt=""
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef3e6] px-4 py-6 sm:px-6 sm:py-8">
+      <div className="absolute inset-0" aria-hidden="true">
+        <GradientWaves />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(255,255,255,0.58),rgba(247,249,242,0.18)_48%,rgba(44,60,31,0.14)_100%)]" />
+      </div>
+      <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-20 -top-24 hidden h-[430px] w-[430px] select-none opacity-[0.045] md:block"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),transparent_35%,rgba(255,255,255,0.1))] motion-reduce:bg-[#eef3e6]"
       />
 
-      <Card className="relative z-10 mt-6 w-full max-w-[532px] border-white/80 bg-white/90 shadow-[0_20px_55px_rgba(40,52,31,0.14)] backdrop-blur-sm sm:mt-8">
+      <Card className="relative z-10 mt-6 w-full max-w-[532px] border-white/80 bg-white/[0.88] shadow-[0_24px_70px_rgba(31,46,20,0.22)] backdrop-blur-xl sm:mt-8">
         <CardContent className="px-5 py-7 sm:px-8 sm:py-9">
           <div className="text-center">
             <AppLogo className="mx-auto h-16 w-16 sm:h-20 sm:w-20" />
