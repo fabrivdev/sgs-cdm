@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { calcularKpis } from "./contacto-utils";
 
 describe("calcularKpis", () => {
-  it("calcula la cobertura anual de repuestos por cliente", () => {
+  it("calcula la cobertura de servicio y repuestos según el rango consultado", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-12T12:00:00Z"));
 
@@ -14,7 +14,7 @@ describe("calcularKpis", () => {
         ultRepuestoFecha: "2026-03-01",
         tieneTrabajoAbierto: false,
         tieneRepEnRango: true,
-        tieneSrvEnRango: false,
+        tieneSrvEnRango: true,
         cantMaquinas: 2,
       },
       {
@@ -29,8 +29,10 @@ describe("calcularKpis", () => {
       },
     ], new Date("2025-08-12T00:00:00"));
 
-    expect(resultado.conRepuestosAnio).toBe(1);
-    expect(resultado.pctConRepuestosUltimoAnio).toBe(50);
+    expect(resultado.conRepuestosRango).toBe(1);
+    expect(resultado.pctConRepuestosRango).toBe(50);
+    expect(resultado.conServicioRango).toBe(1);
+    expect(resultado.pctConServicioRango).toBe(50);
 
     vi.useRealTimers();
   });
