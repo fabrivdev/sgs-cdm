@@ -49,7 +49,6 @@ import { cn } from "@/lib/utils";
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
-const money = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 
 const PARAM_FIELDS: Array<{ key: keyof ModeloSugerencia; label: string; step?: string }> = [
   { key: "peso_reciente", label: "Peso últimos 12 meses", step: "0.05" },
@@ -84,6 +83,11 @@ function criticidadFuenteLabel(value: ResultadoSugerencia["criticidad_fuente"]) 
   if (value === "AUTOMATICA_FAMILIA") return "Sugerida por familia";
   if (value === "AUTOMATICA_HEURISTICA") return "Sugerida por motor";
   return "Manual";
+}
+
+function coberturaActualMeses(row: ResultadoSugerencia) {
+  if (row.demanda_ponderada_mensual <= 0) return null;
+  return Math.max(0, row.stock_global / row.demanda_ponderada_mensual);
 }
 
 function MetricCard({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "green" | "amber" }) {
@@ -431,8 +435,10 @@ export default function RepuestosSugerencias() {
         "Stock global": row.stock_global,
         "Unidades 12m": row.unidades_12m,
         "Unidades 24m": row.unidades_24m,
-        "Total vendido 12m": row.total_vendido_12m,
+        "Importe vendido 12m": row.total_vendido_12m,
         "Pedidos 12m": row.pedidos_12m,
+        "Cobertura actual meses": coberturaActualMeses(row),
+        "Horizonte meses": row.horizonte_meses,
         "Demanda horizonte": row.demanda_horizonte,
         "Stock seguridad": row.stock_seguridad,
         "Stock objetivo": row.stock_objetivo,
@@ -565,19 +571,38 @@ export default function RepuestosSugerencias() {
           <>
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader><TableRow><TableHead className="min-w-[280px]">Pieza</TableHead><TableHead>Clasificación</TableHead><TableHead>Histórico 12m</TableHead><TableHead className="text-right">Stock</TableHead><TableHead className="text-right">Objetivo</TableHead><TableHead className="text-right">Sugerencia</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[280px]">Pieza</TableHead>
+                    <TableHead className="min-w-[190px]">Clasificación</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead className="text-right">Vendido 12m</TableHead>
+                    <TableHead className="text-right">Vendido 24m</TableHead>
+                    <TableHead className="min-w-[140px] text-right">Cobertura / horizonte</TableHead>
+                    <TableHead className="text-right">Objetivo</TableHead>
+                    <TableHead className="text-right">Sugerencia</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
-                      <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
-                      <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}{row.ved ?? "?"}</Badge><Badge variant={row.estado_datos === "LISTO" ? "secondary" : "destructive"}>{row.segmento}</Badge>{row.criticidad_revisar && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">AUTO {Math.round(row.criticidad_confianza * 100)}%</Badge>}</div></TableCell>
-                      <TableCell><p>{decimal.format(row.unidades_12m)} un. · {row.pedidos_12m} pedidos</p><p className="text-[11px] text-muted-foreground">Total vendido {money.format(row.total_vendido_12m)}</p></TableCell>
-                      <TableCell className="text-right">{decimal.format(row.stock_global)}</TableCell>
-                      <TableCell className="text-right">{decimal.format(row.stock_objetivo)}</TableCell>
-                      <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-bold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
-                    </TableRow>
-                  ))}
-                  {rows.length === 0 && <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground">No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
+                  {rows.map((row) => {
+                    const cobertura = coberturaActualMeses(row);
+                    return (
+                      <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
+                        <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
+                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}{row.ved ?? "?"}</Badge><Badge variant={row.estado_datos === "LISTO" ? "secondary" : "destructive"}>{row.segmento}</Badge>{row.criticidad_revisar && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">AUTO {Math.round(row.criticidad_confianza * 100)}%</Badge>}</div></TableCell>
+                        <TableCell className="text-right font-medium">{decimal.format(row.stock_global)}</TableCell>
+                        <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_12m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
+                        <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_24m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
+                        <TableCell className="text-right">
+                          <p className="font-medium">{cobertura === null ? "—" : `${decimal.format(cobertura)} meses`}</p>
+                          <p className="text-[10px] text-muted-foreground">Horizonte {row.horizonte_meses} meses</p>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{decimal.format(row.stock_objetivo)}</TableCell>
+                        <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-bold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {rows.length === 0 && <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
