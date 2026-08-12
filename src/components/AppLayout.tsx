@@ -12,7 +12,7 @@ import {
   LogOut,
   Wrench,
   Tractor,
-  MoreHorizontal,
+  Menu,
   Package,
   ShoppingCart,
 } from "lucide-react";
@@ -26,6 +26,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Sidebar,
   SidebarContent,
@@ -185,18 +192,12 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   // Acordeon: un solo grupo de modulo abierto a la vez. Se sincroniza con la
   // ruta activa para que al navegar se abra el grupo correspondiente.
   const [openModulo, setOpenModulo] = useState<string | null>(visibleGroups[0]?.modulo ?? null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useEffect(() => {
     const activeGroup = visibleGroups.find((group) => group.items.some(isItemActive));
     if (activeGroup) setOpenModulo(activeGroup.modulo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
-
-  const allVisibleItems = visibleGroups.flatMap((group) => group.items);
-  const mobilePrimaryItems = isAdmin
-    ? allVisibleItems.filter((it) => ["/", "/trabajos", "/dashboard"].includes(it.to))
-    : allVisibleItems.slice(0, 3);
-  const mobileOverflowItems = allVisibleItems.filter((it) => !mobilePrimaryItems.some((primary) => primary.to === it.to));
-  const overflowActive = mobileOverflowItems.some(isItemActive);
 
   const initials = (profile?.nombre ?? "?")
     .split(" ")
@@ -217,7 +218,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         Ir al contenido principal
       </a>
 
-      {/* Sidebar desktop: colapsable a rail de iconos, agrupado por modulo. No se muestra en mobile (el bottom-nav sigue siendo la navegacion mobile). */}
+      {/* Sidebar desktop: colapsable a rail de iconos, agrupado por módulo. */}
       <Sidebar collapsible="icon" className="z-50 hidden md:flex">
         <SidebarHeader className="h-14 justify-center border-b border-sidebar-border/70 p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <div className="flex h-full w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
@@ -252,6 +253,17 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         {/* Top header */}
         <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b border-border/70 bg-card/95 px-3 backdrop-blur sm:h-14 sm:px-4">
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5 px-2 md:hidden"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Abrir menú de módulos"
+            >
+              <Menu className="h-5 w-5" />
+              <span className="text-xs font-semibold">Menú</span>
+            </Button>
             <AppLogo className="h-8 w-8 rounded-md md:hidden" />
             <div className="hidden sm:block md:hidden">
               <div className="text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
@@ -309,65 +321,69 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           </div>
         )}
 
-        <main id="main-content" className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
+        <main id="main-content" className="pb-6">
           <div key={location.pathname} className="app-page-enter">{children ?? <Outlet />}</div>
         </main>
 
         {AI_ASSISTANT_ENABLED && <AIAssistant />}
 
-        {/* Bottom nav (mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-card/95 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] backdrop-blur md:hidden">
-          <div className="grid grid-cols-4 px-1 pb-[env(safe-area-inset-bottom)]">
-            {mobilePrimaryItems.map((it) => {
-              const active = isItemActive(it);
-              return (
-                <NavLink
-                  key={it.to}
-                  to={it.to}
-                  className={cn(
-                    "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium",
-                    active ? "text-primary" : "text-muted-foreground",
-                  )}
-                >
-                  <it.icon className="h-5 w-5" />
-                  <span className="max-w-full truncate">{it.label}</span>
-                </NavLink>
-              );
-            })}
-            {mobileOverflowItems.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium",
-                      overflowActive ? "text-primary" : "text-muted-foreground",
-                    )}
-                    aria-label="Más páginas"
-                  >
-                    <MoreHorizontal className="h-5 w-5" />
-                    <span className="max-w-full truncate">Más</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="top" className="mb-2 w-48">
-                  {mobileOverflowItems.map((it) => {
-                    const active = isItemActive(it);
-                    return (
-                      <DropdownMenuItem
-                        key={it.to}
-                        onClick={() => navigate(it.to)}
-                        className={cn("gap-2", active && "bg-accent font-medium text-primary")}
-                      >
-                        <it.icon className="h-4 w-4" />
-                        {it.label}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </nav>
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetContent side="left" className="w-[min(88vw,340px)] overflow-y-auto p-0 md:hidden">
+            <SheetHeader className="border-b px-5 py-5 text-left">
+              <div className="flex items-center gap-3 pr-8">
+                <AppLogo className="h-10 w-10 rounded-xl" />
+                <div className="min-w-0">
+                  <SheetTitle className="text-base">{APP_SHORT_NAME}</SheetTitle>
+                  <SheetDescription className="truncate text-xs">{APP_NAME}</SheetDescription>
+                </div>
+              </div>
+            </SheetHeader>
+
+            <nav className="space-y-5 px-3 py-5" aria-label="Módulos y secciones">
+              {visibleGroups.map((group) => {
+                const GroupIcon = group.icon;
+                return (
+                  <section key={group.modulo}>
+                    <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      <GroupIcon className="h-4 w-4 text-primary" />
+                      {group.label}
+                    </div>
+                    <div className="space-y-1">
+                      {group.items.map((item) => {
+                        const active = isItemActive(item);
+                        const ItemIcon = item.icon;
+                        return (
+                          <button
+                            key={item.to}
+                            type="button"
+                            onClick={() => {
+                              navigate(item.to);
+                              setMobileMenuOpen(false);
+                            }}
+                            className={cn(
+                              "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors",
+                              active
+                                ? "bg-primary/10 text-primary"
+                                : "text-foreground hover:bg-accent hover:text-accent-foreground",
+                            )}
+                          >
+                            <span className={cn(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                              active ? "bg-primary/15" : "bg-muted",
+                            )}>
+                              <ItemIcon className="h-4 w-4" />
+                            </span>
+                            <span>{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </nav>
+          </SheetContent>
+        </Sheet>
       </SidebarInset>
     </SidebarProvider>
   );
