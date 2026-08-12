@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Download, Plus } from "lucide-react";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
@@ -306,41 +307,48 @@ export function MaquinasTab({
   return (
     <div className="space-y-3">
       <FiltersBar
-        search={{ value: q, onChange: setQ, placeholder: "Cliente, serie o modelo…", label: "Buscar" }}
+        search={{ value: q, onChange: setQ, placeholder: "Cliente, serie o modelo…", label: "Buscar", width: "w-[190px]" }}
         activeCount={activos}
         onClear={limpiar}
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportar} className="hidden h-9 sm:inline-flex">
-              <Download className="mr-1 h-4 w-4" /> Exportar
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={exportar}
+              className="hidden h-9 w-9 shrink-0 sm:inline-flex"
+              title="Exportar máquinas a Excel"
+            >
+              <Download className="h-4 w-4" />
+              <span className="sr-only">Exportar máquinas</span>
             </Button>
-            <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9">
-              <Plus className="mr-1 h-4 w-4" /> Nueva máquina
+            <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9 shrink-0 px-3">
+              <Plus className="mr-1 h-4 w-4" /> Nueva
             </Button>
           </div>
         }
       >
         <FilterSelect
-          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[140px]"
+          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[120px]"
           options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[135px]"
+          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[110px]"
           options={MARCA_OPTIONS}
         />
         <FilterSelect
-          label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[170px]"
+          label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[145px]"
           options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
         />
-        <FilterCustom label="Año desde" width="w-[100px]">
+        <FilterCustom label="Año desde" width="w-[86px]">
           <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
         </FilterCustom>
-        <FilterCustom label="Año hasta" width="w-[100px]">
+        <FilterCustom label="Año hasta" width="w-[86px]">
           <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
         </FilterCustom>
         <FilterSelect
-          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
+          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[110px]"
           options={[
             { value: "activa", label: "Activas" },
             { value: "inactiva", label: "Inactivas" },
@@ -360,7 +368,6 @@ export function MaquinasTab({
               <TableHead className="cursor-pointer" onClick={() => toggleSort("sucursal")}>
                 <div className="flex items-center gap-1">Sucursal {sortIcon("sucursal")}</div>
               </TableHead>
-              <TableHead>Localidad</TableHead>
               <TableHead className="cursor-pointer" onClick={() => toggleSort("marca")}>
                 <div className="flex items-center gap-1">Marca {sortIcon("marca")}</div>
               </TableHead>
@@ -384,7 +391,7 @@ export function MaquinasTab({
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
                   Cargando...
                 </TableCell>
               </TableRow>
@@ -392,7 +399,7 @@ export function MaquinasTab({
 
             {!loading && ordenadas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
                   Sin máquinas.
                 </TableCell>
               </TableRow>
@@ -412,11 +419,8 @@ export function MaquinasTab({
                   >
                     <TableCell className="font-medium">{cli?.nombre ?? "—"}</TableCell>
                     <TableCell className="text-xs">{m.sucursal ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{m.localidad ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-[10px]">
-                        {m.marca}
-                      </Badge>
+                      <MarcaBadge marca={m.marca} className="text-[10px]" />
                     </TableCell>
                     <TableCell className="text-xs">{m.subgrupo}</TableCell>
                     <TableCell className="text-xs">{m.modelo_tipo ?? "—"}</TableCell>
@@ -437,8 +441,8 @@ export function MaquinasTab({
                           size="icon"
                           className="h-8 w-8"
                           title="Transferir a otro cliente"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={(event) => {
+                            event.stopPropagation();
                             setTransferMaquina({
                               id: m.id,
                               clienteIdActual: m.cliente_id,
