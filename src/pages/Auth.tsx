@@ -32,7 +32,7 @@ export default function Auth() {
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef3e6] px-4 py-6 sm:px-6 sm:py-8">
       <div className="absolute inset-0" aria-hidden="true">
         <GradientWaves />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(255,255,255,0.58),rgba(247,249,242,0.18)_48%,rgba(44,60,31,0.14)_100%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(255,255,255,0.34),transparent_48%,rgba(26,54,30,0.1)_100%)]" />
       </div>
       <div
         aria-hidden="true"

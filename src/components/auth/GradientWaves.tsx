@@ -127,12 +127,40 @@ void main() {
     dir = mat3(1.0, 0.0, 0.0, 0.0, c, -s, 0.0, s, c) * dir;
   }
 
-  float dist = raymarch(cam, dir, freq, tc);
-  vec3 pos = cam + dist * dir;
-  float fog = clamp(uFogDepth / max(dist, 0.001), 0.0, 1.0);
-  vec3 body = mix(uWaveColor, uCrestColor, clamp(pos.z * 0.08 + 0.5, 0.0, 1.0));
-  vec3 color = clamp(mix(uHorizonColor, body, fog) * uBrightness, 0.0, 1.0);
-  float alpha = clamp(fog, 0.0, 1.0) * uOpacity;
+  vec2 screenUv = gl_FragCoord.xy / iResolution.xy;
+  float aspect = iResolution.x / max(iResolution.y, 1.0);
+  float pointerShift = uEnableMouse ? (uMouse.x - 0.5) * uParallax : 0.0;
+  float waveX = (screenUv.x - 0.5) * aspect + pointerShift * 0.18;
+
+  float surfaceA = 0.50
+    + 0.10 * sin(waveX * 5.2 + T * 1.8)
+    + 0.045 * sin(waveX * 11.0 - T * 1.15);
+  float surfaceB = 0.30
+    + 0.075 * sin(waveX * 6.4 - T * 1.45 + 1.6)
+    + 0.025 * cos(waveX * 15.0 + T);
+  float surfaceC = 0.13
+    + 0.045 * sin(waveX * 8.5 + T * 1.1 + 3.0);
+
+  float layerA = 1.0 - smoothstep(surfaceA - 0.025, surfaceA + 0.025, screenUv.y);
+  float layerB = 1.0 - smoothstep(surfaceB - 0.02, surfaceB + 0.02, screenUv.y);
+  float layerC = 1.0 - smoothstep(surfaceC - 0.018, surfaceC + 0.018, screenUv.y);
+
+  vec3 middleGreen = mix(uWaveColor, uHorizonColor, 0.22);
+  vec3 deepGreen = mix(uWaveColor, vec3(0.08, 0.18, 0.10), 0.34);
+  vec3 color = mix(uHorizonColor, middleGreen, layerA * 0.78);
+  color = mix(color, uWaveColor, layerB * 0.86);
+  color = mix(color, deepGreen, layerC * 0.92);
+
+  float crestA = exp(-abs(screenUv.y - surfaceA) * 72.0);
+  float crestB = exp(-abs(screenUv.y - surfaceB) * 90.0);
+  float crestC = exp(-abs(screenUv.y - surfaceC) * 105.0);
+  float crest = clamp(crestA * 0.72 + crestB * 0.52 + crestC * 0.38, 0.0, 1.0);
+  color = mix(color, uCrestColor, crest * 0.82);
+
+  float glow = 1.0 - length((screenUv - vec2(0.5, 0.62)) * vec2(0.82, 1.0));
+  color += max(glow, 0.0) * 0.07;
+  color = clamp(color * uBrightness, 0.0, 1.0);
+  float alpha = uOpacity;
   if (uGrain > 0.5) {
     float grainValue = hash21(gl_FragCoord.xy + mod(iTime, 64.0) * 11.0);
     alpha += (grainValue - 0.5) * uGrainIntensity;
