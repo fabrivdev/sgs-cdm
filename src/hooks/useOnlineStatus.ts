@@ -7,14 +7,18 @@ export function useOnlineStatus() {
   });
 
   useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    const syncStatus = () => setOnline(navigator.onLine);
 
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("focus", syncStatus);
 
     return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("focus", syncStatus);
     };
   }, []);
 

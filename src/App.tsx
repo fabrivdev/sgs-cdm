@@ -10,6 +10,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AssistantPageProvider } from "@/contexts/AssistantPageContext";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { OfflineExperience } from "@/components/offline/OfflineExperience";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
@@ -26,10 +28,17 @@ const SinAcceso = lazy(() => import("./pages/SinAcceso"));
 
 const queryClient = new QueryClient();
 
+function OfflineGuard() {
+  const online = useOnlineStatus();
+  const previewOffline = import.meta.env.DEV && new URLSearchParams(window.location.search).has("offline-preview");
+  return online && !previewOffline ? null : <OfflineExperience />;
+}
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <OfflineGuard />
         <Toaster />
         <Sonner />
         <BrowserRouter>

@@ -49,7 +49,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useUnseen } from "@/hooks/useUnseen";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { cn } from "@/lib/utils";
 import { AIAssistant } from "@/components/assistant/AIAssistant";
@@ -172,7 +171,6 @@ function ModuloNavGroup({
 export function AppLayout({ children }: { children?: React.ReactNode }) {
   const { profile, isAdmin, hasModuloAccess, can, signOut, roles, moduloAccess } = useAuth();
   const unseen = useUnseen();
-  const online = useOnlineStatus();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -314,12 +312,6 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
             </DropdownMenu>
           </div>
         </header>
-
-        {!online && (
-          <div className="sticky top-[52px] z-30 border-b border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs font-medium text-amber-900 sm:top-14">
-            Sin conexion. Los datos pueden no estar actualizados.
-          </div>
-        )}
 
         <main id="main-content" className="pb-6">
           <div key={location.pathname} className="app-page-enter">{children ?? <Outlet />}</div>
