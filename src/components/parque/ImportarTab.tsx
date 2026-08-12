@@ -686,6 +686,9 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         archivo_nombre: osFile,
       });
 
+      const { error: refreshParkError } = await (supabase.rpc as any)("refrescar_parque_ultima_actividad");
+      if (refreshParkError) console.error("No se pudo reconciliar la ultima actividad del Parque", refreshParkError);
+
       toast.success(`Importadas ${osRows.length} OS. ${vinculadas} vinculadas a trabajos.`);
       setOsRows(null);
       setOsFile("");
@@ -1085,6 +1088,9 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         duplicados: factRows.length - insertadosReal,
         archivo_nombre: factFile,
       });
+
+      const { error: refreshParkError } = await (supabase.rpc as any)("refrescar_parque_ultima_actividad");
+      if (refreshParkError) console.error("No se pudo reconciliar la ultima actividad del Parque", refreshParkError);
 
       toast.success(
         `Importadas ${insertadosReal} facturas` +

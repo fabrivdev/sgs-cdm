@@ -275,6 +275,11 @@ export async function persistNewSystemBundle({
     .eq("id", osImp.id);
   if (updateOsImpError) throw updateOsImpError;
 
+  const { error: refreshParkError } = await (supabase.rpc as any)("refrescar_parque_ultima_actividad");
+  if (refreshParkError) {
+    console.error("No se pudo reconciliar la ultima actividad del Parque", refreshParkError);
+  }
+
   return {
     facturacionLineas: facturacionLineas.length,
     ordenesServicio: ordenesServicioPayload.length,
