@@ -4,7 +4,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { CriticidadImportItem } from "@/lib/imports/partsCriticality";
 
 export type MarcaSugerencia = "CLAAS" | "HORSCH";
 
@@ -53,8 +52,9 @@ export interface CorridaSugerencia {
   total_piezas: number;
   piezas_sugeridas: number;
   unidades_sugeridas: number;
-  pendientes_criticidad: number;
   piezas_sin_ventas: number;
+  piezas_nuevas_sin_historial: number;
+  piezas_sin_ventas_recientes: number;
   creado_en: string;
   completado_en: string | null;
 }
@@ -66,12 +66,10 @@ export interface ResultadoSugerencia {
   descripcion: string;
   familia: string | null;
   marca: MarcaSugerencia;
-  criticidad: "V" | "E" | "D" | null;
-  criticidad_fuente: "MANUAL" | "IMPORTADA" | "AUTOMATICA_FAMILIA" | "AUTOMATICA_HEURISTICA";
-  criticidad_confianza: number;
-  criticidad_revisar: boolean;
   origen: string;
   estado_datos: string;
+  incorporado_en: string | null;
+  stock_minimo_estrategico: number;
   stock_global: number;
   unidades_12m: number;
   unidades_24m: number;
@@ -88,7 +86,6 @@ export interface ResultadoSugerencia {
   abc: string;
   fsn: string;
   xyz: string;
-  ved: string | null;
   codigo_mix: string | null;
   segmento: string;
   horizonte_meses: number;
@@ -106,15 +103,6 @@ export interface FiltrosResultados {
   segmento?: string;
   estado?: string;
   soloSugeridos?: boolean;
-  soloCriticidadAutomatica?: boolean;
-}
-
-export interface ResultadoImportacionCriticidad {
-  recibidos: number;
-  validos: number;
-  aplicados: number;
-  sin_coincidencia: number;
-  ambiguos: number;
 }
 
 const PAGE_SIZE = 50;
@@ -133,7 +121,6 @@ function aplicarFiltros(query: any, filtros: FiltrosResultados) {
   if (filtros.segmento && filtros.segmento !== "TODOS") query = query.eq("segmento", filtros.segmento);
   if (filtros.estado && filtros.estado !== "TODOS") query = query.eq("estado_datos", filtros.estado);
   if (filtros.soloSugeridos) query = query.gt("sugerencia_unidades", 0);
-  if (filtros.soloCriticidadAutomatica) query = query.eq("criticidad_revisar", true);
   return query;
 }
 
@@ -241,15 +228,15 @@ export async function ejecutarSugerencia(marca: MarcaSugerencia, fechaAnalisis: 
   return data as string;
 }
 
-export async function asignarCriticidad(input: {
+export async function guardarPlanificacionArticulo(input: {
   productoCodigo: string;
-  criticidad: string | null;
+  stockMinimoEstrategico: number;
   origen: string;
   observaciones?: string;
 }) {
-  const { error } = await (supabase.rpc as any)("repuestos_asignar_criticidad", {
+  const { error } = await (supabase.rpc as any)("repuestos_guardar_planificacion_articulo", {
     p_producto_codigo: input.productoCodigo,
-    p_criticidad: input.criticidad,
+    p_stock_minimo_estrategico: input.stockMinimoEstrategico,
     p_origen: input.origen,
     p_observaciones: input.observaciones ?? null,
   });
@@ -276,30 +263,4 @@ export async function crearVersionModelo(input: {
   });
   if (error) throw error;
   return data as string;
-}
-
-export async function importarCriticidades(marca: MarcaSugerencia, items: CriticidadImportItem[]) {
-  const chunkSize = 750;
-  const total: ResultadoImportacionCriticidad = {
-    recibidos: 0,
-    validos: 0,
-    aplicados: 0,
-    sin_coincidencia: 0,
-    ambiguos: 0,
-  };
-  for (let offset = 0; offset < items.length; offset += chunkSize) {
-    const chunk = items.slice(offset, offset + chunkSize);
-    const { data, error } = await (supabase.rpc as any)("repuestos_importar_criticidades", {
-      p_marca: marca,
-      p_items: chunk,
-    });
-    if (error) throw error;
-    const result = data as ResultadoImportacionCriticidad;
-    total.recibidos += Number(result.recibidos ?? 0);
-    total.validos += Number(result.validos ?? 0);
-    total.aplicados += Number(result.aplicados ?? 0);
-    total.sin_coincidencia += Number(result.sin_coincidencia ?? 0);
-    total.ambiguos += Number(result.ambiguos ?? 0);
-  }
-  return total;
 }

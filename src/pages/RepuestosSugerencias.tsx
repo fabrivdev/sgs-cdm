@@ -11,7 +11,6 @@ import {
   Play,
   Settings2,
   ShoppingCart,
-  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -27,11 +26,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  asignarCriticidad,
   cargarTodosLosResultados,
   crearVersionModelo,
   ejecutarSugerencia,
-  importarCriticidades,
+  guardarPlanificacionArticulo,
   type CorridaSugerencia,
   type FiltrosResultados,
   type MarcaSugerencia,
@@ -43,7 +41,6 @@ import {
   useResultadosSugerencia,
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
-import { leerCriticidadesDesdeExcel } from "@/lib/imports/partsCriticality";
 import { cardLabel, metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
@@ -76,13 +73,6 @@ function analysisDateDefault() {
 function displayDate(value?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("es-PY").format(new Date(`${value.slice(0, 10)}T12:00:00`));
-}
-
-function criticidadFuenteLabel(value: ResultadoSugerencia["criticidad_fuente"]) {
-  if (value === "IMPORTADA") return "Importada";
-  if (value === "AUTOMATICA_FAMILIA") return "Sugerida por familia";
-  if (value === "AUTOMATICA_HEURISTICA") return "Sugerida por motor";
-  return "Manual";
 }
 
 function coberturaActualMeses(row: ResultadoSugerencia) {
@@ -237,20 +227,20 @@ function ResultDetailSheet({
   canManage: boolean;
   onSaved: () => void;
 }) {
-  const [criticity, setCriticity] = useState<string>("");
+  const [strategicMinimum, setStrategicMinimum] = useState("0");
   const [origin, setOrigin] = useState("ALEMANIA");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    setCriticity(row?.criticidad ?? "SIN_ASIGNAR");
+    setStrategicMinimum(String(row?.stock_minimo_estrategico ?? 0));
     setOrigin(row?.origen ?? "ALEMANIA");
     setNotes("");
   }, [row]);
 
   const save = useMutation({
-    mutationFn: () => asignarCriticidad({
+    mutationFn: () => guardarPlanificacionArticulo({
       productoCodigo: row!.producto_codigo,
-      criticidad: criticity === "SIN_ASIGNAR" ? null : criticity,
+      stockMinimoEstrategico: Math.max(0, Number(strategicMinimum) || 0),
       origen: origin,
       observaciones: notes,
     }),
@@ -274,7 +264,7 @@ function ResultDetailSheet({
             <div className="mt-6 space-y-5">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
-                  ["Clasificación", `${row.abc}${row.fsn}${row.xyz}${row.ved ?? "?"}`],
+                  ["Clasificación", `${row.abc}${row.fsn}${row.xyz}`],
                   ["Segmento", row.segmento],
                   ["Stock global", decimal.format(row.stock_global)],
                   ["Venta 12m", decimal.format(row.unidades_12m)],
@@ -288,13 +278,19 @@ function ResultDetailSheet({
                 ))}
               </div>
 
-              <div className={cn("rounded-xl border p-4", row.criticidad_revisar && "border-amber-300 bg-amber-50/60")}>
-                <p className={cardLabel}>Origen de la criticidad</p>
+              <div className="rounded-xl border p-4">
+                <p className={cardLabel}>Estado del historial</p>
                 <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">{criticidadFuenteLabel(row.criticidad_fuente)}</p>
-                  <Badge variant={row.criticidad_revisar ? "outline" : "secondary"}>{Math.round(row.criticidad_confianza * 100)}% confianza</Badge>
+                  <p className="text-sm font-semibold">
+                    {row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL"
+                      ? "Código nuevo sin historial"
+                      : row.estado_datos === "SIN_VENTAS_RECIENTES"
+                        ? "Código anterior sin ventas recientes"
+                        : "Con historial reciente"}
+                  </p>
+                  <Badge variant={row.estado_datos === "LISTO" ? "secondary" : "outline"}>{row.estado_datos}</Badge>
                 </div>
-                {row.criticidad_revisar && <p className="mt-2 text-xs text-muted-foreground">La clasificación permitió calcular la sugerencia, pero conviene validarla. Al guardar abajo pasará a ser manual.</p>}
+                {row.incorporado_en && <p className="mt-2 text-xs text-muted-foreground">Incorporado al maestro: {displayDate(row.incorporado_en)}</p>}
               </div>
 
               <div className="rounded-xl border p-4">
@@ -305,6 +301,7 @@ function ResultDetailSheet({
                   <span>Horizonte <strong className="float-right text-foreground">{row.horizonte_meses} meses</strong></span>
                   <span>Demanda horizonte <strong className="float-right text-foreground">{decimal.format(row.demanda_horizonte)}</strong></span>
                   <span>Stock seguridad <strong className="float-right text-foreground">{decimal.format(row.stock_seguridad)}</strong></span>
+                  <span>Mínimo estratégico <strong className="float-right text-foreground">{decimal.format(row.stock_minimo_estrategico)}</strong></span>
                   <span>Tránsito <strong className="float-right text-foreground">0 (pendiente fuente)</strong></span>
                   <span>Necesidad neta <strong className="float-right text-foreground">{decimal.format(row.necesidad_neta)}</strong></span>
                 </div>
@@ -313,20 +310,12 @@ function ResultDetailSheet({
               <div className="space-y-3 rounded-xl border p-4">
                 <div>
                   <h3 className="text-sm font-semibold">Datos maestros de planificación</h3>
-                  <p className={metaText}>El motor propone una criticidad cuando falta; cualquier valor guardado aquí pasa a ser el criterio manual prioritario.</p>
+                  <p className={metaText}>El mínimo estratégico es opcional y funciona como piso del objetivo, incluso cuando la pieza todavía no tiene historial.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Criticidad</Label>
-                    <Select value={criticity} onValueChange={setCriticity} disabled={!canManage}>
-                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SIN_ASIGNAR">Sin asignar</SelectItem>
-                        <SelectItem value="V">V · Vital</SelectItem>
-                        <SelectItem value="E">E · Esencial</SelectItem>
-                        <SelectItem value="D">D · Deseable</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Stock mínimo estratégico</Label>
+                    <Input className="mt-1" type="number" min="0" step="1" value={strategicMinimum} onChange={(event) => setStrategicMinimum(event.target.value)} disabled={!canManage} />
                   </div>
                   <div>
                     <Label>Origen</Label>
@@ -355,7 +344,7 @@ export default function RepuestosSugerencias() {
   const [analysisDate, setAnalysisDate] = useState(analysisDateDefault);
   const [runId, setRunId] = useState<string>();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false, soloCriticidadAutomatica: false });
+  const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -377,8 +366,6 @@ export default function RepuestosSugerencias() {
   const totalPages = Math.max(1, Math.ceil((resultsQuery.data?.count ?? 0) / (resultsQuery.data?.pageSize ?? 50)));
   const segmentOptions = useMemo(() => [
     ...(segmentsQuery.data?.map((segment) => segment.segmento) ?? []),
-    "PENDIENTE CRITICIDAD",
-    "SIN REGLA",
   ], [segmentsQuery.data]);
 
   const run = useMutation({
@@ -390,25 +377,6 @@ export default function RepuestosSugerencias() {
       toast.success("Sugerencia global calculada");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el modelo"),
-  });
-
-  const criticalityImport = useMutation({
-    mutationFn: async (file: File) => {
-      const parsed = await leerCriticidadesDesdeExcel(file);
-      if (parsed.marcas.length > 0 && !parsed.marcas.includes(brand)) {
-        throw new Error(`El archivo corresponde a ${parsed.marcas.join(", ")} y la marca seleccionada es ${brand}`);
-      }
-      if (parsed.items.length === 0) throw new Error("El archivo no contiene criticidades válidas");
-      const result = await importarCriticidades(brand, parsed.items);
-      return { parsed, result };
-    },
-    onSuccess: ({ result }) => {
-      toast.success(
-        `${integer.format(result.aplicados)} criticidades aplicadas · ${integer.format(result.sin_coincidencia)} sin coincidencia · ${integer.format(result.ambiguos)} ambiguas. Recalculá la sugerencia.`,
-        { duration: 9000 },
-      );
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo importar la criticidad"),
   });
 
   const exportMutation = useMutation({
@@ -425,14 +393,13 @@ export default function RepuestosSugerencias() {
         ABC: row.abc,
         FSN: row.fsn,
         XYZ: row.xyz,
-        VED: row.ved,
-        "Origen criticidad": criticidadFuenteLabel(row.criticidad_fuente),
-        "Confianza criticidad": row.criticidad_confianza,
-        "Revisar criticidad": row.criticidad_revisar ? "SÍ" : "NO",
+        Clasificación: `${row.abc}${row.fsn}${row.xyz}`,
         Segmento: row.segmento,
         Estado: row.estado_datos,
+        "Incorporado al maestro": row.incorporado_en,
         Origen: row.origen,
         "Stock global": row.stock_global,
+        "Stock mínimo estratégico": row.stock_minimo_estrategico,
         "Unidades 12m": row.unidades_12m,
         "Unidades 24m": row.unidades_24m,
         "Importe vendido 12m": row.total_vendido_12m,
@@ -461,7 +428,7 @@ export default function RepuestosSugerencias() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className={pageTitle}>Sugerencia de compra</h1>
-          <p className={pageDescription}>Plan global de empresa basado en histórico, clasificación ABC-FSN-XYZ-VED, stock disponible y parámetros versionados.</p>
+          <p className={pageDescription}>Plan global de empresa basado en histórico, clasificación ABC-FSN-XYZ, stock disponible y un mínimo estratégico opcional.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div>
@@ -476,25 +443,6 @@ export default function RepuestosSugerencias() {
             <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => setAnalysisDate(event.target.value)} />
           </div>
           <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
-          {canManage && (
-            <Button asChild variant="outline" className={cn(criticalityImport.isPending && "pointer-events-none opacity-60")}>
-              <label>
-                {criticalityImport.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                {criticalityImport.isPending ? "Importando..." : "Importar criticidad"}
-                <input
-                  className="sr-only"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  disabled={criticalityImport.isPending}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) criticalityImport.mutate(file);
-                    event.target.value = "";
-                  }}
-                />
-              </label>
-            </Button>
-          )}
           <Button onClick={() => run.mutate()} disabled={!canManage || run.isPending || !modelQuery.data}>
             {run.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
             Calcular sugerencia
@@ -502,24 +450,15 @@ export default function RepuestosSugerencias() {
         </div>
       </div>
 
-      {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>Solo Admin y Jefatura pueden cambiar parámetros, criticidad o ejecutar una nueva corrida.</AlertDescription></Alert>}
+      {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>Solo Admin y Jefatura pueden cambiar parámetros, mínimos estratégicos o ejecutar una nueva corrida.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá el SQL de la migración para habilitar modelos y corridas.</AlertDescription></Alert>}
-      {activeRun && activeRun.pendientes_criticidad > 0 && (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Criticidades pendientes de revisión</AlertTitle>
-          <AlertDescription>
-            Esta corrida contiene {integer.format(activeRun.pendientes_criticidad)} piezas pendientes o sugeridas por el motor. En las corridas nuevas ya no bloquean el cálculo; podés filtrarlas y confirmar o cambiar su V/E/D manualmente.
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Piezas analizadas" value={integer.format(activeRun?.total_piezas ?? 0)} />
         <MetricCard label="Piezas sugeridas" value={integer.format(activeRun?.piezas_sugeridas ?? 0)} tone="green" />
         <MetricCard label="Unidades sugeridas" value={integer.format(activeRun?.unidades_sugeridas ?? 0)} tone="green" />
-        <MetricCard label="Criticidad pendiente / revisar" value={integer.format(activeRun?.pendientes_criticidad ?? 0)} tone="amber" />
-        <MetricCard label="Sin ventas 24m" value={integer.format(activeRun?.piezas_sin_ventas ?? 0)} />
+        <MetricCard label="Nuevos sin historial" value={integer.format(activeRun?.piezas_nuevas_sin_historial ?? 0)} tone="amber" />
+        <MetricCard label="Anteriores sin ventas 24m" value={integer.format(activeRun?.piezas_sin_ventas_recientes ?? activeRun?.piezas_sin_ventas ?? 0)} />
       </div>
 
       {activeRun && (
@@ -544,7 +483,7 @@ export default function RepuestosSugerencias() {
 
       <Card>
         <CardContent className="p-3">
-          <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_190px_190px_auto_auto]">
+          <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_190px_220px_auto]">
             <Input placeholder="Código, fabricante o descripción..." value={filters.buscar ?? ""} onChange={(event) => { setFilters((current) => ({ ...current, buscar: event.target.value })); setPage(1); }} />
             <Select value={filters.segmento} onValueChange={(value) => { setFilters((current) => ({ ...current, segmento: value })); setPage(1); }}>
               <SelectTrigger><SelectValue placeholder="Segmento" /></SelectTrigger>
@@ -552,10 +491,9 @@ export default function RepuestosSugerencias() {
             </Select>
             <Select value={filters.estado} onValueChange={(value) => { setFilters((current) => ({ ...current, estado: value })); setPage(1); }}>
               <SelectTrigger><SelectValue placeholder="Estado de datos" /></SelectTrigger>
-              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Listos</SelectItem><SelectItem value="PENDIENTE_CRITICIDAD">Pendiente (corridas anteriores)</SelectItem><SelectItem value="SIN_REGLA_SEGMENTO">Sin regla (corridas anteriores)</SelectItem><SelectItem value="SIN_VENTAS_24M">Sin ventas 24m</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Con historial reciente</SelectItem><SelectItem value="CODIGO_NUEVO_SIN_HISTORIAL">Nuevos sin historial</SelectItem><SelectItem value="SIN_VENTAS_RECIENTES">Anteriores sin ventas 24m</SelectItem><SelectItem value="SIN_VENTAS_24M">Sin ventas 24m (corridas anteriores)</SelectItem></SelectContent>
             </Select>
             <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-xs font-medium"><Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />Solo con sugerencia</label>
-            <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-xs font-medium"><Checkbox checked={filters.soloCriticidadAutomatica} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloCriticidadAutomatica: checked === true })); setPage(1); }} />Criticidad automática</label>
           </div>
         </CardContent>
       </Card>
@@ -589,7 +527,7 @@ export default function RepuestosSugerencias() {
                     return (
                       <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
                         <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
-                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}{row.ved ?? "?"}</Badge><Badge variant={row.estado_datos === "LISTO" ? "secondary" : "destructive"}>{row.segmento}</Badge>{row.criticidad_revisar && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">AUTO {Math.round(row.criticidad_confianza * 100)}%</Badge>}</div></TableCell>
+                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}</Badge><Badge variant="secondary">{row.segmento}</Badge>{row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">NUEVO SIN HISTORIAL</Badge>}{row.estado_datos === "SIN_VENTAS_RECIENTES" && <Badge variant="outline">SIN VENTAS 24M</Badge>}{row.stock_minimo_estrategico > 0 && <Badge className="border-primary/30 bg-primary/5 text-primary" variant="outline">MÍN. {decimal.format(row.stock_minimo_estrategico)}</Badge>}</div></TableCell>
                         <TableCell className="text-right font-medium">{decimal.format(row.stock_global)}</TableCell>
                         <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_12m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
                         <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_24m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>

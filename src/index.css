@@ -118,6 +118,15 @@
   }
 }
 
+/* En escritorio la interfaz adopta la densidad visual equivalente al 80 %
+   del zoom del navegador. Se hace con la unidad raiz para que login, layout,
+   dialogos y todas las secciones mantengan proporciones consistentes. */
+@media (min-width: 1024px) {
+  html {
+    font-size: 80%;
+  }
+}
+
 @keyframes app-page-enter {
   from {
     opacity: 0;
