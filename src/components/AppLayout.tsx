@@ -15,6 +15,7 @@ import {
   Menu,
   Package,
   ShoppingCart,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,6 +91,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/repuestos", label: "Catálogo y Stock", icon: Package, end: true },
       { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, end: true },
+      { to: "/repuestos/sugerencias", label: "Sugerencia de compra", icon: Sparkles, end: true },
     ],
   },
 ];

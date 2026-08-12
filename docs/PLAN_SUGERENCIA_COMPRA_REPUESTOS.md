@@ -312,3 +312,18 @@ Una corrida con ventas, stock o maestro vencidos debe quedar bloqueada o marcada
 9. No existe aprobación ni límite presupuestario: el resultado es informativo y exportable.
 
 Con estas decisiones existe alcance suficiente para comenzar la Fase 0 y preparar los casos dorados de validación.
+
+## 11. Estado de la primera entrega funcional
+
+Implementado en la migración `20260812230000_add_parts_purchase_suggestions_v1.sql`:
+
+- modelos iniciales separados para CLAAS y HORSCH, con parámetros y políticas versionadas;
+- tabla completa de equivalencias entre el mix ABC-FSN-XYZ-VED y los seis segmentos;
+- criticidad manual por pieza y origen Alemania editable;
+- corrida global de empresa que consolida stock, reconstruye 24 meses de ventas y evita contar dos veces una línea vinculada por más de un código;
+- demanda ponderada 60/40, horizonte por marca/segmento, seguridad, objetivo, necesidad neta y redondeo entero;
+- snapshots inmutables de parámetros, fuentes y resultados explicables;
+- RLS y validación de rol: consulta para usuarios de Repuestos; configuración y ejecución para Admin/Jefatura;
+- pantalla para ejecutar y consultar corridas, editar parámetros, completar criticidad/origen, revisar la explicación por pieza y exportar Excel.
+
+La primera entrega es un **piloto analítico**, no una recomendación validada para compra automática. Antes de usarla para decisiones reales siguen pendientes la prueba de paridad contra los tres libros, el backtest CLAAS enero-junio y la verificación de casos dorados. Tampoco incluye todavía estacionalidad avanzada, stock histórico, tránsito, precios de proveedor, costos logísticos, MOQ, devoluciones ni garantías.

@@ -22,6 +22,7 @@ const Agenda = lazy(() => import("./pages/Agenda"));
 const Trabajos = lazy(() => import("./pages/Trabajos"));
 const Repuestos = lazy(() => import("./pages/Repuestos"));
 const RepuestosCompras = lazy(() => import("./pages/RepuestosCompras"));
+const RepuestosSugerencias = lazy(() => import("./pages/RepuestosSugerencias"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const SinAcceso = lazy(() => import("./pages/SinAcceso"));
@@ -120,6 +121,14 @@ const App = () => (
                   element={
                     <ProtectedRoute requireRoles={["admin"]}>
                       <Admin />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/repuestos/sugerencias"
+                  element={
+                    <ProtectedRoute requireModulo="repuestos">
+                      <RepuestosSugerencias />
                     </ProtectedRoute>
                   }
                 />
