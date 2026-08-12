@@ -135,16 +135,15 @@ const dias = (d: string | null | undefined) => {
 const fmtMoney = (n: number) => formatGuaranies(n);
 
 async function cargarRpcConReintento<T>(
-  request: () => PromiseLike<{ data: T | null; error: { message?: string } | null }>,
-  intentos = 2,
+  requests: Array<() => PromiseLike<{ data: T | null; error: { message?: string } | null }>>,
 ) {
   let ultimoError: { message?: string } | null = null;
 
-  for (let intento = 0; intento < intentos; intento += 1) {
-    const resultado = await request();
+  for (let intento = 0; intento < requests.length; intento += 1) {
+    const resultado = await requests[intento]();
     if (!resultado.error) return resultado.data;
     ultimoError = resultado.error;
-    if (intento < intentos - 1) await new Promise((resolve) => setTimeout(resolve, 350));
+    if (intento < requests.length - 1) await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
   throw new Error(ultimoError?.message || "No se pudo cargar la facturación");
@@ -356,16 +355,41 @@ export function ParqueTab({
         const marcaFacturacion =
           fMarca === MARCA_AMBAS ? "AMBAS" : fMarca === "all" ? "ALL" : fMarca;
         const rubroFacturacion = fRubro === "all" ? "ALL" : fRubro;
-        const resumen = await cargarRpcConReintento(() =>
-          supabase.rpc("parque_resumen_facturacion_filtros", {
-            p_desde: fmt(desdeDate),
-            p_hasta: fmt(hastaDate),
-            p_prev_desde: fmt(prevDesdeDate),
-            p_prev_hasta: fmt(prevHastaDate),
-            p_marca: marcaFacturacion,
-            p_rubro: rubroFacturacion,
-          }),
-        );
+        const fechas = {
+          p_desde: fmt(desdeDate),
+          p_hasta: fmt(hastaDate),
+          p_prev_desde: fmt(prevDesdeDate),
+          p_prev_hasta: fmt(prevHastaDate),
+        };
+        const resumenRequests = fRubro !== "all"
+          ? [
+              () => supabase.rpc("parque_resumen_facturacion_filtros", {
+                ...fechas,
+                p_marca: marcaFacturacion,
+                p_rubro: rubroFacturacion,
+              }),
+              () => supabase.rpc("parque_resumen_facturacion_filtros", {
+                ...fechas,
+                p_marca: marcaFacturacion,
+                p_rubro: rubroFacturacion,
+              }),
+            ]
+          : fMarca !== "all"
+            ? [
+                () => supabase.rpc("parque_resumen_facturacion_marca", {
+                  ...fechas,
+                  p_marca: marcaFacturacion,
+                }),
+                () => supabase.rpc("parque_resumen_facturacion_marca", {
+                  ...fechas,
+                  p_marca: marcaFacturacion,
+                }),
+              ]
+            : [
+                () => supabase.rpc("parque_resumen_facturacion", fechas),
+                () => supabase.rpc("parque_resumen_facturacion", fechas),
+              ];
+        const resumen = await cargarRpcConReintento(resumenRequests);
         if (cancelado) return;
 
         const map = new Map<string, FactAgregado>();
@@ -388,11 +412,16 @@ export function ParqueTab({
         setFactAgregados(new Map(map));
 
         try {
-          const ultimas = await cargarRpcConReintento(() =>
-            supabase.rpc("parque_ultimas_facturas_marca", {
-              p_marca: marcaFacturacion,
-            }),
-          );
+          const ultimasRequests = fMarca === "all"
+            ? [
+                () => supabase.rpc("parque_ultimas_facturas"),
+                () => supabase.rpc("parque_ultimas_facturas"),
+              ]
+            : [
+                () => supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion }),
+                () => supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion }),
+              ];
+          const ultimas = await cargarRpcConReintento(ultimasRequests);
           if (cancelado) return;
 
           for (const r of (ultimas ?? []) as Array<{
