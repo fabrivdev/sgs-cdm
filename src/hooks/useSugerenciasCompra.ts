@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { CriticidadImportItem } from "@/lib/imports/partsCriticality";
 
 export type MarcaSugerencia = "CLAAS" | "HORSCH";
 
@@ -102,6 +103,14 @@ export interface FiltrosResultados {
   segmento?: string;
   estado?: string;
   soloSugeridos?: boolean;
+}
+
+export interface ResultadoImportacionCriticidad {
+  recibidos: number;
+  validos: number;
+  aplicados: number;
+  sin_coincidencia: number;
+  ambiguos: number;
 }
 
 const PAGE_SIZE = 50;
@@ -262,4 +271,30 @@ export async function crearVersionModelo(input: {
   });
   if (error) throw error;
   return data as string;
+}
+
+export async function importarCriticidades(marca: MarcaSugerencia, items: CriticidadImportItem[]) {
+  const chunkSize = 750;
+  const total: ResultadoImportacionCriticidad = {
+    recibidos: 0,
+    validos: 0,
+    aplicados: 0,
+    sin_coincidencia: 0,
+    ambiguos: 0,
+  };
+  for (let offset = 0; offset < items.length; offset += chunkSize) {
+    const chunk = items.slice(offset, offset + chunkSize);
+    const { data, error } = await (supabase.rpc as any)("repuestos_importar_criticidades", {
+      p_marca: marca,
+      p_items: chunk,
+    });
+    if (error) throw error;
+    const result = data as ResultadoImportacionCriticidad;
+    total.recibidos += Number(result.recibidos ?? 0);
+    total.validos += Number(result.validos ?? 0);
+    total.aplicados += Number(result.aplicados ?? 0);
+    total.sin_coincidencia += Number(result.sin_coincidencia ?? 0);
+    total.ambiguos += Number(result.ambiguos ?? 0);
+  }
+  return total;
 }

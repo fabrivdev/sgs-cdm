@@ -11,6 +11,7 @@ import {
   Play,
   Settings2,
   ShoppingCart,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,6 +31,7 @@ import {
   cargarTodosLosResultados,
   crearVersionModelo,
   ejecutarSugerencia,
+  importarCriticidades,
   type CorridaSugerencia,
   type FiltrosResultados,
   type MarcaSugerencia,
@@ -41,6 +43,7 @@ import {
   useResultadosSugerencia,
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
+import { leerCriticidadesDesdeExcel } from "@/lib/imports/partsCriticality";
 import { cardLabel, metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
@@ -369,6 +372,25 @@ export default function RepuestosSugerencias() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el modelo"),
   });
 
+  const criticalityImport = useMutation({
+    mutationFn: async (file: File) => {
+      const parsed = await leerCriticidadesDesdeExcel(file);
+      if (parsed.marcas.length > 0 && !parsed.marcas.includes(brand)) {
+        throw new Error(`El archivo corresponde a ${parsed.marcas.join(", ")} y la marca seleccionada es ${brand}`);
+      }
+      if (parsed.items.length === 0) throw new Error("El archivo no contiene criticidades válidas");
+      const result = await importarCriticidades(brand, parsed.items);
+      return { parsed, result };
+    },
+    onSuccess: ({ result }) => {
+      toast.success(
+        `${integer.format(result.aplicados)} criticidades aplicadas · ${integer.format(result.sin_coincidencia)} sin coincidencia · ${integer.format(result.ambiguos)} ambiguas. Recalculá la sugerencia.`,
+        { duration: 9000 },
+      );
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo importar la criticidad"),
+  });
+
   const exportMutation = useMutation({
     mutationFn: async () => {
       if (!runId) throw new Error("No hay una corrida para exportar");
@@ -429,6 +451,25 @@ export default function RepuestosSugerencias() {
             <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => setAnalysisDate(event.target.value)} />
           </div>
           <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
+          {canManage && (
+            <Button asChild variant="outline" className={cn(criticalityImport.isPending && "pointer-events-none opacity-60")}>
+              <label>
+                {criticalityImport.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                {criticalityImport.isPending ? "Importando..." : "Importar criticidad"}
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  disabled={criticalityImport.isPending}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) criticalityImport.mutate(file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </Button>
+          )}
           <Button onClick={() => run.mutate()} disabled={!canManage || run.isPending || !modelQuery.data}>
             {run.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
             Calcular sugerencia
@@ -438,6 +479,15 @@ export default function RepuestosSugerencias() {
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>Solo Admin y Jefatura pueden cambiar parámetros, criticidad o ejecutar una nueva corrida.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá el SQL de la migración para habilitar modelos y corridas.</AlertDescription></Alert>}
+      {activeRun && activeRun.pendientes_criticidad > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Falta la clasificación manual de criticidad</AlertTitle>
+          <AlertDescription>
+            Importá el libro de segmentación de {brand} y luego pulsá Calcular sugerencia. Esta corrida histórica permanecerá sin cambios para conservar su trazabilidad.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Piezas analizadas" value={integer.format(activeRun?.total_piezas ?? 0)} />
