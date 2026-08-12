@@ -49,8 +49,13 @@ export function ModeloMaquinaSelect({
     return [...byKey.values()].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   }, [data, value]);
 
+  const esModeloNuevo = Boolean(
+    value?.trim() &&
+    !data.some((modelo) => normalizeMachineModelKey(modelo.nombre) === normalizeMachineModelKey(value)),
+  );
+
   return (
-    <>
+    <div className="space-y-1">
       <Input
         list={listId}
         value={value ?? ""}
@@ -63,6 +68,11 @@ export function ModeloMaquinaSelect({
           <option key={normalizeMachineModelKey(modelo)} value={modelo} />
         ))}
       </datalist>
-    </>
+      <p className={esModeloNuevo ? "text-[11px] text-amber-700 dark:text-amber-400" : "text-[11px] text-muted-foreground"}>
+        {esModeloNuevo
+          ? "Modelo nuevo: se agregará al catálogo al guardar la máquina."
+          : "Seleccioná una opción o escribí un modelo nuevo."}
+      </p>
+    </div>
   );
 }

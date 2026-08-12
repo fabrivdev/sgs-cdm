@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ResponsiveDrawer,
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
+  const queryClient = useQueryClient();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,6 +113,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
     });
     setSaving(false);
     if (error) return toast.error(error.message);
+    await queryClient.invalidateQueries({ queryKey: ["parque-modelos-catalogo"] });
     toast.success("Máquina creada");
     onOpenChange(false);
     onCreated?.();

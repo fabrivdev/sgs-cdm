@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,6 +163,7 @@ const initials = (s: string) =>
 
 export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrearServicio }: Props) {
   const { user, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -346,6 +348,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       });
       if (error) return toast.error(error.message);
     }
+    await queryClient.invalidateQueries({ queryKey: ["parque-modelos-catalogo"] });
     toast.success("Máquina guardada");
     setEditMaquina(null);
     setNewMaquina(false);
