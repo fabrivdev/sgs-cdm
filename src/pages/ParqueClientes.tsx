@@ -3,8 +3,9 @@ import { useLocation } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParqueTab } from "@/components/parque/ParqueTab";
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
+import { StockMaquinasTab, type StockMaquinasResumen } from "@/components/parque/StockMaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { Tractor, CheckCircle2, PackageCheck, Users } from "lucide-react";
+import { Tractor, CheckCircle2, PackageCheck, Users, Sparkles, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { pageShell, pageTitle } from "@/lib/ui-classes";
 import type { KpiResult } from "@/lib/contacto-utils";
@@ -27,8 +28,9 @@ export default function ParqueClientes() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [parqueMetricas, setParqueMetricas] = useState<KpiResult | null>(null);
   const [maquinasResumen, setMaquinasResumen] = useState<MaquinasResumen>({ totalMaquinas: 0, totalClientes: 0, totalModelos: 0 });
+  const [stockResumen, setStockResumen] = useState<StockMaquinasResumen>({ total: 0, nuevas: 0, usadas: 0, marcas: 0 });
   const [refreshCounter, setRefreshCounter] = useState(0);
-  const vistaParque = location.pathname === "/parque-maquinas" ? "maquinas" : "clientes";
+  const vistaParque = location.pathname === "/parque-stock" ? "stock" : location.pathname === "/parque-maquinas" ? "maquinas" : "clientes";
 
   const handleChanged = () => {
     setParqueMetricas(null);
@@ -68,23 +70,28 @@ export default function ParqueClientes() {
         icon: PackageCheck,
         accent: "text-amber-600",
       },
-    ] : [
+    ] : vistaParque === "maquinas" ? [
       { label: "Máquinas activas", value: maquinasResumen.totalMaquinas.toLocaleString(), icon: Tractor, accent: "text-primary" },
       { label: "Clientes con máquinas", value: maquinasResumen.totalClientes.toLocaleString(), icon: Users, accent: "text-blue-600" },
       { label: "Modelos unificados", value: maquinasResumen.totalModelos.toLocaleString(), icon: CheckCircle2, accent: "text-emerald-600" },
+    ] : [
+      { label: "Unidades en stock", value: stockResumen.total.toLocaleString(), icon: Tractor, accent: "text-primary" },
+      { label: "Máquinas nuevas", value: stockResumen.nuevas.toLocaleString(), icon: Sparkles, accent: "text-emerald-600" },
+      { label: "Máquinas usadas", value: stockResumen.usadas.toLocaleString(), icon: RefreshCw, accent: "text-amber-600" },
+      { label: "Marcas", value: stockResumen.marcas.toLocaleString(), icon: CheckCircle2, accent: "text-blue-600" },
     ],
-    [metricasMostradas, maquinasResumen, vistaParque],
+    [metricasMostradas, maquinasResumen, stockResumen, vistaParque],
   );
 
   return (
     <div className={pageShell}>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className={pageTitle}>{vistaParque === "clientes" ? "Clientes del parque" : "Máquinas del parque"}</h1>
+        <h1 className={pageTitle}>{vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"}</h1>
       </div>
 
       <div className={cn(
         "mb-4 grid grid-cols-1 gap-2 sm:gap-3",
-        vistaParque === "clientes" ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3",
+        vistaParque === "clientes" || vistaParque === "stock" ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3",
       )}>
         {cards.map((c) => (
           <Card key={c.label} className="border">
@@ -113,8 +120,10 @@ export default function ParqueClientes() {
             onOpenCliente={handleOpenCliente}
             onMetricasChange={setParqueMetricas}
           />
-        ) : (
+        ) : vistaParque === "maquinas" ? (
           <MaquinasTab key={refreshCounter} onOpenCliente={handleOpenCliente} onResumenChange={setMaquinasResumen} />
+        ) : (
+          <StockMaquinasTab key={refreshCounter} onResumenChange={setStockResumen} />
         )}
       </div>
 

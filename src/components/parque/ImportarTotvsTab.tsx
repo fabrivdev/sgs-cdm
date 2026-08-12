@@ -17,11 +17,13 @@ import { toast } from "sonner";
 import {
   mapCanonicalClienteToRow,
   mapCanonicalPedidoCompraToRow,
+  mapCanonicalMachineStockToRow,
   mapCanonicalProductToRow,
   mapCanonicalSolicitudCompraToRow,
   mapCanonicalStockToRow,
   mapClienteSheet,
   mapPedidoCompraSheet,
+  mapMachineStockSheet,
   mapProductosSheet,
   mapSolicitudCompraSheet,
   mapStockSheet,
@@ -30,6 +32,7 @@ import {
   persistNewSystemBundle,
   type CanonicalClienteRow,
   type CanonicalPedidoCompraRow,
+  type CanonicalMachineStockRow,
   type CanonicalProductRow,
   type CanonicalSolicitudCompraRow,
   type CanonicalStockRow,
@@ -37,13 +40,14 @@ import {
 } from "@/lib/imports";
 import { cn } from "@/lib/utils";
 
-type FileKind = "os" | "facturacion" | "productos" | "stock" | "pedidos" | "solicitudes" | "clientes";
+type FileKind = "os" | "facturacion" | "productos" | "stock" | "stock_maquinas" | "pedidos" | "solicitudes" | "clientes";
 
 const KIND_LABELS: Record<FileKind, string> = {
   os: "Órdenes de servicio",
   facturacion: "Facturación de ventas",
   productos: "Maestro de productos",
   stock: "Reporte de stock",
+  stock_maquinas: "Stock de maquinarias",
   pedidos: "Pedidos de compra",
   solicitudes: "Solicitudes de compra",
   clientes: "Maestro de clientes",
@@ -66,6 +70,7 @@ function detectFileKind(fileName: string): FileKind | "ignorar" {
   if (n.includes("ordenes_de_servicio") || n.includes("ordenes de servicio")) return "os";
   if (n.includes("ndc") || n.includes("ncc") || n.includes("ventas")) return "facturacion";
   if (n.includes("maestro_de_productos") || n.includes("maestro de productos")) return "productos";
+  if (n.includes("stock_de_maquinarias") || n.includes("stock de maquinarias")) return "stock_maquinas";
   if (n.includes("reporte_de_stock") || n.includes("reporte de stock")) return "stock";
   if (n.includes("pedidos_de_compra") || n.includes("pedidos de compra")) return "pedidos";
   if (n.includes("solicitudes_de_compra") || n.includes("solicitudes de compra")) return "solicitudes";
@@ -76,6 +81,7 @@ function detectFileKind(fileName: string): FileKind | "ignorar" {
 interface Preview {
   productos: CanonicalProductRow[];
   stock: CanonicalStockRow[];
+  stockMaquinas: CanonicalMachineStockRow[];
   pedidos: CanonicalPedidoCompraRow[];
   solicitudes: CanonicalSolicitudCompraRow[];
   clientesTodos: CanonicalClienteRow[];
@@ -149,6 +155,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     try {
       const productos: CanonicalProductRow[] = [];
       const stock: CanonicalStockRow[] = [];
+      const stockMaquinas: CanonicalMachineStockRow[] = [];
       const pedidos: CanonicalPedidoCompraRow[] = [];
       const solicitudes: CanonicalSolicitudCompraRow[] = [];
       let clientesTodos: CanonicalClienteRow[] = [];
@@ -177,6 +184,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           productos.push(...mapProductosSheet(file.name, sheet).rows);
         } else if (kind === "stock") {
           stock.push(...mapStockSheet(file.name, sheet).rows);
+        } else if (kind === "stock_maquinas") {
+          stockMaquinas.push(...mapMachineStockSheet(file.name, sheet).rows);
         } else if (kind === "pedidos") {
           pedidos.push(...mapPedidoCompraSheet(file.name, sheet).rows);
         } else if (kind === "solicitudes") {
@@ -230,6 +239,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       setPreview({
         productos,
         stock,
+        stockMaquinas,
         pedidos,
         solicitudes,
         clientesTodos,
@@ -243,6 +253,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         bundleFiles ? "OS + Facturación" : null,
         productos.length ? `${productos.length} productos` : null,
         stock.length ? `${stock.length} filas de stock` : null,
+        stockMaquinas.length ? `${stockMaquinas.length} máquinas en stock` : null,
         pedidos.length ? `${pedidos.length} líneas de pedido` : null,
         solicitudes.length ? `${solicitudes.length} líneas de solicitud` : null,
         clientesTodos.length ? `${clientesNuevos.length} clientes nuevos` : null,
@@ -286,6 +297,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       const productoRows = preview.productos.map(mapCanonicalProductToRow).filter((r): r is NonNullable<typeof r> => r !== null);
       const stockRows = preview.stock.map(mapCanonicalStockToRow).filter((r): r is NonNullable<typeof r> => r !== null);
+      const machineStockRows = preview.stockMaquinas.map(mapCanonicalMachineStockToRow);
       const pedidoRows = preview.pedidos.map(mapCanonicalPedidoCompraToRow).filter((r): r is NonNullable<typeof r> => r !== null);
       const solicitudRows = preview.solicitudes.map(mapCanonicalSolicitudCompraToRow).filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -303,6 +315,22 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           const { error } = await (supabase.from("repuestos_stock" as any).insert(stockRows.slice(i, i + 500)) as any);
           if (error) throw error;
         }
+      }
+
+      if (machineStockRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        const rowsWithBatch = machineStockRows.map((row) => ({ ...row, carga_id: cargaId }));
+
+        for (let i = 0; i < rowsWithBatch.length; i += 500) {
+          const { error } = await (supabase.from("parque_stock_maquinas" as any).upsert(rowsWithBatch.slice(i, i + 500), { onConflict: "producto_codigo" }) as any);
+          if (error) throw error;
+        }
+
+        // Solo después de guardar correctamente la foto nueva se eliminan
+        // las unidades que ya no aparecen. Así una falla de inserción nunca
+        // deja el stock vacío.
+        const { error: deleteError } = await (supabase.from("parque_stock_maquinas" as any).delete().neq("carga_id", cargaId) as any);
+        if (deleteError) throw deleteError;
       }
 
       for (let i = 0; i < pedidoRows.length; i += 500) {
@@ -353,9 +381,21 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           insertados: totalOtros,
           duplicados: preview.clientesExistentes,
           archivo_nombre: usableFiles
-            .filter((d) => d.kind !== "os" && d.kind !== "facturacion")
+            .filter((d) => d.kind !== "os" && d.kind !== "facturacion" && d.kind !== "stock_maquinas")
             .map((d) => d.file.name)
             .join(", "),
+        } as any);
+      }
+
+      if (machineStockRows.length > 0) {
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id,
+          tipo: "parque",
+          total_filas: machineStockRows.length,
+          insertados: machineStockRows.length,
+          duplicados: Math.max(preview.stockMaquinas.length - machineStockRows.length, 0),
+          archivo_nombre: usableFiles.filter((d) => d.kind === "stock_maquinas").map((d) => d.file.name).join(", "),
+          metadata: { fuente: "stock_maquinarias_totvs", reemplazo_total: true },
         } as any);
       }
 
@@ -363,6 +403,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         preview.bundleFiles ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} de OS` : null,
         productoRows.length ? `${productoRows.length} productos` : null,
         stockRows.length ? `${stockRows.length} filas de stock` : null,
+        machineStockRows.length ? `${machineStockRows.length} máquinas en stock` : null,
         pedidoRows.length ? `${pedidoRows.length} líneas de pedido` : null,
         solicitudRows.length ? `${solicitudRows.length} líneas de solicitud` : null,
         preview.clientesNuevos.length ? `${preview.clientesNuevos.length} clientes nuevos` : null,
@@ -386,7 +427,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           <div className="text-sm font-semibold">Importar datos de TOTVS</div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Elegí la carpeta completa de exports (o los archivos sueltos) — se detecta automáticamente cada tipo de
-            reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock, pedidos,
+            reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, pedidos,
             solicitudes y clientes.
           </p>
         </div>
@@ -495,6 +536,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               {preview.bundleFiles && <Badge variant="secondary">OS + Facturación listas para cruzar</Badge>}
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
               {preview.stock.length > 0 && <Badge variant="secondary">{preview.stock.length} filas de stock</Badge>}
+              {preview.stockMaquinas.length > 0 && <Badge variant="secondary">{preview.stockMaquinas.length} máquinas en stock</Badge>}
               {preview.pedidos.length > 0 && <Badge variant="secondary">{preview.pedidos.length} líneas de pedido</Badge>}
               {preview.solicitudes.length > 0 && <Badge variant="secondary">{preview.solicitudes.length} líneas de solicitud</Badge>}
               {preview.clientesTodos.length > 0 && (
@@ -504,7 +546,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              El stock reemplaza por completo lo importado antes (es una foto del momento). Productos, pedidos y
+              El stock de repuestos y de máquinas reemplaza por completo lo importado antes (es una foto del momento). Productos, pedidos y
               solicitudes se actualizan sin duplicar. Clientes solo agrega los que todavía no existen.
             </p>
             <Button type="button" size="sm" onClick={confirmar} disabled={busy}>

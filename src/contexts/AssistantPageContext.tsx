@@ -19,6 +19,7 @@ const moduleByPath: Record<string, string> = {
   "/historial": "Historial",
   "/parque-clientes": "Clientes del parque",
   "/parque-maquinas": "Maquinas del parque",
+  "/parque-stock": "Stock de maquinas",
   "/agenda": "Agenda comercial",
   "/admin": "Administracion",
 };

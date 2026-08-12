@@ -84,6 +84,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/parque-stock"
+                  element={
+                    <ProtectedRoute requireModulo="parque">
+                      <ParqueClientes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/agenda"
                   element={
                     <ProtectedRoute requireRoles={["admin"]}>

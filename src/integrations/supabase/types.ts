@@ -907,6 +907,54 @@ export type Database = {
         }
         Relationships: []
       }
+      parque_stock_maquinas: {
+        Row: {
+          carga_id: string
+          chasis: string | null
+          deposito: string | null
+          estado: string | null
+          filial_original: string | null
+          id: string
+          importado_en: string
+          marca: string | null
+          modelo: string | null
+          producto_codigo: string
+          saldo_actual: number
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo: string | null
+        }
+        Insert: {
+          carga_id: string
+          chasis?: string | null
+          deposito?: string | null
+          estado?: string | null
+          filial_original?: string | null
+          id?: string
+          importado_en?: string
+          marca?: string | null
+          modelo?: string | null
+          producto_codigo: string
+          saldo_actual?: number
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          tipo?: string | null
+        }
+        Update: {
+          carga_id?: string
+          chasis?: string | null
+          deposito?: string | null
+          estado?: string | null
+          filial_original?: string | null
+          id?: string
+          importado_en?: string
+          marca?: string | null
+          modelo?: string | null
+          producto_codigo?: string
+          saldo_actual?: number
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          tipo?: string | null
+        }
+        Relationships: []
+      }
       parque_maquinas: {
         Row: {
           activo: boolean

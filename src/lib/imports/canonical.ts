@@ -109,6 +109,21 @@ export interface CanonicalStockRow {
   raw: Record<string, unknown>;
 }
 
+export interface CanonicalMachineStockRow {
+  rowId: string;
+  productCode: string;
+  branch: string | null;
+  branchRaw: string | null;
+  warehouse: string | null;
+  machineType: string | null;
+  brand: string | null;
+  model: string | null;
+  condition: "Nuevo" | "Usado" | null;
+  chassis: string | null;
+  balance: number;
+  raw: Record<string, unknown>;
+}
+
 export interface CanonicalPedidoCompraRow {
   rowId: string;
   nroPedido: string | null;

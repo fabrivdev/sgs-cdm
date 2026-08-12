@@ -3,6 +3,7 @@ export * from "@/lib/imports/comprasMatching";
 export * from "@/lib/imports/cutoff";
 export * from "@/lib/imports/fiscal";
 export * from "@/lib/imports/mappings";
+export * from "@/lib/imports/machineStock";
 export * from "@/lib/imports/newSystemXml";
 export * from "@/lib/imports/newSystemBundle";
 export * from "@/lib/imports/newSystemPersist";
