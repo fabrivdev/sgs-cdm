@@ -79,6 +79,13 @@ function displayDate(value?: string | null) {
   return new Intl.DateTimeFormat("es-PY").format(new Date(`${value.slice(0, 10)}T12:00:00`));
 }
 
+function criticidadFuenteLabel(value: ResultadoSugerencia["criticidad_fuente"]) {
+  if (value === "IMPORTADA") return "Importada";
+  if (value === "AUTOMATICA_FAMILIA") return "Sugerida por familia";
+  if (value === "AUTOMATICA_HEURISTICA") return "Sugerida por motor";
+  return "Manual";
+}
+
 function MetricCard({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "green" | "amber" }) {
   return (
     <Card>
@@ -277,6 +284,15 @@ function ResultDetailSheet({
                 ))}
               </div>
 
+              <div className={cn("rounded-xl border p-4", row.criticidad_revisar && "border-amber-300 bg-amber-50/60")}>
+                <p className={cardLabel}>Origen de la criticidad</p>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">{criticidadFuenteLabel(row.criticidad_fuente)}</p>
+                  <Badge variant={row.criticidad_revisar ? "outline" : "secondary"}>{Math.round(row.criticidad_confianza * 100)}% confianza</Badge>
+                </div>
+                {row.criticidad_revisar && <p className="mt-2 text-xs text-muted-foreground">La clasificación permitió calcular la sugerencia, pero conviene validarla. Al guardar abajo pasará a ser manual.</p>}
+              </div>
+
               <div className="rounded-xl border p-4">
                 <h3 className="flex items-center gap-2 text-sm font-semibold"><Calculator className="h-4 w-4 text-primary" /> Cómo se obtuvo</h3>
                 <p className="mt-2 text-sm">{String(explanation.motivo ?? "Sin explicación disponible")}</p>
@@ -293,7 +309,7 @@ function ResultDetailSheet({
               <div className="space-y-3 rounded-xl border p-4">
                 <div>
                   <h3 className="text-sm font-semibold">Datos maestros de planificación</h3>
-                  <p className={metaText}>La criticidad es manual; el origen inicia en Alemania y puede cambiarse.</p>
+                  <p className={metaText}>El motor propone una criticidad cuando falta; cualquier valor guardado aquí pasa a ser el criterio manual prioritario.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -335,7 +351,7 @@ export default function RepuestosSugerencias() {
   const [analysisDate, setAnalysisDate] = useState(analysisDateDefault);
   const [runId, setRunId] = useState<string>();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
+  const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false, soloCriticidadAutomatica: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -406,6 +422,9 @@ export default function RepuestosSugerencias() {
         FSN: row.fsn,
         XYZ: row.xyz,
         VED: row.ved,
+        "Origen criticidad": criticidadFuenteLabel(row.criticidad_fuente),
+        "Confianza criticidad": row.criticidad_confianza,
+        "Revisar criticidad": row.criticidad_revisar ? "SÍ" : "NO",
         Segmento: row.segmento,
         Estado: row.estado_datos,
         Origen: row.origen,
@@ -482,9 +501,9 @@ export default function RepuestosSugerencias() {
       {activeRun && activeRun.pendientes_criticidad > 0 && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Falta la clasificación manual de criticidad</AlertTitle>
+          <AlertTitle>Criticidades pendientes de revisión</AlertTitle>
           <AlertDescription>
-            Importá el libro de segmentación de {brand} y luego pulsá Calcular sugerencia. Esta corrida histórica permanecerá sin cambios para conservar su trazabilidad.
+            Esta corrida contiene {integer.format(activeRun.pendientes_criticidad)} piezas pendientes o sugeridas por el motor. En las corridas nuevas ya no bloquean el cálculo; podés filtrarlas y confirmar o cambiar su V/E/D manualmente.
           </AlertDescription>
         </Alert>
       )}
@@ -493,7 +512,7 @@ export default function RepuestosSugerencias() {
         <MetricCard label="Piezas analizadas" value={integer.format(activeRun?.total_piezas ?? 0)} />
         <MetricCard label="Piezas sugeridas" value={integer.format(activeRun?.piezas_sugeridas ?? 0)} tone="green" />
         <MetricCard label="Unidades sugeridas" value={integer.format(activeRun?.unidades_sugeridas ?? 0)} tone="green" />
-        <MetricCard label="Sin criticidad" value={integer.format(activeRun?.pendientes_criticidad ?? 0)} tone="amber" />
+        <MetricCard label="Criticidad pendiente / revisar" value={integer.format(activeRun?.pendientes_criticidad ?? 0)} tone="amber" />
         <MetricCard label="Sin ventas 24m" value={integer.format(activeRun?.piezas_sin_ventas ?? 0)} />
       </div>
 
@@ -519,7 +538,7 @@ export default function RepuestosSugerencias() {
 
       <Card>
         <CardContent className="p-3">
-          <div className="grid gap-2 md:grid-cols-[minmax(240px,1fr)_220px_220px_auto]">
+          <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_190px_190px_auto_auto]">
             <Input placeholder="Código, fabricante o descripción..." value={filters.buscar ?? ""} onChange={(event) => { setFilters((current) => ({ ...current, buscar: event.target.value })); setPage(1); }} />
             <Select value={filters.segmento} onValueChange={(value) => { setFilters((current) => ({ ...current, segmento: value })); setPage(1); }}>
               <SelectTrigger><SelectValue placeholder="Segmento" /></SelectTrigger>
@@ -527,9 +546,10 @@ export default function RepuestosSugerencias() {
             </Select>
             <Select value={filters.estado} onValueChange={(value) => { setFilters((current) => ({ ...current, estado: value })); setPage(1); }}>
               <SelectTrigger><SelectValue placeholder="Estado de datos" /></SelectTrigger>
-              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Listos</SelectItem><SelectItem value="PENDIENTE_CRITICIDAD">Sin criticidad</SelectItem><SelectItem value="SIN_REGLA_SEGMENTO">Sin regla</SelectItem><SelectItem value="SIN_VENTAS_24M">Sin ventas 24m</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Listos</SelectItem><SelectItem value="PENDIENTE_CRITICIDAD">Pendiente (corridas anteriores)</SelectItem><SelectItem value="SIN_REGLA_SEGMENTO">Sin regla (corridas anteriores)</SelectItem><SelectItem value="SIN_VENTAS_24M">Sin ventas 24m</SelectItem></SelectContent>
             </Select>
             <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-xs font-medium"><Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />Solo con sugerencia</label>
+            <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-xs font-medium"><Checkbox checked={filters.soloCriticidadAutomatica} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloCriticidadAutomatica: checked === true })); setPage(1); }} />Criticidad automática</label>
           </div>
         </CardContent>
       </Card>
@@ -550,7 +570,7 @@ export default function RepuestosSugerencias() {
                   {rows.map((row) => (
                     <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
                       <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
-                      <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}{row.ved ?? "?"}</Badge><Badge variant={row.estado_datos === "LISTO" ? "secondary" : "destructive"}>{row.segmento}</Badge></div></TableCell>
+                      <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}{row.ved ?? "?"}</Badge><Badge variant={row.estado_datos === "LISTO" ? "secondary" : "destructive"}>{row.segmento}</Badge>{row.criticidad_revisar && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">AUTO {Math.round(row.criticidad_confianza * 100)}%</Badge>}</div></TableCell>
                       <TableCell><p>{decimal.format(row.unidades_12m)} un. · {row.pedidos_12m} pedidos</p><p className="text-[11px] text-muted-foreground">Total vendido {money.format(row.total_vendido_12m)}</p></TableCell>
                       <TableCell className="text-right">{decimal.format(row.stock_global)}</TableCell>
                       <TableCell className="text-right">{decimal.format(row.stock_objetivo)}</TableCell>

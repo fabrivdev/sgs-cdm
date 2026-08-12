@@ -67,6 +67,9 @@ export interface ResultadoSugerencia {
   familia: string | null;
   marca: MarcaSugerencia;
   criticidad: "V" | "E" | "D" | null;
+  criticidad_fuente: "MANUAL" | "IMPORTADA" | "AUTOMATICA_FAMILIA" | "AUTOMATICA_HEURISTICA";
+  criticidad_confianza: number;
+  criticidad_revisar: boolean;
   origen: string;
   estado_datos: string;
   stock_global: number;
@@ -103,6 +106,7 @@ export interface FiltrosResultados {
   segmento?: string;
   estado?: string;
   soloSugeridos?: boolean;
+  soloCriticidadAutomatica?: boolean;
 }
 
 export interface ResultadoImportacionCriticidad {
@@ -129,6 +133,7 @@ function aplicarFiltros(query: any, filtros: FiltrosResultados) {
   if (filtros.segmento && filtros.segmento !== "TODOS") query = query.eq("segmento", filtros.segmento);
   if (filtros.estado && filtros.estado !== "TODOS") query = query.eq("estado_datos", filtros.estado);
   if (filtros.soloSugeridos) query = query.gt("sugerencia_unidades", 0);
+  if (filtros.soloCriticidadAutomatica) query = query.eq("criticidad_revisar", true);
   return query;
 }
 

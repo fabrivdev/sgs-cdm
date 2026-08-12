@@ -327,3 +327,7 @@ Implementado en la migración `20260812230000_add_parts_purchase_suggestions_v1.
 - pantalla para ejecutar y consultar corridas, editar parámetros, completar criticidad/origen, revisar la explicación por pieza y exportar Excel.
 
 La primera entrega es un **piloto analítico**, no una recomendación validada para compra automática. Antes de usarla para decisiones reales siguen pendientes la prueba de paridad contra los tres libros, el backtest CLAAS enero-junio y la verificación de casos dorados. Tampoco incluye todavía estacionalidad avanzada, stock histórico, tránsito, precios de proveedor, costos logísticos, MOQ, devoluciones ni garantías.
+
+### Ajuste posterior a la primera corrida
+
+La criticidad deja de ser un requisito bloqueante. Cuando una pieza no tiene V/E/D importada o manual, el motor propone una clasificación usando la criticidad predominante de su familia y una heurística conservadora cuando no existe evidencia suficiente. La propuesta automática incluye fuente, confianza y estado de revisión; participa inmediatamente del cálculo y puede reemplazarse manualmente. También se completan todas las combinaciones ABC-FSN-XYZ-VED para que una regla ausente no anule la sugerencia.
