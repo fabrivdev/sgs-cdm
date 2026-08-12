@@ -112,7 +112,8 @@ function usePedidosResumen() {
 }
 
 export function ComprasPedidosTab() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const canManageParts = can("repuestos:gestionar");
   const queryClient = useQueryClient();
   const resumenQuery = usePedidosResumen();
   const pedidosLineasQuery = useComprasPedidosLineas();
@@ -397,7 +398,7 @@ export function ComprasPedidosTab() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
+                        {canManageParts && <Button
                           type="button"
                           variant="ghost"
                           size="sm"
@@ -407,7 +408,7 @@ export function ComprasPedidosTab() {
                           }}
                         >
                           Editar
-                        </Button>
+                        </Button>}
                       </TableCell>
                     </TableRow>
 
@@ -490,7 +491,7 @@ export function ComprasPedidosTab() {
         </div>
       </CardContent>
 
-      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+      <Dialog open={canManageParts && editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>

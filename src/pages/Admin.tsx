@@ -84,7 +84,8 @@ function ModuloChips({
 }
 
 export default function Admin() {
-  const { isSuperAdmin } = useAuth();
+  const { can } = useAuth();
+  const canManageAdmin = can("administracion:gestionar");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [moduloAcceso, setModuloAcceso] = useState<UserModuloAcceso[]>([]);
@@ -134,6 +135,10 @@ export default function Admin() {
     const linkedUserId = profile.auth_user_id || profile.id;
     return emails[linkedUserId] ?? "";
   };
+
+  const permissionOwnerId = (profile: Profile) => profile.auth_user_id || profile.id;
+  const modulesForProfile = (profile: Profile) =>
+    moduloAccesoByUser[permissionOwnerId(profile)] ?? moduloAccesoByUser[profile.id] ?? [];
 
   const profilesConAcceso = useMemo(
     () => profiles.filter((profile) => Boolean(emailByProfile(profile))),
@@ -391,7 +396,7 @@ export default function Admin() {
         </TabsList>
 
         <TabsContent value="equipo" className="space-y-4">
-          {!isSuperAdmin && (
+          {!canManageAdmin && (
             <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <div className="text-xs">
@@ -430,7 +435,7 @@ export default function Admin() {
                   <TableHead>Sucursal</TableHead>
                   <TableHead>Nivel</TableHead>
                   <TableHead>Activo</TableHead>
-                  {isSuperAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
+                  {canManageAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -441,7 +446,7 @@ export default function Admin() {
                       {emailByProfile(profile) || "Sin acceso"}
                     </TableCell>
                     <TableCell>
-                      {isSuperAdmin ? (
+                      {canManageAdmin ? (
                         <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
                           <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
                           <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -451,10 +456,10 @@ export default function Admin() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</Badge>
+                      <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</Badge>
                     </TableCell>
                     <TableCell>
-                      {isSuperAdmin ? (
+                      {canManageAdmin ? (
                         <Button variant={profile.activo ? "default" : "outline"} size="sm" onClick={() => toggleActivo(profile)}>
                           {profile.activo ? "Activo" : "Inactivo"}
                         </Button>
@@ -462,7 +467,7 @@ export default function Admin() {
                         <Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge>
                       )}
                     </TableCell>
-                    {isSuperAdmin && (
+                    {canManageAdmin && (
                       <TableCell>
                         <div className="flex gap-1">
                           <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Credenciales">
@@ -493,7 +498,7 @@ export default function Admin() {
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-1.5">
-                    {isSuperAdmin && (
+                    {canManageAdmin && (
                       <>
                         <Button variant="outline" size="sm" onClick={() => openCred(profile)} className="h-9 w-9 px-0">
                           <KeyRound className="h-4 w-4" />
@@ -513,7 +518,7 @@ export default function Admin() {
                         </Button>
                       </>
                     )}
-                    {!isSuperAdmin && (
+                    {!canManageAdmin && (
                       <Badge variant={profile.activo ? "default" : "outline"} className="text-[10px]">
                         {profile.activo ? "Activo" : "Inactivo"}
                       </Badge>
@@ -524,7 +529,7 @@ export default function Admin() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
-                    {isSuperAdmin ? (
+                    {canManageAdmin ? (
                       <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -535,7 +540,7 @@ export default function Admin() {
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Nivel</Label>
-                    <div className="py-1.5 text-xs">{nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</div>
+                    <div className="py-1.5 text-xs">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
                   </div>
                 </div>
               </Card>
@@ -544,7 +549,7 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="accesos" className="space-y-4">
-          {!isSuperAdmin && (
+          {!canManageAdmin && (
             <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <div className="text-xs">
@@ -554,7 +559,7 @@ export default function Admin() {
             </Card>
           )}
 
-          {isSuperAdmin && (
+          {canManageAdmin && (
             <Card className="p-3 sm:p-4">
               <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                 <UserPlus className="h-4 w-4" />
@@ -618,7 +623,7 @@ export default function Admin() {
                     <TableHead>Módulos</TableHead>
                     <TableHead>Sucursal</TableHead>
                     <TableHead>Estado</TableHead>
-                    {isSuperAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
+                    {canManageAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -627,25 +632,25 @@ export default function Admin() {
                       <TableCell className="font-medium">{profile.nombre}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{emailByProfile(profile)}</TableCell>
                       <TableCell>
-                        {isSuperAdmin ? (
+                        {canManageAdmin ? (
                           <Select value={rolesByUser[profile.id]?.[0] ?? ""} onValueChange={(value) => cambiarRol(profile.id, value as Role)}>
                             <SelectTrigger className="h-8 w-36"><SelectValue placeholder="—" /></SelectTrigger>
                             <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
                           </Select>
                         ) : (
-                          <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</Badge>
+                          <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         <ModuloChips
-                          activos={moduloAccesoByUser[profile.id] ?? []}
-                          editable={isSuperAdmin}
-                          onToggle={(modulo, activo) => cambiarModuloAcceso(profile.id, modulo, activo)}
+                          activos={modulesForProfile(profile)}
+                          editable={canManageAdmin}
+                          onToggle={(modulo, activo) => cambiarModuloAcceso(permissionOwnerId(profile), modulo, activo)}
                         />
                       </TableCell>
                       <TableCell className="text-xs">{profile.sucursal ?? "-"}</TableCell>
                       <TableCell><Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
-                      {isSuperAdmin && (
+                      {canManageAdmin && (
                         <TableCell>
                           <div className="flex gap-1">
                             <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Editar acceso"><KeyRound className="h-3.5 w-3.5" /></Button>
@@ -673,9 +678,9 @@ export default function Admin() {
                 <div key={profile.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{profile.nombre}</div>
-                    <div className="truncate text-xs text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(rolesByUser[profile.id]?.[0], moduloAccesoByUser[profile.id] ?? [])}</div>
+                    <div className="truncate text-xs text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
                   </div>
-                  {isSuperAdmin && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
+                  {canManageAdmin && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
                 </div>
               ))}
               {profilesSinAcceso.length > 12 && (
@@ -718,7 +723,7 @@ export default function Admin() {
                     step="1"
                     value={monthlyProductivityGoal}
                     onChange={(event) => setMonthlyProductivityGoal(Number(event.target.value))}
-                    disabled={!isSuperAdmin}
+                    disabled={!canManageAdmin}
                     className="pr-12"
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">hs</span>
@@ -728,7 +733,7 @@ export default function Admin() {
                 Para rangos parciales, la aplicación prorratea esta meta por días calendario. Un mes completo siempre usa la meta indicada.
               </div>
             </div>
-            {isSuperAdmin ? (
+            {canManageAdmin ? (
               <Button className="mt-4" onClick={saveParameters} disabled={savingParameters}>
                 <Save className="mr-2 h-4 w-4" />
                 {savingParameters ? "Guardando..." : "Guardar parámetro"}

@@ -22,6 +22,7 @@ const Repuestos = lazy(() => import("./pages/Repuestos"));
 const RepuestosCompras = lazy(() => import("./pages/RepuestosCompras"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const SinAcceso = lazy(() => import("./pages/SinAcceso"));
 
 const queryClient = new QueryClient();
 
@@ -45,18 +46,18 @@ const App = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route path="/" element={<Planificador />} />
-                <Route path="/trabajos" element={<Trabajos />} />
-                <Route path="/calendario" element={<Calendario />} />
+                <Route path="/" element={<ProtectedRoute requireModulo="servicios"><Planificador /></ProtectedRoute>} />
+                <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios"><Trabajos /></ProtectedRoute>} />
+                <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios"><Calendario /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={
-                    <ProtectedRoute requireRoles={["admin"]}>
+                    <ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios">
                       <Dashboard />
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/historial" element={<Historial />} />
+                <Route path="/historial" element={<ProtectedRoute requireModulo="servicios"><Historial /></ProtectedRoute>} />
                 <Route
                   path="/parque-clientes"
                   element={
@@ -105,6 +106,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/sin-acceso" element={<SinAcceso />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

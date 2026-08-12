@@ -46,7 +46,8 @@ function lineaCoincideBusqueda(linea: SolicitudLinea, busqueda: string) {
 }
 
 export function SolicitudesCompraTab() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const canManageParts = can("repuestos:gestionar");
   const pedidosLineasQuery = useComprasPedidosLineas();
   const solicitudesLineasQuery = useComprasSolicitudesLineas();
   const vinculosQuery = useComprasVinculos();
@@ -375,7 +376,7 @@ export function SolicitudesCompraTab() {
                                           {resolucion.pedidoVinculado.sucursal}-{resolucion.pedidoVinculado.nroPedido}
                                           {!resolucion.esManual && " (probable)"}
                                         </span>
-                                      ) : resolucion.candidatos.length > 1 ? (
+                                      ) : resolucion.candidatos.length > 1 && canManageParts ? (
                                         <Button
                                           type="button"
                                           variant="outline"
@@ -413,7 +414,7 @@ export function SolicitudesCompraTab() {
         </div>
       </CardContent>
 
-      <Dialog open={vinculando !== null} onOpenChange={(open) => !open && setVinculando(null)}>
+      <Dialog open={canManageParts && vinculando !== null} onOpenChange={(open) => !open && setVinculando(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Elegir el pedido correspondiente</DialogTitle>

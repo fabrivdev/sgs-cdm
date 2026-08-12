@@ -11,13 +11,13 @@ import GradientWaves from "@/components/auth/GradientWaves";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 
 export default function Auth() {
-  const { user, signIn, loading } = useAuth();
+  const { user, signIn, loading, defaultRoute } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  if (!loading && user) return <Navigate to="/" replace />;
+  if (!loading && user) return <Navigate to={defaultRoute} replace />;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

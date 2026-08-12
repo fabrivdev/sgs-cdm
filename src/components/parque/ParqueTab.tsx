@@ -32,6 +32,7 @@ import {
   buildClientesConTrabajoAbierto,
 } from "@/lib/contacto-utils";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { useAuth } from "@/hooks/useAuth";
 
 const MARCA_AMBAS = "ambas";
 const MARCA_OPTIONS = [
@@ -184,6 +185,7 @@ export function ParqueTab({
   onOpenCliente?: (id: string) => void;
   onMetricasChange?: (m: KpiResult) => void;
 }) {
+  const { can } = useAuth();
   const [loading, setLoading] = useState(true);
   const [factLoading, setFactLoading] = useState(true);
   const [factError, setFactError] = useState<string | null>(null);
@@ -711,9 +713,9 @@ export function ParqueTab({
           )}
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
-          <Button variant="outline" size="sm" onClick={exportar} className="hidden h-8 sm:inline-flex">
+          {can("datos:exportar") && <Button variant="outline" size="sm" onClick={exportar} className="hidden h-8 sm:inline-flex">
             <Download className="mr-1 h-3.5 w-3.5" /> Exportar
-          </Button>
+          </Button>}
         </div>
       </div>
 

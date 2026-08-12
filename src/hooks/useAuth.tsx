@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role, Sucursal } from "@/lib/constants";
+import { firstAccessibleRoute, roleHasCapability, type Capability } from "@/lib/permissions";
 
 interface Profile {
   id: string;
@@ -28,6 +29,8 @@ interface AuthCtx {
   /** @deprecated alias de isOperativo, valido solo dentro del contexto de Servicios */
   isTecnico: boolean;
   hasModuloAccess: (moduloId: string) => boolean;
+  can: (capability: Capability) => boolean;
+  defaultRoute: string;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -120,9 +123,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const roleOwnerId = loadedProfile?.id ?? uid;
+      const permissionOwnerIds = Array.from(new Set([uid, roleOwnerId]));
       const [{ data: roleRows }, { data: moduloRows }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", roleOwnerId),
-        (supabase as any).from("user_modulo_acceso").select("modulo_id").eq("user_id", roleOwnerId),
+        (supabase as any).from("user_modulo_acceso").select("modulo_id").in("user_id", permissionOwnerIds),
       ]);
 
       setProfile(loadedProfile);
@@ -177,6 +181,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [clearInvalidLocalSession, loadUserData]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`auth-permissions-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_modulo_acceso" }, () => {
+        void loadUserData(user.id, true);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, () => {
+        void loadUserData(user.id, true);
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [loadUserData, user]);
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error };
@@ -205,6 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isJefatura = roles.includes("jefatura");
   const isOperativo = roles.includes("operativo");
+  const isSuperAdmin = (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py";
+  const defaultRoute = firstAccessibleRoute(moduloAccess, roles, isSuperAdmin);
 
   return (
     <Ctx.Provider
@@ -216,15 +240,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         moduloAccess,
         loading,
         isAdmin: roles.includes("admin"),
-        isSuperAdmin: (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py",
+        isSuperAdmin,
         isGerencia: roles.includes("gerencia"),
         isJefatura,
         isOperativo,
         isCabecilla: isJefatura,
         isTecnico: isOperativo,
-        // Admin ve todos los modulos sin necesitar un grant explicito, igual
-        // que ya bypassea el resto de los gates de rol en la app.
-        hasModuloAccess: (moduloId: string) => roles.includes("admin") || moduloAccess.includes(moduloId),
+        // Solo la cuenta tecnica de emergencia tiene acceso global. El resto,
+        // incluso administradores, respeta los modulos asignados.
+        hasModuloAccess: (moduloId: string) => isSuperAdmin || moduloAccess.includes(moduloId),
+        can: (capability: Capability) => isSuperAdmin || roleHasCapability(roles, capability),
+        defaultRoute,
         signIn,
         signOut,
         refresh,

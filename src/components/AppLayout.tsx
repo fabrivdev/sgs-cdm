@@ -56,7 +56,7 @@ import { AIAssistant } from "@/components/assistant/AIAssistant";
 import { nivelLabel } from "@/lib/constants";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 
-type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; adminOnly?: boolean };
+type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; managementOnly?: boolean };
 type NavGroup = { modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
 
 // Temporary kill switch: preserves the assistant configuration and history for a future re-enable.
@@ -71,7 +71,7 @@ const navGroups: NavGroup[] = [
       { to: "/", label: "Planificador", icon: ListChecks, end: true },
       { to: "/trabajos", label: "Trabajos", icon: Wrench },
       { to: "/calendario", label: "Calendario", icon: CalendarDays },
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: true },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, managementOnly: true },
     ],
   },
   {
@@ -170,19 +170,19 @@ function ModuloNavGroup({
 }
 
 export function AppLayout({ children }: { children?: React.ReactNode }) {
-  const { profile, isAdmin, hasModuloAccess, signOut, roles, moduloAccess } = useAuth();
+  const { profile, isAdmin, hasModuloAccess, can, signOut, roles, moduloAccess } = useAuth();
   const unseen = useUnseen();
   const online = useOnlineStatus();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Un grupo solo aparece si el usuario tiene acceso a ese modulo; adminOnly
-  // sigue siendo un filtro adicional para vistas ejecutivas o administrativas.
+  // Un grupo solo aparece si el usuario tiene acceso a ese modulo; las vistas
+  // ejecutivas exigen ademas la capacidad correspondiente.
   const visibleGroups = navGroups
     .filter((group) => hasModuloAccess(group.modulo))
     .map((group) => ({
       ...group,
-      items: group.items.filter((it) => !(it.adminOnly && !isAdmin)),
+      items: group.items.filter((it) => !(it.managementOnly && !can("dashboard:ver"))),
     }))
     .filter((group) => group.items.length > 0);
 

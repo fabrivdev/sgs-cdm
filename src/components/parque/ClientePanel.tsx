@@ -162,7 +162,9 @@ const initials = (s: string) =>
     .toUpperCase();
 
 export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrearServicio }: Props) {
-  const { user, isAdmin } = useAuth();
+  const { user, can } = useAuth();
+  const canManagePark = can("parque:gestionar");
+  const canDeletePark = can("parque:eliminar");
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [cliente, setCliente] = useState<Cliente | null>(null);
@@ -540,16 +542,16 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Building2 className="h-4 w-4 text-primary" /> Datos generales
             </div>
-            {!editCliente ? (
+            {!editCliente && canManagePark ? (
               <Button variant="ghost" size="sm" onClick={() => { setCForm(cliente ?? {}); setEditCliente(true); }}>
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
-            ) : (
+            ) : editCliente ? (
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" onClick={() => setEditCliente(false)}><X className="h-3.5 w-3.5" /></Button>
                 <Button size="sm" onClick={guardarCliente}><Save className="mr-1 h-3.5 w-3.5" />Guardar</Button>
               </div>
-            )}
+            ) : null}
           </div>
           {!editCliente ? (
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -581,9 +583,9 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
               <UsersIcon className="h-4 w-4 text-primary" /> Contactos
               <Badge variant="secondary" className="text-[10px]">{contactos.filter((c) => c.activo).length}</Badge>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setNewContacto(true); setEditContacto(null); setContactoForm({}); }}>
+            {canManagePark && <Button variant="outline" size="sm" onClick={() => { setNewContacto(true); setEditContacto(null); setContactoForm({}); }}>
               <Plus className="h-3.5 w-3.5" />
-            </Button>
+            </Button>}
           </div>
           <div className="space-y-2">
             {contactos.filter((c) => c.activo).length === 0 && !newContacto && (
@@ -619,14 +621,14 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-1">
+                    {canManagePark && <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => { setEditContacto(c.id); setContactoForm(c); }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => desactivarContacto(c.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
-                    </div>
+                    </div>}
                   </div>
                 )}
               </div>
@@ -666,9 +668,9 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                         {mostrarInactivas ? "Ocultar inactivas" : "Ver inactivas"}
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => { setNewMaquina(true); setEditMaquina(null); setMaquinaForm({}); }}>
+                    {canManagePark && <Button variant="outline" size="sm" onClick={() => { setNewMaquina(true); setEditMaquina(null); setMaquinaForm({}); }}>
                       <Plus className="h-3.5 w-3.5" />
-                    </Button>
+                    </Button>}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -694,7 +696,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                             <div className="mt-0.5 text-xs">{m.modelo_tipo ?? "—"}</div>
                             <div className="text-[11px] text-muted-foreground">Serie: {m.serie}</div>
                           </div>
-                          <div className="flex gap-1">
+                          {canManagePark && <div className="flex gap-1">
                             {m.activo ? (
                               <>
                                 <Button variant="ghost" size="sm" onClick={() => { setEditMaquina(m.id); setMaquinaForm(m); }} title="Editar datos">
@@ -726,7 +728,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                 Reactivar
                               </Button>
                             )}
-                            {isAdmin && (
+                            {canDeletePark && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -737,7 +739,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
-                          </div>
+                          </div>}
                         </div>
                       )}
                     </div>

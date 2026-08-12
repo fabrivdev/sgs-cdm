@@ -13,6 +13,7 @@ import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./Transferi
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
 import { MACHINE_SUBGROUPS, normalizeMachineModelKey } from "@/lib/machineModels";
 import * as XLSX from "xlsx";
+import { useAuth } from "@/hooks/useAuth";
 
 const MARCA_AMBAS = "ambas";
 const MARCA_OPTIONS = [
@@ -95,6 +96,9 @@ export function MaquinasTab({
   onOpenCliente?: (id: string) => void;
   onResumenChange?: (resumen: MaquinasResumen) => void;
 }) {
+  const { can } = useAuth();
+  const canManagePark = can("parque:gestionar");
+  const canExport = can("datos:exportar");
   const [loading, setLoading] = useState(true);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -313,7 +317,7 @@ export function MaquinasTab({
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
         actions={
           <div className="flex items-center gap-2">
-            <Button
+            {canExport && <Button
               variant="outline"
               size="icon"
               onClick={exportar}
@@ -322,10 +326,10 @@ export function MaquinasTab({
             >
               <Download className="h-4 w-4" />
               <span className="sr-only">Exportar máquinas</span>
-            </Button>
-            <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9 shrink-0 px-3">
+            </Button>}
+            {canManagePark && <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9 shrink-0 px-3">
               <Plus className="mr-1 h-4 w-4" /> Nueva
-            </Button>
+            </Button>}
           </div>
         }
       >
@@ -434,7 +438,7 @@ export function MaquinasTab({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {activa && (
+                      {activa && canManagePark && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -465,7 +469,7 @@ export function MaquinasTab({
           </TableBody>
         </Table>
       </div>
-      <TransferirMaquinaDialog
+      {canManagePark && <TransferirMaquinaDialog
         maquina={transferMaquina}
         clienteNombreActual={transferMaquina?.clienteIdActual ? cliById.get(transferMaquina.clienteIdActual)?.nombre ?? "Cliente actual" : "Sin cliente"}
         open={!!transferMaquina}
@@ -474,12 +478,12 @@ export function MaquinasTab({
           setTransferMaquina(null);
           await cargar();
         }}
-      />
-      <NuevaMaquinaDialog
+      />}
+      {canManagePark && <NuevaMaquinaDialog
         open={nuevaMaquinaOpen}
         onOpenChange={setNuevaMaquinaOpen}
         onCreated={cargar}
-      />
+      />}
     </div>
   );
 }
