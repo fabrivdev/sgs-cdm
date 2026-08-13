@@ -126,6 +126,22 @@ export interface ResultadoRefrescoHistorial {
   productos_con_demanda: number;
 }
 
+export interface ResumenSugerenciaViva {
+  total_piezas: number;
+  piezas_sugeridas: number;
+  unidades_sugeridas: number;
+  piezas_nuevas_sin_historial: number;
+  piezas_sin_ventas_recientes: number;
+}
+
+export interface SugerenciaVivaResponse {
+  modelo: { id: string; version: number; nombre: string };
+  fecha_analisis: string;
+  resumen: ResumenSugerenciaViva;
+  total_filtrado: number;
+  rows: ResultadoSugerencia[];
+}
+
 const PAGE_SIZE = 50;
 
 function cleanSearch(value: string) {
@@ -230,6 +246,58 @@ export function useResultadosSugerencia(
       };
     },
   });
+}
+
+async function consultarSugerenciaViva(
+  marca: MarcaSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+  limite: number,
+  offset: number,
+) {
+  const { data, error } = await (supabase.rpc as any)("repuestos_sugerencia_viva", {
+    p_marca: marca,
+    p_fecha_analisis: fechaAnalisis,
+    p_buscar: filtros.buscar?.trim() || null,
+    p_segmento: filtros.segmento || "TODOS",
+    p_estado: filtros.estado || "TODOS",
+    p_solo_sugeridos: Boolean(filtros.soloSugeridos),
+    p_limite: limite,
+    p_offset: offset,
+  });
+  if (error) {
+    const details = [error.code ? `[${error.code}]` : null, error.message, error.details, error.hint].filter(Boolean);
+    throw new Error(details.join(" | ") || "No se pudo calcular la sugerencia en vivo");
+  }
+  return data as SugerenciaVivaResponse;
+}
+
+export function useSugerenciaViva(
+  marca: MarcaSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+  page: number,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["repuestos", "sugerencia-viva", marca, fechaAnalisis, filtros, page],
+    enabled: enabled && Boolean(fechaAnalisis),
+    queryFn: () => consultarSugerenciaViva(
+      marca,
+      fechaAnalisis,
+      filtros,
+      PAGE_SIZE,
+      (page - 1) * PAGE_SIZE,
+    ),
+  });
+}
+
+export function cargarSugerenciaViva(
+  marca: MarcaSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+) {
+  return consultarSugerenciaViva(marca, fechaAnalisis, filtros, 20000, 0);
 }
 
 export async function cargarTodosLosResultados(corridaId: string, filtros: FiltrosResultados) {

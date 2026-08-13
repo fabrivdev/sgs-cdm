@@ -9,7 +9,6 @@ import {
   Download,
   Loader2,
   PackageCheck,
-  Play,
   RefreshCw,
   Settings2,
   ShoppingCart,
@@ -28,23 +27,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  cargarTodosLosResultados,
+  cargarSugerenciaViva,
   crearVersionModelo,
-  ejecutarSugerencia,
   guardarPlanificacionArticulo,
   refrescarHistorialUnificado,
-  type CorridaSugerencia,
   type FiltrosResultados,
   type MarcaSugerencia,
   type ModeloSugerencia,
   type ResultadoSugerencia,
   type SegmentoSugerencia,
-  useCorridasSugerencia,
   useCalidadHistorialRepuestos,
   useModeloActivo,
-  useResultadosSugerencia,
+  useSugerenciaViva,
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cardLabel, metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
@@ -132,7 +129,8 @@ function ModelConfigSheet({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencias", "modelo"] });
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencias", "segmentos"] });
-      toast.success("Nueva versión del modelo activada. Ejecutá una corrida para aplicar los cambios.");
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
+      toast.success("Nueva versión activada. La sugerencia en vivo ya usa estos parámetros.");
       onOpenChange(false);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo guardar el modelo"),
@@ -144,7 +142,7 @@ function ModelConfigSheet({
         <SheetHeader>
           <SheetTitle>Parámetros del modelo {model?.marca}</SheetTitle>
           <SheetDescription>
-            Cada guardado crea una versión nueva. Las corridas anteriores conservan sus parámetros originales.
+            Cada guardado crea una versión nueva y el cálculo en vivo se actualiza automáticamente.
           </SheetDescription>
         </SheetHeader>
         {!model ? (
@@ -250,7 +248,7 @@ function ResultDetailSheet({
       observaciones: notes,
     }),
     onSuccess: () => {
-      toast.success("Datos de planificación guardados. La corrida actual no cambia; recalculá para aplicarlos.");
+      toast.success("Datos guardados. La sugerencia en vivo se está actualizando.");
       onSaved();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo guardar"),
@@ -347,7 +345,6 @@ export default function RepuestosSugerencias() {
   const canManage = isAdmin || isJefatura || isSuperAdmin;
   const [brand, setBrand] = useState<MarcaSugerencia>("CLAAS");
   const [analysisDate, setAnalysisDate] = useState(analysisDateDefault);
-  const [runId, setRunId] = useState<string>();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
@@ -355,40 +352,28 @@ export default function RepuestosSugerencias() {
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
-  const runsQuery = useCorridasSugerencia(brand);
   const historyQualityQuery = useCalidadHistorialRepuestos(brand);
-
-  useEffect(() => {
-    setRunId(runsQuery.data?.[0]?.id);
-    setPage(1);
-  }, [brand, runsQuery.data]);
-
-  const activeRun = useMemo(
-    () => runsQuery.data?.find((run) => run.id === runId) ?? null,
-    [runId, runsQuery.data],
+  const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
+  const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
+  const liveQuery = useSugerenciaViva(
+    brand,
+    analysisDate,
+    liveFilters,
+    page,
+    Boolean(historyQualityQuery.data?.preparado && modelQuery.data),
   );
-  const resultsQuery = useResultadosSugerencia(runId, filters, page);
-  const rows = resultsQuery.data?.rows ?? [];
-  const totalPages = Math.max(1, Math.ceil((resultsQuery.data?.count ?? 0) / (resultsQuery.data?.pageSize ?? 50)));
+  const rows = liveQuery.data?.rows ?? [];
+  const liveSummary = liveQuery.data?.resumen;
+  const totalPages = Math.max(1, Math.ceil((liveQuery.data?.total_filtrado ?? 0) / 50));
   const segmentOptions = useMemo(() => [
     ...(segmentsQuery.data?.map((segment) => segment.segmento) ?? []),
   ], [segmentsQuery.data]);
-
-  const run = useMutation({
-    mutationFn: () => ejecutarSugerencia(brand, analysisDate),
-    onSuccess: async (newId) => {
-      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencias", "corridas", brand] });
-      setRunId(newId);
-      setPage(1);
-      toast.success("Sugerencia global calculada");
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el modelo"),
-  });
 
   const refreshHistory = useMutation({
     mutationFn: refrescarHistorialUnificado,
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       toast.success(
         `Historial preparado: ${integer.format(result.confirmadas)} líneas confirmadas, ${integer.format(result.ambiguas)} ambiguas y ${integer.format(result.sin_coincidencia)} sin coincidencia.`,
         { duration: 9000 },
@@ -399,8 +384,8 @@ export default function RepuestosSugerencias() {
 
   const exportMutation = useMutation({
     mutationFn: async () => {
-      if (!runId) throw new Error("No hay una corrida para exportar");
-      const all = await cargarTodosLosResultados(runId, filters);
+      const response = await cargarSugerenciaViva(brand, analysisDate, liveFilters);
+      const all = response.rows;
       const XLSX = await import("xlsx");
       const exportRows = all.map((row) => ({
         "Código interno": row.producto_codigo,
@@ -432,21 +417,12 @@ export default function RepuestosSugerencias() {
       const sheet = XLSX.utils.json_to_sheet(exportRows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, "Sugerencia");
-      XLSX.writeFile(workbook, `sugerencia-compra-${brand.toLowerCase()}-${activeRun?.fecha_analisis ?? analysisDate}.xlsx`);
+      XLSX.writeFile(workbook, `sugerencia-compra-${brand.toLowerCase()}-${analysisDate}.xlsx`);
     },
     onSuccess: () => toast.success("Excel exportado"),
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo exportar"),
   });
 
-  const sourceDate = activeRun?.fuentes_snapshot?.ventas_hasta as string | undefined;
-  const staleSales = sourceDate && new Date(sourceDate) < new Date(new Date(activeRun!.fecha_analisis).setMonth(new Date(activeRun!.fecha_analisis).getMonth() - 2));
-  const noSalesCount = activeRun
-    ? Number(activeRun.piezas_nuevas_sin_historial ?? 0)
-      + Number(activeRun.piezas_sin_ventas_recientes ?? activeRun.piezas_sin_ventas ?? 0)
-    : 0;
-  const suspiciousHistoryCoverage = Boolean(
-    activeRun?.total_piezas && noSalesCount / activeRun.total_piezas >= 0.7,
-  );
   const historyQuality = historyQualityQuery.data;
   const confirmedHistoryRate = historyQuality?.lineas_totales
     ? (historyQuality.confirmadas / historyQuality.lineas_totales) * 100
@@ -462,25 +438,28 @@ export default function RepuestosSugerencias() {
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <Label className={cardLabel}>Marca</Label>
-            <Select value={brand} onValueChange={(value) => setBrand(value as MarcaSugerencia)}>
+            <Select value={brand} onValueChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}>
               <SelectTrigger className="mt-1 w-32"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="CLAAS">CLAAS</SelectItem><SelectItem value="HORSCH">HORSCH</SelectItem></SelectContent>
             </Select>
           </div>
           <div>
             <Label className={cardLabel}>Corte del análisis</Label>
-            <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => setAnalysisDate(event.target.value)} />
+            <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => { setAnalysisDate(event.target.value); setPage(1); }} />
           </div>
           <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
-          <Button onClick={() => run.mutate()} disabled={!canManage || run.isPending || !modelQuery.data}>
-            {run.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-            Calcular sugerencia
-          </Button>
+          <div className="flex h-10 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary">
+            <span className="relative flex h-2.5 w-2.5">
+              {liveQuery.isFetching && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />}
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+            </span>
+            Cálculo en vivo
+          </div>
         </div>
       </div>
 
-      {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>Solo Admin y Jefatura pueden cambiar parámetros, mínimos estratégicos o ejecutar una nueva corrida.</AlertDescription></Alert>}
-      {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá el SQL de la migración para habilitar modelos y corridas.</AlertDescription></Alert>}
+      {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
+      {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
 
       <Card>
         <CardContent className="p-4">
@@ -521,39 +500,33 @@ export default function RepuestosSugerencias() {
       </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard label="Piezas analizadas" value={integer.format(activeRun?.total_piezas ?? 0)} />
-        <MetricCard label="Piezas sugeridas" value={integer.format(activeRun?.piezas_sugeridas ?? 0)} tone="green" />
-        <MetricCard label="Unidades sugeridas" value={integer.format(activeRun?.unidades_sugeridas ?? 0)} tone="green" />
-        <MetricCard label="Nuevos sin historial" value={integer.format(activeRun?.piezas_nuevas_sin_historial ?? 0)} tone="amber" />
-        <MetricCard label="Anteriores sin ventas 24m" value={integer.format(activeRun?.piezas_sin_ventas_recientes ?? activeRun?.piezas_sin_ventas ?? 0)} />
+        <MetricCard label="Piezas analizadas" value={integer.format(liveSummary?.total_piezas ?? 0)} />
+        <MetricCard label="Piezas sugeridas" value={integer.format(liveSummary?.piezas_sugeridas ?? 0)} tone="green" />
+        <MetricCard label="Unidades sugeridas" value={integer.format(liveSummary?.unidades_sugeridas ?? 0)} tone="green" />
+        <MetricCard label="Nuevos sin historial" value={integer.format(liveSummary?.piezas_nuevas_sin_historial ?? 0)} tone="amber" />
+        <MetricCard label="Anteriores sin ventas 24m" value={integer.format(liveSummary?.piezas_sin_ventas_recientes ?? 0)} />
       </div>
 
-      {activeRun && (
+      {liveQuery.data && (
         <Card>
-          <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-end">
+          <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1">
-              <Label className={cardLabel}>Corrida consultada</Label>
-              <Select value={runId} onValueChange={(value) => { setRunId(value); setPage(1); }}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>{runsQuery.data?.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre} · modelo v{String((item.parametros_snapshot as { version?: number }).version ?? "?")}</SelectItem>)}</SelectContent>
-              </Select>
+              <p className={cardLabel}>Modelo activo</p>
+              <p className="mt-1 text-sm font-semibold">{liveQuery.data.modelo.nombre} · v{liveQuery.data.modelo.version}</p>
             </div>
             <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Ventas hasta <strong className="text-foreground">{displayDate(sourceDate)}</strong> · stock importado <strong className="text-foreground">{displayDate(activeRun.fuentes_snapshot?.stock_importado_en as string | undefined)}</strong>
+              Recalculado sobre el historial confirmado al corte <strong className="text-foreground">{displayDate(liveQuery.data.fecha_analisis)}</strong>
             </div>
             <Button variant="outline" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar</Button>
           </CardContent>
         </Card>
       )}
 
-      {staleSales && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Histórico desactualizado</AlertTitle><AlertDescription>La última factura detectada es anterior al período esperado. Actualizá la importación antes de tomar una decisión.</AlertDescription></Alert>}
-      {suspiciousHistoryCoverage && (
+      {liveQuery.error && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Cobertura histórica insuficiente</AlertTitle>
-          <AlertDescription>
-            {integer.format(noSalesCount)} de {integer.format(activeRun?.total_piezas ?? 0)} piezas no tienen ventas vinculadas en 24 meses. No tomes esta corrida como propuesta final: verificá que el SQL v2.1 esté aplicado, generá una corrida nueva y, si persiste, revisaremos las coincidencias entre facturación y maestro.
-          </AlertDescription>
+          <AlertTitle>No se pudo actualizar el cálculo en vivo</AlertTitle>
+          <AlertDescription>{liveQuery.error instanceof Error ? liveQuery.error.message : "Aplicá la migración del motor en vivo."}</AlertDescription>
         </Alert>
       )}
 
@@ -567,7 +540,7 @@ export default function RepuestosSugerencias() {
             </Select>
             <Select value={filters.estado} onValueChange={(value) => { setFilters((current) => ({ ...current, estado: value })); setPage(1); }}>
               <SelectTrigger><SelectValue placeholder="Estado de datos" /></SelectTrigger>
-              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Con historial reciente</SelectItem><SelectItem value="CODIGO_NUEVO_SIN_HISTORIAL">Nuevos sin historial</SelectItem><SelectItem value="SIN_VENTAS_RECIENTES">Anteriores sin ventas 24m</SelectItem><SelectItem value="SIN_VENTAS_24M">Sin ventas 24m (corridas anteriores)</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Con historial reciente</SelectItem><SelectItem value="CODIGO_NUEVO_SIN_HISTORIAL">Nuevos sin historial</SelectItem><SelectItem value="SIN_VENTAS_RECIENTES">Anteriores sin ventas 24m</SelectItem></SelectContent>
             </Select>
             <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-xs font-medium"><Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />Solo con sugerencia</label>
           </div>
@@ -575,12 +548,12 @@ export default function RepuestosSugerencias() {
       </Card>
 
       <Card className="overflow-hidden">
-        {!runId ? (
-          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Todavía no hay corridas para {brand}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">Aplicá el SQL y ejecutá la primera sugerencia. El cálculo no crea pedidos: solo construye una propuesta revisable.</p></div>
-        ) : resultsQuery.isLoading ? (
+        {!historyQuality?.preparado ? (
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
+        ) : liveQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
-        ) : resultsQuery.error ? (
-          <div className="p-6 text-sm text-destructive">{resultsQuery.error instanceof Error ? resultsQuery.error.message : "No se pudieron cargar los resultados"}</div>
+        ) : liveQuery.error ? (
+          <div className="p-6 text-sm text-destructive">{liveQuery.error instanceof Error ? liveQuery.error.message : "No se pudo calcular la sugerencia en vivo"}</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -620,15 +593,18 @@ export default function RepuestosSugerencias() {
                 </TableBody>
               </Table>
             </div>
-            <div className="flex items-center justify-between border-t px-4 py-3"><p className={metaText}>{integer.format(resultsQuery.data?.count ?? 0)} piezas · página {page} de {totalPages}</p><div className="flex gap-1"><Button size="icon" variant="outline" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button size="icon" variant="outline" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
+            <div className="flex items-center justify-between border-t px-4 py-3"><p className={metaText}>{integer.format(liveQuery.data?.total_filtrado ?? 0)} piezas · página {page} de {totalPages}</p><div className="flex gap-1"><Button size="icon" variant="outline" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button size="icon" variant="outline" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
           </>
         )}
       </Card>
 
-      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Primera etapa: stock actual y ventas históricas. Tránsito, precios, devoluciones, garantías y MOQ quedan visibles como extensiones pendientes, sin inventar datos.</div>
+      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Motor en vivo sobre stock global y ventas confirmadas. Tránsito, precios, garantías y MOQ permanecen como extensiones pendientes, sin inventar datos.</div>
 
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
-      <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => setSelected(null)} />
+      <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {
+        void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
+        setSelected(null);
+      }} />
     </div>
   );
 }
