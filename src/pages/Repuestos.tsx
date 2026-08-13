@@ -771,7 +771,19 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                             <TableCell className={cn(td, "whitespace-nowrap")}>{fechaVentaLabel(linea.fecha_factura)}</TableCell>
                             <TableCell className={cn(td, "whitespace-nowrap font-mono text-[10px]")}>{linea.factura || "Sin número"}</TableCell>
                             <TableCell className={cn(td, "max-w-48 truncate")}>{linea.cliente || "Sin cliente"}</TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>{cantidad.toLocaleString("es-PY")}</TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span>{cantidad.toLocaleString("es-PY")}</span>
+                                {linea.conversion_aplicada && (
+                                  <span
+                                    className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold text-amber-700"
+                                    title={`${Number(linea.cantidad_original || 0).toLocaleString("es-PY")} ${linea.unidad_original || ""} x ${linea.factor_conversion} = ${cantidad.toLocaleString("es-PY")} ${linea.unidad_destino || ""}`}
+                                  >
+                                    {linea.unidad_original}-{">"}{linea.unidad_destino}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className={cn(td, "text-right tabular-nums")}>
                               {precioUnitario === null ? "—" : precioUnitario.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
                             </TableCell>

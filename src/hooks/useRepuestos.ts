@@ -31,6 +31,7 @@ export interface VentaRepuestoHistorial {
   producto_codigo_fabricante: string | null;
   fecha_factura: string;
   cantidad: number;
+  cantidad_original?: number;
   total_venta_usd: number;
   cliente: string | null;
   sucursal: string | null;
@@ -39,7 +40,13 @@ export interface VentaRepuestoHistorial {
   codigo_fabricante_facturado: string | null;
   descripcion_facturada: string | null;
   origen_sistema: string;
+  conversion_aplicada?: boolean;
+  factor_conversion?: number;
+  unidad_original?: string | null;
+  unidad_destino?: string | null;
+  regla_conversion?: string | null;
   metodo_vinculo:
+    | "vinculacion_confirmada"
     | "codigo_fabricante"
     | "codigo_interno"
     | "codigo_facturado_fabricante"
