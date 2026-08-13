@@ -12,7 +12,7 @@ export function PageHeader({ title, actions, tabs, meta, className }: { title: R
 }
 
 export function KpiStrip({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("grid overflow-hidden rounded-lg border bg-card shadow-sm divide-y sm:divide-x sm:divide-y-0", className)}>{children}</div>;
+  return <div className={cn("grid overflow-hidden rounded-lg border bg-card shadow-sm divide-y sm:grid-flow-col sm:auto-cols-fr sm:divide-x sm:divide-y-0", className)}>{children}</div>;
 }
 
 export function KpiItem({ label, value, detail, tone = "default", icon, className }: { label: ReactNode; value: ReactNode; detail?: ReactNode; tone?: "default" | "positive" | "info" | "warning" | "danger"; icon?: ReactNode; className?: string }) {
