@@ -398,7 +398,11 @@ SELECT
         THEN upper(to_jsonb(f) ->> 'marca_normalizada')::public.marca
       ELSE NULL
     END,
-    public.facturacion_marca_por_grupo(f.grupo)
+    CASE
+      WHEN coalesce(f.grupo, '') ~* 'CLAAS' THEN 'CLAAS'::public.marca
+      WHEN coalesce(f.grupo, '') ~* 'HORSCH' THEN 'HORSCH'::public.marca
+      ELSE 'OTROS'::public.marca
+    END
   ),
   f.tipo,
   CASE
