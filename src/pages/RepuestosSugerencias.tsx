@@ -5,10 +5,12 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
+  Database,
   Download,
   Loader2,
   PackageCheck,
   Play,
+  RefreshCw,
   Settings2,
   ShoppingCart,
 } from "lucide-react";
@@ -30,6 +32,7 @@ import {
   crearVersionModelo,
   ejecutarSugerencia,
   guardarPlanificacionArticulo,
+  refrescarHistorialUnificado,
   type CorridaSugerencia,
   type FiltrosResultados,
   type MarcaSugerencia,
@@ -37,6 +40,7 @@ import {
   type ResultadoSugerencia,
   type SegmentoSugerencia,
   useCorridasSugerencia,
+  useCalidadHistorialRepuestos,
   useModeloActivo,
   useResultadosSugerencia,
   useSegmentosModelo,
@@ -352,6 +356,7 @@ export default function RepuestosSugerencias() {
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
   const runsQuery = useCorridasSugerencia(brand);
+  const historyQualityQuery = useCalidadHistorialRepuestos(brand);
 
   useEffect(() => {
     setRunId(runsQuery.data?.[0]?.id);
@@ -378,6 +383,18 @@ export default function RepuestosSugerencias() {
       toast.success("Sugerencia global calculada");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el modelo"),
+  });
+
+  const refreshHistory = useMutation({
+    mutationFn: refrescarHistorialUnificado,
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
+      toast.success(
+        `Historial preparado: ${integer.format(result.confirmadas)} líneas confirmadas, ${integer.format(result.ambiguas)} ambiguas y ${integer.format(result.sin_coincidencia)} sin coincidencia.`,
+        { duration: 9000 },
+      );
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial"),
   });
 
   const exportMutation = useMutation({
@@ -430,6 +447,10 @@ export default function RepuestosSugerencias() {
   const suspiciousHistoryCoverage = Boolean(
     activeRun?.total_piezas && noSalesCount / activeRun.total_piezas >= 0.7,
   );
+  const historyQuality = historyQualityQuery.data;
+  const confirmedHistoryRate = historyQuality?.lineas_totales
+    ? (historyQuality.confirmadas / historyQuality.lineas_totales) * 100
+    : 0;
 
   return (
     <div className={pageShellWide}>
@@ -460,6 +481,44 @@ export default function RepuestosSugerencias() {
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>Solo Admin y Jefatura pueden cambiar parámetros, mínimos estratégicos o ejecutar una nueva corrida.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá el SQL de la migración para habilitar modelos y corridas.</AlertDescription></Alert>}
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Database className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Historial unificado y auditable</h2>
+                <Badge variant="outline">Base del motor en vivo</Badge>
+              </div>
+              {historyQualityQuery.isError ? (
+                <p className="mt-2 text-xs text-muted-foreground">Aplicá la migración de historial auditable para habilitar el diagnóstico de coincidencias.</p>
+              ) : historyQuality?.preparado ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {decimal.format(confirmedHistoryRate)}% confirmado · actualizado {displayDate(historyQuality.actualizado_en)} · datos {displayDate(historyQuality.fecha_desde)} a {displayDate(historyQuality.fecha_hasta)}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">La estructura está disponible, pero todavía falta preparar el primer historial consolidado.</p>
+              )}
+            </div>
+            {canManage && !historyQualityQuery.isError && (
+              <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending}>
+                {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                {historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
+              </Button>
+            )}
+          </div>
+          {historyQuality?.preparado && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div><p className={cardLabel}>Líneas evaluadas</p><p className="mt-1 text-lg font-semibold">{integer.format(historyQuality.lineas_totales)}</p></div>
+              <div><p className={cardLabel}>Confirmadas</p><p className="mt-1 text-lg font-semibold text-emerald-600">{integer.format(historyQuality.confirmadas)}</p></div>
+              <div><p className={cardLabel}>Ambiguas</p><p className="mt-1 text-lg font-semibold text-amber-600">{integer.format(historyQuality.ambiguas)}</p></div>
+              <div><p className={cardLabel}>Sin coincidencia</p><p className="mt-1 text-lg font-semibold text-destructive">{integer.format(historyQuality.sin_coincidencia)}</p></div>
+              <div><p className={cardLabel}>Productos confirmados</p><p className="mt-1 text-lg font-semibold">{integer.format(historyQuality.productos_confirmados)}</p></div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Piezas analizadas" value={integer.format(activeRun?.total_piezas ?? 0)} />

@@ -105,6 +105,27 @@ export interface FiltrosResultados {
   soloSugeridos?: boolean;
 }
 
+export interface CalidadHistorialRepuestos {
+  preparado: boolean;
+  lineas_totales: number;
+  confirmadas: number;
+  ambiguas: number;
+  sin_coincidencia: number;
+  productos_confirmados: number;
+  fecha_desde: string | null;
+  fecha_hasta: string | null;
+  actualizado_en: string | null;
+}
+
+export interface ResultadoRefrescoHistorial {
+  actualizacion_id: number;
+  lineas_totales: number;
+  confirmadas: number;
+  ambiguas: number;
+  sin_coincidencia: number;
+  productos_con_demanda: number;
+}
+
 const PAGE_SIZE = 50;
 
 function cleanSearch(value: string) {
@@ -170,6 +191,20 @@ export function useCorridasSugerencia(marca: MarcaSugerencia) {
   });
 }
 
+export function useCalidadHistorialRepuestos(marca: MarcaSugerencia) {
+  return useQuery({
+    queryKey: ["repuestos", "historial-unificado", "calidad", marca],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", {
+        p_marca: marca,
+      });
+      if (error) throw error;
+      return data as CalidadHistorialRepuestos;
+    },
+    retry: false,
+  });
+}
+
 export function useResultadosSugerencia(
   corridaId: string | undefined,
   filtros: FiltrosResultados,
@@ -226,6 +261,12 @@ export async function ejecutarSugerencia(marca: MarcaSugerencia, fechaAnalisis: 
   });
   if (error) throw error;
   return data as string;
+}
+
+export async function refrescarHistorialUnificado() {
+  const { data, error } = await (supabase.rpc as any)("repuestos_refrescar_historial_unificado");
+  if (error) throw error;
+  return data as ResultadoRefrescoHistorial;
 }
 
 export async function guardarPlanificacionArticulo(input: {
