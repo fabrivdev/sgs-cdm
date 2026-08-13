@@ -76,8 +76,9 @@ function displayDate(value?: string | null) {
 }
 
 function coberturaActualMeses(row: ResultadoSugerencia) {
-  if (row.demanda_ponderada_mensual <= 0) return null;
-  return Math.max(0, row.stock_global / row.demanda_ponderada_mensual);
+  const ritmoActualMensual = Math.max(0, row.unidades_12m) / 12;
+  if (ritmoActualMensual <= 0) return null;
+  return Math.max(0, row.stock_global / ritmoActualMensual);
 }
 
 function MetricCard({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "green" | "amber" }) {
@@ -422,6 +423,13 @@ export default function RepuestosSugerencias() {
 
   const sourceDate = activeRun?.fuentes_snapshot?.ventas_hasta as string | undefined;
   const staleSales = sourceDate && new Date(sourceDate) < new Date(new Date(activeRun!.fecha_analisis).setMonth(new Date(activeRun!.fecha_analisis).getMonth() - 2));
+  const noSalesCount = activeRun
+    ? Number(activeRun.piezas_nuevas_sin_historial ?? 0)
+      + Number(activeRun.piezas_sin_ventas_recientes ?? activeRun.piezas_sin_ventas ?? 0)
+    : 0;
+  const suspiciousHistoryCoverage = Boolean(
+    activeRun?.total_piezas && noSalesCount / activeRun.total_piezas >= 0.7,
+  );
 
   return (
     <div className={pageShellWide}>
@@ -480,6 +488,15 @@ export default function RepuestosSugerencias() {
       )}
 
       {staleSales && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Histórico desactualizado</AlertTitle><AlertDescription>La última factura detectada es anterior al período esperado. Actualizá la importación antes de tomar una decisión.</AlertDescription></Alert>}
+      {suspiciousHistoryCoverage && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Cobertura histórica insuficiente</AlertTitle>
+          <AlertDescription>
+            {integer.format(noSalesCount)} de {integer.format(activeRun?.total_piezas ?? 0)} piezas no tienen ventas vinculadas en 24 meses. No tomes esta corrida como propuesta final: verificá que el SQL v2.1 esté aplicado, generá una corrida nueva y, si persiste, revisaremos las coincidencias entre facturación y maestro.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardContent className="p-3">
@@ -533,7 +550,7 @@ export default function RepuestosSugerencias() {
                         <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_24m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
                         <TableCell className="text-right">
                           <p className="font-medium">{cobertura === null ? "—" : `${decimal.format(cobertura)} meses`}</p>
-                          <p className="text-[10px] text-muted-foreground">Horizonte {row.horizonte_meses} meses</p>
+                          <p className="text-[10px] text-muted-foreground">Al ritmo 12m · horizonte {row.horizonte_meses} meses</p>
                         </TableCell>
                         <TableCell className="text-right font-medium">{decimal.format(row.stock_objetivo)}</TableCell>
                         <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-bold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
