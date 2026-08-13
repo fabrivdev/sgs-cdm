@@ -548,7 +548,10 @@ export default function Calendario() {
   };
 
   return (
-    <div className="w-full space-y-3 px-3 py-3 sm:px-4 lg:px-5">
+    <div className={cn(
+      "w-full space-y-3 px-3 py-3 sm:px-4 lg:px-5",
+      vista === "mes" && "md:flex md:h-[calc(100svh-48px)] md:flex-col md:gap-2 md:space-y-0 md:overflow-hidden md:py-2",
+    )}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Calendario</h1>
@@ -750,7 +753,7 @@ export default function Calendario() {
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-card to-transparent md:hidden" aria-hidden />
         </div>
       ) : (
-      <Card className="overflow-hidden">
+      <Card className={cn("overflow-hidden", vista === "mes" && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
         <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
             <div
@@ -765,7 +768,10 @@ export default function Calendario() {
           ))}
         </div>
 
-        <div className={cn("grid grid-cols-7", vista === "semana" && "auto-rows-fr")}>
+        <div
+          className={cn("grid grid-cols-7", vista === "semana" && "auto-rows-fr", vista === "mes" && "md:min-h-0 md:flex-1")}
+          style={vista === "mes" ? { gridTemplateRows: `repeat(${Math.ceil(days.length / 7)}, minmax(0, 1fr))` } : undefined}
+        >
           {days.map((d) => {
             const evs = eventsForDay(d);
             const isCur = isSameMonth(d, cursor);
@@ -810,7 +816,7 @@ export default function Calendario() {
                 }}
                 className={cn(
                   "relative border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[110px]",
+                  esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[88px] md:min-h-0 md:overflow-hidden",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
                   esNL && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
                   esNL && !isCur && vista === "mes" && "bg-slate-200/70 text-slate-500",
