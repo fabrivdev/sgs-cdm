@@ -383,35 +383,51 @@ INSERT INTO public.facturacion_lineas_importadas(
   raw_data
 )
 SELECT
-  f.importacion_id,
+  NULL::uuid,
   'legacy_facturacion_detalle',
-  coalesce(f.codigo_interno_factura, f.cod_factura),
+  coalesce(nullif(to_jsonb(f) ->> 'codigo_interno_factura', ''), f.cod_factura),
   f.cod_factura,
   f.entidad_nombre,
   f.fecha::timestamptz,
   f.sucursal,
   f.grupo,
-  coalesce(f.grupo_normalizado, f.grupo),
-  coalesce(f.marca_normalizada, public.facturacion_marca_por_grupo(f.grupo)),
+  coalesce(nullif(to_jsonb(f) ->> 'grupo_normalizado', ''), f.grupo),
+  coalesce(
+    CASE
+      WHEN upper(nullif(to_jsonb(f) ->> 'marca_normalizada', '')) IN ('CLAAS', 'HORSCH', 'OTROS')
+        THEN upper(to_jsonb(f) ->> 'marca_normalizada')::public.marca
+      ELSE NULL
+    END,
+    public.facturacion_marca_por_grupo(f.grupo)
+  ),
   f.tipo,
-  CASE WHEN f.tipo_tiempo IN ('Cliente', 'Garantia', 'Interno') THEN f.tipo_tiempo ELSE 'Cliente' END,
-  f.observacion,
-  f.cod_mercaderia,
+  CASE
+    WHEN to_jsonb(f) ->> 'tipo_tiempo' IN ('Cliente', 'Garantia', 'Interno')
+      THEN to_jsonb(f) ->> 'tipo_tiempo'
+    ELSE 'Cliente'
+  END,
+  nullif(to_jsonb(f) ->> 'observacion', ''),
+  nullif(to_jsonb(f) ->> 'cod_mercaderia', ''),
   coalesce(f.cantidad, 0),
   coalesce(f.total_venta, 0),
-  f.moneda,
+  nullif(to_jsonb(f) ->> 'moneda', ''),
   jsonb_build_object('facturacion_id', f.id, 'fuente', 'facturacion')
 FROM public.facturacion f
-WHERE NOT coalesce(f.excluido_de_reportes, false)
-  AND public.es_linea_facturacion_repuesto(f.tipo, f.grupo_normalizado, f.grupo)
-  AND nullif(trim(f.cod_mercaderia), '') IS NOT NULL
+WHERE NOT coalesce((to_jsonb(f) ->> 'excluido_de_reportes')::boolean, false)
+  AND public.es_linea_facturacion_repuesto(
+    f.tipo,
+    nullif(to_jsonb(f) ->> 'grupo_normalizado', ''),
+    f.grupo
+  )
+  AND nullif(trim(to_jsonb(f) ->> 'cod_mercaderia'), '') IS NOT NULL
   AND NOT EXISTS (
     SELECT 1
     FROM public.facturacion_lineas_importadas d
-    WHERE coalesce(d.codigo_interno_factura, d.factura) = coalesce(f.codigo_interno_factura, f.cod_factura)
+    WHERE coalesce(d.codigo_interno_factura, d.factura)
+          = coalesce(nullif(to_jsonb(f) ->> 'codigo_interno_factura', ''), f.cod_factura)
       AND d.fecha_factura::date = f.fecha
       AND public.normalizar_codigo_repuesto_flexible(d.cod_mercaderia)
-          = public.normalizar_codigo_repuesto_flexible(f.cod_mercaderia)
+          = public.normalizar_codigo_repuesto_flexible(to_jsonb(f) ->> 'cod_mercaderia')
   )
 ON CONFLICT (origen_sistema, linea_hash) DO NOTHING;
 
