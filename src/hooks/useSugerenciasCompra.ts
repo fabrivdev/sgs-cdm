@@ -299,12 +299,40 @@ export function useSugerenciaViva(
   });
 }
 
-export function cargarSugerenciaViva(
+export async function cargarSugerenciaViva(
   marca: MarcaSugerencia,
   fechaAnalisis: string,
   filtros: FiltrosResultados,
+  onProgress?: (loaded: number, total: number) => void,
 ) {
-  return consultarSugerenciaViva(marca, fechaAnalisis, filtros, 20000, 0);
+  const chunkSize = 1000;
+  const rows: ResultadoSugerencia[] = [];
+  let offset = 0;
+  let latest: SugerenciaVivaResponse | null = null;
+
+  while (true) {
+    let response: SugerenciaVivaResponse | null = null;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        response = await consultarSugerenciaViva(marca, fechaAnalisis, filtros, chunkSize, offset);
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
+      }
+    }
+    if (!response) throw lastError instanceof Error ? lastError : new Error("No se pudo completar la exportación");
+
+    latest = response;
+    rows.push(...response.rows);
+    onProgress?.(rows.length, response.total_filtrado);
+    offset += response.rows.length;
+    if (response.rows.length === 0 || rows.length >= response.total_filtrado) break;
+  }
+
+  if (!latest) throw new Error("No se encontraron resultados para exportar");
+  return { ...latest, rows };
 }
 
 export async function cargarTodosLosResultados(corridaId: string, filtros: FiltrosResultados) {

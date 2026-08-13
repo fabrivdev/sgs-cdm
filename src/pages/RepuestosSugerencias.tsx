@@ -396,10 +396,13 @@ export default function RepuestosSugerencias() {
 
   const exportMutation = useMutation({
     mutationFn: async () => {
-      const response = await cargarSugerenciaViva(brand, analysisDate, liveFilters);
-      const all = response.rows;
-      const XLSX = await import("xlsx");
-      const exportRows = all.map((row) => ({
+      const toastId = toast.loading("Preparando exportación…");
+      try {
+        const response = await cargarSugerenciaViva(brand, analysisDate, liveFilters, (loaded, total) => {
+          toast.loading(`Descargando ${integer.format(Math.min(loaded, total))} de ${integer.format(total)} piezas…`, { id: toastId });
+        });
+        const XLSX = await import("xlsx");
+        const exportRows = response.rows.map((row) => ({
         "Código interno": row.producto_codigo,
         "Código fabricante": row.codigo_fabricante,
         Descripción: row.descripcion,
@@ -425,11 +428,14 @@ export default function RepuestosSugerencias() {
         "Stock seguridad": row.stock_seguridad,
         "Stock objetivo": row.stock_objetivo,
         "Sugerencia unidades": row.sugerencia_unidades,
-      }));
-      const sheet = XLSX.utils.json_to_sheet(exportRows);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, sheet, "Sugerencia");
-      XLSX.writeFile(workbook, `sugerencia-compra-${brand.toLowerCase()}-${analysisDate}.xlsx`);
+        }));
+        const sheet = XLSX.utils.json_to_sheet(exportRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, sheet, "Sugerencia");
+        XLSX.writeFile(workbook, `sugerencia-compra-${brand.toLowerCase()}-${analysisDate}.xlsx`);
+      } finally {
+        toast.dismiss(toastId);
+      }
     },
     onSuccess: () => toast.success("Excel exportado"),
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo exportar"),
