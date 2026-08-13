@@ -375,9 +375,10 @@ export default function RepuestosSugerencias() {
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
-  const historyQualityQuery = useCalidadHistorialRepuestos(brand);
   const legacyMasterQuery = useEstadoMaestroLegacy();
   const legacyBillingQuery = useEstadoFacturacionHistorica();
+  const historySourceVersion = legacyBillingQuery.data?.completado_en ?? null;
+  const historyQualityQuery = useCalidadHistorialRepuestos(brand, historySourceVersion);
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
   const liveQuery = useSugerenciaViva(
@@ -391,6 +392,7 @@ export default function RepuestosSugerencias() {
       && legacyMasterQuery.data?.cargado
       && !historyRebuildRequired
     ),
+    historySourceVersion,
   );
   const rows = liveQuery.data?.rows ?? [];
   const liveSummary = liveQuery.data?.resumen;
@@ -448,8 +450,8 @@ export default function RepuestosSugerencias() {
       setLegacyBillingProgress(null);
       setHistoryRebuildRequired(false);
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "facturacion-historica", "estado"] });
-      await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
-      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
+      await queryClient.resetQueries({ queryKey: ["repuestos", "historial-unificado"] });
+      await queryClient.resetQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       toast.success(
         `Facturación histórica cargada: ${integer.format(result.lineas_vinculadas)} líneas vinculadas a ${integer.format(result.productos_vinculados)} productos.`,
         { duration: 12000 },

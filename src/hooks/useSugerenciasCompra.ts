@@ -253,9 +253,9 @@ export function useCorridasSugerencia(marca: MarcaSugerencia) {
   });
 }
 
-export function useCalidadHistorialRepuestos(marca: MarcaSugerencia) {
+export function useCalidadHistorialRepuestos(marca: MarcaSugerencia, sourceVersion?: string | null) {
   return useQuery({
-    queryKey: ["repuestos", "historial-unificado", "calidad", marca],
+    queryKey: ["repuestos", "historial-unificado", "calidad", marca, sourceVersion ?? "base"],
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", {
         p_marca: marca,
@@ -350,9 +350,10 @@ export function useSugerenciaViva(
   filtros: FiltrosResultados,
   page: number,
   enabled = true,
+  sourceVersion?: string | null,
 ) {
   return useQuery({
-    queryKey: ["repuestos", "sugerencia-viva", marca, fechaAnalisis, filtros, page],
+    queryKey: ["repuestos", "sugerencia-viva", marca, fechaAnalisis, filtros, page, sourceVersion ?? "base"],
     enabled: enabled && Boolean(fechaAnalisis),
     queryFn: () => consultarSugerenciaViva(
       marca,
@@ -432,7 +433,11 @@ export async function ejecutarSugerencia(marca: MarcaSugerencia, fechaAnalisis: 
 }
 
 export async function refrescarHistorialUnificado() {
-  const { data, error } = await (supabase.rpc as any)("repuestos_refrescar_historial_unificado");
+  const state = await (supabase.rpc as any)("repuestos_estado_facturacion_historica");
+  const rpcName = !state.error && state.data?.cargado
+    ? "repuestos_publicar_facturacion_historica"
+    : "repuestos_refrescar_historial_unificado";
+  const { data, error } = await (supabase.rpc as any)(rpcName);
   if (error) {
     const details = [
       error.code ? `[${error.code}]` : null,
@@ -441,6 +446,18 @@ export async function refrescarHistorialUnificado() {
       error.hint,
     ].filter(Boolean);
     throw new Error(details.join(" | ") || "No se pudo preparar el historial");
+  }
+  if (rpcName === "repuestos_publicar_facturacion_historica") {
+    const quality = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", { p_marca: null });
+    if (quality.error) throw new Error(mensajeErrorSupabase(quality.error, "No se pudo verificar el historial publicado"));
+    return {
+      actualizacion_id: 0,
+      lineas_totales: quality.data?.lineas_totales ?? data?.lineas_vinculadas ?? 0,
+      confirmadas: quality.data?.confirmadas ?? data?.lineas_vinculadas ?? 0,
+      ambiguas: quality.data?.ambiguas ?? 0,
+      sin_coincidencia: quality.data?.sin_coincidencia ?? 0,
+      productos_con_demanda: data?.productos_vinculados ?? 0,
+    } as ResultadoRefrescoHistorial;
   }
   return data as ResultadoRefrescoHistorial;
 }
