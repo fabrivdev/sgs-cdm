@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Settings2,
   ShoppingCart,
-  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -31,7 +30,6 @@ import {
   cargarSugerenciaViva,
   crearVersionModelo,
   guardarPlanificacionArticulo,
-  importarHistorialLegacy,
   refrescarHistorialUnificado,
   type FiltrosResultados,
   type MarcaSugerencia,
@@ -365,7 +363,6 @@ export default function RepuestosSugerencias() {
   const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
-  const [historyImportProgress, setHistoryImportProgress] = useState<{ loaded: number; total: number } | null>(null);
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
@@ -399,25 +396,6 @@ export default function RepuestosSugerencias() {
       void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial"),
-  });
-
-  const importLegacyHistory = useMutation({
-    mutationFn: (file: File) => importarHistorialLegacy(file, brand, (loaded, total) => {
-      setHistoryImportProgress({ loaded, total });
-    }),
-    onSuccess: async (result) => {
-      setHistoryImportProgress(null);
-      await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
-      void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
-      toast.success(
-        `Histórico ${brand} incorporado: ${integer.format(result.productos_vinculados)} productos asociados y ${integer.format(result.pendientes_revision)} movimientos preservados para revisión.`,
-        { duration: 12000 },
-      );
-    },
-    onError: (error) => {
-      setHistoryImportProgress(null);
-      toast.error(error instanceof Error ? error.message : "No se pudo importar el histórico");
-    },
   });
 
   const exportMutation = useMutation({
@@ -531,27 +509,7 @@ export default function RepuestosSugerencias() {
             </div>
             {canManage && !historyQualityQuery.isError && (
               <div className="flex flex-wrap gap-2">
-                <input
-                  id={`legacy-history-${brand}`}
-                  className="sr-only"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  disabled={importLegacyHistory.isPending}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) importLegacyHistory.mutate(file);
-                    event.target.value = "";
-                  }}
-                />
-                <Button asChild variant="outline" className={cn(importLegacyHistory.isPending && "pointer-events-none opacity-60")}>
-                  <label htmlFor={`legacy-history-${brand}`}>
-                    {importLegacyHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                    {historyImportProgress
-                      ? `${integer.format(historyImportProgress.loaded)} / ${integer.format(historyImportProgress.total)}`
-                      : `Importar histórico ${brand}`}
-                  </label>
-                </Button>
-                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || importLegacyHistory.isPending}>
+                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending}>
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   {historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
                 </Button>
