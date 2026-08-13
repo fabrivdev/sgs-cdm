@@ -1,6 +1,12 @@
 -- Permite reintentar inmediatamente la carga unica del maestro anterior
 -- cuando el navegador, la red o un lote RPC interrumpieron el intento previo.
 
+-- Desbloqueo inmediato del intento que motivo este parche. Las filas parciales
+-- quedan auditables bajo una carga FALLIDA y no participan del maestro activo.
+UPDATE public.repuestos_maestro_legacy_cargas
+SET estado = 'FALLIDO'
+WHERE estado = 'PROCESANDO';
+
 CREATE OR REPLACE FUNCTION public.repuestos_iniciar_maestro_legacy(p_archivo_nombre text)
 RETURNS uuid
 LANGUAGE plpgsql

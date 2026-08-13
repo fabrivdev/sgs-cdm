@@ -368,6 +368,7 @@ export default function RepuestosSugerencias() {
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [legacyMasterProgress, setLegacyMasterProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [historyRebuildRequired, setHistoryRebuildRequired] = useState(false);
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
@@ -380,7 +381,12 @@ export default function RepuestosSugerencias() {
     analysisDate,
     liveFilters,
     page,
-    Boolean(historyQualityQuery.data?.preparado && modelQuery.data),
+    Boolean(
+      historyQualityQuery.data?.preparado
+      && modelQuery.data
+      && legacyMasterQuery.data?.cargado
+      && !historyRebuildRequired
+    ),
   );
   const rows = liveQuery.data?.rows ?? [];
   const liveSummary = liveQuery.data?.resumen;
@@ -392,6 +398,7 @@ export default function RepuestosSugerencias() {
   const refreshHistory = useMutation({
     mutationFn: refrescarHistorialUnificado,
     onSuccess: async (result) => {
+      setHistoryRebuildRequired(false);
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
       toast.success(
         `Historial preparado: ${integer.format(result.confirmadas)} líneas confirmadas, ${integer.format(result.ambiguas)} ambiguas y ${integer.format(result.sin_coincidencia)} sin coincidencia.`,
@@ -401,10 +408,14 @@ export default function RepuestosSugerencias() {
       // longer and must not make the successful refresh look like a failure.
       void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial"),
+    onError: (error) => {
+      setHistoryRebuildRequired(false);
+      toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial");
+    },
   });
 
   const loadLegacyMaster = useMutation({
+    onMutate: () => setHistoryRebuildRequired(true),
     mutationFn: (file: File) => importarMaestroLegacy(file, (loaded, total) => {
       setLegacyMasterProgress({ loaded, total });
     }),
@@ -418,6 +429,7 @@ export default function RepuestosSugerencias() {
       refreshHistory.mutate();
     },
     onError: (error) => {
+      setHistoryRebuildRequired(false);
       setLegacyMasterProgress(null);
       toast.error(error instanceof Error ? error.message : "No se pudo cargar el maestro anterior");
     },
@@ -632,7 +644,11 @@ export default function RepuestosSugerencias() {
       </Card>
 
       <Card className="overflow-hidden">
-        {!historyQuality?.preparado ? (
+        {!legacyMasterQuery.isLoading && !legacyMasterQuery.data?.cargado ? (
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Upload className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Cargá el maestro anterior</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El cálculo en vivo permanecerá detenido para no consumir conexiones mientras se vinculan los códigos históricos.</p></div>
+        ) : historyRebuildRequired || refreshHistory.isPending ? (
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-sm text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
+        ) : !historyQuality?.preparado ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
         ) : liveQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
