@@ -102,6 +102,9 @@ export interface ResultadoSugerencia {
   stock_objetivo: number;
   necesidad_neta: number;
   sugerencia_unidades: number;
+  confianza_datos?: "ALTA" | "MEDIA" | "BAJA";
+  tipo_stock_seguridad?: "ESTADISTICA" | "ESTIMADA";
+  cobertura_aplicada_meses?: number;
   explicacion: Record<string, unknown>;
 }
 
@@ -139,6 +142,7 @@ export interface ResumenSugerenciaViva {
   unidades_sugeridas: number;
   piezas_nuevas_sin_historial: number;
   piezas_sin_ventas_recientes: number;
+  piezas_confianza_baja?: number;
 }
 
 export interface SugerenciaVivaResponse {

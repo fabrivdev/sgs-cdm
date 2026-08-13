@@ -280,6 +280,7 @@ function ResultDetailSheet({
                   ["Venta 12m", decimal.format(row.unidades_12m)],
                   ["Objetivo", decimal.format(row.stock_objetivo)],
                   ["Sugerencia", integer.format(row.sugerencia_unidades)],
+                  ["Confianza", row.confianza_datos ?? "—"],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border bg-muted/20 p-3">
                     <p className={cardLabel}>{label}</p>
@@ -315,7 +316,8 @@ function ResultDetailSheet({
                   <span>Demanda mensual <strong className="float-right text-foreground">{decimal.format(row.demanda_ponderada_mensual)}</strong></span>
                   <span>Horizonte <strong className="float-right text-foreground">{row.horizonte_meses} meses</strong></span>
                   <span>Demanda horizonte <strong className="float-right text-foreground">{decimal.format(row.demanda_horizonte)}</strong></span>
-                  <span>Stock seguridad <strong className="float-right text-foreground">{decimal.format(row.stock_seguridad)}</strong></span>
+                  <span>Stock seguridad <strong className="float-right text-foreground">{decimal.format(row.stock_seguridad)}{row.tipo_stock_seguridad === "ESTIMADA" ? " (estimada)" : ""}</strong></span>
+                  <span>Cobertura aplicada <strong className="float-right text-foreground">{decimal.format(row.cobertura_aplicada_meses ?? row.horizonte_meses)} meses</strong></span>
                   <span>Mínimo estratégico <strong className="float-right text-foreground">{decimal.format(row.stock_minimo_estrategico)}</strong></span>
                   <span>Tránsito <strong className="float-right text-foreground">0 (pendiente fuente)</strong></span>
                   <span>Necesidad neta <strong className="float-right text-foreground">{decimal.format(row.necesidad_neta)}</strong></span>
@@ -427,6 +429,10 @@ export default function RepuestosSugerencias() {
         "Horizonte meses": row.horizonte_meses,
         "Demanda horizonte": row.demanda_horizonte,
         "Stock seguridad": row.stock_seguridad,
+        "Tipo stock seguridad": row.tipo_stock_seguridad ?? "ESTADISTICA",
+        "Confianza de datos": row.confianza_datos ?? "NO INFORMADA",
+        "Cobertura aplicada meses": row.cobertura_aplicada_meses ?? row.horizonte_meses,
+        "Motivo": String(row.explicacion?.motivo ?? ""),
         "Stock objetivo": row.stock_objetivo,
         "Sugerencia unidades": row.sugerencia_unidades,
         }));
@@ -452,7 +458,7 @@ export default function RepuestosSugerencias() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className={pageTitle}>Sugerencia de compra</h1>
-          <p className={pageDescription}>Plan global de empresa basado en histórico, clasificación ABC-FSN-XYZ, stock disponible y un mínimo estratégico opcional.</p>
+          <p className={pageDescription}>Plan global con demanda intermitente, cobertura gradual según recurrencia, stock disponible y un mínimo estratégico opcional.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div>
@@ -518,12 +524,13 @@ export default function RepuestosSugerencias() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <MetricCard label="Piezas analizadas" value={integer.format(liveSummary?.total_piezas ?? 0)} />
         <MetricCard label="Piezas sugeridas" value={integer.format(liveSummary?.piezas_sugeridas ?? 0)} tone="green" />
         <MetricCard label="Unidades sugeridas" value={integer.format(liveSummary?.unidades_sugeridas ?? 0)} tone="green" />
         <MetricCard label="Nuevos sin historial" value={integer.format(liveSummary?.piezas_nuevas_sin_historial ?? 0)} tone="amber" />
         <MetricCard label="Anteriores sin ventas 24m" value={integer.format(liveSummary?.piezas_sin_ventas_recientes ?? 0)} />
+        <MetricCard label="Confianza baja" value={integer.format(liveSummary?.piezas_confianza_baja ?? 0)} tone="amber" />
       </div>
 
       {liveQuery.data && (
@@ -595,7 +602,7 @@ export default function RepuestosSugerencias() {
                     return (
                       <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
                         <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
-                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}</Badge><Badge variant="secondary">{row.segmento}</Badge>{row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">NUEVO SIN HISTORIAL</Badge>}{row.estado_datos === "SIN_VENTAS_RECIENTES" && <Badge variant="outline">SIN VENTAS 24M</Badge>}{row.stock_minimo_estrategico > 0 && <Badge className="border-primary/30 bg-primary/5 text-primary" variant="outline">MÍN. {decimal.format(row.stock_minimo_estrategico)}</Badge>}</div></TableCell>
+                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}</Badge><Badge variant="secondary">{row.segmento}</Badge>{row.confianza_datos === "BAJA" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">CONFIANZA BAJA</Badge>}{row.tipo_stock_seguridad === "ESTIMADA" && <Badge variant="outline">SEGURIDAD ESTIMADA</Badge>}{row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">NUEVO SIN HISTORIAL</Badge>}{row.estado_datos === "SIN_VENTAS_RECIENTES" && <Badge variant="outline">SIN VENTAS 24M</Badge>}{row.stock_minimo_estrategico > 0 && <Badge className="border-primary/30 bg-primary/5 text-primary" variant="outline">MÍN. {decimal.format(row.stock_minimo_estrategico)}</Badge>}</div></TableCell>
                         <TableCell className="text-right font-medium">{decimal.format(row.stock_global)}</TableCell>
                         <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_12m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
                         <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_24m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
@@ -617,7 +624,7 @@ export default function RepuestosSugerencias() {
         )}
       </Card>
 
-      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Motor en vivo sobre stock global y ventas confirmadas. Tránsito, precios, garantías y MOQ permanecen como extensiones pendientes, sin inventar datos.</div>
+      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Motor v3 en vivo: cobertura gradual y reserva estimada cuando el historial no permite una seguridad estadística. Tránsito, precios, garantías y MOQ permanecen pendientes.</div>
 
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
       <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {
