@@ -379,7 +379,10 @@ export default function RepuestosSugerencias() {
   const legacyMasterQuery = useEstadoMaestroLegacy();
   const legacyBillingQuery = useEstadoFacturacionHistorica();
   const historySourceVersion = legacyBillingQuery.data?.publicado_en ?? legacyBillingQuery.data?.completado_en ?? null;
-  const historyQualityQuery = useCalidadHistorialRepuestos(brand, historySourceVersion);
+  const historyIsPersisted = legacyBillingQuery.data?.publicacion_estado === "COMPLETADO"
+    || Boolean(legacyBillingQuery.data?.publicado_en);
+  const historyQualityQuery = useCalidadHistorialRepuestos(brand, historySourceVersion, !historyIsPersisted);
+  const historyIsPrepared = historyIsPersisted || Boolean(historyQualityQuery.data?.preparado);
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
   const liveQuery = useSugerenciaViva(
@@ -388,7 +391,7 @@ export default function RepuestosSugerencias() {
     liveFilters,
     page,
     Boolean(
-      historyQualityQuery.data?.preparado
+      historyIsPrepared
       && modelQuery.data
       && legacyMasterQuery.data?.cargado
       && !historyRebuildRequired
@@ -569,11 +572,13 @@ export default function RepuestosSugerencias() {
                 <h2 className="text-sm font-semibold">Historial unificado y auditable</h2>
                 <Badge variant="outline">Base del motor en vivo</Badge>
               </div>
-              {historyQualityQuery.isError ? (
+              {historyQualityQuery.isError && !historyIsPersisted ? (
                 <p className="mt-2 text-xs text-muted-foreground">Aplicá la migración de historial auditable para habilitar el diagnóstico de coincidencias.</p>
-              ) : historyQuality?.preparado ? (
+              ) : historyIsPrepared ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {decimal.format(confirmedHistoryRate)}% confirmado · actualizado {displayDate(historyQuality.actualizado_en)} · datos {displayDate(historyQuality.fecha_desde)} a {displayDate(historyQuality.fecha_hasta)}
+                  {historyQuality
+                    ? `${decimal.format(confirmedHistoryRate)}% confirmado · actualizado ${displayDate(historyQuality.actualizado_en)} · datos ${displayDate(historyQuality.fecha_desde)} a ${displayDate(historyQuality.fecha_hasta)}`
+                    : `Historial publicado y persistido · actualizado ${displayDate(legacyBillingQuery.data?.publicado_en)}`}
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-muted-foreground">La estructura está disponible, pero todavía falta preparar el primer historial consolidado.</p>
@@ -591,7 +596,7 @@ export default function RepuestosSugerencias() {
                 <p className="mt-1 text-xs text-amber-700">Falta cargar una vez “FACTURACIÓN HISTORICA.xlsx” para recuperar las ventas por código.</p>
               ) : null}
             </div>
-            {canManage && !historyQualityQuery.isError && (
+            {canManage && (
               <div className="flex flex-wrap gap-2">
                 {canLoadLegacyMaster && !legacyMasterQuery.isError && !legacyMasterQuery.data?.cargado && (
                   <>
@@ -645,7 +650,7 @@ export default function RepuestosSugerencias() {
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   {historyPublishProgress
                     ? `Publicando ${historyPublishProgress.completed}/${historyPublishProgress.total}`
-                    : historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
+                    : historyIsPrepared ? "Actualizar historial" : "Preparar historial"}
                 </Button>
               </div>
             )}
@@ -718,7 +723,7 @@ export default function RepuestosSugerencias() {
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : historyRebuildRequired || refreshHistory.isPending ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-sm text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
-        ) : !historyQuality?.preparado ? (
+        ) : !historyIsPrepared ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
         ) : liveQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>

@@ -256,9 +256,14 @@ export function useCorridasSugerencia(marca: MarcaSugerencia) {
   });
 }
 
-export function useCalidadHistorialRepuestos(marca: MarcaSugerencia, sourceVersion?: string | null) {
+export function useCalidadHistorialRepuestos(
+  marca: MarcaSugerencia,
+  sourceVersion?: string | null,
+  enabled = true,
+) {
   return useQuery({
     queryKey: ["repuestos", "historial-unificado", "calidad", marca, sourceVersion ?? "base"],
+    enabled,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", {
         p_marca: marca,
@@ -455,12 +460,12 @@ export async function refrescarHistorialUnificado(
     const [startYear, startMonth] = cursor.split("-").map(Number);
     const [endYear, endMonth] = end.split("-").map(Number);
     const totalMonths = (endYear - startYear) * 12 + endMonth - startMonth;
-    const total = Math.max(1, Math.ceil(totalMonths / 3));
+    const total = Math.max(1, totalMonths);
     let completed = 0;
     onProgress?.(completed, total);
 
     while (cursor < end) {
-      const next = [sumarMesesFecha(cursor, 3), end].sort()[0];
+      const next = [sumarMesesFecha(cursor, 1), end].sort()[0];
       const batch = await (supabase.rpc as any)("repuestos_publicar_historial_lote", {
         p_desde: cursor,
         p_hasta_exclusiva: next,
