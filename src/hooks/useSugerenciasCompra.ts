@@ -34,6 +34,9 @@ export interface EstadoFacturacionHistorica {
   lineas_vinculadas?: number;
   productos_vinculados?: number;
   completado_en?: string;
+  publicacion_estado?: "PROCESANDO" | "COMPLETADO" | null;
+  publicacion_hasta?: string | null;
+  publicado_en?: string | null;
 }
 
 export interface ResultadoFacturacionHistorica {
@@ -432,12 +435,57 @@ export async function ejecutarSugerencia(marca: MarcaSugerencia, fechaAnalisis: 
   return data as string;
 }
 
-export async function refrescarHistorialUnificado() {
+const sumarMesesFecha = (fecha: string, meses: number) => {
+  const [year, month, day] = fecha.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1 + meses, day));
+  return result.toISOString().slice(0, 10);
+};
+
+export async function refrescarHistorialUnificado(
+  onProgress?: (completed: number, total: number) => void,
+) {
   const state = await (supabase.rpc as any)("repuestos_estado_facturacion_historica");
-  const rpcName = !state.error && state.data?.cargado
-    ? "repuestos_publicar_facturacion_historica"
-    : "repuestos_refrescar_historial_unificado";
-  const { data, error } = await (supabase.rpc as any)(rpcName);
+  if (!state.error && state.data?.cargado) {
+    const start = await (supabase.rpc as any)("repuestos_iniciar_publicacion_historial");
+    if (start.error) throw new Error(mensajeErrorSupabase(start.error, "No se pudo iniciar la publicación del historial"));
+
+    let cursor = String(start.data?.fecha_desde ?? "");
+    const end = String(start.data?.fecha_hasta_exclusiva ?? "");
+    if (!cursor || !end) throw new Error("La base no devolvió el período histórico que debe publicarse");
+    const [startYear, startMonth] = cursor.split("-").map(Number);
+    const [endYear, endMonth] = end.split("-").map(Number);
+    const totalMonths = (endYear - startYear) * 12 + endMonth - startMonth;
+    const total = Math.max(1, Math.ceil(totalMonths / 3));
+    let completed = 0;
+    onProgress?.(completed, total);
+
+    while (cursor < end) {
+      const next = [sumarMesesFecha(cursor, 3), end].sort()[0];
+      const batch = await (supabase.rpc as any)("repuestos_publicar_historial_lote", {
+        p_desde: cursor,
+        p_hasta_exclusiva: next,
+      });
+      if (batch.error) throw new Error(mensajeErrorSupabase(batch.error, `No se pudo publicar el período ${cursor} a ${next}`));
+      cursor = next;
+      completed += 1;
+      onProgress?.(completed, total);
+    }
+
+    const finish = await (supabase.rpc as any)("repuestos_finalizar_publicacion_historial");
+    if (finish.error) throw new Error(mensajeErrorSupabase(finish.error, "No se pudo finalizar la publicación del historial"));
+    const quality = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", { p_marca: null });
+    if (quality.error) throw new Error(mensajeErrorSupabase(quality.error, "No se pudo verificar el historial publicado"));
+    return {
+      actualizacion_id: 0,
+      lineas_totales: quality.data?.lineas_totales ?? finish.data?.lineas_vinculadas ?? 0,
+      confirmadas: quality.data?.confirmadas ?? finish.data?.lineas_vinculadas ?? 0,
+      ambiguas: quality.data?.ambiguas ?? 0,
+      sin_coincidencia: quality.data?.sin_coincidencia ?? 0,
+      productos_con_demanda: finish.data?.productos_vinculados ?? 0,
+    } as ResultadoRefrescoHistorial;
+  }
+
+  const { data, error } = await (supabase.rpc as any)("repuestos_refrescar_historial_unificado");
   if (error) {
     const details = [
       error.code ? `[${error.code}]` : null,
@@ -446,18 +494,6 @@ export async function refrescarHistorialUnificado() {
       error.hint,
     ].filter(Boolean);
     throw new Error(details.join(" | ") || "No se pudo preparar el historial");
-  }
-  if (rpcName === "repuestos_publicar_facturacion_historica") {
-    const quality = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", { p_marca: null });
-    if (quality.error) throw new Error(mensajeErrorSupabase(quality.error, "No se pudo verificar el historial publicado"));
-    return {
-      actualizacion_id: 0,
-      lineas_totales: quality.data?.lineas_totales ?? data?.lineas_vinculadas ?? 0,
-      confirmadas: quality.data?.confirmadas ?? data?.lineas_vinculadas ?? 0,
-      ambiguas: quality.data?.ambiguas ?? 0,
-      sin_coincidencia: quality.data?.sin_coincidencia ?? 0,
-      productos_con_demanda: data?.productos_vinculados ?? 0,
-    } as ResultadoRefrescoHistorial;
   }
   return data as ResultadoRefrescoHistorial;
 }

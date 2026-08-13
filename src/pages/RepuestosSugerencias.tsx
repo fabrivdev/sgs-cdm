@@ -371,13 +371,14 @@ export default function RepuestosSugerencias() {
   const [configOpen, setConfigOpen] = useState(false);
   const [legacyMasterProgress, setLegacyMasterProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [legacyBillingProgress, setLegacyBillingProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [historyPublishProgress, setHistoryPublishProgress] = useState<{ completed: number; total: number } | null>(null);
   const [historyRebuildRequired, setHistoryRebuildRequired] = useState(false);
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
   const legacyMasterQuery = useEstadoMaestroLegacy();
   const legacyBillingQuery = useEstadoFacturacionHistorica();
-  const historySourceVersion = legacyBillingQuery.data?.completado_en ?? null;
+  const historySourceVersion = legacyBillingQuery.data?.publicado_en ?? legacyBillingQuery.data?.completado_en ?? null;
   const historyQualityQuery = useCalidadHistorialRepuestos(brand, historySourceVersion);
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
@@ -402,9 +403,13 @@ export default function RepuestosSugerencias() {
   ], [segmentsQuery.data]);
 
   const refreshHistory = useMutation({
-    mutationFn: refrescarHistorialUnificado,
+    mutationFn: () => refrescarHistorialUnificado((completed, total) => {
+      setHistoryPublishProgress({ completed, total });
+    }),
     onSuccess: async (result) => {
+      setHistoryPublishProgress(null);
       setHistoryRebuildRequired(false);
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "facturacion-historica", "estado"] });
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
       toast.success(
         `Historial preparado: ${integer.format(result.confirmadas)} líneas confirmadas, ${integer.format(result.ambiguas)} ambiguas y ${integer.format(result.sin_coincidencia)} sin coincidencia.`,
@@ -415,6 +420,7 @@ export default function RepuestosSugerencias() {
       void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
     },
     onError: (error) => {
+      setHistoryPublishProgress(null);
       setHistoryRebuildRequired(false);
       toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial");
     },
@@ -637,7 +643,9 @@ export default function RepuestosSugerencias() {
                 )}
                 <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending || loadLegacyBilling.isPending}>
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  {historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
+                  {historyPublishProgress
+                    ? `Publicando ${historyPublishProgress.completed}/${historyPublishProgress.total}`
+                    : historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
                 </Button>
               </div>
             )}
