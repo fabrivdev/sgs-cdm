@@ -387,11 +387,13 @@ export default function RepuestosSugerencias() {
     mutationFn: refrescarHistorialUnificado,
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
-      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       toast.success(
         `Historial preparado: ${integer.format(result.confirmadas)} líneas confirmadas, ${integer.format(result.ambiguas)} ambiguas y ${integer.format(result.sin_coincidencia)} sin coincidencia.`,
         { duration: 9000 },
       );
+      // The history is already committed. A cold live calculation may take
+      // longer and must not make the successful refresh look like a failure.
+      void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial"),
   });
