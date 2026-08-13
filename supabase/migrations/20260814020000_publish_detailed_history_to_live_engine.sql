@@ -232,7 +232,4 @@ REVOKE ALL ON FUNCTION public.repuestos_publicar_facturacion_historica() FROM PU
 GRANT EXECUTE ON FUNCTION public.repuestos_publicar_facturacion_historica() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.repuestos_resumen_calidad_historial(text) TO authenticated;
 
--- La carga ya se completo: republica ahora sin pedir el Excel nuevamente.
-SELECT public.repuestos_publicar_facturacion_historica();
-
 NOTIFY pgrst, 'reload schema';
