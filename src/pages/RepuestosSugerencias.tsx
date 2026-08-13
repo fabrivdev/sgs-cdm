@@ -398,7 +398,8 @@ export default function RepuestosSugerencias() {
     mutationFn: async () => {
       const toastId = toast.loading("Preparando exportación…");
       try {
-        const response = await cargarSugerenciaViva(brand, analysisDate, liveFilters, (loaded, total) => {
+        const exportFilters = { ...liveFilters, soloSugeridos: true };
+        const response = await cargarSugerenciaViva(brand, analysisDate, exportFilters, (loaded, total) => {
           toast.loading(`Descargando ${integer.format(Math.min(loaded, total))} de ${integer.format(total)} piezas…`, { id: toastId });
         });
         const XLSX = await import("xlsx");
@@ -535,7 +536,7 @@ export default function RepuestosSugerencias() {
             <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               Recalculado sobre el historial confirmado al corte <strong className="text-foreground">{displayDate(liveQuery.data.fecha_analisis)}</strong>
             </div>
-            <Button variant="outline" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar</Button>
+            <Button variant="outline" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar propuesta</Button>
           </CardContent>
         </Card>
       )}
