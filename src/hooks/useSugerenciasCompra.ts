@@ -265,7 +265,15 @@ export async function ejecutarSugerencia(marca: MarcaSugerencia, fechaAnalisis: 
 
 export async function refrescarHistorialUnificado() {
   const { data, error } = await (supabase.rpc as any)("repuestos_refrescar_historial_unificado");
-  if (error) throw error;
+  if (error) {
+    const details = [
+      error.code ? `[${error.code}]` : null,
+      error.message,
+      error.details,
+      error.hint,
+    ].filter(Boolean);
+    throw new Error(details.join(" | ") || "No se pudo preparar el historial");
+  }
   return data as ResultadoRefrescoHistorial;
 }
 
