@@ -153,12 +153,12 @@ export function ServiciosDashboard({
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <section key={kpi.label} className={cn("relative min-h-[110px] rounded-md border border-t-2 bg-card p-3.5", kpi.border)}>
+            <section key={kpi.label} className={cn("relative min-h-[92px] rounded-md border border-t-2 bg-card p-3", kpi.border)}>
               <span className={cn("absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-md", kpi.iconBg, kpi.tone)}>
                 <Icon className="h-4 w-4" />
               </span>
               <div className="pr-11 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
-              <div className="mt-2 text-[25px] font-extrabold leading-none tabular-nums">{kpi.value}</div>
+              <div className="mt-1.5 text-xl font-bold leading-none tabular-nums">{kpi.value}</div>
               <div className="mt-2 line-clamp-2 text-[10px] text-muted-foreground" title={kpi.detail}>{kpi.detail}</div>
             </section>
           );
@@ -185,7 +185,7 @@ export function ServiciosDashboard({
           ) : (
             <div className="mt-3 max-w-full overflow-x-auto overflow-y-hidden pb-1">
               <div
-                className="grid h-[220px] shrink-0 items-end gap-2 border-b px-2"
+                className="grid h-[176px] shrink-0 items-end gap-2 border-b px-2"
                 style={{
                   gridTemplateColumns: `repeat(${Math.max(data.evolucion.length, 1)}, minmax(42px, 1fr))`,
                   width: data.evolucion.length > 12 ? `${data.evolucion.length * 58}px` : "100%",

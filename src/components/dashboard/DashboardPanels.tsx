@@ -36,7 +36,7 @@ export function SummaryCard({
 }) {
   return (
     <button className="h-full rounded-lg text-left" onClick={onClick}>
-      <Card className={cn("flex h-full min-h-[78px] flex-col gap-1 p-2 transition-colors hover:bg-accent/50 sm:min-h-[128px] sm:gap-2 sm:p-3", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
+      <Card className={cn("flex h-full min-h-[76px] flex-col gap-1 p-2 transition-colors hover:bg-accent/50 sm:min-h-[96px] sm:gap-1.5 sm:p-2.5", tone === "bad" && "border-destructive/40 bg-destructive/5", tone === "warn" && "border-amber-300 bg-amber-50/60")}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="truncate text-[9px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[10px]">{title}</div>

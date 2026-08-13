@@ -229,7 +229,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
             <AppLogo className="h-8 w-8 rounded-lg transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02]" />
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <div className="truncate text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
-              <div className="truncate text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
+              <div className="whitespace-nowrap text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
             </div>
             <SidebarTrigger className="ml-auto h-8 w-8 rounded-lg border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.375rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-3">
               <ChevronLeft className="transition-transform duration-300 ease-spring group-data-[collapsible=icon]:rotate-180" />

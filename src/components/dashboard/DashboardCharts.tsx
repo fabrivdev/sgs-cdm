@@ -192,7 +192,7 @@ function OSEvolution({
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="grid min-h-[170px] shrink-0 items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[210px] sm:gap-3 sm:px-2 sm:pt-4"
+        className="grid min-h-[150px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[176px] sm:gap-3 sm:px-2 sm:pt-3"
         style={barGridStyle(rows.length)}
       >
         {rows.map((row, index) => {
@@ -203,7 +203,7 @@ function OSEvolution({
           return (
             <button key={row.key} type="button" onClick={() => onSelect(row.key)} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
               <span className="max-w-full truncate text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">{formatOSMetric(value, metric)}</span>
-              <span className="flex h-[130px] w-full items-end justify-center sm:h-[150px]">
+              <span className="flex h-[108px] w-full items-end justify-center sm:h-[124px]">
                 <span
                   className={cn("w-full max-w-[34px] rounded-t-md bg-primary/80 transition-all hover:bg-primary sm:max-w-[42px]", active && "bg-primary ring-2 ring-primary/20")}
                   style={{ height }}
@@ -532,21 +532,21 @@ export function WeeklyBars({
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="relative grid min-h-[218px] shrink-0 items-end gap-1 border-b px-0.5 pt-3 sm:min-h-[260px] sm:gap-3 sm:px-2 sm:pt-4"
+        className="relative grid min-h-[176px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[204px] sm:gap-3 sm:px-2 sm:pt-3"
         style={barGridStyle(rows.length, 62)}
       >
         {rows.map((row, index) => {
           const value = weekMetric(row, metric);
           const comparison = comparisonWeekMetric(row, metric);
           const unavailable = metricUnavailable(row, metric);
-          const height = unavailable || value <= 0 ? 0 : Math.max(6, Math.round((value / max) * 150));
-          const comparisonBottom = comparison > 0 ? Math.max(4, Math.round((comparison / max) * 150)) : 0;
+          const height = unavailable || value <= 0 ? 0 : Math.max(6, Math.round((value / max) * 118));
+          const comparisonBottom = comparison > 0 ? Math.max(4, Math.round((comparison / max) * 118)) : 0;
           const active = row.key === activeKey;
           const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
           return (
             <button key={row.key} onClick={() => onSelect(row.key)} className="flex min-w-0 flex-col items-center gap-1.5 text-center sm:gap-2">
               <span className="max-w-full truncate text-[9px] font-medium tabular-nums text-muted-foreground sm:text-[10px]">{formatWeekMetric(row, metric)}</span>
-              <span className="relative flex h-[150px] w-full items-end justify-center sm:h-[180px]">
+              <span className="relative flex h-[118px] w-full items-end justify-center sm:h-[136px]">
                 {comparison > 0 && (
                   <span
                     className="absolute left-1/2 z-10 w-full max-w-[34px] -translate-x-1/2 border-t-2 border-red-500 sm:max-w-[42px]"
@@ -627,10 +627,10 @@ export function CumplimientoAgendaChart({
       <div className="min-w-0 pb-1">
         <div className="min-w-0 overflow-x-auto overflow-y-hidden">
           <div
-            className="relative grid min-h-[259px] shrink-0 items-end gap-1 border-b px-1 pt-7 sm:gap-2 sm:px-2"
+            className="relative grid min-h-[205px] shrink-0 items-end gap-1 border-b px-1 pt-6 sm:gap-2 sm:px-2"
             style={barGridStyle(rows.length, 58)}
           >
-            <div className="pointer-events-none absolute inset-x-1 top-7 h-[185px] sm:inset-x-2">
+            <div className="pointer-events-none absolute inset-x-1 top-6 h-[140px] sm:inset-x-2">
               {[100, 75, 50, 25].map((value) => (
                 <div
                   key={value}
@@ -650,7 +650,7 @@ export function CumplimientoAgendaChart({
               const isCurrent = row.estadoPeriodo === "actual";
               const isFuture = row.estadoPeriodo === "futuro";
               const barHeight = hasAgenda && row.porcentaje > 0
-                ? Math.max(6, Math.round((row.porcentaje / 100) * 185))
+                ? Math.max(6, Math.round((row.porcentaje / 100) * 140))
                 : 0;
               const showLabel = index === 0 || index === rows.length - 1 || index % labelEvery === 0;
               const valueLabel = !hasAgenda
@@ -692,7 +692,7 @@ export function CumplimientoAgendaChart({
                       >
                         {valueLabel}
                       </span>
-                      <span className="flex h-[185px] w-full items-end justify-center">
+                      <span className="flex h-[140px] w-full items-end justify-center">
                         <span
                           className={cn(
                             "relative h-full w-full max-w-[42px] overflow-hidden rounded-t-md bg-muted/60",
@@ -822,7 +822,7 @@ export function TecnicosNoRealizadosRanking({
 
   if (visibleRows.length === 0) {
     return (
-      <div className="flex min-h-[214px] items-center justify-center rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">
+      <div className="flex min-h-[168px] items-center justify-center rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">
         Sin jornadas no realizadas para los filtros actuales.
       </div>
     );
@@ -3122,7 +3122,7 @@ export function ServiciosDashboard({
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className="relative min-h-[112px] rounded-md border bg-card p-3.5">
+            <div key={kpi.label} className="relative min-h-[92px] rounded-md border bg-card p-3">
               <div className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Icon className="h-4 w-4" />
               </div>

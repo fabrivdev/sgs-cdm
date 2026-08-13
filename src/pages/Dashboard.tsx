@@ -3305,17 +3305,17 @@ export default function Dashboard() {
                 className="text-left"
               >
                 <Card className={cn(
-                  "relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50",
+                  "relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50",
                   (variacionTotalPct ?? 0) < -20 && "border-destructive/40",
                 )}>
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-primary" />
-                  <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <div className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <DollarSign className="h-[18px] w-[18px]" />
                   </div>
                   <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
                     Facturacion del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
                   </div>
-                  <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(totalPeriodo)}</div>
+                  <div className="mt-1.5 text-xl font-bold leading-tight tabular-nums">{money(totalPeriodo)}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {variacionTotalPct != null ? (
                       <span className={cn(
@@ -3335,15 +3335,15 @@ export default function Dashboard() {
               </button>
 
               <button type="button" onClick={() => goSection("facturación")} className="text-left">
-                <Card className="relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50">
+                <Card className="relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50">
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-sky-500" />
                   <div className="relative z-10 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
-                      <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{clientesAtendidosSemana}</div>
+                      <div className="mt-1.5 text-xl font-bold leading-tight tabular-nums">{clientesAtendidosSemana}</div>
                       <div className="text-[11px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
                     </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <Users className="h-[18px] w-[18px]" />
                     </div>
                   </div>
@@ -3356,11 +3356,11 @@ export default function Dashboard() {
 
               <button type="button" onClick={() => goSection("facturación")} className="text-left">
                 <Card className={cn(
-                  "relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50",
+                  "relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50",
                   (variacionTicketPct ?? 0) < -10 && "border-destructive/40",
                 )}>
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-emerald-500" />
-                  <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <div className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Receipt className="h-[18px] w-[18px]" />
                   </div>
                   {ticketSparkline.path ? (
@@ -3378,7 +3378,7 @@ export default function Dashboard() {
                   <div className="relative z-10 flex items-start justify-between gap-3 pr-16 sm:pr-24">
                     <div className="min-w-0">
                       <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
-                      <div className="mt-2 text-[24px] font-extrabold leading-tight tabular-nums sm:text-[26px]">{money(ticketPromedio)}</div>
+                      <div className="mt-1.5 text-xl font-bold leading-tight tabular-nums">{money(ticketPromedio)}</div>
                       <div className="text-[11px] text-muted-foreground">por factura</div>
                     </div>
                   </div>
@@ -3395,9 +3395,9 @@ export default function Dashboard() {
               </button>
 
               <button type="button" onClick={() => goSection("facturación")} className="text-left">
-                <Card className="relative flex h-full min-h-[132px] flex-col justify-between overflow-hidden bg-card p-4 pt-5 transition-colors hover:bg-accent/50">
+                <Card className="relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50">
                   <div className="absolute inset-x-0 top-0 h-[3px] bg-amber-500" />
-                  <div className="absolute right-4 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <div className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <PieChart className="h-[18px] w-[18px]" />
                   </div>
                   <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>

@@ -17,9 +17,9 @@ export function KpiStrip({ children, className }: { children: ReactNode; classNa
 
 export function KpiItem({ label, value, detail, tone = "default", icon, className }: { label: ReactNode; value: ReactNode; detail?: ReactNode; tone?: "default" | "positive" | "info" | "warning" | "danger"; icon?: ReactNode; className?: string }) {
   const tones = { default: "text-foreground", positive: "text-emerald-600", info: "text-blue-600", warning: "text-amber-600", danger: "text-destructive" };
-  return <div className={cn("min-w-0 px-3 py-2.5", className)}>
+  return <div className={cn("min-w-0 px-3 py-2", className)}>
     <div className="flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground"><span className="truncate">{label}</span>{icon && <span className="shrink-0">{icon}</span>}</div>
-    <div className={cn("mt-0.5 text-[26px] font-semibold leading-none tabular-nums", tones[tone])}>{value}</div>
+    <div className={cn("mt-0.5 text-xl font-semibold leading-none tabular-nums", tones[tone])}>{value}</div>
     {detail && <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>}
   </div>;
 }

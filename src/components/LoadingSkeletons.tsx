@@ -5,7 +5,7 @@ export function DashboardKPISkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="grid auto-rows-fr grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-5">
       {Array.from({ length: count }).map((_, i) => (
-        <Card key={i} className="flex min-h-[78px] flex-col gap-2 p-2 sm:min-h-[128px] sm:p-3">
+        <Card key={i} className="flex min-h-[76px] flex-col gap-2 p-2 sm:min-h-[96px] sm:p-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 space-y-1.5">
               <Skeleton className="h-2.5 w-20" />
