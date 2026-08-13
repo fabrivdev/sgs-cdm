@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cardLabel as labelCls } from "@/lib/ui-classes";
@@ -50,6 +51,7 @@ export function FiltersBar({
   className?: string;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
   const debouncedSearch = useDebouncedValue(searchDraft, 250);
   const hasControls = !!children || !!actions || (activeCount > 0 && !!onClear);
@@ -68,7 +70,7 @@ export function FiltersBar({
   };
 
   return (
-    <Card className={cn("p-2 sm:p-2.5", className)}>
+    <Card className={cn("p-2", className)}>
       <div className="flex gap-2 sm:hidden">
         {search && (
           <div className="relative min-w-0 flex-1">
@@ -124,7 +126,7 @@ export function FiltersBar({
         <div className="mt-1 text-right text-[11px] text-muted-foreground sm:hidden">{meta}</div>
       )}
 
-      <div className="hidden gap-2 sm:flex sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="hidden gap-2 sm:flex sm:flex-row sm:flex-nowrap sm:items-end">
         {search && (
           <Field label={search.label ?? "Buscar"} className={search.width ?? "w-full sm:w-[240px]"}>
             <div className="relative">
@@ -153,10 +155,15 @@ export function FiltersBar({
 
         {children}
 
-        {activeCount > 0 && onClear && (
+        {expanded && <Field><Popover open={moreOpen} onOpenChange={setMoreOpen}>
+          <PopoverTrigger asChild><Button variant={activeCount > 0 ? "secondary" : "outline"} size="sm" className="h-9"><SlidersHorizontal className="h-3.5 w-3.5" />Filtros{activeCount > 0 ? ` ${activeCount}` : ""}</Button></PopoverTrigger>
+          <PopoverContent align="end" className="w-[min(92vw,520px)] p-3"><div className="grid gap-2 sm:grid-cols-2">{expanded}</div><div className="mt-3 flex justify-between border-t pt-2">{activeCount > 0 && onClear ? <Button variant="ghost" size="sm" onClick={onClear}><X className="h-3.5 w-3.5" />Limpiar</Button> : <span />}<Button size="sm" onClick={() => setMoreOpen(false)}>Aplicar</Button></div></PopoverContent>
+        </Popover></Field>}
+
+        {activeCount > 0 && onClear && !expanded && (
           <Field>
             <Button variant="ghost" size="sm" onClick={onClear} className="h-9 text-xs">
-              <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
+              <X className="mr-1 h-3 w-3" /> Limpiar
             </Button>
           </Field>
         )}
@@ -169,11 +176,6 @@ export function FiltersBar({
         </div>
       </div>
 
-      {expanded && (
-        <div className="mt-2 hidden border-t pt-2 sm:block">
-          {expanded}
-        </div>
-      )}
     </Card>
   );
 }

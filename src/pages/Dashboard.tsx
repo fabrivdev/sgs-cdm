@@ -22,7 +22,6 @@ import {
   PieChart,
   Receipt,
   Shield,
-  SlidersHorizontal,
   User,
   Users,
   Wrench,
@@ -627,7 +626,6 @@ export default function Dashboard() {
   const [factMetric, setFactMetric] = useState<FactMetric>("usd");
   const [osMetric, setOsMetric] = useState<OSMetric>("usd");
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const loading = baseLoading || jornadasLoading || facturaciónLoading;
@@ -3133,7 +3131,7 @@ export default function Dashboard() {
     (filtrosServiciosActivos && fEstadosOS.length > 0 ? 1 : 0);
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 sm:py-4">
+    <div className="w-full overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 lg:px-5">
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -3149,7 +3147,7 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        expanded={showAdvancedFilters ? (
+        expanded={(
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
             <FilterMultiSelect
               label="Marca"
@@ -3251,7 +3249,7 @@ export default function Dashboard() {
               </>
             )}
           </div>
-        ) : null}
+        )}
       >
         <FilterCustom label="Período rápido" width="w-[190px]">
           <select
@@ -3276,18 +3274,6 @@ export default function Dashboard() {
           width="w-[170px]"
           options={SUCURSALES.map((s) => ({ value: s, label: s }))}
         />
-        <FilterCustom label="Filtros" width="w-auto">
-          <Button
-            type="button"
-            variant={showAdvancedFilters || filtrosAvanzadosActivos > 0 ? "default" : "outline"}
-            size="sm"
-            className="h-9 w-full gap-2 whitespace-nowrap sm:w-auto"
-            onClick={() => setShowAdvancedFilters((value) => !value)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Más filtros{filtrosAvanzadosActivos > 0 ? ` (${filtrosAvanzadosActivos})` : ""}
-          </Button>
-        </FilterCustom>
       </FiltersBar>
 
         {excluidasGsCount > 0 && (

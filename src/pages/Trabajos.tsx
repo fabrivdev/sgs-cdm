@@ -14,7 +14,8 @@ import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/Filte
 import { EmptyState } from "@/components/EmptyState";
 import { KanbanSkeleton } from "@/components/LoadingSkeletons";
 import { parseISO, format } from "date-fns";
-import { pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
+import { pageShellWide } from "@/lib/ui-classes";
+import { PageHeader } from "@/components/layout/AppPrimitives";
 import { useAuth } from "@/hooks/useAuth";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
@@ -162,39 +163,27 @@ export default function Trabajos() {
 
   return (
     <div className={pageShellWide}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className={pageTitle}>Trabajos</h1>
-          <p className={pageDescription}>
-            Vista macro de casos. Lo operativo se maneja desde Planificador / Calendario.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader title="Trabajos" actions={
           <Button size="sm" onClick={() => setOpenNuevo(true)}>
             <Plus className="mr-1.5 h-4 w-4" /> Nuevo trabajo
           </Button>
-        </div>
-      </div>
+      } />
 
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: "Buscar OS, TR, cliente o problema..." }}
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
+        expanded={<><FilterSelect label="Prioridad" value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-full" options={[{ value: "all", label: "Todos" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]} /><FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" width="w-full" /></>}
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
           options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
-          label="Prioridad" value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-[130px]"
-          options={[{ value: "all", label: "Todos" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]}
-        />
-        <FilterSelect
           label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
           options={[{ value: "all", label: "Todos" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
         />
-        <FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" />
       </FiltersBar>
 
 

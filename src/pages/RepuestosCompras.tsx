@@ -1,17 +1,13 @@
 import { ComprasPedidosTab } from "@/components/repuestos/ComprasPedidosTab";
 import { SolicitudesCompraTab } from "@/components/repuestos/SolicitudesCompraTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { pageDescription, pageShell, pageTitle } from "@/lib/ui-classes";
+import { pageShell } from "@/lib/ui-classes";
+import { PageHeader } from "@/components/layout/AppPrimitives";
 
 export default function RepuestosCompras() {
   return (
     <div className={pageShell}>
-      <div>
-        <h1 className={pageTitle}>Compras</h1>
-        <p className={pageDescription}>
-          Pedidos y solicitudes de compra de repuestos, importados desde TOTVS, con seguimiento propio por pedido.
-        </p>
-      </div>
+      <PageHeader title="Compras" />
 
       <Tabs defaultValue="pedidos">
         <TabsList>

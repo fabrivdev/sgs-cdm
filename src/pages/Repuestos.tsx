@@ -36,7 +36,8 @@ import {
   type StockSortKey,
 } from "@/hooks/useRepuestos";
 import { MARCAS, SUCURSALES } from "@/lib/constants";
-import { metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
+import { metaText, pageShellWide } from "@/lib/ui-classes";
+import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import { cn } from "@/lib/utils";
 
 interface VentaMensual {
@@ -891,25 +892,13 @@ export default function Repuestos() {
 
   return (
     <div className={pageShellWide}>
-      <div>
-        <h1 className={pageTitle}>Catálogo y Stock</h1>
-        <p className={pageDescription}>Matriz de existencias por sucursal, importada desde TOTVS.</p>
-      </div>
+      <PageHeader title="Catálogo y Stock" />
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <KpiCard
-          icon={Package}
-          value={kpisQuery.isLoading ? "…" : `${(kpis?.conStock ?? 0).toLocaleString("es-PY")} de ${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")}`}
-          label="productos con stock registrado"
-        />
-        <KpiCard
-          icon={AlertTriangle}
-          value={kpisQuery.isLoading ? "…" : (kpis?.enCero ?? 0).toLocaleString("es-PY")}
-          label="productos en cero (ninguna sucursal)"
-          tone={kpis && kpis.enCero > 0 ? "warn" : undefined}
-        />
-        <KpiCard icon={Clock} value={kpisQuery.isLoading ? "…" : ultimaImportacionTexto} label="Última importación de stock" />
-      </div>
+      <KpiStrip className="sm:grid-cols-3">
+        <KpiItem label="Con stock" value={kpisQuery.isLoading ? "…" : (kpis?.conStock ?? 0).toLocaleString("es-PY")} detail={`${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")} productos`} icon={<Package className="h-4 w-4 text-primary" />} tone="positive" />
+        <KpiItem label="Sin stock" value={kpisQuery.isLoading ? "…" : (kpis?.enCero ?? 0).toLocaleString("es-PY")} icon={<AlertTriangle className="h-4 w-4 text-amber-600" />} tone="warning" />
+        <KpiItem label="Actualizado" value={kpisQuery.isLoading ? "…" : ultimaImportacionTexto} icon={<Clock className="h-4 w-4" />} />
+      </KpiStrip>
 
       <Card>
         <CardContent className="space-y-3 p-4">

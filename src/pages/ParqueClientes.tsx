@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
 import { ParqueTab } from "@/components/parque/ParqueTab";
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
 import { StockMaquinasTab, type StockMaquinasResumen } from "@/components/parque/StockMaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
 import { Tractor, CheckCircle2, PackageCheck, Users, Sparkles, RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { pageShell, pageTitle } from "@/lib/ui-classes";
+import { pageShell } from "@/lib/ui-classes";
+import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import type { KpiResult } from "@/lib/contacto-utils";
 
 const METRICAS_VACIAS: KpiResult = {
@@ -91,32 +90,13 @@ export default function ParqueClientes() {
 
   return (
     <div className={pageShell}>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className={pageTitle}>{vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"}</h1>
-      </div>
+      <PageHeader title={vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"} />
 
-      <div className={cn(
-        "mb-4 grid grid-cols-1 gap-2 sm:gap-3",
-        "sm:grid-cols-2 xl:grid-cols-4",
-      )}>
+      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
-          <Card key={c.label} className="border">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">
-                    {c.label}
-                  </div>
-                  <div className={cn("mt-1 text-xl font-bold sm:text-2xl", c.accent)}>
-                    {c.value}
-                  </div>
-                </div>
-                <c.icon className={cn("h-4 w-4 shrink-0 sm:h-5 sm:w-5", c.accent)} />
-              </div>
-            </CardContent>
-          </Card>
+          <KpiItem key={c.label} label={c.label} value={c.value} tone={c.accent.includes("amber") ? "warning" : c.accent.includes("blue") ? "info" : c.accent.includes("emerald") || c.accent.includes("primary") ? "positive" : "danger"} icon={<c.icon className="h-4 w-4" />} />
         ))}
-      </div>
+      </KpiStrip>
 
       <div className="space-y-3">
         {vistaParque === "clientes" ? (

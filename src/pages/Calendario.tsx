@@ -548,7 +548,7 @@ export default function Calendario() {
   };
 
   return (
-    <div className="container max-w-[1400px] py-3 sm:py-4 px-3 sm:px-4 space-y-3 sm:space-y-4">
+    <div className="w-full space-y-3 px-3 py-3 sm:px-4 lg:px-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Calendario</h1>

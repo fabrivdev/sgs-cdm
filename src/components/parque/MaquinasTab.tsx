@@ -330,6 +330,20 @@ export function MaquinasTab({
             </Button>}
           </div>
         }
+        expanded={
+          <div className="grid gap-2 sm:grid-cols-3">
+            <FilterCustom label="Año desde" width="w-full">
+              <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
+            </FilterCustom>
+            <FilterCustom label="Año hasta" width="w-full">
+              <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
+            </FilterCustom>
+            <FilterSelect
+              label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full"
+              options={[{ value: "activa", label: "Activas" }, { value: "inactiva", label: "Inactivas" }, { value: "all", label: "Todos" }]}
+            />
+          </div>
+        }
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[120px]"
@@ -342,20 +356,6 @@ export function MaquinasTab({
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[145px]"
           options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
-        />
-        <FilterCustom label="Año desde" width="w-[86px]">
-          <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
-        </FilterCustom>
-        <FilterCustom label="Año hasta" width="w-[86px]">
-          <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
-        </FilterCustom>
-        <FilterSelect
-          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[110px]"
-          options={[
-            { value: "activa", label: "Activas" },
-            { value: "inactiva", label: "Inactivas" },
-            { value: "all", label: "Todos" },
-          ]}
         />
       </FiltersBar>
 

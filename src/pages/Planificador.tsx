@@ -22,7 +22,8 @@ import { addDays, format, getISOWeek, parseISO, setISOWeek, startOfWeek } from "
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { pageDescription, pageShellWide, pageTitle, tableText } from "@/lib/ui-classes";
+import { pageShellWide, tableText } from "@/lib/ui-classes";
+import { PageHeader } from "@/components/layout/AppPrimitives";
 import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
 
 interface Servicio {
@@ -562,16 +563,7 @@ export default function Planificador() {
 
   return (
     <div className={pageShellWide}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className={pageTitle}>Planificador</h1>
-          <p className={pageDescription}>
-            {displayed.length} jornadas visibles · Plan diario y semanal de trabajo.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-
+      <PageHeader title="Planificador" actions={<>
           <Button variant="outline" size="sm" onClick={exportExcel} className="hidden sm:inline-flex">
             <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
           </Button>
@@ -581,14 +573,18 @@ export default function Planificador() {
               <CalendarPlus className="mr-2 h-4 w-4" /> Programar jornada
             </Button>
           )}
-        </div>
-      </div>
+      </>} />
 
       <FiltersBar
         search={{ value: fCliente, onChange: setFCliente, placeholder: "Cliente, OS o folio…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
+        expanded={<>
+          <FilterSelect label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-full" options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]} />
+          <FilterSelect label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full" options={[{ value: "all", label: "Todos" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]} />
+          <FilterCustom label="Lectura" width="w-full"><Button type="button" variant={soloPrincipalesSemana ? "default" : "outline"} size="sm" className="h-9 w-full" disabled={fSemana === "all"} onClick={() => setSoloPrincipalesSemana((value) => !value)}>Solo principales</Button></FilterCustom>
+        </>}
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
@@ -597,14 +593,6 @@ export default function Planificador() {
         <FilterSelect
           label="Técnico" value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
           options={[{ value: "all", label: "Todos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
-        />
-        <FilterSelect
-          label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[120px]"
-          options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]}
-        />
-        <FilterSelect
-          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
-          options={[{ value: "all", label: "Todos" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]}
         />
         <FilterCustom label="Semana" width="w-[230px]">
           <div className="flex h-9 overflow-hidden rounded-md border bg-background">
@@ -644,19 +632,6 @@ export default function Planificador() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </FilterCustom>
-        <FilterCustom label="Lectura" width="w-[150px]">
-          <Button
-            type="button"
-            variant={soloPrincipalesSemana ? "default" : "outline"}
-            size="sm"
-            className="h-9 w-full"
-            disabled={fSemana === "all"}
-            onClick={() => setSoloPrincipalesSemana((value) => !value)}
-            title={fSemana === "all" ? "Filtra una semana para resumir continuaciones" : "Muestra solo la primera fila de cada trabajo continuado en la semana"}
-          >
-            Solo principales
-          </Button>
         </FilterCustom>
       </FiltersBar>
 

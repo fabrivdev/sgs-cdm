@@ -16,6 +16,7 @@ import {
   Package,
   ShoppingCart,
   Sparkles,
+  CircleHelp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +56,7 @@ import { cn } from "@/lib/utils";
 import { AIAssistant } from "@/components/assistant/AIAssistant";
 import { nivelLabel } from "@/lib/constants";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
+import { HelpDrawer } from "@/components/layout/HelpDrawer";
 
 type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; managementOnly?: boolean };
 type NavGroup = { modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
@@ -127,13 +129,13 @@ function ModuloNavGroup({
             type="button"
             onClick={() => iconRail && toggleSidebar()}
             className={cn(
-              "group/module mx-2 flex h-14 w-[calc(100%-1rem)] items-center gap-3 rounded-2xl px-3 text-left outline-none transition-[background-color,color,box-shadow,transform] duration-200 ease-spring hover:bg-sidebar-accent/80 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2",
+              "group/module mx-2 flex h-10 w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 text-left outline-none transition-[background-color,color,box-shadow,transform] duration-150 ease-spring hover:bg-sidebar-accent/80 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2",
               groupActive && "bg-sidebar-accent/70 text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-border)/0.55)]",
-              "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:px-0",
+              "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:px-0",
             )}
             aria-label={group.label}
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/[0.08] text-primary transition-[transform,background-color] duration-200 group-hover/module:scale-105 group-hover/module:bg-primary/[0.12]">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition-[transform,background-color] duration-150 group-hover/module:bg-primary/[0.12]">
               <GroupIcon className="h-[18px] w-[18px]" />
             </span>
             <span className="min-w-0 flex-1 truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
@@ -146,7 +148,7 @@ function ModuloNavGroup({
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-          <SidebarGroupContent className="relative mx-5 mb-2 ml-[3.25rem] border-l border-primary/25 pb-2 pl-3 pt-1 group-data-[collapsible=icon]:hidden">
+          <SidebarGroupContent className="relative mx-4 mb-1 ml-10 border-l border-primary/20 pb-1 pl-2.5 pt-0.5 group-data-[collapsible=icon]:hidden">
             <SidebarMenu className="gap-0.5">
               {group.items.map((it) => (
                 <SidebarMenuItem key={it.to}>
@@ -154,7 +156,7 @@ function ModuloNavGroup({
                     asChild
                     isActive={isItemActive(it)}
                     tooltip={it.label}
-                    className="h-9 rounded-xl px-2.5 text-[13px] transition-[background-color,color,transform] duration-200 ease-spring hover:translate-x-0.5 data-[active=true]:bg-primary/[0.10] data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/[0.14]"
+                    className="h-8 rounded-md px-2 text-[13px] transition-[background-color,color] duration-150 data-[active=true]:bg-primary/[0.10] data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/[0.14]"
                   >
                     <NavLink to={it.to} end={it.end as boolean | undefined} className="group/nav">
                       <it.icon className="transition-transform duration-200 group-hover/nav:scale-110" />
@@ -194,6 +196,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   // ruta activa para que al navegar se abra el grupo correspondiente.
   const [openModulo, setOpenModulo] = useState<string | null>(visibleGroups[0]?.modulo ?? null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     const activeGroup = visibleGroups.find((group) => group.items.some(isItemActive));
     if (activeGroup) setOpenModulo(activeGroup.modulo);
@@ -221,7 +224,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
       {/* Sidebar desktop: colapsable a rail de iconos, agrupado por módulo. */}
       <Sidebar collapsible="icon" className="z-50 hidden md:flex">
-        <SidebarHeader className="h-14 justify-center border-b border-sidebar-border/70 p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
+        <SidebarHeader className="h-12 justify-center border-b border-sidebar-border/70 p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <div className="flex h-full w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <AppLogo className="h-8 w-8 rounded-lg transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02]" />
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
@@ -233,7 +236,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
             </SidebarTrigger>
           </div>
         </SidebarHeader>
-        <SidebarContent className="gap-1 px-1 py-4">
+        <SidebarContent className="gap-1 px-1 py-3">
           <div className="px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">
             Módulos
           </div>
@@ -252,7 +255,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
       <SidebarInset className="min-h-screen bg-background">
         {/* Top header */}
-        <header className="sticky top-0 z-40 flex h-[52px] items-center justify-between border-b border-border/70 bg-card/95 px-3 backdrop-blur sm:h-14 sm:px-4">
+        <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border/70 bg-card/95 px-3 sm:px-4">
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -273,6 +276,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHelpOpen(true)} aria-label="Abrir ayuda"><CircleHelp className="h-4 w-4" /></Button>
             <NotificationsPanel count={unseen} />
 
             <DropdownMenu>
@@ -321,6 +325,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         </main>
 
         {AI_ASSISTANT_ENABLED && <AIAssistant />}
+        <HelpDrawer open={helpOpen} onOpenChange={setHelpOpen} />
 
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetContent side="left" className="w-[min(88vw,340px)] overflow-y-auto p-0 md:hidden">

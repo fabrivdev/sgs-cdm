@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Database,
   Download,
+  Info,
   Loader2,
   PackageCheck,
   RefreshCw,
@@ -26,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { KpiItem, KpiStrip } from "@/components/layout/AppPrimitives";
 import { useAuth } from "@/hooks/useAuth";
 import {
   cargarSugerenciaViva,
@@ -47,7 +49,7 @@ import {
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel, metaText, pageDescription, pageShellWide, pageTitle } from "@/lib/ui-classes";
+import { cardLabel, metaText, pageShellWide, pageTitle } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -369,6 +371,7 @@ export default function RepuestosSugerencias() {
   const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [legacyMasterProgress, setLegacyMasterProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [legacyBillingProgress, setLegacyBillingProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [historyPublishProgress, setHistoryPublishProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -535,7 +538,6 @@ export default function RepuestosSugerencias() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className={pageTitle}>Sugerencia de compra</h1>
-          <p className={pageDescription}>Plan global con demanda intermitente, cobertura gradual según recurrencia, stock disponible y un mínimo estratégico opcional.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <div>
@@ -550,7 +552,8 @@ export default function RepuestosSugerencias() {
             <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => { setAnalysisDate(event.target.value); setPage(1); }} />
           </div>
           <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
-          <div className="flex h-10 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-sm font-semibold text-primary">
+          <Button variant="outline" size="icon" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial"><Info className="h-4 w-4" /></Button>
+          <div className="flex h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-xs font-semibold text-primary">
             <span className="relative flex h-2.5 w-2.5">
               {liveQuery.isFetching && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />}
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
@@ -563,7 +566,13 @@ export default function RepuestosSugerencias() {
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
 
-      <Card>
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Modelo e historial</SheetTitle>
+            <SheetDescription>Calidad de vinculaciones, fuentes cargadas y mantenimiento del motor.</SheetDescription>
+          </SheetHeader>
+      <Card className="mt-5 border-0 shadow-none">
         <CardContent className="p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
@@ -667,14 +676,15 @@ export default function RepuestosSugerencias() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricCard label="Piezas analizadas" value={integer.format(liveSummary?.total_piezas ?? 0)} />
-        <MetricCard label="Piezas sugeridas" value={integer.format(liveSummary?.piezas_sugeridas ?? 0)} tone="green" />
-        <MetricCard label="Unidades sugeridas" value={integer.format(liveSummary?.unidades_sugeridas ?? 0)} tone="green" />
-        <MetricCard label="Nuevos sin historial" value={integer.format(liveSummary?.piezas_nuevas_sin_historial ?? 0)} tone="amber" />
-        <MetricCard label="Anteriores sin ventas 24m" value={integer.format(liveSummary?.piezas_sin_ventas_recientes ?? 0)} />
-        <MetricCard label="Confianza baja" value={integer.format(liveSummary?.piezas_confianza_baja ?? 0)} tone="amber" />
-      </div>
+        </SheetContent>
+      </Sheet>
+
+      <KpiStrip>
+        <KpiItem label="Piezas analizadas" value={integer.format(liveSummary?.total_piezas ?? 0)} detail={`${integer.format(liveSummary?.piezas_sin_ventas_recientes ?? 0)} sin ventas 24m`} />
+        <KpiItem label="Piezas sugeridas" value={integer.format(liveSummary?.piezas_sugeridas ?? 0)} tone="positive" />
+        <KpiItem label="Unidades sugeridas" value={integer.format(liveSummary?.unidades_sugeridas ?? 0)} tone="positive" />
+        <KpiItem label="Confianza baja" value={integer.format(liveSummary?.piezas_confianza_baja ?? 0)} detail={`${integer.format(liveSummary?.piezas_nuevas_sin_historial ?? 0)} nuevas sin historial`} tone="warning" />
+      </KpiStrip>
 
       {liveQuery.data && (
         <Card>

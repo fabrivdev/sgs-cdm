@@ -7,8 +7,8 @@
 @layer base {
   :root {
     --motion-fast: 160ms;
-    --motion-base: 220ms;
-    --motion-slow: 320ms;
+    --motion-base: 180ms;
+    --motion-slow: 200ms;
     --motion-spring: cubic-bezier(0.22, 1, 0.36, 1);
     /* Core colors - Clean iOS whites */
     --background: 0 0% 98%;
@@ -40,7 +40,7 @@
     --input: 0 0% 90%;
     --ring: 75 46% 44%;
 
-    --radius: 0.75rem;
+    --radius: 0.625rem;
 
     /* Estado colors */
     --estado-pendiente: 38 92% 50%;
@@ -109,21 +109,12 @@
 }
 
 @layer components {
-  .row-pendiente { @apply bg-[hsl(var(--estado-pendiente-bg))]; }
-  .row-iniciado { @apply bg-[hsl(var(--estado-iniciado-bg))]; }
-  .row-completado { @apply bg-[hsl(var(--estado-completado-bg))]; }
+  .row-pendiente { @apply border-l-2 border-l-amber-400; }
+  .row-iniciado { @apply border-l-2 border-l-blue-500; }
+  .row-completado { @apply border-l-2 border-l-primary; }
 
   .app-page-enter {
     animation: app-page-enter var(--motion-base) var(--motion-spring) both;
-  }
-}
-
-/* En escritorio la interfaz adopta la densidad visual equivalente al 80 %
-   del zoom del navegador. Se hace con la unidad raiz para que login, layout,
-   dialogos y todas las secciones mantengan proporciones consistentes. */
-@media (min-width: 1024px) {
-  html {
-    font-size: 80%;
   }
 }
 
