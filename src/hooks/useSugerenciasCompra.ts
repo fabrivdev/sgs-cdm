@@ -24,6 +24,24 @@ export interface ResultadoMaestroLegacy {
   sin_coincidencia: number;
 }
 
+export interface EstadoFacturacionHistorica {
+  cargado: boolean;
+  en_proceso: boolean;
+  carga_id?: string;
+  archivo_nombre?: string;
+  filas_archivo?: number;
+  filas_recibidas?: number;
+  lineas_vinculadas?: number;
+  productos_vinculados?: number;
+  completado_en?: string;
+}
+
+export interface ResultadoFacturacionHistorica {
+  carga_id: string;
+  lineas_vinculadas: number;
+  productos_vinculados: number;
+}
+
 export interface ModeloSugerencia {
   id: string;
   marca: MarcaSugerencia;
@@ -258,6 +276,19 @@ export function useEstadoMaestroLegacy() {
       const { data, error } = await (supabase.rpc as any)("repuestos_estado_maestro_legacy");
       if (error) throw error;
       return data as EstadoMaestroLegacy;
+    },
+  });
+}
+
+export function useEstadoFacturacionHistorica() {
+  return useQuery({
+    queryKey: ["repuestos", "facturacion-historica", "estado"],
+    staleTime: 5 * 60_000,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("repuestos_estado_facturacion_historica");
+      if (error) throw error;
+      return data as EstadoFacturacionHistorica;
     },
   });
 }
@@ -508,6 +539,109 @@ export async function importarMaestroLegacy(
     throw new Error(mensajeErrorSupabase(finish.error, "No se pudo finalizar la vinculación del maestro anterior"));
   }
   return finish.data as ResultadoMaestroLegacy;
+}
+
+const fechaExcelHistorica = (value: unknown) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const date = new Date(Date.UTC(1899, 11, 30) + value * 86_400_000);
+    return date.toISOString().slice(0, 10);
+  }
+  const text = textoMaestroLegacy(value);
+  if (!text) return null;
+  const match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (match) {
+    const year = Number(match[3]) < 100 ? 2000 + Number(match[3]) : Number(match[3]);
+    return `${year.toString().padStart(4, "0")}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+};
+
+const numeroHistorico = (value: unknown) => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const text = textoMaestroLegacy(value).replace(/\s/g, "");
+  if (!text) return 0;
+  const normalized = text.includes(",") && text.includes(".")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : text.replace(",", ".");
+  const result = Number(normalized);
+  return Number.isFinite(result) ? result : 0;
+};
+
+export async function importarFacturacionHistorica(
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+) {
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", raw: true, cellDates: true });
+  const sheetName = workbook.SheetNames.find((name) => claveMaestroLegacy(name).includes("factrepuestos"));
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+  if (!sheet) throw new Error("El archivo no contiene la hoja 'Fact. Repuestos'");
+
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
+  if (rawRows.length === 0) throw new Error("La hoja 'Fact. Repuestos' está vacía");
+
+  const rows = rawRows.flatMap((row, index) => {
+    const movimiento = textoMaestroLegacy(campoMaestroLegacy(row, "Tp. Movimento", "Tipo Movimiento")) || "S";
+    const fecha = fechaExcelHistorica(campoMaestroLegacy(row, "Fecha Factura", "Fecha"));
+    const codigoLegacy = textoMaestroLegacy(campoMaestroLegacy(row, "Cod. Mercaderia", "Cód. Mercadería"));
+    if (movimiento.toUpperCase() !== "S" || !fecha || !codigoLegacy) return [];
+    const documento = textoMaestroLegacy(campoMaestroLegacy(row, "Código Factura", "Codigo Factura"));
+    const cantidad = numeroHistorico(campoMaestroLegacy(row, "Cant. Unit.", "Cantidad"));
+    const totalVenta = numeroHistorico(campoMaestroLegacy(row, "Total Venta"));
+    return [{
+      linea_clave: `${index + 2}|${fecha}|${documento}|${codigoLegacy}`,
+      fecha,
+      documento: documento || null,
+      codigo_legacy: codigoLegacy,
+      descripcion: textoMaestroLegacy(campoMaestroLegacy(row, "Nombre Mercaderia", "Mercaderia")),
+      entidad: textoMaestroLegacy(campoMaestroLegacy(row, "Entidad", "Cliente")),
+      grupo: textoMaestroLegacy(campoMaestroLegacy(row, "Grupo")),
+      sucursal: textoMaestroLegacy(campoMaestroLegacy(row, "Sucursal")),
+      movimiento,
+      cantidad,
+      valor_unitario: numeroHistorico(campoMaestroLegacy(row, "Valor Medio", "Valor Unitario")),
+      total_venta: totalVenta,
+    }];
+  });
+  if (rows.length === 0) throw new Error("No se encontraron líneas de salida con fecha y código de mercadería");
+
+  const start = await (supabase.rpc as any)("repuestos_iniciar_facturacion_historica", {
+    p_archivo_nombre: file.name,
+    p_filas_archivo: rows.length,
+  });
+  if (start.error) throw new Error(mensajeErrorSupabase(start.error, "No se pudo iniciar la carga histórica"));
+  const cargaId = start.data as string;
+
+  const chunkSize = 1000;
+  for (let offset = 0; offset < rows.length; offset += chunkSize) {
+    const chunk = rows.slice(offset, offset + chunkSize);
+    let completed = false;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3 && !completed; attempt += 1) {
+      const result = await (supabase.rpc as any)("repuestos_importar_facturacion_historica_lote", {
+        p_carga_id: cargaId,
+        p_filas: chunk,
+      });
+      if (!result.error) {
+        completed = true;
+        break;
+      }
+      lastError = result.error;
+      if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)));
+    }
+    if (!completed) {
+      throw new Error(mensajeErrorSupabase(lastError, `No se pudo importar el lote ${Math.floor(offset / chunkSize) + 1}`));
+    }
+    onProgress?.(Math.min(offset + chunk.length, rows.length), rows.length);
+  }
+
+  const finish = await (supabase.rpc as any)("repuestos_finalizar_facturacion_historica", {
+    p_carga_id: cargaId,
+  });
+  if (finish.error) throw new Error(mensajeErrorSupabase(finish.error, "No se pudo publicar el historial detallado"));
+  return finish.data as ResultadoFacturacionHistorica;
 }
 
 export async function guardarPlanificacionArticulo(input: {

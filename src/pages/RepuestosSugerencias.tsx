@@ -31,6 +31,7 @@ import {
   cargarSugerenciaViva,
   crearVersionModelo,
   guardarPlanificacionArticulo,
+  importarFacturacionHistorica,
   importarMaestroLegacy,
   refrescarHistorialUnificado,
   type FiltrosResultados,
@@ -39,6 +40,7 @@ import {
   type ResultadoSugerencia,
   type SegmentoSugerencia,
   useCalidadHistorialRepuestos,
+  useEstadoFacturacionHistorica,
   useEstadoMaestroLegacy,
   useModeloActivo,
   useSugerenciaViva,
@@ -368,12 +370,14 @@ export default function RepuestosSugerencias() {
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [legacyMasterProgress, setLegacyMasterProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [legacyBillingProgress, setLegacyBillingProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [historyRebuildRequired, setHistoryRebuildRequired] = useState(false);
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
   const historyQualityQuery = useCalidadHistorialRepuestos(brand);
   const legacyMasterQuery = useEstadoMaestroLegacy();
+  const legacyBillingQuery = useEstadoFacturacionHistorica();
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
   const liveQuery = useSugerenciaViva(
@@ -432,6 +436,29 @@ export default function RepuestosSugerencias() {
       setHistoryRebuildRequired(false);
       setLegacyMasterProgress(null);
       toast.error(error instanceof Error ? error.message : "No se pudo cargar el maestro anterior");
+    },
+  });
+
+  const loadLegacyBilling = useMutation({
+    onMutate: () => setHistoryRebuildRequired(true),
+    mutationFn: (file: File) => importarFacturacionHistorica(file, (loaded, total) => {
+      setLegacyBillingProgress({ loaded, total });
+    }),
+    onSuccess: async (result) => {
+      setLegacyBillingProgress(null);
+      setHistoryRebuildRequired(false);
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "facturacion-historica", "estado"] });
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] });
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
+      toast.success(
+        `Facturación histórica cargada: ${integer.format(result.lineas_vinculadas)} líneas vinculadas a ${integer.format(result.productos_vinculados)} productos.`,
+        { duration: 12000 },
+      );
+    },
+    onError: (error) => {
+      setHistoryRebuildRequired(false);
+      setLegacyBillingProgress(null);
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar la facturación histórica");
     },
   });
 
@@ -548,6 +575,13 @@ export default function RepuestosSugerencias() {
                   Maestro anterior vinculado · {integer.format(legacyMasterQuery.data.vinculadas ?? 0)} de {integer.format(legacyMasterQuery.data.filas ?? 0)} códigos · carga única completada {displayDate(legacyMasterQuery.data.completado_en)}
                 </p>
               )}
+              {legacyBillingQuery.data?.cargado ? (
+                <p className="mt-1 text-xs text-emerald-700">
+                  Facturación histórica detallada · {integer.format(legacyBillingQuery.data.lineas_vinculadas ?? 0)} líneas vinculadas a {integer.format(legacyBillingQuery.data.productos_vinculados ?? 0)} productos · carga única completada {displayDate(legacyBillingQuery.data.completado_en)}
+                </p>
+              ) : legacyMasterQuery.data?.cargado ? (
+                <p className="mt-1 text-xs text-amber-700">Falta cargar una vez “FACTURACIÓN HISTORICA.xlsx” para recuperar las ventas por código.</p>
+              ) : null}
             </div>
             {canManage && !historyQualityQuery.isError && (
               <div className="flex flex-wrap gap-2">
@@ -575,7 +609,31 @@ export default function RepuestosSugerencias() {
                     </Button>
                   </>
                 )}
-                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending}>
+                {canLoadLegacyMaster && legacyMasterQuery.data?.cargado && !legacyBillingQuery.isError && !legacyBillingQuery.data?.cargado && (
+                  <>
+                    <input
+                      id="legacy-detailed-billing"
+                      className="sr-only"
+                      type="file"
+                      accept=".xlsx"
+                      disabled={loadLegacyBilling.isPending}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) loadLegacyBilling.mutate(file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <Button asChild variant="outline" className={cn(loadLegacyBilling.isPending && "pointer-events-none opacity-60")}>
+                      <label htmlFor="legacy-detailed-billing">
+                        {loadLegacyBilling.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                        {legacyBillingProgress
+                          ? `${integer.format(legacyBillingProgress.loaded)} / ${integer.format(legacyBillingProgress.total)}`
+                          : "Cargar facturación histórica"}
+                      </label>
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending || loadLegacyBilling.isPending}>
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   {historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
                 </Button>
@@ -646,6 +704,8 @@ export default function RepuestosSugerencias() {
       <Card className="overflow-hidden">
         {!legacyMasterQuery.isLoading && !legacyMasterQuery.data?.cargado ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Upload className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Cargá el maestro anterior</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El cálculo en vivo permanecerá detenido para no consumir conexiones mientras se vinculan los códigos históricos.</p></div>
+        ) : legacyBillingQuery.isLoading ? (
+          <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : historyRebuildRequired || refreshHistory.isPending ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-sm text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
         ) : !historyQuality?.preparado ? (
