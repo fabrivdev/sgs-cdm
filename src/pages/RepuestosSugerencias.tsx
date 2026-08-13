@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Settings2,
   ShoppingCart,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,6 +31,7 @@ import {
   cargarSugerenciaViva,
   crearVersionModelo,
   guardarPlanificacionArticulo,
+  importarMaestroLegacy,
   refrescarHistorialUnificado,
   type FiltrosResultados,
   type MarcaSugerencia,
@@ -37,6 +39,7 @@ import {
   type ResultadoSugerencia,
   type SegmentoSugerencia,
   useCalidadHistorialRepuestos,
+  useEstadoMaestroLegacy,
   useModeloActivo,
   useSugerenciaViva,
   useSegmentosModelo,
@@ -357,16 +360,19 @@ export default function RepuestosSugerencias() {
   const queryClient = useQueryClient();
   const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
+  const canLoadLegacyMaster = isAdmin || isSuperAdmin;
   const [brand, setBrand] = useState<MarcaSugerencia>("CLAAS");
   const [analysisDate, setAnalysisDate] = useState(analysisDateDefault);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [legacyMasterProgress, setLegacyMasterProgress] = useState<{ loaded: number; total: number } | null>(null);
 
   const modelQuery = useModeloActivo(brand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
   const historyQualityQuery = useCalidadHistorialRepuestos(brand);
+  const legacyMasterQuery = useEstadoMaestroLegacy();
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
   const liveQuery = useSugerenciaViva(
@@ -396,6 +402,25 @@ export default function RepuestosSugerencias() {
       void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo preparar el historial"),
+  });
+
+  const loadLegacyMaster = useMutation({
+    mutationFn: (file: File) => importarMaestroLegacy(file, (loaded, total) => {
+      setLegacyMasterProgress({ loaded, total });
+    }),
+    onSuccess: async (result) => {
+      setLegacyMasterProgress(null);
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "maestro-legacy", "estado"] });
+      toast.success(
+        `Maestro anterior cargado: ${integer.format(result.vinculadas)} de ${integer.format(result.filas)} códigos vinculados. Reconstruyendo ventas…`,
+        { duration: 12000 },
+      );
+      refreshHistory.mutate();
+    },
+    onError: (error) => {
+      setLegacyMasterProgress(null);
+      toast.error(error instanceof Error ? error.message : "No se pudo cargar el maestro anterior");
+    },
   });
 
   const exportMutation = useMutation({
@@ -506,10 +531,39 @@ export default function RepuestosSugerencias() {
               ) : (
                 <p className="mt-2 text-xs text-muted-foreground">La estructura está disponible, pero todavía falta preparar el primer historial consolidado.</p>
               )}
+              {legacyMasterQuery.data?.cargado && (
+                <p className="mt-1 text-xs text-emerald-700">
+                  Maestro anterior vinculado · {integer.format(legacyMasterQuery.data.vinculadas ?? 0)} de {integer.format(legacyMasterQuery.data.filas ?? 0)} códigos · carga única completada {displayDate(legacyMasterQuery.data.completado_en)}
+                </p>
+              )}
             </div>
             {canManage && !historyQualityQuery.isError && (
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending}>
+                {canLoadLegacyMaster && !legacyMasterQuery.isError && !legacyMasterQuery.data?.cargado && (
+                  <>
+                    <input
+                      id="legacy-product-master"
+                      className="sr-only"
+                      type="file"
+                      accept=".xls,.xlsx"
+                      disabled={loadLegacyMaster.isPending}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) loadLegacyMaster.mutate(file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <Button asChild variant="outline" className={cn(loadLegacyMaster.isPending && "pointer-events-none opacity-60")}>
+                      <label htmlFor="legacy-product-master">
+                        {loadLegacyMaster.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                        {legacyMasterProgress
+                          ? `${integer.format(legacyMasterProgress.loaded)} / ${integer.format(legacyMasterProgress.total)}`
+                          : "Cargar maestro anterior"}
+                      </label>
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending}>
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   {historyQuality?.preparado ? "Actualizar historial" : "Preparar historial"}
                 </Button>

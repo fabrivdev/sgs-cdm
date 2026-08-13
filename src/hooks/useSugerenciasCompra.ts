@@ -7,6 +7,23 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type MarcaSugerencia = "CLAAS" | "HORSCH";
 
+export interface EstadoMaestroLegacy {
+  cargado: boolean;
+  archivo_nombre?: string;
+  filas?: number;
+  vinculadas?: number;
+  canonicas?: number;
+  sin_coincidencia?: number;
+  completado_en?: string;
+}
+
+export interface ResultadoMaestroLegacy {
+  filas: number;
+  vinculadas: number;
+  canonicas: number;
+  sin_coincidencia: number;
+}
+
 export interface ModeloSugerencia {
   id: string;
   marca: MarcaSugerencia;
@@ -232,6 +249,19 @@ export function useCalidadHistorialRepuestos(marca: MarcaSugerencia) {
   });
 }
 
+export function useEstadoMaestroLegacy() {
+  return useQuery({
+    queryKey: ["repuestos", "maestro-legacy", "estado"],
+    staleTime: 5 * 60_000,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("repuestos_estado_maestro_legacy");
+      if (error) throw error;
+      return data as EstadoMaestroLegacy;
+    },
+  });
+}
+
 export function useResultadosSugerencia(
   corridaId: string | undefined,
   filtros: FiltrosResultados,
@@ -382,6 +412,55 @@ export async function refrescarHistorialUnificado() {
     throw new Error(details.join(" | ") || "No se pudo preparar el historial");
   }
   return data as ResultadoRefrescoHistorial;
+}
+
+const textoMaestroLegacy = (value: unknown) => String(value ?? "").trim();
+
+export async function importarMaestroLegacy(
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+) {
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", raw: true });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) throw new Error("El archivo no contiene hojas");
+
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
+  const rows = rawRows.flatMap((row) => {
+    const codigoLegacy = textoMaestroLegacy(row.Código ?? row.Codigo);
+    if (!codigoLegacy) return [];
+    return [{
+      codigo_legacy: codigoLegacy,
+      codigo_fabricante: textoMaestroLegacy(row["Cód. Fabricante"] ?? row["Cod. Fabricante"] ?? row.Fabricante) || null,
+      descripcion: textoMaestroLegacy(row.Nombre ?? row["Nombre Impresión"] ?? row["Nombre Impresion"]),
+      situacion: textoMaestroLegacy(row.Situación ?? row.Situacion) || null,
+      tipo: textoMaestroLegacy(row.Tipo) || null,
+    }];
+  });
+  if (rows.length === 0) throw new Error("No se encontraron códigos del maestro anterior");
+
+  const start = await (supabase.rpc as any)("repuestos_iniciar_maestro_legacy", {
+    p_archivo_nombre: file.name,
+  });
+  if (start.error) throw start.error;
+  const cargaId = start.data as string;
+
+  const chunkSize = 500;
+  for (let offset = 0; offset < rows.length; offset += chunkSize) {
+    const chunk = rows.slice(offset, offset + chunkSize);
+    const result = await (supabase.rpc as any)("repuestos_importar_maestro_legacy_lote", {
+      p_carga_id: cargaId,
+      p_filas: chunk,
+    });
+    if (result.error) throw result.error;
+    onProgress?.(Math.min(offset + chunk.length, rows.length), rows.length);
+  }
+
+  const finish = await (supabase.rpc as any)("repuestos_finalizar_maestro_legacy", {
+    p_carga_id: cargaId,
+  });
+  if (finish.error) throw finish.error;
+  return finish.data as ResultadoMaestroLegacy;
 }
 
 export async function guardarPlanificacionArticulo(input: {

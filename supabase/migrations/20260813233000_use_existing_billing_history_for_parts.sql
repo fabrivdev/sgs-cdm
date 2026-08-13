@@ -18,6 +18,347 @@ AS $$
     OR coalesce(p_subgrupo_original, '') ~* 'repuest|parts';
 $$;
 
+-- Puente permanente entre el codigo interno del sistema anterior y el
+-- producto vigente. Se carga una sola vez desde "Lista Mercadoria.xls".
+CREATE TABLE IF NOT EXISTS public.repuestos_maestro_legacy_cargas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  archivo_nombre text NOT NULL,
+  estado text NOT NULL DEFAULT 'PROCESANDO'
+    CHECK (estado IN ('PROCESANDO', 'COMPLETADO', 'FALLIDO')),
+  activo boolean NOT NULL DEFAULT false,
+  filas integer NOT NULL DEFAULT 0,
+  vinculadas integer NOT NULL DEFAULT 0,
+  canonicas integer NOT NULL DEFAULT 0,
+  sin_coincidencia integer NOT NULL DEFAULT 0,
+  creado_en timestamptz NOT NULL DEFAULT now(),
+  completado_en timestamptz,
+  creado_por uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS repuestos_maestro_legacy_carga_activa_idx
+  ON public.repuestos_maestro_legacy_cargas(activo)
+  WHERE activo;
+
+CREATE TABLE IF NOT EXISTS public.repuestos_maestro_legacy (
+  carga_id uuid NOT NULL REFERENCES public.repuestos_maestro_legacy_cargas(id) ON DELETE CASCADE,
+  codigo_legacy text NOT NULL,
+  codigo_legacy_norm text NOT NULL,
+  codigo_fabricante text,
+  codigo_fabricante_norm text,
+  descripcion text NOT NULL,
+  situacion text,
+  tipo text,
+  producto_codigo text REFERENCES public.productos(codigo_interno) ON DELETE SET NULL,
+  estado_vinculo text NOT NULL DEFAULT 'PENDIENTE'
+    CHECK (estado_vinculo IN ('PENDIENTE', 'CONFIRMADA', 'CONFIRMADA_CANONICA', 'SIN_COINCIDENCIA')),
+  metodo_vinculo text,
+  candidatos text[] NOT NULL DEFAULT '{}'::text[],
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (carga_id, codigo_legacy_norm)
+);
+
+CREATE INDEX IF NOT EXISTS repuestos_maestro_legacy_codigo_idx
+  ON public.repuestos_maestro_legacy(codigo_legacy_norm);
+CREATE INDEX IF NOT EXISTS repuestos_maestro_legacy_fabricante_idx
+  ON public.repuestos_maestro_legacy(codigo_fabricante_norm)
+  WHERE codigo_fabricante_norm IS NOT NULL;
+CREATE INDEX IF NOT EXISTS repuestos_maestro_legacy_producto_idx
+  ON public.repuestos_maestro_legacy(producto_codigo)
+  WHERE producto_codigo IS NOT NULL;
+
+ALTER TABLE public.repuestos_maestro_legacy_cargas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.repuestos_maestro_legacy ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS repuestos_maestro_legacy_cargas_select ON public.repuestos_maestro_legacy_cargas;
+CREATE POLICY repuestos_maestro_legacy_cargas_select
+ON public.repuestos_maestro_legacy_cargas FOR SELECT TO authenticated
+USING (public.has_module_access(auth.uid(), 'repuestos'));
+
+DROP POLICY IF EXISTS repuestos_maestro_legacy_select ON public.repuestos_maestro_legacy;
+CREATE POLICY repuestos_maestro_legacy_select
+ON public.repuestos_maestro_legacy FOR SELECT TO authenticated
+USING (public.has_module_access(auth.uid(), 'repuestos'));
+
+GRANT SELECT ON public.repuestos_maestro_legacy_cargas TO authenticated;
+GRANT SELECT ON public.repuestos_maestro_legacy TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.repuestos_estado_maestro_legacy()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+  SELECT coalesce(
+    (
+      SELECT jsonb_build_object(
+        'cargado', true,
+        'archivo_nombre', archivo_nombre,
+        'filas', filas,
+        'vinculadas', vinculadas,
+        'canonicas', canonicas,
+        'sin_coincidencia', sin_coincidencia,
+        'completado_en', completado_en
+      )
+      FROM public.repuestos_maestro_legacy_cargas
+      WHERE activo AND estado = 'COMPLETADO'
+      ORDER BY completado_en DESC
+      LIMIT 1
+    ),
+    jsonb_build_object('cargado', false)
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.repuestos_iniciar_maestro_legacy(p_archivo_nombre text)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.has_role(auth.uid(), 'admin'::public.app_role) THEN
+    RAISE EXCEPTION 'Solo un administrador puede cargar el maestro anterior'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.repuestos_maestro_legacy_cargas
+    WHERE estado = 'COMPLETADO'
+  ) THEN
+    RAISE EXCEPTION 'El maestro anterior ya fue cargado. Esta operacion se realiza una sola vez.';
+  END IF;
+
+  UPDATE public.repuestos_maestro_legacy_cargas
+  SET estado = 'FALLIDO'
+  WHERE estado = 'PROCESANDO'
+    AND creado_en < now() - interval '2 hours';
+
+  IF EXISTS (
+    SELECT 1 FROM public.repuestos_maestro_legacy_cargas
+    WHERE estado = 'PROCESANDO'
+  ) THEN
+    RAISE EXCEPTION 'Ya existe una carga del maestro anterior en proceso';
+  END IF;
+
+  INSERT INTO public.repuestos_maestro_legacy_cargas(archivo_nombre, creado_por)
+  VALUES (coalesce(nullif(trim(p_archivo_nombre), ''), 'Lista Mercadoria.xls'), auth.uid())
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.repuestos_importar_maestro_legacy_lote(
+  p_carga_id uuid,
+  p_filas jsonb
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_insertadas integer := 0;
+BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.has_role(auth.uid(), 'admin'::public.app_role) THEN
+    RAISE EXCEPTION 'Solo un administrador puede cargar el maestro anterior'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.repuestos_maestro_legacy_cargas
+    WHERE id = p_carga_id AND estado = 'PROCESANDO'
+  ) THEN
+    RAISE EXCEPTION 'La carga no existe o ya fue cerrada';
+  END IF;
+
+  INSERT INTO public.repuestos_maestro_legacy(
+    carga_id, codigo_legacy, codigo_legacy_norm,
+    codigo_fabricante, codigo_fabricante_norm,
+    descripcion, situacion, tipo
+  )
+  SELECT
+    p_carga_id,
+    trim(x.codigo_legacy),
+    public.normalizar_codigo_repuesto_flexible(x.codigo_legacy),
+    nullif(trim(x.codigo_fabricante), ''),
+    coalesce(
+      public.normalizar_codigo_repuesto_flexible(x.codigo_fabricante),
+      public.extraer_codigo_repuesto_descripcion(x.descripcion)
+    ),
+    coalesce(nullif(trim(x.descripcion), ''), 'Producto ' || trim(x.codigo_legacy)),
+    nullif(trim(x.situacion), ''),
+    nullif(trim(x.tipo), '')
+  FROM jsonb_to_recordset(coalesce(p_filas, '[]'::jsonb)) AS x(
+    codigo_legacy text,
+    codigo_fabricante text,
+    descripcion text,
+    situacion text,
+    tipo text
+  )
+  WHERE public.normalizar_codigo_repuesto_flexible(x.codigo_legacy) IS NOT NULL
+  ON CONFLICT (carga_id, codigo_legacy_norm) DO UPDATE SET
+    codigo_legacy = EXCLUDED.codigo_legacy,
+    codigo_fabricante = EXCLUDED.codigo_fabricante,
+    codigo_fabricante_norm = EXCLUDED.codigo_fabricante_norm,
+    descripcion = EXCLUDED.descripcion,
+    situacion = EXCLUDED.situacion,
+    tipo = EXCLUDED.tipo,
+    actualizado_en = now();
+
+  GET DIAGNOSTICS v_insertadas = ROW_COUNT;
+  RETURN v_insertadas;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.repuestos_finalizar_maestro_legacy(p_carga_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+SET statement_timeout = '180s'
+AS $$
+DECLARE
+  v_filas integer := 0;
+  v_vinculadas integer := 0;
+  v_canonicas integer := 0;
+  v_sin integer := 0;
+BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.has_role(auth.uid(), 'admin'::public.app_role) THEN
+    RAISE EXCEPTION 'Solo un administrador puede cargar el maestro anterior'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.repuestos_maestro_legacy_cargas
+    WHERE id = p_carga_id AND estado = 'PROCESANDO'
+  ) THEN
+    RAISE EXCEPTION 'La carga no existe o ya fue cerrada';
+  END IF;
+
+  CREATE TEMP TABLE tmp_maestro_actual ON COMMIT DROP AS
+  SELECT
+    p.codigo_interno,
+    p.marca,
+    p.incorporado_en,
+    coalesce(s.stock_total, 0)::numeric AS stock_total,
+    public.normalizar_codigo_repuesto_flexible(p.codigo_fabricante) AS fabricante_norm,
+    public.extraer_codigo_repuesto_descripcion(p.descripcion) AS descripcion_norm
+  FROM public.productos p
+  LEFT JOIN (
+    SELECT producto_codigo, sum(saldo_actual)::numeric AS stock_total
+    FROM public.repuestos_stock
+    GROUP BY producto_codigo
+  ) s ON s.producto_codigo = p.codigo_interno
+  WHERE p.activo AND p.codigo_interno ILIKE 'REP%';
+
+  CREATE INDEX tmp_maestro_actual_fabricante_idx
+    ON tmp_maestro_actual(fabricante_norm) WHERE fabricante_norm IS NOT NULL;
+  CREATE INDEX tmp_maestro_actual_descripcion_idx
+    ON tmp_maestro_actual(descripcion_norm) WHERE descripcion_norm IS NOT NULL;
+
+  CREATE TEMP TABLE tmp_maestro_candidatos ON COMMIT DROP AS
+  SELECT DISTINCT
+    m.codigo_legacy_norm,
+    p.codigo_interno AS producto_codigo,
+    CASE WHEN p.fabricante_norm = m.codigo_fabricante_norm THEN 1 ELSE 2 END AS prioridad
+  FROM public.repuestos_maestro_legacy m
+  JOIN tmp_maestro_actual p
+    ON p.fabricante_norm = m.codigo_fabricante_norm
+    OR p.descripcion_norm = m.codigo_fabricante_norm
+  WHERE m.carga_id = p_carga_id
+    AND m.codigo_fabricante_norm IS NOT NULL;
+
+  CREATE INDEX tmp_maestro_candidatos_codigo_idx
+    ON tmp_maestro_candidatos(codigo_legacy_norm, prioridad, producto_codigo);
+
+  WITH mejor AS MATERIALIZED (
+    SELECT codigo_legacy_norm, min(prioridad) AS prioridad
+    FROM tmp_maestro_candidatos
+    GROUP BY codigo_legacy_norm
+  ),
+  resumen AS MATERIALIZED (
+    SELECT
+      c.codigo_legacy_norm,
+      array_agg(DISTINCT c.producto_codigo ORDER BY c.producto_codigo) AS candidatos,
+      count(DISTINCT c.producto_codigo)::integer AS cantidad
+    FROM tmp_maestro_candidatos c
+    JOIN mejor b
+      ON b.codigo_legacy_norm = c.codigo_legacy_norm
+     AND b.prioridad = c.prioridad
+    GROUP BY c.codigo_legacy_norm
+  ),
+  elegido AS MATERIALIZED (
+    SELECT DISTINCT ON (c.codigo_legacy_norm)
+      c.codigo_legacy_norm,
+      c.producto_codigo
+    FROM tmp_maestro_candidatos c
+    JOIN mejor b
+      ON b.codigo_legacy_norm = c.codigo_legacy_norm
+     AND b.prioridad = c.prioridad
+    JOIN tmp_maestro_actual p ON p.codigo_interno = c.producto_codigo
+    ORDER BY
+      c.codigo_legacy_norm,
+      p.stock_total DESC,
+      p.incorporado_en ASC NULLS LAST,
+      p.codigo_interno
+  )
+  UPDATE public.repuestos_maestro_legacy m
+  SET
+    producto_codigo = e.producto_codigo,
+    estado_vinculo = CASE
+      WHEN e.producto_codigo IS NULL THEN 'SIN_COINCIDENCIA'
+      WHEN r.cantidad > 1 THEN 'CONFIRMADA_CANONICA'
+      ELSE 'CONFIRMADA'
+    END,
+    metodo_vinculo = CASE
+      WHEN e.producto_codigo IS NULL THEN NULL
+      WHEN r.cantidad > 1 THEN 'FABRICANTE_CANONICO'
+      ELSE 'FABRICANTE_UNICO'
+    END,
+    candidatos = coalesce(r.candidatos, '{}'::text[]),
+    actualizado_en = now()
+  FROM (SELECT codigo_legacy_norm FROM public.repuestos_maestro_legacy WHERE carga_id = p_carga_id) base
+  LEFT JOIN resumen r ON r.codigo_legacy_norm = base.codigo_legacy_norm
+  LEFT JOIN elegido e ON e.codigo_legacy_norm = base.codigo_legacy_norm
+  WHERE m.carga_id = p_carga_id
+    AND m.codigo_legacy_norm = base.codigo_legacy_norm;
+
+  SELECT
+    count(*)::integer,
+    count(*) FILTER (WHERE estado_vinculo IN ('CONFIRMADA', 'CONFIRMADA_CANONICA'))::integer,
+    count(*) FILTER (WHERE estado_vinculo = 'CONFIRMADA_CANONICA')::integer,
+    count(*) FILTER (WHERE estado_vinculo = 'SIN_COINCIDENCIA')::integer
+  INTO v_filas, v_vinculadas, v_canonicas, v_sin
+  FROM public.repuestos_maestro_legacy
+  WHERE carga_id = p_carga_id;
+
+  UPDATE public.repuestos_maestro_legacy_cargas
+  SET activo = false
+  WHERE activo;
+
+  UPDATE public.repuestos_maestro_legacy_cargas
+  SET
+    estado = 'COMPLETADO',
+    activo = true,
+    filas = v_filas,
+    vinculadas = v_vinculadas,
+    canonicas = v_canonicas,
+    sin_coincidencia = v_sin,
+    completado_en = now()
+  WHERE id = p_carga_id;
+
+  RETURN jsonb_build_object(
+    'filas', v_filas,
+    'vinculadas', v_vinculadas,
+    'canonicas', v_canonicas,
+    'sin_coincidencia', v_sin
+  );
+END;
+$$;
+
 -- Algunas cargas antiguas quedaron en facturacion aunque ya traian codigo y
 -- cantidad. Se promueven una sola vez al detalle auditable. Las facturas que
 -- ya tienen una linea detallada equivalente no se duplican.
@@ -191,6 +532,19 @@ BEGIN
     prioridad integer NOT NULL,
     metodo text NOT NULL
   ) ON COMMIT DROP;
+
+  -- Regla principal: el codigo interno facturado del sistema anterior se
+  -- resuelve mediante el maestro legacy cargado una sola vez.
+  INSERT INTO tmp_repuestos_candidatos
+  SELECT l.id, m.producto_codigo, 0, 'MAESTRO_LEGACY'
+  FROM tmp_repuestos_lineas l
+  JOIN public.repuestos_maestro_legacy_cargas c
+    ON c.activo AND c.estado = 'COMPLETADO'
+  JOIN public.repuestos_maestro_legacy m
+    ON m.carga_id = c.id
+   AND m.codigo_legacy_norm = l.mercaderia_norm
+  WHERE m.producto_codigo IS NOT NULL
+    AND m.estado_vinculo IN ('CONFIRMADA', 'CONFIRMADA_CANONICA');
 
   INSERT INTO tmp_repuestos_candidatos
   SELECT l.id, p.codigo_interno, 1, 'CODIGO_INTERNO'
@@ -434,6 +788,7 @@ SECURITY INVOKER
 SET search_path = public, pg_temp
 AS $$
   SELECT jsonb_build_object(
+    'maestro_legacy', public.repuestos_estado_maestro_legacy(),
     'lineas_detalladas_totales', count(*)::integer,
     'lineas_repuestos_detectadas', count(*) FILTER (
       WHERE public.es_linea_facturacion_repuesto(
@@ -470,9 +825,17 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.es_linea_facturacion_repuesto(public.tipo_facturacion,text,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.repuestos_estado_maestro_legacy() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.repuestos_iniciar_maestro_legacy(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.repuestos_importar_maestro_legacy_lote(uuid,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.repuestos_finalizar_maestro_legacy(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.repuestos_refrescar_historial_unificado() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.repuestos_diagnostico_fuentes_historial() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.es_linea_facturacion_repuesto(public.tipo_facturacion,text,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.repuestos_estado_maestro_legacy() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.repuestos_iniciar_maestro_legacy(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.repuestos_importar_maestro_legacy_lote(uuid,jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.repuestos_finalizar_maestro_legacy(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.repuestos_refrescar_historial_unificado() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.repuestos_diagnostico_fuentes_historial() TO authenticated;
 
