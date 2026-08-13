@@ -28,6 +28,13 @@ export interface ModeloSugerencia {
   xyz_meses_x: number;
   xyz_meses_y_min: number;
   xyz_meses_y_max: number;
+  adi_intermitente_umbral: number;
+  cv2_erratico_umbral: number;
+  tendencia_caida_umbral: number;
+  tendencia_caida_tope: number;
+  stock_seguridad_tope: number;
+  cobertura_margen_meses: number;
+  pedido_unico_cobertura_meses: number;
   creado_en: string;
 }
 

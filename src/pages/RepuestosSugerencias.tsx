@@ -63,6 +63,13 @@ const PARAM_FIELDS: Array<{ key: keyof ModeloSugerencia; label: string; step?: s
   { key: "xyz_meses_x", label: "XYZ · meses con venta X" },
   { key: "xyz_meses_y_min", label: "XYZ · meses mínimos Y" },
   { key: "xyz_meses_y_max", label: "XYZ · meses máximos Y" },
+  { key: "adi_intermitente_umbral", label: "Intermitencia · umbral ADI", step: "0.01" },
+  { key: "cv2_erratico_umbral", label: "Variabilidad · umbral CV²", step: "0.01" },
+  { key: "tendencia_caida_umbral", label: "Caída · proporción de activación", step: "0.05" },
+  { key: "tendencia_caida_tope", label: "Caída · tope sobre ritmo reciente", step: "0.05" },
+  { key: "stock_seguridad_tope", label: "Seguridad · máximo sobre demanda", step: "0.05" },
+  { key: "cobertura_margen_meses", label: "Cobertura · margen adicional (meses)", step: "0.25" },
+  { key: "pedido_unico_cobertura_meses", label: "Pedido único · cobertura máxima", step: "0.5" },
 ];
 
 function analysisDateDefault() {
@@ -299,6 +306,11 @@ function ResultDetailSheet({
               <div className="rounded-xl border p-4">
                 <h3 className="flex items-center gap-2 text-sm font-semibold"><Calculator className="h-4 w-4 text-primary" /> Cómo se obtuvo</h3>
                 <p className="mt-2 text-sm">{String(explanation.motivo ?? "Sin explicación disponible")}</p>
+                {explanation.tipo_demanda && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Patrón {String(explanation.tipo_demanda).toLowerCase()} · ADI {decimal.format(Number(explanation.adi ?? 0))} · CV² {decimal.format(Number(explanation.cv2 ?? 0))}
+                  </p>
+                )}
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground">
                   <span>Demanda mensual <strong className="float-right text-foreground">{decimal.format(row.demanda_ponderada_mensual)}</strong></span>
                   <span>Horizonte <strong className="float-right text-foreground">{row.horizonte_meses} meses</strong></span>
