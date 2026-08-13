@@ -143,7 +143,8 @@ BEGIN
     ON tmp_repuestos_candidatos(linea_id, prioridad, producto_codigo);
   ANALYZE tmp_repuestos_candidatos;
 
-  DELETE FROM public.repuestos_ventas_vinculacion;
+  DELETE FROM public.repuestos_ventas_vinculacion
+  WHERE linea_id IS NOT NULL;
 
   WITH mejor_prioridad AS MATERIALIZED (
     SELECT linea_id, min(prioridad) AS prioridad
@@ -202,7 +203,8 @@ BEGIN
       ELSE NULL
     END;
 
-  DELETE FROM public.repuestos_demanda_mensual;
+  DELETE FROM public.repuestos_demanda_mensual
+  WHERE producto_codigo IS NOT NULL;
 
   INSERT INTO public.repuestos_demanda_mensual (
     producto_codigo, mes, unidades_netas, unidades_positivas,
