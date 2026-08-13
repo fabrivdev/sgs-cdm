@@ -130,10 +130,12 @@ BEGIN
     RAISE EXCEPTION 'El maestro anterior ya fue cargado. Esta operacion se realiza una sola vez.';
   END IF;
 
+  -- Un fallo de red o del navegador no debe bloquear un nuevo intento.
+  -- Solo se cierran intentos anteriores del mismo usuario.
   UPDATE public.repuestos_maestro_legacy_cargas
   SET estado = 'FALLIDO'
   WHERE estado = 'PROCESANDO'
-    AND creado_en < now() - interval '2 hours';
+    AND creado_por IS NOT DISTINCT FROM auth.uid();
 
   IF EXISTS (
     SELECT 1 FROM public.repuestos_maestro_legacy_cargas

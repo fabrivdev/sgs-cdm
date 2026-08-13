@@ -416,6 +416,41 @@ export async function refrescarHistorialUnificado() {
 
 const textoMaestroLegacy = (value: unknown) => String(value ?? "").trim();
 
+const claveMaestroLegacy = (value: unknown) => textoMaestroLegacy(value)
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, "");
+
+const campoMaestroLegacy = (
+  row: Record<string, unknown>,
+  ...aliases: string[]
+) => {
+  const normalized = new Map(
+    Object.entries(row).map(([key, value]) => [claveMaestroLegacy(key), value]),
+  );
+  for (const alias of aliases) {
+    const value = normalized.get(claveMaestroLegacy(alias));
+    if (value !== undefined && value !== null && textoMaestroLegacy(value)) return value;
+  }
+  return null;
+};
+
+const mensajeErrorSupabase = (error: unknown, fallback: string) => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const value = error as Record<string, unknown>;
+    const details = [
+      value.code ? `[${String(value.code)}]` : null,
+      value.message,
+      value.details,
+      value.hint,
+    ].filter(Boolean).map(String);
+    if (details.length) return details.join(" | ");
+  }
+  return fallback;
+};
+
 export async function importarMaestroLegacy(
   file: File,
   onProgress?: (loaded: number, total: number) => void,
@@ -427,39 +462,51 @@ export async function importarMaestroLegacy(
 
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: true });
   const rows = rawRows.flatMap((row) => {
-    const codigoLegacy = textoMaestroLegacy(row.Código ?? row.Codigo);
+    const codigoLegacy = textoMaestroLegacy(campoMaestroLegacy(row, "Código", "Codigo"));
     if (!codigoLegacy) return [];
     return [{
       codigo_legacy: codigoLegacy,
-      codigo_fabricante: textoMaestroLegacy(row["Cód. Fabricante"] ?? row["Cod. Fabricante"] ?? row.Fabricante) || null,
-      descripcion: textoMaestroLegacy(row.Nombre ?? row["Nombre Impresión"] ?? row["Nombre Impresion"]),
-      situacion: textoMaestroLegacy(row.Situación ?? row.Situacion) || null,
-      tipo: textoMaestroLegacy(row.Tipo) || null,
+      codigo_fabricante: textoMaestroLegacy(campoMaestroLegacy(row, "Cód. Fabricante", "Cod. Fabricante")) || null,
+      descripcion: textoMaestroLegacy(campoMaestroLegacy(row, "Nombre", "Nombre Impresión", "Nombre Impresion")),
+      situacion: textoMaestroLegacy(campoMaestroLegacy(row, "Situación", "Situacion")) || null,
+      tipo: textoMaestroLegacy(campoMaestroLegacy(row, "Tipo")) || null,
     }];
   });
-  if (rows.length === 0) throw new Error("No se encontraron códigos del maestro anterior");
+  if (rows.length === 0) {
+    const headers = rawRows[0] ? Object.keys(rawRows[0]).join(", ") : "sin encabezados";
+    throw new Error(`No se encontraron códigos del maestro anterior. Encabezados detectados: ${headers}`);
+  }
 
   const start = await (supabase.rpc as any)("repuestos_iniciar_maestro_legacy", {
     p_archivo_nombre: file.name,
   });
-  if (start.error) throw start.error;
+  if (start.error) {
+    throw new Error(mensajeErrorSupabase(start.error, "No se pudo iniciar la carga del maestro anterior"));
+  }
   const cargaId = start.data as string;
 
-  const chunkSize = 500;
+  const chunkSize = 200;
   for (let offset = 0; offset < rows.length; offset += chunkSize) {
     const chunk = rows.slice(offset, offset + chunkSize);
     const result = await (supabase.rpc as any)("repuestos_importar_maestro_legacy_lote", {
       p_carga_id: cargaId,
       p_filas: chunk,
     });
-    if (result.error) throw result.error;
+    if (result.error) {
+      throw new Error(mensajeErrorSupabase(
+        result.error,
+        `No se pudo importar el lote ${Math.floor(offset / chunkSize) + 1}`,
+      ));
+    }
     onProgress?.(Math.min(offset + chunk.length, rows.length), rows.length);
   }
 
   const finish = await (supabase.rpc as any)("repuestos_finalizar_maestro_legacy", {
     p_carga_id: cargaId,
   });
-  if (finish.error) throw finish.error;
+  if (finish.error) {
+    throw new Error(mensajeErrorSupabase(finish.error, "No se pudo finalizar la vinculación del maestro anterior"));
+  }
   return finish.data as ResultadoMaestroLegacy;
 }
 
