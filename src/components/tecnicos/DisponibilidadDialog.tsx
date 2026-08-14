@@ -128,7 +128,7 @@ export function DisponibilidadDialog({
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">
       <ResponsiveDrawerHeader>
         <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <CalendarOff className="h-4 w-4" />
           </span>
           <div>

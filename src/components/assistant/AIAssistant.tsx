@@ -216,7 +216,7 @@ export function AIAssistant() {
             <SheetHeader className="border-b px-4 py-3 pr-12 text-left">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <SheetTitle className="flex items-center gap-2"><Bot className="h-5 w-5 text-primary" />Asistente de datos</SheetTitle>
+                  <SheetTitle className="flex items-center gap-2"><Bot className="h-4 w-4 text-primary" />Asistente de datos</SheetTitle>
                   <SheetDescription className="truncate">Groq · solo lectura</SheetDescription>
                 </div>
                 <div className="flex items-center gap-1">
@@ -235,8 +235,8 @@ export function AIAssistant() {
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={newConversation} title="Nueva conversación"><MessageSquarePlus className="h-4 w-4" /></Button>
-                  {conversationId && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => void deleteConversation()} title="Eliminar conversación"><Trash2 className="h-4 w-4" /></Button>}
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={newConversation} title="Nueva conversación"><MessageSquarePlus className="h-3.5 w-3.5" /></Button>
+                  {conversationId && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => void deleteConversation()} title="Eliminar conversación"><Trash2 className="h-3.5 w-3.5" /></Button>}
                 </div>
               </div>
             </SheetHeader>
@@ -261,7 +261,7 @@ export function AIAssistant() {
               <div className="space-y-4 p-4">
                 {messages.length === 0 && (
                   <div className="space-y-4 py-4">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Database className="h-6 w-6" /></div>
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Database className="h-5 w-5" /></div>
                     <div className="text-center">
                       <h3 className="font-semibold">Preguntá sobre los datos de la app</h3>
                       <p className="mt-1 text-[13px] text-muted-foreground">Las cifras se consultan en Supabase mediante herramientas de solo lectura.</p>

@@ -3393,9 +3393,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <BarChart3 className="h-4 w-4" />
-                  </div>
+                  <BarChart3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 </div>
               </div>
               <WeeklyBars
@@ -3418,9 +3416,7 @@ export default function Dashboard() {
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
               <div className="mt-2 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <Building2 className="h-4 w-4" />
-                  </div>
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
                     <div className={cn(cardLabel, "truncate leading-3")}>Sucursales con movimiento</div>
@@ -3428,9 +3424,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 rounded-md border p-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <BarChart3 className="h-4 w-4" />
-                  </div>
+                  <BarChart3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold">Top 2</div>
                     <div className={cn(cardLabel, "truncate")}>Concentran {topSucursalesPct}% del total</div>
@@ -3459,18 +3453,14 @@ export default function Dashboard() {
             </Card>
 
             <Card className="flex h-full flex-col p-3">
-              <div className="mb-3 flex items-start justify-between">
-                <div className="min-w-0">
-                  <h2 className="truncate text-[13px] font-semibold leading-5">Carga del equipo</h2>
-                </div>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <CalendarDays className="h-4 w-4" />
-                </div>
+              <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
+                <h2 className="truncate text-[13px] font-semibold leading-5">Carga del equipo</h2>
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </div>
               <div className="mb-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded-md border bg-muted/10 p-2.5">
                   <div className="flex items-start gap-2">
-                    <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <User className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <div className={cardLabel}>Activos actuales con carga</div>
                       <div className="mt-0.5 flex items-baseline gap-2">

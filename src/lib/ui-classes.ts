@@ -35,3 +35,15 @@ export const controlClass = `${controlHeight} ${controlText}`;
 
 // Altura estándar de gráficos del dashboard
 export const chartHeight = "h-[240px]";
+
+// Iconos: escala única de la app.
+// - iconXs: dentro de badges/pills/texto meta
+// - iconSm: default (botones, filtros, tablas, KPIs)
+// - iconMd: títulos de sección, acciones principales, menú lateral
+// - iconLg: solo estados vacíos / error
+export const iconXs = "h-3 w-3 shrink-0";
+export const iconSm = "h-3.5 w-3.5 shrink-0";
+export const iconMd = "h-4 w-4 shrink-0";
+export const iconLg = "h-5 w-5 shrink-0";
+// Contenedor con fondo: solo menú lateral, encabezado de panel/drawer y estados vacíos.
+export const iconTile = "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary";
