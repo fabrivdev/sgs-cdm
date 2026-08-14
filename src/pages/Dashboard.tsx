@@ -3414,23 +3414,6 @@ export default function Dashboard() {
             <Card className="flex h-full min-w-0 flex-col p-3">
               <PanelTitle icon={Building2} title="Facturacion por sucursal" />
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
-              <div className="mt-2 flex flex-col gap-2">
-                <div className="flex items-center gap-2 rounded-md border p-2">
-                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
-                    <div className={cn(cardLabel, "truncate leading-3")}>Sucursales con movimiento</div>
-
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 rounded-md border p-2">
-                  <BarChart3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-semibold">Top 2</div>
-                    <div className={cn(cardLabel, "truncate")}>Concentran {topSucursalesPct}% del total</div>
-                  </div>
-                </div>
-              </div>
             </Card>
           </section>
 
