@@ -9,7 +9,6 @@ import {
   Download,
   Info,
   Loader2,
-  PackageCheck,
   RefreshCw,
   Settings2,
   ShoppingCart,
