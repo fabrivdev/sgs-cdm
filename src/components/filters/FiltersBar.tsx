@@ -153,7 +153,7 @@ export function FiltersBar({
 
       {/* Desktop: una sola fila, sin wrap. Lo que no entra se oculta y queda en el panel. */}
       <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 sm:flex">
-        <div className="flex min-w-0 flex-1 flex-nowrap items-end gap-x-2 overflow-hidden">
+        <div ref={rowRef} className="flex min-w-0 flex-1 flex-nowrap items-end gap-x-2 overflow-hidden">
           {search && (
             <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] min-w-[150px] shrink"}>
               <div className="flex">{searchInput}</div>
