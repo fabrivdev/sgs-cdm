@@ -99,6 +99,16 @@ function coberturaActualMeses(row: ResultadoSugerencia) {
   return Math.max(0, row.stock_global / ritmoActualMensual);
 }
 
+function avisosFila(row: ResultadoSugerencia) {
+  const avisos: string[] = [];
+  if (row.confianza_datos === "BAJA") avisos.push("Confianza baja");
+  if (row.tipo_stock_seguridad === "ESTIMADA") avisos.push("Stock de seguridad estimado");
+  if (row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL") avisos.push("Código nuevo sin historial");
+  if (row.estado_datos === "SIN_VENTAS_RECIENTES") avisos.push("Sin ventas en 24 meses");
+  if (row.stock_minimo_estrategico > 0) avisos.push(`Mínimo estratégico ${decimal.format(row.stock_minimo_estrategico)}`);
+  return avisos;
+}
+
 function ModelConfigSheet({
   open,
   onOpenChange,
