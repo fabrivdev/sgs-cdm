@@ -34,7 +34,6 @@ function useOverflowHiding(ref: React.RefObject<HTMLDivElement>) {
     apply();
     const ro = new ResizeObserver(() => apply());
     ro.observe(el);
-    Array.from(el.children).forEach((c) => ro.observe(c));
     return () => ro.disconnect();
   });
 }
