@@ -69,9 +69,16 @@ export default function Repuestos() {
     setPage(0);
   }, [filtros, sortKey, sortDir]);
 
+  const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
+  const canManage = isAdmin || isJefatura || isSuperAdmin;
   const kpisQuery = useStockKpis();
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
+  const marcaSugerencia = seleccionado && (seleccionado.marca === "CLAAS" || seleccionado.marca === "HORSCH")
+    ? (seleccionado.marca as MarcaSugerencia)
+    : null;
+  const sugerenciaQuery = useSugerenciaProducto(marcaSugerencia, seleccionado?.codigo_interno ?? null);
+
 
   const filtrosActivos =
     (filtros.busqueda ? 1 : 0) +
