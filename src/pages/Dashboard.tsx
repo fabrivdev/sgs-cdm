@@ -3416,9 +3416,7 @@ export default function Dashboard() {
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
               <div className="mt-2 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <Building2 className="h-4 w-4" />
-                  </div>
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
                     <div className={cn(cardLabel, "truncate leading-3")}>Sucursales con movimiento</div>
