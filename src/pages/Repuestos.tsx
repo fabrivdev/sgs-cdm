@@ -4,22 +4,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  DollarSign,
   Download,
-  History,
   Package,
-  RefreshCw,
-  Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { MarcaBadge } from "@/components/StatusBadges";
+import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
+import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSortable } from "@/hooks/useSortable";
 import {
@@ -27,128 +22,18 @@ import {
   STOCK_FILTROS_VACIOS,
   STOCK_PAGE_SIZE,
   useFamiliasStock,
-  useRepuestoHermanos,
   useStockKpis,
   useStockMatriz,
-  useVentasRepuesto,
   type StockFiltros,
   type StockMatrizRow,
   type StockSortKey,
 } from "@/hooks/useRepuestos";
-import { MARCAS, SUCURSALES } from "@/lib/constants";
+import { useSugerenciaProducto, type MarcaSugerencia } from "@/hooks/useSugerenciasCompra";
+import { MARCAS } from "@/lib/constants";
 import { metaText, pageShellWide } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
-
-interface VentaMensual {
-  mes: string;
-  cantidad: number;
-}
-
-interface VentaAgrupada {
-  clave: string;
-  etiqueta: string;
-  cantidad: number;
-  facturas: number;
-  total: number;
-}
-
-type VistaHistorial = "facturas" | "clientes" | "meses";
-
-const VISTAS_HISTORIAL: { value: VistaHistorial; label: string }[] = [
-  { value: "facturas", label: "Facturas" },
-  { value: "clientes", label: "Por cliente" },
-  { value: "meses", label: "Por mes" },
-];
-
-const MESES_KPI = 12;
-const MESES_KPI_LARGO = 24;
-
-function fechaLocal(fecha: string | null | undefined): Date | null {
-  const valor = String(fecha ?? "").trim();
-  if (!valor) return null;
-
-  const iso = valor.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) {
-    const resultado = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12);
-    return Number.isNaN(resultado.getTime()) ? null : resultado;
-  }
-
-  const local = valor.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
-  if (local) {
-    const resultado = new Date(Number(local[3]), Number(local[2]) - 1, Number(local[1]), 12);
-    return Number.isNaN(resultado.getTime()) ? null : resultado;
-  }
-
-  const resultado = new Date(valor);
-  return Number.isNaN(resultado.getTime()) ? null : resultado;
-}
-
-function fechaVentaLabel(fecha: string | null | undefined) {
-  return fechaLocal(fecha)?.toLocaleDateString("es-PY") ?? "Sin fecha";
-}
-
-function mesVenta(fecha: string | null | undefined) {
-  const resultado = fechaLocal(fecha);
-  if (!resultado) return null;
-  return `${resultado.getFullYear()}-${String(resultado.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function normalizarSucursal(value: string | null | undefined) {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-// Al menos un cliente (Campos del Manana) viene facturado con la sucursal
-// pegada al nombre en algunas lineas ("CAMPOS DEL MANANA S.A. - SANTA RITA")
-// y sin pegar en otras ("CAMPOS DEL MA\u00d1ANA S.A.") -- ese sufijo no lo saca
-// normalizar tildes/mayusculas, hay que sacarlo aparte antes de comparar.
-const SUFIJO_SUCURSAL_RE = new RegExp(`\\s*-\\s*(${SUCURSALES.join("|")})\\s*$`, "i");
-
-function limpiarNombreCliente(value: string | null | undefined) {
-  return (value ?? "").trim().replace(SUFIJO_SUCURSAL_RE, "").trim();
-}
-
-// Mismo cliente puede quedar facturado con variantes de tilde/mayusculas/
-// espacios/sucursal-pegada-al-nombre distintas segun quien emitio -- se
-// agrupa por esta clave para que no aparezca como un cliente distinto por
-// cada variante.
-function normalizarClienteClave(value: string | null | undefined) {
-  return limpiarNombreCliente(value)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, " ");
-}
-
-function mensajeError(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object") {
-    const candidate = error as Record<string, unknown>;
-    const details = [
-      candidate.message,
-      candidate.details,
-      candidate.hint,
-      candidate.code ? `Codigo ${String(candidate.code)}` : null,
-    ].filter((value): value is string => typeof value === "string" && value.length > 0);
-
-    return details.join(" | ") || "Error desconocido";
-  }
-  return "Error desconocido";
-}
-
-function ultimosMeses(cantidad: number) {
-  const hoy = new Date();
-  return Array.from({ length: cantidad }, (_, index) => {
-    const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - (cantidad - 1 - index), 1);
-    return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
-  });
-}
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
@@ -162,45 +47,6 @@ const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
 const th = "px-2 py-1.5 text-[11px] font-medium";
 const td = "px-2 py-1.5 text-[12px]";
 
-const formatMes = (mes: string) => {
-  const [anio, mesNum] = mes.split("-");
-  const nombre = new Date(Number(anio), Number(mesNum) - 1, 1).toLocaleDateString("es-PY", {
-    month: "short",
-    year: "numeric",
-  });
-  return nombre.charAt(0).toUpperCase() + nombre.slice(1);
-};
-
-function KpiCard({
-  icon: Icon,
-  value,
-  label,
-  tone,
-}: {
-  icon: typeof Package;
-  value: string;
-  label: string;
-  tone?: "warn";
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-3">
-        <div
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
-            tone === "warn" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <div className="truncate text-[18px] font-bold leading-tight">{value}</div>
-          <div className={metaText}>{label}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 
 
