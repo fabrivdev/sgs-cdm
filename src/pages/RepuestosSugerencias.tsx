@@ -9,7 +9,6 @@ import {
   Download,
   Info,
   Loader2,
-  PackageCheck,
   RefreshCw,
   Settings2,
   ShoppingCart,
@@ -775,8 +774,6 @@ export default function RepuestosSugerencias() {
           </>
         )}
       </Card>
-
-      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-[12px] text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Motor v3 en vivo: cobertura gradual y reserva estimada cuando el historial no permite una seguridad estadística. Tránsito, precios, garantías y MOQ permanecen pendientes.</div>
 
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
       <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {
