@@ -643,14 +643,14 @@ export default function Planificador() {
           <Table className={tableText}>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="h-9 px-3 py-2 w-[92px]">Fecha</TableHead>
-                <TableHead className="h-9 px-3 py-2">Cliente</TableHead>
-                <TableHead className="h-9 px-3 py-2">Trabajo</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[92px]">Fecha</TableHead>
+                <TableHead className="h-8 px-3 py-1.5">Cliente</TableHead>
+                <TableHead className="h-8 px-3 py-1.5">Trabajo</TableHead>
                 <TableHead className="h-8 px-3 py-1.5 w-[110px]">Marca</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[150px]">Responsable</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[80px]">Suc.</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[110px]">Resultado</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[50px] text-right">Hs</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[150px]">Responsable</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[80px]">Suc.</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[110px]">Resultado</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[50px] text-right">Hs</TableHead>
               </TableRow>
             </TableHeader>
 
