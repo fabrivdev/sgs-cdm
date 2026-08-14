@@ -680,19 +680,34 @@ export default function RepuestosSugerencias() {
       )}
 
       <FiltersBar
-        search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción...", width: "min-w-0 flex-1" }}
+        search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción…", width: "w-[min(360px,26vw)]" }}
         activeCount={[filters.buscar, filters.segmento !== "TODOS", filters.estado !== "TODOS", filters.soloSugeridos].filter(Boolean).length}
         onClear={() => { setFilters({ buscar: "", segmento: "TODOS", estado: "TODOS", soloSugeridos: false }); setPage(1); }}
-        actions={<Button variant="outline" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar</Button>}
+        actions={<Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-1 h-3.5 w-3.5" />Exportar</Button>}
       >
+        <FilterSelect
+          label="Marca"
+          value={brand}
+          onChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}
+          placeholder="Marca"
+          options={[{ value: "CLAAS", label: "CLAAS" }, { value: "HORSCH", label: "HORSCH" }]}
+          width="w-[120px]"
+        />
+        <FilterDate
+          label="Corte del análisis"
+          value={analysisDate}
+          onChange={(value) => { setAnalysisDate(value); setPage(1); }}
+          width="w-[150px]"
+        />
         <FilterSelect
           label="Segmento"
           value={filters.segmento}
           onChange={(segmento) => { setFilters((current) => ({ ...current, segmento })); setPage(1); }}
           placeholder="Segmento"
           options={[{ value: "TODOS", label: "Todos los segmentos" }, ...segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))]}
-          width="w-[190px]"
+          width="w-[180px]"
         />
+
         <FilterSelect
           label="Estado de datos"
           value={filters.estado}
