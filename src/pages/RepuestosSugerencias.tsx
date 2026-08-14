@@ -748,40 +748,78 @@ export default function RepuestosSugerencias() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[280px]">Pieza</TableHead>
-                    <TableHead className="min-w-[190px]">Clasificación</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-right">Vendido 12m</TableHead>
-                    <TableHead className="text-right">Vendido 24m</TableHead>
-                    <TableHead className="min-w-[140px] text-right">Cobertura / horizonte</TableHead>
-                    <TableHead className="text-right">Objetivo</TableHead>
-                    <TableHead className="text-right">Sugerencia</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 min-w-[280px]")}>Pieza</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 min-w-[170px]")}>Clase</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Stock</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Demanda mensual</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Cobertura</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Última venta</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Objetivo</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Sugerencia</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => {
                     const cobertura = coberturaActualMeses(row);
+                    const avisos = avisosFila(row);
+                    const coberturaTono = cobertura === null
+                      ? "text-muted-foreground"
+                      : cobertura < leadTimeMeses
+                        ? "text-destructive"
+                        : cobertura < leadTimeMeses + 1
+                          ? "text-amber-600"
+                          : "text-foreground";
                     return (
                       <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
-                        <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
-                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}</Badge><Badge variant="secondary">{row.segmento}</Badge>{row.confianza_datos === "BAJA" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">CONFIANZA BAJA</Badge>}{row.tipo_stock_seguridad === "ESTIMADA" && <Badge variant="outline">SEGURIDAD ESTIMADA</Badge>}{row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">NUEVO SIN HISTORIAL</Badge>}{row.estado_datos === "SIN_VENTAS_RECIENTES" && <Badge variant="outline">SIN VENTAS 24M</Badge>}{row.stock_minimo_estrategico > 0 && <Badge className="border-primary/30 bg-primary/5 text-primary" variant="outline">MÍN. {decimal.format(row.stock_minimo_estrategico)}</Badge>}</div></TableCell>
-                        <TableCell className="text-right font-medium">{decimal.format(row.stock_global)}</TableCell>
-                        <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_12m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
-                        <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_24m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
-                        <TableCell className="text-right">
-                          <p className="font-medium">{cobertura === null ? "—" : `${decimal.format(cobertura)} meses`}</p>
-                          <p className="text-[10px] text-muted-foreground">Al ritmo 12m · horizonte {row.horizonte_meses} meses</p>
+                        <TableCell className={cn(cellText, "max-w-[360px]")}>
+                          <p className="truncate font-medium" title={row.descripcion}>{row.descripcion}</p>
+                          <p className="truncate text-[10px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p>
                         </TableCell>
-                        <TableCell className="text-right font-medium">{decimal.format(row.stock_objetivo)}</TableCell>
-                        <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-semibold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
+                        <TableCell className={cellText}>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-semibold">{row.abc}{row.fsn}{row.xyz}</Badge>
+                            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{row.segmento}</Badge>
+                            {avisos.length > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-800"
+                                title={avisos.join(" · ")}
+                              >
+                                <AlertTriangle className="mr-1 h-3 w-3" />{avisos.length}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className={cn(cellText, "text-right font-medium tabular-nums")}>{decimal.format(row.stock_global)}</TableCell>
+                        <TableCell className={cn(cellText, "text-right tabular-nums")}>{decimal.format(row.demanda_ponderada_mensual)}</TableCell>
+                        <TableCell className={cn(cellText, "text-right font-medium tabular-nums", coberturaTono)}>
+                          {cobertura === null ? "—" : `${decimal.format(cobertura)} m`}
+                        </TableCell>
+                        <TableCell className={cn(cellText, "text-right tabular-nums")}>
+                          {row.ultima_venta ? (
+                            <>
+                              <span>{displayDate(row.ultima_venta)}</span>
+                              {row.dias_ultima_venta != null && <span className="ml-1 text-[10px] text-muted-foreground">{integer.format(row.dias_ultima_venta)} d</span>}
+                            </>
+                          ) : <span className="text-muted-foreground">Sin ventas</span>}
+                        </TableCell>
+                        <TableCell className={cn(cellText, "text-right tabular-nums")}>{decimal.format(row.stock_objetivo)}</TableCell>
+                        <TableCell className={cn(cellText, "text-right")}><span className={cn("inline-flex min-w-11 justify-center rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
                       </TableRow>
                     );
                   })}
-                  {rows.length === 0 && <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
+                  {rows.length === 0 && <TableRow><TableCell colSpan={8} className={cn(cellText, "h-32 text-center text-muted-foreground")}>No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
-            <div className="flex items-center justify-between border-t px-4 py-3"><p className={metaText}>{integer.format(liveQuery.data?.total_filtrado ?? 0)} piezas · página {page} de {totalPages}</p><div className="flex gap-1"><Button size="icon" variant="outline" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button size="icon" variant="outline" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
+            <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
+              <p className={metaText}>{integer.format(liveQuery.data?.total_filtrado ?? 0)} piezas · página {page} de {totalPages}</p>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}><ChevronRight className="h-3.5 w-3.5" /></Button>
+              </div>
+            </div>
+
           </>
         )}
       </Card>
