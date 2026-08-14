@@ -142,7 +142,7 @@ export function OfflineExperience() {
         {showMotion && Lanyard ? (
           <Lanyard3DBoundary>
             <Suspense fallback={<StaticCredential />}>
-              <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={22} frontImage="/offline-card.svg" backImage="/offline-card.svg" imageFit="cover" lanyardImage="/offline-lanyard.svg" logoImage="/sig-cdm-logo.png" lanyardWidth={0.58} />
+              <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={22} frontImage={inlinedImages["/offline-card.svg"]} backImage={inlinedImages["/offline-card.svg"]} imageFit="cover" lanyardImage={inlinedImages["/offline-lanyard.svg"]} logoImage={inlinedImages["/sig-cdm-logo.png"]} lanyardWidth={0.58} />
             </Suspense>
           </Lanyard3DBoundary>
         ) : (
