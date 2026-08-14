@@ -27,6 +27,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
+import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
 import { FiltersBar, FilterCustom, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -235,132 +236,6 @@ function ModelConfigSheet({
   );
 }
 
-function ResultDetailSheet({
-  row,
-  onClose,
-  canManage,
-  onSaved,
-}: {
-  row: ResultadoSugerencia | null;
-  onClose: () => void;
-  canManage: boolean;
-  onSaved: () => void;
-}) {
-  const [strategicMinimum, setStrategicMinimum] = useState("0");
-  const [origin, setOrigin] = useState("ALEMANIA");
-  const [notes, setNotes] = useState("");
-
-  useEffect(() => {
-    setStrategicMinimum(String(row?.stock_minimo_estrategico ?? 0));
-    setOrigin(row?.origen ?? "ALEMANIA");
-    setNotes("");
-  }, [row]);
-
-  const save = useMutation({
-    mutationFn: () => guardarPlanificacionArticulo({
-      productoCodigo: row!.producto_codigo,
-      stockMinimoEstrategico: Math.max(0, Number(strategicMinimum) || 0),
-      origen: origin,
-      observaciones: notes,
-    }),
-    onSuccess: () => {
-      toast.success("Datos guardados. La sugerencia en vivo se está actualizando.");
-      onSaved();
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo guardar"),
-  });
-
-  const explanation = row?.explicacion ?? {};
-  return (
-    <Sheet open={Boolean(row)} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-        {row && (
-          <>
-            <SheetHeader>
-              <SheetTitle>{row.descripcion}</SheetTitle>
-              <SheetDescription>{row.producto_codigo} · {row.codigo_fabricante || "Sin código de fabricante"}</SheetDescription>
-            </SheetHeader>
-            <div className="mt-6 space-y-5">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {[
-                  ["Clasificación", `${row.abc}${row.fsn}${row.xyz}`],
-                  ["Segmento", row.segmento],
-                  ["Stock global", decimal.format(row.stock_global)],
-                  ["Venta 12m", decimal.format(row.unidades_12m)],
-                  ["Objetivo", decimal.format(row.stock_objetivo)],
-                  ["Sugerencia", integer.format(row.sugerencia_unidades)],
-                  ["Confianza", row.confianza_datos ?? "—"],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border bg-muted/20 p-3">
-                    <p className={cardLabel}>{label}</p>
-                    <p className="mt-1 text-[13px] font-semibold">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-xl border p-4">
-                <p className={cardLabel}>Estado del historial</p>
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-[13px] font-semibold">
-                    {row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL"
-                      ? "Código nuevo sin historial"
-                      : row.estado_datos === "SIN_VENTAS_RECIENTES"
-                        ? "Código anterior sin ventas recientes"
-                        : "Con historial reciente"}
-                  </p>
-                  <Badge variant={row.estado_datos === "LISTO" ? "secondary" : "outline"}>{row.estado_datos}</Badge>
-                </div>
-                {row.incorporado_en && <p className="mt-2 text-[12px] text-muted-foreground">Incorporado al maestro: {displayDate(row.incorporado_en)}</p>}
-              </div>
-
-              <div className="rounded-xl border p-4">
-                <h3 className="flex items-center gap-2 text-[13px] font-semibold"><Calculator className="h-4 w-4 text-primary" /> Cómo se obtuvo</h3>
-                <p className="mt-2 text-[13px]">{String(explanation.motivo ?? "Sin explicación disponible")}</p>
-                {explanation.tipo_demanda && (
-                  <p className="mt-1 text-[12px] text-muted-foreground">
-                    Patrón {String(explanation.tipo_demanda).toLowerCase()} · ADI {decimal.format(Number(explanation.adi ?? 0))} · CV² {decimal.format(Number(explanation.cv2 ?? 0))}
-                  </p>
-                )}
-                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] text-muted-foreground">
-                  <span>Demanda mensual <strong className="float-right text-foreground">{decimal.format(row.demanda_ponderada_mensual)}</strong></span>
-                  <span>Horizonte <strong className="float-right text-foreground">{row.horizonte_meses} meses</strong></span>
-                  <span>Demanda horizonte <strong className="float-right text-foreground">{decimal.format(row.demanda_horizonte)}</strong></span>
-                  <span>Stock seguridad <strong className="float-right text-foreground">{decimal.format(row.stock_seguridad)}{row.tipo_stock_seguridad === "ESTIMADA" ? " (estimada)" : ""}</strong></span>
-                  <span>Cobertura aplicada <strong className="float-right text-foreground">{decimal.format(row.cobertura_aplicada_meses ?? row.horizonte_meses)} meses</strong></span>
-                  <span>Mínimo estratégico <strong className="float-right text-foreground">{decimal.format(row.stock_minimo_estrategico)}</strong></span>
-                  <span>Tránsito <strong className="float-right text-foreground">0 (pendiente fuente)</strong></span>
-                  <span>Necesidad neta <strong className="float-right text-foreground">{decimal.format(row.necesidad_neta)}</strong></span>
-                </div>
-              </div>
-
-              <div className="space-y-3 rounded-xl border p-4">
-                <div>
-                  <h3 className="text-[13px] font-semibold leading-5">Datos maestros de planificación</h3>
-                  <p className={metaText}>El mínimo estratégico es opcional y funciona como piso del objetivo, incluso cuando la pieza todavía no tiene historial.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Stock mínimo estratégico</Label>
-                    <Input className="mt-1" type="number" min="0" step="1" value={strategicMinimum} onChange={(event) => setStrategicMinimum(event.target.value)} disabled={!canManage} />
-                  </div>
-                  <div>
-                    <Label>Origen</Label>
-                    <Input className="mt-1" value={origin} onChange={(event) => setOrigin(event.target.value)} disabled={!canManage} />
-                  </div>
-                </div>
-                <div>
-                  <Label>Observaciones</Label>
-                  <Textarea className="mt-1" value={notes} onChange={(event) => setNotes(event.target.value)} disabled={!canManage} />
-                </div>
-                {canManage && <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar datos maestros</Button>}
-              </div>
-            </div>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
-  );
-}
 
 export default function RepuestosSugerencias() {
   const queryClient = useQueryClient();
@@ -830,10 +705,24 @@ export default function RepuestosSugerencias() {
       </Card>
 
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
-      <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {
-        void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
-        setSelected(null);
-      }} />
+      <DetalleRepuestoSheet
+        producto={selected ? {
+          codigo_interno: selected.producto_codigo,
+          descripcion: selected.descripcion,
+          codigo_fabricante: selected.codigo_fabricante,
+          marca: selected.marca,
+          familia: selected.familia,
+        } : null}
+        onClose={() => setSelected(null)}
+        sugerencia={selected}
+        canManage={canManage}
+        tabInicial="planificacion"
+        onSugerenciaGuardada={() => {
+          void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
+          setSelected(null);
+        }}
+      />
+
     </div>
   );
 }
