@@ -156,7 +156,7 @@ function ModuloNavGroup({
                     asChild
                     isActive={isItemActive(it)}
                     tooltip={it.label}
-                    className="h-8 rounded-md px-2 text-[13px] transition-[background-color,color] duration-150 data-[active=true]:bg-primary/[0.10] data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/[0.14]"
+                    className="h-9 rounded-md px-2 text-[13px] transition-[background-color,color] duration-150 data-[active=true]:bg-primary/[0.10] data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/[0.14]"
                   >
                     <NavLink to={it.to} end={it.end as boolean | undefined} className="group/nav">
                       <it.icon className="transition-transform duration-200 group-hover/nav:scale-110" />
