@@ -445,6 +445,8 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
   const hermanosQuery = useRepuestoHermanos(producto?.codigo_interno ?? null);
   const hermanos = hermanosQuery.data ?? [];
   const [vistaHistorial, setVistaHistorial] = useState<VistaHistorial>("facturas");
+  const [tab, setTab] = useState("ventas");
+
   const historialCargando = ventasQuery.isLoading || ventasQuery.isFetching;
   const historialError = ventasQuery.isError;
   const meses12 = useMemo(() => ultimosMeses(MESES_KPI), []);
