@@ -3424,9 +3424,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 rounded-md border p-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <BarChart3 className="h-4 w-4" />
-                  </div>
+                  <BarChart3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold">Top 2</div>
                     <div className={cn(cardLabel, "truncate")}>Concentran {topSucursalesPct}% del total</div>
