@@ -30,7 +30,7 @@ export function LoadingScreen() {
             <AppLogo className="h-20 w-20 object-contain sm:h-28 sm:w-28" />
           </div>
         </div>
-        <p className="text-sm font-medium text-muted-foreground animate-pulse">
+        <p className="text-[13px] font-medium text-muted-foreground animate-pulse">
           Cargando…
         </p>
       </div>

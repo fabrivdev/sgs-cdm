@@ -155,18 +155,18 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
           </TableRow></TableHeader>
           <TableBody>
             {loading && <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">Cargando stock…</TableCell></TableRow>}
-            {!loading && loadError && <TableRow><TableCell colSpan={9} className="h-24 text-center text-sm text-destructive">{loadError}</TableCell></TableRow>}
-            {!loading && !loadError && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="h-28 text-center"><PackageOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" /><span className="text-sm text-muted-foreground">Sin máquinas en stock.</span></TableCell></TableRow>}
+            {!loading && loadError && <TableRow><TableCell colSpan={9} className="h-24 text-center text-[13px] text-destructive">{loadError}</TableCell></TableRow>}
+            {!loading && !loadError && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="h-28 text-center"><PackageOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" /><span className="text-[13px] text-muted-foreground">Sin máquinas en stock.</span></TableCell></TableRow>}
             {!loading && filtered.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="text-xs">{row.sucursal ?? row.filial_original ?? "—"}</TableCell>
-                <TableCell className="max-w-[180px] truncate text-xs" title={row.deposito ?? undefined}>{row.deposito ?? "—"}</TableCell>
-                <TableCell className="font-mono text-xs">{row.producto_codigo}</TableCell>
-                <TableCell className="text-xs">{row.tipo ?? "—"}</TableCell>
+                <TableCell className="text-[12px]">{row.sucursal ?? row.filial_original ?? "—"}</TableCell>
+                <TableCell className="max-w-[180px] truncate text-[12px]" title={row.deposito ?? undefined}>{row.deposito ?? "—"}</TableCell>
+                <TableCell className="font-mono text-[12px]">{row.producto_codigo}</TableCell>
+                <TableCell className="text-[12px]">{row.tipo ?? "—"}</TableCell>
                 <TableCell><Badge variant="outline" className={cn("text-[10px] font-bold tracking-wide", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge></TableCell>
-                <TableCell className="min-w-[180px] text-xs font-medium">{row.modelo ?? "—"}</TableCell>
+                <TableCell className="min-w-[180px] text-[12px] font-medium">{row.modelo ?? "—"}</TableCell>
                 <TableCell><Badge variant="outline" className={cn("text-[10px]", row.estado === "Nuevo" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{row.estado ?? "—"}</Badge></TableCell>
-                <TableCell className="font-mono text-xs">
+                <TableCell className="font-mono text-[12px]">
                   <div className="flex items-center gap-1.5">
                     <span>{row.chasis ?? "—"}</span>
                     {row.chasis && duplicateChassis.has(row.chasis.trim().toUpperCase()) && (

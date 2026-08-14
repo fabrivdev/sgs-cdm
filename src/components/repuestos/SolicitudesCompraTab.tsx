@@ -280,13 +280,13 @@ export function SolicitudesCompraTab() {
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </TableCell>
-                      <TableCell className="text-xs">{grupo.sucursal}</TableCell>
-                      <TableCell className="font-mono text-xs">{grupo.nroSolicitud}</TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
+                      <TableCell className="text-[12px]">{grupo.sucursal}</TableCell>
+                      <TableCell className="font-mono text-[12px]">{grupo.nroSolicitud}</TableCell>
+                      <TableCell className="hidden text-[12px] text-muted-foreground sm:table-cell">
                         {grupo.fechaEmision ?? "—"}
                       </TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs">{grupo.solicitante ?? "—"}</TableCell>
-                      <TableCell className="text-right text-xs">
+                      <TableCell className="max-w-[180px] truncate text-[12px]">{grupo.solicitante ?? "—"}</TableCell>
+                      <TableCell className="text-right text-[12px]">
                         {busquedaActiva ? `${lineasVisibles.length} / ${grupo.lineas.length}` : grupo.lineas.length}
                       </TableCell>
                     </TableRow>
@@ -312,13 +312,13 @@ export function SolicitudesCompraTab() {
 
                                 return (
                                   <TableRow key={linea.item}>
-                                    <TableCell className="pl-8 text-xs">{linea.item}</TableCell>
-                                    <TableCell className="font-mono text-xs">{linea.productoCodigo}</TableCell>
-                                    <TableCell className="max-w-[200px] truncate text-xs">{linea.descripcion ?? "—"}</TableCell>
-                                    <TableCell className="text-right text-xs">
+                                    <TableCell className="pl-8 text-[12px]">{linea.item}</TableCell>
+                                    <TableCell className="font-mono text-[12px]">{linea.productoCodigo}</TableCell>
+                                    <TableCell className="max-w-[200px] truncate text-[12px]">{linea.descripcion ?? "—"}</TableCell>
+                                    <TableCell className="text-right text-[12px]">
                                       {linea.cantidad} {linea.unidad ?? ""}
                                     </TableCell>
-                                    <TableCell className="text-right text-xs">
+                                    <TableCell className="text-right text-[12px]">
                                       {linea.precioUnitario > 0
                                         ? linea.precioUnitario.toLocaleString("es-PY", { maximumFractionDigits: 2 })
                                         : "—"}
@@ -334,7 +334,7 @@ export function SolicitudesCompraTab() {
                                         </Badge>
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-xs">
+                                    <TableCell className="text-[12px]">
                                       {!resolucion || resolucion.estado === "reposicion_stock" ? (
                                         "—"
                                       ) : resolucion.pedidoVinculado ? (
@@ -401,7 +401,7 @@ export function SolicitudesCompraTab() {
                 type="button"
                 disabled={guardandoVinculo}
                 onClick={() => guardarVinculo(candidato)}
-                className="flex w-full items-center justify-between rounded-md border p-2 text-left text-xs hover:bg-muted/50"
+                className="flex w-full items-center justify-between rounded-md border p-2 text-left text-[12px] hover:bg-muted/50"
               >
                 <span className="font-mono">
                   {candidato.sucursal}-{candidato.nroPedido}

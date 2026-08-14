@@ -70,7 +70,7 @@ export function OSImpactSection({
   onSelectOS: (os: string) => void;
 }) {
   if (loading) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Cargando detalle OS...</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Cargando detalle OS...</div>;
   }
   return (
     <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -82,14 +82,14 @@ export function OSImpactSection({
       <div className="grid min-w-0 gap-3 lg:grid-cols-2 xl:grid-cols-1">
         <div className="rounded-md border p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold">OS por sucursal</div>
+            <div className="text-[12px] font-semibold">OS por sucursal</div>
             <Building2 className="h-4 w-4 text-primary" />
           </div>
           <OSSucursalBars rows={sucursalRows} totalValue={selectedSummary.total} metric={metric} comparisonLabel={comparisonLabel} onSelect={onSelectSucursal} />
         </div>
         <div className="rounded-md border p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold">{detailMode === "os" ? "Detalle por OS" : "Detalle por cliente"}</div>
+            <div className="text-[12px] font-semibold">{detailMode === "os" ? "Detalle por OS" : "Detalle por cliente"}</div>
             <div className="flex items-center gap-2">
               <div className="grid h-7 grid-cols-2 overflow-hidden rounded-md border text-[10px]">
                 <button
@@ -187,12 +187,12 @@ function OSEvolution({
   const max = Math.max(1, ...rows.map((row) => osMetricValue(row, metric)));
   const labelEvery = rows.length > 14 ? Math.ceil(rows.length / 6) : rows.length > 9 ? 2 : 1;
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin OS absorbidas.</div>;
   }
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="grid min-h-[150px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[176px] sm:gap-3 sm:px-2 sm:pt-3"
+        className="grid min-h-[150px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[160px] sm:gap-3 sm:px-2 sm:pt-3"
         style={barGridStyle(rows.length)}
       >
         {rows.map((row, index) => {
@@ -295,7 +295,7 @@ function OSSucursalBars({
   const visibleRows = rows.filter((row) => row.total > 0 || row.horas > 0 || row.km > 0);
   const max = Math.max(1, ...visibleRows.map((row) => osMetricValue(row, metric)));
   if (visibleRows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas por sucursal.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin OS absorbidas por sucursal.</div>;
   }
   return (
     <div className="space-y-2">
@@ -306,7 +306,7 @@ function OSSucursalBars({
         const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
         return (
           <button key={row.sucursal} type="button" onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
-            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+            <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
               <span className="font-medium">{row.sucursal}</span>
               <span className="tabular-nums text-muted-foreground">
                 {formatOSMetric(value, metric)}{metric === "usd" ? ` - ${participation}%` : ""}
@@ -327,7 +327,7 @@ function OSSucursalBars({
         );
       })}
       {visibleRows.length > 5 && (
-        <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground md:hidden">
+        <div className="rounded-md border px-3 py-2 text-center text-[12px] text-muted-foreground md:hidden">
           Mostrando 5 de {visibleRows.length} sucursales
         </div>
       )}
@@ -347,7 +347,7 @@ function OSDetalle({
   onSelect: (value: string) => void;
 }) {
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin OS absorbidas en el periodo.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin OS absorbidas en el periodo.</div>;
   }
   if (mode === "cliente") {
     const grouped = Array.from(rows.reduce((map, row) => {
@@ -398,10 +398,10 @@ function OSDetalle({
             className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
           >
             <div className="min-w-0">
-              <div className="truncate text-xs font-semibold">{row.cliente}</div>
+              <div className="truncate text-[12px] font-semibold">{row.cliente}</div>
               <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{row.os.size} OS - {Array.from(row.sucursales).join(", ") || "Sin sucursal"}</div>
             </div>
-            <div className="mt-1 text-sm font-bold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
+            <div className="mt-1 text-[13px] font-bold tabular-nums">{formatOSMetric(osMetricValue(row, metric), metric)}</div>
             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
               <span>Serv. {money(row.servicios)}</span>
               <span>Rep. {money(row.repuestos)}</span>
@@ -409,7 +409,7 @@ function OSDetalle({
             </div>
           </button>
         ))}
-        {grouped.length > 5 && <div className="col-span-2 rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">Mostrando 5 de {grouped.length} clientes</div>}
+        {grouped.length > 5 && <div className="col-span-2 rounded-md border px-3 py-2 text-center text-[12px] text-muted-foreground">Mostrando 5 de {grouped.length} clientes</div>}
       </div>
       <div className="hidden overflow-hidden rounded-md border md:block">
         <div className="grid grid-cols-[minmax(0,1fr)_72px_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]">
@@ -423,7 +423,7 @@ function OSDetalle({
             key={row.cliente}
             type="button"
             onClick={() => onSelect(row.cliente)}
-            className="grid w-full grid-cols-[minmax(0,1fr)_72px_82px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]"
+            className="grid w-full grid-cols-[minmax(0,1fr)_72px_82px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent sm:grid-cols-[minmax(0,1fr)_72px_86px_86px]"
           >
             <div className="min-w-0">
               <div className="truncate font-medium">{row.cliente}</div>
@@ -460,7 +460,7 @@ function OSDetalle({
           <div className="mb-1 flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-mono text-[10px] font-semibold text-muted-foreground">{row.os}</div>
-              <div className="truncate text-xs font-semibold">{row.cliente}</div>
+              <div className="truncate text-[12px] font-semibold">{row.cliente}</div>
             </div>
             <Badge variant="secondary" className="shrink-0 text-[10px]">{row.tipo}</Badge>
           </div>
@@ -471,7 +471,7 @@ function OSDetalle({
           </div>
         </button>
       ))}
-      {rows.length > 5 && <div className="rounded-md border px-3 py-2 text-center text-xs text-muted-foreground">Mostrando 5 de {rows.length} OS</div>}
+      {rows.length > 5 && <div className="rounded-md border px-3 py-2 text-center text-[12px] text-muted-foreground">Mostrando 5 de {rows.length} OS</div>}
     </div>
     <div className="hidden overflow-hidden rounded-md border md:block">
       <div className="grid grid-cols-[72px_minmax(0,1fr)_82px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[72px_minmax(0,1fr)_86px_86px]">
@@ -485,7 +485,7 @@ function OSDetalle({
           key={`${row.os}-${row.fecha}`}
           type="button"
           onClick={() => onSelect(row.os)}
-          className="grid w-full grid-cols-[72px_minmax(0,1fr)_82px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent sm:grid-cols-[72px_minmax(0,1fr)_86px_86px]"
+          className="grid w-full grid-cols-[72px_minmax(0,1fr)_82px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent sm:grid-cols-[72px_minmax(0,1fr)_86px_86px]"
         >
           <div className="font-mono text-[11px] font-semibold">{row.os}</div>
           <div className="min-w-0">
@@ -532,7 +532,7 @@ export function WeeklyBars({
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="relative grid min-h-[176px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[204px] sm:gap-3 sm:px-2 sm:pt-3"
+        className="relative grid min-h-[160px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[188px] sm:gap-3 sm:px-2 sm:pt-3"
         style={barGridStyle(rows.length, 62)}
       >
         {rows.map((row, index) => {
@@ -608,7 +608,7 @@ export function CumplimientoAgendaChart({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">
+      <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">
         Sin agenda para los filtros seleccionados.
       </div>
     );
@@ -627,7 +627,7 @@ export function CumplimientoAgendaChart({
       <div className="min-w-0 pb-1">
         <div className="min-w-0 overflow-x-auto overflow-y-hidden">
           <div
-            className="relative grid min-h-[205px] shrink-0 items-end gap-1 border-b px-1 pt-6 sm:gap-2 sm:px-2"
+            className="relative grid min-h-[188px] shrink-0 items-end gap-1 border-b px-1 pt-6 sm:gap-2 sm:px-2"
             style={barGridStyle(rows.length, 58)}
           >
             <div className="pointer-events-none absolute inset-x-1 top-6 h-[140px] sm:inset-x-2">
@@ -724,7 +724,7 @@ export function CumplimientoAgendaChart({
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[220px]">
                     <div className="font-semibold">{row.label}</div>
-                    <div className="mt-1 text-xs">
+                    <div className="mt-1 text-[12px]">
                       {hasAgenda ? statusLabel : "Sin agenda programada"}
                     </div>
                     {hasAgenda ? (
@@ -822,7 +822,7 @@ export function TecnicosNoRealizadosRanking({
 
   if (visibleRows.length === 0) {
     return (
-      <div className="flex min-h-[168px] items-center justify-center rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">
+      <div className="flex min-h-[168px] items-center justify-center rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">
         Sin jornadas no realizadas para los filtros actuales.
       </div>
     );
@@ -844,8 +844,8 @@ export function TecnicosNoRealizadosRanking({
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 truncate text-xs font-semibold">{row.nombre}</div>
-                <div className="shrink-0 text-sm font-bold tabular-nums text-amber-700">{row.porcentaje}%</div>
+                <div className="min-w-0 truncate text-[12px] font-semibold">{row.nombre}</div>
+                <div className="shrink-0 text-[13px] font-bold tabular-nums text-amber-700">{row.porcentaje}%</div>
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
                 <span>{row.noRealizadas} de {row.programadas} agendadas</span>
@@ -884,7 +884,7 @@ export function SucursalBars({
   const max = Math.max(1, ...rows.map((row) => Math.max(row.total, row.previousTotal ?? 0)));
 
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin movimiento por sucursal.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin movimiento por sucursal.</div>;
   }
 
   return (
@@ -896,7 +896,7 @@ export function SucursalBars({
         const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
         return (
           <button key={row.sucursal} onClick={() => !isZero && onSelect(row.sucursal)} className={cn("w-full rounded-md px-2 py-1.5 text-left", !isZero && "hover:bg-accent", isZero && "opacity-60 cursor-default")}>
-            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+            <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
               <span className={cn("font-medium", isZero && "text-muted-foreground")}>{row.sucursal}</span>
               <span className="tabular-nums text-muted-foreground">{money(row.total)} - {participation}%</span>
             </div>
@@ -935,7 +935,7 @@ export function ClientesRanking({
   const max = Math.max(1, ...rows.map((row) => row.total));
 
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin clientes en el periodo.</div>;
   }
 
   return (
@@ -945,7 +945,7 @@ export function ClientesRanking({
         const participation = totalValue > 0 ? Math.round((row.total / totalValue) * 100) : 0;
         return (
           <button key={row.nombre} onClick={() => onSelect(row.nombre)} className="w-full rounded-md border px-3 py-2 text-left hover:bg-accent">
-            <div className="flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center justify-between gap-3 text-[12px]">
               <span className="min-w-0 font-semibold">
                 <span className="mr-2 text-muted-foreground">{index + 1}</span>
                 <span className="truncate">{row.nombre}</span>
@@ -983,7 +983,7 @@ export function EstadoBars({
         const width = Math.max(row.count > 0 ? 4 : 0, Math.round((row.count / max) * 100));
         const participation = totalValue > 0 ? Math.round((row.count / totalValue) * 100) : 0;
         return (
-          <button key={row.estado} onClick={() => onSelect(row.estado)} className="grid w-full grid-cols-[96px_1fr_72px_52px] items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent">
+          <button key={row.estado} onClick={() => onSelect(row.estado)} className="grid w-full grid-cols-[96px_1fr_72px_52px] items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-accent">
             <span className="font-medium">{row.label}</span>
             <span className="h-2 rounded-full bg-muted">
               <span className={cn("block h-full rounded-full", row.estado === "pausado" ? "bg-amber-500" : "bg-primary")} style={{ width: `${width}%` }} />
@@ -1008,7 +1008,7 @@ export function TrabajoSucursalBars({
   const visibleRows = rows.filter((row) => row.activos + row.cerrados > 0);
 
   if (visibleRows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin trabajos por sucursal.</div>;
   }
 
   return (
@@ -1018,7 +1018,7 @@ export function TrabajoSucursalBars({
         const width = Math.max(4, Math.round((totalRow / max) * 100));
         return (
           <button key={row.sucursal} onClick={() => onSelect(row.sucursal)} className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent">
-            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+            <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
               <span className="font-medium">{row.sucursal}</span>
               <span className="tabular-nums text-muted-foreground">{row.activos} activos - {row.cerrados} cerrados</span>
             </div>
@@ -1034,7 +1034,7 @@ export function TrabajoSucursalBars({
 
 export function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombre: string; jornadas: number; horas: number; trabajos: number }> }) {
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin actividad técnica en el período seleccionado.</div>;
+    return <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin actividad técnica en el período seleccionado.</div>;
   }
 
   return (
@@ -1046,7 +1046,7 @@ export function TecnicoProductividad({ rows }: { rows: Array<{ id: string; nombr
         <div className="text-right">Trab.</div>
       </div>
       {rows.map((row) => (
-        <div key={row.id} className="grid grid-cols-[1fr_74px_74px_74px] items-center border-t px-3 py-2 text-xs">
+        <div key={row.id} className="grid grid-cols-[1fr_74px_74px_74px] items-center border-t px-3 py-2 text-[12px]">
           <div className="truncate font-medium">{row.nombre}</div>
           <div className="text-right tabular-nums">{row.jornadas}</div>
           <div className="text-right tabular-nums">{row.horas.toFixed(1)}</div>
@@ -1066,7 +1066,7 @@ export function MixRubros({
   rubroFiltro: string;
   onSelect?: (rubro: string) => void;
 }) {
-  if (!row) return <div className="text-xs text-muted-foreground">Sin datos.</div>;
+  if (!row) return <div className="text-[12px] text-muted-foreground">Sin datos.</div>;
   if (rubroFiltro !== "all") {
     const valor = rubroFiltro === "Repuestos" ? row.repuestos
       : rubroFiltro === "Servicio" ? row.servicio
@@ -1078,7 +1078,7 @@ export function MixRubros({
         <div className="flex items-baseline justify-between gap-2">
           <div>
             <div className="text-[10px] uppercase text-muted-foreground">Rubro</div>
-            <div className="text-sm font-semibold">{rubroFiltro}</div>
+            <div className="text-[13px] font-semibold">{rubroFiltro}</div>
           </div>
           <div className="text-[15px] font-bold tabular-nums">{money(valor)}</div>
         </div>
@@ -1157,7 +1157,7 @@ export function EstadoCompacto({
 }) {
   if (flujo.total === 0) {
     return (
-      <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">
+      <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">
         Sin trabajos en el período seleccionado.
       </div>
     );
@@ -1228,7 +1228,7 @@ export function EstadoCompacto({
             <button
               key={s.key}
               onClick={() => onSelect(s.key)}
-              className="grid w-full grid-cols-[1fr_54px_48px] items-center gap-2 border-b px-3 py-2 text-xs last:border-b-0 hover:bg-muted/50"
+              className="grid w-full grid-cols-[1fr_54px_48px] items-center gap-2 border-b px-3 py-2 text-[12px] last:border-b-0 hover:bg-muted/50"
             >
               <span className="flex items-center gap-1.5">
                 <span className={cn("h-2.5 w-2.5 rounded-full", s.dot)} />
@@ -1318,7 +1318,7 @@ export function CargaSucursalTabla({
   onSelect: (sucursal: Sucursal) => void;
 }) {
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos por sucursal.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin trabajos por sucursal.</div>;
   }
 
   const maxTotal = Math.max(1, ...rows.map((row) => row.total));
@@ -1347,7 +1347,7 @@ export function CargaSucursalTabla({
                 className="grid w-full grid-cols-[160px_minmax(0,1fr)_64px_44px] items-center gap-3 px-3 py-2 text-left hover:bg-accent/35"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{row.sucursal}</div>
+                  <div className="truncate text-[13px] font-medium">{row.sucursal}</div>
                 </div>
 
                 <div className="min-w-0">
@@ -1366,11 +1366,11 @@ export function CargaSucursalTabla({
                 </div>
 
                 <div className="text-right">
-                  <span className="inline-flex min-w-[40px] justify-center rounded-lg bg-primary/5 px-1.5 py-0.5 text-sm font-bold tabular-nums text-primary">
+                  <span className="inline-flex min-w-[40px] justify-center rounded-lg bg-primary/5 px-1.5 py-0.5 text-[13px] font-bold tabular-nums text-primary">
                     {row.total}
                   </span>
                 </div>
-                <div className="text-right text-sm font-semibold tabular-nums text-primary">{row.pct}%</div>
+                <div className="text-right text-[13px] font-semibold tabular-nums text-primary">{row.pct}%</div>
               </button>
             );
           })}
@@ -1401,7 +1401,7 @@ export function DistribucionMarca({
     { cerrados: 0, abiertos: 0, pausados: 0, total: 0, horas: 0 },
   );
   if (totales.total === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin actividad por marca en el periodo.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin actividad por marca en el periodo.</div>;
   }
   const PALETAS: Record<Marca, { abiertos: string; pausados: string; cerrados: string; dot: string }> = {
     CLAAS: { abiertos: "#7BC58A", pausados: "#2E9F4F", cerrados: "#00853E", dot: "#00853E" },
@@ -1426,7 +1426,7 @@ export function DistribucionMarca({
                 isActive && "border-primary bg-accent/40",
               )}
             >
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-[12px]">
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: pal.dot }} />
                   <span className="font-semibold">{d.marca}</span>
@@ -1601,11 +1601,11 @@ export function MatrizTécnicosDías({
   const [leftWidth, setLeftWidth] = useState(320);
 
   if (overLimit) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Disponible para rangos de hasta 31 columnas visibles.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Disponible para rangos de hasta 31 columnas visibles.</div>;
   }
 
   if (blocks.length === 0 || buckets.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin actividad técnica para los filtros actuales.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin actividad técnica para los filtros actuales.</div>;
   }
 
   const dayWidth = buckets.length <= 7 ? 1 : buckets.length <= 14 ? 76 : 58;
@@ -1727,7 +1727,7 @@ export function MatrizTécnicosDías({
       <div className="dashboard-matrix-print-root space-y-3">
         <div className="dashboard-matrix-print-header hidden">
           <div>
-            <div className="text-sm font-bold">Matriz técnicos por período</div>
+            <div className="text-[13px] font-bold">Matriz técnicos por período</div>
             <div className="text-[10px] text-muted-foreground">
               {bucketMode === "dia" ? "Vista diaria" : bucketMode === "semana" ? "Vista semanal" : bucketMode === "mes" ? "Vista mensual" : "Vista anual"} · {metric === "horas" ? "Horas" : "Trabajos"}
             </div>
@@ -1774,7 +1774,7 @@ export function MatrizTécnicosDías({
                     onClick={() => onSelectSucursal(block.sucursal)}
                     className="dashboard-matrix-sucursal flex h-11 w-full flex-col items-start justify-center px-3 text-left hover:bg-accent/60"
                   >
-                    <span className="text-sm font-semibold">{block.sucursal}</span>
+                    <span className="text-[13px] font-semibold">{block.sucursal}</span>
                     <span className="text-[11px] text-muted-foreground">{block.totalTécnicos} técnicos · {block.totalActividad} {metric === "horas" ? "hs" : "registros"}</span>
                   </button>
                   <button
@@ -1816,7 +1816,7 @@ export function MatrizTécnicosDías({
                       row.sinAsignacion ? "bg-red-50" : "bg-background"
                     )}
                   >
-                    <span className="truncate text-sm font-medium">{row.nombre}</span>
+                    <span className="truncate text-[13px] font-medium">{row.nombre}</span>
                     <span className="truncate text-[11px] text-muted-foreground">
                       {row.sinAsignacion ? "Sin asignación" : row.tieneNoDisponibilidad ? "Con no disponibilidad" : row.sucursal}
                     </span>
@@ -1955,7 +1955,7 @@ export function TrabajosAbiertosList({
   const [expanded, setExpanded] = useState(false);
 
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin trabajos abiertos para los filtros actuales.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin trabajos abiertos para los filtros actuales.</div>;
   }
 
   const visibleRows = expanded ? rows : rows.slice(0, 5);
@@ -1973,11 +1973,11 @@ export function TrabajosAbiertosList({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="font-mono text-[11px] font-semibold text-muted-foreground">{row.ref}</div>
-                <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                <div className="truncate text-[13px] font-semibold">{row.cliente}</div>
                 <div className="text-[11px] text-muted-foreground">{row.sucursal}</div>
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-sm font-bold tabular-nums">{row.díasSinCierre} d</div>
+                <div className="text-[13px] font-bold tabular-nums">{row.díasSinCierre} d</div>
                 <div className="text-[11px] text-muted-foreground">{row.estado}</div>
               </div>
             </div>
@@ -2000,7 +2000,7 @@ export function TrabajosAbiertosList({
             key={row.id}
             type="button"
             onClick={() => onSelect(row)}
-            className="grid w-full grid-cols-[90px_1.2fr_120px_100px_94px_90px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent/40"
+            className="grid w-full grid-cols-[90px_1.2fr_120px_100px_94px_90px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent/40"
           >
             <div className="font-mono font-semibold text-muted-foreground">{row.ref}</div>
             <div className="truncate font-medium">{row.cliente}</div>
@@ -2016,7 +2016,7 @@ export function TrabajosAbiertosList({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+          className="w-full rounded-md border px-3 py-2 text-[12px] text-muted-foreground hover:bg-accent"
         >
           {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
         </button>
@@ -2250,7 +2250,7 @@ export function CargaTecnicaMatriz({
       </div>
 
       {rows.length === 0 || buckets.length === 0 ? (
-        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin datos para los filtros seleccionados.</div>
+        <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin datos para los filtros seleccionados.</div>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 md:hidden">
@@ -2264,7 +2264,7 @@ export function CargaTecnicaMatriz({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 truncate text-[11px] font-semibold">{r.nombre}</div>
-                    <div className="shrink-0 text-sm font-bold tabular-nums">
+                    <div className="shrink-0 text-[13px] font-bold tabular-nums">
                       {metrica === "horas" ? `${rowTotal.toFixed(1)} hs` : `${rowTotal} serv.`}
                     </div>
                   </div>
@@ -2292,7 +2292,7 @@ export function CargaTecnicaMatriz({
               <button
                 key={r.id}
                 onClick={onClick}
-                className="grid w-full items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+                className="grid w-full items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent"
                 style={{ gridTemplateColumns: gridCols }}
               >
                 <div className="truncate font-medium">{r.nombre}</div>
@@ -2350,7 +2350,7 @@ export function ClientesCompacto({
 }) {
   const [expanded, setExpanded] = useState(false);
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin clientes en el periodo.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin clientes en el periodo.</div>;
   }
   const top5 = rows.slice(0, 5).reduce((a, r) => a + r.total, 0);
   const pctTop5 = totalValue > 0 ? Math.round((top5 / totalValue) * 100) : 0;
@@ -2372,10 +2372,10 @@ export function ClientesCompacto({
               className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm"
             >
               <div className="min-w-0">
-                <div className="truncate text-xs font-semibold">{r.nombre}</div>
+                <div className="truncate text-[12px] font-semibold">{r.nombre}</div>
                 <div className="mt-0.5 text-[10px] text-muted-foreground">{r.facturas} facturas - {rowPct}%</div>
               </div>
-              <div className="mt-1 truncate text-sm font-bold tabular-nums">{money(r.total)}</div>
+              <div className="mt-1 truncate text-[13px] font-bold tabular-nums">{money(r.total)}</div>
             </button>
           );
         })}
@@ -2393,7 +2393,7 @@ export function ClientesCompacto({
             <button
               key={r.nombre}
               onClick={() => onSelect(r.nombre)}
-              className="grid w-full grid-cols-[1fr_60px_96px_48px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+              className="grid w-full grid-cols-[1fr_60px_96px_48px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent"
             >
               <div className="truncate font-medium">{r.nombre}</div>
               <div className="text-right tabular-nums">{r.facturas}</div>
@@ -2708,8 +2708,8 @@ export function FacturacionExplorer({
     <div className="space-y-3">
       <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold">Mesa flexible de facturación</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="text-[13px] font-semibold">Mesa flexible de facturación</h3>
+          <p className="text-[12px] text-muted-foreground">
             {selectedLabel} · explora por cliente, sucursal, tipo de tiempo, factura o repuesto.
           </p>
         </div>
@@ -2752,7 +2752,7 @@ export function FacturacionExplorer({
         <>
           <div className="space-y-2 md:hidden">
             {invoiceRows.length === 0 ? (
-              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin facturas en el período seleccionado.</div>
+              <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin facturas en el período seleccionado.</div>
             ) : (
               invoiceRows.slice(0, 30).map((row) => (
                 <div key={row.key} className="rounded-md border bg-background shadow-sm">
@@ -2760,11 +2760,11 @@ export function FacturacionExplorer({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate font-mono text-[11px] font-semibold text-muted-foreground">{row.factura}</div>
-                        <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                        <div className="truncate text-[13px] font-semibold">{row.cliente}</div>
                         <div className="text-[10px] text-muted-foreground">{row.sucursal} · {format(parseISO(row.fecha), "dd/MM/yy")}</div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="text-sm font-bold tabular-nums">{money(row.total)}</div>
+                        <div className="text-[13px] font-bold tabular-nums">{money(row.total)}</div>
                         <div className="text-[10px] text-muted-foreground">{row.lineas} lineas</div>
                       </div>
                     </div>
@@ -2810,11 +2810,11 @@ export function FacturacionExplorer({
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {invoiceRows.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin facturas en el período seleccionado.</div>
+                <div className="px-3 py-10 text-center text-[12px] text-muted-foreground">Sin facturas en el período seleccionado.</div>
               ) : (
                 invoiceRows.map((row) => (
                   <div key={row.key} className="border-t">
-                    <button type="button" onClick={() => setExpandedKey((current) => current === row.key ? null : row.key)} className="grid w-full grid-cols-[110px_1.15fr_140px_90px_90px_80px_120px] items-center px-3 py-2 text-left text-xs hover:bg-accent">
+                    <button type="button" onClick={() => setExpandedKey((current) => current === row.key ? null : row.key)} className="grid w-full grid-cols-[110px_1.15fr_140px_90px_90px_80px_120px] items-center px-3 py-2 text-left text-[12px] hover:bg-accent">
                       <div className="truncate font-mono font-semibold">{row.factura}</div>
                       <div className="truncate font-medium">{row.cliente}</div>
                       <div className="truncate text-muted-foreground">{row.rubro}</div>
@@ -2824,7 +2824,7 @@ export function FacturacionExplorer({
                       <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
                     </button>
                     {expandedKey === row.key && (
-                      <div className="bg-muted/20 px-3 py-2 text-xs">
+                      <div className="bg-muted/20 px-3 py-2 text-[12px]">
                         <div className="mb-2 flex flex-wrap gap-1">
                           {row.tiposTiempo.map((item) => <Badge key={item} variant="secondary">{item}</Badge>)}
                           {row.conceptos.map((item) => <Badge key={item} variant="outline">{item}</Badge>)}
@@ -2862,17 +2862,17 @@ export function FacturacionExplorer({
         <>
           <div className="space-y-2 md:hidden">
             {clientRowsComputed.length === 0 ? (
-              <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">Sin clientes facturados en el periodo.</div>
+              <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin clientes facturados en el periodo.</div>
             ) : (
               clientRowsComputed.slice(0, 30).map((row) => (
                 <div key={row.nombre} className="rounded-md border bg-background shadow-sm">
                   <button type="button" onClick={() => setExpandedKey((current) => current === row.nombre ? null : row.nombre)} className="w-full px-3 py-2.5 text-left">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{row.nombre}</div>
+                        <div className="truncate text-[13px] font-semibold">{row.nombre}</div>
                         <div className="text-[10px] text-muted-foreground">{row.facturas} facturas</div>
                       </div>
-                      <div className="shrink-0 text-sm font-bold tabular-nums">{money(row.total)}</div>
+                      <div className="shrink-0 text-[13px] font-bold tabular-nums">{money(row.total)}</div>
                     </div>
                   </button>
                   {expandedKey === row.nombre && (
@@ -2902,18 +2902,18 @@ export function FacturacionExplorer({
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {clientRowsComputed.length === 0 ? (
-                <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin clientes facturados en el periodo.</div>
+                <div className="px-3 py-10 text-center text-[12px] text-muted-foreground">Sin clientes facturados en el periodo.</div>
               ) : (
                 clientRowsComputed.map((row) => (
                   <div key={row.nombre} className="border-t">
-                    <button type="button" onClick={() => setExpandedKey((current) => current === row.nombre ? null : row.nombre)} className="grid w-full grid-cols-[1.4fr_84px_120px_110px] items-center px-3 py-2 text-left text-xs hover:bg-accent">
+                    <button type="button" onClick={() => setExpandedKey((current) => current === row.nombre ? null : row.nombre)} className="grid w-full grid-cols-[1.4fr_84px_120px_110px] items-center px-3 py-2 text-left text-[12px] hover:bg-accent">
                       <div className="truncate font-medium">{row.nombre}</div>
                       <div className="text-right tabular-nums">{row.facturas}</div>
                       <div className="text-right tabular-nums">{money(row.facturas ? row.total / row.facturas : 0)}</div>
                       <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
                     </button>
                     {expandedKey === row.nombre && (
-                      <div className="bg-muted/20 px-3 py-2 text-xs">
+                      <div className="bg-muted/20 px-3 py-2 text-[12px]">
                         <div className="mb-1 text-[11px] font-medium text-muted-foreground">Facturas del cliente en el periodo</div>
                         {row.rows.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map((detail, index) => {
                           const code = repuestoCode(detail);
@@ -2940,7 +2940,7 @@ export function FacturacionExplorer({
           <div className="grid gap-2 rounded-md border p-3 lg:grid-cols-[1.2fr_1.2fr_0.9fr]">
             <label className="space-y-1">
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Filas</span>
-              <select value={pivotRows} onChange={(e) => setPivotRows(e.target.value as PivotRowDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary">
+              <select value={pivotRows} onChange={(e) => setPivotRows(e.target.value as PivotRowDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-[13px] outline-none focus:border-primary">
                 {rowOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -2948,7 +2948,7 @@ export function FacturacionExplorer({
             </label>
             <label className="space-y-1">
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Columnas</span>
-              <select value={pivotColumns} onChange={(e) => setPivotColumns(e.target.value as PivotColumnDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary">
+              <select value={pivotColumns} onChange={(e) => setPivotColumns(e.target.value as PivotColumnDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-[13px] outline-none focus:border-primary">
                 {columnOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -2956,7 +2956,7 @@ export function FacturacionExplorer({
             </label>
             <label className="space-y-1">
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Medida</span>
-              <select value={pivotMetric} onChange={(e) => setPivotMetric(e.target.value as PivotMetric)} className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary">
+              <select value={pivotMetric} onChange={(e) => setPivotMetric(e.target.value as PivotMetric)} className="h-9 w-full rounded-md border bg-background px-3 text-[13px] outline-none focus:border-primary">
                 {metricOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -2967,22 +2967,22 @@ export function FacturacionExplorer({
           <div className="rounded-md border">
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
               <div>
-                <div className="text-sm font-semibold">Tabla dinamica</div>
-                <div className="text-xs text-muted-foreground">Configurable por fila, columna y medida. En repuestos prioriza fabricante y descripcion.</div>
+                <div className="text-[13px] font-semibold">Tabla dinamica</div>
+                <div className="text-[12px] text-muted-foreground">Configurable por fila, columna y medida. En repuestos prioriza fabricante y descripcion.</div>
               </div>
               <Badge variant="secondary">{pivot.rows.length} filas</Badge>
             </div>
 
             {pivot.rows.length === 0 ? (
-              <div className="px-3 py-8 text-center text-xs text-muted-foreground">No hay datos para la combinacion elegida.</div>
+              <div className="px-3 py-8 text-center text-[12px] text-muted-foreground">No hay datos para la combinacion elegida.</div>
             ) : (
               <>
                 <div className="space-y-2 p-3 md:hidden">
                   {pivot.rows.slice(0, 25).map((row) => (
                     <div key={row.key} className="rounded-md border bg-background px-3 py-2.5 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 text-sm font-semibold">{row.label}</div>
-                        <div className="shrink-0 text-sm font-bold tabular-nums">{formatMetric(metricValue(row, pivotMetric), pivotMetric)}</div>
+                        <div className="min-w-0 text-[13px] font-semibold">{row.label}</div>
+                        <div className="shrink-0 text-[13px] font-bold tabular-nums">{formatMetric(metricValue(row, pivotMetric), pivotMetric)}</div>
                       </div>
                       <div className="mt-2 space-y-1">
                         {pivot.columns.map((column) => {
@@ -3016,7 +3016,7 @@ export function FacturacionExplorer({
                       {pivot.rows.map((row) => (
                         <div
                           key={row.key}
-                          className="grid items-center border-b px-3 py-2 text-xs"
+                          className="grid items-center border-b px-3 py-2 text-[12px]"
                           style={{ gridTemplateColumns: `240px repeat(${Math.max(pivot.columns.length, 1)}, minmax(120px, 1fr)) 140px` }}
                         >
                           <div className="truncate font-medium">{row.label}</div>
@@ -3033,7 +3033,7 @@ export function FacturacionExplorer({
                       ))}
                     </div>
                     <div
-                      className="grid items-center bg-muted/30 px-3 py-2 text-xs font-semibold"
+                      className="grid items-center bg-muted/30 px-3 py-2 text-[12px] font-semibold"
                       style={{ gridTemplateColumns: `240px repeat(${Math.max(pivot.columns.length, 1)}, minmax(120px, 1fr)) 140px` }}
                     >
                       <div>Total</div>
@@ -3100,7 +3100,7 @@ export function ServiciosDashboard({
   onSelectTecnico: (tecnico: string) => void;
 }) {
   if (loading) {
-    return <div className="rounded-md border px-3 py-10 text-center text-xs text-muted-foreground">Cargando servicios...</div>;
+    return <div className="rounded-md border px-3 py-10 text-center text-[12px] text-muted-foreground">Cargando servicios...</div>;
   }
 
   const maxTecnico = Math.max(...data.tecnicos.map((row) => row.totalOS), 1);
@@ -3150,14 +3150,14 @@ export function ServiciosDashboard({
         <div className="rounded-md border bg-card p-3">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">Órdenes por responsable</h2>
-              <p className="text-xs text-muted-foreground">Carga y estado de las OS asignadas</p>
+              <h2 className="text-[13px] font-semibold">Órdenes por responsable</h2>
+              <p className="text-[12px] text-muted-foreground">Carga y estado de las OS asignadas</p>
             </div>
             <Users className="h-4 w-4 text-primary" />
           </div>
           <div className="space-y-2.5">
             {data.tecnicos.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">Sin órdenes de servicio para los filtros actuales.</div>
+              <div className="py-8 text-center text-[12px] text-muted-foreground">Sin órdenes de servicio para los filtros actuales.</div>
             ) : data.tecnicos.slice(0, 12).map((row) => {
               const active = selectedTecnicos.includes(row.tecnico);
               return (
@@ -3167,7 +3167,7 @@ export function ServiciosDashboard({
                   onClick={() => onSelectTecnico(row.tecnico)}
                   className={cn("w-full rounded-md px-2 py-1.5 text-left hover:bg-accent", active && "bg-primary/5 ring-1 ring-primary/30")}
                 >
-                  <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                  <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
                     <span className="min-w-0 truncate font-medium">{row.tecnico}</span>
                     <span className="shrink-0 font-semibold tabular-nums">{row.totalOS} OS</span>
                   </div>
@@ -3185,12 +3185,12 @@ export function ServiciosDashboard({
 
         <div className="space-y-3">
           <div className="rounded-md border bg-card p-3">
-            <h2 className="text-sm font-semibold">Tipo de tiempo</h2>
-            <p className="mb-3 text-xs text-muted-foreground">Cantidad de OS por clasificación</p>
+            <h2 className="text-[13px] font-semibold">Tipo de tiempo</h2>
+            <p className="mb-3 text-[12px] text-muted-foreground">Cantidad de OS por clasificación</p>
             <div className="space-y-2">
               {data.mixTiempo.map((row) => (
                 <div key={row.label}>
-                  <div className="mb-1 flex justify-between gap-3 text-xs">
+                  <div className="mb-1 flex justify-between gap-3 text-[12px]">
                     <span>{row.label}</span>
                     <span className="font-medium tabular-nums">{row.total} OS</span>
                   </div>
@@ -3203,12 +3203,12 @@ export function ServiciosDashboard({
           </div>
 
           <div className="rounded-md border bg-card p-3">
-            <h2 className="text-sm font-semibold">Estados de las OS</h2>
-            <p className="mb-3 text-xs text-muted-foreground">Situación informada en el sistema de origen</p>
+            <h2 className="text-[13px] font-semibold">Estados de las OS</h2>
+            <p className="mb-3 text-[12px] text-muted-foreground">Situación informada en el sistema de origen</p>
             <div className="space-y-2">
               {data.estados.map((row) => (
                 <div key={row.label}>
-                  <div className="mb-1 flex justify-between gap-3 text-xs">
+                  <div className="mb-1 flex justify-between gap-3 text-[12px]">
                     <span>{row.label}</span>
                     <span className="font-medium tabular-nums">{row.total} OS</span>
                   </div>
@@ -3225,15 +3225,15 @@ export function ServiciosDashboard({
       <div className="rounded-md border bg-card p-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Detalle por orden de servicio</h2>
-            <p className="text-xs text-muted-foreground">Todas las OS abiertas en el periodo y su estado actual</p>
+            <h2 className="text-[13px] font-semibold">Detalle por orden de servicio</h2>
+            <p className="text-[12px] text-muted-foreground">Todas las OS abiertas en el periodo y su estado actual</p>
           </div>
           <Badge variant="secondary">{data.ordenes.length} OS</Badge>
         </div>
 
         <div className="space-y-2 md:hidden">
           {data.ordenes.slice(0, 30).map((row) => (
-            <div key={row.key} className="rounded-md border p-3 text-xs">
+            <div key={row.key} className="rounded-md border p-3 text-[12px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="font-mono font-semibold">{row.os}</div>
                 <Badge variant="outline">{row.estadoOS}</Badge>
@@ -3251,7 +3251,7 @@ export function ServiciosDashboard({
         </div>
 
         <div className="hidden max-h-[430px] overflow-auto rounded-md border md:block">
-          <table className="w-full min-w-[920px] text-xs">
+          <table className="w-full min-w-[920px] text-[12px]">
             <thead className="sticky top-0 bg-muted/90 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">OS</th>

@@ -345,16 +345,16 @@ export function ComprasPedidosTab() {
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </TableCell>
-                      <TableCell className="text-xs">{row.sucursal ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.nro_pedido}</TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
+                      <TableCell className="text-[12px]">{row.sucursal ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-[12px]">{row.nro_pedido}</TableCell>
+                      <TableCell className="hidden text-[12px] text-muted-foreground sm:table-cell">
                         {row.fecha_emision ?? "—"}
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-xs">{row.proveedor_nombre ?? "—"}</TableCell>
-                      <TableCell className="text-right text-xs">
+                      <TableCell className="max-w-[220px] truncate text-[12px]">{row.proveedor_nombre ?? "—"}</TableCell>
+                      <TableCell className="text-right text-[12px]">
                         {busquedaActiva ? `${lineas.length} / ${row.cantidad_items}` : row.cantidad_items}
                       </TableCell>
-                      <TableCell className="text-right text-xs font-medium">
+                      <TableCell className="text-right text-[12px] font-medium">
                         {row.moneda ?? ""} {Number(row.valor_total ?? 0).toLocaleString("es-PY", { maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
@@ -409,27 +409,27 @@ export function ComprasPedidosTab() {
 
                                   return (
                                     <TableRow key={linea.item}>
-                                      <TableCell className="pl-8 text-xs">{linea.item}</TableCell>
-                                      <TableCell className="font-mono text-xs">{linea.productoCodigo}</TableCell>
-                                      <TableCell className="max-w-[220px] truncate text-xs">{linea.descripcion ?? "—"}</TableCell>
-                                      <TableCell className="text-right text-xs">
+                                      <TableCell className="pl-8 text-[12px]">{linea.item}</TableCell>
+                                      <TableCell className="font-mono text-[12px]">{linea.productoCodigo}</TableCell>
+                                      <TableCell className="max-w-[220px] truncate text-[12px]">{linea.descripcion ?? "—"}</TableCell>
+                                      <TableCell className="text-right text-[12px]">
                                         {linea.cantidad} {linea.unidad ?? ""}
                                       </TableCell>
-                                      <TableCell className="text-right text-xs">
+                                      <TableCell className="text-right text-[12px]">
                                         {linea.precioUnitario.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
                                       </TableCell>
-                                      <TableCell className="text-right text-xs font-medium">
+                                      <TableCell className="text-right text-[12px] font-medium">
                                         {linea.valorTotal.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
                                       </TableCell>
                                       <TableCell
                                         className={cn(
-                                          "text-right text-xs",
+                                          "text-right text-[12px]",
                                           linea.cantidadPendiente > 0 && "font-semibold text-amber-700",
                                         )}
                                       >
                                         {linea.cantidadPendiente}
                                       </TableCell>
-                                      <TableCell className="text-xs">
+                                      <TableCell className="text-[12px]">
                                         {!solicitudes || solicitudes.length === 0 ? (
                                           <span className="text-muted-foreground">—</span>
                                         ) : (

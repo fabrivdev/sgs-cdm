@@ -15,7 +15,7 @@
     --radius-control: 6px;
     --radius-panel: 8px;
     --radius-pill: 999px;
-    --control-height: 36px;
+    --control-height: 34px;
     --panel-padding: 12px;
     --table-row-height: 44px;
     --motion-fast: 160ms;
@@ -113,12 +113,12 @@
 @layer base {
   * { @apply border-border; }
   html {
-    font-size: 13px;
+    font-size: 14px;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  body { @apply bg-background text-foreground font-sans antialiased; font-size: 13px; line-height: 1.45; }
+  body { @apply bg-background text-foreground font-sans antialiased; font-size: 13px; line-height: 1.5; }
 
   /* En pantallas táctiles conservamos 16px para legibilidad y para evitar el
      zoom automático de iOS en inputs. La densidad compacta es desktop-first. */

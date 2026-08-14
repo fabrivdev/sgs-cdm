@@ -683,7 +683,7 @@ export function ParqueTab({
                 <FilterCustom label="Desde" width="w-full">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
+                      <Button variant="outline" size="sm" className="h-9 w-full justify-start text-[12px]">
                         <CalendarIcon className="mr-1 h-3.5 w-3.5" />
                         {customDesde ? format(customDesde, "dd/MM") : "Desde"}
                       </Button>
@@ -696,7 +696,7 @@ export function ParqueTab({
                 <FilterCustom label="Hasta" width="w-full">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
+                      <Button variant="outline" size="sm" className="h-9 w-full justify-start text-[12px]">
                         <CalendarIcon className="mr-1 h-3.5 w-3.5" />
                         {customHasta ? format(customHasta, "dd/MM") : "Hasta"}
                       </Button>
@@ -711,7 +711,7 @@ export function ParqueTab({
             <FilterCustom label="Plataformas / cabezales" width="w-full">
               <div className="flex h-9 items-center gap-2 rounded-md border px-3">
                 <Switch id="incluir-plataformas" checked={incluirPlataformas} onCheckedChange={setIncluirPlataformas} />
-                <Label htmlFor="incluir-plataformas" className="cursor-pointer whitespace-nowrap text-xs">Incluir</Label>
+                <Label htmlFor="incluir-plataformas" className="cursor-pointer whitespace-nowrap text-[12px]">Incluir</Label>
               </div>
             </FilterCustom>
           </>
@@ -738,7 +738,7 @@ export function ParqueTab({
         />
       </FiltersBar>
 
-      <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <div>
           {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
           {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
@@ -756,7 +756,7 @@ export function ParqueTab({
       </div>
 
       {factError && !factLoading && (
-        <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive sm:flex-row sm:items-center sm:justify-between">
           <span>{factError}</span>
           <Button
             type="button"
@@ -772,7 +772,7 @@ export function ParqueTab({
 
 
       {!loading && !factLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-900 dark:text-amber-200">
           ⚠️ No hay facturas de <strong>Servicio</strong> (Mano de Obra / Kilometraje) en el período seleccionado.
           {servicioInfo.ultimaServicio
             ? ` Última factura de servicio en la base: ${format(servicioInfo.ultimaServicio, "dd/MM/yyyy")}.`
@@ -780,7 +780,7 @@ export function ParqueTab({
         </div>
       )}
 
-      <div className="hidden text-xs text-muted-foreground">
+      <div className="hidden text-[12px] text-muted-foreground">
         {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
         {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
         {factLoading && !loading && (
@@ -865,13 +865,13 @@ export function ParqueTab({
                         <a
   href={`tel:${r.contactoPrincipal.telefono}`}
   onClick={(e) => e.stopPropagation()}
-  className="flex items-center gap-1 text-sm hover:text-primary whitespace-nowrap"
+  className="flex items-center gap-1 text-[13px] hover:text-primary whitespace-nowrap"
 >
   <Phone className="h-3 w-3 shrink-0" />
   <span className="whitespace-nowrap">{r.contactoPrincipal.telefono}</span>
 </a>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-[12px] text-muted-foreground">—</span>
                       )}
                     </TableCell>
 
@@ -883,7 +883,7 @@ export function ParqueTab({
                           {r.antiguedadProm}
                         </Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-[12px] text-muted-foreground">—</span>
                       )}
                     </TableCell>
 
@@ -909,7 +909,7 @@ export function ParqueTab({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-[12px] text-muted-foreground">—</span>
                       )}
                     </TableCell>
 

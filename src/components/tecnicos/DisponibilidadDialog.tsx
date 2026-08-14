@@ -132,8 +132,8 @@ export function DisponibilidadDialog({
             <CalendarOff className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Disponibilidad tecnica</h2>
-            <p className="text-sm text-muted-foreground">Capacitacion, permiso o ausencia sin crear trabajo.</p>
+            <h2 className="text-[14px] font-semibold">Disponibilidad tecnica</h2>
+            <p className="text-[13px] text-muted-foreground">Capacitacion, permiso o ausencia sin crear trabajo.</p>
           </div>
         </div>
       </ResponsiveDrawerHeader>
@@ -179,7 +179,7 @@ export function DisponibilidadDialog({
           </div>
           <div className="max-h-72 overflow-y-auto rounded-lg border">
             {filtrados.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">Sin tecnicos.</p>
+              <p className="p-4 text-[13px] text-muted-foreground">Sin tecnicos.</p>
             ) : (
               filtrados.map((t) => {
                 const checked = selected.includes(t.id);
@@ -193,8 +193,8 @@ export function DisponibilidadDialog({
                   >
                     <Checkbox checked={checked} onCheckedChange={(v) => toggleTecnico(t.id, Boolean(v))} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{t.nombre}</span>
-                      <span className="block text-xs text-muted-foreground">{t.sucursal ?? "Sin sucursal"}</span>
+                      <span className="block truncate text-[13px] font-medium">{t.nombre}</span>
+                      <span className="block text-[12px] text-muted-foreground">{t.sucursal ?? "Sin sucursal"}</span>
                     </span>
                   </label>
                 );
@@ -206,8 +206,8 @@ export function DisponibilidadDialog({
         <label className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
           <Checkbox checked={bloqueaAgenda} onCheckedChange={(v) => setBloqueaAgenda(Boolean(v))} />
           <span>
-            <span className="block text-sm font-medium">Bloquea agenda</span>
-            <span className="block text-xs text-muted-foreground">Se muestra como tecnico no disponible.</span>
+            <span className="block text-[13px] font-medium">Bloquea agenda</span>
+            <span className="block text-[12px] text-muted-foreground">Se muestra como tecnico no disponible.</span>
           </span>
         </label>
 

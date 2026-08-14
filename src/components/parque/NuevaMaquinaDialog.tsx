@@ -122,15 +122,15 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
       <ResponsiveDrawerHeader>
-        <h2 className="text-base font-semibold pr-8">Nueva máquina</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Alta manual al parque del cliente</p>
+        <h2 className="text-[14px] font-semibold pr-8">Nueva máquina</h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">Alta manual al parque del cliente</p>
       </ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
         <div className="grid gap-5">
           <section className="grid gap-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Identificación</h3>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Cliente *</Label>
+              <Label className="text-[12px]">Cliente *</Label>
               <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -171,7 +171,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label className="text-xs">Marca *</Label>
+                <Label className="text-[12px]">Marca *</Label>
                 <Select value={form.marca} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: "" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -180,7 +180,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label className="text-xs">Subgrupo</Label>
+                <Label className="text-[12px]">Subgrupo</Label>
                 <Select value={form.subgrupo} onValueChange={(v) => setForm({ ...form, subgrupo: v, modelo_tipo: "" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -195,16 +195,16 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Datos de la máquina</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label className="text-xs">N° de serie *</Label>
+                <Label className="text-[12px]">N° de serie *</Label>
                 <Input value={form.serie} onChange={(e) => setForm({ ...form, serie: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
-                <Label className="text-xs">Año</Label>
+                <Label className="text-[12px]">Año</Label>
                 <Input type="number" value={form.anio} onChange={(e) => setForm({ ...form, anio: e.target.value })} />
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Modelo</Label>
+              <Label className="text-[12px]">Modelo</Label>
               <ModeloMaquinaSelect
                 marca={form.marca}
                 subgrupo={form.subgrupo}
@@ -218,7 +218,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ubicación</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label className="text-xs">Sucursal</Label>
+                <Label className="text-[12px]">Sucursal</Label>
                 <Select value={form.sucursal || "none"} onValueChange={(v) => setForm({ ...form, sucursal: v === "none" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
@@ -228,7 +228,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label className="text-xs">Localidad</Label>
+                <Label className="text-[12px]">Localidad</Label>
                 <Input value={form.localidad} onChange={(e) => setForm({ ...form, localidad: e.target.value })} />
               </div>
             </div>
@@ -237,11 +237,11 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
           <section className="grid gap-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Comercial</h3>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Vendedor</Label>
+              <Label className="text-[12px]">Vendedor</Label>
               <Input value={form.vendedor} onChange={(e) => setForm({ ...form, vendedor: e.target.value })} />
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Notas</Label>
+              <Label className="text-[12px]">Notas</Label>
               <Input value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
             </div>
           </section>

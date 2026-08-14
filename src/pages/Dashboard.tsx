@@ -3180,10 +3180,10 @@ export default function Dashboard() {
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
       <PageHeader title="Dashboard ejecutivo" tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
-          <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
-          <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-xs">Facturación</TabsTrigger>
-          <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
-          <TabsTrigger value="servicios" className="h-7 whitespace-nowrap px-3 text-xs">Servicios</TabsTrigger>
+          <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-[12px]">Vista general</TabsTrigger>
+          <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-[12px]">Facturación</TabsTrigger>
+          <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-[12px]">Trabajos</TabsTrigger>
+          <TabsTrigger value="servicios" className="h-7 whitespace-nowrap px-3 text-[12px]">Servicios</TabsTrigger>
         </TabsList>} />
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
@@ -3297,7 +3297,7 @@ export default function Dashboard() {
           <select
             value={activeDatePreset}
             onChange={(event) => applyDatePreset(event.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option value="">Personalizado</option>
             {datePresets.map((preset) => (
@@ -3431,7 +3431,7 @@ export default function Dashboard() {
                     <BarChart3 className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold">Top 2</div>
+                    <div className="text-[13px] font-semibold">Top 2</div>
                     <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">concentran {topSucursalesPct}% del total</div>
                   </div>
                 </div>
@@ -3474,7 +3474,7 @@ export default function Dashboard() {
                       <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Activos actuales con carga</div>
                       <div className="mt-0.5 flex items-baseline gap-2">
                         <span className="text-[18px] font-extrabold leading-none tabular-nums">
-                          {técnicosConActividadPeriodo.size}<span className="text-sm font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
+                          {técnicosConActividadPeriodo.size}<span className="text-[13px] font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
                         </span>
                         <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
                           {técnicosActivosPct}%
@@ -3513,7 +3513,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-[13px] font-semibold leading-5">{T.comparativoFacturacion}</h2>
-                <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
+                <p className="text-[12px] text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
@@ -3549,7 +3549,7 @@ export default function Dashboard() {
                     key={row.key}
                     onClick={() => setSelectedWeekKey(row.key)}
                     className={cn(
-                      "grid w-full grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent",
+                      "grid w-full grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent",
                       active && "bg-primary/5 outline outline-1 outline-primary/20",
                     )}
                   >
@@ -3700,7 +3700,7 @@ export default function Dashboard() {
             </div>
             <div className="space-y-2 md:hidden">
               {trabajosResumen.length === 0 ? (
-                <div className="rounded-md border px-3 py-8 text-center text-xs text-muted-foreground">Sin trabajos para los filtros actuales.</div>
+                <div className="rounded-md border px-3 py-8 text-center text-[12px] text-muted-foreground">Sin trabajos para los filtros actuales.</div>
               ) : (
                 <>
                 {(showAllMobileTrabajos ? trabajosResumen : trabajosResumen.slice(0, 5)).map((row) => (
@@ -3712,11 +3712,11 @@ export default function Dashboard() {
                     <div className="mb-1 flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-mono text-[11px] font-semibold text-muted-foreground">{row.ref}</div>
-                        <div className="truncate text-sm font-semibold">{row.cliente}</div>
+                        <div className="truncate text-[13px] font-semibold">{row.cliente}</div>
                       </div>
                       <TrabajoEstadoBadge estado={row.estado as any} className="shrink-0 text-[10px]" />
                     </div>
-                    <div className="line-clamp-2 text-xs text-muted-foreground">{row.descripcion}</div>
+                    <div className="line-clamp-2 text-[12px] text-muted-foreground">{row.descripcion}</div>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
                       <div className="rounded-md bg-muted/50 px-2 py-1">
                         <div className="text-muted-foreground">Jornadas</div>
@@ -3749,7 +3749,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowAllMobileTrabajos((v) => !v)}
-                    className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+                    className="w-full rounded-md border px-3 py-2 text-[12px] text-muted-foreground hover:bg-accent"
                   >
                     {showAllMobileTrabajos ? "Ver menos" : `Ver todos (${trabajosResumen.length})`}
                   </button>
@@ -3771,13 +3771,13 @@ export default function Dashboard() {
                   <div className="text-right">Estado</div>
                 </div>
                 {trabajosResumen.length === 0 ? (
-                  <div className="px-3 py-10 text-center text-xs text-muted-foreground">Sin trabajos para los filtros actuales.</div>
+                  <div className="px-3 py-10 text-center text-[12px] text-muted-foreground">Sin trabajos para los filtros actuales.</div>
                 ) : (
                   trabajosResumen.slice(0, 80).map((row) => (
                     <button
                       key={row.id}
                       onClick={() => navigate(`/trabajos?q=${encodeURIComponent(row.ref)}`)}
-                      className="grid w-full grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] items-center border-t px-3 py-2 text-left text-xs hover:bg-accent"
+                      className="grid w-full grid-cols-[96px_1.2fr_0.7fr_96px_84px_78px_108px_120px_110px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent"
                     >
                       <div className="font-mono text-[11px] font-semibold">{row.ref}</div>
                       <div className="min-w-0">
@@ -3813,7 +3813,7 @@ export default function Dashboard() {
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-[13px] font-semibold leading-5">Trabajos abiertos sin cierre</h2>
-                  <p className="text-xs text-muted-foreground">Ordenados de mayor a menor por días sin cerrar</p>
+                  <p className="text-[12px] text-muted-foreground">Ordenados de mayor a menor por días sin cerrar</p>
                 </div>
                 <Badge variant="secondary">{trabajosAbiertosSinCierre.length} abiertos</Badge>
               </div>

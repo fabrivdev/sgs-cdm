@@ -53,7 +53,7 @@ export function FilterMultiSelect({
           <button
             type="button"
             className={cn(
-              "flex h-9 w-full items-center justify-between gap-1 rounded-md border bg-background px-2.5 text-xs",
+              "flex h-9 w-full items-center justify-between gap-1 rounded-md border bg-background px-2.5 text-[12px]",
               "hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring",
               !allSelected && "border-primary/40 bg-primary/5",
             )}
@@ -90,7 +90,7 @@ export function FilterMultiSelect({
                   key={opt.value}
                   type="button"
                   onClick={() => toggle(opt.value)}
-                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-accent"
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px] hover:bg-accent"
                 >
                   <Checkbox checked={checked} className="pointer-events-none" />
                   <span className="truncate">{opt.label}</span>

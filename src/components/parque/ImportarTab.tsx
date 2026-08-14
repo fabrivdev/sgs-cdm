@@ -1693,7 +1693,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         <CardContent className="space-y-3 p-3 sm:p-4">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="space-y-1">
-              <div className="text-sm font-semibold">Importacion vigente - Nuevo sistema XML</div>
+              <div className="text-[13px] font-semibold">Importacion vigente - Nuevo sistema XML</div>
               <div className="max-w-3xl text-[11px] text-muted-foreground">
                 El historico hasta 30/06/2026 queda congelado. Al confirmar, se reemplaza solo el tramo nuevo de facturacion y ordenes de servicio.
               </div>
@@ -1733,7 +1733,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         <CardContent className="space-y-3 p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-sm font-semibold">Importaciones anteriores</div>
+              <div className="text-[13px] font-semibold">Importaciones anteriores</div>
               <div className="text-[11px] text-muted-foreground">Archivadas por cambio de sistema. Se conservan solo como referencia.</div>
             </div>
             <Badge variant="outline" className="text-[10px]">Deshabilitado</Badge>
@@ -1747,7 +1747,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
               "Contactos",
               "Ordenes de servicio",
             ].map((item) => (
-              <div key={item} className="flex items-center gap-2 rounded-md border bg-background/70 px-3 py-2 text-sm text-muted-foreground">
+              <div key={item} className="flex items-center gap-2 rounded-md border bg-background/70 px-3 py-2 text-[13px] text-muted-foreground">
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
                 <span className="truncate">{item}</span>
                 <Badge variant="outline" className="ml-auto text-[10px]">Archivado</Badge>
@@ -1773,8 +1773,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           {factDiag && (
             <Card className="border-blue-500/30 bg-blue-500/5">
               <CardContent className="p-3 sm:p-4 space-y-2">
-                <div className="text-sm font-semibold">Resumen de lectura</div>
-                <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div className="text-[13px] font-semibold">Resumen de lectura</div>
+                <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
                   <div>
                     <div className="text-muted-foreground">Repuesto (total)</div>
                     <div className="font-semibold">{factDiag.repuestoTotal.toLocaleString()}</div>
@@ -1806,7 +1806,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
                 </div>
                 {factDiag.grupoFxNoComercial.length > 0 && (
                   <div className="pt-2 border-t border-blue-500/20">
-                    <div className="text-xs font-semibold mb-1">
+                    <div className="text-[12px] font-semibold mb-1">
                       Servicios con GRUPO FX no comercial ({factDiag.grupoFxNoComercial.reduce((s, x) => s + x.count, 0).toLocaleString()} filas):
                     </div>
                     <div className="text-[10px] text-muted-foreground">
@@ -1850,8 +1850,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
               <CardContent className="p-3 sm:p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="text-sm font-semibold">Resumen GRID Campos</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-[13px] font-semibold">Resumen GRID Campos</div>
+                    <div className="text-[12px] text-muted-foreground">
                       Clasificacion por observacion para distinguir Garantia e Interno.
                     </div>
                   </div>
@@ -1859,7 +1859,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
                     {gridDiag.total.toLocaleString()} lineas
                   </Badge>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-7">
+                <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4 lg:grid-cols-7">
                   <div>
                     <div className="text-muted-foreground">Garantia</div>
                     <div className="font-semibold">{gridDiag.garantia.toLocaleString()}</div>
@@ -1991,17 +1991,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       <Card>
         <CardContent className="p-3 sm:p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-semibold">
+            <div className="flex items-center gap-2 text-[13px] font-semibold">
               <History className="h-4 w-4 text-primary" /> Historial de importaciones
             </div>
             {historial.length > 10 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowAllHistory((value) => !value)}>
+              <Button variant="ghost" size="sm" className="h-7 text-[12px]" onClick={() => setShowAllHistory((value) => !value)}>
                 {showAllHistory ? "Mostrar ultimos 10" : `Ver ${historial.length}`}
               </Button>
             )}
           </div>
           {historial.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Sin importaciones registradas.</div>
+            <div className="text-[12px] text-muted-foreground">Sin importaciones registradas.</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -2019,19 +2019,19 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
                 <TableBody>
                   {historialVisible.map((h) => (
                     <TableRow key={h.id}>
-                      <TableCell className="text-xs">
+                      <TableCell className="text-[12px]">
                         {new Date(h.creado_en).toLocaleString("es-PY", {
                           dateStyle: "short",
                           timeStyle: "short",
                         })}
                       </TableCell>
-                      <TableCell className="text-xs">{h.usuario_id ? profiles[h.usuario_id] ?? "—" : "—"}</TableCell>
+                      <TableCell className="text-[12px]">{h.usuario_id ? profiles[h.usuario_id] ?? "—" : "—"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[10px]">
                           {h.tipo}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs truncate max-w-[180px]">{h.archivo_nombre ?? "—"}</TableCell>
+                      <TableCell className="text-[12px] truncate max-w-[180px]">{h.archivo_nombre ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{h.total_filas}</TableCell>
                       <TableCell className="text-right tabular-nums text-emerald-600 font-medium">
                         {h.insertados}
@@ -2096,7 +2096,7 @@ function DropZone({
       <div className={cn(compact && "flex items-center gap-3")}>
         <FileSpreadsheet className={cn("text-muted-foreground", compact ? "h-5 w-5 shrink-0" : "mx-auto mb-2 h-8 w-8")} />
         <div className={cn(compact && "min-w-0 flex-1 text-left")}>
-          <div className="text-sm font-medium">{title}</div>
+          <div className="text-[13px] font-medium">{title}</div>
           <div className={cn("text-[11px] text-muted-foreground", compact ? "truncate" : "mb-3 mt-1")} title={help}>
             {help}
           </div>
@@ -2164,7 +2164,7 @@ function NewSystemXmlPreview({
       <CardContent className="p-3 sm:p-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="font-semibold text-sm">Nuevo sistema listo para importar</div>
+            <div className="font-semibold text-[13px]">Nuevo sistema listo para importar</div>
             <div className="text-[11px] text-muted-foreground">
               Reemplaza solo datos desde {NEW_SYSTEM_START}. El histórico anterior queda intacto.
             </div>
@@ -2183,14 +2183,14 @@ function NewSystemXmlPreview({
           <Card className="border-border/60">
             <CardContent className="p-3">
               <div className="text-[11px] text-muted-foreground">Venta directa</div>
-              <div className="text-2xl font-semibold">{bundle.diagnostics.billingDirectSales.toLocaleString()}</div>
+              <div className="text-[20px] font-semibold">{bundle.diagnostics.billingDirectSales.toLocaleString()}</div>
               <div className="text-[11px] text-muted-foreground">Sin cruce con OS</div>
             </CardContent>
           </Card>
           <Card className="border-border/60">
             <CardContent className="p-3">
               <div className="text-[11px] text-muted-foreground">Cruzadas con OS</div>
-              <div className="text-2xl font-semibold">{bundle.diagnostics.billingMatchedToOs.toLocaleString()}</div>
+              <div className="text-[20px] font-semibold">{bundle.diagnostics.billingMatchedToOs.toLocaleString()}</div>
               <div className="text-[11px] text-muted-foreground">Documento / factura</div>
             </CardContent>
           </Card>
@@ -2218,7 +2218,7 @@ function NewSystemXmlPreview({
           <Card>
             <CardContent className="p-3 sm:p-4">
               <div className="mb-2">
-                <div className="font-semibold text-sm">Facturación nueva</div>
+                <div className="font-semibold text-[13px]">Facturación nueva</div>
                 <div className="text-[11px] text-muted-foreground">{files.facturacion?.fileName ?? "—"}</div>
               </div>
               <div className="overflow-x-auto rounded-md border">
@@ -2237,11 +2237,11 @@ function NewSystemXmlPreview({
                       const crosswalk = bundle.billingCrosswalk.find((item) => item.billingRowId === row.rowId);
                       return (
                         <TableRow key={row.rowId}>
-                          <TableCell className="text-xs whitespace-nowrap">{row.emissionDate ?? "—"}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap">{row.invoiceShortNumber ?? row.invoiceLongNumber ?? "—"}</TableCell>
-                          <TableCell className="text-xs max-w-[220px] truncate">{row.clientName}</TableCell>
-                          <TableCell className="text-xs whitespace-nowrap">{crosswalk?.inferredTimeType ?? row.timeType}</TableCell>
-                          <TableCell className="text-xs text-right whitespace-nowrap">
+                          <TableCell className="text-[12px] whitespace-nowrap">{row.emissionDate ?? "—"}</TableCell>
+                          <TableCell className="text-[12px] whitespace-nowrap">{row.invoiceShortNumber ?? row.invoiceLongNumber ?? "—"}</TableCell>
+                          <TableCell className="text-[12px] max-w-[220px] truncate">{row.clientName}</TableCell>
+                          <TableCell className="text-[12px] whitespace-nowrap">{crosswalk?.inferredTimeType ?? row.timeType}</TableCell>
+                          <TableCell className="text-[12px] text-right whitespace-nowrap">
                             USD {(row.totalValueWithIva || row.totalValueBase || 0).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                         </TableRow>
@@ -2256,7 +2256,7 @@ function NewSystemXmlPreview({
           <Card>
             <CardContent className="p-3 sm:p-4">
               <div className="mb-2">
-                <div className="font-semibold text-sm">Órdenes de servicio nuevas</div>
+                <div className="font-semibold text-[13px]">Órdenes de servicio nuevas</div>
                 <div className="text-[11px] text-muted-foreground">{files.ordenesServicio?.fileName ?? "—"}</div>
               </div>
               <div className="overflow-x-auto rounded-md border">
@@ -2273,11 +2273,11 @@ function NewSystemXmlPreview({
                   <TableBody>
                     {osPreview.map((row) => (
                       <TableRow key={row.rowId}>
-                        <TableCell className="text-xs whitespace-nowrap">{row.serviceOrderNumber}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">{row.openDate ?? row.invoiceDate ?? "—"}</TableCell>
-                        <TableCell className="text-xs max-w-[220px] truncate">{row.ownerName ?? row.billedClientName ?? "—"}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">{row.timeType}</TableCell>
-                        <TableCell className="text-xs text-right whitespace-nowrap">
+                        <TableCell className="text-[12px] whitespace-nowrap">{row.serviceOrderNumber}</TableCell>
+                        <TableCell className="text-[12px] whitespace-nowrap">{row.openDate ?? row.invoiceDate ?? "—"}</TableCell>
+                        <TableCell className="text-[12px] max-w-[220px] truncate">{row.ownerName ?? row.billedClientName ?? "—"}</TableCell>
+                        <TableCell className="text-[12px] whitespace-nowrap">{row.timeType}</TableCell>
+                        <TableCell className="text-[12px] text-right whitespace-nowrap">
                           USD {(row.lineTotal || 0).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                       </TableRow>
@@ -2325,7 +2325,7 @@ function Preview<T extends { _isNew: boolean }>({
     <Card>
       <CardContent className="p-3 sm:p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-sm">{title}</div>
+          <div className="font-semibold text-[13px]">{title}</div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{rows.length} filas</Badge>
             <Badge className="bg-emerald-600 text-white">
@@ -2362,7 +2362,7 @@ function Preview<T extends { _isNew: boolean }>({
                     )}
                   </TableCell>
                   {columns.map((c) => (
-                    <TableCell key={c} className="whitespace-nowrap text-xs">
+                    <TableCell key={c} className="whitespace-nowrap text-[12px]">
                       {String((r as Record<string, unknown>)[c] ?? "—")}
                     </TableCell>
                   ))}
@@ -2407,7 +2407,7 @@ function ContactosPreview({
     <Card>
       <CardContent className="p-3 sm:p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-sm">{title}</div>
+          <div className="font-semibold text-[13px]">{title}</div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{rows.length} filas</Badge>
             <Badge className="bg-emerald-600 text-white">
@@ -2458,14 +2458,14 @@ function ContactosPreview({
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs">
+                  <TableCell className="text-[12px]">
                     <div className="font-mono text-[10px] text-muted-foreground">{r.cliente_ruc ?? "—"}</div>
                     <div className="truncate max-w-[200px]">{r.cliente_nombre ?? "—"}</div>
                   </TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{r.nombre}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{r.cargo ?? "—"}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{r.telefono ?? "—"}</TableCell>
-                  <TableCell className="text-xs whitespace-nowrap">{r.correo ?? "—"}</TableCell>
+                  <TableCell className="text-[12px] whitespace-nowrap">{r.nombre}</TableCell>
+                  <TableCell className="text-[12px] whitespace-nowrap">{r.cargo ?? "—"}</TableCell>
+                  <TableCell className="text-[12px] whitespace-nowrap">{r.telefono ?? "—"}</TableCell>
+                  <TableCell className="text-[12px] whitespace-nowrap">{r.correo ?? "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

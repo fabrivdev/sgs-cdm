@@ -535,13 +535,13 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader className="mb-3">
-          <SheetTitle className="text-lg">{cliente?.nombre ?? "Cargando..."}</SheetTitle>
+          <SheetTitle className="text-[14px]">{cliente?.nombre ?? "Cargando..."}</SheetTitle>
         </SheetHeader>
 
         {/* Datos generales */}
         <section className="mb-5 rounded-lg border bg-card p-3">
           <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold">
+            <div className="flex items-center gap-2 text-[13px] font-semibold">
               <Building2 className="h-4 w-4 text-primary" /> Datos generales
             </div>
             {!editCliente && canManagePark ? (
@@ -556,7 +556,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
             ) : null}
           </div>
           {!editCliente ? (
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-[12px]">
               <div><span className="text-muted-foreground">RUC:</span> {cliente?.ruc ?? "—"}</div>
               <div><span className="text-muted-foreground">Sucursal:</span> {Array.from(new Set(maquinas.map((m) => m.sucursal).filter(Boolean))).join(", ") || "—"}</div>
               <div><span className="text-muted-foreground">Región:</span> {cliente?.region ?? "—"}</div>
@@ -581,7 +581,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         {/* Contactos */}
         <section className="mb-5 rounded-lg border bg-card p-3">
           <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold">
+            <div className="flex items-center gap-2 text-[13px] font-semibold">
               <UsersIcon className="h-4 w-4 text-primary" /> Contactos
               <Badge variant="secondary" className="text-[10px]">{contactos.filter((c) => c.activo).length}</Badge>
             </div>
@@ -591,7 +591,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
           </div>
           <div className="space-y-2">
             {contactos.filter((c) => c.activo).length === 0 && !newContacto && (
-              <div className="text-xs text-muted-foreground">Sin contactos.</div>
+              <div className="text-[12px] text-muted-foreground">Sin contactos.</div>
             )}
             {contactos.filter((c) => c.activo).map((c) => (
               <div key={c.id} className="rounded-md border p-2">
@@ -601,7 +601,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium">{c.nombre}</span>
+                        <span className="text-[13px] font-medium">{c.nombre}</span>
                         {c.es_principal && <Badge className="text-[9px] bg-primary text-primary-foreground">Principal</Badge>}
                       </div>
                       {c.cargo && <div className="text-[11px] text-muted-foreground">{c.cargo}</div>}
@@ -652,7 +652,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
             return (
               <>
                 <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 text-sm font-semibold">
+                  <div className="flex items-center gap-2 text-[13px] font-semibold">
                     <Tractor className="h-4 w-4 text-primary" /> Máquinas
                     <Badge variant="secondary" className="text-[10px]">{activas.length} activas</Badge>
                     {inactivas.length > 0 && (
@@ -665,7 +665,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                         variant="ghost"
                         size="sm"
                         onClick={() => setMostrarInactivas((v) => !v)}
-                        className="h-8 text-xs"
+                        className="h-8 text-[12px]"
                       >
                         {mostrarInactivas ? "Ocultar inactivas" : "Ver inactivas"}
                       </Button>
@@ -677,7 +677,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                 </div>
                 <div className="space-y-2">
                   {visibles.length === 0 && !newMaquina && (
-                    <div className="text-xs text-muted-foreground">Sin máquinas.</div>
+                    <div className="text-[12px] text-muted-foreground">Sin máquinas.</div>
                   )}
                   {visibles.map((m) => (
                     <div key={m.id} className={cn("rounded-md border p-2", !m.activo && "opacity-60 bg-muted/30")}>
@@ -690,12 +690,12 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                               <Badge className={cn("text-[10px]", m.marca === "CLAAS" ? "bg-emerald-600 text-white" : m.marca === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
                                 {m.marca}
                               </Badge>
-                              <span className="text-sm font-medium">{m.anio ?? "—"}</span>
+                              <span className="text-[13px] font-medium">{m.anio ?? "—"}</span>
                               <Badge variant="outline" className="text-[10px]">{m.subgrupo}</Badge>
                               {m.agregado_manualmente && <Badge variant="secondary" className="text-[9px]">Manual</Badge>}
                               {!m.activo && <Badge variant="destructive" className="text-[9px]">Inactiva</Badge>}
                             </div>
-                            <div className="mt-0.5 text-xs">{m.modelo_tipo ?? "—"}</div>
+                            <div className="mt-0.5 text-[12px]">{m.modelo_tipo ?? "—"}</div>
                             <div className="text-[11px] text-muted-foreground">Serie: {m.serie}</div>
                           </div>
                           {canManagePark && <div className="flex gap-1">
@@ -721,12 +721,12 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                 >
                                   <ArrowRightLeft className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={() => desactivarMaquina(m.id)} className="text-xs h-8" title="Marcar como inactiva">
+                                <Button variant="outline" size="sm" onClick={() => desactivarMaquina(m.id)} className="text-[12px] h-8" title="Marcar como inactiva">
                                   Inactivar
                                 </Button>
                               </>
                             ) : (
-                              <Button variant="outline" size="sm" onClick={() => reactivarMaquina(m.id)} className="text-xs h-8">
+                              <Button variant="outline" size="sm" onClick={() => reactivarMaquina(m.id)} className="text-[12px] h-8">
                                 Reactivar
                               </Button>
                             )}
@@ -759,13 +759,13 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
         {/* Seguimientos */}
         <section className="mb-5 rounded-lg border bg-card p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+          <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
             <ClipboardList className="h-4 w-4 text-primary" /> Seguimientos
             <Badge variant="secondary" className="text-[10px]">{seguimientosCompletos.length}</Badge>
           </div>
           <div className="space-y-2">
             {seguimientosCompletos.length === 0 && (
-              <div className="text-xs text-muted-foreground">Sin seguimientos.</div>
+              <div className="text-[12px] text-muted-foreground">Sin seguimientos.</div>
             )}
             {seguimientosCompletos.map((s) => {
               const nombre = s.derivadoDeTrabajo ? "Sistema" : s.usuario_id ? profiles[s.usuario_id] ?? "?" : "?";
@@ -783,7 +783,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                       <Badge className={cn("text-[10px]", resultadoColor(s.resultado))}>{s.resultado}</Badge>
                       {s.derivadoDeTrabajo && <Badge variant="outline" className="text-[10px]">TR asociado</Badge>}
                     </div>
-                    {s.observaciones && <div className="mt-1 text-xs text-foreground/80">{s.observaciones}</div>}
+                    {s.observaciones && <div className="mt-1 text-[12px] text-foreground/80">{s.observaciones}</div>}
                   </div>
                 </div>
               );
@@ -818,7 +818,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
         {/* Facturación */}
         <section className="mb-5 rounded-lg border bg-card p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+          <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
             <Receipt className="h-4 w-4 text-primary" /> Facturación
           </div>
           <Tabs defaultValue="Repuesto">
@@ -833,16 +833,16 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-md border p-2">
                       <div className="text-[10px] uppercase text-muted-foreground">YTD</div>
-                      <div className="text-sm font-bold">$ {fmtMoney(st.ytd)}</div>
+                      <div className="text-[13px] font-bold">$ {fmtMoney(st.ytd)}</div>
                     </div>
                     <div className="rounded-md border p-2">
                       <div className="text-[10px] uppercase text-muted-foreground">Año ant.</div>
-                      <div className="text-sm font-bold">$ {fmtMoney(st.prev)}</div>
+                      <div className="text-[13px] font-bold">$ {fmtMoney(st.prev)}</div>
                     </div>
                     <div className="rounded-md border p-2">
                       <div className="text-[10px] uppercase text-muted-foreground">Var %</div>
                       <div className={cn(
-                        "text-sm font-bold",
+                        "text-[13px] font-bold",
                         st.varPct != null && st.varPct >= 0 && "text-emerald-600",
                         st.varPct != null && st.varPct < 0 && "text-destructive",
                       )}>
@@ -852,11 +852,11 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                   </div>
                   <div className="rounded-md border">
                     {st.lista.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-muted-foreground">Sin facturas.</div>
+                      <div className="p-3 text-center text-[12px] text-muted-foreground">Sin facturas.</div>
                     ) : (
                       <div className="divide-y">
                         {st.lista.map((f) => (
-                          <div key={f.id} className="flex items-center justify-between gap-2 p-2 text-xs">
+                          <div key={f.id} className="flex items-center justify-between gap-2 p-2 text-[12px]">
                             <div className="min-w-0 flex-1">
                               <div className="text-[11px] text-muted-foreground">
                                 {new Date(f.fecha).toLocaleDateString("es-PY")} · {f.cod_factura}
@@ -941,7 +941,7 @@ function ContactoForm({
         <div><Label className="text-[11px]">Teléfono</Label><Input value={form.telefono ?? ""} onChange={(e) => setForm({ ...form, telefono: e.target.value })} /></div>
         <div><Label className="text-[11px]">Correo</Label><Input value={form.correo ?? ""} onChange={(e) => setForm({ ...form, correo: e.target.value })} /></div>
       </div>
-      <div className="flex flex-wrap gap-3 text-xs">
+      <div className="flex flex-wrap gap-3 text-[12px]">
         <label className="flex items-center gap-1.5">
           <Checkbox checked={!!form.es_whatsapp} onCheckedChange={(v) => setForm({ ...form, es_whatsapp: !!v })} />
           Tiene WhatsApp

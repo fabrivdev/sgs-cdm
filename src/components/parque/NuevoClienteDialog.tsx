@@ -55,11 +55,11 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: Props) {
 
   return (
     <ResponsiveDrawer open={open} onOpenChange={handleOpenChange} size="sm">
-      <ResponsiveDrawerHeader><div className="text-lg font-semibold">Nuevo cliente</div></ResponsiveDrawerHeader>
+      <ResponsiveDrawerHeader><div className="text-[14px] font-semibold">Nuevo cliente</div></ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs">Nombre *</Label>
+            <Label className="text-[12px]">Nombre *</Label>
             <Input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -68,7 +68,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: Props) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Sucursal principal (opcional)</Label>
+            <Label className="text-[12px]">Sucursal principal (opcional)</Label>
             <Select value={sucursal || "none"} onValueChange={(v) => setSucursal(v === "none" ? "" : (v as Sucursal))}>
               <SelectTrigger>
                 <SelectValue placeholder="— Ninguna —" />

@@ -31,8 +31,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
           <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
             <AlertTriangle className="h-5 w-5" />
           </div>
-          <h1 className="text-lg font-semibold">No se pudo cargar esta vista</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-[14px] font-semibold">No se pudo cargar esta vista</h1>
+          <p className="mt-2 text-[13px] text-muted-foreground">
             Actualiza la pantalla para volver a intentarlo.
           </p>
           <Button className="mt-5" onClick={() => window.location.reload()}>

@@ -137,9 +137,9 @@ export function ProgramarIntervencionDialog({
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">
       <ResponsiveDrawerHeader>
-        <h2 className="text-base font-semibold">Programar jornada</h2>
+        <h2 className="text-[14px] font-semibold">Programar jornada</h2>
         {trabajoActivo && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-[12px] text-muted-foreground mt-1">
             {trabajoActivo.codigo ? `${trabajoActivo.codigo} - ` : ""}{trabajoActivo.cliente_id ? clienteMap.get(trabajoActivo.cliente_id) : "Sin cliente"}
           </p>
         )}

@@ -170,7 +170,7 @@ export function ServiciosDashboard({
         <section className="min-w-0 overflow-hidden rounded-md border bg-card p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">Evolución de órdenes</h2>
+              <h2 className="text-[13px] font-semibold">Evolución de órdenes</h2>
             </div>
             <div className="inline-flex h-8 shrink-0 overflow-hidden rounded-md border bg-muted/30 text-[10px] font-semibold">
               <button type="button" onClick={() => setEvolutionMetric("orders")} className={cn("px-4 hover:bg-accent", evolutionMetric === "orders" && "bg-primary text-primary-foreground hover:bg-primary")}>OS</button>
@@ -179,7 +179,7 @@ export function ServiciosDashboard({
           </div>
 
           {data.evolucion.length === 0 ? (
-            <div className="flex h-56 items-center justify-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>
+            <div className="flex h-56 items-center justify-center text-[12px] text-muted-foreground">Sin órdenes para los filtros actuales.</div>
           ) : (
             <div className="mt-3 max-w-full overflow-x-auto overflow-y-hidden pb-1">
               <div
@@ -242,7 +242,7 @@ export function ServiciosDashboard({
         <section className="min-w-0 rounded-md border bg-card p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">Estado actual de OS</h2>
+              <h2 className="text-[13px] font-semibold">Estado actual de OS</h2>
             </div>
             <Wrench className="h-4 w-4 text-primary" />
           </div>
@@ -257,7 +257,7 @@ export function ServiciosDashboard({
                 <span className="text-[9px] uppercase text-muted-foreground">OS</span>
               </div>
             </div>
-            <div className="divide-y text-xs">
+            <div className="divide-y text-[12px]">
               <CompositionRow color={STATE_COLORS.cerradas} label="Cerradas" value={data.cerradas} percent={closeRate} selected={selectedEstados.includes("cerrada")} onClick={() => onSelectEstado("cerrada")} />
               <CompositionRow color={STATE_COLORS.abiertas} label="Abiertas" value={data.abiertas} percent={openRate} selected={selectedEstados.includes("abierta")} onClick={() => onSelectEstado("abierta")} />
               <CompositionRow color={STATE_COLORS.otras} label="Anuladas" value={data.otras} percent={otherRate} selected={selectedEstados.includes("otra")} onClick={() => onSelectEstado("otra")} />
@@ -266,7 +266,7 @@ export function ServiciosDashboard({
 
           <div className="mt-4 border-t pt-3">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xs font-semibold">Tipo de tiempo</h3>
+              <h3 className="text-[12px] font-semibold">Tipo de tiempo</h3>
               <span className="text-[10px] text-muted-foreground">{integer.format(timeTotal)} OS clasificadas</span>
             </div>
             <div className="mt-2 flex h-3 overflow-hidden rounded-sm bg-muted">
@@ -297,7 +297,7 @@ export function ServiciosDashboard({
         <section className="min-w-0 rounded-md border bg-card p-3.5">
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold">Carga por responsable</h2>
+              <h2 className="text-[13px] font-semibold">Carga por responsable</h2>
             </div>
             <div className="flex items-center gap-2">
               <div className="inline-flex rounded-md bg-muted p-0.5" aria-label="Filtrar responsables por estado">
@@ -335,7 +335,7 @@ export function ServiciosDashboard({
                   key={row.tecnico}
                   onClick={() => onSelectTecnico(row.tecnico)}
                   className={cn(
-                    "w-full rounded-md border p-3 text-left text-xs hover:bg-accent",
+                    "w-full rounded-md border p-3 text-left text-[12px] hover:bg-accent",
                     !row.activo && "bg-muted/60 text-muted-foreground",
                     selectedTecnicos.includes(row.tecnico) && "bg-primary/5 ring-1 ring-primary/20",
                   )}
@@ -348,9 +348,9 @@ export function ServiciosDashboard({
                     {!row.activo && <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px]">Inactivo</Badge>}
                   </span>
                   <span className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
-                    <span><strong className="block text-sm text-foreground">{row.totalOS}</strong>OS</span>
-                    <span><strong className="block text-sm text-foreground">{decimal.format(row.horas)}</strong>Horas</span>
-                    <span title={`Meta disponible: ${decimal.format(row.horasDisponibles)} hs`}><strong className="block text-sm text-foreground">{Math.round(productivity)}%</strong>Productividad</span>
+                    <span><strong className="block text-[13px] text-foreground">{row.totalOS}</strong>OS</span>
+                    <span><strong className="block text-[13px] text-foreground">{decimal.format(row.horas)}</strong>Horas</span>
+                    <span title={`Meta disponible: ${decimal.format(row.horasDisponibles)} hs`}><strong className="block text-[13px] text-foreground">{Math.round(productivity)}%</strong>Productividad</span>
                   </span>
                   <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted">
                     <span className={cn("block h-full rounded-full", productivity >= 100 ? "bg-emerald-500" : productivity >= 75 ? "bg-primary" : "bg-amber-500")} style={{ width: `${Math.min(productivity, 100)}%` }} />
@@ -358,7 +358,7 @@ export function ServiciosDashboard({
                 </button>
               );
             })}
-            {filteredTechnicians.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para este estado.</div>}
+            {filteredTechnicians.length === 0 && <div className="py-10 text-center text-[12px] text-muted-foreground">Sin responsables para este estado.</div>}
           </div>
 
           <div className={cn("hidden overflow-x-auto md:block", showAllTechnicians && "max-h-[360px] overflow-y-auto overscroll-contain pr-1")}>
@@ -374,7 +374,7 @@ export function ServiciosDashboard({
                     key={row.tecnico}
                     onClick={() => onSelectTecnico(row.tecnico)}
                     className={cn(
-                      "grid w-full grid-cols-[30px_minmax(190px,1fr)_52px_82px_minmax(150px,0.8fr)] items-center gap-2 border-b px-2 py-2 text-left text-xs last:border-b-0 hover:bg-accent",
+                      "grid w-full grid-cols-[30px_minmax(190px,1fr)_52px_82px_minmax(150px,0.8fr)] items-center gap-2 border-b px-2 py-2 text-left text-[12px] last:border-b-0 hover:bg-accent",
                       !row.activo && "bg-muted/60 text-muted-foreground",
                       selectedTecnicos.includes(row.tecnico) && "bg-primary/5 ring-1 ring-inset ring-primary/20",
                     )}
@@ -395,12 +395,12 @@ export function ServiciosDashboard({
                   </button>
                 );
               })}
-              {filteredTechnicians.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin responsables para este estado.</div>}
+              {filteredTechnicians.length === 0 && <div className="py-10 text-center text-[12px] text-muted-foreground">Sin responsables para este estado.</div>}
             </div>
           </div>
 
           {filteredTechnicians.length > 5 && (
-            <button type="button" onClick={() => setShowAllTechnicians((value) => !value)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+            <button type="button" onClick={() => setShowAllTechnicians((value) => !value)} className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline">
               {showAllTechnicians ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               {showAllTechnicians ? "Ver los 5 principales" : `Ver todos los responsables (${filteredTechnicians.length})`}
             </button>
@@ -410,7 +410,7 @@ export function ServiciosDashboard({
         <section className="min-w-0 rounded-md border bg-card p-3.5">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">OS por sucursal</h2>
+              <h2 className="text-[13px] font-semibold">OS por sucursal</h2>
             </div>
             <MapPin className="h-4 w-4 text-primary" />
           </div>
@@ -420,7 +420,7 @@ export function ServiciosDashboard({
                 type="button"
                 key={row.sucursal}
                 onClick={() => onSelectSucursal(row.sucursal)}
-                className={cn("grid w-full grid-cols-[92px_1fr_42px] items-center gap-2 rounded px-1 py-1 text-left text-xs hover:bg-accent", selectedSucursales.includes(row.sucursal) && "bg-primary/5 ring-1 ring-primary/20")}
+                className={cn("grid w-full grid-cols-[92px_1fr_42px] items-center gap-2 rounded px-1 py-1 text-left text-[12px] hover:bg-accent", selectedSucursales.includes(row.sucursal) && "bg-primary/5 ring-1 ring-primary/20")}
               >
                 <span className="truncate font-medium" title={row.sucursal}>{row.sucursal}</span>
                 <span className="h-3 overflow-hidden rounded-sm bg-muted" style={{ width: `${Math.max((row.total / branchMax) * 100, 4)}%` }}>
@@ -433,7 +433,7 @@ export function ServiciosDashboard({
                 <strong className="text-right tabular-nums">{row.total}</strong>
               </button>
             ))}
-            {data.sucursales.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin sucursales para los filtros actuales.</div>}
+            {data.sucursales.length === 0 && <div className="py-10 text-center text-[12px] text-muted-foreground">Sin sucursales para los filtros actuales.</div>}
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-4 border-t pt-3 text-[10px] text-muted-foreground">
             <Legend color={STATE_COLORS.cerradas} label="Cerradas" />
@@ -446,14 +446,14 @@ export function ServiciosDashboard({
       <section className="rounded-md border bg-card p-3.5">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Detalle de órdenes de servicio</h2>
+            <h2 className="text-[13px] font-semibold">Detalle de órdenes de servicio</h2>
           </div>
           <Badge variant="secondary">{data.ordenes.length} OS</Badge>
         </div>
 
         <div className="max-h-[620px] space-y-2 overflow-y-auto overscroll-contain pr-1 md:hidden">
           {visibleOrders.map((row) => (
-            <article key={row.key} className="rounded-md border p-3 text-xs">
+            <article key={row.key} className="rounded-md border p-3 text-[12px]">
               <div className="flex items-start justify-between gap-2">
                 <strong className="font-mono">{row.os}</strong>
                 <Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge>
@@ -468,11 +468,11 @@ export function ServiciosDashboard({
               </div>
             </article>
           ))}
-          {visibleOrders.length === 0 && <div className="py-10 text-center text-xs text-muted-foreground">Sin órdenes para los filtros actuales.</div>}
+          {visibleOrders.length === 0 && <div className="py-10 text-center text-[12px] text-muted-foreground">Sin órdenes para los filtros actuales.</div>}
         </div>
 
         <div className="hidden max-h-[480px] overflow-auto rounded-md border md:block">
-          <table className="w-full min-w-[1040px] text-xs">
+          <table className="w-full min-w-[1040px] text-[12px]">
             <thead className="sticky top-0 z-10 bg-muted text-left text-[9px] uppercase tracking-wide text-muted-foreground shadow-sm">
               <tr>
                 <th className="px-3 py-2">OS</th>

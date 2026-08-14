@@ -355,7 +355,7 @@ export function ServicioFormDialog({
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
       <ResponsiveDrawerHeader className="px-4 py-4 sm:px-6">
-        <h2 className="pr-6 text-base font-semibold sm:text-lg">
+        <h2 className="pr-6 text-[14px] font-semibold sm:text-[14px]">
           {servicio ? "Editar servicio" : "Nuevo servicio"}
         </h2>
       </ResponsiveDrawerHeader>
@@ -375,7 +375,7 @@ export function ServicioFormDialog({
                   type="button"
                   onClick={() => setTipo("Visita de campo")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-medium transition-colors",
+                    "flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-[12px] font-medium transition-colors",
                     tipo === "Visita de campo"
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-input bg-background hover:bg-accent",
@@ -388,7 +388,7 @@ export function ServicioFormDialog({
                   type="button"
                   onClick={() => setTipo("Máquina en taller")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-medium transition-colors",
+                    "flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-[12px] font-medium transition-colors",
                     tipo === "Máquina en taller"
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-input bg-background hover:bg-accent",
@@ -437,8 +437,8 @@ export function ServicioFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="trabajo-input" className="text-sm font-semibold">Trabajo o problema a resolver</Label>
-            <Textarea id="trabajo-input" value={trabajo} onChange={(e) => setTrabajo(e.target.value)} rows={3} placeholder="Ej: Cambio de aceite hidráulico, revisar pérdida en bomba…" className="text-sm" />
+            <Label htmlFor="trabajo-input" className="text-[13px] font-semibold">Trabajo o problema a resolver</Label>
+            <Textarea id="trabajo-input" value={trabajo} onChange={(e) => setTrabajo(e.target.value)} rows={3} placeholder="Ej: Cambio de aceite hidráulico, revisar pérdida en bomba…" className="text-[13px]" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -470,9 +470,9 @@ export function ServicioFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Auxiliares <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+            <Label>Auxiliares <span className="text-[12px] font-normal text-muted-foreground">(opcional)</span></Label>
             {auxDisponibles.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No hay técnicos disponibles.</p>
+              <p className="text-[12px] text-muted-foreground">No hay técnicos disponibles.</p>
             ) : (
               <>
                 <Popover>
@@ -523,7 +523,7 @@ export function ServicioFormDialog({
           </div>
 
           <Collapsible open={obsOpen} onOpenChange={setObsOpen}>
-            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-accent">
+            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-2 text-[12px] font-medium text-muted-foreground hover:bg-accent">
               <span>Observaciones {observaciones && <span className="ml-1 text-foreground">({observaciones.length} car.)</span>}</span>
               <ChevronDown className={cn("h-4 w-4 transition-transform", obsOpen && "rotate-180")} />
             </CollapsibleTrigger>

@@ -194,7 +194,7 @@ export default function Historial() {
         </div>
 
         {q.trim() && matches.length === 0 && !selected && (
-          <div className="mt-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+          <div className="mt-2 rounded-md border border-dashed p-3 text-[12px] text-muted-foreground">
             No se encontraron clientes del parque con ese nombre.
           </div>
         )}
@@ -211,7 +211,7 @@ export default function Historial() {
                   }}
                 >
                   <span className="font-medium">{c.nombre}</span>
-                  {c.sucursal && <span className="ml-2 text-xs text-muted-foreground">{c.sucursal}</span>}
+                  {c.sucursal && <span className="ml-2 text-[12px] text-muted-foreground">{c.sucursal}</span>}
                 </button>
               </li>
             ))}
@@ -230,7 +230,7 @@ export default function Historial() {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <div className="text-[15px] font-semibold">{selected.nombre}</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[12px] text-muted-foreground">
                 {selected.sucursal ? `${selected.sucursal} · ` : ""}
                 {historial.length} servicio(s)
               </div>
@@ -238,7 +238,7 @@ export default function Historial() {
           </div>
 
           {historial.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin servicios registrados.</p>
+            <p className="text-[13px] text-muted-foreground">Sin servicios registrados.</p>
           ) : (
             <ul className="space-y-2">
               {historial.map((s) => {
@@ -252,7 +252,7 @@ export default function Historial() {
                       className="w-full rounded-md border p-3 text-left hover:bg-accent transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium tabular-nums">
+                        <span className="text-[13px] font-medium tabular-nums">
                           {format(parseISO(s.fecha_programada), "dd/MM/yyyy")}
                         </span>
                         <div className="flex items-center gap-2">
@@ -265,9 +265,9 @@ export default function Historial() {
                         </div>
                       </div>
 
-                      <div className="mt-1 text-sm">{s.trabajo_descripcion}</div>
+                      <div className="mt-1 text-[13px]">{s.trabajo_descripcion}</div>
 
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <div className="mt-1 text-[12px] text-muted-foreground">
                         {s.tecnico_responsable_id ? profById[s.tecnico_responsable_id] ?? "—" : "—"}
                         {s.horas_trabajadas != null && ` · ${s.horas_trabajadas} hs`}
                       </div>

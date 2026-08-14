@@ -353,12 +353,12 @@ export function TrabajoDetalleDrawer({
       <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="xl">
         <ResponsiveDrawerHeader>
           {!trabajo ? (
-            <div className="text-sm text-muted-foreground">Cargando...</div>
+            <div className="text-[13px] text-muted-foreground">Cargando...</div>
           ) : (
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 space-y-2 pr-8">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-[12px] font-mono font-semibold text-muted-foreground">
                     {trabajoReferencia(trabajo)}
                   </span>
                   <Badge variant="outline" className="text-[10px]">{trabajo.sucursal}</Badge>
@@ -373,8 +373,8 @@ export function TrabajoDetalleDrawer({
                     {estadoTrabajoLabel(estado)}
                   </Badge>
                 </div>
-                <h2 className="text-lg font-semibold leading-tight">{cliente?.nombre ?? "Sin cliente"}</h2>
-                <p className="text-xs text-muted-foreground">{hint}</p>
+                <h2 className="text-[14px] font-semibold leading-tight">{cliente?.nombre ?? "Sin cliente"}</h2>
+                <p className="text-[12px] text-muted-foreground">{hint}</p>
               </div>
 
               {canManage && (
@@ -418,20 +418,20 @@ export function TrabajoDetalleDrawer({
 
         <ResponsiveDrawerBody className="space-y-5">
           {loading || !trabajo ? (
-            <p className="text-sm text-muted-foreground">Cargando...</p>
+            <p className="text-[13px] text-muted-foreground">Cargando...</p>
           ) : (
             <>
               <section className="rounded-xl border bg-card p-4 space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resumen del trabajo</h3>
+                <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Resumen del trabajo</h3>
                 {pausado && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">Trabajo pausado</div>
-                    <div className="mt-1 text-sm text-amber-950">{trabajo.motivo_bloqueo || "Sin motivo cargado"}</div>
+                    <div className="mt-1 text-[13px] text-amber-950">{trabajo.motivo_bloqueo || "Sin motivo cargado"}</div>
                   </div>
                 )}
                 <div>
                   <div className="text-[11px] text-muted-foreground">Problema reportado</div>
-                  <div className="text-sm">{trabajo.descripcion_problema}</div>
+                  <div className="text-[13px]">{trabajo.descripcion_problema}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
                   <Stat k="Tipo" v={trabajo.tipo_trabajo} />
@@ -447,10 +447,10 @@ export function TrabajoDetalleDrawer({
                 <section className="rounded-xl border bg-card p-4 space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Orden de servicio importada
                       </h3>
-                      <div className="mt-1 text-sm font-semibold">{trabajoReferencia(trabajo)}</div>
+                      <div className="mt-1 text-[13px] font-semibold">{trabajoReferencia(trabajo)}</div>
                     </div>
                     {ordenServicio?.actualizado_en && (
                       <Badge variant="outline" className="text-[10px]">
@@ -460,7 +460,7 @@ export function TrabajoDetalleDrawer({
                   </div>
 
                   {!ordenServicio ? (
-                    <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                    <div className="rounded-lg border border-dashed p-3 text-[12px] text-muted-foreground">
                       {osImportDisponible
                         ? "Esta OS esta asociada al trabajo, pero todavia no tiene datos importados del Excel."
                         : "La tabla de detalle OS todavia no esta disponible en la base. Cuando Lovable aplique la migracion, aca se vera el detalle importado."}
@@ -480,7 +480,7 @@ export function TrabajoDetalleDrawer({
                       {ordenServicio.problema && ordenServicio.problema !== trabajo.descripcion_problema && (
                         <div>
                           <div className="text-[11px] text-muted-foreground">Problema segun OS</div>
-                          <div className="text-sm">{ordenServicio.problema}</div>
+                          <div className="text-[13px]">{ordenServicio.problema}</div>
                         </div>
                       )}
                     </>
@@ -489,9 +489,9 @@ export function TrabajoDetalleDrawer({
               )}
 
               <section className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Jornadas</h3>
+                <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Jornadas</h3>
                 {jornadas.length === 0 && (
-                  <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+                  <div className="rounded-lg border border-dashed p-4 text-center text-[12px] text-muted-foreground">
                     Todavia no hay jornadas.
                   </div>
                 )}
@@ -504,7 +504,7 @@ export function TrabajoDetalleDrawer({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm">{format(parseISO(j.fecha), "dd/MM/yyyy")}</span>
+                            <span className="font-semibold text-[13px]">{format(parseISO(j.fecha), "dd/MM/yyyy")}</span>
                             <span className="text-[11px] text-muted-foreground capitalize">
                               {format(parseISO(j.fecha), "EEEE", { locale: es })}
                             </span>
@@ -513,7 +513,7 @@ export function TrabajoDetalleDrawer({
                             </Badge>
                             {vencida && <Badge variant="outline" className="text-[10px] border-amber-200 bg-amber-50 text-amber-800">Sin cierre +7d</Badge>}
                           </div>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
                             {principal && <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{principal}</span>}
                             {aux.length > 0 && <span className="inline-flex items-center gap-1"><Users className="h-3 w-3" />{aux.join(", ")}</span>}
                             {j.horas_trabajadas != null && <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{j.horas_trabajadas} hs</span>}
@@ -673,7 +673,7 @@ function Stat({ k, v, warn }: { k: string; v: string; warn?: boolean }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</div>
-      <div className={cn("text-sm font-medium", warn && "text-amber-700")}>{v}</div>
+      <div className={cn("text-[13px] font-medium", warn && "text-amber-700")}>{v}</div>
     </div>
   );
 }

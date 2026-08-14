@@ -126,8 +126,8 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="sm">
       <ResponsiveDrawerHeader>
-        <h2 className="text-base font-semibold pr-8">Transferir máquina</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Cambiar el cliente propietario de esta máquina</p>
+        <h2 className="text-[14px] font-semibold pr-8">Transferir máquina</h2>
+        <p className="text-[12px] text-muted-foreground mt-0.5">Cambiar el cliente propietario de esta máquina</p>
       </ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
         {maquina && (
@@ -137,22 +137,22 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
                 <Badge className="text-[10px]">{maquina.marca}</Badge>
                 <Badge variant="outline" className="text-[10px]">{maquina.subgrupo}</Badge>
-                {maquina.anio && <span className="text-xs text-muted-foreground">{maquina.anio}</span>}
+                {maquina.anio && <span className="text-[12px] text-muted-foreground">{maquina.anio}</span>}
               </div>
-              <div className="text-sm font-medium">{maquina.modelo_tipo ?? "—"}</div>
-              <div className="text-xs text-muted-foreground">Serie: {maquina.serie}</div>
+              <div className="text-[13px] font-medium">{maquina.modelo_tipo ?? "—"}</div>
+              <div className="text-[12px] text-muted-foreground">Serie: {maquina.serie}</div>
             </div>
 
             <div className="grid gap-3">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Dueño actual</div>
-                <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">{clienteNombreActual}</div>
+                <div className="rounded-md border bg-muted/20 px-3 py-2 text-[13px] text-muted-foreground">{clienteNombreActual}</div>
               </div>
               <div className="flex justify-center">
                 <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="grid gap-1.5">
-                <Label className="text-xs">Nuevo propietario *</Label>
+                <Label className="text-[12px]">Nuevo propietario *</Label>
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -170,12 +170,12 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
                       <CommandList>
                         <CommandEmpty>
                           <div className="space-y-2 p-2 text-left">
-                            <div className="text-xs text-muted-foreground">No se encontró ese cliente.</div>
+                            <div className="text-[12px] text-muted-foreground">No se encontró ese cliente.</div>
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="h-8 w-full justify-start text-xs"
+                              className="h-8 w-full justify-start text-[12px]"
                               onClick={() => {
                                 setNuevoClienteNombre(clienteSearch);
                                 setCrearClienteOpen(true);
@@ -213,7 +213,7 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 justify-start px-0 text-xs text-primary hover:bg-transparent"
+                  className="h-8 justify-start px-0 text-[12px] text-primary hover:bg-transparent"
                   onClick={() => {
                     setNuevoClienteNombre(clienteSearch);
                     setCrearClienteOpen((value) => !value);
@@ -229,7 +229,7 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
               <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Nuevo cliente</div>
                 <div className="grid gap-1.5">
-                  <Label className="text-xs">Nombre *</Label>
+                  <Label className="text-[12px]">Nombre *</Label>
                   <Input
                     value={nuevoClienteNombre}
                     onChange={(e) => setNuevoClienteNombre(e.target.value)}
@@ -238,11 +238,11 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label className="text-xs">Sucursal principal (opcional)</Label>
+                  <Label className="text-[12px]">Sucursal principal (opcional)</Label>
                   <select
                     value={nuevoClienteSucursal}
                     onChange={(e) => setNuevoClienteSucursal(e.target.value as Sucursal | "")}
-                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                    className="h-9 rounded-md border bg-background px-3 text-[13px]"
                   >
                     <option value="">Sin definir</option>
                     {SUCURSALES.map((s) => (
@@ -262,13 +262,13 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
             )}
 
             <div className="grid gap-1.5">
-              <Label className="text-xs">Motivo (opcional)</Label>
+              <Label className="text-[12px]">Motivo (opcional)</Label>
               <Textarea
                 placeholder="Venta, error de carga, cambio de titularidad..."
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
                 rows={2}
-                className="resize-none text-sm"
+                className="resize-none text-[13px]"
               />
               <p className="text-[10px] text-muted-foreground">Se guardará en las notas de la máquina.</p>
             </div>

@@ -608,7 +608,7 @@ export default function Planificador() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Select value={fSemana} onValueChange={setFSemana}>
-              <SelectTrigger className="h-9 min-w-0 flex-1 rounded-none border-0 px-2 text-xs shadow-none focus:ring-0">
+              <SelectTrigger className="h-9 min-w-0 flex-1 rounded-none border-0 px-2 text-[12px] shadow-none focus:ring-0">
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="max-h-[280px] min-w-[--radix-select-trigger-width]">
@@ -731,7 +731,7 @@ export default function Planificador() {
                       {responsableNombre}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top text-xs text-muted-foreground">
+                    <TableCell className="px-3 py-2 align-top text-[12px] text-muted-foreground">
                       {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                     </TableCell>
 

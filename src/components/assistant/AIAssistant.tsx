@@ -59,7 +59,7 @@ function formatTime(value: string) {
 
 function MessageBody({ content }: { content: string }) {
   return (
-    <div className="space-y-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
+    <div className="space-y-2 whitespace-pre-wrap break-words text-[13px] leading-relaxed">
       {content.split(/\n{2,}/).map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 12)}`}>{paragraph}</p>)}
     </div>
   );
@@ -225,11 +225,11 @@ export function AIAssistant() {
                       <Button variant="outline" size="sm" className="h-8 gap-1"><History className="h-3.5 w-3.5" />Historial</Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-72">
-                      {loadingHistory && <div className="p-3 text-xs text-muted-foreground">Cargando...</div>}
-                      {!loadingHistory && conversations.length === 0 && <div className="p-3 text-xs text-muted-foreground">Sin conversaciones guardadas.</div>}
+                      {loadingHistory && <div className="p-3 text-[12px] text-muted-foreground">Cargando...</div>}
+                      {!loadingHistory && conversations.length === 0 && <div className="p-3 text-[12px] text-muted-foreground">Sin conversaciones guardadas.</div>}
                       {conversations.map((conversation) => (
                         <DropdownMenuItem key={conversation.id} onClick={() => void loadMessages(conversation.id)} className="flex-col items-start gap-0.5">
-                          <span className="max-w-full truncate text-sm font-medium">{conversation.title}</span>
+                          <span className="max-w-full truncate text-[13px] font-medium">{conversation.title}</span>
                           <span className="text-[10px] text-muted-foreground">{formatTime(conversation.updated_at)}</span>
                         </DropdownMenuItem>
                       ))}
@@ -243,8 +243,8 @@ export function AIAssistant() {
 
             <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-4 py-2">
               <div className="inline-flex rounded-md border bg-background p-0.5">
-                <button type="button" onClick={() => setMode("brief")} className={cn("rounded px-3 py-1 text-xs font-medium", mode === "brief" && "bg-primary text-primary-foreground")}>Breve</button>
-                <button type="button" onClick={() => setMode("analytic")} className={cn("rounded px-3 py-1 text-xs font-medium", mode === "analytic" && "bg-primary text-primary-foreground")}>Analítica</button>
+                <button type="button" onClick={() => setMode("brief")} className={cn("rounded px-3 py-1 text-[12px] font-medium", mode === "brief" && "bg-primary text-primary-foreground")}>Breve</button>
+                <button type="button" onClick={() => setMode("analytic")} className={cn("rounded px-3 py-1 text-[12px] font-medium", mode === "analytic" && "bg-primary text-primary-foreground")}>Analítica</button>
               </div>
               <button
                 type="button"
@@ -264,11 +264,11 @@ export function AIAssistant() {
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Database className="h-6 w-6" /></div>
                     <div className="text-center">
                       <h3 className="font-semibold">Preguntá sobre los datos de la app</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">Las cifras se consultan en Supabase mediante herramientas de solo lectura.</p>
+                      <p className="mt-1 text-[13px] text-muted-foreground">Las cifras se consultan en Supabase mediante herramientas de solo lectura.</p>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {examples.map((example) => (
-                        <button key={example} type="button" onClick={() => void send(example)} className="rounded-md border p-3 text-left text-xs leading-relaxed transition-colors hover:border-primary/40 hover:bg-primary/5">{example}</button>
+                        <button key={example} type="button" onClick={() => void send(example)} className="rounded-md border p-3 text-left text-[12px] leading-relaxed transition-colors hover:border-primary/40 hover:bg-primary/5">{example}</button>
                       ))}
                     </div>
                   </div>
@@ -298,9 +298,9 @@ export function AIAssistant() {
                 ))}
 
                 {sending && (
-                  <div className="flex justify-start"><div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin text-primary" />Consultando fuentes...</div></div>
+                  <div className="flex justify-start"><div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-[13px] text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin text-primary" />Consultando fuentes...</div></div>
                 )}
-                {error && <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</div>}
+                {error && <div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">{error}</div>}
                 <div ref={endRef} />
               </div>
             </ScrollArea>

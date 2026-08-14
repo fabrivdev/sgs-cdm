@@ -76,7 +76,7 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={cn("tabular-nums font-semibold", highlight ? "text-base text-primary" : "text-sm")}>{value}</div>
+      <div className={cn("tabular-nums font-semibold", highlight ? "text-[14px] text-primary" : "text-[13px]")}>{value}</div>
     </div>
   );
 }

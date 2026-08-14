@@ -11,8 +11,8 @@ import { cardLabel as labelCls } from "@/lib/ui-classes";
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-0.5 max-sm:!w-full", className)}>
-      {label ? <span className={labelCls}>{label}</span> : <span className="h-[14px]" aria-hidden />}
+    <div className={cn("flex min-w-0 flex-col gap-1 max-sm:!w-full", className)}>
+      {label ? <span className={labelCls}>{label}</span> : <span className="h-4" aria-hidden />}
       {children}
     </div>
   );
@@ -71,18 +71,18 @@ export function FiltersBar({
   };
 
   return (
-    <Card className={cn("px-2 py-1.5", className)}>
+    <Card className={cn("min-w-0 px-3 py-3", className)}>
       <div className="flex gap-2 sm:hidden">
         {search && (
           <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               enterKeyHint="search"
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
               placeholder={search.placeholder ?? "Buscar…"}
-              className="h-8 pl-7 pr-7 text-[13px]"
+              className="h-[34px] pl-8 pr-8 text-[13px]"
             />
             {searchDraft && (
               <button
@@ -101,7 +101,7 @@ export function FiltersBar({
             type="button"
             variant={mobileOpen || activeCount > 0 ? "default" : "outline"}
             size="icon"
-            className="h-8 w-8 shrink-0"
+            className="h-[34px] w-[34px] shrink-0"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label="Filtros"
           >
@@ -111,34 +111,34 @@ export function FiltersBar({
       </div>
 
       {hasControls && mobileOpen && (
-        <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/20 p-2 sm:hidden">
+        <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-muted/20 p-3 sm:hidden">
           {children}
           {expanded && <div className="border-t pt-2">{expanded}</div>}
           {activeCount > 0 && onClear && (
-            <Button variant="ghost" size="sm" onClick={onClear} className="h-8 justify-start text-xs">
+            <Button variant="ghost" size="sm" onClick={onClear} className="h-[34px] justify-start text-[13px]">
               <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
             </Button>
           )}
           {actions && <div className="flex flex-col gap-2 border-t pt-2">{actions}</div>}
-          {meta && <div className="text-[10px] text-muted-foreground">{meta}</div>}
+          {meta && <div className="text-[11px] text-muted-foreground">{meta}</div>}
         </div>
       )}
       {!mobileOpen && meta && (
-        <div className="mt-1 text-right text-[10px] text-muted-foreground sm:hidden">{meta}</div>
+        <div className="mt-1 text-right text-[11px] text-muted-foreground sm:hidden">{meta}</div>
       )}
 
-      <div className="hidden gap-2 sm:flex sm:flex-row sm:flex-nowrap sm:items-end">
+      <div className="hidden min-w-0 gap-x-3 gap-y-3 sm:flex sm:flex-row sm:flex-wrap sm:items-end">
         {search && (
-          <Field label={search.label ?? "Buscar"} className={search.width ?? "w-full sm:w-[240px]"}>
+          <Field label={search.label ?? "Buscar"} className={"sm:min-w-[240px] " + (search.width ?? "w-full sm:w-[260px]")}>
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 enterKeyHint="search"
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
                 placeholder={search.placeholder ?? "Buscar…"}
-                className="h-8 pl-7 pr-7 text-[13px]"
+                className="h-[34px] pl-8 pr-8 text-[13px]"
               />
               {searchDraft && (
                 <button
@@ -157,13 +157,13 @@ export function FiltersBar({
         {children}
 
         {expanded && <Field><Popover open={moreOpen} onOpenChange={setMoreOpen}>
-          <PopoverTrigger asChild><Button variant={activeCount > 0 ? "secondary" : "outline"} size="sm" className="h-8"><SlidersHorizontal className="h-3.5 w-3.5" />Filtros{activeCount > 0 ? ` ${activeCount}` : ""}</Button></PopoverTrigger>
+          <PopoverTrigger asChild><Button variant={activeCount > 0 ? "secondary" : "outline"} size="sm" className="h-[34px]"><SlidersHorizontal className="h-3.5 w-3.5" />Filtros{activeCount > 0 ? ` ${activeCount}` : ""}</Button></PopoverTrigger>
           <PopoverContent align="end" className="w-[min(92vw,520px)] p-3"><div className="grid gap-2 sm:grid-cols-2">{expanded}</div><div className="mt-3 flex justify-between border-t pt-2">{activeCount > 0 && onClear ? <Button variant="ghost" size="sm" onClick={onClear}><X className="h-3.5 w-3.5" />Limpiar</Button> : <span />}<Button size="sm" onClick={() => setMoreOpen(false)}>Aplicar</Button></div></PopoverContent>
         </Popover></Field>}
 
         {activeCount > 0 && onClear && !expanded && (
           <Field>
-            <Button variant="ghost" size="sm" onClick={onClear} className="h-8 text-xs">
+            <Button variant="ghost" size="sm" onClick={onClear} className="h-[34px] text-[13px]">
               <X className="mr-1 h-3 w-3" /> Limpiar
             </Button>
           </Field>
@@ -171,7 +171,7 @@ export function FiltersBar({
 
         <div className="flex w-full flex-col gap-1.5 sm:ml-auto sm:w-auto sm:flex-row sm:items-end">
           {meta && (
-            <div className="pb-0 text-[10px] text-muted-foreground sm:pb-1.5">{meta}</div>
+            <div className="pb-0 text-[11px] text-muted-foreground sm:pb-1.5">{meta}</div>
           )}
           {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
         </div>
@@ -189,7 +189,7 @@ export function FilterSelect({
   onChange,
   placeholder,
   options,
-  width = "w-[140px]",
+  width = "w-[150px]",
 }: {
   label?: string;
   value: string;
@@ -201,7 +201,7 @@ export function FilterSelect({
   return (
     <Field label={label} className={width}>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 w-full overflow-hidden text-[13px]">
+        <SelectTrigger className="h-[34px] w-full overflow-hidden text-[13px]">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className="max-h-[320px] min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]">
@@ -240,7 +240,7 @@ export function FilterDate({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 w-full text-[13px]"
+        className="h-[34px] w-full text-[13px]"
         title={title}
         min={min}
         max={max}

@@ -18,7 +18,7 @@ export function FactPeriodsMobile({
   const visible = expanded ? rows : rows.slice(-5);
 
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground md:hidden">Sin facturacion.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground md:hidden">Sin facturacion.</div>;
   }
 
   return (
@@ -51,7 +51,7 @@ export function FactPeriodsMobile({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="col-span-2 w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+          className="col-span-2 w-full rounded-md border px-3 py-2 text-[12px] text-muted-foreground hover:bg-accent"
         >
           {expanded ? "Ver menos" : `Ver todos (${rows.length})`}
         </button>
@@ -71,7 +71,7 @@ export function FacturasMobile({
   const source = expanded ? visibleRows : visibleRows.slice(0, 5);
 
   if (rows.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground md:hidden">Sin facturacion en el periodo.</div>;
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground md:hidden">Sin facturacion en el periodo.</div>;
   }
 
   return (
@@ -80,10 +80,10 @@ export function FacturasMobile({
         <div key={`${row.cod_factura}-${index}`} className="rounded-md border bg-background px-2.5 py-2 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <div className="truncate text-xs font-semibold">{row.entidad_nombre || "Sin cliente"}</div>
+              <div className="truncate text-[12px] font-semibold">{row.entidad_nombre || "Sin cliente"}</div>
               <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.cod_factura}</div>
             </div>
-            <div className="shrink-0 text-right text-sm font-bold tabular-nums">{money(Number(row.total_venta || 0))}</div>
+            <div className="shrink-0 text-right text-[13px] font-bold tabular-nums">{money(Number(row.total_venta || 0))}</div>
           </div>
           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
             <span>{format(parseISO(row.fecha), "dd/MM")}</span>
@@ -97,7 +97,7 @@ export function FacturasMobile({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="w-full rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+          className="w-full rounded-md border px-3 py-2 text-[12px] text-muted-foreground hover:bg-accent"
         >
           {expanded ? "Ver menos" : `Ver todos (${visibleRows.length})`}
         </button>
@@ -131,7 +131,7 @@ export function ConceptLine({ label, value, total }: { label: string; value: num
   const width = total > 0 ? Math.max(3, Math.round((value / total) * 100)) : 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+      <div className="mb-1 flex items-center justify-between gap-2 text-[12px]">
         <span className="font-medium">{label}</span>
         <span className="tabular-nums text-muted-foreground">{money(value)}</span>
       </div>
