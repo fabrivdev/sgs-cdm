@@ -155,9 +155,10 @@ export function PeriodSelector({
   disabledModes?: Set<PeriodMode>;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 max-sm:!w-full sm:w-[220px]">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Agrupar por</span>
-      <div className="grid h-9 grid-cols-4 overflow-hidden rounded-md border bg-background text-[11px]">
+    <div className="flex min-w-0 flex-col gap-0.5 max-sm:!w-full sm:w-[220px]">
+      <span className="text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Agrupar por</span>
+      <div className="grid h-8 grid-cols-4 overflow-hidden rounded-md border bg-background text-[11px]">
+
         {[
           { value: "dia", label: "Día" },
           { value: "semana", label: "Semana" },
