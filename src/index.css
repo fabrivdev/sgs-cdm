@@ -168,17 +168,19 @@
   box-shadow: 12px 0 36px -12px rgba(24, 32, 16, 0.28);
 }
 
-[data-hover-sidebar] > .peer > div:nth-child(2) [data-sidebar="sidebar"] span,
-[data-hover-sidebar] > .peer > div:nth-child(2) [data-sidebar="sidebar"] svg.lucide-chevron-down {
+/* Las etiquetas entran con fade + leve desplazamiento al expandirse. */
+[data-hover-sidebar] .sidebar-label-anim {
   transition:
     opacity 220ms cubic-bezier(0.32, 0.72, 0, 1),
     transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-[data-hover-sidebar] > .peer[data-state="collapsed"] > div:nth-child(2) [data-sidebar="sidebar"] span:not(.sr-only) {
+[data-hover-sidebar] > .peer[data-state="collapsed"] .sidebar-label-anim {
   opacity: 0;
-  transform: translateX(-6px);
+  transform: translateX(-8px);
 }
+
+
 
 
 @media (prefers-reduced-motion: reduce) {
