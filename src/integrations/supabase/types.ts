@@ -874,6 +874,113 @@ export type Database = {
           },
         ]
       }
+      parque_maquinas: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          agregado_manualmente: boolean
+          anio: number | null
+          cliente_id: string | null
+          creado_en: string
+          id: string
+          localidad: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_tipo: string | null
+          notas: string | null
+          serie: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          vendedor: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          agregado_manualmente?: boolean
+          anio?: number | null
+          cliente_id?: string | null
+          creado_en?: string
+          id?: string
+          localidad?: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_tipo?: string | null
+          notas?: string | null
+          serie: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          vendedor?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          agregado_manualmente?: boolean
+          anio?: number | null
+          cliente_id?: string | null
+          creado_en?: string
+          id?: string
+          localidad?: string | null
+          marca?: Database["public"]["Enums"]["marca"]
+          modelo_tipo?: string | null
+          notas?: string | null
+          serie?: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          vendedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parque_modelos_alias: {
+        Row: {
+          alias: string
+          clave_alias: string
+          creado_en: string
+          id: string
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_catalogo_id: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Insert: {
+          alias: string
+          clave_alias: string
+          creado_en?: string
+          id?: string
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_catalogo_id: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Update: {
+          alias?: string
+          clave_alias?: string
+          creado_en?: string
+          id?: string
+          marca?: Database["public"]["Enums"]["marca"]
+          modelo_catalogo_id?: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parque_modelos_alias_modelo_catalogo_id_fkey"
+            columns: ["modelo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "parque_modelos_catalogo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parque_modelos_catalogo: {
         Row: {
           activo: boolean
@@ -955,68 +1062,41 @@ export type Database = {
         }
         Relationships: []
       }
-      parque_maquinas: {
+      parque_ultima_actividad: {
         Row: {
-          activo: boolean
           actualizado_en: string
-          agregado_manualmente: boolean
-          anio: number | null
-          cliente_id: string | null
-          creado_en: string
-          id: string
-          localidad: string | null
-          marca: Database["public"]["Enums"]["marca"]
-          modelo_tipo: string | null
-          notas: string | null
-          serie: string
-          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
-          sucursal: Database["public"]["Enums"]["sucursal"] | null
-          vendedor: string | null
+          cliente_id: string
+          marca: string
+          ultima_os: string | null
+          ultima_venta_repuestos: string | null
+          ultimo_servicio_facturado: string | null
         }
         Insert: {
-          activo?: boolean
           actualizado_en?: string
-          agregado_manualmente?: boolean
-          anio?: number | null
-          cliente_id?: string | null
-          creado_en?: string
-          id?: string
-          localidad?: string | null
-          marca: Database["public"]["Enums"]["marca"]
-          modelo_tipo?: string | null
-          notas?: string | null
-          serie: string
-          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
-          sucursal?: Database["public"]["Enums"]["sucursal"] | null
-          vendedor?: string | null
+          cliente_id: string
+          marca?: string
+          ultima_os?: string | null
+          ultima_venta_repuestos?: string | null
+          ultimo_servicio_facturado?: string | null
         }
         Update: {
-          activo?: boolean
           actualizado_en?: string
-          agregado_manualmente?: boolean
-          anio?: number | null
-          cliente_id?: string | null
-          creado_en?: string
-          id?: string
-          localidad?: string | null
-          marca?: Database["public"]["Enums"]["marca"]
-          modelo_tipo?: string | null
-          notas?: string | null
-          serie?: string
-          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
-          sucursal?: Database["public"]["Enums"]["sucursal"] | null
-          vendedor?: string | null
+          cliente_id?: string
+          marca?: string
+          ultima_os?: string | null
+          ultima_venta_repuestos?: string | null
+          ultimo_servicio_facturado?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            foreignKeyName: "parque_ultima_actividad_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            foreignKeyName: "parque_ultima_actividad_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "v_clientes_resumen"
@@ -1033,6 +1113,7 @@ export type Database = {
           descripcion: string
           familia: string | null
           grupo: string | null
+          incorporado_en: string
           marca: Database["public"]["Enums"]["marca"]
           unidad: string | null
         }
@@ -1044,6 +1125,7 @@ export type Database = {
           descripcion: string
           familia?: string | null
           grupo?: string | null
+          incorporado_en?: string
           marca?: Database["public"]["Enums"]["marca"]
           unidad?: string | null
         }
@@ -1055,6 +1137,7 @@ export type Database = {
           descripcion?: string
           familia?: string | null
           grupo?: string | null
+          incorporado_en?: string
           marca?: Database["public"]["Enums"]["marca"]
           unidad?: string | null
         }
@@ -1163,6 +1246,774 @@ export type Database = {
           },
         ]
       }
+      repuestos_articulo_planificacion: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          criticidad: string | null
+          criticidad_confianza: number
+          criticidad_fuente: string
+          observaciones: string | null
+          origen: string
+          producto_codigo: string
+          stock_minimo_estrategico: number
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          criticidad?: string | null
+          criticidad_confianza?: number
+          criticidad_fuente?: string
+          observaciones?: string | null
+          origen?: string
+          producto_codigo: string
+          stock_minimo_estrategico?: number
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          criticidad?: string | null
+          criticidad_confianza?: number
+          criticidad_fuente?: string
+          observaciones?: string | null
+          origen?: string
+          producto_codigo?: string
+          stock_minimo_estrategico?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_articulo_planificacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: true
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_articulo_planificacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_articulo_planificacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
+      repuestos_conversiones_unidad_historica: {
+        Row: {
+          activa: boolean
+          actualizado_en: string
+          codigo_legacy_norm: string
+          creado_en: string
+          factor_cantidad: number
+          fecha_desde: string | null
+          fecha_hasta_exclusiva: string | null
+          fuente: string | null
+          id: number
+          motivo: string
+          precio_unitario_max: number | null
+          precio_unitario_min: number | null
+          regla_clave: string
+          unidad_destino: string
+          unidad_origen: string
+        }
+        Insert: {
+          activa?: boolean
+          actualizado_en?: string
+          codigo_legacy_norm: string
+          creado_en?: string
+          factor_cantidad: number
+          fecha_desde?: string | null
+          fecha_hasta_exclusiva?: string | null
+          fuente?: string | null
+          id?: never
+          motivo: string
+          precio_unitario_max?: number | null
+          precio_unitario_min?: number | null
+          regla_clave: string
+          unidad_destino: string
+          unidad_origen: string
+        }
+        Update: {
+          activa?: boolean
+          actualizado_en?: string
+          codigo_legacy_norm?: string
+          creado_en?: string
+          factor_cantidad?: number
+          fecha_desde?: string | null
+          fecha_hasta_exclusiva?: string | null
+          fuente?: string | null
+          id?: never
+          motivo?: string
+          precio_unitario_max?: number | null
+          precio_unitario_min?: number | null
+          regla_clave?: string
+          unidad_destino?: string
+          unidad_origen?: string
+        }
+        Relationships: []
+      }
+      repuestos_corrida_resultados: {
+        Row: {
+          abc: string
+          codigo_fabricante: string | null
+          codigo_mix: string | null
+          coeficiente_variacion: number
+          corrida_id: string
+          criticidad: string | null
+          criticidad_confianza: number
+          criticidad_fuente: string
+          criticidad_revisar: boolean
+          demanda_horizonte: number
+          demanda_ponderada_mensual: number
+          descripcion: string
+          desviacion_mensual_12m: number
+          dias_ultima_venta: number | null
+          estado_datos: string
+          explicacion: Json
+          familia: string | null
+          fsn: string
+          horizonte_meses: number
+          incorporado_en: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          media_mensual_12m: number
+          meses_venta_12m: number
+          necesidad_neta: number
+          origen: string
+          pedidos_12m: number
+          pedidos_24m: number
+          producto_codigo: string
+          segmento: string
+          stock_global: number
+          stock_minimo_estrategico: number
+          stock_objetivo: number
+          stock_seguridad: number
+          sugerencia_unidades: number
+          total_vendido_12m: number
+          total_vendido_24m: number
+          ultima_venta: string | null
+          unidades_12m: number
+          unidades_24m: number
+          ved: string | null
+          xyz: string
+        }
+        Insert: {
+          abc: string
+          codigo_fabricante?: string | null
+          codigo_mix?: string | null
+          coeficiente_variacion?: number
+          corrida_id: string
+          criticidad?: string | null
+          criticidad_confianza?: number
+          criticidad_fuente?: string
+          criticidad_revisar?: boolean
+          demanda_horizonte?: number
+          demanda_ponderada_mensual?: number
+          descripcion: string
+          desviacion_mensual_12m?: number
+          dias_ultima_venta?: number | null
+          estado_datos: string
+          explicacion?: Json
+          familia?: string | null
+          fsn: string
+          horizonte_meses?: number
+          incorporado_en?: string | null
+          marca: Database["public"]["Enums"]["marca"]
+          media_mensual_12m?: number
+          meses_venta_12m?: number
+          necesidad_neta?: number
+          origen: string
+          pedidos_12m?: number
+          pedidos_24m?: number
+          producto_codigo: string
+          segmento: string
+          stock_global?: number
+          stock_minimo_estrategico?: number
+          stock_objetivo?: number
+          stock_seguridad?: number
+          sugerencia_unidades?: number
+          total_vendido_12m?: number
+          total_vendido_24m?: number
+          ultima_venta?: string | null
+          unidades_12m?: number
+          unidades_24m?: number
+          ved?: string | null
+          xyz: string
+        }
+        Update: {
+          abc?: string
+          codigo_fabricante?: string | null
+          codigo_mix?: string | null
+          coeficiente_variacion?: number
+          corrida_id?: string
+          criticidad?: string | null
+          criticidad_confianza?: number
+          criticidad_fuente?: string
+          criticidad_revisar?: boolean
+          demanda_horizonte?: number
+          demanda_ponderada_mensual?: number
+          descripcion?: string
+          desviacion_mensual_12m?: number
+          dias_ultima_venta?: number | null
+          estado_datos?: string
+          explicacion?: Json
+          familia?: string | null
+          fsn?: string
+          horizonte_meses?: number
+          incorporado_en?: string | null
+          marca?: Database["public"]["Enums"]["marca"]
+          media_mensual_12m?: number
+          meses_venta_12m?: number
+          necesidad_neta?: number
+          origen?: string
+          pedidos_12m?: number
+          pedidos_24m?: number
+          producto_codigo?: string
+          segmento?: string
+          stock_global?: number
+          stock_minimo_estrategico?: number
+          stock_objetivo?: number
+          stock_seguridad?: number
+          sugerencia_unidades?: number
+          total_vendido_12m?: number
+          total_vendido_24m?: number
+          ultima_venta?: string | null
+          unidades_12m?: number
+          unidades_24m?: number
+          ved?: string | null
+          xyz?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_corrida_resultados_corrida_id_fkey"
+            columns: ["corrida_id"]
+            isOneToOne: false
+            referencedRelation: "repuestos_corridas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repuestos_corrida_resultados_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_corrida_resultados_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_corrida_resultados_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
+      repuestos_corridas: {
+        Row: {
+          alcance: string
+          completado_en: string | null
+          creado_en: string
+          creado_por: string
+          estado: string
+          fecha_analisis: string
+          fuentes_snapshot: Json
+          id: string
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_version_id: string
+          nombre: string
+          parametros_snapshot: Json
+          pendientes_criticidad: number
+          piezas_nuevas_sin_historial: number
+          piezas_sin_ventas: number
+          piezas_sin_ventas_recientes: number
+          piezas_sugeridas: number
+          total_piezas: number
+          unidades_sugeridas: number
+        }
+        Insert: {
+          alcance?: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por: string
+          estado?: string
+          fecha_analisis: string
+          fuentes_snapshot?: Json
+          id?: string
+          marca: Database["public"]["Enums"]["marca"]
+          modelo_version_id: string
+          nombre: string
+          parametros_snapshot?: Json
+          pendientes_criticidad?: number
+          piezas_nuevas_sin_historial?: number
+          piezas_sin_ventas?: number
+          piezas_sin_ventas_recientes?: number
+          piezas_sugeridas?: number
+          total_piezas?: number
+          unidades_sugeridas?: number
+        }
+        Update: {
+          alcance?: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string
+          estado?: string
+          fecha_analisis?: string
+          fuentes_snapshot?: Json
+          id?: string
+          marca?: Database["public"]["Enums"]["marca"]
+          modelo_version_id?: string
+          nombre?: string
+          parametros_snapshot?: Json
+          pendientes_criticidad?: number
+          piezas_nuevas_sin_historial?: number
+          piezas_sin_ventas?: number
+          piezas_sin_ventas_recientes?: number
+          piezas_sugeridas?: number
+          total_piezas?: number
+          unidades_sugeridas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_corridas_modelo_version_id_fkey"
+            columns: ["modelo_version_id"]
+            isOneToOne: false
+            referencedRelation: "repuestos_modelo_versiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repuestos_demanda_mensual: {
+        Row: {
+          actualizado_en: string
+          devoluciones: number
+          importe_comparable: number
+          mes: string
+          pedidos: number
+          producto_codigo: string
+          unidades_netas: number
+          unidades_positivas: number
+        }
+        Insert: {
+          actualizado_en?: string
+          devoluciones?: number
+          importe_comparable?: number
+          mes: string
+          pedidos?: number
+          producto_codigo: string
+          unidades_netas?: number
+          unidades_positivas?: number
+        }
+        Update: {
+          actualizado_en?: string
+          devoluciones?: number
+          importe_comparable?: number
+          mes?: string
+          pedidos?: number
+          producto_codigo?: string
+          unidades_netas?: number
+          unidades_positivas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_demanda_mensual_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_demanda_mensual_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_demanda_mensual_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
+      repuestos_facturacion_historica_cargas: {
+        Row: {
+          activo: boolean
+          archivo_nombre: string
+          completado_en: string | null
+          creado_en: string
+          creado_por: string | null
+          estado: string
+          filas_archivo: number
+          filas_recibidas: number
+          id: string
+          lineas_vinculadas: number
+          productos_vinculados: number
+          publicacion_estado: string | null
+          publicacion_hasta: string | null
+          publicado_en: string | null
+        }
+        Insert: {
+          activo?: boolean
+          archivo_nombre: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          estado?: string
+          filas_archivo?: number
+          filas_recibidas?: number
+          id?: string
+          lineas_vinculadas?: number
+          productos_vinculados?: number
+          publicacion_estado?: string | null
+          publicacion_hasta?: string | null
+          publicado_en?: string | null
+        }
+        Update: {
+          activo?: boolean
+          archivo_nombre?: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          estado?: string
+          filas_archivo?: number
+          filas_recibidas?: number
+          id?: string
+          lineas_vinculadas?: number
+          productos_vinculados?: number
+          publicacion_estado?: string | null
+          publicacion_hasta?: string | null
+          publicado_en?: string | null
+        }
+        Relationships: []
+      }
+      repuestos_historial_actualizaciones: {
+        Row: {
+          ambiguas: number
+          completado_en: string | null
+          confirmadas: number
+          detalle: Json
+          ejecutado_por: string | null
+          estado: string
+          id: number
+          iniciado_en: string
+          lineas_totales: number
+          sin_coincidencia: number
+        }
+        Insert: {
+          ambiguas?: number
+          completado_en?: string | null
+          confirmadas?: number
+          detalle?: Json
+          ejecutado_por?: string | null
+          estado: string
+          id?: never
+          iniciado_en?: string
+          lineas_totales?: number
+          sin_coincidencia?: number
+        }
+        Update: {
+          ambiguas?: number
+          completado_en?: string | null
+          confirmadas?: number
+          detalle?: Json
+          ejecutado_por?: string | null
+          estado?: string
+          id?: never
+          iniciado_en?: string
+          lineas_totales?: number
+          sin_coincidencia?: number
+        }
+        Relationships: []
+      }
+      repuestos_maestro_legacy: {
+        Row: {
+          actualizado_en: string
+          candidatos: string[]
+          carga_id: string
+          codigo_fabricante: string | null
+          codigo_fabricante_norm: string | null
+          codigo_legacy: string
+          codigo_legacy_norm: string
+          descripcion: string
+          estado_vinculo: string
+          metodo_vinculo: string | null
+          producto_codigo: string | null
+          situacion: string | null
+          tipo: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          candidatos?: string[]
+          carga_id: string
+          codigo_fabricante?: string | null
+          codigo_fabricante_norm?: string | null
+          codigo_legacy: string
+          codigo_legacy_norm: string
+          descripcion: string
+          estado_vinculo?: string
+          metodo_vinculo?: string | null
+          producto_codigo?: string | null
+          situacion?: string | null
+          tipo?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          candidatos?: string[]
+          carga_id?: string
+          codigo_fabricante?: string | null
+          codigo_fabricante_norm?: string | null
+          codigo_legacy?: string
+          codigo_legacy_norm?: string
+          descripcion?: string
+          estado_vinculo?: string
+          metodo_vinculo?: string | null
+          producto_codigo?: string | null
+          situacion?: string | null
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_maestro_legacy_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "repuestos_maestro_legacy_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repuestos_maestro_legacy_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_maestro_legacy_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_maestro_legacy_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
+      repuestos_maestro_legacy_cargas: {
+        Row: {
+          activo: boolean
+          archivo_nombre: string
+          canonicas: number
+          completado_en: string | null
+          creado_en: string
+          creado_por: string | null
+          estado: string
+          filas: number
+          id: string
+          sin_coincidencia: number
+          vinculadas: number
+        }
+        Insert: {
+          activo?: boolean
+          archivo_nombre: string
+          canonicas?: number
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          estado?: string
+          filas?: number
+          id?: string
+          sin_coincidencia?: number
+          vinculadas?: number
+        }
+        Update: {
+          activo?: boolean
+          archivo_nombre?: string
+          canonicas?: number
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          estado?: string
+          filas?: number
+          id?: string
+          sin_coincidencia?: number
+          vinculadas?: number
+        }
+        Relationships: []
+      }
+      repuestos_modelo_reglas_mix: {
+        Row: {
+          codigo_mix: string
+          modelo_version_id: string
+          segmento: string
+        }
+        Insert: {
+          codigo_mix: string
+          modelo_version_id: string
+          segmento: string
+        }
+        Update: {
+          codigo_mix?: string
+          modelo_version_id?: string
+          segmento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_modelo_reglas_mix_modelo_version_id_fkey"
+            columns: ["modelo_version_id"]
+            isOneToOne: false
+            referencedRelation: "repuestos_modelo_versiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repuestos_modelo_segmentos: {
+        Row: {
+          descripcion: string | null
+          modelo_version_id: string
+          nivel_servicio: number | null
+          revision_meses: number
+          segmento: string
+          valor_z: number
+        }
+        Insert: {
+          descripcion?: string | null
+          modelo_version_id: string
+          nivel_servicio?: number | null
+          revision_meses: number
+          segmento: string
+          valor_z: number
+        }
+        Update: {
+          descripcion?: string | null
+          modelo_version_id?: string
+          nivel_servicio?: number | null
+          revision_meses?: number
+          segmento?: string
+          valor_z?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_modelo_segmentos_modelo_version_id_fkey"
+            columns: ["modelo_version_id"]
+            isOneToOne: false
+            referencedRelation: "repuestos_modelo_versiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repuestos_modelo_versiones: {
+        Row: {
+          abc_limite_a: number
+          abc_limite_b: number
+          activa: boolean
+          adi_intermitente_umbral: number
+          ciclo_planificacion_meses: number
+          cobertura_margen_meses: number
+          creado_en: string
+          creado_por: string | null
+          cv2_erratico_umbral: number
+          fsn_dias_f: number
+          fsn_dias_n: number
+          fsn_pedidos_f: number
+          id: string
+          lead_time_meses: number
+          marca: Database["public"]["Enums"]["marca"]
+          nombre: string
+          origen_predeterminado: string
+          pedido_unico_cobertura_meses: number
+          peso_anterior: number
+          peso_reciente: number
+          stock_seguridad_tope: number
+          tendencia_caida_tope: number
+          tendencia_caida_umbral: number
+          version: number
+          xyz_cv_x: number
+          xyz_cv_y: number
+          xyz_meses_x: number
+          xyz_meses_y_max: number
+          xyz_meses_y_min: number
+        }
+        Insert: {
+          abc_limite_a?: number
+          abc_limite_b?: number
+          activa?: boolean
+          adi_intermitente_umbral?: number
+          ciclo_planificacion_meses?: number
+          cobertura_margen_meses?: number
+          creado_en?: string
+          creado_por?: string | null
+          cv2_erratico_umbral?: number
+          fsn_dias_f?: number
+          fsn_dias_n?: number
+          fsn_pedidos_f?: number
+          id?: string
+          lead_time_meses: number
+          marca: Database["public"]["Enums"]["marca"]
+          nombre: string
+          origen_predeterminado?: string
+          pedido_unico_cobertura_meses?: number
+          peso_anterior?: number
+          peso_reciente?: number
+          stock_seguridad_tope?: number
+          tendencia_caida_tope?: number
+          tendencia_caida_umbral?: number
+          version: number
+          xyz_cv_x?: number
+          xyz_cv_y?: number
+          xyz_meses_x?: number
+          xyz_meses_y_max?: number
+          xyz_meses_y_min?: number
+        }
+        Update: {
+          abc_limite_a?: number
+          abc_limite_b?: number
+          activa?: boolean
+          adi_intermitente_umbral?: number
+          ciclo_planificacion_meses?: number
+          cobertura_margen_meses?: number
+          creado_en?: string
+          creado_por?: string | null
+          cv2_erratico_umbral?: number
+          fsn_dias_f?: number
+          fsn_dias_n?: number
+          fsn_pedidos_f?: number
+          id?: string
+          lead_time_meses?: number
+          marca?: Database["public"]["Enums"]["marca"]
+          nombre?: string
+          origen_predeterminado?: string
+          pedido_unico_cobertura_meses?: number
+          peso_anterior?: number
+          peso_reciente?: number
+          stock_seguridad_tope?: number
+          tendencia_caida_tope?: number
+          tendencia_caida_umbral?: number
+          version?: number
+          xyz_cv_x?: number
+          xyz_cv_y?: number
+          xyz_meses_x?: number
+          xyz_meses_y_max?: number
+          xyz_meses_y_min?: number
+        }
+        Relationships: []
+      }
       repuestos_stock: {
         Row: {
           codigo_fabricante: string | null
@@ -1198,6 +2049,93 @@ export type Database = {
           unidad?: string | null
         }
         Relationships: []
+      }
+      repuestos_ventas_vinculacion: {
+        Row: {
+          actualizado_en: string
+          candidatos: string[]
+          cantidad: number
+          cantidad_candidatos: number
+          confianza: number
+          estado_vinculo: string
+          fecha_efectiva: string | null
+          linea_id: string
+          marca_origen: Database["public"]["Enums"]["marca"]
+          metodo_vinculo: string | null
+          moneda: string | null
+          prioridad: number | null
+          producto_codigo: string | null
+          unidad_producto: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          candidatos?: string[]
+          cantidad?: number
+          cantidad_candidatos?: number
+          confianza?: number
+          estado_vinculo: string
+          fecha_efectiva?: string | null
+          linea_id: string
+          marca_origen?: Database["public"]["Enums"]["marca"]
+          metodo_vinculo?: string | null
+          moneda?: string | null
+          prioridad?: number | null
+          producto_codigo?: string | null
+          unidad_producto?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          candidatos?: string[]
+          cantidad?: number
+          cantidad_candidatos?: number
+          confianza?: number
+          estado_vinculo?: string
+          fecha_efectiva?: string | null
+          linea_id?: string
+          marca_origen?: Database["public"]["Enums"]["marca"]
+          metodo_vinculo?: string | null
+          moneda?: string | null
+          prioridad?: number | null
+          producto_codigo?: string | null
+          unidad_producto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
       }
       seguimiento_comercial: {
         Row: {
@@ -1736,6 +2674,14 @@ export type Database = {
       }
     }
     Functions: {
+      es_linea_facturacion_repuesto: {
+        Args: {
+          p_grupo_normalizado: string
+          p_subgrupo_original: string
+          p_tipo: Database["public"]["Enums"]["tipo_facturacion"]
+        }
+        Returns: boolean
+      }
       extraer_codigo_repuesto_descripcion: {
         Args: { p_descripcion: string }
         Returns: string
@@ -1747,6 +2693,10 @@ export type Database = {
       get_user_sucursal: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["sucursal"]
+      }
+      has_module_access: {
+        Args: { _modulo_id: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
@@ -1772,8 +2722,28 @@ export type Database = {
           os_numero: string
         }[]
       }
+      parque_actividad_os_chasis_rango: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          cliente_id: string
+          fecha: string
+          marca: string
+          os_numero: string
+        }[]
+      }
       parque_facturacion_atribuida: {
         Args: never
+        Returns: {
+          cliente_id: string
+          fecha: string
+          grupo_fx: string
+          marca: string
+          rubro: string
+          total_venta: number
+        }[]
+      }
+      parque_facturacion_atribuida_rango: {
+        Args: { p_desde: string; p_hasta: string }
         Returns: {
           cliente_id: string
           fecha: string
@@ -1801,6 +2771,8 @@ export type Database = {
           total_maquinas: number
         }[]
       }
+      parque_modelo_clave: { Args: { p_modelo: string }; Returns: string }
+      parque_modelo_nombre: { Args: { p_modelo: string }; Returns: string }
       parque_normalizar_clave: { Args: { p_valor: string }; Returns: string }
       parque_resumen_facturacion: {
         Args: {
@@ -1880,9 +2852,135 @@ export type Database = {
         Args: { p_trabajo_id: string }
         Returns: undefined
       }
+      refrescar_parque_ultima_actividad: { Args: never; Returns: number }
       repuesto_hermanos: { Args: { p_producto_codigo: string }; Returns: Json }
       repuesto_ventas_historial: {
         Args: { p_producto_codigo: string }
+        Returns: Json
+      }
+      repuestos_aplicar_conversiones_unidad_historica: {
+        Args: never
+        Returns: Json
+      }
+      repuestos_asignar_criticidad: {
+        Args: {
+          p_criticidad: string
+          p_observaciones?: string
+          p_origen?: string
+          p_producto_codigo: string
+        }
+        Returns: undefined
+      }
+      repuestos_crear_version_modelo: {
+        Args: {
+          p_marca: string
+          p_nombre: string
+          p_parametros: Json
+          p_segmentos?: Json
+        }
+        Returns: string
+      }
+      repuestos_diagnostico_fuentes_historial: { Args: never; Returns: Json }
+      repuestos_ejecutar_sugerencia: {
+        Args: { p_fecha_analisis?: string; p_marca: string; p_nombre?: string }
+        Returns: string
+      }
+      repuestos_estado_facturacion_historica: { Args: never; Returns: Json }
+      repuestos_estado_maestro_legacy: { Args: never; Returns: Json }
+      repuestos_finalizar_facturacion_historica: {
+        Args: { p_carga_id: string }
+        Returns: Json
+      }
+      repuestos_finalizar_maestro_legacy: {
+        Args: { p_carga_id: string }
+        Returns: Json
+      }
+      repuestos_finalizar_publicacion_historial: { Args: never; Returns: Json }
+      repuestos_guardar_planificacion_articulo: {
+        Args: {
+          p_observaciones?: string
+          p_origen?: string
+          p_producto_codigo: string
+          p_stock_minimo_estrategico?: number
+        }
+        Returns: undefined
+      }
+      repuestos_importar_criticidades: {
+        Args: { p_items: Json; p_marca: string }
+        Returns: Json
+      }
+      repuestos_importar_facturacion_historica_lote: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      repuestos_importar_maestro_legacy_lote: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: number
+      }
+      repuestos_iniciar_facturacion_historica: {
+        Args: { p_archivo_nombre: string; p_filas_archivo: number }
+        Returns: string
+      }
+      repuestos_iniciar_maestro_legacy: {
+        Args: { p_archivo_nombre: string }
+        Returns: string
+      }
+      repuestos_iniciar_publicacion_historial: { Args: never; Returns: Json }
+      repuestos_preparar_criticidades_automaticas: {
+        Args: { p_marca: string }
+        Returns: Json
+      }
+      repuestos_preparar_planificacion_neutral: {
+        Args: { p_marca: string }
+        Returns: undefined
+      }
+      repuestos_publicar_facturacion_historica: { Args: never; Returns: Json }
+      repuestos_publicar_historial_lote: {
+        Args: { p_desde: string; p_hasta_exclusiva: string }
+        Returns: Json
+      }
+      repuestos_refrescar_historial_unificado: { Args: never; Returns: Json }
+      repuestos_resumen_calidad_historial: {
+        Args: { p_marca?: string }
+        Returns: Json
+      }
+      repuestos_sugerencia_viva: {
+        Args: {
+          p_buscar?: string
+          p_estado?: string
+          p_fecha_analisis: string
+          p_limite?: number
+          p_marca: string
+          p_offset?: number
+          p_segmento?: string
+          p_solo_sugeridos?: boolean
+        }
+        Returns: Json
+      }
+      repuestos_sugerencia_viva_base_v1: {
+        Args: {
+          p_buscar?: string
+          p_estado?: string
+          p_fecha_analisis: string
+          p_limite?: number
+          p_marca: string
+          p_offset?: number
+          p_segmento?: string
+          p_solo_sugeridos?: boolean
+        }
+        Returns: Json
+      }
+      repuestos_sugerencia_viva_base_v2: {
+        Args: {
+          p_buscar?: string
+          p_estado?: string
+          p_fecha_analisis: string
+          p_limite?: number
+          p_marca: string
+          p_offset?: number
+          p_segmento?: string
+          p_solo_sugeridos?: boolean
+        }
         Returns: Json
       }
     }
