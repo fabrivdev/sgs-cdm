@@ -669,8 +669,6 @@ export default function Planificador() {
 
               {displayed.map((s) => {
                 const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
-                const tipo = s.tipo_trabajo ?? "Visita de campo";
-                const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
                 const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
@@ -690,7 +688,7 @@ export default function Planificador() {
                       }
                     }}
                   >
-                    <TableCell className="px-3 py-2 align-top">
+                    <TableCell className="px-3 py-1.5 align-top">
                       <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
                         {fechaLabel}
                         {continuidad && continuidad.total > 1 && (
@@ -702,11 +700,11 @@ export default function Planificador() {
                       <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
+                    <TableCell className="px-3 py-1.5 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
                       {clienteNombre}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
+                    <TableCell className="px-3 py-1.5 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
                       <div className="flex items-center gap-1.5">
                         {refByServicio.get(s.id)?.ref && (
                           <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
@@ -722,19 +720,19 @@ export default function Planificador() {
                     </TableCell>
 
 
-                    <TableCell className="px-3 py-2 align-top truncate" title={responsableNombre}>
+                    <TableCell className="px-3 py-1.5 align-top truncate" title={responsableNombre}>
                       {responsableNombre}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top text-[12px] text-muted-foreground">
+                    <TableCell className="px-3 py-1.5 align-top text-[12px] text-muted-foreground">
                       {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top">
+                    <TableCell className="px-3 py-1.5 align-top">
                       <EstadoBadge estado={s.estado} />
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top text-right tabular-nums">
+                    <TableCell className="px-3 py-1.5 align-top text-right tabular-nums">
                       {s.horas_trabajadas ?? "—"}
                     </TableCell>
                   </TableRow>
