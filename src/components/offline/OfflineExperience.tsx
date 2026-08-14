@@ -8,16 +8,29 @@ let lanyardModule: LanyardModule | null = null;
 let lanyardReadyPromise: Promise<boolean> | null = null;
 let lanyardFailed = false;
 
-const CARD_IMAGES = ["/offline-card.svg", "/offline-lanyard.svg", "/sig-cdm-logo.png"];
+const CARD_IMAGES = ["/offline-card.svg", "/offline-lanyard.svg", "/sig-cdm-logo.png"] as const;
 
-function preloadImage(src: string) {
-  return new Promise<void>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error(src));
-    image.src = src;
-  });
+// Images are inlined as data URLs while online: the 3D texture loader would
+// otherwise re-request them from the network at the exact moment there is none.
+const inlinedImages: Record<string, string> = {};
+
+function inlineImage(src: string) {
+  return fetch(src)
+    .then((res) => res.blob())
+    .then(
+      (blob) =>
+        new Promise<void>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            inlinedImages[src] = String(reader.result);
+            resolve();
+          };
+          reader.onerror = () => reject(new Error(src));
+          reader.readAsDataURL(blob);
+        })
+    );
 }
+
 
 // Warm up the heavy 3D runtime and its assets while the network is available.
 // Any failure is contained here: the offline card then falls back to the
@@ -30,7 +43,23 @@ function ensureLanyardReady(): Promise<boolean> {
       import("@/components/Lanyard").then((mod) => {
         lanyardModule = mod;
       }),
-      ...CARD_IMAGES.map(preloadImage),
+      // The physics engine chunk + its WASM are fetched lazily by
+      // @react-three/rapier when <Physics> mounts. Download and initialise them
+      // now, while the network is up, so an offline mount never hits the network.
+      import("@dimforge/rapier3d-compat").then((RAPIER) => RAPIER.init()),
+      import("@react-three/rapier"),
+      // Card model + lanyard texture.
+      (async () => {
+        const [drei, cardGLB, lanyardPng] = await Promise.all([
+          import("@react-three/drei"),
+          import("@/components/card.glb").then((m) => m.default),
+          import("@/components/lanyard.png").then((m) => m.default),
+        ]);
+        drei.useGLTF.preload(cardGLB);
+        drei.useTexture.preload(lanyardPng);
+      })(),
+
+      ...CARD_IMAGES.map(inlineImage),
     ])
       .then(() => true)
       .catch(() => {
@@ -41,6 +70,7 @@ function ensureLanyardReady(): Promise<boolean> {
   }
   return lanyardReadyPromise;
 }
+
 
 if (typeof window !== "undefined") {
   void ensureLanyardReady();
@@ -112,7 +142,7 @@ export function OfflineExperience() {
         {showMotion && Lanyard ? (
           <Lanyard3DBoundary>
             <Suspense fallback={<StaticCredential />}>
-              <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={22} frontImage="/offline-card.svg" backImage="/offline-card.svg" imageFit="cover" lanyardImage="/offline-lanyard.svg" logoImage="/sig-cdm-logo.png" lanyardWidth={0.58} />
+              <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={22} frontImage={inlinedImages["/offline-card.svg"]} backImage={inlinedImages["/offline-card.svg"]} imageFit="cover" lanyardImage={inlinedImages["/offline-lanyard.svg"]} logoImage={inlinedImages["/sig-cdm-logo.png"]} lanyardWidth={0.58} />
             </Suspense>
           </Lanyard3DBoundary>
         ) : (
