@@ -27,7 +27,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
-import { FiltersBar, FilterCustom, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { useAuth } from "@/hooks/useAuth";
 import {
   cargarSugerenciaViva,
@@ -49,8 +49,11 @@ import {
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel, metaText, pageShellWide } from "@/lib/ui-classes";
+import { cardLabel, metaText, pageShellWide, tableHeadText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
+
+const cellText = "py-2 text-[13px] leading-5";
+
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
@@ -94,6 +97,16 @@ function coberturaActualMeses(row: ResultadoSugerencia) {
   const ritmoActualMensual = Math.max(0, row.unidades_12m) / 12;
   if (ritmoActualMensual <= 0) return null;
   return Math.max(0, row.stock_global / ritmoActualMensual);
+}
+
+function avisosFila(row: ResultadoSugerencia) {
+  const avisos: string[] = [];
+  if (row.confianza_datos === "BAJA") avisos.push("Confianza baja");
+  if (row.tipo_stock_seguridad === "ESTIMADA") avisos.push("Stock de seguridad estimado");
+  if (row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL") avisos.push("Código nuevo sin historial");
+  if (row.estado_datos === "SIN_VENTAS_RECIENTES") avisos.push("Sin ventas en 24 meses");
+  if (row.stock_minimo_estrategico > 0) avisos.push(`Mínimo estratégico ${decimal.format(row.stock_minimo_estrategico)}`);
+  return avisos;
 }
 
 function ModelConfigSheet({
@@ -391,6 +404,7 @@ export default function RepuestosSugerencias() {
     historySourceVersion,
   );
   const rows = liveQuery.data?.rows ?? [];
+  const leadTimeMeses = modelQuery.data?.lead_time_meses ?? 3;
   const liveSummary = liveQuery.data?.resumen;
   const totalPages = Math.max(1, Math.ceil((liveQuery.data?.total_filtrado ?? 0) / 50));
   const segmentOptions = useMemo(() => [
@@ -526,31 +540,27 @@ export default function RepuestosSugerencias() {
     <div className={pageShellWide}>
       <PageHeader
         title="Sugerencia de compra"
-        actions={(
-          <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <Label className={cardLabel}>Marca</Label>
-            <Select value={brand} onValueChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}>
-              <SelectTrigger className="mt-1 w-32"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="CLAAS">CLAAS</SelectItem><SelectItem value="HORSCH">HORSCH</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className={cardLabel}>Corte del análisis</Label>
-            <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => { setAnalysisDate(event.target.value); setPage(1); }} />
-          </div>
-          <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
-          <Button variant="outline" size="icon" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial"><Info className="h-4 w-4" /></Button>
-          <div className="flex h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-[12px] font-semibold text-primary">
-            <span className="relative flex h-2.5 w-2.5">
+        meta={(
+          <span className="inline-flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
               {liveQuery.isFetching && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />}
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
             </span>
-            Cálculo en vivo
-          </div>
+            Cálculo en vivo · {brand}
+          </span>
+        )}
+        actions={(
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)}>
+              <Settings2 className="mr-1 h-3.5 w-3.5" />Parámetros
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial">
+              <Info className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )}
       />
+
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
@@ -684,19 +694,34 @@ export default function RepuestosSugerencias() {
       )}
 
       <FiltersBar
-        search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción...", width: "min-w-0 flex-1" }}
+        search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción…", width: "w-[min(360px,26vw)]" }}
         activeCount={[filters.buscar, filters.segmento !== "TODOS", filters.estado !== "TODOS", filters.soloSugeridos].filter(Boolean).length}
         onClear={() => { setFilters({ buscar: "", segmento: "TODOS", estado: "TODOS", soloSugeridos: false }); setPage(1); }}
-        actions={<Button variant="outline" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar</Button>}
+        actions={<Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-1 h-3.5 w-3.5" />Exportar</Button>}
       >
+        <FilterSelect
+          label="Marca"
+          value={brand}
+          onChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}
+          placeholder="Marca"
+          options={[{ value: "CLAAS", label: "CLAAS" }, { value: "HORSCH", label: "HORSCH" }]}
+          width="w-[120px]"
+        />
+        <FilterDate
+          label="Corte del análisis"
+          value={analysisDate}
+          onChange={(value) => { setAnalysisDate(value); setPage(1); }}
+          width="w-[150px]"
+        />
         <FilterSelect
           label="Segmento"
           value={filters.segmento}
           onChange={(segmento) => { setFilters((current) => ({ ...current, segmento })); setPage(1); }}
           placeholder="Segmento"
           options={[{ value: "TODOS", label: "Todos los segmentos" }, ...segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))]}
-          width="w-[190px]"
+          width="w-[180px]"
         />
+
         <FilterSelect
           label="Estado de datos"
           value={filters.estado}
@@ -737,40 +762,78 @@ export default function RepuestosSugerencias() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[280px]">Pieza</TableHead>
-                    <TableHead className="min-w-[190px]">Clasificación</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-right">Vendido 12m</TableHead>
-                    <TableHead className="text-right">Vendido 24m</TableHead>
-                    <TableHead className="min-w-[140px] text-right">Cobertura / horizonte</TableHead>
-                    <TableHead className="text-right">Objetivo</TableHead>
-                    <TableHead className="text-right">Sugerencia</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 min-w-[280px]")}>Pieza</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 min-w-[170px]")}>Clase</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Stock</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Demanda mensual</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Cobertura</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Última venta</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Objetivo</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Sugerencia</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => {
                     const cobertura = coberturaActualMeses(row);
+                    const avisos = avisosFila(row);
+                    const coberturaTono = cobertura === null
+                      ? "text-muted-foreground"
+                      : cobertura < leadTimeMeses
+                        ? "text-destructive"
+                        : cobertura < leadTimeMeses + 1
+                          ? "text-amber-600"
+                          : "text-foreground";
                     return (
                       <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
-                        <TableCell><p className="font-medium">{row.descripcion}</p><p className="text-[11px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p></TableCell>
-                        <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline">{row.abc}{row.fsn}{row.xyz}</Badge><Badge variant="secondary">{row.segmento}</Badge>{row.confianza_datos === "BAJA" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">CONFIANZA BAJA</Badge>}{row.tipo_stock_seguridad === "ESTIMADA" && <Badge variant="outline">SEGURIDAD ESTIMADA</Badge>}{row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL" && <Badge className="border-amber-300 bg-amber-50 text-amber-800" variant="outline">NUEVO SIN HISTORIAL</Badge>}{row.estado_datos === "SIN_VENTAS_RECIENTES" && <Badge variant="outline">SIN VENTAS 24M</Badge>}{row.stock_minimo_estrategico > 0 && <Badge className="border-primary/30 bg-primary/5 text-primary" variant="outline">MÍN. {decimal.format(row.stock_minimo_estrategico)}</Badge>}</div></TableCell>
-                        <TableCell className="text-right font-medium">{decimal.format(row.stock_global)}</TableCell>
-                        <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_12m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
-                        <TableCell className="text-right"><span className="font-medium">{decimal.format(row.unidades_24m)}</span><span className="ml-1 text-[10px] text-muted-foreground">un.</span></TableCell>
-                        <TableCell className="text-right">
-                          <p className="font-medium">{cobertura === null ? "—" : `${decimal.format(cobertura)} meses`}</p>
-                          <p className="text-[10px] text-muted-foreground">Al ritmo 12m · horizonte {row.horizonte_meses} meses</p>
+                        <TableCell className={cn(cellText, "max-w-[360px]")}>
+                          <p className="truncate font-medium" title={row.descripcion}>{row.descripcion}</p>
+                          <p className="truncate text-[10px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p>
                         </TableCell>
-                        <TableCell className="text-right font-medium">{decimal.format(row.stock_objetivo)}</TableCell>
-                        <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-semibold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
+                        <TableCell className={cellText}>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-semibold">{row.abc}{row.fsn}{row.xyz}</Badge>
+                            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{row.segmento}</Badge>
+                            {avisos.length > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-800"
+                                title={avisos.join(" · ")}
+                              >
+                                <AlertTriangle className="mr-1 h-3 w-3" />{avisos.length}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className={cn(cellText, "text-right font-medium tabular-nums")}>{decimal.format(row.stock_global)}</TableCell>
+                        <TableCell className={cn(cellText, "text-right tabular-nums")}>{decimal.format(row.demanda_ponderada_mensual)}</TableCell>
+                        <TableCell className={cn(cellText, "text-right font-medium tabular-nums", coberturaTono)}>
+                          {cobertura === null ? "—" : `${decimal.format(cobertura)} m`}
+                        </TableCell>
+                        <TableCell className={cn(cellText, "text-right tabular-nums")}>
+                          {row.ultima_venta ? (
+                            <>
+                              <span>{displayDate(row.ultima_venta)}</span>
+                              {row.dias_ultima_venta != null && <span className="ml-1 text-[10px] text-muted-foreground">{integer.format(row.dias_ultima_venta)} d</span>}
+                            </>
+                          ) : <span className="text-muted-foreground">Sin ventas</span>}
+                        </TableCell>
+                        <TableCell className={cn(cellText, "text-right tabular-nums")}>{decimal.format(row.stock_objetivo)}</TableCell>
+                        <TableCell className={cn(cellText, "text-right")}><span className={cn("inline-flex min-w-11 justify-center rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
                       </TableRow>
                     );
                   })}
-                  {rows.length === 0 && <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
+                  {rows.length === 0 && <TableRow><TableCell colSpan={8} className={cn(cellText, "h-32 text-center text-muted-foreground")}>No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
-            <div className="flex items-center justify-between border-t px-4 py-3"><p className={metaText}>{integer.format(liveQuery.data?.total_filtrado ?? 0)} piezas · página {page} de {totalPages}</p><div className="flex gap-1"><Button size="icon" variant="outline" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button size="icon" variant="outline" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
+            <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
+              <p className={metaText}>{integer.format(liveQuery.data?.total_filtrado ?? 0)} piezas · página {page} de {totalPages}</p>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}><ChevronRight className="h-3.5 w-3.5" /></Button>
+              </div>
+            </div>
+
           </>
         )}
       </Card>
