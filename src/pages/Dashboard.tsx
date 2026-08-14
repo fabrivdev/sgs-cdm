@@ -3653,7 +3653,7 @@ export default function Dashboard() {
           <Card className="flex flex-col p-3">
             <PanelTitle
               icon={CalendarDays}
-              title="Matriz técnicos / periodo" - ${format(periodEnd, "dd/MM/yy")} · actividad por sucursal del técnico`}
+              title="Matriz técnicos / periodo"
             />
             <MatrizTécnicosDías
               data={matrizTécnicosDías}
