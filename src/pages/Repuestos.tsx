@@ -780,33 +780,28 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
               </TabsContent>
 
               <TabsContent value="consumo" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
-                <div className="flex h-full items-end gap-2 px-5 pb-8 pt-10">
-                  {historialCargando && <p className="m-auto text-[12px] text-muted-foreground">Cargando consumo...</p>}
-                  {historialError && <p className="m-auto text-[12px] text-muted-foreground">Consumo no disponible.</p>}
-                  {!historialCargando && !historialError && ventas12m.length === 0 && (
-                    <p className="m-auto text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
+                <div className="h-full overflow-auto px-4 py-3">
+                  {historialCargando && <p className="py-10 text-center text-[12px] text-muted-foreground">Cargando consumo...</p>}
+                  {!historialCargando && historialError && (
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">Consumo no disponible.</p>
                   )}
-                  {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => {
-                    const altura = item.cantidad > 0 ? Math.max((item.cantidad / maxMensual) * 88, 3) : 0;
-                    return (
-                      <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
-                        {item.cantidad > 0 && (
-                          <span
-                            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
-                            style={{ bottom: `calc(${altura}% + 5px)` }}
-                          >
-                            {Number(item.cantidad).toLocaleString("es-PY", { maximumFractionDigits: 1 })}
-                          </span>
-                        )}
-                        <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
-                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
-                          {item.mes.slice(5)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {!historialCargando && !historialError && ventas.length === 0 && (
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
+                  )}
+                  {!historialCargando && !historialError && ventas.length > 0 && (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <BloqueConsumo titulo="Por año" subtitulo="Historial completo — unidades" series={consumoPorAnio} />
+                      <BloqueConsumo titulo="Por mes" subtitulo="Últimos 12 meses — unidades" series={consumoPorMes} />
+                      <BloqueConsumo
+                        titulo="Por sucursal"
+                        subtitulo="Últimos 12 meses — unidades"
+                        series={consumoPorSucursal}
+                      />
+                    </div>
+                  )}
                 </div>
               </TabsContent>
+
 
               <TabsContent value="ventas" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                 <div className="h-full overflow-auto">
