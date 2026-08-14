@@ -159,7 +159,7 @@ export function PeriodSelector({
 
         {[
           { value: "dia", label: "Día" },
-          { value: "semana", label: "Semana" },
+          { value: "semana", label: "Sem" },
           { value: "mes", label: "Mes" },
           { value: "anio", label: "Año" },
         ].map((option) => {
