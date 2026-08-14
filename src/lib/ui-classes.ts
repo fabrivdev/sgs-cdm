@@ -8,7 +8,7 @@
  */
 
 // Layout de página
-export const pageShell = "w-full min-w-0 space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:px-6";
+export const pageShell = "w-full min-w-0 space-y-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-6";
 export const pageShellWide = pageShell;
 
 // Jerarquía de texto
