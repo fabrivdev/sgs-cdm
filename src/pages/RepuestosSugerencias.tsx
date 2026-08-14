@@ -27,6 +27,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
+import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
 import { FiltersBar, FilterCustom, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { useAuth } from "@/hooks/useAuth";
 import {
