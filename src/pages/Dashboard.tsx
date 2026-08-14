@@ -51,6 +51,7 @@ import { MARCAS, SUCURSALES, DIAS_JORNADA_VENCIDA, MAX_TOP_RANKING, type Marca, 
 import { estadoTrabajoDesdeJornadas, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
 import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
+import { cardLabel, metaText } from "@/lib/ui-classes";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal } from "@/lib/appSettings";
 import {
   displayImportedTechnicianName,
@@ -3422,7 +3423,7 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
-                    <div className="truncate text-[10px] leading-3 uppercase tracking-[0.04em] text-muted-foreground">sucursales con movimiento</div>
+                    <div className={cn(cardLabel, "truncate leading-3")}>Sucursales con movimiento</div>
 
                   </div>
                 </div>
@@ -3432,7 +3433,7 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold">Top 2</div>
-                    <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">concentran {topSucursalesPct}% del total</div>
+                    <div className={cn(cardLabel, "truncate")}>Concentran {topSucursalesPct}% del total</div>
                   </div>
                 </div>
               </div>
@@ -3471,7 +3472,7 @@ export default function Dashboard() {
                   <div className="flex items-start gap-2">
                     <User className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div className="min-w-0">
-                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Activos actuales con carga</div>
+                      <div className={cardLabel}>Activos actuales con carga</div>
                       <div className="mt-0.5 flex items-baseline gap-2">
                         <span className="text-[18px] font-extrabold leading-none tabular-nums">
                           {técnicosConActividadPeriodo.size}<span className="text-[13px] font-normal text-muted-foreground">/{activeTechnicianIds.size}</span>
@@ -3487,7 +3488,7 @@ export default function Dashboard() {
                   <div className="flex items-start gap-2">
                     <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div>
-                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Trabajos totales</div>
+                      <div className={cardLabel}>Trabajos totales</div>
                       <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{flujo.total}</div>
                     </div>
                   </div>
@@ -3496,7 +3497,7 @@ export default function Dashboard() {
                   <div className="flex items-start gap-2">
                     <Activity className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <div>
-                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Prom. tec./periodo</div>
+                      <div className={cardLabel}>Prom. tec./periodo</div>
                       <div className="mt-0.5 text-[18px] font-extrabold leading-none tabular-nums">{productividadMatriz.equipoPromTécnicos}</div>
                     </div>
                   </div>
@@ -3516,7 +3517,7 @@ export default function Dashboard() {
                 <p className="text-[12px] text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
+                <div className={cn(cardLabel, "text-right")}>{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
                 <div className="text-[18px] font-semibold tabular-nums">{loading ? "..." : money(selectedWeek ? selectedWeek.total : totalPeriodo)}</div>
                 <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
                   {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}

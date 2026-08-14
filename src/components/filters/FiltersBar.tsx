@@ -7,7 +7,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel as labelCls, controlHeight, controlText } from "@/lib/ui-classes";
+import { filterLabel as labelCls, controlHeight, controlText } from "@/lib/ui-classes";
 
 const ctrl = `${controlHeight} ${controlText}`;
 
@@ -41,11 +41,11 @@ function useOverflowHiding(ref: React.RefObject<HTMLDivElement>) {
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div data-filter-field className={cn("flex min-w-0 flex-col gap-0.5 max-sm:!w-full", className)}>
+    <div data-filter-field className={cn("flex min-w-0 flex-col gap-2 max-sm:!w-full", className)}>
       {label ? (
-        <span className={cn(labelCls, "block h-3.5 truncate whitespace-nowrap")}>{label}</span>
+        <span className={cn(labelCls, "block h-4 truncate whitespace-nowrap")}>{label}</span>
       ) : (
-        <span className="block h-3.5" aria-hidden />
+        <span className="block h-4" aria-hidden />
       )}
       {children}
     </div>

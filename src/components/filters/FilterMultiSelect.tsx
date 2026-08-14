@@ -4,8 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const labelCls = "text-[10px] leading-3.5 uppercase tracking-[0.04em] text-muted-foreground font-medium";
+import { filterLabel as labelCls } from "@/lib/ui-classes";
 
 export interface MultiOption {
   value: string;
@@ -46,11 +45,11 @@ export function FilterMultiSelect({
   };
 
   return (
-    <div data-filter-field className={cn("flex min-w-0 shrink-0 flex-col gap-0.5 max-sm:!w-full", width)}>
+    <div data-filter-field className={cn("flex min-w-0 shrink-0 flex-col gap-2 max-sm:!w-full", width)}>
       {label ? (
-        <span className={cn(labelCls, "block h-3.5 truncate whitespace-nowrap")}>{label}</span>
+        <span className={cn(labelCls, "block h-4 truncate whitespace-nowrap")}>{label}</span>
       ) : (
-        <span className="block h-3.5" aria-hidden />
+        <span className="block h-4" aria-hidden />
       )}
 
       <Popover>
