@@ -373,6 +373,38 @@ export function useSugerenciaViva(
   });
 }
 
+/** Sugerencia vigente de un único producto, para mostrar la recomendación de compra desde Catálogo y stock. */
+export function useSugerenciaProducto(
+  marca: MarcaSugerencia | null,
+  productoCodigo: string | null,
+  fechaAnalisis?: string,
+) {
+  const fecha = fechaAnalisis ?? (() => {
+    const date = new Date();
+    date.setDate(0);
+    return date.toISOString().slice(0, 10);
+  })();
+
+  return useQuery({
+    queryKey: ["repuestos", "sugerencia-producto", marca, productoCodigo, fecha],
+    enabled: Boolean(marca && productoCodigo),
+    retry: 0,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const response = await consultarSugerenciaViva(
+        marca as MarcaSugerencia,
+        fecha,
+        { buscar: productoCodigo as string, segmento: "TODOS", estado: "TODOS", soloSugeridos: false },
+        5,
+        0,
+      );
+      const rows = response?.rows ?? [];
+      return rows.find((row) => row.producto_codigo === productoCodigo) ?? null;
+    },
+  });
+}
+
+
 export async function cargarSugerenciaViva(
   marca: MarcaSugerencia,
   fechaAnalisis: string,
