@@ -41,7 +41,7 @@ export function MobileCardSkeletons({ rows = 4 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <Card key={i} className="rounded-[18px] p-3 shadow-sm">
+        <Card key={i} className="rounded-lg p-3">
           <div className="mb-3 flex items-center justify-between">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-5 w-20 rounded-full" />

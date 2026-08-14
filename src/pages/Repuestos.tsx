@@ -9,14 +9,11 @@ import {
   History,
   Package,
   Warehouse,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MarcaBadge } from "@/components/StatusBadges";
@@ -38,6 +35,7 @@ import {
 import { MARCAS, SUCURSALES } from "@/lib/constants";
 import { metaText, pageShellWide } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 
 interface VentaMensual {
@@ -842,9 +840,11 @@ export default function Repuestos() {
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
 
-  const filtrosActivos = Boolean(
-    filtros.busqueda || filtros.marca || filtros.familia || filtros.estadoStock !== "con_stock",
-  );
+  const filtrosActivos =
+    (filtros.busqueda ? 1 : 0) +
+    (filtros.marca ? 1 : 0) +
+    (filtros.familia ? 1 : 0) +
+    (filtros.estadoStock !== "con_stock" ? 1 : 0);
 
   const limpiarFiltros = () => {
     setBusquedaInput("");
@@ -900,93 +900,29 @@ export default function Repuestos() {
         <KpiItem label="Actualizado" value={kpisQuery.isLoading ? "…" : ultimaImportacionTexto} icon={<Clock className="h-4 w-4" />} />
       </KpiStrip>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[220px] flex-1 space-y-1">
-              <Label className="text-[11px]">Buscar (código, fabricante, descripción)</Label>
-              <Input
-                value={busquedaInput}
-                onChange={(e) => setBusquedaInput(e.target.value)}
-                placeholder="REPIN003187, 06673230, casquillo…"
-                className="h-8 text-xs"
-              />
-            </div>
-            <div className="w-40 space-y-1">
-              <Label className="text-[11px]">Marca</Label>
-              <Select
-                value={filtros.marca || "todas"}
-                onValueChange={(v) => setFiltros((f) => ({ ...f, marca: v === "todas" ? "" : v }))}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {MARCAS.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-44 space-y-1">
-              <Label className="text-[11px]">Familia</Label>
-              <Select
-                value={filtros.familia || "todas"}
-                onValueChange={(v) => setFiltros((f) => ({ ...f, familia: v === "todas" ? "" : v }))}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-[320px]">
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {(familiasQuery.data ?? []).map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {f}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-36 space-y-1">
-              <Label className="text-[11px]">Existencia</Label>
-              <Select
-                value={filtros.estadoStock}
-                onValueChange={(value: StockFiltros["estadoStock"]) =>
-                  setFiltros((f) => ({ ...f, estadoStock: value }))
-                }
-              >
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="con_stock">Con stock</SelectItem>
-                  <SelectItem value="sin_stock">Sin stock</SelectItem>
-                  <SelectItem value="todos">Todos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {filtrosActivos && (
-              <Button type="button" variant="ghost" size="sm" className="h-8" onClick={limpiarFiltros}>
-                <X className="mr-1 h-3.5 w-3.5" />
-                Limpiar
-              </Button>
-            )}
-            <Button type="button" variant="outline" size="sm" className="h-8 sm:ml-auto" onClick={exportar} disabled={exporting}>
-              <Download className="mr-1 h-3.5 w-3.5" />
-              {exporting ? "Exportando…" : "Exportar"}
-            </Button>
-          </div>
+      <FiltersBar
+        search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
+        activeCount={filtrosActivos}
+        onClear={limpiarFiltros}
+        actions={<Button type="button" variant="outline" size="sm" className="h-9" onClick={exportar} disabled={exporting}><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Exportando…" : "Exportar"}</Button>}
+      >
+        <FilterSelect label="Marca" value={filtros.marca || "todas"} onChange={(value) => setFiltros((current) => ({ ...current, marca: value === "todas" ? "" : value }))} placeholder="Marca" width="w-[140px]" options={[{ value: "todas", label: "Todas" }, ...MARCAS.map((value) => ({ value, label: value }))]} />
+        <FilterSelect label="Familia" value={filtros.familia || "todas"} onChange={(value) => setFiltros((current) => ({ ...current, familia: value === "todas" ? "" : value }))} placeholder="Familia" width="w-[180px]" options={[{ value: "todas", label: "Todas" }, ...(familiasQuery.data ?? []).map((value) => ({ value, label: value }))]} />
+        <FilterSelect label="Existencia" value={filtros.estadoStock} onChange={(value) => setFiltros((current) => ({ ...current, estadoStock: value as StockFiltros["estadoStock"] }))} placeholder="Existencia" width="w-[140px]" options={[{ value: "con_stock", label: "Con stock" }, { value: "sin_stock", label: "Sin stock" }, { value: "todos", label: "Todos" }]} />
+      </FiltersBar>
 
-          {matrizQuery.isLoading && <p className={metaText}>Cargando matriz de stock…</p>}
+      <Card className="overflow-hidden">
+        <CardContent className="space-y-3 p-0">
+
+          {matrizQuery.isLoading && <p className={cn(metaText, "p-3")}>Cargando matriz de stock…</p>}
 
           {!matrizQuery.isLoading && rows.length === 0 && (
-            <p className={metaText}>Sin productos para este filtro.</p>
+            <p className={cn(metaText, "p-3")}>Sin productos para este filtro.</p>
           )}
 
           {!matrizQuery.isLoading && rows.length > 0 && (
             <>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1016,7 +952,7 @@ export default function Repuestos() {
                     {rows.map((row) => (
                       <TableRow
                         key={row.codigo_interno}
-                        className={cn("cursor-pointer", row.total === 0 && "bg-destructive/5")}
+                        className="cursor-pointer"
                         onClick={() => setSeleccionado(row)}
                       >
                         <TableCell className={cn(td, "font-mono")}>
@@ -1052,7 +988,7 @@ export default function Repuestos() {
                 </Table>
               </div>
 
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
                 <p className={metaText}>
                   Página {page + 1} de {totalPages} ({count.toLocaleString("es-PY")} productos)
                 </p>

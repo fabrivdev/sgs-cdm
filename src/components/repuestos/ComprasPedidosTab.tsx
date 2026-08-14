@@ -11,7 +11,6 @@ import {
 } from "@/hooks/useCompras";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,13 +29,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { resolverSolicitudes, solicitudesPorPedido } from "@/lib/imports";
 import { SUCURSALES } from "@/lib/constants";
 import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
+import { FiltersBar, FilterCustom, FilterSelect } from "@/components/filters/FiltersBar";
 
 type PedidoSortKey =
   | "sucursal"
@@ -245,57 +245,28 @@ export function ComprasPedidosTab() {
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[200px] flex-1 space-y-1">
-            <Label className="text-[11px]">Buscar (código, fabricante, descripción)</Label>
-            <Input
-              value={filtros.busqueda}
-              onChange={(e) => setFiltros((f) => ({ ...f, busqueda: e.target.value }))}
-              placeholder="REPIN003187, 06673230, casquillo…"
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="w-40 space-y-1">
-            <Label className="text-[11px]">Sucursal</Label>
-            <Select value={filtros.sucursal || "todas"} onValueChange={(v) => setFiltros((f) => ({ ...f, sucursal: v === "todas" ? "" : v }))}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas</SelectItem>
-                {SUCURSALES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-32 space-y-1">
-            <Label className="text-[11px]">N° Pedido</Label>
-            <Input
-              value={filtros.nroPedido}
-              onChange={(e) => setFiltros((f) => ({ ...f, nroPedido: e.target.value }))}
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="min-w-[160px] flex-1 space-y-1">
-            <Label className="text-[11px]">Proveedor</Label>
-            <Input
-              value={filtros.proveedor}
-              onChange={(e) => setFiltros((f) => ({ ...f, proveedor: e.target.value }))}
-              className="h-8 text-xs"
-            />
-          </div>
-          {filtrosActivos && (
-            <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setFiltros(FILTROS_VACIOS)}>
-              <X className="mr-1 h-3.5 w-3.5" />
-              Limpiar
-            </Button>
-          )}
-        </div>
+    <div className="space-y-3">
+      <div className="space-y-3">
+        <FiltersBar
+          search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN003187, 06673230, casquillo…", width: "min-w-0 flex-1" }}
+          activeCount={[filtros.busqueda, filtros.sucursal, filtros.nroPedido, filtros.proveedor].filter(Boolean).length}
+          onClear={() => setFiltros(FILTROS_VACIOS)}
+        >
+          <FilterSelect
+            label="Sucursal"
+            value={filtros.sucursal || "todas"}
+            onChange={(value) => setFiltros((f) => ({ ...f, sucursal: value === "todas" ? "" : value }))}
+            placeholder="Sucursal"
+            options={[{ value: "todas", label: "Todas" }, ...SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))]}
+            width="w-40"
+          />
+          <FilterCustom label="N° Pedido" width="w-32">
+            <Input value={filtros.nroPedido} onChange={(e) => setFiltros((f) => ({ ...f, nroPedido: e.target.value }))} />
+          </FilterCustom>
+          <FilterCustom label="Proveedor" width="min-w-[160px] flex-1">
+            <Input value={filtros.proveedor} onChange={(e) => setFiltros((f) => ({ ...f, proveedor: e.target.value }))} />
+          </FilterCustom>
+        </FiltersBar>
 
         {filtrosActivos && (
           <p className={metaText}>
@@ -489,7 +460,7 @@ export function ComprasPedidosTab() {
             </TableBody>
           </Table>
         </div>
-      </CardContent>
+      </div>
 
       <Dialog open={canManageParts && editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
@@ -557,6 +528,6 @@ export function ComprasPedidosTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

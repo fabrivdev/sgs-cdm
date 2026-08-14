@@ -6,6 +6,18 @@
 
 @layer base {
   :root {
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --radius-control: 6px;
+    --radius-panel: 8px;
+    --radius-pill: 999px;
+    --control-height: 36px;
+    --panel-padding: 12px;
+    --table-row-height: 44px;
     --motion-fast: 160ms;
     --motion-base: 180ms;
     --motion-slow: 200ms;
@@ -40,7 +52,7 @@
     --input: 0 0% 90%;
     --ring: 75 46% 44%;
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
     /* Estado colors */
     --estado-pendiente: 38 92% 50%;
@@ -106,7 +118,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  body { @apply bg-background text-foreground font-sans antialiased; }
+  body { @apply bg-background text-foreground font-sans antialiased; font-size: 13px; line-height: 1.45; }
 
   /* En pantallas táctiles conservamos 16px para legibilidad y para evitar el
      zoom automático de iOS en inputs. La densidad compacta es desktop-first. */

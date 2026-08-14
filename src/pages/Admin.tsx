@@ -27,6 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ImportarTotvsTab } from "@/components/parque/ImportarTotvsTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 
 interface Profile {
@@ -372,8 +373,8 @@ export default function Admin() {
   };
 
   return (
-    <div className="container max-w-6xl space-y-4 px-3 py-3 sm:py-4">
-      <h1 className="text-2xl font-bold">Administración</h1>
+    <PageShell>
+      <PageHeader title="Administración" />
 
       <Tabs defaultValue="equipo">
         <TabsList>
@@ -408,23 +409,11 @@ export default function Admin() {
             </Card>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Card className="p-3">
-              <div className="text-[11px] uppercase text-muted-foreground">Perfiles operativos</div>
-              <div className="mt-1 text-2xl font-semibold">{profiles.length}</div>
-              <div className="text-xs text-muted-foreground">{perfilesActivos} activos</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] uppercase text-muted-foreground">Con acceso</div>
-              <div className="mt-1 text-2xl font-semibold">{profilesConAcceso.length}</div>
-              <div className="text-xs text-muted-foreground">Pueden iniciar sesion</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-[11px] uppercase text-muted-foreground">Sin acceso</div>
-              <div className="mt-1 text-2xl font-semibold">{profilesSinAcceso.length}</div>
-              <div className="text-xs text-muted-foreground">Solo equipo operativo</div>
-            </Card>
-          </div>
+          <KpiStrip className="sm:grid-cols-3">
+            <KpiItem label="Perfiles operativos" value={profiles.length} detail={`${perfilesActivos} activos`} />
+            <KpiItem label="Con acceso" value={profilesConAcceso.length} detail="Pueden iniciar sesión" tone="positive" />
+            <KpiItem label="Sin acceso" value={profilesSinAcceso.length} detail="Solo equipo operativo" tone="warning" />
+          </KpiStrip>
 
           <Card className="hidden md:block">
             <Table>
@@ -829,6 +818,6 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }

@@ -60,11 +60,10 @@ import {
 import { attributeServiceOrderMetrics } from "@/lib/serviceOrderMetrics";
 import { resolveDashboardServiceOrderBranch } from "@/lib/serviceOrderBranch";
 import { DashboardKPISkeleton } from "@/components/LoadingSkeletons";
-import { pageTitle } from "@/lib/ui-classes";
 import { TrabajoEstadoBadge } from "@/components/StatusBadges";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, OSImpactRow, OSRubro, PeriodMode, ServiciosDashboardData } from "@/components/dashboard/types";
 import { money, pct, concept, total, weekMetric, comparisonWeekMetric, metricUnavailable, formatWeekMetric, factMetricLabel, formatOSMetric, osMetricValue, osRubroValue, summarizeOSImpact } from "@/components/dashboard/utils";
-import { SummaryCard, FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
+import { FactPeriodsMobile, FacturasMobile, PanelTitle, FactMetricSwitch, OSMetricSwitch, PeriodSelector } from "@/components/dashboard/DashboardPanels";
 import {
   WeeklyBars,
   SucursalBars,
@@ -83,6 +82,7 @@ import {
   TecnicosNoRealizadosRanking,
 } from "@/components/dashboard/DashboardCharts";
 import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
+import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
 const PAGE = 1000;
@@ -2159,27 +2159,6 @@ export default function Dashboard() {
   const ticketPromedio = facturasPeriodo > 0 ? Math.round(totalPeriodo / facturasPeriodo) : 0;
   const ticketPromedioPrev = facturasPrevPeriodo > 0 ? Math.round(totalPrevPeriodo / facturasPrevPeriodo) : 0;
   const variacionTicketPct = pct(ticketPromedio, ticketPromedioPrev);
-  const ticketSparkline = useMemo(() => {
-    const values = weeklyRows
-      .map((row) => (row.facturas > 0 ? weekMetric(row, "usd") / row.facturas : 0))
-      .filter((value) => value > 0)
-      .slice(-8);
-
-    if (values.length < 2) return { path: "", last: null as { x: number; y: number } | null };
-
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const span = max - min || 1;
-    const points = values.map((value, index) => ({
-      x: 6 + (index / (values.length - 1)) * 108,
-      y: 36 - ((value - min) / span) * 28,
-    }));
-
-    return {
-      path: points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" "),
-      last: points[points.length - 1],
-    };
-  }, [weeklyRows]);
   const facturasPorCliente = clientesAtendidosSemana > 0 ? facturasPeriodo / clientesAtendidosSemana : 0;
   const clientesPareto80 = (() => {
     if (totalPeriodo <= 0) return 0;
@@ -3131,18 +3110,15 @@ export default function Dashboard() {
     (filtrosServiciosActivos && fEstadosOS.length > 0 ? 1 : 0);
 
   return (
-    <div className="w-full overflow-x-hidden px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 lg:px-5">
+    <PageShell className="overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <h1 className={pageTitle}>Dashboard ejecutivo</h1>
-        <TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
+      <PageHeader title="Dashboard ejecutivo" tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-xs">Vista general</TabsTrigger>
           <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-xs">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-xs">Trabajos</TabsTrigger>
           <TabsTrigger value="servicios" className="h-7 whitespace-nowrap px-3 text-xs">Servicios</TabsTrigger>
-        </TabsList>
-      </div>
+        </TabsList>} />
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
@@ -3298,146 +3274,47 @@ export default function Dashboard() {
           {loading ? (
             <DashboardKPISkeleton count={4} />
           ) : (
-            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+            <KpiStrip className="grid-cols-2 lg:grid-cols-4">
               <button
                 type="button"
                 onClick={() => goSection("facturación")}
-                className="text-left"
+                className="min-w-0 text-left transition-colors hover:bg-accent/50"
               >
-                <Card className={cn(
-                  "relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50",
-                  (variacionTotalPct ?? 0) < -20 && "border-destructive/40",
-                )}>
-                  <div className="absolute inset-x-0 top-0 h-[3px] bg-primary" />
-                  <div className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <DollarSign className="h-[18px] w-[18px]" />
-                  </div>
-                  <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Facturacion del periodo - {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")}
-                  </div>
-                  <div className="mt-1.5 text-xl font-bold leading-tight tabular-nums">{money(totalPeriodo)}</div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {variacionTotalPct != null ? (
-                      <span className={cn(
-                        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold",
-                        variacionTotalPct >= 0
-                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border border-red-200 bg-red-50 text-red-700",
-                      )}>
-                        {variacionTotalPct >= 0 ? "+" : "-"} {Math.abs(variacionTotalPct)}% vs año anterior
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">sin base previa</span>
-                    )}
-                    <span className="text-[11px] text-muted-foreground">{facturasPeriodo} facturas</span>
-                  </div>
-                </Card>
+                <KpiItem
+                  label="Facturación"
+                  value={money(totalPeriodo)}
+                  detail={variacionTotalPct != null ? `${variacionTotalPct >= 0 ? "+" : "-"}${Math.abs(variacionTotalPct)}% vs año anterior · ${facturasPeriodo} facturas` : `${facturasPeriodo} facturas · sin base previa`}
+                  tone={(variacionTotalPct ?? 0) < 0 ? "danger" : "positive"}
+                  icon={<DollarSign />}
+                  className="h-full"
+                />
               </button>
 
-              <button type="button" onClick={() => goSection("facturación")} className="text-left">
-                <Card className="relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50">
-                  <div className="absolute inset-x-0 top-0 h-[3px] bg-sky-500" />
-                  <div className="relative z-10 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Clientes</div>
-                      <div className="mt-1.5 text-xl font-bold leading-tight tabular-nums">{clientesAtendidosSemana}</div>
-                      <div className="text-[11px] text-muted-foreground">{facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente</div>
-                    </div>
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Users className="h-[18px] w-[18px]" />
-                    </div>
-                  </div>
-                  <div className="relative z-10 mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <BarChart3 className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span><span className="font-semibold text-foreground">{clientesPareto80}</span> clientes concentran 80%</span>
-                  </div>
-                </Card>
+              <button type="button" onClick={() => goSection("facturación")} className="min-w-0 text-left transition-colors hover:bg-accent/50">
+                <KpiItem label="Clientes" value={clientesAtendidosSemana} detail={`${facturasPorCliente.toFixed(1).replace(".", ",")} fact./cliente · ${clientesPareto80} concentran 80%`} icon={<Users />} className="h-full" />
               </button>
 
-              <button type="button" onClick={() => goSection("facturación")} className="text-left">
-                <Card className={cn(
-                  "relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50",
-                  (variacionTicketPct ?? 0) < -10 && "border-destructive/40",
-                )}>
-                  <div className="absolute inset-x-0 top-0 h-[3px] bg-emerald-500" />
-                  <div className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Receipt className="h-[18px] w-[18px]" />
-                  </div>
-                  {ticketSparkline.path ? (
-                    <svg
-                      className="pointer-events-none absolute right-4 top-14 hidden h-9 w-24 text-primary/45 sm:block"
-                      viewBox="0 0 120 44"
-                      aria-hidden="true"
-                    >
-                      <path d={ticketSparkline.path} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" />
-                      {ticketSparkline.last ? (
-                        <circle cx={ticketSparkline.last.x} cy={ticketSparkline.last.y} r="2.8" fill="white" stroke="currentColor" strokeWidth="2" />
-                      ) : null}
-                    </svg>
-                  ) : null}
-                  <div className="relative z-10 flex items-start justify-between gap-3 pr-16 sm:pr-24">
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Ticket promedio</div>
-                      <div className="mt-1.5 text-xl font-bold leading-tight tabular-nums">{money(ticketPromedio)}</div>
-                      <div className="text-[11px] text-muted-foreground">por factura</div>
-                    </div>
-                  </div>
-                  <div className="relative z-10 mt-3 flex items-center gap-2 text-[11px]">
-                    {variacionTicketPct != null ? (
-                      <span className={cn("rounded-full px-2 py-0.5 font-semibold tabular-nums", variacionTicketPct >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive")}>
-                        {variacionTicketPct >= 0 ? "+" : "-"}{Math.abs(variacionTicketPct)}% vs anterior
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Sin base previa</span>
-                    )}
-                  </div>
-                </Card>
+              <button type="button" onClick={() => goSection("facturación")} className="min-w-0 text-left transition-colors hover:bg-accent/50">
+                <KpiItem
+                  label="Ticket promedio"
+                  value={money(ticketPromedio)}
+                  detail={variacionTicketPct != null ? `${variacionTicketPct >= 0 ? "+" : "-"}${Math.abs(variacionTicketPct)}% vs anterior · por factura` : "Por factura · sin base previa"}
+                  tone={(variacionTicketPct ?? 0) < 0 ? "danger" : "positive"}
+                  icon={<Receipt />}
+                  className="h-full"
+                />
               </button>
 
-              <button type="button" onClick={() => goSection("facturación")} className="text-left">
-                <Card className="relative flex h-full min-h-[104px] flex-col justify-between overflow-hidden bg-card p-3 pt-4 transition-colors hover:bg-accent/50">
-                  <div className="absolute inset-x-0 top-0 h-[3px] bg-amber-500" />
-                  <div className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <PieChart className="h-[18px] w-[18px]" />
-                  </div>
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Tipo facturación</div>
-                  <div className="mt-2 text-lg font-extrabold leading-tight">
-                    {tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span>
-                  </div>
-                  <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div className="flex h-full">
-                      <div className="h-full bg-primary" style={{ width: `${tipoFactBreakdown.pctCliente}%` }} />
-                      <div className="h-full bg-blue-500" style={{ width: `${tipoFactBreakdown.pctGarantia}%` }} />
-                      <div className="h-full bg-amber-500" style={{ width: `${tipoFactBreakdown.pctInterno}%` }} />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      Cliente {tipoFactBreakdown.pctCliente}%
-                    </span>
-                    {tipoFactBreakdown.pctGarantia > 0 && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        Gnt. {tipoFactBreakdown.pctGarantia}%
-                      </span>
-                    )}
-                    {tipoFactBreakdown.pctInterno > 0 && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                        Int. {tipoFactBreakdown.pctInterno}%
-                      </span>
-                    )}
-                  </div>
-                  <div className="hidden text-[10px] text-muted-foreground">
-                    {[
-                      tipoFactBreakdown.pctGarantia > 0 && `Gnt. ${tipoFactBreakdown.pctGarantia}%`,
-                      tipoFactBreakdown.pctInterno > 0 && `Int. ${tipoFactBreakdown.pctInterno}%`,
-                    ].filter(Boolean).join(" - ") || "Solo cliente"}
-                  </div>
-                </Card>
+              <button type="button" onClick={() => goSection("facturación")} className="min-w-0 text-left transition-colors hover:bg-accent/50">
+                <KpiItem
+                  label="Tipo de facturación"
+                  value={<>{tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span></>}
+                  detail={`Cliente ${tipoFactBreakdown.pctCliente}% · Gnt. ${tipoFactBreakdown.pctGarantia}% · Int. ${tipoFactBreakdown.pctInterno}%`}
+                  icon={<PieChart />}
+                  className="h-full"
+                />
               </button>
-            </div>
+            </KpiStrip>
           )}
 
           {/* FILA 2 - TENDENCIA */}
@@ -3473,7 +3350,7 @@ export default function Dashboard() {
             </Card>
 
             <Card className="flex h-full min-w-0 flex-col p-3">
-              <PanelTitle icon={Building2} title="Facturacion por sucursal" subtitle="Acumulado del rango completo." />
+              <PanelTitle icon={Building2} title="Facturacion por sucursal" />
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
@@ -3676,66 +3553,19 @@ export default function Dashboard() {
 
         <TabsContent value="trabajos" className="space-y-3">
 
-          <Card className="flex flex-col p-3">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold">Resultado de jornadas</h2>
-                <p className="text-xs text-muted-foreground">
-                  {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} · cierre operativo del periodo
-                </p>
-              </div>
-              <Badge variant="secondary">{jornadasResultadoResumen.programadas} programadas</Badge>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-md border bg-muted/10 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Realizadas</div>
-                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums text-emerald-600">{jornadasResultadoResumen.realizadas}</div>
-                  </div>
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                </div>
-                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctRealizadas}% del total programado</div>
-              </div>
-              <div className="rounded-md border bg-muted/10 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">No realizadas</div>
-                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums text-amber-600">{jornadasResultadoResumen.noRealizadas}</div>
-                  </div>
-                  <XCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                </div>
-                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctNoRealizadas}% del total programado</div>
-              </div>
-              <div className="rounded-md border bg-muted/10 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pendientes</div>
-                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums">{jornadasResultadoResumen.pendientes}</div>
-                  </div>
-                  <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
-                </div>
-                <div className="mt-2 text-[11px] text-muted-foreground">{jornadasResultadoResumen.pctPendientes}% aún sin cierre</div>
-              </div>
-              <div className="rounded-md border bg-muted/10 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cerradas</div>
-                    <div className="mt-1 text-[22px] font-extrabold leading-none tabular-nums">{jornadasResultadoResumen.cerradas}</div>
-                  </div>
-                  <Activity className="h-4 w-4 shrink-0 text-primary" />
-                </div>
-                <div className="mt-2 text-[11px] text-muted-foreground">Realizadas + no realizadas · {jornadasResultadoResumen.pctCerradas}% del total</div>
-              </div>
-            </div>
-          </Card>
+          <KpiStrip className="grid-cols-2 xl:grid-cols-4">
+            <KpiItem label="Realizadas" value={jornadasResultadoResumen.realizadas} detail={`${jornadasResultadoResumen.pctRealizadas}% del total programado`} tone="positive" icon={<CheckCircle2 />} />
+            <KpiItem label="No realizadas" value={jornadasResultadoResumen.noRealizadas} detail={`${jornadasResultadoResumen.pctNoRealizadas}% del total programado`} tone="warning" icon={<XCircle />} />
+            <KpiItem label="Pendientes" value={jornadasResultadoResumen.pendientes} detail={`${jornadasResultadoResumen.pctPendientes}% aún sin cierre`} icon={<CalendarDays />} />
+            <KpiItem label="Cerradas" value={jornadasResultadoResumen.cerradas} detail={`${jornadasResultadoResumen.pctCerradas}% del total`} icon={<Activity />} />
+          </KpiStrip>
 
           <section className="grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
             <Card className="flex min-w-0 flex-col p-3">
               <PanelTitle
                 icon={BarChart3}
                 title="Cumplimiento de agenda"
-                subtitle="% de jornadas realizadas sobre el total programado"
+                subtitle=""
               />
               <CumplimientoAgendaChart
                 rows={cumplimientoAgenda}
@@ -3746,7 +3576,7 @@ export default function Dashboard() {
               <PanelTitle
                 icon={Users}
                 title="No realizadas por técnico"
-                subtitle="Top 5 por porcentaje sobre su agenda"
+                subtitle=""
               />
               <TecnicosNoRealizadosRanking
                 rows={tecnicosNoRealizados}
@@ -3796,7 +3626,7 @@ export default function Dashboard() {
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={Building2} title="Carga por sucursal" subtitle="Trabajos por sucursal segmentados por estado" />
+              <PanelTitle icon={Building2} title="Carga por sucursal" />
               <CargaSucursalTabla rows={cargaSucursal} onSelect={(sucursal) => setFSucursales([sucursal])} />
             </Card>
           </section>
@@ -3933,7 +3763,7 @@ export default function Dashboard() {
               />
             </Card>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Distribucion por marca" subtitle="Trabajos con actividad en el periodo" />
+              <PanelTitle icon={BarChart3} title="Distribucion por marca" />
               <DistribucionMarca
                 data={cargaMarca}
                 onSelect={(marca) =>
@@ -3948,7 +3778,7 @@ export default function Dashboard() {
         </TabsContent>
       </Tabs>
       </div>
-    </div>
+    </PageShell>
   );
 }
 

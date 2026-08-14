@@ -12,6 +12,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { KpiItem, KpiStrip } from "@/components/layout/AppPrimitives";
 import { cn } from "@/lib/utils";
 import type { ServiciosDashboardData } from "./types";
 
@@ -149,30 +150,27 @@ export function ServiciosDashboard({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+      <KpiStrip className="grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <section key={kpi.label} className={cn("relative min-h-[92px] rounded-md border border-t-2 bg-card p-3", kpi.border)}>
-              <span className={cn("absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-md", kpi.iconBg, kpi.tone)}>
-                <Icon className="h-4 w-4" />
-              </span>
-              <div className="pr-11 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
-              <div className="mt-1.5 text-xl font-bold leading-none tabular-nums">{kpi.value}</div>
-              <div className="mt-2 line-clamp-2 text-[10px] text-muted-foreground" title={kpi.detail}>{kpi.detail}</div>
-            </section>
+            <KpiItem
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              detail={kpi.detail}
+              icon={<Icon />}
+              tone={kpi.label === "Cierre operativo" ? "positive" : kpi.label === "Productividad" ? "info" : kpi.label === "Cierre por horas" ? "warning" : "default"}
+            />
           );
         })}
-      </div>
+      </KpiStrip>
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
         <section className="min-w-0 overflow-hidden rounded-md border bg-card p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Evolución de órdenes</h2>
-              <p className="text-[11px] text-muted-foreground">
-                {evolutionMetric === "orders" ? "Órdenes por estado y período" : "Horas registradas por período"}
-              </p>
             </div>
             <div className="inline-flex h-8 shrink-0 overflow-hidden rounded-md border bg-muted/30 text-[10px] font-semibold">
               <button type="button" onClick={() => setEvolutionMetric("orders")} className={cn("px-4 hover:bg-accent", evolutionMetric === "orders" && "bg-primary text-primary-foreground hover:bg-primary")}>OS</button>
@@ -245,7 +243,6 @@ export function ServiciosDashboard({
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Estado actual de OS</h2>
-              <p className="text-[11px] text-muted-foreground">Composición del período filtrado</p>
             </div>
             <Wrench className="h-4 w-4 text-primary" />
           </div>
@@ -301,7 +298,6 @@ export function ServiciosDashboard({
           <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold">Carga por responsable</h2>
-              <p className="text-[11px] text-muted-foreground">Horas-persona sobre la meta del período</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="inline-flex rounded-md bg-muted p-0.5" aria-label="Filtrar responsables por estado">
@@ -415,7 +411,6 @@ export function ServiciosDashboard({
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">OS por sucursal</h2>
-              <p className="text-[11px] text-muted-foreground">Distribución por estado</p>
             </div>
             <MapPin className="h-4 w-4 text-primary" />
           </div>
@@ -452,7 +447,6 @@ export function ServiciosDashboard({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold">Detalle de órdenes de servicio</h2>
-            <p className="text-[11px] text-muted-foreground">Casos del período filtrado</p>
           </div>
           <Badge variant="secondary">{data.ordenes.length} OS</Badge>
         </div>

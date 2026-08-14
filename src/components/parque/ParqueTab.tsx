@@ -662,19 +662,60 @@ export function ParqueTab({
     XLSX.writeFile(wb, `parque-clientes-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const filaColor = (diasServ: number | null) => {
-    if (diasServ == null) return "bg-destructive/10 hover:bg-destructive/15";
-    if (diasServ > 365) return "bg-destructive/10 hover:bg-destructive/15";
-    if (diasServ > 180) return "bg-amber-500/10 hover:bg-amber-500/15";
-    return "hover:bg-accent/40";
-  };
-
   return (
     <div className="space-y-3">
       <FiltersBar
         search={{ value: q, onChange: setQ, placeholder: "Nombre del cliente…", label: "Buscar" }}
         activeCount={filtrosActivos + (q ? 1 : 0)}
         onClear={() => { setQ(""); limpiarFiltros(); }}
+        expanded={(
+          <>
+            <FilterSelect
+              label="Rubro" value={fRubro} onChange={setFRubro} placeholder="Rubro" width="w-full"
+              options={RUBRO_OPTIONS}
+            />
+            <FilterSelect
+              label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-full"
+              options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
+            />
+            {rango === "custom" && (
+              <>
+                <FilterCustom label="Desde" width="w-full">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
+                        <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                        {customDesde ? format(customDesde, "dd/MM") : "Desde"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={customDesde} onSelect={setCustomDesde} className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                </FilterCustom>
+                <FilterCustom label="Hasta" width="w-full">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
+                        <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                        {customHasta ? format(customHasta, "dd/MM") : "Hasta"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={customHasta} onSelect={setCustomHasta} className={cn("p-3 pointer-events-auto")} />
+                    </PopoverContent>
+                  </Popover>
+                </FilterCustom>
+              </>
+            )}
+            <FilterCustom label="Plataformas / cabezales" width="w-full">
+              <div className="flex h-9 items-center gap-2 rounded-md border px-3">
+                <Switch id="incluir-plataformas" checked={incluirPlataformas} onCheckedChange={setIncluirPlataformas} />
+                <Label htmlFor="incluir-plataformas" className="cursor-pointer whitespace-nowrap text-xs">Incluir</Label>
+              </div>
+            </FilterCustom>
+          </>
+        )}
       >
         <FilterSelect
           label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
@@ -683,14 +724,6 @@ export function ParqueTab({
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[135px]"
           options={MARCA_OPTIONS}
-        />
-        <FilterSelect
-          label="Rubro" value={fRubro} onChange={setFRubro} placeholder="Rubro" width="w-[140px]"
-          options={RUBRO_OPTIONS}
-        />
-        <FilterSelect
-          label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
         />
         <FilterSelect
           label="Período" value={rango} onChange={(v) => setRango(v as RangoPreset)} placeholder="Período" width="w-[160px]"
@@ -703,44 +736,6 @@ export function ParqueTab({
             { value: "custom", label: "Personalizado…" },
           ]}
         />
-        {rango === "custom" && (
-          <>
-            <FilterCustom label="Desde" width="w-[120px]">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
-                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                    {customDesde ? format(customDesde, "dd/MM") : "Desde"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={customDesde} onSelect={setCustomDesde} className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </FilterCustom>
-            <FilterCustom label="Hasta" width="w-[120px]">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 w-full justify-start text-xs">
-                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
-                    {customHasta ? format(customHasta, "dd/MM") : "Hasta"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={customHasta} onSelect={setCustomHasta} className={cn("p-3 pointer-events-auto")} />
-                </PopoverContent>
-              </Popover>
-            </FilterCustom>
-          </>
-        )}
-        <FilterCustom label="Plataformas / cabezales">
-          <div className="flex items-center gap-2 rounded-md border px-3 h-9">
-            <Switch id="incluir-plataformas" checked={incluirPlataformas} onCheckedChange={setIncluirPlataformas} />
-            <Label htmlFor="incluir-plataformas" className="text-xs cursor-pointer whitespace-nowrap">
-              Incluir
-            </Label>
-          </div>
-        </FilterCustom>
       </FiltersBar>
 
       <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -855,7 +850,7 @@ export function ParqueTab({
                 return (
                   <TableRow
                     key={r.cliente.id}
-                    className={cn(filaColor(r.diasUltServicio), onOpenCliente && "cursor-pointer")}
+                    className={cn("hover:bg-accent/40", onOpenCliente && "cursor-pointer")}
                     onClick={() => onOpenCliente?.(r.cliente.id)}
                   >
                     <TableCell>

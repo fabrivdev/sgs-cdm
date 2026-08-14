@@ -27,7 +27,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { KpiItem, KpiStrip } from "@/components/layout/AppPrimitives";
+import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
+import { FiltersBar, FilterCustom, FilterSelect } from "@/components/filters/FiltersBar";
 import { useAuth } from "@/hooks/useAuth";
 import {
   cargarSugerenciaViva,
@@ -49,7 +50,7 @@ import {
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel, metaText, pageShellWide, pageTitle } from "@/lib/ui-classes";
+import { cardLabel, metaText, pageShellWide } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -94,17 +95,6 @@ function coberturaActualMeses(row: ResultadoSugerencia) {
   const ritmoActualMensual = Math.max(0, row.unidades_12m) / 12;
   if (ritmoActualMensual <= 0) return null;
   return Math.max(0, row.stock_global / ritmoActualMensual);
-}
-
-function MetricCard({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "green" | "amber" }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <p className={cardLabel}>{label}</p>
-        <p className={cn("mt-1 text-2xl font-bold", tone === "green" && "text-emerald-600", tone === "amber" && "text-amber-600")}>{value}</p>
-      </CardContent>
-    </Card>
-  );
 }
 
 function ModelConfigSheet({
@@ -535,11 +525,10 @@ export default function RepuestosSugerencias() {
 
   return (
     <div className={pageShellWide}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className={pageTitle}>Sugerencia de compra</h1>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
+      <PageHeader
+        title="Sugerencia de compra"
+        actions={(
+          <div className="flex flex-wrap items-end gap-2">
           <div>
             <Label className={cardLabel}>Marca</Label>
             <Select value={brand} onValueChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}>
@@ -560,8 +549,9 @@ export default function RepuestosSugerencias() {
             </span>
             Cálculo en vivo
           </div>
-        </div>
-      </div>
+          </div>
+        )}
+      />
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
@@ -686,21 +676,6 @@ export default function RepuestosSugerencias() {
         <KpiItem label="Confianza baja" value={integer.format(liveSummary?.piezas_confianza_baja ?? 0)} detail={`${integer.format(liveSummary?.piezas_nuevas_sin_historial ?? 0)} nuevas sin historial`} tone="warning" />
       </KpiStrip>
 
-      {liveQuery.data && (
-        <Card>
-          <CardContent className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
-            <div className="min-w-0 flex-1">
-              <p className={cardLabel}>Modelo activo</p>
-              <p className="mt-1 text-sm font-semibold">{liveQuery.data.modelo.nombre} · v{liveQuery.data.modelo.version}</p>
-            </div>
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Recalculado sobre el historial confirmado al corte <strong className="text-foreground">{displayDate(liveQuery.data.fecha_analisis)}</strong>
-            </div>
-            <Button variant="outline" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar propuesta</Button>
-          </CardContent>
-        </Card>
-      )}
-
       {liveQuery.error && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -709,22 +684,38 @@ export default function RepuestosSugerencias() {
         </Alert>
       )}
 
-      <Card>
-        <CardContent className="p-3">
-          <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_190px_220px_auto]">
-            <Input placeholder="Código, fabricante o descripción..." value={filters.buscar ?? ""} onChange={(event) => { setFilters((current) => ({ ...current, buscar: event.target.value })); setPage(1); }} />
-            <Select value={filters.segmento} onValueChange={(value) => { setFilters((current) => ({ ...current, segmento: value })); setPage(1); }}>
-              <SelectTrigger><SelectValue placeholder="Segmento" /></SelectTrigger>
-              <SelectContent><SelectItem value="TODOS">Todos los segmentos</SelectItem>{segmentOptions.map((segment) => <SelectItem key={segment} value={segment}>{segment}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={filters.estado} onValueChange={(value) => { setFilters((current) => ({ ...current, estado: value })); setPage(1); }}>
-              <SelectTrigger><SelectValue placeholder="Estado de datos" /></SelectTrigger>
-              <SelectContent><SelectItem value="TODOS">Todos los estados</SelectItem><SelectItem value="LISTO">Con historial reciente</SelectItem><SelectItem value="CODIGO_NUEVO_SIN_HISTORIAL">Nuevos sin historial</SelectItem><SelectItem value="SIN_VENTAS_RECIENTES">Anteriores sin ventas 24m</SelectItem></SelectContent>
-            </Select>
-            <label className="flex h-10 items-center gap-2 rounded-md border px-3 text-xs font-medium"><Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />Solo con sugerencia</label>
-          </div>
-        </CardContent>
-      </Card>
+      <FiltersBar
+        search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción...", width: "min-w-0 flex-1" }}
+        activeCount={[filters.buscar, filters.segmento !== "TODOS", filters.estado !== "TODOS", filters.soloSugeridos].filter(Boolean).length}
+        onClear={() => { setFilters({ buscar: "", segmento: "TODOS", estado: "TODOS", soloSugeridos: false }); setPage(1); }}
+        actions={<Button variant="outline" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar</Button>}
+      >
+        <FilterSelect
+          value={filters.segmento}
+          onChange={(segmento) => { setFilters((current) => ({ ...current, segmento })); setPage(1); }}
+          placeholder="Segmento"
+          options={[{ value: "TODOS", label: "Todos los segmentos" }, ...segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))]}
+          width="w-[190px]"
+        />
+        <FilterSelect
+          value={filters.estado}
+          onChange={(estado) => { setFilters((current) => ({ ...current, estado })); setPage(1); }}
+          placeholder="Estado de datos"
+          options={[
+            { value: "TODOS", label: "Todos los estados" },
+            { value: "LISTO", label: "Con historial reciente" },
+            { value: "CODIGO_NUEVO_SIN_HISTORIAL", label: "Nuevos sin historial" },
+            { value: "SIN_VENTAS_RECIENTES", label: "Anteriores sin ventas 24m" },
+          ]}
+          width="w-[220px]"
+        />
+        <FilterCustom width="w-[170px]">
+          <label className="flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium">
+            <Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />
+            Solo con sugerencia
+          </label>
+        </FilterCustom>
+      </FiltersBar>
 
       <Card className="overflow-hidden">
         {!legacyMasterQuery.isLoading && !legacyMasterQuery.data?.cargado ? (
@@ -770,7 +761,7 @@ export default function RepuestosSugerencias() {
                           <p className="text-[10px] text-muted-foreground">Al ritmo 12m · horizonte {row.horizonte_meses} meses</p>
                         </TableCell>
                         <TableCell className="text-right font-medium">{decimal.format(row.stock_objetivo)}</TableCell>
-                        <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-bold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
+                        <TableCell className="text-right"><span className={cn("inline-flex min-w-12 justify-center rounded-full px-2.5 py-1 font-semibold", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
                       </TableRow>
                     );
                   })}

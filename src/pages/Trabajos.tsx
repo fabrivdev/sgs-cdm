@@ -254,7 +254,7 @@ export default function Trabajos() {
                           key={t.id}
                           onClick={() => setDetalleId(t.id)}
                           className={cn(
-                            "w-full rounded-md border bg-card px-2 py-1.5 text-left shadow-sm transition-all hover:shadow-md hover:border-primary/40",
+                            "w-full rounded-md border bg-card px-2 py-1.5 text-left transition-[border-color,background-color] hover:border-primary/40 hover:bg-accent/25",
                             col.color,
                           )}
                         >
@@ -266,7 +266,7 @@ export default function Trabajos() {
                               {prioLabel.charAt(0)}
                             </Badge>
                           </div>
-                          <div className="mt-0.5 truncate text-[12px] font-semibold leading-tight">
+                          <div className="mt-0.5 truncate text-[12px] font-medium leading-tight">
                             {cli?.nombre ?? "Sin cliente"}
                           </div>
                           {pausado && (

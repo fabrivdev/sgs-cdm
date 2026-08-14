@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { MAX_EVENTOS_DIA_CALENDARIO, MAX_DISPONIBILIDADES_DIA } from "@/lib/constants";
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
+import { PageHeader } from "@/components/layout/AppPrimitives";
 
 interface Servicio {
   id: string;
@@ -553,15 +554,10 @@ export default function Calendario() {
       "w-full space-y-3 px-3 py-3 sm:px-4 lg:px-5",
       vista === "mes" && "md:flex md:h-[calc(100svh-48px)] md:flex-col md:gap-2 md:space-y-0 md:overflow-hidden md:py-2",
     )}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Calendario</h1>
-          <p className="text-xs text-muted-foreground capitalize">
-            {format(cursor, "MMMM yyyy", { locale: es })}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="Calendario"
+        meta={<span className="capitalize">{format(cursor, "MMMM yyyy", { locale: es })}</span>}
+        actions={<>
           <Button
             variant="outline"
             size="icon"
@@ -604,8 +600,8 @@ export default function Calendario() {
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       <FiltersBar
         activeCount={fTecnicos.length > 0 ? 1 : 0}

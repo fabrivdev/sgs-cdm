@@ -18,7 +18,7 @@ export function MarcaBadge({ marca, className }: { marca: Marca; className?: str
     HORSCH: "bg-marca-horsch-bg text-marca-horsch border-marca-horsch/30",
     OTROS: "bg-muted text-muted-foreground border-border",
   };
-  return <Badge variant="outline" className={cn("font-bold tracking-wide", map[marca], className)}>{marca}</Badge>;
+  return <Badge variant="outline" className={cn("font-medium tracking-wide", map[marca], className)}>{marca}</Badge>;
 }
 
 const TRABAJO_ESTADO_STYLES: Record<EstadoTrabajo, string> = {

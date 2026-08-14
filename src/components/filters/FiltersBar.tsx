@@ -70,7 +70,7 @@ export function FiltersBar({
   };
 
   return (
-    <Card className={cn("p-2", className)}>
+    <Card className={cn("px-2 py-1", className)}>
       <div className="flex gap-2 sm:hidden">
         {search && (
           <div className="relative min-w-0 flex-1">
@@ -81,7 +81,7 @@ export function FiltersBar({
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
               placeholder={search.placeholder ?? "Buscar…"}
-              className="h-9 pl-7 pr-7 text-sm"
+              className="h-9 pl-7 pr-7 text-[13px]"
             />
             {searchDraft && (
               <button
@@ -137,7 +137,7 @@ export function FiltersBar({
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
                 placeholder={search.placeholder ?? "Buscar…"}
-                className="h-9 pl-7 pr-7 text-sm"
+                className="h-9 pl-7 pr-7 text-[13px]"
               />
               {searchDraft && (
                 <button
@@ -199,7 +199,7 @@ export function FilterSelect({
   return (
     <Field label={label} className={width}>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 w-full overflow-hidden text-xs">
+        <SelectTrigger className="h-9 w-full overflow-hidden text-[13px]">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className="max-h-[320px] min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]">
@@ -238,7 +238,7 @@ export function FilterDate({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 text-xs w-full"
+        className="h-9 w-full text-[13px]"
         title={title}
         min={min}
         max={max}
