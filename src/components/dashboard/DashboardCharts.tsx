@@ -192,7 +192,7 @@ function OSEvolution({
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="grid min-h-[150px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[176px] sm:gap-3 sm:px-2 sm:pt-3"
+        className="grid min-h-[150px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[160px] sm:gap-3 sm:px-2 sm:pt-3"
         style={barGridStyle(rows.length)}
       >
         {rows.map((row, index) => {
@@ -532,7 +532,7 @@ export function WeeklyBars({
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden pb-1">
       <div
-        className="relative grid min-h-[176px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[204px] sm:gap-3 sm:px-2 sm:pt-3"
+        className="relative grid min-h-[160px] shrink-0 items-end gap-1 border-b px-0.5 pt-2 sm:min-h-[188px] sm:gap-3 sm:px-2 sm:pt-3"
         style={barGridStyle(rows.length, 62)}
       >
         {rows.map((row, index) => {
@@ -627,7 +627,7 @@ export function CumplimientoAgendaChart({
       <div className="min-w-0 pb-1">
         <div className="min-w-0 overflow-x-auto overflow-y-hidden">
           <div
-            className="relative grid min-h-[205px] shrink-0 items-end gap-1 border-b px-1 pt-6 sm:gap-2 sm:px-2"
+            className="relative grid min-h-[188px] shrink-0 items-end gap-1 border-b px-1 pt-6 sm:gap-2 sm:px-2"
             style={barGridStyle(rows.length, 58)}
           >
             <div className="pointer-events-none absolute inset-x-1 top-6 h-[140px] sm:inset-x-2">
