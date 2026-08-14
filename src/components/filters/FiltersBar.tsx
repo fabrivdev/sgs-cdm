@@ -129,7 +129,7 @@ export function FiltersBar({
 
       <div className="hidden min-w-0 gap-x-3 gap-y-3 sm:flex sm:flex-row sm:flex-wrap sm:items-end">
         {search && (
-          <Field label={search.label ?? "Buscar"} className={search.width ?? "w-full sm:w-[260px]"}>
+          <Field label={search.label ?? "Buscar"} className={"sm:min-w-[240px] " + (search.width ?? "w-full sm:w-[260px]")}>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
