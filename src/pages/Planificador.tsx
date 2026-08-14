@@ -717,15 +717,10 @@ export default function Planificador() {
                       </div>
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top">
-                      <div className="flex flex-col gap-1">
-                        <MarcaBadge marca={s.marca} className="self-start text-[10px]" />
-                        <Badge variant="outline" className="self-start gap-0.5 px-1.5 py-0 text-[10px] font-normal">
-                          <TipoIcon className="h-2.5 w-2.5" />
-                          {tipo === "Máquina en taller" ? "Taller" : "Visita"}
-                        </Badge>
-                      </div>
+                    <TableCell className="px-3 py-1.5 align-middle">
+                      <MarcaBadge marca={s.marca} className="self-start text-[10px]" />
                     </TableCell>
+
 
                     <TableCell className="px-3 py-2 align-top truncate" title={responsableNombre}>
                       {responsableNombre}
