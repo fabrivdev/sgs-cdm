@@ -14,14 +14,16 @@ export const pageShellWide = pageShell;
 // Jerarquía de texto
 export const pageTitle = "text-[18px] font-semibold leading-6 tracking-[-0.02em]";
 export const pageDescription = "text-[10px] leading-4 text-muted-foreground";
-export const sectionTitle = "text-[14px] font-semibold leading-5 tracking-[-0.01em]";
-export const kpiValue = "text-[22px] font-semibold leading-7 tabular-nums tracking-[-0.02em]";
+export const sectionTitle = "text-[13px] font-semibold leading-5 tracking-[-0.01em]";
+export const kpiValue = "text-[20px] font-semibold leading-6 tabular-nums tracking-[-0.02em]";
 export const bodyText = "text-[13px] leading-5";
 export const tableText = "text-[13px] leading-5";
-export const tableHeadText = "text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground";
+export const tableHeadText = "text-[11px] leading-4 font-medium tracking-[0.02em] text-muted-foreground";
 
-// Etiqueta de campo/filtro: "SUCURSAL", "PERÍODO", etc.
-export const cardLabel = "text-[10px] leading-3.5 uppercase tracking-[0.04em] text-muted-foreground font-medium";
+// Etiqueta de campo/filtro: "Sucursal", "Período rápido", etc.
+export const filterLabel = "text-[11px] leading-4 font-medium tracking-[0.02em] text-muted-foreground";
+// Etiqueta de card pequeño (KPIs, métricas).
+export const cardLabel = "text-[10px] leading-3.5 font-medium tracking-[0.02em] text-muted-foreground";
 // Texto secundario de apoyo: contadores, fechas, metadatos.
 export const metaText = "text-[11px] leading-4 text-muted-foreground";
 

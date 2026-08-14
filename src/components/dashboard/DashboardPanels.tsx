@@ -2,6 +2,7 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Clock3, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { cardLabel, filterLabel as labelCls, metaText } from "@/lib/ui-classes";
 import type { WeekRow, Facturacion, FactMetric, OSMetric, PeriodMode } from "./types";
 import { money, concept, formatWeekMetric } from "./utils";
 
@@ -109,8 +110,8 @@ export function FacturasMobile({
 export function MiniMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0 rounded-md bg-muted/45 px-2 py-1">
-      <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="truncate font-semibold tabular-nums">{value}</div>
+      <div className={cn(cardLabel, "truncate")}>{label}</div>
+      <div className="truncate text-[13px] font-semibold tabular-nums">{value}</div>
     </div>
   );
 }
@@ -152,8 +153,8 @@ export function PeriodSelector({
   disabledModes?: Set<PeriodMode>;
 }) {
   return (
-    <div data-filter-field className="flex min-w-0 shrink-0 flex-col gap-0.5 max-sm:!w-full sm:w-[200px]">
-      <span className="block h-3.5 truncate whitespace-nowrap text-[10px] font-medium uppercase leading-3.5 tracking-[0.04em] text-muted-foreground">Agrupar por</span>
+    <div data-filter-field className="flex min-w-0 shrink-0 flex-col gap-2 max-sm:!w-full sm:w-[200px]">
+      <span className={cn(labelCls, "block h-4 truncate whitespace-nowrap")}>Agrupar por</span>
       <div className="grid h-8 grid-cols-4 overflow-hidden rounded-md border bg-background text-[12px]">
 
 

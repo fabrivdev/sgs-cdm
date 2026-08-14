@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Activity, Building2, CalendarDays, Clock3, FileText, Printer, Receipt, Route, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { cardLabel, metaText, tableHeadText } from "@/lib/ui-classes";
 import type { Marca, Sucursal } from "@/lib/constants";
 import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion, ServiciosDashboardData } from "./types";
 import {
@@ -135,22 +136,22 @@ function OSImpactKpis({
     <div className="space-y-2">
       <div className="grid gap-2 sm:grid-cols-4">
         <div className="rounded-md border bg-primary/5 px-3 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Impacto OS</div>
+          <div className={cardLabel}>Impacto OS</div>
           <div className="mt-1 text-[18px] font-bold tabular-nums">{formatOSMetric(selectedValue, metric)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{summary.osCount} OS cerradas</div>
         </div>
         <div className="rounded-md border px-3 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Servicio</div>
+          <div className={cardLabel}>Servicio</div>
           <div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.servicios)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.horas, "horas")}</div>
         </div>
         <div className="rounded-md border px-3 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Kilometraje</div>
+          <div className={cardLabel}>Kilometraje</div>
           <div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.kilometraje)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.km, "km")}</div>
         </div>
         <div className="rounded-md border px-3 py-2">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Repuestos</div>
+          <div className={cardLabel}>Repuestos</div>
           <div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.repuestos)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">incluido en impacto OS</div>
         </div>
@@ -158,7 +159,7 @@ function OSImpactKpis({
       <div className="rounded-md border bg-muted/20 px-3 py-2">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Acumulado visible</div>
+            <div className={cardLabel}>Acumulado visible</div>
             <div className="text-[11px] text-muted-foreground">{accumulatedRange}</div>
           </div>
           <div className="text-left sm:text-right">
@@ -241,9 +242,9 @@ function OSMix({
   ];
   return (
     <div className="border-t pt-2">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase text-muted-foreground">
+      <div className={cn("mb-1.5 flex flex-wrap items-center justify-between gap-2", cardLabel)}>
         <button type="button" onClick={onClear} className="hover:text-primary">
-          Mix OS absorbido
+          Mix OS interno
         </button>
         <span className="tabular-nums normal-case text-foreground/70">
           Garantia {money(summary.garantia)} · Interno {money(summary.interno)}
@@ -758,7 +759,7 @@ export function CumplimientoAgendaChart({
         </div>
         <div className="mt-3 grid grid-cols-3 border-t pt-3">
           <div className="min-w-0 pr-2">
-            <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className={cardLabel}>
               Efectividad de cierre
             </div>
             <div className="mt-1 truncate text-[18px] font-extrabold tabular-nums">
@@ -769,7 +770,7 @@ export function CumplimientoAgendaChart({
             </div>
           </div>
           <div className="min-w-0 border-l px-2 sm:px-3">
-            <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className={cardLabel}>
               Tendencia reciente
             </div>
             <div
@@ -786,7 +787,7 @@ export function CumplimientoAgendaChart({
             </div>
           </div>
           <div className="min-w-0 border-l pl-2 sm:pl-3">
-            <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className={cardLabel}>
               Mayor desvío
             </div>
             <div className="mt-1 truncate text-[18px] font-extrabold tabular-nums">
@@ -1077,7 +1078,7 @@ export function MixRubros({
       <div className="rounded-md border bg-muted/30 px-3 py-2">
         <div className="flex items-baseline justify-between gap-2">
           <div>
-            <div className="text-[10px] uppercase text-muted-foreground">Rubro</div>
+            <div className={cardLabel}>Rubro</div>
             <div className="text-[13px] font-semibold">{rubroFiltro}</div>
           </div>
           <div className="text-[15px] font-bold tabular-nums">{money(valor)}</div>
@@ -1095,7 +1096,7 @@ export function MixRubros({
   const total = row.total || 1;
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[10px] uppercase text-muted-foreground">
+      <div className={cn("flex items-center justify-between", cardLabel)}>
         <span>Mix $ del periodo</span>
         <span className="tabular-nums normal-case text-foreground/70">{money(row.total)}</span>
       </div>
@@ -1219,7 +1220,7 @@ export function EstadoCompacto({
             className="absolute inset-0 flex flex-col items-center justify-center hover:text-primary"
           >
             <span className="text-[18px] font-bold tabular-nums leading-none">{flujo.total}</span>
-            <span className="mt-0.5 text-[10px] uppercase text-muted-foreground">gestionados</span>
+            <span className={cn("mt-0.5", cardLabel)}>gestionados</span>
           </button>
         </div>
 
@@ -1245,7 +1246,7 @@ export function EstadoCompacto({
         <div className="grid gap-2 sm:grid-cols-3">
           <EstadoMiniCard
             icon={FileText}
-            title="ABIERTOS"
+            title="Abiertos"
             titleClassName="text-sky-700"
             iconClassName="bg-sky-500/10 text-sky-700"
             value={`${flujo.abiertos} trabajos`}
@@ -1254,12 +1255,12 @@ export function EstadoCompacto({
           />
           <EstadoMiniCard
             icon={CalendarDays}
-            title="PRÓXIMO PERIODO"
+            title="Próximo período"
             value={`${jornadasPlanificadas ?? 0} jornadas`}
           />
           <EstadoMiniCard
             icon={Activity}
-            title="CIERRE ANTERIOR"
+            title="Cierre anterior"
             value={jornadasPrev ? `${jornadasPrev} jornadas · ${(horasPrev ?? 0).toFixed(0)} hs` : "Sin cierre anterior disponible"}
             detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} técnicos activos` : ""}
           />
@@ -1289,17 +1290,17 @@ function EstadoMiniCard({
   onClick?: () => void;
 }) {
   const content = (
-    <div className="flex h-full flex-col rounded-md border bg-background p-2.5 text-left shadow-sm">
-      <div className="mb-2 flex items-start gap-2">
-        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary", iconClassName)}>
-          <Icon className="h-4 w-4" />
+    <div className="flex h-full flex-col rounded-md border bg-background p-2 text-left shadow-sm">
+      <div className="mb-1.5 flex items-start gap-2">
+        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary", iconClassName)}>
+          <Icon className="h-3.5 w-3.5" />
         </div>
         <div className="min-w-0">
-          <div className={cn("text-[10px] font-bold uppercase tracking-wide text-primary", titleClassName)}>{title}</div>
+          <div className={cn(cardLabel, titleClassName)}>{title}</div>
         </div>
       </div>
-      <div className="text-[15px] font-bold leading-5 tabular-nums">{value}</div>
-      {detail ? <div className="mt-1 text-[10px] leading-3 text-muted-foreground">{detail}</div> : null}
+      <div className="text-[14px] font-semibold leading-5 tabular-nums">{value}</div>
+      {detail ? <div className={cn("mt-1", metaText)}>{detail}</div> : null}
     </div>
   );
 
@@ -1326,7 +1327,7 @@ export function CargaSucursalTabla({
   return (
     <div className="space-y-2">
       <div className="rounded-xl border overflow-hidden">
-        <div className="grid grid-cols-[160px_minmax(0,1fr)_64px_44px] bg-muted/35 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className={cn("grid grid-cols-[160px_minmax(0,1fr)_64px_44px] bg-muted/35 px-3 py-2", tableHeadText)}>
           <div>Sucursal</div>
           <div>Estado</div>
           <div className="text-right">Total</div>
@@ -2938,24 +2939,24 @@ export function FacturacionExplorer({
       {view === "analisis" && (
         <div className="space-y-3">
           <div className="grid gap-2 rounded-md border p-3 lg:grid-cols-[1.2fr_1.2fr_0.9fr]">
-            <label className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Filas</span>
+            <label className="space-y-2">
+              <span className={filterLabel}>Filas</span>
               <select value={pivotRows} onChange={(e) => setPivotRows(e.target.value as PivotRowDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-[13px] outline-none focus:border-primary">
                 {rowOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </label>
-            <label className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Columnas</span>
+            <label className="space-y-2">
+              <span className={filterLabel}>Columnas</span>
               <select value={pivotColumns} onChange={(e) => setPivotColumns(e.target.value as PivotColumnDimension)} className="h-9 w-full rounded-md border bg-background px-3 text-[13px] outline-none focus:border-primary">
                 {columnOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </label>
-            <label className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Medida</span>
+            <label className="space-y-2">
+              <span className={filterLabel}>Medida</span>
               <select value={pivotMetric} onChange={(e) => setPivotMetric(e.target.value as PivotMetric)} className="h-9 w-full rounded-md border bg-background px-3 text-[13px] outline-none focus:border-primary">
                 {metricOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -3123,7 +3124,7 @@ export function ServiciosDashboard({
               <div className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <Icon className="h-4 w-4" />
               </div>
-              <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
+              <div className={cn("pr-10", cardLabel)}>{kpi.label}</div>
               <div className="mt-2 text-[18px] font-extrabold leading-tight tabular-nums">{kpi.value}</div>
               <div className="mt-2 text-[11px] text-muted-foreground">{kpi.detail}</div>
             </div>
@@ -3133,15 +3134,15 @@ export function ServiciosDashboard({
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded-md border bg-card px-3 py-2.5">
-          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Horas registradas</div>
+          <div className={cardLabel}>Horas registradas</div>
           <div className="mt-1 font-semibold tabular-nums">{data.horas.toFixed(1).replace(".0", "")} hs</div>
         </div>
         <div className="rounded-md border bg-card px-3 py-2.5">
-          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Kilómetros registrados</div>
+          <div className={cardLabel}>Kilómetros registrados</div>
           <div className="mt-1 font-semibold tabular-nums">{Math.round(data.km).toLocaleString("es-PY")} km</div>
         </div>
         <div className="rounded-md border bg-card px-3 py-2.5">
-          <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Valor registrado en OS</div>
+          <div className={cardLabel}>Valor registrado en OS</div>
           <div className="mt-1 font-semibold tabular-nums">{servicioMoney(data.valorOS)}</div>
         </div>
       </div>
@@ -3252,7 +3253,7 @@ export function ServiciosDashboard({
 
         <div className="hidden max-h-[430px] overflow-auto rounded-md border md:block">
           <table className="w-full min-w-[920px] text-[12px]">
-            <thead className="sticky top-0 bg-muted/90 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+            <thead className={cn("sticky top-0 bg-muted/90 text-left", tableHeadText)}>
               <tr>
                 <th className="px-3 py-2">OS</th>
                 <th className="px-3 py-2">Técnico</th>
