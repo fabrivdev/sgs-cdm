@@ -210,8 +210,18 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
   const nivelActual = nivelLabel(roles[0], moduloAccess);
 
+  // El sidebar de escritorio se despliega solo al acercar el puntero (o el
+  // foco de teclado) y se retrae al salir. No hay boton de colapsar.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleSidebar = useCallback((open: boolean) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setSidebarOpen(open), open ? 90 : 250);
+  }, []);
+  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
+
   return (
-    <SidebarProvider>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} data-hover-sidebar="">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-[13px] focus:font-medium focus:shadow-md focus:ring-2 focus:ring-primary"
@@ -219,20 +229,25 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         Ir al contenido principal
       </a>
 
-      {/* Sidebar desktop: colapsable a rail de iconos, agrupado por módulo. */}
-      <Sidebar collapsible="icon" className="z-50 hidden md:flex">
+      {/* Sidebar desktop: rail de iconos que se expande al pasar el puntero. */}
+      <Sidebar
+        collapsible="icon"
+        className="z-50 hidden md:flex"
+        onMouseEnter={() => scheduleSidebar(true)}
+        onMouseLeave={() => scheduleSidebar(false)}
+        onFocusCapture={() => scheduleSidebar(true)}
+        onBlurCapture={() => scheduleSidebar(false)}
+      >
         <SidebarHeader className="h-12 justify-center border-b border-sidebar-border/70 p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <div className="flex h-full w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <AppLogo className="h-8 w-8 rounded-lg transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02]" />
-            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <div className="sidebar-label-anim min-w-0 group-data-[collapsible=icon]:hidden">
               <div className="truncate text-[13px] font-bold leading-tight">{APP_SHORT_NAME}</div>
               <div className="whitespace-nowrap text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
             </div>
-            <SidebarTrigger className="ml-auto h-8 w-8 rounded-lg border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.375rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-3">
-              <ChevronLeft className="transition-transform duration-300 ease-spring group-data-[collapsible=icon]:rotate-180" />
-            </SidebarTrigger>
           </div>
         </SidebarHeader>
+
         <SidebarContent className="gap-1 px-1 py-3">
           <div className="px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">
             Módulos
