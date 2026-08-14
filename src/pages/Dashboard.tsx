@@ -3516,12 +3516,12 @@ export default function Dashboard() {
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
+                <h2 className="text-[13px] font-semibold leading-5">{T.comparativoFacturacion}</h2>
                 <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
-                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(selectedWeek ? selectedWeek.total : totalPeriodo)}</div>
+                <div className="text-[18px] font-semibold tabular-nums">{loading ? "..." : money(selectedWeek ? selectedWeek.total : totalPeriodo)}</div>
                 <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
                   {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}
                 </div>
@@ -3701,7 +3701,7 @@ export default function Dashboard() {
           <Card className="flex h-full flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Seguimiento por OS/TR</h2>
+                <h2 className="text-[13px] font-semibold leading-5">Seguimiento por OS/TR</h2>
               </div>
               <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
             </div>
@@ -3819,7 +3819,7 @@ export default function Dashboard() {
             <Card className="flex h-full flex-col p-3">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold">Trabajos abiertos sin cierre</h2>
+                  <h2 className="text-[13px] font-semibold leading-5">Trabajos abiertos sin cierre</h2>
                   <p className="text-xs text-muted-foreground">Ordenados de mayor a menor por días sin cerrar</p>
                 </div>
                 <Badge variant="secondary">{trabajosAbiertosSinCierre.length} abiertos</Badge>

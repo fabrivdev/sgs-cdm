@@ -656,11 +656,11 @@ export default function RepuestosSugerencias() {
           </div>
           {historyQuality?.preparado && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div><p className={cardLabel}>Líneas evaluadas</p><p className="mt-1 text-lg font-semibold">{integer.format(historyQuality.lineas_totales)}</p></div>
-              <div><p className={cardLabel}>Confirmadas</p><p className="mt-1 text-lg font-semibold text-emerald-600">{integer.format(historyQuality.confirmadas)}</p></div>
-              <div><p className={cardLabel}>Ambiguas</p><p className="mt-1 text-lg font-semibold text-amber-600">{integer.format(historyQuality.ambiguas)}</p></div>
-              <div><p className={cardLabel}>Sin coincidencia</p><p className="mt-1 text-lg font-semibold text-destructive">{integer.format(historyQuality.sin_coincidencia)}</p></div>
-              <div><p className={cardLabel}>Productos confirmados</p><p className="mt-1 text-lg font-semibold">{integer.format(historyQuality.productos_confirmados)}</p></div>
+              <div><p className={cardLabel}>Líneas evaluadas</p><p className="mt-1 text-[18px] font-semibold">{integer.format(historyQuality.lineas_totales)}</p></div>
+              <div><p className={cardLabel}>Confirmadas</p><p className="mt-1 text-[18px] font-semibold text-emerald-600">{integer.format(historyQuality.confirmadas)}</p></div>
+              <div><p className={cardLabel}>Ambiguas</p><p className="mt-1 text-[18px] font-semibold text-amber-600">{integer.format(historyQuality.ambiguas)}</p></div>
+              <div><p className={cardLabel}>Sin coincidencia</p><p className="mt-1 text-[18px] font-semibold text-destructive">{integer.format(historyQuality.sin_coincidencia)}</p></div>
+              <div><p className={cardLabel}>Productos confirmados</p><p className="mt-1 text-[18px] font-semibold">{integer.format(historyQuality.productos_confirmados)}</p></div>
             </div>
           )}
         </CardContent>

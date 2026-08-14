@@ -136,22 +136,22 @@ function OSImpactKpis({
       <div className="grid gap-2 sm:grid-cols-4">
         <div className="rounded-md border bg-primary/5 px-3 py-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Impacto OS</div>
-          <div className="mt-1 text-xl font-bold tabular-nums">{formatOSMetric(selectedValue, metric)}</div>
+          <div className="mt-1 text-[18px] font-bold tabular-nums">{formatOSMetric(selectedValue, metric)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{summary.osCount} OS cerradas</div>
         </div>
         <div className="rounded-md border px-3 py-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Servicio</div>
-          <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.servicios)}</div>
+          <div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.servicios)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.horas, "horas")}</div>
         </div>
         <div className="rounded-md border px-3 py-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Kilometraje</div>
-          <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.kilometraje)}</div>
+          <div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.kilometraje)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">{formatOSMetric(summary.km, "km")}</div>
         </div>
         <div className="rounded-md border px-3 py-2">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Repuestos</div>
-          <div className="mt-1 text-lg font-semibold tabular-nums">{money(summary.repuestos)}</div>
+          <div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.repuestos)}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">incluido en impacto OS</div>
         </div>
       </div>
@@ -162,7 +162,7 @@ function OSImpactKpis({
             <div className="text-[11px] text-muted-foreground">{accumulatedRange}</div>
           </div>
           <div className="text-left sm:text-right">
-            <div className="text-lg font-bold tabular-nums">{formatOSMetric(accumulatedValue, metric)}</div>
+            <div className="text-[18px] font-bold tabular-nums">{formatOSMetric(accumulatedValue, metric)}</div>
             <div className="text-[11px] text-muted-foreground">
               {accumulatedSummary.osCount} OS · {formatOSMetric(accumulatedSummary.horas, "horas")} · {formatOSMetric(accumulatedSummary.km, "km")}
             </div>
@@ -761,7 +761,7 @@ export function CumplimientoAgendaChart({
             <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
               Efectividad de cierre
             </div>
-            <div className="mt-1 truncate text-lg font-extrabold tabular-nums">
+            <div className="mt-1 truncate text-[18px] font-extrabold tabular-nums">
               {insights.efectividad === null ? "—" : `${insights.efectividad}%`}
             </div>
             <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
@@ -774,7 +774,7 @@ export function CumplimientoAgendaChart({
             </div>
             <div
               className={cn(
-                "mt-1 truncate text-lg font-extrabold tabular-nums",
+                "mt-1 truncate text-[18px] font-extrabold tabular-nums",
                 insights.tendencia && insights.tendencia.delta > 0 && "text-emerald-600",
                 insights.tendencia && insights.tendencia.delta < 0 && "text-red-600",
               )}
@@ -789,7 +789,7 @@ export function CumplimientoAgendaChart({
             <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
               Mayor desvío
             </div>
-            <div className="mt-1 truncate text-lg font-extrabold tabular-nums">
+            <div className="mt-1 truncate text-[18px] font-extrabold tabular-nums">
               {insights.mayorDesvio?.label ?? "Sin desvíos"}
             </div>
             <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
@@ -1080,7 +1080,7 @@ export function MixRubros({
             <div className="text-[10px] uppercase text-muted-foreground">Rubro</div>
             <div className="text-sm font-semibold">{rubroFiltro}</div>
           </div>
-          <div className="text-base font-bold tabular-nums">{money(valor)}</div>
+          <div className="text-[15px] font-bold tabular-nums">{money(valor)}</div>
         </div>
       </div>
     );
@@ -1218,7 +1218,7 @@ export function EstadoCompacto({
             onClick={() => onSelect("all")}
             className="absolute inset-0 flex flex-col items-center justify-center hover:text-primary"
           >
-            <span className="text-2xl font-bold tabular-nums leading-none">{flujo.total}</span>
+            <span className="text-[18px] font-bold tabular-nums leading-none">{flujo.total}</span>
             <span className="mt-0.5 text-[10px] uppercase text-muted-foreground">gestionados</span>
           </button>
         </div>
@@ -1301,7 +1301,7 @@ function EstadoMiniCard({
           {subtitle ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</div> : null}
         </div>
       </div>
-      <div className="text-lg font-bold tabular-nums">{value}</div>
+      <div className="text-[18px] font-bold tabular-nums">{value}</div>
       {detail ? <div className="mt-2 text-xs text-muted-foreground">{detail}</div> : null}
     </div>
   );
@@ -3127,7 +3127,7 @@ export function ServiciosDashboard({
                 <Icon className="h-4 w-4" />
               </div>
               <div className="pr-10 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</div>
-              <div className="mt-2 text-xl font-extrabold leading-tight tabular-nums sm:text-2xl">{kpi.value}</div>
+              <div className="mt-2 text-[18px] font-extrabold leading-tight tabular-nums">{kpi.value}</div>
               <div className="mt-2 text-[11px] text-muted-foreground">{kpi.detail}</div>
             </div>
           );

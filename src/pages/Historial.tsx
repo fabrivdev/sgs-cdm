@@ -229,7 +229,7 @@ export default function Historial() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <div className="text-lg font-semibold">{selected.nombre}</div>
+              <div className="text-[15px] font-semibold">{selected.nombre}</div>
               <div className="text-xs text-muted-foreground">
                 {selected.sucursal ? `${selected.sucursal} · ` : ""}
                 {historial.length} servicio(s)
