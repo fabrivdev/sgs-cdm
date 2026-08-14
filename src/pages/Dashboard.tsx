@@ -3442,7 +3442,7 @@ export default function Dashboard() {
           {/* FILA 3 - OPERATIVA */}
           <section className="grid gap-3 md:grid-cols-2" aria-busy={operationalLoading}>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} - clic filtra en Trabajos`} />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}

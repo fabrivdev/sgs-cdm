@@ -1255,13 +1255,11 @@ export function EstadoCompacto({
           <EstadoMiniCard
             icon={CalendarDays}
             title="PRÓXIMO PERIODO"
-            subtitle={planificacionRango}
             value={`${jornadasPlanificadas ?? 0} jornadas`}
           />
           <EstadoMiniCard
             icon={Activity}
             title="CIERRE ANTERIOR"
-            subtitle={jornadasPrev ? cierreAnteriorRango : undefined}
             value={jornadasPrev ? `${jornadasPrev} jornadas · ${(horasPrev ?? 0).toFixed(0)} hs` : "Sin cierre anterior disponible"}
             detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} técnicos activos` : ""}
           />
@@ -1298,7 +1296,6 @@ function EstadoMiniCard({
         </div>
         <div className="min-w-0">
           <div className={cn("text-[10px] font-bold uppercase tracking-wide text-primary", titleClassName)}>{title}</div>
-          {subtitle ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</div> : null}
         </div>
       </div>
       <div className="text-[18px] font-bold tabular-nums">{value}</div>
