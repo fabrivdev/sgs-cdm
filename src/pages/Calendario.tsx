@@ -642,7 +642,7 @@ export default function Calendario() {
             return (
               <div className="min-w-[900px]">
                 <div
-                  className="grid border-b bg-muted/40 text-[10px] sm:text-xs font-semibold uppercase"
+                  className="grid border-b bg-muted/40 text-[10px] sm:text-[12px] font-semibold uppercase"
                   style={{ gridTemplateColumns: `180px repeat(7, minmax(0,1fr))` }}
                 >
                   <div className="py-2 px-2 text-left">Técnico</div>
@@ -666,7 +666,7 @@ export default function Calendario() {
                 </div>
 
                 {tecnicosVisibles.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">
+                  <div className="p-6 text-center text-[13px] text-muted-foreground">
                     No hay técnicos activos.
                   </div>
                 ) : (
@@ -686,7 +686,7 @@ export default function Calendario() {
                         style={{ gridTemplateColumns: `180px repeat(7, minmax(0,1fr))` }}
                       >
                         <div className="p-2 border-r bg-muted/20 flex flex-col justify-center">
-                          <div className="text-sm font-medium truncate">{tec.nombre}</div>
+                          <div className="text-[13px] font-medium truncate">{tec.nombre}</div>
                           <div className="text-[10px] text-muted-foreground">
                             {tec.sucursal ?? "—"} · {total} {total === 1 ? "servicio" : "servicios"}
                             {diasBloqueados > 0 ? ` · ${diasBloqueados} no disp.` : ""}
@@ -751,7 +751,7 @@ export default function Calendario() {
         </div>
       ) : (
       <Card className={cn("overflow-hidden", vista === "mes" && "md:flex md:min-h-0 md:flex-1 md:flex-col")}>
-        <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-xs font-semibold uppercase">
+        <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[10px] sm:text-[12px] font-semibold uppercase">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
             <div
               key={d}
@@ -823,7 +823,7 @@ export default function Calendario() {
                   moverJornada(jornadaId, d, servicioId);
                 }}
                 className={cn(
-                  "relative border-b border-r p-1 sm:p-1.5 text-xs text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  "relative border-b border-r p-1 sm:p-1.5 text-[12px] text-left transition-colors hover:bg-accent/50 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   esSemana ? "min-h-[260px] sm:min-h-[420px]" : "min-h-[56px] sm:min-h-[88px] md:min-h-0 md:overflow-hidden",
                   !isCur && vista === "mes" && "bg-muted/30 text-muted-foreground",
                   esNL && "bg-slate-100 text-slate-500 hover:bg-slate-200/80",
@@ -1039,13 +1039,13 @@ export default function Calendario() {
 
             {disponibilidadDiaSel.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">No disponibilidad</p>
+                <p className="text-[12px] font-semibold uppercase text-muted-foreground">No disponibilidad</p>
                 {disponibilidadDiaSel.map((disp) => (
                   <div key={disp.id} className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sky-900">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2">
                         <GraduationCap className="h-4 w-4 shrink-0" />
-                        <span className="truncate text-sm font-medium">{profById[disp.tecnico_id] ?? "Tecnico"}</span>
+                        <span className="truncate text-[13px] font-medium">{profById[disp.tecnico_id] ?? "Tecnico"}</span>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <Badge variant="outline" className="border-sky-200 bg-white text-sky-800">
@@ -1066,7 +1066,7 @@ export default function Calendario() {
                       </div>
                     </div>
                     {disp.observacion && (
-                      <p className="mt-1 text-xs text-sky-800">{disp.observacion}</p>
+                      <p className="mt-1 text-[12px] text-sky-800">{disp.observacion}</p>
                     )}
                   </div>
                 ))}
@@ -1074,7 +1074,7 @@ export default function Calendario() {
             )}
 
             {eventosDia.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">Sin servicios programados.</p>
+              <p className="py-8 text-center text-[13px] text-muted-foreground">Sin servicios programados.</p>
             ) : (
               eventosDia.map((s) => {
                 const TipoIcon = (s.tipo_trabajo ?? "Visita de campo") === "Máquina en taller" ? Wrench : MapPin;
@@ -1097,12 +1097,12 @@ export default function Calendario() {
                             {codigoByServicio.get(s.id)}
                           </span>
                         )}
-                        <span className="truncate text-sm font-medium">{clienteNombre(s.cliente_id)}</span>
+                        <span className="truncate text-[13px] font-medium">{clienteNombre(s.cliente_id)}</span>
                       </div>
                       <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
                     </div>
 
-                    <div className="text-xs text-muted-foreground truncate">{s.trabajo_descripcion}</div>
+                    <div className="text-[12px] text-muted-foreground truncate">{s.trabajo_descripcion}</div>
 
                     <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                       <MarcaBadge marca={s.marca} className="text-[9px]" />

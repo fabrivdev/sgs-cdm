@@ -217,7 +217,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
     <SidebarProvider>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-primary"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-[13px] focus:font-medium focus:shadow-md focus:ring-2 focus:ring-primary"
       >
         Ir al contenido principal
       </a>
@@ -228,7 +228,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           <div className="flex h-full w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <AppLogo className="h-8 w-8 rounded-lg transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02]" />
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-              <div className="truncate text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
+              <div className="truncate text-[13px] font-bold leading-tight">{APP_SHORT_NAME}</div>
               <div className="whitespace-nowrap text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
             </div>
             <SidebarTrigger className="ml-auto h-8 w-8 rounded-lg border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.375rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-3">
@@ -266,11 +266,11 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               aria-label="Abrir menú de módulos"
             >
               <Menu className="h-5 w-5" />
-              <span className="text-xs font-semibold">Menú</span>
+              <span className="text-[12px] font-semibold">Menú</span>
             </Button>
             <AppLogo className="h-8 w-8 rounded-md md:hidden" />
             <div className="hidden sm:block md:hidden">
-              <div className="text-sm font-bold leading-tight">{APP_SHORT_NAME}</div>
+              <div className="text-[13px] font-bold leading-tight">{APP_SHORT_NAME}</div>
               <div className="text-[10px] text-muted-foreground">{APP_NAME}</div>
             </div>
           </div>
@@ -286,7 +286,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                     {initials}
                   </div>
                   <div className="hidden sm:flex flex-col items-start text-left leading-tight">
-                    <span className="text-xs font-medium">{profile?.nombre ?? "—"}</span>
+                    <span className="text-[12px] font-medium">{profile?.nombre ?? "—"}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {nivelActual}
                       {profile?.sucursal ? ` · ${profile.sucursal}` : ""}
@@ -297,7 +297,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">{profile?.nombre ?? "—"}</span>
+                    <span className="text-[13px] font-medium">{profile?.nombre ?? "—"}</span>
                     <span className="text-[11px] font-normal text-muted-foreground">
                       {nivelActual}
                       {profile?.sucursal ? ` · ${profile.sucursal}` : ""}
@@ -333,8 +333,8 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               <div className="flex items-center gap-3 pr-8">
                 <AppLogo className="h-10 w-10 rounded-xl" />
                 <div className="min-w-0">
-                  <SheetTitle className="text-base">{APP_SHORT_NAME}</SheetTitle>
-                  <SheetDescription className="truncate text-xs">{APP_NAME}</SheetDescription>
+                  <SheetTitle className="text-[14px]">{APP_SHORT_NAME}</SheetTitle>
+                  <SheetDescription className="truncate text-[12px]">{APP_NAME}</SheetDescription>
                 </div>
               </div>
             </SheetHeader>
@@ -361,7 +361,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                               setMobileMenuOpen(false);
                             }}
                             className={cn(
-                              "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors",
+                              "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-medium transition-colors",
                               active
                                 ? "bg-primary/10 text-primary"
                                 : "text-foreground hover:bg-accent hover:text-accent-foreground",

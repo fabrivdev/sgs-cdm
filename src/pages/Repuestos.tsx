@@ -158,7 +158,7 @@ const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
 ];
 
 const th = "px-2 py-1.5 text-[11px] font-medium";
-const td = "px-2 py-1.5 text-xs";
+const td = "px-2 py-1.5 text-[12px]";
 
 const formatMes = (mes: string) => {
   const [anio, mesNum] = mes.split("-");
@@ -277,7 +277,7 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
             <DialogHeader>
               <DialogTitle className="flex items-start justify-between gap-2 pr-6">
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{producto.descripcion}</span>
+                  <span className="block truncate text-[13px] font-semibold">{producto.descripcion}</span>
                   <span className={metaText}>
                     {producto.codigo_interno}
                     {producto.codigo_fabricante ? ` · Fabricante: ${producto.codigo_fabricante}` : ""}
@@ -312,7 +312,7 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <div className="mb-2 flex items-center gap-2 text-[13px] font-medium">
                   <Warehouse className="h-4 w-4 text-muted-foreground" />
                   Stock y ventas por sucursal
                 </div>
@@ -353,7 +353,7 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
               </div>
 
               <div>
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <div className="mb-2 flex items-center gap-2 text-[13px] font-medium">
                   <History className="h-4 w-4 text-muted-foreground" />
                   Últimas ventas
                 </div>
@@ -381,12 +381,12 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
                       <TableBody>
                         {ultimasVentas.map((l, i) => (
                           <TableRow key={`${l.fecha_factura}-${i}`}>
-                            <TableCell className="max-w-[120px] truncate text-xs">{l.entidad_nombre ?? "—"}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
+                            <TableCell className="max-w-[120px] truncate text-[12px]">{l.entidad_nombre ?? "—"}</TableCell>
+                            <TableCell className="text-[12px] text-muted-foreground">
                               {fechaVentaLabel(l.fecha_factura)}
                             </TableCell>
-                            <TableCell className="text-right text-xs">{l.cantidad}</TableCell>
-                            <TableCell className="text-right text-xs">
+                            <TableCell className="text-right text-[12px]">{l.cantidad}</TableCell>
+                            <TableCell className="text-right text-[12px]">
                               $ {Number(l.total_venta || 0).toLocaleString("es-PY", { maximumFractionDigits: 0 })}
                             </TableCell>
                           </TableRow>
@@ -399,7 +399,7 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
             </div>
 
             <div className="border-t pt-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <div className="mb-2 flex items-center gap-2 text-[13px] font-medium">
                 <History className="h-4 w-4 text-muted-foreground" />
                 Evolución mensual — unidades vendidas (últimos {MESES_EVOLUCION} meses)
               </div>
@@ -571,7 +571,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
             <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <SheetTitle className="text-base">{producto.descripcion}</SheetTitle>
+                  <SheetTitle className="text-[14px]">{producto.descripcion}</SheetTitle>
                   <SheetDescription className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-mono">{producto.codigo_interno}</span>
                     {producto.codigo_fabricante && <span>Fabricante: {producto.codigo_fabricante}</span>}
@@ -602,7 +602,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
               </section>
 
               {hermanos.length > 0 && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
                     Mismo código de fabricante que{" "}
@@ -619,10 +619,10 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
               )}
 
               {historialError && (
-                <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[13px] text-destructive sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p>No se pudo consultar el historial. La información de stock sigue disponible.</p>
-                    <p className="mt-1 break-words text-xs opacity-80">
+                    <p className="mt-1 break-words text-[12px] opacity-80">
                       {mensajeError(ventasQuery.error)}
                     </p>
                   </div>
@@ -641,7 +641,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
 
               <section className="grid gap-4 lg:grid-cols-2">
                 <div>
-                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
                     <Warehouse className="h-4 w-4 text-primary" />
                     Disponibilidad por sucursal
                   </div>
@@ -679,17 +679,17 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                 </div>
 
                 <div>
-                  <div className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold">
+                  <div className="mb-2 flex items-center justify-between gap-2 text-[13px] font-semibold">
                     <span className="flex items-center gap-2">
                       <History className="h-4 w-4 text-primary" /> Evolución de consumo
                     </span>
                     <span className={metaText}>Últimos 12 meses</span>
                   </div>
                   <div className="flex h-64 items-end gap-2 rounded-md border px-3 pb-7 pt-8">
-                    {historialCargando && <p className="m-auto text-xs text-muted-foreground">Cargando consumo...</p>}
-                    {historialError && <p className="m-auto text-xs text-muted-foreground">Consumo no disponible.</p>}
+                    {historialCargando && <p className="m-auto text-[12px] text-muted-foreground">Cargando consumo...</p>}
+                    {historialError && <p className="m-auto text-[12px] text-muted-foreground">Consumo no disponible.</p>}
                     {!historialCargando && !historialError && ventas12m.length === 0 && (
-                      <p className="m-auto text-xs text-muted-foreground">Sin consumo vinculado.</p>
+                      <p className="m-auto text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
                     )}
                     {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => {
                       const altura = item.cantidad > 0 ? Math.max((item.cantidad / maxMensual) * 78, 4) : 0;
@@ -716,7 +716,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
 
               <section>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <h3 className="flex items-center gap-2 text-[13px] font-semibold">
                     <History className="h-4 w-4 text-primary" /> Historial de ventas
                   </h3>
                   <div className="flex flex-wrap items-center gap-2">
@@ -762,14 +762,14 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     <TableBody>
                       {historialCargando && (
                         <TableRow>
-                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-[12px] text-muted-foreground">
                             Cargando historial de ventas...
                           </TableCell>
                         </TableRow>
                       )}
                       {historialError && (
                         <TableRow>
-                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-[12px] text-muted-foreground">
                             El historial no está disponible.
                           </TableCell>
                         </TableRow>
@@ -814,7 +814,7 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                         ))}
                       {!historialCargando && !historialError && ventas.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
+                          <TableCell colSpan={6} className="py-8 text-center text-[12px] text-muted-foreground">
                             No se encontraron ventas vinculadas a {producto.codigo_interno}
                             {producto.codigo_fabricante ? ` / fabricante ${producto.codigo_fabricante}` : ""}.
                           </TableCell>

@@ -147,8 +147,8 @@ export function CargarJornadaDialog({
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="md">
       <ResponsiveDrawerHeader>
-        <h2 className="text-base font-semibold">Cargar resultado</h2>
-        <p className="text-xs text-muted-foreground mt-1">
+        <h2 className="text-[14px] font-semibold">Cargar resultado</h2>
+        <p className="text-[12px] text-muted-foreground mt-1">
           Marca el resultado de una fecha de trabajo.
         </p>
       </ResponsiveDrawerHeader>
@@ -217,7 +217,7 @@ export function CargarJornadaDialog({
               step="0.5"
               min="0"
               inputMode="decimal"
-              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-[13px]"
               value={form.horas_trabajadas}
               onChange={(e) => setForm(f => ({ ...f, horas_trabajadas: e.target.value }))}
               placeholder="0"

@@ -150,7 +150,7 @@ function ModelConfigSheet({
           </SheetDescription>
         </SheetHeader>
         {!model ? (
-          <p className="mt-6 text-sm text-muted-foreground">Primero aplicá la migración SQL para crear el modelo inicial.</p>
+          <p className="mt-6 text-[13px] text-muted-foreground">Primero aplicá la migración SQL para crear el modelo inicial.</p>
         ) : (
           <div className="mt-6 space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -162,7 +162,7 @@ function ModelConfigSheet({
                 <Label>Origen predeterminado</Label>
                 <Input className="mt-1" value={params.origen_predeterminado ?? ""} onChange={(event) => setParams((current) => ({ ...current, origen_predeterminado: event.target.value }))} disabled={!canManage} />
               </div>
-              <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <div className="rounded-lg border bg-muted/30 p-3 text-[12px] text-muted-foreground">
                 Versión activa <strong className="text-foreground">v{model.version}</strong><br />
                 Creada {displayDate(model.creado_en)}
               </div>
@@ -188,7 +188,7 @@ function ModelConfigSheet({
                 {draftSegments.map((segment, index) => (
                   <div key={segment.segmento} className="grid grid-cols-[1fr_88px_88px_88px] items-end gap-2 rounded-lg border p-3">
                     <div>
-                      <p className="text-xs font-semibold">{segment.segmento}</p>
+                      <p className="text-[12px] font-semibold">{segment.segmento}</p>
                       <p className="text-[10px] text-muted-foreground">{segment.descripcion}</p>
                     </div>
                     <div>
@@ -214,7 +214,7 @@ function ModelConfigSheet({
                 Crear y activar nueva versión
               </Button>
             ) : (
-              <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">Tu rol puede consultar los parámetros, pero solo Admin y Jefatura pueden modificarlos.</p>
+              <p className="rounded-lg bg-muted p-3 text-[12px] text-muted-foreground">Tu rol puede consultar los parámetros, pero solo Admin y Jefatura pueden modificarlos.</p>
             )}
           </div>
         )}
@@ -281,7 +281,7 @@ function ResultDetailSheet({
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border bg-muted/20 p-3">
                     <p className={cardLabel}>{label}</p>
-                    <p className="mt-1 text-sm font-semibold">{value}</p>
+                    <p className="mt-1 text-[13px] font-semibold">{value}</p>
                   </div>
                 ))}
               </div>
@@ -289,7 +289,7 @@ function ResultDetailSheet({
               <div className="rounded-xl border p-4">
                 <p className={cardLabel}>Estado del historial</p>
                 <div className="mt-1 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">
+                  <p className="text-[13px] font-semibold">
                     {row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL"
                       ? "Código nuevo sin historial"
                       : row.estado_datos === "SIN_VENTAS_RECIENTES"
@@ -298,18 +298,18 @@ function ResultDetailSheet({
                   </p>
                   <Badge variant={row.estado_datos === "LISTO" ? "secondary" : "outline"}>{row.estado_datos}</Badge>
                 </div>
-                {row.incorporado_en && <p className="mt-2 text-xs text-muted-foreground">Incorporado al maestro: {displayDate(row.incorporado_en)}</p>}
+                {row.incorporado_en && <p className="mt-2 text-[12px] text-muted-foreground">Incorporado al maestro: {displayDate(row.incorporado_en)}</p>}
               </div>
 
               <div className="rounded-xl border p-4">
-                <h3 className="flex items-center gap-2 text-sm font-semibold"><Calculator className="h-4 w-4 text-primary" /> Cómo se obtuvo</h3>
-                <p className="mt-2 text-sm">{String(explanation.motivo ?? "Sin explicación disponible")}</p>
+                <h3 className="flex items-center gap-2 text-[13px] font-semibold"><Calculator className="h-4 w-4 text-primary" /> Cómo se obtuvo</h3>
+                <p className="mt-2 text-[13px]">{String(explanation.motivo ?? "Sin explicación disponible")}</p>
                 {explanation.tipo_demanda && (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-[12px] text-muted-foreground">
                     Patrón {String(explanation.tipo_demanda).toLowerCase()} · ADI {decimal.format(Number(explanation.adi ?? 0))} · CV² {decimal.format(Number(explanation.cv2 ?? 0))}
                   </p>
                 )}
-                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px] text-muted-foreground">
                   <span>Demanda mensual <strong className="float-right text-foreground">{decimal.format(row.demanda_ponderada_mensual)}</strong></span>
                   <span>Horizonte <strong className="float-right text-foreground">{row.horizonte_meses} meses</strong></span>
                   <span>Demanda horizonte <strong className="float-right text-foreground">{decimal.format(row.demanda_horizonte)}</strong></span>
@@ -542,7 +542,7 @@ export default function RepuestosSugerencias() {
           </div>
           <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
           <Button variant="outline" size="icon" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial"><Info className="h-4 w-4" /></Button>
-          <div className="flex h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-xs font-semibold text-primary">
+          <div className="flex h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-[12px] font-semibold text-primary">
             <span className="relative flex h-2.5 w-2.5">
               {liveQuery.isFetching && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />}
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
@@ -572,27 +572,27 @@ export default function RepuestosSugerencias() {
                 <Badge variant="outline">Base del motor en vivo</Badge>
               </div>
               {historyQualityQuery.isError && !historyIsPersisted ? (
-                <p className="mt-2 text-xs text-muted-foreground">Aplicá la migración de historial auditable para habilitar el diagnóstico de coincidencias.</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">Aplicá la migración de historial auditable para habilitar el diagnóstico de coincidencias.</p>
               ) : historyIsPrepared ? (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 text-[12px] text-muted-foreground">
                   {historyQuality
                     ? `${decimal.format(confirmedHistoryRate)}% confirmado · actualizado ${displayDate(historyQuality.actualizado_en)} · datos ${displayDate(historyQuality.fecha_desde)} a ${displayDate(historyQuality.fecha_hasta)}`
                     : `Historial publicado y persistido · actualizado ${displayDate(legacyBillingQuery.data?.publicado_en)}`}
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-muted-foreground">La estructura está disponible, pero todavía falta preparar el primer historial consolidado.</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">La estructura está disponible, pero todavía falta preparar el primer historial consolidado.</p>
               )}
               {legacyMasterQuery.data?.cargado && (
-                <p className="mt-1 text-xs text-emerald-700">
+                <p className="mt-1 text-[12px] text-emerald-700">
                   Maestro anterior vinculado · {integer.format(legacyMasterQuery.data.vinculadas ?? 0)} de {integer.format(legacyMasterQuery.data.filas ?? 0)} códigos · carga única completada {displayDate(legacyMasterQuery.data.completado_en)}
                 </p>
               )}
               {legacyBillingQuery.data?.cargado ? (
-                <p className="mt-1 text-xs text-emerald-700">
+                <p className="mt-1 text-[12px] text-emerald-700">
                   Facturación histórica detallada · {integer.format(legacyBillingQuery.data.lineas_vinculadas ?? 0)} líneas vinculadas a {integer.format(legacyBillingQuery.data.productos_vinculados ?? 0)} productos · carga única completada {displayDate(legacyBillingQuery.data.completado_en)}
                 </p>
               ) : legacyMasterQuery.data?.cargado ? (
-                <p className="mt-1 text-xs text-amber-700">Falta cargar una vez “FACTURACIÓN HISTORICA.xlsx” para recuperar las ventas por código.</p>
+                <p className="mt-1 text-[12px] text-amber-700">Falta cargar una vez “FACTURACIÓN HISTORICA.xlsx” para recuperar las ventas por código.</p>
               ) : null}
             </div>
             {canManage && (
@@ -710,7 +710,7 @@ export default function RepuestosSugerencias() {
           width="w-[220px]"
         />
         <FilterCustom width="w-[170px]">
-          <label className="flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium">
+          <label className="flex h-9 items-center gap-2 rounded-md border px-3 text-[12px] font-medium">
             <Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />
             Solo con sugerencia
           </label>
@@ -719,17 +719,17 @@ export default function RepuestosSugerencias() {
 
       <Card className="overflow-hidden">
         {!legacyMasterQuery.isLoading && !legacyMasterQuery.data?.cargado ? (
-          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Upload className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Cargá el maestro anterior</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El cálculo en vivo permanecerá detenido para no consumir conexiones mientras se vinculan los códigos históricos.</p></div>
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Upload className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Cargá el maestro anterior</h2><p className="mt-1 max-w-md text-[13px] text-muted-foreground">El cálculo en vivo permanecerá detenido para no consumir conexiones mientras se vinculan los códigos históricos.</p></div>
         ) : legacyBillingQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : historyRebuildRequired || refreshHistory.isPending ? (
-          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-sm text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-[13px] text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
         ) : !historyIsPrepared ? (
-          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand}</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand}</h2><p className="mt-1 max-w-md text-[13px] text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
         ) : liveQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : liveQuery.error ? (
-          <div className="p-6 text-sm text-destructive">{liveQuery.error instanceof Error ? liveQuery.error.message : "No se pudo calcular la sugerencia en vivo"}</div>
+          <div className="p-6 text-[13px] text-destructive">{liveQuery.error instanceof Error ? liveQuery.error.message : "No se pudo calcular la sugerencia en vivo"}</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -774,7 +774,7 @@ export default function RepuestosSugerencias() {
         )}
       </Card>
 
-      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Motor v3 en vivo: cobertura gradual y reserva estimada cuando el historial no permite una seguridad estadística. Tránsito, precios, garantías y MOQ permanecen pendientes.</div>
+      <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-[12px] text-muted-foreground"><PackageCheck className="h-4 w-4 text-primary" />Motor v3 en vivo: cobertura gradual y reserva estimada cuando el historial no permite una seguridad estadística. Tránsito, precios, garantías y MOQ permanecen pendientes.</div>
 
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
       <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {

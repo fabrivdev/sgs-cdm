@@ -400,7 +400,7 @@ export default function Admin() {
           {!canManageAdmin && (
             <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <div className="text-xs">
+              <div className="text-[12px]">
                 <div className="font-semibold text-amber-700">Solo lectura</div>
                 <div className="text-muted-foreground">
                   Únicamente el super administrador puede crear usuarios o modificar credenciales, roles y sucursales.
@@ -431,7 +431,7 @@ export default function Admin() {
                 {profiles.map((profile) => (
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">{profile.nombre}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-[12px] text-muted-foreground">
                       {emailByProfile(profile) || "Sin acceso"}
                     </TableCell>
                     <TableCell>
@@ -441,7 +441,7 @@ export default function Admin() {
                           <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                         </Select>
                       ) : (
-                        <span className="text-xs">{profile.sucursal ?? "—"}</span>
+                        <span className="text-[12px]">{profile.sucursal ?? "—"}</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -501,7 +501,7 @@ export default function Admin() {
                           variant={profile.activo ? "default" : "outline"}
                           size="sm"
                           onClick={() => toggleActivo(profile)}
-                          className="h-9 px-3 text-xs"
+                          className="h-9 px-3 text-[12px]"
                         >
                           {profile.activo ? "Activo" : "Inactivo"}
                         </Button>
@@ -520,16 +520,16 @@ export default function Admin() {
                     <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
                     {canManageAdmin ? (
                       <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                       </Select>
                     ) : (
-                      <div className="py-1.5 text-xs">{profile.sucursal ?? "—"}</div>
+                      <div className="py-1.5 text-[12px]">{profile.sucursal ?? "—"}</div>
                     )}
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Nivel</Label>
-                    <div className="py-1.5 text-xs">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
+                    <div className="py-1.5 text-[12px]">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
                   </div>
                 </div>
               </Card>
@@ -541,7 +541,7 @@ export default function Admin() {
           {!canManageAdmin && (
             <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-              <div className="text-xs">
+              <div className="text-[12px]">
                 <div className="font-semibold text-amber-700">Solo lectura</div>
                 <div className="text-muted-foreground">Solo el super administrador puede crear, editar o quitar accesos.</div>
               </div>
@@ -550,24 +550,24 @@ export default function Admin() {
 
           {canManageAdmin && (
             <Card className="p-3 sm:p-4">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <h3 className="mb-3 flex items-center gap-2 text-[13px] font-semibold">
                 <UserPlus className="h-4 w-4" />
                 Crear acceso nuevo
               </h3>
-              <p className="mb-3 text-xs text-muted-foreground">
+              <p className="mb-3 text-[12px] text-muted-foreground">
                 Usalo solo para una persona que todavia no existe en Equipo. Para tecnicos ya cargados, usa Crear acceso en la lista inferior.
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div>
-                  <Label className="text-xs">Nombre</Label>
+                  <Label className="text-[12px]">Nombre</Label>
                   <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="text-xs">Email</Label>
+                  <Label className="text-[12px]">Email</Label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 <div>
-                  <Label className="text-xs">Contrasena</Label>
+                  <Label className="text-[12px]">Contrasena</Label>
                   <div className="relative">
                     <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="pr-9" />
                     <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}>
@@ -576,14 +576,14 @@ export default function Admin() {
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs">Sucursal</Label>
+                  <Label className="text-[12px]">Sucursal</Label>
                   <Select value={nuSucursal} onValueChange={(value) => setNuSucursal(value as Sucursal)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs">Rol</Label>
+                  <Label className="text-[12px]">Rol</Label>
                   <Select value={nuRol} onValueChange={(value) => setNuRol(value as Role)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
@@ -597,8 +597,8 @@ export default function Admin() {
           <Card className="p-3 sm:p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold">Accesos activos</div>
-                <div className="text-xs text-muted-foreground">Personas con email asociado para iniciar sesion.</div>
+                <div className="text-[13px] font-semibold">Accesos activos</div>
+                <div className="text-[12px] text-muted-foreground">Personas con email asociado para iniciar sesion.</div>
               </div>
               <Badge variant="outline">{profilesConAcceso.length} accesos</Badge>
             </div>
@@ -619,7 +619,7 @@ export default function Admin() {
                   {profilesConAcceso.map((profile) => (
                     <TableRow key={profile.id}>
                       <TableCell className="font-medium">{profile.nombre}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{emailByProfile(profile)}</TableCell>
+                      <TableCell className="text-[12px] text-muted-foreground">{emailByProfile(profile)}</TableCell>
                       <TableCell>
                         {canManageAdmin ? (
                           <Select value={rolesByUser[profile.id]?.[0] ?? ""} onValueChange={(value) => cambiarRol(profile.id, value as Role)}>
@@ -637,7 +637,7 @@ export default function Admin() {
                           onToggle={(modulo, activo) => cambiarModuloAcceso(permissionOwnerId(profile), modulo, activo)}
                         />
                       </TableCell>
-                      <TableCell className="text-xs">{profile.sucursal ?? "-"}</TableCell>
+                      <TableCell className="text-[12px]">{profile.sucursal ?? "-"}</TableCell>
                       <TableCell><Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
                       {canManageAdmin && (
                         <TableCell>
@@ -657,8 +657,8 @@ export default function Admin() {
           <Card className="p-3 sm:p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold">Equipo sin acceso</div>
-                <div className="text-xs text-muted-foreground">Siguen disponibles para planificador, calendario y jornadas, pero no pueden iniciar sesion.</div>
+                <div className="text-[13px] font-semibold">Equipo sin acceso</div>
+                <div className="text-[12px] text-muted-foreground">Siguen disponibles para planificador, calendario y jornadas, pero no pueden iniciar sesion.</div>
               </div>
               <Badge variant="outline">{profilesSinAcceso.length} perfiles</Badge>
             </div>
@@ -666,14 +666,14 @@ export default function Admin() {
               {profilesSinAcceso.slice(0, 12).map((profile) => (
                 <div key={profile.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{profile.nombre}</div>
-                    <div className="truncate text-xs text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
+                    <div className="truncate text-[13px] font-medium">{profile.nombre}</div>
+                    <div className="truncate text-[12px] text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
                   </div>
                   {canManageAdmin && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
                 </div>
               ))}
               {profilesSinAcceso.length > 12 && (
-                <div className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">+{profilesSinAcceso.length - 12} perfiles sin acceso. Buscalos en Equipo para asociarlos.</div>
+                <div className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">+{profilesSinAcceso.length - 12} perfiles sin acceso. Buscalos en Equipo para asociarlos.</div>
               )}
             </div>
           </Card>
@@ -683,7 +683,7 @@ export default function Admin() {
           <ImportarTotvsTab onChanged={load} />
 
           <Collapsible>
-            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-xs font-medium text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-180">
+            <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-[12px] font-medium text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-180">
               <ChevronDown className="h-3.5 w-3.5 transition-transform" />
               Importadores anteriores e historial
             </CollapsibleTrigger>
@@ -697,13 +697,13 @@ export default function Admin() {
           <Card className="max-w-2xl p-4">
             <div className="mb-4">
               <h2 className="text-[13px] font-semibold leading-5">Productividad técnica</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-[12px] text-muted-foreground">
                 Define la meta mensual usada para calcular la productividad en el Dashboard de Servicios.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,260px)_1fr] sm:items-end">
               <div className="space-y-1.5">
-                <Label htmlFor="monthly-productivity-goal" className="text-xs">Meta mensual por técnico</Label>
+                <Label htmlFor="monthly-productivity-goal" className="text-[12px]">Meta mensual por técnico</Label>
                 <div className="relative">
                   <Input
                     id="monthly-productivity-goal"
@@ -715,10 +715,10 @@ export default function Admin() {
                     disabled={!canManageAdmin}
                     className="pr-12"
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">hs</span>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground">hs</span>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[12px] text-muted-foreground">
                 Para rangos parciales, la aplicación prorratea esta meta por días calendario. Un mes completo siempre usa la meta indicada.
               </div>
             </div>
@@ -728,7 +728,7 @@ export default function Admin() {
                 {savingParameters ? "Guardando..." : "Guardar parámetro"}
               </Button>
             ) : (
-              <div className="mt-4 text-xs text-muted-foreground">Solo el super administrador puede modificar este parámetro.</div>
+              <div className="mt-4 text-[12px] text-muted-foreground">Solo el super administrador puede modificar este parámetro.</div>
             )}
           </Card>
         </TabsContent>
@@ -741,11 +741,11 @@ export default function Admin() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Email</Label>
+              <Label className="text-[12px]">Email</Label>
               <Input type="email" value={credEmail} onChange={(e) => setCredEmail(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{credUser && emailByProfile(credUser) ? "Nueva contraseña" : "Contraseña inicial"}</Label>
+              <Label className="text-[12px]">{credUser && emailByProfile(credUser) ? "Nueva contraseña" : "Contraseña inicial"}</Label>
               <div className="relative">
                 <Input
                   type={showCredPassword ? "text" : "password"}

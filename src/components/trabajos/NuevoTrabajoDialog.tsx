@@ -181,8 +181,8 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
   return (
     <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
       <ResponsiveDrawerHeader>
-        <h2 className="text-base font-semibold">{editing ? "Editar trabajo" : "Nuevo trabajo"}</h2>
-        <p className="text-xs text-muted-foreground mt-1">
+        <h2 className="text-[14px] font-semibold">{editing ? "Editar trabajo" : "Nuevo trabajo"}</h2>
+        <p className="text-[12px] text-muted-foreground mt-1">
           Sólo registrá el caso. La fecha y el técnico se asignan después desde el Planificador o Calendario.
         </p>
       </ResponsiveDrawerHeader>

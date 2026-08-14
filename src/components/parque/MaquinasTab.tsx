@@ -333,10 +333,10 @@ export function MaquinasTab({
         expanded={
           <div className="grid gap-2 sm:grid-cols-3">
             <FilterCustom label="Año desde" width="w-full">
-              <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-xs" placeholder="2010" />
+              <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-[12px]" placeholder="2010" />
             </FilterCustom>
             <FilterCustom label="Año hasta" width="w-full">
-              <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-xs" placeholder={String(hoy)} />
+              <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-[12px]" placeholder={String(hoy)} />
             </FilterCustom>
             <FilterSelect
               label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full"
@@ -420,16 +420,16 @@ export function MaquinasTab({
                     onClick={() => cli && onOpenCliente?.(cli.id)}
                   >
                     <TableCell className="font-medium">{cli?.nombre ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{m.sucursal ?? "—"}</TableCell>
+                    <TableCell className="text-[12px]">{m.sucursal ?? "—"}</TableCell>
                     <TableCell>
                       <MarcaBadge marca={m.marca} className="text-[10px]" />
                     </TableCell>
-                    <TableCell className="text-xs">{m.subgrupo}</TableCell>
-                    <TableCell className="text-xs">{m.modelo_tipo ?? "—"}</TableCell>
+                    <TableCell className="text-[12px]">{m.subgrupo}</TableCell>
+                    <TableCell className="text-[12px]">{m.modelo_tipo ?? "—"}</TableCell>
                     <TableCell className="text-center tabular-nums">{m.anio ?? "—"}</TableCell>
-                    <TableCell className="text-center tabular-nums text-xs">{antig != null ? `${antig}a` : "—"}</TableCell>
-                    <TableCell className="text-xs font-mono">{m.serie}</TableCell>
-                    <TableCell className="text-xs">{m.vendedor ?? "—"}</TableCell>
+                    <TableCell className="text-center tabular-nums text-[12px]">{antig != null ? `${antig}a` : "—"}</TableCell>
+                    <TableCell className="text-[12px] font-mono">{m.serie}</TableCell>
+                    <TableCell className="text-[12px]">{m.vendedor ?? "—"}</TableCell>
                     <TableCell className="text-center">
                       <Badge variant={activa ? "default" : "secondary"} className="text-[10px]">
                         {activa ? "Activa" : "Inactiva"}

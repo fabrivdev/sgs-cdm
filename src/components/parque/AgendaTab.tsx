@@ -541,10 +541,10 @@ export function AgendaTab({
 
     <Tabs defaultValue="pendientes" className="space-y-3">
       <TabsList>
-        <TabsTrigger value="pendientes" className="text-xs sm:text-sm">
+        <TabsTrigger value="pendientes" className="text-[12px] sm:text-[13px]">
           Pendientes
         </TabsTrigger>
-        <TabsTrigger value="historial" className="text-xs sm:text-sm">
+        <TabsTrigger value="historial" className="text-[12px] sm:text-[13px]">
           Historial por cliente
         </TabsTrigger>
       </TabsList>
@@ -575,7 +575,7 @@ export function AgendaTab({
             </SelectContent>
           </Select>
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-[12px] text-muted-foreground">
           {filasFiltradas.length} de {filas.length} clientes para contactar
         </div>
 
@@ -612,7 +612,7 @@ export function AgendaTab({
                       </div>
                     </button>
 
-                    <div className={cn("text-right text-sm whitespace-nowrap tabular-nums", colorDias(f.dias))}>
+                    <div className={cn("text-right text-[13px] whitespace-nowrap tabular-nums", colorDias(f.dias))}>
                       {f.dias == null ? "Nunca" : `${f.dias}d`}
                     </div>
 
@@ -694,7 +694,7 @@ export function AgendaTab({
           </Select>
         </div>
 
-        <div className="text-xs text-muted-foreground">
+        <div className="text-[12px] text-muted-foreground">
           {historialPorCliente.length} clientes con seguimiento
         </div>
 
@@ -735,7 +735,7 @@ export function AgendaTab({
                   </div>
 
                   {ultimo.observaciones && (
-                    <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                    <div className="mt-2 text-[13px] text-muted-foreground whitespace-pre-wrap break-words">
                       {ultimo.observaciones}
                     </div>
                   )}
@@ -770,7 +770,7 @@ function AgendaMetricCard({
             <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               {title}
             </div>
-            <div className={cn("mt-1 text-xl font-bold tabular-nums", accent)}>{value}</div>
+            <div className={cn("mt-1 text-[18px] font-bold tabular-nums", accent)}>{value}</div>
             <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
           </div>
           <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted", accent)}>

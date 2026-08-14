@@ -165,7 +165,7 @@ export function TecnicosPicker({
                   ? "Buscar técnico para agregar…"
                   : "Buscar para agregar más…"
               }
-              className="h-9 pl-8 text-sm"
+              className="h-9 pl-8 text-[13px]"
             />
           </div>
         </div>
@@ -174,13 +174,13 @@ export function TecnicosPicker({
         {listaAbierta && (
           <div className="max-h-56 overflow-y-auto overflow-x-hidden divide-y divide-border border-t">
             {tecnicos.length === 0 && (
-              <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              <div className="px-3 py-6 text-center text-[12px] text-muted-foreground">
                 {emptyText}
               </div>
             )}
 
             {tecnicos.length > 0 && visibles.length === 0 && (
-              <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              <div className="px-3 py-6 text-center text-[12px] text-muted-foreground">
                 Sin coincidencias.
               </div>
             )}
@@ -194,7 +194,7 @@ export function TecnicosPicker({
                 <div
                   key={t.id}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm min-w-0 transition-colors",
+                    "flex items-center gap-2 px-3 py-2 text-[13px] min-w-0 transition-colors",
                     esPrincipal && "bg-primary/5 border-l-2 border-primary",
                     !esPrincipal && esAux && "bg-accent/40",
                   )}

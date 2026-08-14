@@ -65,11 +65,11 @@ export function NotificationsPanel({ count }: { count: number }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[320px] p-2">
-        <div className="px-2 py-1.5 text-sm font-semibold">Notificaciones</div>
+        <div className="px-2 py-1.5 text-[13px] font-semibold">Notificaciones</div>
         {loading ? (
-          <div className="px-2 py-6 text-center text-xs text-muted-foreground">Cargando...</div>
+          <div className="px-2 py-6 text-center text-[12px] text-muted-foreground">Cargando...</div>
         ) : items.length === 0 ? (
-          <div className="px-2 py-6 text-center text-xs text-muted-foreground">No tenes servicios pendientes de ver.</div>
+          <div className="px-2 py-6 text-center text-[12px] text-muted-foreground">No tenes servicios pendientes de ver.</div>
         ) : (
           <div className="max-h-[360px] space-y-1 overflow-y-auto">
             {items.map((item) => (
@@ -79,7 +79,7 @@ export function NotificationsPanel({ count }: { count: number }) {
                 className="w-full rounded-md px-2 py-2 text-left hover:bg-accent"
                 onClick={() => openServicio(item)}
               >
-                <div className="text-xs font-medium line-clamp-2">
+                <div className="text-[12px] font-medium line-clamp-2">
                   {item.trabajo_descripcion ?? "Servicio asignado"}
                 </div>
                 {item.fecha_programada && (

@@ -46,12 +46,12 @@ export default function Auth() {
             <h1 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-slate-900 sm:text-4xl">
               {APP_SHORT_NAME}
             </h1>
-            <p className="mt-2 text-sm text-slate-500 sm:text-lg">{APP_NAME}</p>
+            <p className="mt-2 text-[13px] text-slate-500 sm:text-[14px]">{APP_NAME}</p>
           </div>
 
           <form onSubmit={onSubmit} className="mt-7 space-y-5 sm:mt-9 sm:space-y-6">
             <div className="space-y-2.5">
-              <Label htmlFor="email" className="text-sm font-semibold text-slate-900 sm:text-base">Email</Label>
+              <Label htmlFor="email" className="text-[13px] font-semibold text-slate-900 sm:text-[14px]">Email</Label>
               <div className="relative">
                 <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
                 <Input
@@ -62,13 +62,13 @@ export default function Auth() {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                   placeholder="Ingresa tu email"
-                  className="h-14 rounded-xl border-slate-300 bg-white/80 pl-12 pr-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary sm:h-[58px]"
+                  className="h-14 rounded-xl border-slate-300 bg-white/80 pl-12 pr-4 text-[14px] text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary sm:h-[58px]"
                 />
               </div>
             </div>
 
             <div className="space-y-2.5">
-              <Label htmlFor="password" className="text-sm font-semibold text-slate-900 sm:text-base">Contraseña</Label>
+              <Label htmlFor="password" className="text-[13px] font-semibold text-slate-900 sm:text-[14px]">Contraseña</Label>
               <div className="relative">
                 <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
                 <Input
@@ -79,7 +79,7 @@ export default function Auth() {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                   placeholder="Ingresa tu contraseña"
-                  className="h-14 rounded-xl border-slate-300 bg-white/80 pl-12 pr-12 text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary sm:h-[58px]"
+                  className="h-14 rounded-xl border-slate-300 bg-white/80 pl-12 pr-12 text-[14px] text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary sm:h-[58px]"
                 />
                 <button
                   type="button"
@@ -94,14 +94,14 @@ export default function Auth() {
 
             <Button
               type="submit"
-              className="h-14 w-full rounded-xl bg-[#86a536] text-base font-semibold shadow-[0_10px_24px_rgba(111,139,44,0.25)] transition-all hover:-translate-y-0.5 hover:bg-[#78952f] hover:shadow-[0_14px_28px_rgba(111,139,44,0.3)] sm:h-[60px] sm:text-lg"
+              className="h-14 w-full rounded-xl bg-[#86a536] text-[14px] font-semibold shadow-[0_10px_24px_rgba(111,139,44,0.25)] transition-all hover:-translate-y-0.5 hover:bg-[#78952f] hover:shadow-[0_14px_28px_rgba(111,139,44,0.3)] sm:h-[60px] sm:text-[14px]"
               disabled={busy}
             >
               {busy ? "Ingresando…" : "Ingresar"}
               {!busy && <ArrowRight className="h-5 w-5" />}
             </Button>
 
-            <p className="flex items-center justify-center gap-2 text-center text-xs text-slate-500 sm:text-sm">
+            <p className="flex items-center justify-center gap-2 text-center text-[12px] text-slate-500 sm:text-[13px]">
               <ShieldCheck className="h-4 w-4 text-[#6f922b]" />
               Tu información está protegida
             </p>
@@ -109,7 +109,7 @@ export default function Auth() {
         </CardContent>
       </Card>
 
-      <footer className="relative z-10 mt-auto pt-8 text-center text-xs text-slate-500 sm:text-sm">
+      <footer className="relative z-10 mt-auto pt-8 text-center text-[12px] text-slate-500 sm:text-[13px]">
         © {new Date().getFullYear()} SIG. Todos los derechos reservados.
       </footer>
     </main>

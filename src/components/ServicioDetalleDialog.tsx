@@ -422,7 +422,7 @@ export function ServicioDetalleDialog({
             <div className="min-w-0 space-y-1 pr-8">
               <div className="flex flex-wrap items-center gap-2">
                 {trabajoMadre?.codigo && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono font-semibold text-muted-foreground tabular-nums">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[12px] font-mono font-semibold text-muted-foreground tabular-nums">
                     {trabajoMadre.codigo}
                   </span>
                 )}
@@ -436,7 +436,7 @@ export function ServicioDetalleDialog({
                   {tipo}
                 </Badge>
               </div>
-              <h2 className="truncate text-lg font-semibold">{clienteNombre}</h2>
+              <h2 className="truncate text-[14px] font-semibold">{clienteNombre}</h2>
             </div>
 
             {canManage && (
@@ -464,15 +464,15 @@ export function ServicioDetalleDialog({
         </ResponsiveDrawerHeader>
 
         <ResponsiveDrawerBody>
-          <div className="space-y-4 text-sm">
+          <div className="space-y-4 text-[13px]">
             <section className="rounded-lg border bg-card p-3 space-y-2">
               <div className="flex items-start justify-between gap-3">
-                <div className="rounded-md bg-muted/40 p-2.5 text-sm leading-snug flex-1">
+                <div className="rounded-md bg-muted/40 p-2.5 text-[13px] leading-snug flex-1">
                   {servicio.trabajo_descripcion}
                 </div>
                 <Badge variant="secondary" className="shrink-0">{servicio.sucursal}</Badge>
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
                 <span>
                   Responsable: <span className="text-foreground">{servicio.tecnico_responsable_id ? profById[servicio.tecnico_responsable_id] ?? "-" : "-"}</span>
                 </span>
@@ -482,10 +482,10 @@ export function ServicioDetalleDialog({
               </div>
             </section>
 
-            {loadingJornadas && <p className="text-xs text-muted-foreground">Cargando jornadas...</p>}
+            {loadingJornadas && <p className="text-[12px] text-muted-foreground">Cargando jornadas...</p>}
 
             {!loadingJornadas && !activeMerged && (
-              <div className="rounded-lg border border-dashed p-5 text-center text-xs text-muted-foreground">
+              <div className="rounded-lg border border-dashed p-5 text-center text-[12px] text-muted-foreground">
                 Este servicio aun no tiene jornadas.
               </div>
             )}
@@ -501,13 +501,13 @@ export function ServicioDetalleDialog({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {activeIsPending ? "Jornada a cerrar" : "Jornada registrada"}
                     </div>
-                    <div className="text-base font-semibold capitalize">
+                    <div className="text-[14px] font-semibold capitalize">
                       {format(parseISO(activeJornada.fecha), "EEEE d 'de' MMMM yyyy", { locale: es })}
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
                       <span>
                         Responsable: <span className="text-foreground">{jornadaResponsableNombre}</span>
                       </span>
@@ -566,17 +566,17 @@ export function ServicioDetalleDialog({
                     )}
                   </div>
                 ) : activeIsPending ? (
-                  <div className="rounded-md bg-card p-3 text-xs text-muted-foreground">
+                  <div className="rounded-md bg-card p-3 text-[12px] text-muted-foreground">
                     No tenes permisos para editar esta jornada.
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary" className="rounded-md px-2 py-1 text-xs font-medium">
+                      <Badge variant="secondary" className="rounded-md px-2 py-1 text-[12px] font-medium">
                         {activeMerged.horas_trabajadas ?? 0} hs trabajadas
                       </Badge>
                       {!activeMerged.observaciones?.trim() && (
-                        <Badge variant="outline" className="rounded-md px-2 py-1 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="rounded-md px-2 py-1 text-[12px] text-muted-foreground">
                           Sin observaciones
                         </Badge>
                       )}
@@ -584,8 +584,8 @@ export function ServicioDetalleDialog({
 
                     {activeMerged.observaciones?.trim() && (
                       <div className="space-y-1.5">
-                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Observacion</Label>
-                        <div className="rounded-md bg-muted/40 px-3 py-2.5 text-sm leading-relaxed">
+                        <Label className="text-[12px] uppercase tracking-wide text-muted-foreground">Observacion</Label>
+                        <div className="rounded-md bg-muted/40 px-3 py-2.5 text-[13px] leading-relaxed">
                           {activeMerged.observaciones}
                         </div>
                       </div>
@@ -629,7 +629,7 @@ export function ServicioDetalleDialog({
                               step="0.5"
                               min="0"
                               inputMode="decimal"
-                              className="h-11 text-base"
+                              className="h-11 text-[14px]"
                               value={activeMerged.horas_trabajadas ?? ""}
                               onChange={(e) =>
                                 jornadaPatch(activeJornada.id, {
@@ -644,7 +644,7 @@ export function ServicioDetalleDialog({
                             <Label>Observacion</Label>
                             <Textarea
                               rows={3}
-                              className="text-sm"
+                              className="text-[13px]"
                               value={activeMerged.observaciones ?? ""}
                               onChange={(e) => jornadaPatch(activeJornada.id, { observaciones: e.target.value || null })}
                               placeholder="Completa o corrige lo que se hizo ese dia..."
@@ -674,14 +674,14 @@ export function ServicioDetalleDialog({
 
             <section className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="text-sm font-semibold">
+                <Label className="text-[13px] font-semibold">
                   Historial{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
+                  <span className="text-[12px] font-normal text-muted-foreground">
                     ({jornadas.length}) - Total {totalHoras || 0} hs
                   </span>
                 </Label>
                 {canEdit && trabajoMadre && (
-                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setProgramarOpen(true)}>
+                  <Button size="sm" variant="outline" className="h-8 text-[12px]" onClick={() => setProgramarOpen(true)}>
                     <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
                     Nueva jornada
                   </Button>
@@ -704,7 +704,7 @@ export function ServicioDetalleDialog({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="text-xs font-semibold capitalize">
+                          <div className="text-[12px] font-semibold capitalize">
                             {format(parseISO(j.fecha), "EEE d MMM yyyy", { locale: es })}
                           </div>
                           <div className="truncate text-[11px] text-muted-foreground">

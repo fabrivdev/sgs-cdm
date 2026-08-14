@@ -3,7 +3,7 @@
  *
  * Todos los tamaños están fijados en px para que no dependan del tamaño base
  * del documento. Cualquier página o componente debe usar estos tokens en lugar
- * de `text-sm` / `text-xs` / `text-lg` sueltos: así el menú, los filtros, las
+ * de `text-[13px]` / `text-[12px]` / `text-[14px]` sueltos: así el menú, los filtros, las
  * tablas y los KPIs mantienen el mismo peso visual en toda la app.
  */
 

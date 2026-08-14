@@ -424,8 +424,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     <Card>
       <CardContent className="space-y-4 p-4">
         <div>
-          <div className="text-sm font-semibold">Importar datos de TOTVS</div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <div className="text-[13px] font-semibold">Importar datos de TOTVS</div>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
             Elegí la carpeta completa de exports (o los archivos sueltos) — se detecta automáticamente cada tipo de
             reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, pedidos,
             solicitudes y clientes.
@@ -486,10 +486,10 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         {detected.length > 0 && (
           <div className="space-y-2">
             {detected.map((d) => (
-              <div key={d.file.name} className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-xs">
+              <div key={d.file.name} className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-[12px]">
                 <span className="min-w-0 flex-1 truncate font-medium">{d.file.name}</span>
                 <Select value={d.kind} onValueChange={(value) => setKind(d.file.name, value as DetectedFile["kind"])}>
-                  <SelectTrigger className="h-7 w-52 text-xs">
+                  <SelectTrigger className="h-7 w-52 text-[12px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -532,7 +532,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
         {preview && (
           <div className="space-y-3 rounded-md border p-3">
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className="flex flex-wrap gap-2 text-[12px]">
               {preview.bundleFiles && <Badge variant="secondary">OS + Facturación listas para cruzar</Badge>}
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
               {preview.stock.length > 0 && <Badge variant="secondary">{preview.stock.length} filas de stock</Badge>}

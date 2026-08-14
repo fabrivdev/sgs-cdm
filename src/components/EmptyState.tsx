@@ -18,8 +18,8 @@ export function EmptyState({
       <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Inbox className="h-5 w-5" />
       </div>
-      <div className="text-sm font-semibold">{title}</div>
-      {description && <div className="mt-1 max-w-sm text-xs text-muted-foreground">{description}</div>}
+      <div className="text-[13px] font-semibold">{title}</div>
+      {description && <div className="mt-1 max-w-sm text-[12px] text-muted-foreground">{description}</div>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
