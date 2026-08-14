@@ -36,17 +36,16 @@ function ensureLanyardReady(): Promise<boolean> {
       import("@dimforge/rapier3d-compat").then((RAPIER) => RAPIER.init()),
       import("@react-three/rapier"),
       // Card model + lanyard texture.
-      Promise.all([
-        import("@react-three/drei"),
-        import("@/components/card.glb?url" /* @vite-ignore */).catch(() => null),
-      ]).then(async ([drei]) => {
-        const [{ default: cardGLB }, { default: lanyardPng }] = await Promise.all([
-          import("@/components/card.glb"),
-          import("@/components/lanyard.png"),
+      (async () => {
+        const [drei, cardGLB, lanyardPng] = await Promise.all([
+          import("@react-three/drei"),
+          import("@/components/card.glb").then((m) => m.default),
+          import("@/components/lanyard.png").then((m) => m.default),
         ]);
         drei.useGLTF.preload(cardGLB);
         drei.useTexture.preload(lanyardPng);
-      }),
+      })(),
+
       ...CARD_IMAGES.map(preloadImage),
     ])
       .then(() => true)
