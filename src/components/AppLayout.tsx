@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
-  ChevronLeft,
   LayoutDashboard,
   ListChecks,
   Users,
@@ -47,7 +46,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useUnseen } from "@/hooks/useUnseen";
@@ -115,7 +113,7 @@ function ModuloNavGroup({
   onOpenChange: (open: boolean) => void;
   isItemActive: (it: NavItem) => boolean;
 }) {
-  const { state, toggleSidebar } = useSidebar();
+  const { state } = useSidebar();
   const iconRail = state === "collapsed";
   const effectiveOpen = !iconRail && open;
   const groupActive = group.items.some(isItemActive);
@@ -127,7 +125,6 @@ function ModuloNavGroup({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            onClick={() => iconRail && toggleSidebar()}
             className={cn(
               "group/module mx-2 flex h-10 w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 text-left outline-none transition-[background-color,color,box-shadow,transform] duration-150 ease-spring hover:bg-sidebar-accent/80 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2",
               groupActive && "bg-sidebar-accent/70 text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-border)/0.55)]",
@@ -138,10 +135,10 @@ function ModuloNavGroup({
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition-[transform,background-color] duration-150 group-hover/module:bg-primary/[0.12]">
               <GroupIcon className="h-[18px] w-[18px]" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
+            <span className="sidebar-label-anim min-w-0 flex-1 truncate text-[13px] font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
             <ChevronDown
               className={cn(
-                "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-spring group-data-[collapsible=icon]:hidden",
+                "sidebar-label-anim h-4 w-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden",
                 open && "rotate-180",
               )}
             />
@@ -160,7 +157,7 @@ function ModuloNavGroup({
                   >
                     <NavLink to={it.to} end={it.end as boolean | undefined} className="group/nav">
                       <it.icon className="transition-transform duration-200 group-hover/nav:scale-110" />
-                      <span className="group-data-[collapsible=icon]:hidden">{it.label}</span>
+                      <span className="sidebar-label-anim group-data-[collapsible=icon]:hidden">{it.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
