@@ -1296,11 +1296,11 @@ function EstadoMiniCard({
           <Icon className="h-3.5 w-3.5" />
         </div>
         <div className="min-w-0">
-          <div className={cn(cardLabel, titleClassName)}>{title}</div>
+          <div className={cn(cardLabel, "flex h-4 items-center", titleClassName)}>{title}</div>
         </div>
       </div>
       <div className="text-[14px] font-semibold leading-5 tabular-nums">{value}</div>
-      {detail ? <div className={cn("mt-1", metaText)}>{detail}</div> : null}
+      <div className={cn("mt-1 h-4 leading-4", metaText)}>{detail || <span aria-hidden>&nbsp;</span>}</div>
     </div>
   );
 
