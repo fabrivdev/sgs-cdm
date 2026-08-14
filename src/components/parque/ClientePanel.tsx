@@ -463,10 +463,11 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     const payload = {
       cliente_id: cliente.id,
       usuario_id: user.id,
-      resultado: segResultado as never,
+      resultado: segResultado as any,
       observaciones: observaciones || null,
       ...(trabajoAsociado ? { trabajo_id: trabajoAsociado.id } : {}),
     };
+
 
     let { error } = await supabase.from("seguimiento_comercial").insert(payload);
     if (error && trabajoAsociado && /trabajo_id|schema cache|column/i.test(error.message ?? "")) {
