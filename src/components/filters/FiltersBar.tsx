@@ -71,7 +71,7 @@ export function FiltersBar({
   };
 
   return (
-    <Card className={cn("px-2 py-1", className)}>
+    <Card className={cn("px-2 py-1.5", className)}>
       <div className="flex gap-2 sm:hidden">
         {search && (
           <div className="relative min-w-0 flex-1">
@@ -82,7 +82,7 @@ export function FiltersBar({
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
               placeholder={search.placeholder ?? "Buscar…"}
-              className="h-9 pl-7 pr-7 text-[13px]"
+              className="h-8 pl-7 pr-7 text-[13px]"
             />
             {searchDraft && (
               <button
@@ -101,11 +101,11 @@ export function FiltersBar({
             type="button"
             variant={mobileOpen || activeCount > 0 ? "default" : "outline"}
             size="icon"
-            className="h-9 w-9 shrink-0"
+            className="h-8 w-8 shrink-0"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label="Filtros"
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <SlidersHorizontal className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
@@ -115,16 +115,16 @@ export function FiltersBar({
           {children}
           {expanded && <div className="border-t pt-2">{expanded}</div>}
           {activeCount > 0 && onClear && (
-            <Button variant="ghost" size="sm" onClick={onClear} className="h-9 justify-start text-xs">
+            <Button variant="ghost" size="sm" onClick={onClear} className="h-8 justify-start text-xs">
               <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
             </Button>
           )}
           {actions && <div className="flex flex-col gap-2 border-t pt-2">{actions}</div>}
-          {meta && <div className="text-[11px] text-muted-foreground">{meta}</div>}
+          {meta && <div className="text-[10px] text-muted-foreground">{meta}</div>}
         </div>
       )}
       {!mobileOpen && meta && (
-        <div className="mt-1 text-right text-[11px] text-muted-foreground sm:hidden">{meta}</div>
+        <div className="mt-1 text-right text-[10px] text-muted-foreground sm:hidden">{meta}</div>
       )}
 
       <div className="hidden gap-2 sm:flex sm:flex-row sm:flex-nowrap sm:items-end">
@@ -138,7 +138,7 @@ export function FiltersBar({
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
                 placeholder={search.placeholder ?? "Buscar…"}
-                className="h-9 pl-7 pr-7 text-[13px]"
+                className="h-8 pl-7 pr-7 text-[13px]"
               />
               {searchDraft && (
                 <button
@@ -157,27 +157,28 @@ export function FiltersBar({
         {children}
 
         {expanded && <Field><Popover open={moreOpen} onOpenChange={setMoreOpen}>
-          <PopoverTrigger asChild><Button variant={activeCount > 0 ? "secondary" : "outline"} size="sm" className="h-9"><SlidersHorizontal className="h-3.5 w-3.5" />Filtros{activeCount > 0 ? ` ${activeCount}` : ""}</Button></PopoverTrigger>
+          <PopoverTrigger asChild><Button variant={activeCount > 0 ? "secondary" : "outline"} size="sm" className="h-8"><SlidersHorizontal className="h-3.5 w-3.5" />Filtros{activeCount > 0 ? ` ${activeCount}` : ""}</Button></PopoverTrigger>
           <PopoverContent align="end" className="w-[min(92vw,520px)] p-3"><div className="grid gap-2 sm:grid-cols-2">{expanded}</div><div className="mt-3 flex justify-between border-t pt-2">{activeCount > 0 && onClear ? <Button variant="ghost" size="sm" onClick={onClear}><X className="h-3.5 w-3.5" />Limpiar</Button> : <span />}<Button size="sm" onClick={() => setMoreOpen(false)}>Aplicar</Button></div></PopoverContent>
         </Popover></Field>}
 
         {activeCount > 0 && onClear && !expanded && (
           <Field>
-            <Button variant="ghost" size="sm" onClick={onClear} className="h-9 text-xs">
+            <Button variant="ghost" size="sm" onClick={onClear} className="h-8 text-xs">
               <X className="mr-1 h-3 w-3" /> Limpiar
             </Button>
           </Field>
         )}
 
-        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-end">
+        <div className="flex w-full flex-col gap-1.5 sm:ml-auto sm:w-auto sm:flex-row sm:items-end">
           {meta && (
-            <div className="pb-0 text-[11px] text-muted-foreground sm:pb-2">{meta}</div>
+            <div className="pb-0 text-[10px] text-muted-foreground sm:pb-1.5">{meta}</div>
           )}
           {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
         </div>
       </div>
 
     </Card>
+
   );
 }
 
