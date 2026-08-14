@@ -1250,7 +1250,6 @@ export function EstadoCompacto({
             titleClassName="text-sky-700"
             iconClassName="bg-sky-500/10 text-sky-700"
             value={`${flujo.abiertos} trabajos`}
-            detail={`${flujo.pendiente} pendientes · ${flujo.programado} programados · ${flujo.iniciado} iniciados`}
             onClick={() => onSelect("iniciado")}
           />
           <EstadoMiniCard
