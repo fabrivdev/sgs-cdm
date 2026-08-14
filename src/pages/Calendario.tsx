@@ -272,6 +272,7 @@ export default function Calendario() {
       : endOfWeek(cursor, { weekStartsOn: 0 });
 
   const days = eachDayOfInterval({ start, end });
+  const esMesDeSeisSemanas = vista === "mes" && days.length > 35;
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
 
@@ -779,9 +780,20 @@ export default function Calendario() {
             const dayKey = format(d, "yyyy-MM-dd");
             const isDragOver = dragOverKey === dayKey;
             const esSemana = vista === "semana";
-            const visibles = esSemana ? evs : evs.slice(0, MAX_EVENTOS_DIA_CALENDARIO);
             const disponibilidadDia = disponibilidadForDay(d);
-            const visiblesDisponibilidad = esSemana ? disponibilidadDia : disponibilidadDia.slice(0, MAX_DISPONIBILIDADES_DIA);
+            const limiteDisponibilidad = esMesDeSeisSemanas
+              ? Math.min(disponibilidadDia.length, 1)
+              : MAX_DISPONIBILIDADES_DIA;
+            const limiteEventos = esMesDeSeisSemanas
+              ? Math.max(0, 2 - limiteDisponibilidad)
+              : MAX_EVENTOS_DIA_CALENDARIO;
+            const visibles = esSemana ? evs : evs.slice(0, limiteEventos);
+            const visiblesDisponibilidad = esSemana
+              ? disponibilidadDia
+              : disponibilidadDia.slice(0, limiteDisponibilidad);
+            const ocultosDisponibilidad = disponibilidadDia.length - visiblesDisponibilidad.length;
+            const ocultosEventos = evs.length - visibles.length;
+            const ocultosCompactos = ocultosDisponibilidad + ocultosEventos;
             const esDomingo = d.getDay() === 0;
             const nlInfo = diasNL.get(dayKey);
             const esNL = !!nlInfo || esDomingo;
@@ -840,6 +852,7 @@ export default function Calendario() {
                 <div
                   className={cn(
                     "text-right text-[11px] font-semibold tabular-nums sm:mb-1",
+                    esMesDeSeisSemanas && "sm:mb-0",
                     isToday && !esNL && "text-primary",
                     esNL && "text-slate-600"
                   )}
@@ -862,12 +875,13 @@ export default function Calendario() {
                   </div>
                 )}
 
-                <div className={cn("space-y-1", !esSemana && "hidden sm:block")}>
+                <div className={cn("space-y-1", esMesDeSeisSemanas && "space-y-0.5", !esSemana && "hidden sm:block")}>
                   {visiblesDisponibilidad.map((disp) => (
                     <div
                       key={disp.id}
                       className={cn(
                         "flex items-center gap-1 truncate rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-left text-[10px] font-medium text-sky-800",
+                        esMesDeSeisSemanas && "py-0 leading-4",
                         esSemana && "text-[11px] py-1",
                       )}
                       title={`${profById[disp.tecnico_id] ?? "Tecnico"} - ${disp.observacion ?? disponibilidadLabel(disp.tipo)}`}
@@ -880,9 +894,9 @@ export default function Calendario() {
                     </div>
                   ))}
 
-                  {!esSemana && disponibilidadDia.length > MAX_DISPONIBILIDADES_DIA && (
+                  {!esSemana && !esMesDeSeisSemanas && ocultosDisponibilidad > 0 && (
                     <div className="text-[10px] text-sky-700 font-medium">
-                      +{disponibilidadDia.length - MAX_DISPONIBILIDADES_DIA} no disp.
+                      +{ocultosDisponibilidad} no disp.
                     </div>
                   )}
 
@@ -923,6 +937,7 @@ export default function Calendario() {
                         }}
                         className={cn(
                           "flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium",
+                          esMesDeSeisSemanas && "py-0 leading-4",
                           esSemana && "text-[11px] py-1",
                           estadoColor(s.estado),
                           draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
@@ -935,9 +950,15 @@ export default function Calendario() {
                     );
                   })}
 
-                  {!esSemana && evs.length > MAX_EVENTOS_DIA_CALENDARIO && (
+                  {!esSemana && esMesDeSeisSemanas && ocultosCompactos > 0 && (
+                    <div className="text-[10px] leading-4 text-muted-foreground font-medium">
+                      +{ocultosCompactos} más…
+                    </div>
+                  )}
+
+                  {!esSemana && !esMesDeSeisSemanas && ocultosEventos > 0 && (
                     <div className="text-[10px] text-muted-foreground font-medium">
-                      +{evs.length - MAX_EVENTOS_DIA_CALENDARIO} más…
+                      +{ocultosEventos} más…
                     </div>
                   )}
                 </div>
