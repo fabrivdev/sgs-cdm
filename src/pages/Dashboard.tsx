@@ -3393,9 +3393,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <BarChart3 className="h-4 w-4" />
-                  </div>
+                  <BarChart3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 </div>
               </div>
               <WeeklyBars
