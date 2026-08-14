@@ -31,6 +31,7 @@ import { EstadoBadge, MarcaBadge } from "@/components/StatusBadges";
 import { ESTADO_LABELS, type Estado, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -127,17 +128,7 @@ export function ServicioDetalleDialog({
   const [editPendingCrewOpen, setEditPendingCrewOpen] = useState(false);
   const [edits, setEdits] = useState<Record<string, Partial<Jornada>>>({});
   const [clientesAll, setClientesAll] = useState<Cliente[]>([]);
-  const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    supabase.from("user_roles").select("user_id, role").then(({ data }) => {
-      const s = new Set<string>();
-      for (const r of (data ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "admin" || r.role === "jefatura") s.add(r.user_id);
-      }
-      setAdminCabIds(s);
-    });
-  }, []);
+  const { data: tecnicosActivos = [] } = useServicioTecnicos(Boolean(servicio));
 
   useEffect(() => {
     if (!servicio) return;
@@ -544,7 +535,7 @@ export function ServicioDetalleDialog({
                     {editPendingCrewOpen && (
                       <div className="space-y-3 rounded-md border bg-card p-3">
                         <TecnicosPicker
-                          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+                          tecnicos={tecnicosActivos}
                           principalId={activeCrew.tecnico_responsable_id}
                           auxiliares={activeCrew.auxiliares ?? []}
                           onChange={({ principalId, auxiliares }) =>
@@ -653,7 +644,7 @@ export function ServicioDetalleDialog({
                         </div>
 
                         <TecnicosPicker
-                          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+                          tecnicos={tecnicosActivos}
                           principalId={activeCrew.tecnico_responsable_id}
                           auxiliares={activeCrew.auxiliares ?? []}
                           onChange={({ principalId, auxiliares }) =>
@@ -779,7 +770,7 @@ export function ServicioDetalleDialog({
           trabajoId={trabajoMadre.id}
           trabajos={[trabajoMadre as any]}
           clientes={clientesAll.length > 0 ? clientesAll : clientes}
-          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+          tecnicos={tecnicosActivos}
           initialTecnicoId={activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id}
           initialAuxiliares={activeMerged?.auxiliares ?? servicio.auxiliares}
           onSaved={() => {
@@ -795,7 +786,7 @@ export function ServicioDetalleDialog({
           onOpenChange={setCargarOpen}
           trabajoId={trabajoMadre.id}
           legacyServicioId={servicio.id}
-          tecnicos={profiles.filter((p) => !adminCabIds.has(p.id))}
+          tecnicos={tecnicosActivos}
           jornadas={jornadas.filter((j) => j.estado === "Pendiente")}
           initialJornadaId={activeJornadaId}
           defaultTecnicoId={activeMerged?.tecnico_responsable_id ?? servicio.tecnico_responsable_id}

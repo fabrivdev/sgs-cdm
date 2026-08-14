@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -112,7 +113,7 @@ export default function Planificador() {
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   const [openProgramar, setOpenProgramar] = useState(false);
   const [trabajosLite, setTrabajosLite] = useState<any[]>([]);
-  const [adminCabIds, setAdminCabIds] = useState<Set<string>>(new Set());
+  const { data: tecnicosSolo = [] } = useServicioTecnicos();
 
   const currentWeek = useMemo(() => String(getISOWeek(new Date())), []);
   const [fSemana, setFSemana] = useState<string>(currentWeek);
@@ -187,19 +188,13 @@ export default function Planificador() {
     setLoading(true);
 
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }, { data: rls }] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
         supabase.from("trabajos").select("id, codigo, os_numero, proxima_accion, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
-        supabase.from("user_roles").select("user_id, role"),
       ]);
-      const adminCab = new Set<string>();
-      for (const r of (rls ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "admin" || r.role === "jefatura") adminCab.add(r.user_id);
-      }
-      setAdminCabIds(adminCab);
 
       const trabajosRaw = (trabs ?? []) as any[];
       const trabajoPorServicio = new Map<string, any>();
@@ -293,7 +288,6 @@ export default function Planificador() {
 
   const profById = useMemo(() => Object.fromEntries(profiles.map((p) => [p.id, p])), [profiles]);
   const cliById = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c])), [clientes]);
-  const tecnicosSolo = useMemo(() => profiles.filter(p => !adminCabIds.has(p.id)), [profiles, adminCabIds]);
   const refByServicio = useMemo(() => {
     const m = new Map<string, { ref: string; os: string; codigo: string }>();
     for (const t of trabajosLite) {

@@ -29,6 +29,7 @@ import { PRIORIDADES, prioridadBadge, estadoTrabajoLabel, estadoTrabajoDesdeJorn
 import { ESTADO_LABELS, DIAS_JORNADA_VENCIDA, type Estado, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { ProgramarIntervencionDialog } from "./ProgramarIntervencionDialog";
 import { CargarJornadaDialog } from "./CargarJornadaDialog";
 import { NuevoTrabajoDialog } from "./NuevoTrabajoDialog";
@@ -70,7 +71,6 @@ interface Props {
   trabajoId: string | null;
   onOpenChange: (o: boolean) => void;
   clientes: Cliente[];
-  tecnicos: Profile[];
   profileMap: Map<string, Profile>;
   clienteMap: Map<string, Cliente>;
   onChanged: () => void;
@@ -118,7 +118,6 @@ export function TrabajoDetalleDrawer({
   trabajoId,
   onOpenChange,
   clientes,
-  tecnicos,
   profileMap,
   clienteMap,
   onChanged,
@@ -129,7 +128,7 @@ export function TrabajoDetalleDrawer({
   const [servicioBaseCrew, setServicioBaseCrew] = useState<ServicioBaseCrew | null>(null);
   const [ordenServicio, setOrdenServicio] = useState<OrdenServicioImportada | null>(null);
   const [osImportDisponible, setOsImportDisponible] = useState(true);
-  const [rolesTecnico, setRolesTecnico] = useState<Set<string>>(new Set());
+  const { data: tecnicosOnly = [] } = useServicioTecnicos(Boolean(trabajoId));
   const [loading, setLoading] = useState(false);
   const [programarOpen, setProgramarOpen] = useState(false);
   const [cargarOpen, setCargarOpen] = useState(false);
@@ -159,13 +158,9 @@ export function TrabajoDetalleDrawer({
         return found ?? null;
       };
 
-      const [{ data: t, error }, { data: roles }] = await Promise.all([
-        supabase.from("trabajos").select("*").eq("id", trabajoId).single(),
-        supabase.from("user_roles").select("user_id, role").eq("role", "operativo"),
-      ]);
+      const { data: t, error } = await supabase.from("trabajos").select("*").eq("id", trabajoId).single();
       if (error) throw error;
       setTrabajo(t);
-      setRolesTecnico(new Set(((roles as any[]) ?? []).map((r) => r.user_id)));
 
       const osNumero = trabajoOsNumero(t);
       if (osNumero) {
@@ -239,10 +234,6 @@ export function TrabajoDetalleDrawer({
     horas: jornadas.reduce((acc, j) => acc + (j.estado === "Completado" ? Number(j.horas_trabajadas) || 0 : 0), 0),
   }), [jornadas]);
 
-  const tecnicosOnly = useMemo(
-    () => tecnicos.filter((t) => rolesTecnico.size === 0 || rolesTecnico.has(t.id)),
-    [tecnicos, rolesTecnico],
-  );
   const defaultCrew = useMemo(() => {
     const selected = selectedJornadaId ? jornadas.find((j) => j.id === selectedJornadaId) : null;
     const fromSelected = selected && (selected.tecnico_responsable_id || (selected.auxiliares?.length ?? 0) > 0) ? selected : null;

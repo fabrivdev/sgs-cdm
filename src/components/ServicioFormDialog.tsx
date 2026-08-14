@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, ChevronsUpDown, MapPin, Wrench, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal, type TipoTrabajo } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -21,11 +22,6 @@ interface Profile {
   id: string;
   nombre: string;
   sucursal: Sucursal | null;
-}
-
-interface UserRole {
-  user_id: string;
-  role: string;
 }
 
 interface Cliente {
@@ -61,7 +57,6 @@ export function ServicioFormDialog({
   open,
   onOpenChange,
   servicio,
-  profiles,
   clientes,
   onSaved,
   defaultDate,
@@ -81,9 +76,8 @@ export function ServicioFormDialog({
   const [obsOpen, setObsOpen] = useState(false);
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
 
-  const [profilesInternos, setProfilesInternos] = useState<Profile[]>([]);
-  const [roles, setRoles] = useState<UserRole[]>([]);
   const [clientesInternos, setClientesInternos] = useState<Cliente[]>([]);
+  const { data: tecnicosAutorizados = [] } = useServicioTecnicos(open);
 
   const cargarTodosLosClientes = async () => {
     const PAGE = 1000;
@@ -112,44 +106,6 @@ export function ServicioFormDialog({
   useEffect(() => {
     if (!open) return;
 
-    const cargarDatosAsignacion = async () => {
-      const consultas: any[] = [
-        supabase.from("user_roles").select("user_id, role"),
-      ];
-
-      if (profiles.length === 0) {
-        consultas.push(
-          supabase
-            .from("profiles")
-            .select("id, nombre, sucursal")
-            .order("nombre", { ascending: true }),
-        );
-      }
-
-      try {
-        const [rolesRes, profilesRes] = await Promise.all(consultas);
-
-        if (rolesRes.error) {
-          console.error(rolesRes.error);
-          toast.error("No se pudieron cargar los roles de usuarios");
-        } else {
-          setRoles((rolesRes.data ?? []) as UserRole[]);
-        }
-
-        if (profiles.length === 0) {
-          if (profilesRes?.error) {
-            console.error(profilesRes.error);
-            toast.error("No se pudieron cargar los técnicos");
-          } else {
-            setProfilesInternos((profilesRes?.data ?? []) as Profile[]);
-          }
-        }
-      } catch (e) {
-        console.error(e);
-        toast.error("No se pudieron cargar los técnicos");
-      }
-    };
-
     const cargarClientes = async () => {
       try {
         const all = await cargarTodosLosClientes();
@@ -160,27 +116,12 @@ export function ServicioFormDialog({
       }
     };
 
-    cargarDatosAsignacion();
     cargarClientes();
-  }, [open, profiles.length]);
+  }, [open]);
 
-  const profilesDisponibles = profiles.length > 0 ? profiles : profilesInternos;
   const clientesDisponibles = clientesInternos.length > 0 ? clientesInternos : clientes;
 
-  const adminCabIds = useMemo(() => {
-    return new Set(
-      roles
-        .filter((r) => {
-          const role = String(r.role ?? "").trim().toLowerCase();
-          return role === "admin" || role === "jefatura";
-        })
-        .map((r) => r.user_id),
-    );
-  }, [roles]);
-
-  const tecnicos = useMemo(() => {
-    return profilesDisponibles.filter((p) => !adminCabIds.has(p.id));
-  }, [profilesDisponibles, adminCabIds]);
+  const tecnicos = tecnicosAutorizados;
 
   const cliById = useMemo(
     () => Object.fromEntries(clientesDisponibles.map((c) => [c.id, c.nombre])),
@@ -507,7 +448,7 @@ export function ServicioFormDialog({
                 {auxiliares.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
                     {auxiliares.map((id) => {
-                      const p = profilesDisponibles.find((x) => x.id === id);
+                      const p = tecnicos.find((x) => x.id === id);
                       if (!p) return null;
                       return (
                         <Badge key={id} variant="secondary" className="gap-1 pl-2 pr-1 text-[11px] font-normal">

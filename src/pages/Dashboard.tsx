@@ -53,6 +53,7 @@ import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
 import { cardLabel, metaText } from "@/lib/ui-classes";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal } from "@/lib/appSettings";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import {
   displayImportedTechnicianName,
   importedServiceOrderParticipants,
@@ -197,11 +198,6 @@ interface Profile {
   desactivado_en: string | null;
 }
 
-interface UserRole {
-  user_id: string;
-  role: "admin" | "gerencia" | "jefatura" | "operativo";
-}
-
 interface DisponibilidadTecnico {
   id: string;
   tecnico_id: string;
@@ -258,7 +254,6 @@ type DashboardBaseCache = {
   trabajos: Trabajo[];
   clientes: Cliente[];
   profiles: Profile[];
-  roles: UserRole[];
 };
 
 let dashboardBaseCache: DashboardBaseCache | null = null;
@@ -607,7 +602,7 @@ export default function Dashboard() {
   const [trabajos, setTrabajos] = useState<Trabajo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const { data: servicioTecnicos = [] } = useServicioTecnicos();
   const [facturación, setFacturacion] = useState<Facturacion[]>([]);
   const [ordenesServicio, setOrdenesServicio] = useState<OrdenServicioImportada[]>([]);
   const [disponibilidades, setDisponibilidades] = useState<DisponibilidadTecnico[]>([]);
@@ -803,7 +798,6 @@ export default function Dashboard() {
       setTrabajos(dashboardBaseCache.trabajos);
       setClientes(dashboardBaseCache.clientes);
       setProfiles(dashboardBaseCache.profiles);
-      setUserRoles(dashboardBaseCache.roles);
       setBaseLoading(false);
       return () => {
         alive = false;
@@ -813,12 +807,12 @@ export default function Dashboard() {
     (async () => {
       setBaseLoading(true);
       try {
-        // Perfiles y roles comienzan al mismo tiempo que los datos base; antes
-        // se esperaban como una segunda fase y alargaban el bloqueo inicial.
-        const accessRowsPromise = Promise.allSettled([
-          cargarProfilesDashboard(),
-          cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
-        ]);
+        // Los perfiles comienzan al mismo tiempo que los datos base; antes se
+        // esperaban como una segunda fase y alargaban el bloqueo inicial.
+        const profilesResultPromise = cargarProfilesDashboard().then(
+          (value) => ({ status: "fulfilled", value }) as const,
+          (reason) => ({ status: "rejected", reason }) as const,
+        );
         const [serviciosRows, trabajosRows, clientesRows] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
@@ -838,20 +832,14 @@ export default function Dashboard() {
         setTrabajos(trabajosRows);
         setClientes(clientesRows);
 
-        const [profilesResult, rolesResult] = await accessRowsPromise;
+        const profilesResult = await profilesResultPromise;
 
         if (!alive) return;
         const profileRows = profilesResult.status === "fulfilled" ? profilesResult.value : [];
-        const roleRows = rolesResult.status === "fulfilled" ? rolesResult.value : [];
         if (profilesResult.status === "fulfilled") {
           setProfiles(profileRows);
         } else {
           console.error("Error cargando perfiles del dashboard", profilesResult.reason);
-        }
-        if (rolesResult.status === "fulfilled") {
-          setUserRoles(roleRows);
-        } else {
-          console.error("Error cargando roles del dashboard", rolesResult.reason);
         }
 
         dashboardBaseCache = {
@@ -860,7 +848,6 @@ export default function Dashboard() {
           trabajos: trabajosRows,
           clientes: clientesRows,
           profiles: profileRows,
-          roles: roleRows,
         };
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -1160,38 +1147,16 @@ export default function Dashboard() {
   };
 
   const activeTechnicianIds = useMemo(() => {
-    const roleIds = new Set(userRoles.filter((row) => row.role === "operativo").map((row) => row.user_id));
-    const administrativeRoleIds = new Set(
-      userRoles.filter((row) => row.role === "admin" || row.role === "jefatura").map((row) => row.user_id),
-    );
-    const referencedTechIds = new Set<string>();
-    for (const jornada of jornadas) {
-      for (const id of jornadaCrewIds(jornada)) referencedTechIds.add(id);
-    }
-    for (const servicio of servicios) {
-      if (servicio.tecnico_responsable_id) referencedTechIds.add(servicio.tecnico_responsable_id);
-      for (const id of servicio.auxiliares ?? []) referencedTechIds.add(id);
-    }
-    return new Set(
-      profiles
-        .filter((profile) => {
-          const name = profile.nombre.toLowerCase();
-          const hasTecnicoRole = roleIds.has(profile.id);
-          const referenced = referencedTechIds.has(profile.id);
-          const isAdministrativeOnly = administrativeRoleIds.has(profile.id) && !hasTecnicoRole && !referenced;
-          return profile.activo !== false && !isAdministrativeOnly && !name.includes("pasante");
-        })
-        .map((profile) => profile.id),
-    );
-  }, [jornadas, profiles, servicios, userRoles, servicioById]);
+    return new Set(servicioTecnicos.map((profile) => profile.id));
+  }, [servicioTecnicos]);
 
 
   const technicianOptions = useMemo(
     () =>
       Array.from(activeTechnicianIds)
-        .map((id) => ({ id, nombre: profileById.get(id)?.nombre ?? "Sin técnico" }))
+        .map((id) => ({ id, nombre: servicioTecnicos.find((profile) => profile.id === id)?.nombre ?? profileById.get(id)?.nombre ?? "Sin técnico" }))
         .sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    [activeTechnicianIds, profileById],
+    [activeTechnicianIds, profileById, servicioTecnicos],
   );
 
   const allTechnicianProfiles = useMemo(

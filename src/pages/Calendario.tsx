@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,10 +80,6 @@ interface DisponibilidadTecnico {
 }
 
 const PAGE = 1000;
-const PASANTE_NOMBRE = "PASANTE";
-
-const esPasante = (profile: Profile) => profile.nombre.trim().toUpperCase() === PASANTE_NOMBRE;
-
 async function cargarTodosLosClientes() {
   let from = 0;
   const all: Cliente[] = [];
@@ -113,7 +110,7 @@ export default function Calendario() {
   const [cursor, setCursor] = useState(new Date());
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [adminCabecillaIds, setAdminCabecillaIds] = useState<Set<string>>(new Set());
+  const { data: tecnicosSolo = [] } = useServicioTecnicos();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [fTecnicos, setFTecnicos] = useState<string[]>([]);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
@@ -143,11 +140,10 @@ export default function Calendario() {
 
   const load = async () => {
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, { data: roles }, { data: nl }, cli, { data: trabs }] = await Promise.all([
+      const [{ data: srv }, { data: prof }, { data: jor }, { data: nl }, cli, { data: trabs }] = await Promise.all([
         supabase.from("servicios").select("*"),
         supabase.from("profiles").select("id, nombre, sucursal, activo").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
-        supabase.from("user_roles").select("user_id, role"),
         supabase.from("dias_no_laborales").select("id, fecha, motivo"),
         cargarTodosLosClientes(),
         supabase.from("trabajos").select("codigo, legacy_servicio_id, cliente_id, descripcion_problema, sucursal, marca, tipo_trabajo"),
@@ -221,11 +217,6 @@ export default function Calendario() {
 
       setServicios(expandidos);
       setProfiles((prof ?? []) as Profile[]);
-      const adminCabSet = new Set<string>();
-      for (const r of (roles ?? []) as Array<{ user_id: string; role: string }>) {
-        if (r.role === "admin" || r.role === "jefatura") adminCabSet.add(r.user_id);
-      }
-      setAdminCabecillaIds(adminCabSet);
       const nlMap = new Map<string, { id: string; motivo: string | null }>();
       for (const d of (nl ?? []) as Array<{ id: string; fecha: string; motivo: string | null }>) {
         nlMap.set(d.fecha, { id: d.id, motivo: d.motivo });
@@ -276,14 +267,6 @@ export default function Calendario() {
   const esMesDeSeisSemanas = vista === "mes" && days.length > 35;
 
   const eventsForDay = (d: Date) => filtered.filter((s) => isSameDay(parseISO(s.fecha_programada), d));
-
-  const tecnicosSolo = useMemo(
-    () =>
-      profiles.filter(
-        (p) => p.activo !== false && !adminCabecillaIds.has(p.id) && !esPasante(p),
-      ),
-    [profiles, adminCabecillaIds],
-  );
 
   const tecnicoFilterSet = useMemo(
     () => new Set(fTecnicos.length > 0 ? fTecnicos : tecnicosSolo.map((t) => t.id)),

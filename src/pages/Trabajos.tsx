@@ -352,7 +352,6 @@ export default function Trabajos() {
         trabajoId={detalleId}
         onOpenChange={(o) => !o && setDetalleId(null)}
         clientes={clientes}
-        tecnicos={profiles}
         profileMap={profileMap}
         clienteMap={clienteMap}
         onChanged={load}
