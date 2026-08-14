@@ -2983,6 +2983,14 @@ export type Database = {
         }
         Returns: Json
       }
+      servicios_listar_tecnicos_activos: {
+        Args: never
+        Returns: {
+          id: string
+          nombre: string
+          sucursal: Database["public"]["Enums"]["sucursal"]
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "jefatura" | "operativo" | "gerencia"
