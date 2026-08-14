@@ -49,8 +49,11 @@ import {
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel, metaText, pageShellWide } from "@/lib/ui-classes";
+import { cardLabel, metaText, pageShellWide, tableHeadText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
+
+const cellText = "py-2 text-[13px] leading-5";
+
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
