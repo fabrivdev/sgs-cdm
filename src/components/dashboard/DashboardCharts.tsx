@@ -1292,9 +1292,7 @@ function EstadoMiniCard({
   const content = (
     <div className="flex h-full flex-col rounded-md border bg-background p-2 text-left shadow-sm">
       <div className="mb-1.5 flex items-start gap-2">
-        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary", iconClassName)}>
-          <Icon className="h-3.5 w-3.5" />
-        </div>
+        <Icon className={cn("mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground", iconClassName)} />
         <div className="min-w-0">
           <div className={cn(cardLabel, "flex h-4 items-center", titleClassName)}>{title}</div>
         </div>
