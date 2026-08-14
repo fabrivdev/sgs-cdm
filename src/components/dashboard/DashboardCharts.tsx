@@ -1289,8 +1289,8 @@ function EstadoMiniCard({
   onClick?: () => void;
 }) {
   const content = (
-    <div className="flex h-full flex-col rounded-md border bg-background p-3 text-left shadow-sm">
-      <div className="mb-3 flex items-start gap-2">
+    <div className="flex h-full flex-col rounded-md border bg-background p-2.5 text-left shadow-sm">
+      <div className="mb-2 flex items-start gap-2">
         <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary", iconClassName)}>
           <Icon className="h-4 w-4" />
         </div>
@@ -1298,8 +1298,8 @@ function EstadoMiniCard({
           <div className={cn("text-[10px] font-bold uppercase tracking-wide text-primary", titleClassName)}>{title}</div>
         </div>
       </div>
-      <div className="text-[18px] font-bold tabular-nums">{value}</div>
-      {detail ? <div className="mt-2 text-xs text-muted-foreground">{detail}</div> : null}
+      <div className="text-[15px] font-bold leading-5 tabular-nums">{value}</div>
+      {detail ? <div className="mt-1 text-[10px] leading-3 text-muted-foreground">{detail}</div> : null}
     </div>
   );
 
