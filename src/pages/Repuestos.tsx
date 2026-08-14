@@ -629,6 +629,41 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
       .sort((a, b) => b.clave.localeCompare(a.clave));
   }, [ventas]);
 
+  const consumoPorAnio = useMemo<BarraConsumo[]>(() => {
+    const map = new Map<string, number>();
+    for (const linea of ventas) {
+      const mes = mesVenta(linea.fecha_factura);
+      if (!mes) continue;
+      const anio = mes.slice(0, 4);
+      map.set(anio, (map.get(anio) ?? 0) + Number(linea.cantidad || 0));
+    }
+    const anios = Array.from(map.keys()).sort();
+    if (anios.length === 0) return [];
+    const desde = Number(anios[0]);
+    const hasta = Number(anios[anios.length - 1]);
+    const series: BarraConsumo[] = [];
+    for (let a = desde; a <= hasta; a += 1) {
+      const clave = String(a);
+      series.push({ clave, etiqueta: clave, valor: map.get(clave) ?? 0 });
+    }
+    return series;
+  }, [ventas]);
+
+  const consumoPorMes = useMemo<BarraConsumo[]>(
+    () => evolucionMensual.map((item) => ({ clave: item.mes, etiqueta: item.mes.slice(5), valor: item.cantidad })),
+    [evolucionMensual],
+  );
+
+  const consumoPorSucursal = useMemo<BarraConsumo[]>(
+    () =>
+      Array.from(vendidoPorSucursal.entries())
+        .map(([clave, valor]) => ({ clave, etiqueta: clave, valor }))
+        .sort((a, b) => b.valor - a.valor),
+    [vendidoPorSucursal],
+  );
+
+
+
   const resumen = [
     { label: "Stock total", value: producto ? producto.total.toLocaleString("es-PY") : "—" },
     {
