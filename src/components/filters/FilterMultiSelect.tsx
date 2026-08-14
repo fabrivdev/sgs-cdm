@@ -46,18 +46,19 @@ export function FilterMultiSelect({
   };
 
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1 max-sm:!w-full", width)}>
-      {label ? <span className={labelCls}>{label}</span> : <span className="h-[14px]" aria-hidden />}
+    <div className={cn("flex min-w-0 shrink-0 flex-col gap-0.5 max-sm:!w-full", width)}>
+      {label ? <span className={labelCls}>{label}</span> : <span className="h-3.5" aria-hidden />}
       <Popover>
         <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
-              "flex h-9 w-full items-center justify-between gap-1 rounded-md border bg-background px-2.5 text-[12px]",
+              "flex h-8 w-full items-center justify-between gap-1 rounded-md border bg-background px-2.5 text-[12px]",
               "hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring",
               !allSelected && "border-primary/40 bg-primary/5",
             )}
           >
+
             <span className="truncate">{display}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
           </button>
