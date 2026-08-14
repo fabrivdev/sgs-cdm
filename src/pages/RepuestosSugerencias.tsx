@@ -526,31 +526,27 @@ export default function RepuestosSugerencias() {
     <div className={pageShellWide}>
       <PageHeader
         title="Sugerencia de compra"
-        actions={(
-          <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <Label className={cardLabel}>Marca</Label>
-            <Select value={brand} onValueChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}>
-              <SelectTrigger className="mt-1 w-32"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="CLAAS">CLAAS</SelectItem><SelectItem value="HORSCH">HORSCH</SelectItem></SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className={cardLabel}>Corte del análisis</Label>
-            <Input className="mt-1 w-40" type="date" value={analysisDate} onChange={(event) => { setAnalysisDate(event.target.value); setPage(1); }} />
-          </div>
-          <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Parámetros</Button>
-          <Button variant="outline" size="icon" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial"><Info className="h-4 w-4" /></Button>
-          <div className="flex h-9 items-center gap-2 rounded-md border border-primary/25 bg-primary/5 px-3 text-[12px] font-semibold text-primary">
-            <span className="relative flex h-2.5 w-2.5">
+        meta={(
+          <span className="inline-flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
               {liveQuery.isFetching && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />}
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
             </span>
-            Cálculo en vivo
-          </div>
+            Cálculo en vivo · {brand}
+          </span>
+        )}
+        actions={(
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)}>
+              <Settings2 className="mr-1 h-3.5 w-3.5" />Parámetros
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial">
+              <Info className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )}
       />
+
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
       {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
