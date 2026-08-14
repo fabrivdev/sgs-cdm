@@ -3297,7 +3297,7 @@ export default function Dashboard() {
           <select
             value={activeDatePreset}
             onChange={(event) => applyDatePreset(event.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option value="">Personalizado</option>
             {datePresets.map((preset) => (
