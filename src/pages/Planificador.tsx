@@ -646,7 +646,7 @@ export default function Planificador() {
                 <TableHead className="h-9 px-3 py-2 w-[92px]">Fecha</TableHead>
                 <TableHead className="h-9 px-3 py-2">Cliente</TableHead>
                 <TableHead className="h-9 px-3 py-2">Trabajo</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[120px]">Marca / Tipo</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[110px]">Marca</TableHead>
                 <TableHead className="h-9 px-3 py-2 w-[150px]">Responsable</TableHead>
                 <TableHead className="h-9 px-3 py-2 w-[80px]">Suc.</TableHead>
                 <TableHead className="h-9 px-3 py-2 w-[110px]">Resultado</TableHead>
