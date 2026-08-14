@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Activity, Building2, CalendarDays, Clock3, FileText, Printer, Receipt, Route, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { cardLabel, metaText, tableHeadText } from "@/lib/ui-classes";
+import { cardLabel, filterLabel, metaText, tableHeadText } from "@/lib/ui-classes";
 import type { Marca, Sucursal } from "@/lib/constants";
 import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion, ServiciosDashboardData } from "./types";
 import {
