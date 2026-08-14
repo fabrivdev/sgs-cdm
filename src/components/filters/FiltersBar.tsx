@@ -201,7 +201,7 @@ export function FilterSelect({
   return (
     <Field label={label} className={width}>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 w-full overflow-hidden text-[13px]">
+        <SelectTrigger className="h-8 w-full overflow-hidden text-[13px]">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className="max-h-[320px] min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]">
@@ -240,7 +240,7 @@ export function FilterDate({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-full text-[13px]"
+        className="h-8 w-full text-[13px]"
         title={title}
         min={min}
         max={max}
@@ -248,6 +248,7 @@ export function FilterDate({
     </Field>
   );
 }
+
 
 /** Slot personalizado dentro de FiltersBar con label uniforme (toggles, switches, etc.). */
 export function FilterCustom({
