@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,35 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cardLabel as labelCls, controlHeight, controlText } from "@/lib/ui-classes";
 
 const ctrl = `${controlHeight} ${controlText}`;
+
+/**
+ * Oculta por completo los campos que no entran en la fila (en vez de dejarlos
+ * cortados a la mitad). Siguen disponibles en el panel lateral "Filtros".
+ */
+function useOverflowHiding(ref: React.RefObject<HTMLDivElement>) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const apply = () => {
+      const items = Array.from(el.children) as HTMLElement[];
+      items.forEach((item) => item.classList.remove("hidden"));
+      const max = el.clientWidth;
+      let hide = false;
+      items.forEach((item) => {
+        if (hide || item.offsetLeft - el.offsetLeft + item.offsetWidth > max + 1) {
+          hide = true;
+          item.classList.add("hidden");
+        }
+      });
+    };
+    apply();
+    const ro = new ResizeObserver(() => apply());
+    ro.observe(el);
+    Array.from(el.children).forEach((c) => ro.observe(c));
+    return () => ro.disconnect();
+  });
+}
+
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
