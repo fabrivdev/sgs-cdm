@@ -441,6 +441,68 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
 }
 */
 
+type BarraConsumo = { clave: string; etiqueta: string; valor: number };
+
+function topeEscalonado(max: number) {
+  if (max <= 0) return 1;
+  const exp = Math.pow(10, Math.floor(Math.log10(max)));
+  const norm = max / exp;
+  const paso = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return paso * exp;
+}
+
+function BloqueConsumo({
+  titulo,
+  subtitulo,
+  series,
+}: {
+  titulo: string;
+  subtitulo: string;
+  series: BarraConsumo[];
+}) {
+  const total = series.reduce((sum, item) => sum + item.valor, 0);
+  const tope = topeEscalonado(Math.max(...series.map((item) => item.valor), 0));
+
+  return (
+    <div className="rounded-md border p-3">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <p className="text-[12px] font-medium">{titulo}</p>
+        <p className={metaText}>{total.toLocaleString("es-PY", { maximumFractionDigits: 1 })} un.</p>
+      </div>
+      <p className={cn(metaText, "mb-2")}>{subtitulo}</p>
+      {series.length === 0 ? (
+        <p className="py-8 text-center text-[12px] text-muted-foreground">Sin datos.</p>
+      ) : (
+        <div className="flex h-[140px] items-end gap-1.5 pb-5 pt-5">
+          {series.map((item) => {
+            const altura = item.valor > 0 ? Math.max((item.valor / tope) * 88, 3) : 0;
+            return (
+              <div
+                key={item.clave}
+                className="relative flex h-full min-w-0 flex-1 items-end"
+                title={`${item.etiqueta}: ${item.valor}`}
+              >
+                {item.valor > 0 && (
+                  <span
+                    className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
+                    style={{ bottom: `calc(${altura}% + 4px)` }}
+                  >
+                    {item.valor.toLocaleString("es-PY", { maximumFractionDigits: 1 })}
+                  </span>
+                )}
+                <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
+                <span className="absolute -bottom-4 left-1/2 max-w-full -translate-x-1/2 truncate text-[9px] text-muted-foreground">
+                  {item.etiqueta}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
   const ventasQuery = useVentasRepuesto(producto?.codigo_interno ?? null);
   const ventas = ventasQuery.data ?? [];
