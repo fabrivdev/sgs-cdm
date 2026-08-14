@@ -87,6 +87,9 @@ export function FiltersBar({
   className?: string;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  useOverflowHiding(rowRef);
+
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
   const debouncedSearch = useDebouncedValue(searchDraft, 250);
   const hasControls = !!children || !!actions || !!expanded || (activeCount > 0 && !!onClear);
