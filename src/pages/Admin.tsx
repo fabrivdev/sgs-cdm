@@ -696,7 +696,7 @@ export default function Admin() {
         <TabsContent value="parametros" className="space-y-4">
           <Card className="max-w-2xl p-4">
             <div className="mb-4">
-              <h2 className="text-sm font-semibold">Productividad técnica</h2>
+              <h2 className="text-[13px] font-semibold leading-5">Productividad técnica</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Define la meta mensual usada para calcular la productividad en el Dashboard de Servicios.
               </p>

@@ -3463,7 +3463,7 @@ export default function Dashboard() {
             <Card className="flex h-full flex-col p-3">
               <div className="mb-3 flex items-start justify-between">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
+                  <h2 className="truncate text-[13px] font-semibold leading-5">Carga del equipo</h2>
                   <p className="truncate text-xs text-muted-foreground">Trabajos y participación histórica por periodo</p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">

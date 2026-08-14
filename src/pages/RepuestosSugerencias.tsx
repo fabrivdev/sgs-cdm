@@ -182,7 +182,7 @@ function ModelConfigSheet({
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold">Políticas por segmento</h3>
+              <h3 className="text-[13px] font-semibold leading-5">Políticas por segmento</h3>
               <p className={metaText}>Nivel de servicio, revisión y factor Z permanecen editables por marca.</p>
               <div className="mt-3 space-y-2">
                 {draftSegments.map((segment, index) => (
@@ -323,7 +323,7 @@ function ResultDetailSheet({
 
               <div className="space-y-3 rounded-xl border p-4">
                 <div>
-                  <h3 className="text-sm font-semibold">Datos maestros de planificación</h3>
+                  <h3 className="text-[13px] font-semibold leading-5">Datos maestros de planificación</h3>
                   <p className={metaText}>El mínimo estratégico es opcional y funciona como piso del objetivo, incluso cuando la pieza todavía no tiene historial.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -568,7 +568,7 @@ export default function RepuestosSugerencias() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <Database className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">Historial unificado y auditable</h2>
+                <h2 className="text-[13px] font-semibold leading-5">Historial unificado y auditable</h2>
                 <Badge variant="outline">Base del motor en vivo</Badge>
               </div>
               {historyQualityQuery.isError && !historyIsPersisted ? (
