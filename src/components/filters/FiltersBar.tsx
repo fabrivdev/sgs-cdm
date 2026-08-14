@@ -13,12 +13,17 @@ const ctrl = `${controlHeight} ${controlText}`;
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-0.5 max-sm:!w-full", className)}>
-      {label ? <span className={labelCls}>{label}</span> : <span className="h-3.5" aria-hidden />}
+    <div data-filter-field className={cn("flex min-w-0 flex-col gap-0.5 max-sm:!w-full", className)}>
+      {label ? (
+        <span className={cn(labelCls, "block h-3.5 truncate whitespace-nowrap")}>{label}</span>
+      ) : (
+        <span className="block h-3.5" aria-hidden />
+      )}
       {children}
     </div>
   );
 }
+
 
 
 /**
