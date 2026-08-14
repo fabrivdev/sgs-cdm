@@ -2,18 +2,19 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function PageShell({ children, className }: { children: ReactNode; className?: string }) {
-  return <main className={cn("w-full min-w-0 space-y-4 px-4 py-4 sm:px-5 sm:py-5 lg:px-6", className)}>{children}</main>;
+  return <main className={cn("w-full min-w-0 space-y-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-6", className)}>{children}</main>;
 }
 
 export function PageHeader({ title, actions, tabs, meta, className }: { title: ReactNode; actions?: ReactNode; tabs?: ReactNode; meta?: ReactNode; className?: string }) {
-  return <header className={cn("flex min-h-10 min-w-0 flex-col justify-center gap-2", className)}>
-    <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0"><h1 className="truncate text-[20px] font-semibold leading-7 tracking-[-0.02em]">{title}</h1>{meta && <div className="text-[11px] leading-4 text-muted-foreground">{meta}</div>}</div>
+  return <header className={cn("flex min-h-8 min-w-0 flex-col justify-center gap-1", className)}>
+    <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0"><h1 className="truncate text-[18px] font-semibold leading-6 tracking-[-0.02em]">{title}</h1>{meta && <div className="text-[10px] leading-4 text-muted-foreground">{meta}</div>}</div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
     {tabs && <div className="border-b">{tabs}</div>}
   </header>;
 }
+
 
 export function KpiStrip({ children, className }: { children: ReactNode; className?: string }) {
   return <section className={cn("grid min-h-[72px] overflow-hidden rounded-xl border bg-card divide-y sm:grid-flow-col sm:auto-cols-fr sm:divide-x sm:divide-y-0", className)}>{children}</section>;
