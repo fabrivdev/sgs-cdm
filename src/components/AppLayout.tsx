@@ -288,7 +288,6 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHelpOpen(true)} aria-label="Abrir ayuda"><CircleHelp className="h-4 w-4" /></Button>
             <NotificationsPanel count={unseen} />
 
             <DropdownMenu>
