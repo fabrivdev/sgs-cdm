@@ -15,7 +15,7 @@ export function ErrorState({
 }) {
   return (
     <div className={cn("flex flex-col items-center justify-center rounded-md border border-dashed border-destructive/30 bg-destructive/5 px-4 py-8 text-center", className)}>
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
         <AlertCircle className="h-5 w-5" />
       </div>
       <div className="text-[13px] font-semibold">{title}</div>

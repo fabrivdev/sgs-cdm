@@ -28,7 +28,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md p-6 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <h1 className="text-[14px] font-semibold">No se pudo cargar esta vista</h1>
