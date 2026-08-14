@@ -192,7 +192,7 @@ function KpiCard({
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <div className="truncate text-base font-bold leading-tight">{value}</div>
+          <div className="truncate text-[18px] font-bold leading-tight">{value}</div>
           <div className={metaText}>{label}</div>
         </div>
       </CardContent>

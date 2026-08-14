@@ -115,13 +115,10 @@ export function MiniMetric({ label, value }: { label: string; value: React.React
   );
 }
 
-export function PanelTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
+export function PanelTitle({ icon: Icon, title }: { icon: React.ElementType; title: string; subtitle?: string }) {
   return (
-    <div className="mb-2 flex min-h-7 items-center justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="truncate text-[13px] font-semibold leading-5">{title}</h2>
-        {subtitle ? <p className="truncate text-[10px] leading-3 text-muted-foreground">{subtitle}</p> : null}
-      </div>
+    <div className="mb-2 flex min-h-6 items-center justify-between gap-3">
+      <h2 className="truncate text-[13px] font-semibold leading-5">{title}</h2>
       <div className="shrink-0 text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
       </div>

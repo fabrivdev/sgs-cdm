@@ -3388,10 +3388,7 @@ export default function Dashboard() {
             <Card className="flex h-full min-w-0 flex-col p-3">
             <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
-                  <h2 className="truncate text-[13px] font-semibold leading-5">Evolucion de facturación</h2>
-                  <p className="truncate text-[10px] leading-3 text-muted-foreground">
-                    {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} - clic en barra para selecciónar
-                  </p>
+                  <h2 className="truncate text-[13px] font-semibold leading-5">Evolución de facturación</h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
@@ -3445,7 +3442,7 @@ export default function Dashboard() {
           {/* FILA 3 - OPERATIVA */}
           <section className="grid gap-3 md:grid-cols-2" aria-busy={operationalLoading}>
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} - clic filtra en Trabajos`} />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => { setFEstadosTrabajo(estado === "all" ? [] : [estado]); goSection("trabajos"); }}
@@ -3463,8 +3460,7 @@ export default function Dashboard() {
             <Card className="flex h-full flex-col p-3">
               <div className="mb-3 flex items-start justify-between">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Carga del equipo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Trabajos y participación histórica por periodo</p>
+                  <h2 className="truncate text-[13px] font-semibold leading-5">Carga del equipo</h2>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <CalendarDays className="h-4 w-4" />
@@ -3516,12 +3512,12 @@ export default function Dashboard() {
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">{T.comparativoFacturacion}</h2>
+                <h2 className="text-[13px] font-semibold leading-5">{T.comparativoFacturacion}</h2>
                 <p className="text-xs text-muted-foreground">{T.seleccionaPeriodo}</p>
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase text-muted-foreground">{selectedWeek ? T.periodoSeleccionado : "Rango filtrado"}</div>
-                <div className="text-lg font-semibold tabular-nums">{loading ? "..." : money(selectedWeek ? selectedWeek.total : totalPeriodo)}</div>
+                <div className="text-[18px] font-semibold tabular-nums">{loading ? "..." : money(selectedWeek ? selectedWeek.total : totalPeriodo)}</div>
                 <div className={cn("text-[11px]", selectedTrend != null && selectedTrend < 0 ? "text-destructive" : "text-muted-foreground")}>
                   {selectedTrend == null ? "sin base previa" : `${selectedTrend > 0 ? "+" : ""}${selectedTrend}% vs anterior`}
                 </div>
@@ -3632,7 +3628,6 @@ export default function Dashboard() {
               <PanelTitle
                 icon={BarChart3}
                 title="Cumplimiento de agenda"
-                subtitle=""
               />
               <CumplimientoAgendaChart
                 rows={cumplimientoAgenda}
@@ -3643,7 +3638,6 @@ export default function Dashboard() {
               <PanelTitle
                 icon={Users}
                 title="No realizadas por técnico"
-                subtitle=""
               />
               <TecnicosNoRealizadosRanking
                 rows={tecnicosNoRealizados}
@@ -3660,7 +3654,6 @@ export default function Dashboard() {
             <PanelTitle
               icon={CalendarDays}
               title="Matriz técnicos / periodo"
-              subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} · actividad por sucursal del técnico`}
             />
             <MatrizTécnicosDías
               data={matrizTécnicosDías}
@@ -3678,7 +3671,7 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => setFEstadosTrabajo([estado])}
@@ -3701,7 +3694,7 @@ export default function Dashboard() {
           <Card className="flex h-full flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Seguimiento por OS/TR</h2>
+                <h2 className="text-[13px] font-semibold leading-5">Seguimiento por OS/TR</h2>
               </div>
               <Badge variant="secondary">{trabajosResumen.length} trabajos</Badge>
             </div>
@@ -3819,7 +3812,7 @@ export default function Dashboard() {
             <Card className="flex h-full flex-col p-3">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold">Trabajos abiertos sin cierre</h2>
+                  <h2 className="text-[13px] font-semibold leading-5">Trabajos abiertos sin cierre</h2>
                   <p className="text-xs text-muted-foreground">Ordenados de mayor a menor por días sin cerrar</p>
                 </div>
                 <Badge variant="secondary">{trabajosAbiertosSinCierre.length} abiertos</Badge>

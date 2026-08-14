@@ -253,7 +253,7 @@ export function ServiciosDashboard({
               style={{ background: `conic-gradient(${STATE_COLORS.cerradas} 0 ${closeRate}%, ${STATE_COLORS.abiertas} ${closeRate}% ${closeRate + openRate}%, ${STATE_COLORS.otras} ${closeRate + openRate}% 100%)` }}
             >
               <div className="absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-card">
-                <strong className="text-xl tabular-nums">{integer.format(data.totalOS)}</strong>
+                <strong className="text-[18px] tabular-nums">{integer.format(data.totalOS)}</strong>
                 <span className="text-[9px] uppercase text-muted-foreground">OS</span>
               </div>
             </div>
