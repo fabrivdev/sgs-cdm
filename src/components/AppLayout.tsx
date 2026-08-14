@@ -138,7 +138,7 @@ function ModuloNavGroup({
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition-[transform,background-color] duration-150 group-hover/module:bg-primary/[0.12]">
               <GroupIcon className="h-[18px] w-[18px]" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
             <ChevronDown
               className={cn(
                 "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-spring group-data-[collapsible=icon]:hidden",
@@ -253,7 +253,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         <SidebarFooter className="border-t border-sidebar-border/70 px-5 py-4 group-data-[collapsible=icon]:hidden" />
       </Sidebar>
 
-      <SidebarInset className="min-h-screen bg-background">
+      <SidebarInset className="min-h-screen min-w-0 overflow-x-hidden bg-background">
         {/* Top header */}
         <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border/70 bg-card/95 px-3 sm:px-4">
           <div className="flex items-center gap-2">
@@ -320,8 +320,8 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
           </div>
         </header>
 
-        <main id="main-content" className="pb-6">
-          <div key={location.pathname} className="app-page-enter">{children ?? <Outlet />}</div>
+        <main id="main-content" className="min-w-0 pb-6">
+          <div key={location.pathname} className="min-w-0 app-page-enter">{children ?? <Outlet />}</div>
         </main>
 
         {AI_ASSISTANT_ENABLED && <AIAssistant />}
