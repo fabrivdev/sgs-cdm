@@ -540,15 +540,6 @@ export default function RepuestosSugerencias() {
     <div className={pageShellWide}>
       <PageHeader
         title="Sugerencia de compra"
-        meta={(
-          <span className="inline-flex items-center gap-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              {liveQuery.isFetching && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />}
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-            </span>
-            Cálculo en vivo · {brand}
-          </span>
-        )}
         actions={(
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)}>
