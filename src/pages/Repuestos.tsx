@@ -441,6 +441,68 @@ function DetalleProductoDialog({ producto, onClose }: { producto: StockMatrizRow
 }
 */
 
+type BarraConsumo = { clave: string; etiqueta: string; valor: number };
+
+function topeEscalonado(max: number) {
+  if (max <= 0) return 1;
+  const exp = Math.pow(10, Math.floor(Math.log10(max)));
+  const norm = max / exp;
+  const paso = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return paso * exp;
+}
+
+function BloqueConsumo({
+  titulo,
+  subtitulo,
+  series,
+}: {
+  titulo: string;
+  subtitulo: string;
+  series: BarraConsumo[];
+}) {
+  const total = series.reduce((sum, item) => sum + item.valor, 0);
+  const tope = topeEscalonado(Math.max(...series.map((item) => item.valor), 0));
+
+  return (
+    <div className="rounded-md border p-3">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <p className="text-[12px] font-medium">{titulo}</p>
+        <p className={metaText}>{total.toLocaleString("es-PY", { maximumFractionDigits: 1 })} un.</p>
+      </div>
+      <p className={cn(metaText, "mb-2")}>{subtitulo}</p>
+      {series.length === 0 ? (
+        <p className="py-8 text-center text-[12px] text-muted-foreground">Sin datos.</p>
+      ) : (
+        <div className="flex h-[140px] items-end gap-1.5 pb-5 pt-5">
+          {series.map((item) => {
+            const altura = item.valor > 0 ? Math.max((item.valor / tope) * 88, 3) : 0;
+            return (
+              <div
+                key={item.clave}
+                className="relative flex h-full min-w-0 flex-1 items-end"
+                title={`${item.etiqueta}: ${item.valor}`}
+              >
+                {item.valor > 0 && (
+                  <span
+                    className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
+                    style={{ bottom: `calc(${altura}% + 4px)` }}
+                  >
+                    {item.valor.toLocaleString("es-PY", { maximumFractionDigits: 1 })}
+                  </span>
+                )}
+                <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
+                <span className="absolute -bottom-4 left-1/2 max-w-full -translate-x-1/2 truncate text-[9px] text-muted-foreground">
+                  {item.etiqueta}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow | null; onClose: () => void }) {
   const ventasQuery = useVentasRepuesto(producto?.codigo_interno ?? null);
   const ventas = ventasQuery.data ?? [];
@@ -566,6 +628,41 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
       }))
       .sort((a, b) => b.clave.localeCompare(a.clave));
   }, [ventas]);
+
+  const consumoPorAnio = useMemo<BarraConsumo[]>(() => {
+    const map = new Map<string, number>();
+    for (const linea of ventas) {
+      const mes = mesVenta(linea.fecha_factura);
+      if (!mes) continue;
+      const anio = mes.slice(0, 4);
+      map.set(anio, (map.get(anio) ?? 0) + Number(linea.cantidad || 0));
+    }
+    const anios = Array.from(map.keys()).sort();
+    if (anios.length === 0) return [];
+    const desde = Number(anios[0]);
+    const hasta = Number(anios[anios.length - 1]);
+    const series: BarraConsumo[] = [];
+    for (let a = desde; a <= hasta; a += 1) {
+      const clave = String(a);
+      series.push({ clave, etiqueta: clave, valor: map.get(clave) ?? 0 });
+    }
+    return series;
+  }, [ventas]);
+
+  const consumoPorMes = useMemo<BarraConsumo[]>(
+    () => evolucionMensual.map((item) => ({ clave: item.mes, etiqueta: item.mes.slice(5), valor: item.cantidad })),
+    [evolucionMensual],
+  );
+
+  const consumoPorSucursal = useMemo<BarraConsumo[]>(
+    () =>
+      Array.from(vendidoPorSucursal.entries())
+        .map(([clave, valor]) => ({ clave, etiqueta: clave, valor }))
+        .sort((a, b) => b.valor - a.valor),
+    [vendidoPorSucursal],
+  );
+
+
 
   const resumen = [
     { label: "Stock total", value: producto ? producto.total.toLocaleString("es-PY") : "—" },
@@ -718,33 +815,28 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
               </TabsContent>
 
               <TabsContent value="consumo" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
-                <div className="flex h-full items-end gap-2 px-5 pb-8 pt-10">
-                  {historialCargando && <p className="m-auto text-[12px] text-muted-foreground">Cargando consumo...</p>}
-                  {historialError && <p className="m-auto text-[12px] text-muted-foreground">Consumo no disponible.</p>}
-                  {!historialCargando && !historialError && ventas12m.length === 0 && (
-                    <p className="m-auto text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
+                <div className="h-full overflow-auto px-4 py-3">
+                  {historialCargando && <p className="py-10 text-center text-[12px] text-muted-foreground">Cargando consumo...</p>}
+                  {!historialCargando && historialError && (
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">Consumo no disponible.</p>
                   )}
-                  {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => {
-                    const altura = item.cantidad > 0 ? Math.max((item.cantidad / maxMensual) * 88, 3) : 0;
-                    return (
-                      <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
-                        {item.cantidad > 0 && (
-                          <span
-                            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
-                            style={{ bottom: `calc(${altura}% + 5px)` }}
-                          >
-                            {Number(item.cantidad).toLocaleString("es-PY", { maximumFractionDigits: 1 })}
-                          </span>
-                        )}
-                        <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
-                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
-                          {item.mes.slice(5)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {!historialCargando && !historialError && ventas.length === 0 && (
+                    <p className="py-10 text-center text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
+                  )}
+                  {!historialCargando && !historialError && ventas.length > 0 && (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <BloqueConsumo titulo="Por año" subtitulo="Historial completo — unidades" series={consumoPorAnio} />
+                      <BloqueConsumo titulo="Por mes" subtitulo="Últimos 12 meses — unidades" series={consumoPorMes} />
+                      <BloqueConsumo
+                        titulo="Por sucursal"
+                        subtitulo="Últimos 12 meses — unidades"
+                        series={consumoPorSucursal}
+                      />
+                    </div>
+                  )}
                 </div>
               </TabsContent>
+
 
               <TabsContent value="ventas" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                 <div className="h-full overflow-auto">
