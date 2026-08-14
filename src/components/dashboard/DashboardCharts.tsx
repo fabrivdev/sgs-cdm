@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Activity, Building2, CalendarDays, Clock3, FileText, Printer, Receipt, Route, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { cardLabel, metaText, tableHeadText } from "@/lib/ui-classes";
+import { cardLabel, filterLabel, metaText, tableHeadText } from "@/lib/ui-classes";
 import type { Marca, Sucursal } from "@/lib/constants";
 import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion, ServiciosDashboardData } from "./types";
 import {
@@ -1296,11 +1296,11 @@ function EstadoMiniCard({
           <Icon className="h-3.5 w-3.5" />
         </div>
         <div className="min-w-0">
-          <div className={cn(cardLabel, titleClassName)}>{title}</div>
+          <div className={cn(cardLabel, "flex h-4 items-center", titleClassName)}>{title}</div>
         </div>
       </div>
       <div className="text-[14px] font-semibold leading-5 tabular-nums">{value}</div>
-      {detail ? <div className={cn("mt-1", metaText)}>{detail}</div> : null}
+      <div className={cn("mt-1 h-4 leading-4", metaText)}>{detail || <span aria-hidden>&nbsp;</span>}</div>
     </div>
   );
 

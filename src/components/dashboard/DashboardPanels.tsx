@@ -109,9 +109,9 @@ export function FacturasMobile({
 
 export function MiniMetric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="min-w-0 rounded-md bg-muted/45 px-2 py-1">
-      <div className={cn(cardLabel, "truncate")}>{label}</div>
-      <div className="truncate text-[13px] font-semibold tabular-nums">{value}</div>
+    <div className="flex min-w-0 flex-col justify-start rounded-md bg-muted/45 px-2 py-1">
+      <div className={cn(cardLabel, "flex h-4 items-center truncate")}>{label}</div>
+      <div className="truncate text-[13px] font-semibold leading-5 tabular-nums">{value}</div>
     </div>
   );
 }

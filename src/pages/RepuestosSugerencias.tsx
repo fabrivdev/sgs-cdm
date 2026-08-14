@@ -691,6 +691,7 @@ export default function RepuestosSugerencias() {
         actions={<Button variant="outline" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-2 h-4 w-4" />Exportar</Button>}
       >
         <FilterSelect
+          label="Segmento"
           value={filters.segmento}
           onChange={(segmento) => { setFilters((current) => ({ ...current, segmento })); setPage(1); }}
           placeholder="Segmento"
@@ -698,6 +699,7 @@ export default function RepuestosSugerencias() {
           width="w-[190px]"
         />
         <FilterSelect
+          label="Estado de datos"
           value={filters.estado}
           onChange={(estado) => { setFilters((current) => ({ ...current, estado })); setPage(1); }}
           placeholder="Estado de datos"
@@ -709,8 +711,8 @@ export default function RepuestosSugerencias() {
           ]}
           width="w-[220px]"
         />
-        <FilterCustom width="w-[170px]">
-          <label className="flex h-9 items-center gap-2 rounded-md border px-3 text-[12px] font-medium">
+        <FilterCustom label="Sugerencia" width="w-[170px]">
+          <label className="flex h-8 items-center gap-2 rounded-md border px-3 text-[12px] font-medium">
             <Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />
             Solo con sugerencia
           </label>
