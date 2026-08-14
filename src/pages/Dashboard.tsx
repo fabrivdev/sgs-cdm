@@ -3386,10 +3386,10 @@ export default function Dashboard() {
           {/* FILA 2 - TENDENCIA */}
           <section className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Card className="flex h-full min-w-0 flex-col p-3">
-              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-semibold">Evolucion de facturación</h2>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <h2 className="truncate text-[13px] font-semibold leading-5">Evolucion de facturación</h2>
+                  <p className="truncate text-[10px] leading-3 text-muted-foreground">
                     {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} - clic en barra para selecciónar
                   </p>
                 </div>
@@ -3418,14 +3418,15 @@ export default function Dashboard() {
             <Card className="flex h-full min-w-0 flex-col p-3">
               <PanelTitle icon={Building2} title="Facturacion por sucursal" />
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
-              <div className="mt-3 flex flex-col gap-2">
+              <div className="mt-2 flex flex-col gap-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <Building2 className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
-                    <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">sucursales con movimiento</div>
+                    <div className="text-[13px] font-semibold tabular-nums">{sucursalesConMovimiento} / {SUCURSALES.length}</div>
+                    <div className="truncate text-[10px] leading-3 uppercase tracking-[0.04em] text-muted-foreground">sucursales con movimiento</div>
+
                   </div>
                 </div>
                 <div className="flex items-center gap-2 rounded-md border p-2">

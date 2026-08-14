@@ -36,10 +36,11 @@ export function FactPeriodsMobile({
               active && "border-primary bg-primary/5",
             )}
           >
-            <div className="flex min-h-[58px] flex-col justify-between gap-1">
-              <div className="text-xs font-medium">{row.label}</div>
-              <div className="text-sm font-bold tabular-nums">{formatWeekMetric(row, "usd")}</div>
+            <div className="flex min-h-[52px] flex-col justify-between gap-1">
+              <div className="text-[11px] font-medium">{row.label}</div>
+              <div className="text-[13px] font-semibold tabular-nums">{formatWeekMetric(row, "usd")}</div>
               <div className={cn("text-[10px] tabular-nums", trend != null && trend < 0 ? "text-destructive" : "text-muted-foreground")}>
+
                 {trend == null ? "-" : `${trend > 0 ? "+" : ""}${trend}%`}
               </div>
             </div>
@@ -116,17 +117,18 @@ export function MiniMetric({ label, value }: { label: string; value: React.React
 
 export function PanelTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) {
   return (
-    <div className="mb-2 flex min-h-8 items-center justify-between gap-3">
+    <div className="mb-2 flex min-h-7 items-center justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="truncate text-[15px] font-semibold leading-5">{title}</h2>
-        {subtitle ? <p className="truncate text-[11px] leading-4 text-muted-foreground">{subtitle}</p> : null}
+        <h2 className="truncate text-[13px] font-semibold leading-5">{title}</h2>
+        {subtitle ? <p className="truncate text-[10px] leading-3 text-muted-foreground">{subtitle}</p> : null}
       </div>
       <div className="shrink-0 text-muted-foreground">
-        <Icon className="h-4 w-4" />
+        <Icon className="h-3.5 w-3.5" />
       </div>
     </div>
   );
 }
+
 
 export function ConceptLine({ label, value, total }: { label: string; value: number; total: number }) {
   const width = total > 0 ? Math.max(3, Math.round((value / total) * 100)) : 0;
@@ -153,9 +155,10 @@ export function PeriodSelector({
   disabledModes?: Set<PeriodMode>;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 max-sm:!w-full sm:w-[220px]">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Agrupar por</span>
-      <div className="grid h-9 grid-cols-4 overflow-hidden rounded-md border bg-background text-[11px]">
+    <div className="flex min-w-0 flex-col gap-0.5 max-sm:!w-full sm:w-[220px]">
+      <span className="text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Agrupar por</span>
+      <div className="grid h-8 grid-cols-4 overflow-hidden rounded-md border bg-background text-[11px]">
+
         {[
           { value: "dia", label: "Día" },
           { value: "semana", label: "Semana" },

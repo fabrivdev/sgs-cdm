@@ -139,12 +139,13 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
           </Button>
         ) : undefined}
         expanded={
-          <FilterSelect label="Condición" value={condition} onChange={setCondition} width="w-full" options={[{ value: "all", label: "Todas" }, { value: "Nuevo", label: "Nuevas" }, { value: "Usado", label: "Usadas" }]} />
+          <FilterSelect label="Condición" value={condition} onChange={setCondition} placeholder="Condición" width="w-full" options={[{ value: "all", label: "Todas" }, { value: "Nuevo", label: "Nuevas" }, { value: "Usado", label: "Usadas" }]} />
         }
       >
-        <FilterSelect label="Sucursal" value={branch} onChange={setBranch} width="w-[125px]" options={[{ value: "all", label: "Todas" }, ...options.branches.map((value) => ({ value, label: value }))]} />
-        <FilterSelect label="Marca" value={brand} onChange={setBrand} width="w-[125px]" options={[{ value: "all", label: "Todas" }, ...options.brands.map((value) => ({ value, label: value }))]} />
-        <FilterSelect label="Tipo" value={type} onChange={setType} width="w-[150px]" options={[{ value: "all", label: "Todos" }, ...options.types.map((value) => ({ value, label: value }))]} />
+        <FilterSelect label="Sucursal" value={branch} onChange={setBranch} placeholder="Sucursal" width="w-[125px]" options={[{ value: "all", label: "Todas" }, ...options.branches.map((value) => ({ value, label: value }))]} />
+        <FilterSelect label="Marca" value={brand} onChange={setBrand} placeholder="Marca" width="w-[125px]" options={[{ value: "all", label: "Todas" }, ...options.brands.map((value) => ({ value, label: value }))]} />
+        <FilterSelect label="Tipo" value={type} onChange={setType} placeholder="Tipo" width="w-[150px]" options={[{ value: "all", label: "Todos" }, ...options.types.map((value) => ({ value, label: value }))]} />
+
       </FiltersBar>
 
       <div className="overflow-x-auto rounded-md border bg-card">

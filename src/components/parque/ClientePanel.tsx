@@ -463,17 +463,19 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     const payload = {
       cliente_id: cliente.id,
       usuario_id: user.id,
-      resultado: segResultado as never,
+      resultado: segResultado as any,
       observaciones: observaciones || null,
       ...(trabajoAsociado ? { trabajo_id: trabajoAsociado.id } : {}),
     };
 
-    let { error } = await supabase.from("seguimiento_comercial").insert(payload);
+
+    let { error } = await supabase.from("seguimiento_comercial").insert([payload as any]);
     if (error && trabajoAsociado && /trabajo_id|schema cache|column/i.test(error.message ?? "")) {
       const { trabajo_id: _trabajoId, ...payloadSinTrabajo } = payload as typeof payload & { trabajo_id?: string };
-      const retry = await supabase.from("seguimiento_comercial").insert(payloadSinTrabajo);
+      const retry = await supabase.from("seguimiento_comercial").insert([payloadSinTrabajo as any]);
       error = retry.error;
     }
+
     if (error) return toast.error(error.message);
     toast.success("Seguimiento registrado");
     setSegObs("");
