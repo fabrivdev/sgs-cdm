@@ -25,10 +25,10 @@ export function KpiStrip({ children, className }: { children: ReactNode; classNa
 
 export function KpiItem({ label, value, detail, tone = "default", icon, className }: { label: ReactNode; value: ReactNode; detail?: ReactNode; tone?: "default" | "positive" | "info" | "warning" | "danger"; icon?: ReactNode; className?: string }) {
   const tones = { default: "text-foreground", positive: "text-emerald-600", info: "text-blue-600", warning: "text-amber-600", danger: "text-destructive" };
-  return <div className={cn("flex min-w-0 flex-col justify-center gap-1 px-3 py-2.5", className)}>
-    <div className={cn("flex items-center justify-between gap-2", cardLabel)}><span className="truncate">{label}</span>{icon && <span className="shrink-0 text-muted-foreground [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}</div>
+  return <div className={cn("flex min-w-0 flex-col justify-start gap-1 px-3 py-2.5", className)}>
+    <div className={cn("flex h-4 items-center justify-between gap-2", cardLabel)}><span className="truncate">{label}</span>{icon && <span className="shrink-0 text-muted-foreground [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}</div>
     <div className={cn(kpiValue, tones[tone])}>{value}</div>
-    {detail && <div className="truncate text-[10px] leading-4 text-muted-foreground">{detail}</div>}
+    <div className="h-4 truncate text-[10px] leading-4 text-muted-foreground">{detail ?? <span aria-hidden>&nbsp;</span>}</div>
   </div>;
 }
 
