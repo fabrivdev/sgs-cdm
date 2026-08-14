@@ -3388,10 +3388,7 @@ export default function Dashboard() {
             <Card className="flex h-full min-w-0 flex-col p-3">
             <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
-                  <h2 className="truncate text-[13px] font-semibold leading-5">Evolucion de facturación</h2>
-                  <p className="truncate text-[10px] leading-3 text-muted-foreground">
-                    {format(periodStart, "dd/MM/yy")} - {format(periodEnd, "dd/MM/yy")} - clic en barra para selecciónar
-                  </p>
+                  <h2 className="truncate text-[13px] font-semibold leading-5">Evolución de facturación</h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <FactMetricSwitch value={factMetric} onChange={setFactMetric} />
@@ -3464,7 +3461,6 @@ export default function Dashboard() {
               <div className="mb-3 flex items-start justify-between">
                 <div className="min-w-0">
                   <h2 className="truncate text-[13px] font-semibold leading-5">Carga del equipo</h2>
-                  <p className="truncate text-xs text-muted-foreground">Trabajos y participación histórica por periodo</p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                   <CalendarDays className="h-4 w-4" />
@@ -3632,7 +3628,6 @@ export default function Dashboard() {
               <PanelTitle
                 icon={BarChart3}
                 title="Cumplimiento de agenda"
-                subtitle=""
               />
               <CumplimientoAgendaChart
                 rows={cumplimientoAgenda}
@@ -3643,7 +3638,6 @@ export default function Dashboard() {
               <PanelTitle
                 icon={Users}
                 title="No realizadas por técnico"
-                subtitle=""
               />
               <TecnicosNoRealizadosRanking
                 rows={tecnicosNoRealizados}
@@ -3659,8 +3653,7 @@ export default function Dashboard() {
           <Card className="flex flex-col p-3">
             <PanelTitle
               icon={CalendarDays}
-              title="Matriz técnicos / periodo"
-              subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} · actividad por sucursal del técnico`}
+              title="Matriz técnicos / periodo" - ${format(periodEnd, "dd/MM/yy")} · actividad por sucursal del técnico`}
             />
             <MatrizTécnicosDías
               data={matrizTécnicosDías}
@@ -3678,7 +3671,7 @@ export default function Dashboard() {
 
           <section className="grid gap-3 xl:grid-cols-[1fr_1.1fr]">
             <Card className="flex h-full flex-col p-3">
-              <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle="" />
+              <PanelTitle icon={BarChart3} title="Estado de trabajos" />
               <EstadoCompacto
                 flujo={flujo}
                 onSelect={(estado) => setFEstadosTrabajo([estado])}
