@@ -8,6 +8,7 @@ import {
   Download,
   History,
   Package,
+  RefreshCw,
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -618,11 +619,23 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
               )}
 
               {historialError && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                  <p>No se pudo cargar el historial unificado. Verificá que la migración de ventas históricas esté aplicada.</p>
-                  <p className="mt-1 break-words text-xs opacity-80">
-                    {mensajeError(ventasQuery.error)}
-                  </p>
+                <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p>No se pudo consultar el historial. La información de stock sigue disponible.</p>
+                    <p className="mt-1 break-words text-xs opacity-80">
+                      {mensajeError(ventasQuery.error)}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 border-destructive/30 bg-background text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => ventasQuery.refetch()}
+                  >
+                    <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                    Reintentar
+                  </Button>
                 </div>
               )}
 

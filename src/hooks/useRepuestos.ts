@@ -196,6 +196,8 @@ export function useVentasRepuesto(productoCodigo: string | null) {
     queryKey: ["repuestos", "ventas_unificadas", productoCodigo],
     enabled: Boolean(productoCodigo),
     staleTime: STALE_TIME,
+    retry: 1,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (!productoCodigo) return [];
 

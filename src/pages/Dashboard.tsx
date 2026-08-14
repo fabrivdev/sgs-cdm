@@ -249,6 +249,24 @@ async function cargarTodo<T>(queryBuilder: any): Promise<T[]> {
   return all;
 }
 
+const DASHBOARD_CACHE_TTL = 5 * 60 * 1000;
+
+type DashboardBaseCache = {
+  cachedAt: number;
+  servicios: Servicio[];
+  trabajos: Trabajo[];
+  clientes: Cliente[];
+  profiles: Profile[];
+  roles: UserRole[];
+};
+
+let dashboardBaseCache: DashboardBaseCache | null = null;
+const dashboardFacturacionCache = new Map<string, { cachedAt: number; rows: Facturacion[] }>();
+
+function cacheVigente(cachedAt: number) {
+  return Date.now() - cachedAt < DASHBOARD_CACHE_TTL;
+}
+
 async function cargarProfilesDashboard(): Promise<Profile[]> {
   const selectVariants = [
     "id, nombre, sucursal, activo, actualizado_en, desactivado_en",
@@ -282,6 +300,20 @@ async function cargarProfilesDashboard(): Promise<Profile[]> {
 
 function dateKey(date: Date) {
   return format(date, "yyyy-MM-dd");
+}
+
+function rangosAnuales(desde: Date, hasta: Date) {
+  const rangos: Array<{ desde: Date; hasta: Date }> = [];
+  let cursor = desde;
+
+  while (cursor <= hasta) {
+    const cierreAnual = endOfYear(cursor);
+    const cierre = cierreAnual < hasta ? cierreAnual : hasta;
+    rangos.push({ desde: cursor, hasta: cierre });
+    cursor = addDays(cierre, 1);
+  }
+
+  return rangos;
 }
 
 function inRange(date: string, start: Date, end: Date) {
@@ -390,28 +422,6 @@ function servicePeriodBuckets(start: Date, end: Date, mode: PeriodMode) {
       dateTo: format(rawEnd > end ? end : rawEnd, "yyyy-MM-dd"),
     };
   });
-}
-
-function parseQuantity(value: unknown) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const raw = String(value ?? "").trim();
-  if (!raw) return 0;
-  const cleaned = raw
-    .replace(/[^\d,.-]/g, "")
-    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
-    .replace(",", ".");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function rawQuantity(rawData: Record<string, unknown> | null | undefined) {
-  if (!rawData) return 0;
-  return parseQuantity(
-    rawData["Cant. Unit."] ??
-      rawData["Cant Unit"] ??
-      rawData["Cantidad"] ??
-      rawData["cantidad"],
-  );
 }
 
 function applyOSRubros(row: OSImpactRow, rubros: OSRubro[]): OSImpactRow {
@@ -628,7 +638,10 @@ export default function Dashboard() {
   const [osDetailMode, setOsDetailMode] = useState<"os" | "cliente">("os");
   const [showAllMobileTrabajos, setShowAllMobileTrabajos] = useState(false);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
-  const loading = baseLoading || jornadasLoading || facturaciónLoading;
+  // La vista financiera no debe quedar bloqueada por perfiles o jornadas,
+  // que se cargan en paralelo y solo alimentan los paneles operativos.
+  const loading = facturaciónLoading;
+  const operationalLoading = baseLoading || jornadasLoading;
   const filtrosTrabajoActivos = section === "trabajos";
   const filtrosOSActivos = section === "os" || section === "servicios";
   const filtrosServiciosActivos = section === "servicios";
@@ -784,9 +797,27 @@ export default function Dashboard() {
   useEffect(() => {
     let alive = true;
 
+    if (dashboardBaseCache && cacheVigente(dashboardBaseCache.cachedAt)) {
+      setServicios(dashboardBaseCache.servicios);
+      setTrabajos(dashboardBaseCache.trabajos);
+      setClientes(dashboardBaseCache.clientes);
+      setProfiles(dashboardBaseCache.profiles);
+      setUserRoles(dashboardBaseCache.roles);
+      setBaseLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
+
     (async () => {
       setBaseLoading(true);
       try {
+        // Perfiles y roles comienzan al mismo tiempo que los datos base; antes
+        // se esperaban como una segunda fase y alargaban el bloqueo inicial.
+        const accessRowsPromise = Promise.allSettled([
+          cargarProfilesDashboard(),
+          cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
+        ]);
         const [serviciosRows, trabajosRows, clientesRows] = await Promise.all([
           cargarTodo<Servicio>(
             supabase
@@ -806,22 +837,30 @@ export default function Dashboard() {
         setTrabajos(trabajosRows);
         setClientes(clientesRows);
 
-        const [profilesResult, rolesResult] = await Promise.allSettled([
-          cargarProfilesDashboard(),
-          cargarTodo<UserRole>(supabase.from("user_roles").select("user_id, role")),
-        ]);
+        const [profilesResult, rolesResult] = await accessRowsPromise;
 
         if (!alive) return;
+        const profileRows = profilesResult.status === "fulfilled" ? profilesResult.value : [];
+        const roleRows = rolesResult.status === "fulfilled" ? rolesResult.value : [];
         if (profilesResult.status === "fulfilled") {
-          setProfiles(profilesResult.value);
+          setProfiles(profileRows);
         } else {
           console.error("Error cargando perfiles del dashboard", profilesResult.reason);
         }
         if (rolesResult.status === "fulfilled") {
-          setUserRoles(rolesResult.value);
+          setUserRoles(roleRows);
         } else {
           console.error("Error cargando roles del dashboard", rolesResult.reason);
         }
+
+        dashboardBaseCache = {
+          cachedAt: Date.now(),
+          servicios: serviciosRows,
+          trabajos: trabajosRows,
+          clientes: clientesRows,
+          profiles: profileRows,
+          roles: roleRows,
+        };
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         toast.error(`Error cargando datos del dashboard: ${msg}`);
@@ -878,11 +917,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     let alive = true;
+    const cacheKey = `${dateKey(queryStart)}:${dateKey(queryEnd)}`;
+    const cached = dashboardFacturacionCache.get(cacheKey);
+
+    if (cached && cacheVigente(cached.cachedAt)) {
+      setFacturacion(cached.rows);
+      setFacturacionLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
 
     (async () => {
       setFacturacionLoading(true);
       try {
-        const cargarFacturacionHistorica = async () => {
+        const rangos = rangosAnuales(queryStart, queryEnd);
+        const cargarFacturacionHistorica = async (desde: Date, hasta: Date) => {
           const build = (cols: string) =>
             supabase
               .from("facturacion")
@@ -894,8 +944,8 @@ export default function Dashboard() {
               // "GS") -- filtrar estricto tiraria tambien todo ese historico.
               // Se excluye unicamente lo confirmado en guaranies.
               .or("moneda.neq.GS,moneda.is.null")
-              .gte("fecha", dateKey(queryStart))
-              .lte("fecha", dateKey(queryEnd))
+              .gte("fecha", dateKey(desde))
+              .lte("fecha", dateKey(hasta))
               .order("fecha", { ascending: false });
 
           try {
@@ -912,21 +962,24 @@ export default function Dashboard() {
           }
         };
 
-
-        const gridQuery = (supabase
+        const cargarFacturacionDetallada = (desde: Date, hasta: Date) => cargarTodo<any>(supabase
           .from("facturacion_lineas_importadas" as any)
           .select(
-            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, cod_mercaderia, codigo_fabricante, mercaderia, observacion, raw_data, subgrupo_original, grupo_normalizado, marca_normalizada, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
+            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, subgrupo_original, grupo_normalizado, marca_normalizada, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
           )
           .or("moneda.neq.GS,moneda.is.null")
-          .gte("fecha_factura", dateKey(queryStart))
-          .lte("fecha_factura", `${dateKey(queryEnd)}T23:59:59`)
+          .gte("fecha_factura", dateKey(desde))
+          .lte("fecha_factura", `${dateKey(hasta)}T23:59:59`)
           .order("fecha_factura", { ascending: false }) as any);
 
-        const [legacyRows, gridRowsRaw] = await Promise.all([
-          cargarFacturacionHistorica(),
-          cargarTodo<any>(gridQuery),
+        // Cada año se pagina de forma independiente. Esto aprovecha consultas
+        // concurrentes acotadas y evita una unica cadena de cientos de paginas.
+        const [legacyChunks, gridChunks] = await Promise.all([
+          Promise.all(rangos.map((rango) => cargarFacturacionHistorica(rango.desde, rango.hasta))),
+          Promise.all(rangos.map((rango) => cargarFacturacionDetallada(rango.desde, rango.hasta))),
         ]);
+        const legacyRows = legacyChunks.flat();
+        const gridRowsRaw = gridChunks.flat();
 
         const gridCamposYears = new Set(
           gridRowsRaw
@@ -969,18 +1022,20 @@ export default function Dashboard() {
             cliente_id: null,
             entidad_nombre: row.entidad_nombre ?? "CAMPOS DEL MANANA S.A.",
             total_venta: Number(row.total_venta || 0),
-            cantidad: Number(row.cantidad || 0) || rawQuantity(row.raw_data),
+            cantidad: Number(row.cantidad || 0),
             grupo: row.subgrupo_original ?? row.grupo_normalizado ?? null,
             grupo_fx: row.grupo_normalizado ?? null,
             cod_factura: factura,
             tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
             marca: (row.marca_normalizada ?? clasificarMarcaFacturacion(row.subgrupo_original ?? row.grupo_normalizado)) as Marca,
             origen_sistema: row.origen_sistema ?? "grid_campos",
-            raw_data: row.raw_data ?? null,
+            raw_data: null,
           };
         });
 
-        if (alive) setFacturacion([...legacyRowsNormalizados, ...gridRows]);
+        const rows = [...legacyRowsNormalizados, ...gridRows];
+        dashboardFacturacionCache.set(cacheKey, { cachedAt: Date.now(), rows });
+        if (alive) setFacturacion(rows);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         toast.error(`Error cargando facturacion: ${msg}`);
@@ -1221,9 +1276,20 @@ export default function Dashboard() {
     return map;
   }, [ordenesServicio]);
 
+  const ordenServicioByFactura = useMemo(() => {
+    const map = new Map<string, OrdenServicioImportada>();
+    for (const row of ordenesServicio) {
+      const key = String(row.factura ?? "").trim();
+      if (key) map.set(key, row);
+    }
+    return map;
+  }, [ordenesServicio]);
+
   const linkedOSNumber = (row: Facturacion) => {
     const raw = row.raw_data as Record<string, unknown> | null | undefined;
-    return String(raw?.linked_service_order ?? "").trim();
+    const explicit = String(raw?.linked_service_order ?? "").trim();
+    if (explicit) return explicit;
+    return String(ordenServicioByFactura.get(String(row.cod_factura ?? "").trim())?.os_numero ?? "").trim();
   };
 
   const responsablesOSOptions = useMemo(
@@ -1904,7 +1970,7 @@ export default function Dashboard() {
       ...row,
       variacion: pct(row.total, row.comparisonTotal),
     }));
-  }, [factFiltered, ordenServicioByNumero, periodMode, periodStart, periodEnd, clienteById]);
+  }, [factFiltered, ordenServicioByFactura, ordenServicioByNumero, periodMode, periodStart, periodEnd, clienteById]);
 
   const selectedWeek = selectedWeekKey ? weeklyRows.find((row) => row.key === selectedWeekKey) : undefined;
   const selectedFacts = selectedWeek ? selectedWeek.rows : allPeriodFacts;
@@ -2236,7 +2302,7 @@ export default function Dashboard() {
       variacion: variacionTotalPct,
       rows: allPeriodFacts,
     };
-  }, [allPeriodFacts, ordenServicioByNumero, totalPeriodo, facturasPeriodo, clientesAtendidosSemana, totalPrevPeriodo, periodStart, periodEnd, periodComparisonLabel, variacionTotalPct]);
+  }, [allPeriodFacts, ordenServicioByFactura, ordenServicioByNumero, totalPeriodo, facturasPeriodo, clientesAtendidosSemana, totalPrevPeriodo, periodStart, periodEnd, periodComparisonLabel, variacionTotalPct]);
 
   // Textos derivados del agrupador elegido.
   const periodoLabel =
@@ -3376,7 +3442,7 @@ export default function Dashboard() {
           </section>
 
           {/* FILA 3 - OPERATIVA */}
-          <section className="grid gap-3 md:grid-cols-2">
+          <section className="grid gap-3 md:grid-cols-2" aria-busy={operationalLoading}>
             <Card className="flex h-full flex-col p-3">
               <PanelTitle icon={BarChart3} title="Estado de trabajos" subtitle={`${format(periodStart, "dd/MM/yy")} - ${format(periodEnd, "dd/MM/yy")} - clic filtra en Trabajos`} />
               <EstadoCompacto
