@@ -331,7 +331,7 @@ export function MaquinasTab({
           </div>
         }
         expanded={
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="flex flex-col gap-3">
             <FilterCustom label="Año desde" width="w-full">
               <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-8 text-[12px]" placeholder="2010" />
             </FilterCustom>
