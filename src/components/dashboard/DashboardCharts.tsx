@@ -3119,9 +3119,7 @@ export function ServiciosDashboard({
           const Icon = kpi.icon;
           return (
             <div key={kpi.label} className="relative min-h-[92px] rounded-md border bg-card p-3">
-              <div className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon className="h-4 w-4" />
-              </div>
+              <Icon className="absolute right-3 top-3 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <div className={cn("pr-10", cardLabel)}>{kpi.label}</div>
               <div className="mt-2 text-[18px] font-extrabold leading-tight tabular-nums">{kpi.value}</div>
               <div className="mt-2 text-[11px] text-muted-foreground">{kpi.detail}</div>

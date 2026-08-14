@@ -773,9 +773,7 @@ function AgendaMetricCard({
             <div className={cn("mt-1 text-[18px] font-bold tabular-nums", accent)}>{value}</div>
             <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
           </div>
-          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted", accent)}>
-            <Icon className="h-4 w-4" />
-          </div>
+          <Icon className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground", accent)} />
         </div>
       </CardContent>
     </Card>
