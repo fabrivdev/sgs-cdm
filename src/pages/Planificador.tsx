@@ -583,7 +583,7 @@ export default function Planificador() {
         expanded={<>
           <FilterSelect label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-full" options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]} />
           <FilterSelect label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full" options={[{ value: "all", label: "Todos" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]} />
-          <FilterCustom label="Lectura" width="w-full"><Button type="button" variant={soloPrincipalesSemana ? "default" : "outline"} size="sm" className="h-9 w-full" disabled={fSemana === "all"} onClick={() => setSoloPrincipalesSemana((value) => !value)}>Solo principales</Button></FilterCustom>
+          <FilterCustom label="Lectura" width="w-full"><Button type="button" variant={soloPrincipalesSemana ? "default" : "outline"} size="sm" className="h-8 w-full" disabled={fSemana === "all"} onClick={() => setSoloPrincipalesSemana((value) => !value)}>Solo principales</Button></FilterCustom>
         </>}
       >
         <FilterSelect
@@ -595,12 +595,12 @@ export default function Planificador() {
           options={[{ value: "all", label: "Todos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
         />
         <FilterCustom label="Semana" width="w-[230px]">
-          <div className="flex h-9 overflow-hidden rounded-md border bg-background">
+          <div className="flex h-8 overflow-hidden rounded-md border bg-background">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-none border-r"
+              className="h-8 w-8 shrink-0 rounded-none border-r"
               onClick={() => moverSemana(-1)}
               disabled={fSemana !== "all" && Number(fSemana) <= 1}
               title="Semana anterior"
@@ -608,7 +608,7 @@ export default function Planificador() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Select value={fSemana} onValueChange={setFSemana}>
-              <SelectTrigger className="h-9 min-w-0 flex-1 rounded-none border-0 px-2 text-[12px] shadow-none focus:ring-0">
+              <SelectTrigger className="h-8 min-w-0 flex-1 rounded-none border-0 px-2 text-[12px] shadow-none focus:ring-0">
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="max-h-[280px] min-w-[--radix-select-trigger-width]">
@@ -624,7 +624,7 @@ export default function Planificador() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-none border-l"
+              className="h-8 w-8 shrink-0 rounded-none border-l"
               onClick={() => moverSemana(1)}
               disabled={fSemana !== "all" && Number(fSemana) >= 53}
               title="Semana siguiente"
@@ -643,14 +643,14 @@ export default function Planificador() {
           <Table className={tableText}>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="h-9 px-3 py-2 w-[92px]">Fecha</TableHead>
-                <TableHead className="h-9 px-3 py-2">Cliente</TableHead>
-                <TableHead className="h-9 px-3 py-2">Trabajo</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[120px]">Marca / Tipo</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[150px]">Responsable</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[80px]">Suc.</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[110px]">Resultado</TableHead>
-                <TableHead className="h-9 px-3 py-2 w-[50px] text-right">Hs</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[92px]">Fecha</TableHead>
+                <TableHead className="h-8 px-3 py-1.5">Cliente</TableHead>
+                <TableHead className="h-8 px-3 py-1.5">Trabajo</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[110px]">Marca</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[150px]">Responsable</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[80px]">Suc.</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[110px]">Resultado</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[50px] text-right">Hs</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -669,8 +669,6 @@ export default function Planificador() {
 
               {displayed.map((s) => {
                 const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
-                const tipo = s.tipo_trabajo ?? "Visita de campo";
-                const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
                 const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
                 const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
                 const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
@@ -690,7 +688,7 @@ export default function Planificador() {
                       }
                     }}
                   >
-                    <TableCell className="px-3 py-2 align-top">
+                    <TableCell className="px-3 py-1.5 align-top">
                       <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
                         {fechaLabel}
                         {continuidad && continuidad.total > 1 && (
@@ -702,11 +700,11 @@ export default function Planificador() {
                       <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
+                    <TableCell className="px-3 py-1.5 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
                       {clienteNombre}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
+                    <TableCell className="px-3 py-1.5 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
                       <div className="flex items-center gap-1.5">
                         {refByServicio.get(s.id)?.ref && (
                           <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
@@ -717,29 +715,24 @@ export default function Planificador() {
                       </div>
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top">
-                      <div className="flex flex-col gap-1">
-                        <MarcaBadge marca={s.marca} className="self-start text-[10px]" />
-                        <Badge variant="outline" className="self-start gap-0.5 px-1.5 py-0 text-[10px] font-normal">
-                          <TipoIcon className="h-2.5 w-2.5" />
-                          {tipo === "Máquina en taller" ? "Taller" : "Visita"}
-                        </Badge>
-                      </div>
+                    <TableCell className="px-3 py-1.5 align-middle">
+                      <MarcaBadge marca={s.marca} className="self-start text-[10px]" />
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top truncate" title={responsableNombre}>
+
+                    <TableCell className="px-3 py-1.5 align-top truncate" title={responsableNombre}>
                       {responsableNombre}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top text-[12px] text-muted-foreground">
+                    <TableCell className="px-3 py-1.5 align-top text-[12px] text-muted-foreground">
                       {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top">
+                    <TableCell className="px-3 py-1.5 align-top">
                       <EstadoBadge estado={s.estado} />
                     </TableCell>
 
-                    <TableCell className="px-3 py-2 align-top text-right tabular-nums">
+                    <TableCell className="px-3 py-1.5 align-top text-right tabular-nums">
                       {s.horas_trabajadas ?? "—"}
                     </TableCell>
                   </TableRow>
