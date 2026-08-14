@@ -1,64 +1,53 @@
-## Problema
+# Estandarización tipográfica y compactación visual
 
-En el Dashboard, la facturación, las horas de servicio y los km facturados aparecen todos en `$ 0` / vacíos. La consola muestra repetidamente:
+Aplicar una escala tipográfica más compacta y consistente en toda la app, reduciendo tamaños de títulos, filtros, KPIs y cards para mostrar más contenido sin perder jerarquía.
 
-```
-TypeError: ye.from(...).gte is not a function
-```
+## Alcance
+Toda la app (Dashboard, Trabajos, Planificador, Calendario, Parque, Repuestos, Admin, etc.).
 
-Esto se origina en `src/pages/Dashboard.tsx` (líneas 417-437), donde se arma la consulta a la tabla `facturacion` así:
+## Objetivos
+1. Títulos de sección más pequeños y uniformes.
+2. Labels de filtros más compactos y con márgenes definidos.
+3. KPIs de cards reducidos para evitar que el texto se choque.
+4. Títulos de gráficos alineados a una sola escala.
+5. Densidad general más alta sin sacrificar legibilidad.
 
-```ts
-const base = () =>
-  supabase
-    .from("facturacion")
-    .gte("fecha", dateKey(queryStart))   // ❌ .gte no existe aquí
-    .lte("fecha", dateKey(queryEnd))
-    .order("fecha", { ascending: false });
+## Cambios técnicos
 
-return await cargarTodo<Facturacion>(
-  base().select("fecha, sucursal, tipo, ..."),
-);
-```
+### 1. Tokens de UI compartidos (`src/lib/ui-classes.ts`)
+- Reducir `pageTitle` de `text-[24px]` a `text-[18px]` (con `leading-tight`).
+- Reducir `sectionTitle` de `text-[15px]` a `text-[13px]`.
+- Reducir `cardLabel` de `text-[11px]` a `text-[10px]` y ajustar `leading`/`tracking` para mayor compactación.
+- Mantener `metaText` en `text-[10px]`.
+- Ajustar `tableText` a `text-[12px]` si aplica.
 
-En supabase-js v2 los filtros (`.gte`, `.lte`, `.eq`, `.order`, etc.) sólo están disponibles después de llamar a `.select(...)`. Como `base()` los aplica antes, la llamada lanza una excepción que el `try/catch` traga, y la facturación histórica nunca se carga.
+### 2. Primitivas de layout (`src/components/layout/AppPrimitives.tsx`)
+- `PageHeader`: reducir padding/gap, aplicar el nuevo `pageTitle`.
+- `KpiStrip` / `KpiItem`: reducir valor principal (`text-[24px]` → `text-[18px]`), labels (`text-[11px]` → `text-[10px]`), y padding interno (`px-3 py-2` → `px-2.5 py-1.5`).
+- `Panel` / `SectionHeader`: reducir padding y título (`text-[15px]` → `text-[13px]`).
 
-Resultado: sólo se intenta cargar `facturacion_lineas_importadas` (grid_campos), y el array de `facturacion` termina mayormente vacío → todos los KPIs derivados (total, horas servicio basadas en `cantidad`, km facturados basados en `cantidad`, evolución, top clientes, etc.) muestran 0.
+### 3. Barra de filtros (`src/components/filters/FiltersBar.tsx`)
+- Reducir altura de controles (`h-9` → `h-8` en selectores/inputs).
+- Reducir gap entre fields (`gap-1` → `gap-1` o `gap-0.5`).
+- Ajustar labels con el nuevo `cardLabel`.
+- Reducir padding del card contenedor (`px-2 py-1` → `px-2 py-1.5` o similar, manteniendo inline).
 
-## Cambio
+### 4. Dashboard (`src/pages/Dashboard.tsx`)
+- Reemplazar títulos sueltos (`text-base`, `text-sm`) por `SectionHeader` o `PanelTitle` con `sectionTitle`.
+- Reducir mini-cards internas (Carga del equipo, facturación por sucursal) a valores `text-[16px]` y labels `text-[9px]`.
+- Alinear títulos de gráficos: `Evolución de facturación`, `Estado de trabajos`, `Carga por sucursal`, `Matriz técnicos / periodo`, `Distribución por marca`, etc.
+- Reducir espaciado entre secciones (`space-y-2.5` → `space-y-2`).
 
-En `src/pages/Dashboard.tsx`, dentro del `useEffect` de carga de facturación, reescribir `cargarFacturacionHistorica` para que los filtros se apliquen **después** de `.select(...)`:
+### 5. Otras páginas principales
+- `Trabajos.tsx`, `Planificador.tsx`, `Calendario.tsx`, `ParqueClientes.tsx`, `Repuestos.tsx`, `Admin.tsx`: revisar que usen `PageHeader`, `SectionHeader`, `PanelTitle` y ajustar títulos sueltos.
+- Revisar tablas para evitar doble padding grande en celdas.
 
-```ts
-const cargarFacturacionHistorica = async () => {
-  const build = (cols: string) =>
-    supabase
-      .from("facturacion")
-      .select(cols)
-      .gte("fecha", dateKey(queryStart))
-      .lte("fecha", dateKey(queryEnd))
-      .order("fecha", { ascending: false });
+### 6. Verificación
+- Ejecutar `npm run build` para detectar errores de tipos.
+- Revisar visualmente Dashboard y Trabajos en preview para confirmar que no haya textos cortados ni choques.
+- Ajustar casos puntuales de overflow si aparecen.
 
-  try {
-    return await cargarTodo<Facturacion>(
-      build("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, cantidad, grupo, grupo_fx, cod_factura"),
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes("cantidad")) throw error;
-    const rows = await cargarTodo<Omit<Facturacion, "cantidad">>(
-      build("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura"),
-    );
-    return rows.map((row) => ({ ...row, cantidad: 0 }));
-  }
-};
-```
-
-Sin otros cambios: la consulta a `facturacion_lineas_importadas`, el armado de `legacyRowsNormalizados`/`gridRows` y toda la lógica de cálculo (concept, horas por `cantidad`, km por `cantidad`) ya están correctas y vuelven a funcionar en cuanto los datos legacy se carguen.
-
-## Verificación
-
-- Recargar `/dashboard`: el error `gte is not a function` debe desaparecer de la consola.
-- El total de facturación, "Horas servicio" y "Km fact." vuelven a mostrar valores reales.
-
-Fuera de alcance: cualquier otro ajuste visual del dashboard.
+## Notas
+- Se respeta el color de marca verde olivo existente y el sistema de tokens de Tailwind.
+- No se modifica lógica de negocio, solo presentación.
+- No se agregan nuevas dependencias.
