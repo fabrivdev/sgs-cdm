@@ -8,16 +8,29 @@ let lanyardModule: LanyardModule | null = null;
 let lanyardReadyPromise: Promise<boolean> | null = null;
 let lanyardFailed = false;
 
-const CARD_IMAGES = ["/offline-card.svg", "/offline-lanyard.svg", "/sig-cdm-logo.png"];
+const CARD_IMAGES = ["/offline-card.svg", "/offline-lanyard.svg", "/sig-cdm-logo.png"] as const;
 
-function preloadImage(src: string) {
-  return new Promise<void>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error(src));
-    image.src = src;
-  });
+// Images are inlined as data URLs while online: the 3D texture loader would
+// otherwise re-request them from the network at the exact moment there is none.
+const inlinedImages: Record<string, string> = {};
+
+function inlineImage(src: string) {
+  return fetch(src)
+    .then((res) => res.blob())
+    .then(
+      (blob) =>
+        new Promise<void>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            inlinedImages[src] = String(reader.result);
+            resolve();
+          };
+          reader.onerror = () => reject(new Error(src));
+          reader.readAsDataURL(blob);
+        })
+    );
 }
+
 
 // Warm up the heavy 3D runtime and its assets while the network is available.
 // Any failure is contained here: the offline card then falls back to the
