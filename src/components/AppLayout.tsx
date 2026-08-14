@@ -15,7 +15,6 @@ import {
   Package,
   ShoppingCart,
   Sparkles,
-  CircleHelp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
