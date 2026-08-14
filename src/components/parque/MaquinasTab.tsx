@@ -333,10 +333,10 @@ export function MaquinasTab({
         expanded={
           <div className="grid gap-2 sm:grid-cols-3">
             <FilterCustom label="Año desde" width="w-full">
-              <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-9 text-[12px]" placeholder="2010" />
+              <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-8 text-[12px]" placeholder="2010" />
             </FilterCustom>
             <FilterCustom label="Año hasta" width="w-full">
-              <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-9 text-[12px]" placeholder={String(hoy)} />
+              <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-8 text-[12px]" placeholder={String(hoy)} />
             </FilterCustom>
             <FilterSelect
               label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full"

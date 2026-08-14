@@ -14,7 +14,7 @@ export interface MultiOption {
 
 /**
  * Multi-select compacto para usar dentro de FiltersBar.
- * Misma altura (h-9) que FilterSelect. Popover con checkboxes.
+ * Misma altura (h-8) que FilterSelect. Popover con checkboxes.
  */
 export function FilterMultiSelect({
   label,
