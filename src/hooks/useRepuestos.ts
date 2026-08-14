@@ -116,6 +116,25 @@ export function useStockMatriz(filtros: StockFiltros, page: number, sortKey: Sto
   });
 }
 
+/** Fila de stock por sucursal de un único producto (para el panel de detalle abierto desde otros módulos). */
+export function useStockMatrizProducto(productoCodigo: string | null) {
+  return useQuery({
+    queryKey: ["repuestos", "stock_matriz_producto", productoCodigo],
+    enabled: Boolean(productoCodigo),
+    staleTime: STALE_TIME,
+    queryFn: async () => {
+      if (!productoCodigo) return null;
+      const { data, error } = await (supabase.from("v_repuestos_stock_matriz" as any) as any)
+        .select(STOCK_MATRIZ_COLUMNS)
+        .eq("codigo_interno", productoCodigo)
+        .maybeSingle();
+      if (error) return null;
+      return (data ?? null) as StockMatrizRow | null;
+    },
+  });
+}
+
+
 /** Trae todas las filas que matchean los filtros (sin paginar), para exportar, en el mismo orden que se ve en pantalla. */
 export async function fetchStockMatrizCompleto(
   filtros: StockFiltros,
