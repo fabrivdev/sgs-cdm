@@ -830,10 +830,24 @@ export default function RepuestosSugerencias() {
       </Card>
 
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
-      <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {
-        void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
-        setSelected(null);
-      }} />
+      <DetalleRepuestoSheet
+        producto={selected ? {
+          codigo_interno: selected.producto_codigo,
+          descripcion: selected.descripcion,
+          codigo_fabricante: selected.codigo_fabricante,
+          marca: selected.marca,
+          familia: selected.familia,
+        } : null}
+        onClose={() => setSelected(null)}
+        sugerencia={selected}
+        canManage={canManage}
+        tabInicial="planificacion"
+        onSugerenciaGuardada={() => {
+          void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
+          setSelected(null);
+        }}
+      />
+
     </div>
   );
 }
