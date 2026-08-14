@@ -583,7 +583,7 @@ export default function Planificador() {
         expanded={<>
           <FilterSelect label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-full" options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]} />
           <FilterSelect label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full" options={[{ value: "all", label: "Todos" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]} />
-          <FilterCustom label="Lectura" width="w-full"><Button type="button" variant={soloPrincipalesSemana ? "default" : "outline"} size="sm" className="h-9 w-full" disabled={fSemana === "all"} onClick={() => setSoloPrincipalesSemana((value) => !value)}>Solo principales</Button></FilterCustom>
+          <FilterCustom label="Lectura" width="w-full"><Button type="button" variant={soloPrincipalesSemana ? "default" : "outline"} size="sm" className="h-8 w-full" disabled={fSemana === "all"} onClick={() => setSoloPrincipalesSemana((value) => !value)}>Solo principales</Button></FilterCustom>
         </>}
       >
         <FilterSelect
@@ -595,12 +595,12 @@ export default function Planificador() {
           options={[{ value: "all", label: "Todos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
         />
         <FilterCustom label="Semana" width="w-[230px]">
-          <div className="flex h-9 overflow-hidden rounded-md border bg-background">
+          <div className="flex h-8 overflow-hidden rounded-md border bg-background">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-none border-r"
+              className="h-8 w-8 shrink-0 rounded-none border-r"
               onClick={() => moverSemana(-1)}
               disabled={fSemana !== "all" && Number(fSemana) <= 1}
               title="Semana anterior"
@@ -608,7 +608,7 @@ export default function Planificador() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Select value={fSemana} onValueChange={setFSemana}>
-              <SelectTrigger className="h-9 min-w-0 flex-1 rounded-none border-0 px-2 text-[12px] shadow-none focus:ring-0">
+              <SelectTrigger className="h-8 min-w-0 flex-1 rounded-none border-0 px-2 text-[12px] shadow-none focus:ring-0">
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="max-h-[280px] min-w-[--radix-select-trigger-width]">
@@ -624,7 +624,7 @@ export default function Planificador() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-none border-l"
+              className="h-8 w-8 shrink-0 rounded-none border-l"
               onClick={() => moverSemana(1)}
               disabled={fSemana !== "all" && Number(fSemana) >= 53}
               title="Semana siguiente"
