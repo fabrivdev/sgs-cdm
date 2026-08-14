@@ -59,7 +59,7 @@ function ensureLanyardReady(): Promise<boolean> {
         drei.useTexture.preload(lanyardPng);
       })(),
 
-      ...CARD_IMAGES.map(preloadImage),
+      ...CARD_IMAGES.map(inlineImage),
     ])
       .then(() => true)
       .catch(() => {
