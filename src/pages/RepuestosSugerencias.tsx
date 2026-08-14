@@ -404,6 +404,7 @@ export default function RepuestosSugerencias() {
     historySourceVersion,
   );
   const rows = liveQuery.data?.rows ?? [];
+  const leadTimeMeses = modelQuery.data?.lead_time_meses ?? 3;
   const liveSummary = liveQuery.data?.resumen;
   const totalPages = Math.max(1, Math.ceil((liveQuery.data?.total_filtrado ?? 0) / 50));
   const segmentOptions = useMemo(() => [
