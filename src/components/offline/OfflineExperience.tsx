@@ -30,6 +30,23 @@ function ensureLanyardReady(): Promise<boolean> {
       import("@/components/Lanyard").then((mod) => {
         lanyardModule = mod;
       }),
+      // The physics engine chunk + its WASM are fetched lazily by
+      // @react-three/rapier when <Physics> mounts. Download and initialise them
+      // now, while the network is up, so an offline mount never hits the network.
+      import("@dimforge/rapier3d-compat").then((RAPIER) => RAPIER.init()),
+      import("@react-three/rapier"),
+      // Card model + lanyard texture.
+      Promise.all([
+        import("@react-three/drei"),
+        import("@/components/card.glb?url" /* @vite-ignore */).catch(() => null),
+      ]).then(async ([drei]) => {
+        const [{ default: cardGLB }, { default: lanyardPng }] = await Promise.all([
+          import("@/components/card.glb"),
+          import("@/components/lanyard.png"),
+        ]);
+        drei.useGLTF.preload(cardGLB);
+        drei.useTexture.preload(lanyardPng);
+      }),
       ...CARD_IMAGES.map(preloadImage),
     ])
       .then(() => true)
@@ -41,6 +58,7 @@ function ensureLanyardReady(): Promise<boolean> {
   }
   return lanyardReadyPromise;
 }
+
 
 if (typeof window !== "undefined") {
   void ensureLanyardReady();
