@@ -563,16 +563,40 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
       .sort((a, b) => b.clave.localeCompare(a.clave));
   }, [ventas]);
 
+  const resumen = [
+    { label: "Stock total", value: producto ? producto.total.toLocaleString("es-PY") : "—" },
+    {
+      label: "Unidades 12m",
+      value: historialCargando ? "…" : historialError ? "—" : unidades12m.toLocaleString("es-PY"),
+    },
+    {
+      label: "Facturación 12m",
+      value: historialCargando
+        ? "…"
+        : historialError
+          ? "—"
+          : `USD ${facturado12m.toLocaleString("es-PY", { maximumFractionDigits: 0 })}`,
+    },
+    {
+      label: "Promedio unid./mes",
+      value: historialCargando
+        ? "…"
+        : historialError
+          ? "—"
+          : promedioMensual.toLocaleString("es-PY", { maximumFractionDigits: 1 }),
+    },
+  ];
+
   return (
     <Sheet open={producto !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:w-[min(1120px,94vw)] sm:max-w-none">
+      <SheetContent side="right" className="flex h-full w-full flex-col gap-0 p-0 sm:w-[min(1120px,94vw)] sm:max-w-none">
         {producto && (
           <>
-            <SheetHeader className="border-b px-5 py-4 pr-12 text-left">
+            <SheetHeader className="border-b px-5 py-3 pr-12 text-left">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <SheetTitle className="text-[14px]">{producto.descripcion}</SheetTitle>
-                  <SheetDescription className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <SheetDescription className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
                     <span className="font-mono">{producto.codigo_interno}</span>
                     {producto.codigo_fabricante && <span>Fabricante: {producto.codigo_fabricante}</span>}
                   </SheetDescription>
@@ -581,144 +605,58 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
               </div>
             </SheetHeader>
 
-            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
-              <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                <KpiCard icon={Warehouse} value={producto.total.toLocaleString("es-PY")} label="Stock total" />
-                <KpiCard
-                  icon={Package}
-                  value={historialCargando ? "..." : historialError ? "—" : unidades12m.toLocaleString("es-PY")}
-                  label="Unidades vendidas 12m"
-                />
-                <KpiCard
-                  icon={DollarSign}
-                  value={historialCargando ? "..." : historialError ? "—" : `USD ${facturado12m.toLocaleString("es-PY", { maximumFractionDigits: 0 })}`}
-                  label="Facturación 12m"
-                />
-                <KpiCard
-                  icon={History}
-                  value={historialCargando ? "..." : historialError ? "—" : promedioMensual.toLocaleString("es-PY", { maximumFractionDigits: 1 })}
-                  label="Promedio unidades/mes"
-                />
-              </section>
-
-              {hermanos.length > 0 && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    Mismo código de fabricante que{" "}
-                    {hermanos.map((h, i) => (
-                      <span key={h.codigo_interno}>
-                        {i > 0 && ", "}
-                        <span className="font-mono font-medium">{h.codigo_interno}</span> ({h.descripcion})
-                      </span>
-                    ))}
-                    . La factura no distingue cuál se vendió realmente, así que las ventas de acá abajo podrían
-                    corresponder a cualquiera de estos códigos.
-                  </p>
+            {/* Resumen compacto */}
+            <div className="grid grid-cols-2 divide-x divide-y border-b sm:grid-cols-4 sm:divide-y-0">
+              {resumen.map((item) => (
+                <div key={item.label} className="px-4 py-2">
+                  <p className="text-[16px] font-semibold leading-6 tabular-nums tracking-[-0.02em]">{item.value}</p>
+                  <p className={cn(metaText, "truncate")}>{item.label}</p>
                 </div>
-              )}
+              ))}
+            </div>
 
-              {historialError && (
-                <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[13px] text-destructive sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p>No se pudo consultar el historial. La información de stock sigue disponible.</p>
-                    <p className="mt-1 break-words text-[12px] opacity-80">
-                      {mensajeError(ventasQuery.error)}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 border-destructive/30 bg-background text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => ventasQuery.refetch()}
-                  >
-                    <RefreshCw className="mr-2 h-3.5 w-3.5" />
-                    Reintentar
-                  </Button>
-                </div>
-              )}
+            {hermanos.length > 0 && (
+              <div
+                className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-900"
+                title={`Mismo código de fabricante que ${hermanos
+                  .map((h) => `${h.codigo_interno} (${h.descripcion})`)
+                  .join(", ")}. La factura no distingue cuál se vendió realmente.`}
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  Mismo código de fabricante que{" "}
+                  {hermanos.map((h) => h.codigo_interno).join(", ")} — las ventas pueden corresponder a cualquiera.
+                </span>
+              </div>
+            )}
 
-              <section className="grid gap-4 lg:grid-cols-2">
-                <div>
-                  <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
-                    <Warehouse className="h-4 w-4 text-primary" />
-                    Disponibilidad por sucursal
-                  </div>
-                  <div className="h-64 overflow-y-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className={th}>Sucursal</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Ventas 12M</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Ventas 24M</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Disponible</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {SUCURSAL_COLUMNAS.map((columna) => {
-                          const clave = normalizarSucursal(columna.label);
-                          return (
-                            <TableRow key={columna.key}>
-                              <TableCell className={td}>{columna.label}</TableCell>
-                              <TableCell className={cn(td, "text-right tabular-nums")}>
-                                {historialCargando ? "…" : historialError ? "—" : (vendidoPorSucursal.get(clave) ?? 0).toLocaleString("es-PY")}
-                              </TableCell>
-                              <TableCell className={cn(td, "text-right tabular-nums")}>
-                                {historialCargando ? "…" : historialError ? "—" : (vendidoPorSucursal24m.get(clave) ?? 0).toLocaleString("es-PY")}
-                              </TableCell>
-                              <TableCell className={cn(td, "text-right font-semibold tabular-nums")}>
-                                {Number(producto[columna.key] ?? 0).toLocaleString("es-PY")}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
+            {historialError && (
+              <div className="flex items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-1.5 text-[11px] text-destructive">
+                <span className="truncate" title={mensajeError(ventasQuery.error)}>
+                  No se pudo consultar el historial. El stock sigue disponible.
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 shrink-0 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => ventasQuery.refetch()}
+                >
+                  <RefreshCw className="mr-1 h-3 w-3" />
+                  Reintentar
+                </Button>
+              </div>
+            )}
 
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-2 text-[13px] font-semibold">
-                    <span className="flex items-center gap-2">
-                      <History className="h-4 w-4 text-primary" /> Evolución de consumo
-                    </span>
-                    <span className={metaText}>Últimos 12 meses</span>
-                  </div>
-                  <div className="flex h-64 items-end gap-2 rounded-md border px-3 pb-7 pt-8">
-                    {historialCargando && <p className="m-auto text-[12px] text-muted-foreground">Cargando consumo...</p>}
-                    {historialError && <p className="m-auto text-[12px] text-muted-foreground">Consumo no disponible.</p>}
-                    {!historialCargando && !historialError && ventas12m.length === 0 && (
-                      <p className="m-auto text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
-                    )}
-                    {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => {
-                      const altura = item.cantidad > 0 ? Math.max((item.cantidad / maxMensual) * 78, 4) : 0;
-                      return (
-                        <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
-                          {item.cantidad > 0 && (
-                            <span
-                              className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
-                              style={{ bottom: `calc(${altura}% + 5px)` }}
-                            >
-                              {Number(item.cantidad).toLocaleString("es-PY", { maximumFractionDigits: 1 })}
-                            </span>
-                          )}
-                          <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
-                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
-                            {item.mes.slice(5)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </section>
+            <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+                <TabsList className="h-8">
+                  <TabsTrigger value="ventas" className="h-6 text-[12px]">Ventas</TabsTrigger>
+                  <TabsTrigger value="sucursales" className="h-6 text-[12px]">Sucursales</TabsTrigger>
+                  <TabsTrigger value="consumo" className="h-6 text-[12px]">Consumo</TabsTrigger>
+                </TabsList>
 
-              <section>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-2 text-[13px] font-semibold">
-                    <History className="h-4 w-4 text-primary" /> Historial de ventas
-                  </h3>
+                {tab === "ventas" && (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={metaText}>{cobertura}</span>
                     <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
@@ -737,8 +675,75 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                       ))}
                     </div>
                   </div>
+                )}
+                {tab === "consumo" && <span className={metaText}>Últimos 12 meses</span>}
+              </div>
+
+              <TabsContent value="sucursales" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                <div className="h-full overflow-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead className={th}>Sucursal</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Ventas 12M</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Ventas 24M</TableHead>
+                        <TableHead className={cn(th, "text-right")}>Disponible</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {SUCURSAL_COLUMNAS.map((columna) => {
+                        const clave = normalizarSucursal(columna.label);
+                        return (
+                          <TableRow key={columna.key}>
+                            <TableCell className={td}>{columna.label}</TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>
+                              {historialCargando ? "…" : historialError ? "—" : (vendidoPorSucursal.get(clave) ?? 0).toLocaleString("es-PY")}
+                            </TableCell>
+                            <TableCell className={cn(td, "text-right tabular-nums")}>
+                              {historialCargando ? "…" : historialError ? "—" : (vendidoPorSucursal24m.get(clave) ?? 0).toLocaleString("es-PY")}
+                            </TableCell>
+                            <TableCell className={cn(td, "text-right font-semibold tabular-nums")}>
+                              {Number(producto[columna.key] ?? 0).toLocaleString("es-PY")}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="max-h-[360px] overflow-auto rounded-md border">
+              </TabsContent>
+
+              <TabsContent value="consumo" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                <div className="flex h-full items-end gap-2 px-5 pb-8 pt-10">
+                  {historialCargando && <p className="m-auto text-[12px] text-muted-foreground">Cargando consumo...</p>}
+                  {historialError && <p className="m-auto text-[12px] text-muted-foreground">Consumo no disponible.</p>}
+                  {!historialCargando && !historialError && ventas12m.length === 0 && (
+                    <p className="m-auto text-[12px] text-muted-foreground">Sin consumo vinculado.</p>
+                  )}
+                  {!historialCargando && !historialError && ventas12m.length > 0 && evolucionMensual.map((item) => {
+                    const altura = item.cantidad > 0 ? Math.max((item.cantidad / maxMensual) * 88, 3) : 0;
+                    return (
+                      <div key={item.mes} className="relative flex h-full min-w-0 flex-1 items-end" title={`${formatMes(item.mes)}: ${item.cantidad}`}>
+                        {item.cantidad > 0 && (
+                          <span
+                            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-foreground"
+                            style={{ bottom: `calc(${altura}% + 5px)` }}
+                          >
+                            {Number(item.cantidad).toLocaleString("es-PY", { maximumFractionDigits: 1 })}
+                          </span>
+                        )}
+                        <div className="w-full rounded-t bg-primary/75" style={{ height: `${altura}%` }} />
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
+                          {item.mes.slice(5)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="ventas" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                <div className="h-full overflow-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       {vistaHistorial === "facturas" ? (
@@ -823,14 +828,15 @@ function DetalleProductoSheet({ producto, onClose }: { producto: StockMatrizRow 
                     </TableBody>
                   </Table>
                 </div>
-              </section>
-            </div>
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </SheetContent>
     </Sheet>
   );
 }
+
 
 export default function Repuestos() {
   const [busquedaInput, setBusquedaInput] = useState("");
