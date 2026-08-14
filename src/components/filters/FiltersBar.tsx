@@ -4,15 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel as labelCls } from "@/lib/ui-classes";
+import { cardLabel as labelCls, controlHeight, controlText } from "@/lib/ui-classes";
+
+const ctrl = `${controlHeight} ${controlText}`;
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1 max-sm:!w-full", className)}>
-      {label ? <span className={labelCls}>{label}</span> : <span className="h-4" aria-hidden />}
+    <div className={cn("flex min-w-0 flex-col gap-0.5 max-sm:!w-full", className)}>
+      {label ? <span className={labelCls}>{label}</span> : <span className="h-3.5" aria-hidden />}
       {children}
     </div>
   );
@@ -23,8 +25,8 @@ function Field({ label, children, className }: { label?: string; children: React
  * Barra de filtros global. Diseño unificado para Trabajos / Planificador /
  * Calendario / Dashboard / Parque. Siempre inline, nunca modal.
  *
- * Cada filtro lleva un pequeño título arriba para que se entienda qué hace
- * antes de seleccionar nada.
+ * Los filtros primarios viven en una única fila (nunca se expande a dos filas);
+ * lo secundario va detrás del botón "Filtros", que abre un panel lateral.
  */
 export function FiltersBar({
   search,
@@ -51,11 +53,10 @@ export function FiltersBar({
   expanded?: ReactNode;
   className?: string;
 }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
   const debouncedSearch = useDebouncedValue(searchDraft, 250);
-  const hasControls = !!children || !!actions || (activeCount > 0 && !!onClear);
+  const hasControls = !!children || !!actions || !!expanded || (activeCount > 0 && !!onClear);
 
   useEffect(() => {
     setSearchDraft(search?.value ?? "");
@@ -70,115 +71,113 @@ export function FiltersBar({
     search?.onChange("");
   };
 
+  const searchInput = (
+    <div className="relative min-w-0 flex-1">
+      <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        type="search"
+        enterKeyHint="search"
+        value={searchDraft}
+        onChange={(e) => setSearchDraft(e.target.value)}
+        placeholder={search?.placeholder ?? "Buscar…"}
+        className={cn(ctrl, "pl-7 pr-7")}
+      />
+      {searchDraft && (
+        <button
+          onClick={clearSearch}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
+          aria-label="Limpiar búsqueda"
+          type="button"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <Card className={cn("min-w-0 px-3 py-3", className)}>
+    <Card className={cn("min-w-0 px-3 py-2", className)}>
+      {/* Móvil: búsqueda + botón de panel */}
       <div className="flex gap-2 sm:hidden">
-        {search && (
-          <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              enterKeyHint="search"
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              placeholder={search.placeholder ?? "Buscar…"}
-              className="h-[34px] pl-8 pr-8 text-[13px]"
-            />
-            {searchDraft && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
-                aria-label="Limpiar búsqueda"
-                type="button"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        )}
+        {search && searchInput}
         {hasControls && (
           <Button
             type="button"
-            variant={mobileOpen || activeCount > 0 ? "default" : "outline"}
+            variant={activeCount > 0 ? "default" : "outline"}
             size="icon"
-            className="h-[34px] w-[34px] shrink-0"
-            onClick={() => setMobileOpen((v) => !v)}
+            className={cn(controlHeight, "w-8 shrink-0")}
+            onClick={() => setPanelOpen(true)}
             aria-label="Filtros"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
+      {meta && <div className="mt-1 text-right text-[10px] text-muted-foreground sm:hidden">{meta}</div>}
 
-      {hasControls && mobileOpen && (
-        <div className="mt-3 flex flex-col gap-3 rounded-lg border bg-muted/20 p-3 sm:hidden">
-          {children}
-          {expanded && <div className="border-t pt-2">{expanded}</div>}
-          {activeCount > 0 && onClear && (
-            <Button variant="ghost" size="sm" onClick={onClear} className="h-[34px] justify-start text-[13px]">
-              <X className="mr-1 h-3 w-3" /> Limpiar ({activeCount})
-            </Button>
-          )}
-          {actions && <div className="flex flex-col gap-2 border-t pt-2">{actions}</div>}
-          {meta && <div className="text-[11px] text-muted-foreground">{meta}</div>}
-        </div>
-      )}
-      {!mobileOpen && meta && (
-        <div className="mt-1 text-right text-[11px] text-muted-foreground sm:hidden">{meta}</div>
-      )}
-
-      <div className="hidden min-w-0 gap-x-3 gap-y-3 sm:flex sm:flex-row sm:flex-wrap sm:items-end">
+      {/* Desktop: una sola fila, sin wrap */}
+      <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 overflow-hidden sm:flex">
         {search && (
-          <Field label={search.label ?? "Buscar"} className={"sm:min-w-[240px] " + (search.width ?? "w-full sm:w-[260px]")}>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                enterKeyHint="search"
-                value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
-                placeholder={search.placeholder ?? "Buscar…"}
-                className="h-[34px] pl-8 pr-8 text-[13px]"
-              />
-              {searchDraft && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-accent"
-                  aria-label="Limpiar búsqueda"
-                  type="button"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
+          <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] shrink"}>
+            <div className="flex">{searchInput}</div>
           </Field>
         )}
 
         {children}
 
-        {expanded && <Field><Popover open={moreOpen} onOpenChange={setMoreOpen}>
-          <PopoverTrigger asChild><Button variant={activeCount > 0 ? "secondary" : "outline"} size="sm" className="h-[34px]"><SlidersHorizontal className="h-3.5 w-3.5" />Filtros{activeCount > 0 ? ` ${activeCount}` : ""}</Button></PopoverTrigger>
-          <PopoverContent align="end" className="w-[min(92vw,520px)] p-3"><div className="grid gap-2 sm:grid-cols-2">{expanded}</div><div className="mt-3 flex justify-between border-t pt-2">{activeCount > 0 && onClear ? <Button variant="ghost" size="sm" onClick={onClear}><X className="h-3.5 w-3.5" />Limpiar</Button> : <span />}<Button size="sm" onClick={() => setMoreOpen(false)}>Aplicar</Button></div></PopoverContent>
-        </Popover></Field>}
+        {expanded && (
+          <Field>
+            <Button
+              type="button"
+              variant={activeCount > 0 ? "secondary" : "outline"}
+              size="sm"
+              className={cn(ctrl, "shrink-0 gap-1")}
+              onClick={() => setPanelOpen(true)}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros{activeCount > 0 ? ` ${activeCount}` : ""}
+            </Button>
+          </Field>
+        )}
 
         {activeCount > 0 && onClear && !expanded && (
           <Field>
-            <Button variant="ghost" size="sm" onClick={onClear} className="h-[34px] text-[13px]">
+            <Button variant="ghost" size="sm" onClick={onClear} className={cn(ctrl, "shrink-0")}>
               <X className="mr-1 h-3 w-3" /> Limpiar
             </Button>
           </Field>
         )}
 
-        <div className="flex w-full flex-col gap-1.5 sm:ml-auto sm:w-auto sm:flex-row sm:items-end">
-          {meta && (
-            <div className="pb-0 text-[11px] text-muted-foreground sm:pb-1.5">{meta}</div>
-          )}
-          {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
+        <div className="ml-auto flex shrink-0 items-end gap-2">
+          {meta && <div className="pb-1 text-[10px] text-muted-foreground">{meta}</div>}
+          {actions && <div className="flex flex-wrap items-end gap-2">{actions}</div>}
         </div>
       </div>
 
+      {/* Panel lateral de filtros */}
+      <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
+        <SheetContent side="right" className="flex w-[min(92vw,360px)] flex-col gap-0 p-0">
+          <SheetHeader className="border-b px-4 py-3 text-left">
+            <SheetTitle className="text-[14px]">Filtros</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            <div className="flex flex-col gap-3 sm:hidden">{children}</div>
+            {expanded && <div className="flex flex-col gap-3">{expanded}</div>}
+            {actions && <div className="flex flex-col gap-2 border-t pt-3 sm:hidden">{actions}</div>}
+          </div>
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            {activeCount > 0 && onClear ? (
+              <Button variant="ghost" size="sm" onClick={onClear}>
+                <X className="mr-1 h-3.5 w-3.5" /> Limpiar ({activeCount})
+              </Button>
+            ) : (
+              <span />
+            )}
+            <Button size="sm" onClick={() => setPanelOpen(false)}>Aplicar</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </Card>
-
   );
 }
 
@@ -199,9 +198,9 @@ export function FilterSelect({
   width?: string;
 }) {
   return (
-    <Field label={label} className={width}>
+    <Field label={label} className={cn("shrink-0", width)}>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-[34px] w-full overflow-hidden text-[13px]">
+        <SelectTrigger className={cn(ctrl, "w-full overflow-hidden")}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent className="max-h-[320px] min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]">
@@ -235,12 +234,12 @@ export function FilterDate({
   max?: string;
 }) {
   return (
-    <Field label={label} className={width}>
+    <Field label={label} className={cn("shrink-0", width)}>
       <Input
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-[34px] w-full text-[13px]"
+        className={cn(ctrl, "w-full")}
         title={title}
         min={min}
         max={max}
@@ -260,5 +259,5 @@ export function FilterCustom({
   children: ReactNode;
   width?: string;
 }) {
-  return <Field label={label} className={width}>{children}</Field>;
+  return <Field label={label} className={cn("shrink-0", width)}>{children}</Field>;
 }
