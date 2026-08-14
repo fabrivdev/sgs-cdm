@@ -118,7 +118,7 @@ export function FiltersBar({
       {/* Desktop: una sola fila, sin wrap */}
       <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 overflow-hidden sm:flex">
         {search && (
-          <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] shrink"}>
+          <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] min-w-[130px] shrink"}>
             <div className="flex">{searchInput}</div>
           </Field>
         )}
@@ -148,8 +148,8 @@ export function FiltersBar({
           </Field>
         )}
 
-        <div className="ml-auto flex shrink-0 items-end gap-2">
-          {meta && <div className="pb-1 text-[10px] text-muted-foreground">{meta}</div>}
+        <div className="ml-auto flex shrink-0 items-end gap-2 pl-2">
+          {meta && <div className="whitespace-nowrap pb-1 text-[10px] text-muted-foreground">{meta}</div>}
           {actions && <div className="flex flex-wrap items-end gap-2">{actions}</div>}
         </div>
       </div>
