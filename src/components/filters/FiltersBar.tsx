@@ -11,12 +11,13 @@ import { cardLabel as labelCls } from "@/lib/ui-classes";
 
 function Field({ label, children, className }: { label?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1 max-sm:!w-full", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-0.5 max-sm:!w-full", className)}>
       {label ? <span className={labelCls}>{label}</span> : <span className="h-[14px]" aria-hidden />}
       {children}
     </div>
   );
 }
+
 
 /**
  * Barra de filtros global. Diseño unificado para Trabajos / Planificador /
