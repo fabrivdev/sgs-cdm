@@ -36,10 +36,11 @@ export function FactPeriodsMobile({
               active && "border-primary bg-primary/5",
             )}
           >
-            <div className="flex min-h-[58px] flex-col justify-between gap-1">
-              <div className="text-xs font-medium">{row.label}</div>
-              <div className="text-sm font-bold tabular-nums">{formatWeekMetric(row, "usd")}</div>
+            <div className="flex min-h-[52px] flex-col justify-between gap-1">
+              <div className="text-[11px] font-medium">{row.label}</div>
+              <div className="text-[13px] font-semibold tabular-nums">{formatWeekMetric(row, "usd")}</div>
               <div className={cn("text-[10px] tabular-nums", trend != null && trend < 0 ? "text-destructive" : "text-muted-foreground")}>
+
                 {trend == null ? "-" : `${trend > 0 ? "+" : ""}${trend}%`}
               </div>
             </div>
