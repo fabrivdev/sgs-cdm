@@ -2944,6 +2944,10 @@ export type Database = {
         Args: { p_marca?: string }
         Returns: Json
       }
+      repuestos_sucursal_legacy: {
+        Args: { p_valor: string }
+        Returns: Database["public"]["Enums"]["sucursal"]
+      }
       repuestos_sugerencia_viva: {
         Args: {
           p_buscar?: string
