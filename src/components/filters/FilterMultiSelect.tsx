@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const labelCls = "text-[10px] uppercase tracking-wide text-muted-foreground font-medium";
+const labelCls = "text-[10px] leading-3.5 uppercase tracking-[0.04em] text-muted-foreground font-medium";
 
 export interface MultiOption {
   value: string;
