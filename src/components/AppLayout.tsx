@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
-  ChevronLeft,
   LayoutDashboard,
   ListChecks,
   Users,
@@ -47,7 +46,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useUnseen } from "@/hooks/useUnseen";
@@ -115,7 +113,7 @@ function ModuloNavGroup({
   onOpenChange: (open: boolean) => void;
   isItemActive: (it: NavItem) => boolean;
 }) {
-  const { state, toggleSidebar } = useSidebar();
+  const { state } = useSidebar();
   const iconRail = state === "collapsed";
   const effectiveOpen = !iconRail && open;
   const groupActive = group.items.some(isItemActive);
@@ -127,7 +125,6 @@ function ModuloNavGroup({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            onClick={() => iconRail && toggleSidebar()}
             className={cn(
               "group/module mx-2 flex h-10 w-[calc(100%-1rem)] items-center gap-2.5 rounded-lg px-2.5 text-left outline-none transition-[background-color,color,box-shadow,transform] duration-150 ease-spring hover:bg-sidebar-accent/80 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2",
               groupActive && "bg-sidebar-accent/70 text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--sidebar-border)/0.55)]",
@@ -138,10 +135,10 @@ function ModuloNavGroup({
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary transition-[transform,background-color] duration-150 group-hover/module:bg-primary/[0.12]">
               <GroupIcon className="h-[18px] w-[18px]" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
+            <span className="sidebar-label-anim min-w-0 flex-1 truncate text-[13px] font-semibold group-data-[collapsible=icon]:hidden">{group.label}</span>
             <ChevronDown
               className={cn(
-                "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-spring group-data-[collapsible=icon]:hidden",
+                "sidebar-label-anim h-4 w-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden",
                 open && "rotate-180",
               )}
             />
@@ -160,7 +157,7 @@ function ModuloNavGroup({
                   >
                     <NavLink to={it.to} end={it.end as boolean | undefined} className="group/nav">
                       <it.icon className="transition-transform duration-200 group-hover/nav:scale-110" />
-                      <span className="group-data-[collapsible=icon]:hidden">{it.label}</span>
+                      <span className="sidebar-label-anim group-data-[collapsible=icon]:hidden">{it.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -213,8 +210,18 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
   const nivelActual = nivelLabel(roles[0], moduloAccess);
 
+  // El sidebar de escritorio se despliega solo al acercar el puntero (o el
+  // foco de teclado) y se retrae al salir. No hay boton de colapsar.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleSidebar = useCallback((open: boolean) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setSidebarOpen(open), open ? 90 : 250);
+  }, []);
+  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
+
   return (
-    <SidebarProvider>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen} data-hover-sidebar="">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:text-[13px] focus:font-medium focus:shadow-md focus:ring-2 focus:ring-primary"
@@ -222,20 +229,25 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
         Ir al contenido principal
       </a>
 
-      {/* Sidebar desktop: colapsable a rail de iconos, agrupado por módulo. */}
-      <Sidebar collapsible="icon" className="z-50 hidden md:flex">
+      {/* Sidebar desktop: rail de iconos que se expande al pasar el puntero. */}
+      <Sidebar
+        collapsible="icon"
+        className="z-50 hidden md:flex"
+        onMouseEnter={() => scheduleSidebar(true)}
+        onMouseLeave={() => scheduleSidebar(false)}
+        onFocusCapture={() => scheduleSidebar(true)}
+        onBlurCapture={() => scheduleSidebar(false)}
+      >
         <SidebarHeader className="h-12 justify-center border-b border-sidebar-border/70 p-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <div className="flex h-full w-full items-center gap-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <AppLogo className="h-8 w-8 rounded-lg transition-transform duration-300 ease-spring group-hover/sidebar-wrapper:scale-[1.02]" />
-            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <div className="sidebar-label-anim min-w-0 group-data-[collapsible=icon]:hidden">
               <div className="truncate text-[13px] font-bold leading-tight">{APP_SHORT_NAME}</div>
               <div className="whitespace-nowrap text-[10px] tracking-[-0.01em] text-muted-foreground">{APP_NAME}</div>
             </div>
-            <SidebarTrigger className="ml-auto h-8 w-8 rounded-lg border border-sidebar-border bg-sidebar shadow-sm transition-[transform,background-color,box-shadow] duration-200 hover:bg-sidebar-accent hover:shadow-md active:scale-95 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:left-[calc(100%+0.375rem)] group-data-[collapsible=icon]:right-auto group-data-[collapsible=icon]:top-3">
-              <ChevronLeft className="transition-transform duration-300 ease-spring group-data-[collapsible=icon]:rotate-180" />
-            </SidebarTrigger>
           </div>
         </SidebarHeader>
+
         <SidebarContent className="gap-1 px-1 py-3">
           <div className="px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">
             Módulos
