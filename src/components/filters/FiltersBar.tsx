@@ -120,56 +120,53 @@ export function FiltersBar({
       </div>
       {meta && <div className="mt-1 text-right text-[10px] text-muted-foreground sm:hidden">{meta}</div>}
 
-      {/* Desktop: una sola fila, sin wrap */}
-      <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 overflow-hidden sm:flex">
-        {search && (
-          <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] min-w-[130px] shrink"}>
-            <div className="flex">{searchInput}</div>
-          </Field>
-        )}
+      {/* Desktop: una sola fila, sin wrap. Lo que no entra se oculta y queda en el panel. */}
+      <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 sm:flex">
+        <div className="flex min-w-0 flex-1 flex-nowrap items-end gap-x-2 overflow-hidden">
+          {search && (
+            <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] min-w-[150px] shrink"}>
+              <div className="flex">{searchInput}</div>
+            </Field>
+          )}
 
-        {children}
+          {children}
+        </div>
 
-        {expanded && (
-          <Field>
-            <Button
-              type="button"
-              variant={activeCount > 0 ? "secondary" : "outline"}
-              size="sm"
-              className={cn(ctrl, "shrink-0 gap-1")}
-              onClick={() => setPanelOpen(true)}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filtros{activeCount > 0 ? ` ${activeCount}` : ""}
-            </Button>
-          </Field>
-        )}
-
-        {activeCount > 0 && onClear && !expanded && (
-          <Field>
-            <Button variant="ghost" size="sm" onClick={onClear} className={cn(ctrl, "shrink-0")}>
-              <X className="mr-1 h-3 w-3" /> Limpiar
-            </Button>
-          </Field>
-        )}
-
-        <div className="ml-auto flex shrink-0 items-end gap-2 pl-2">
+        <div className="flex shrink-0 items-end gap-2 pl-2">
+          {(expanded || children) && (
+            <Field>
+              <Button
+                type="button"
+                variant={activeCount > 0 ? "secondary" : "outline"}
+                size="sm"
+                className={cn(ctrl, "shrink-0 gap-1 whitespace-nowrap")}
+                onClick={() => setPanelOpen(true)}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filtros{activeCount > 0 ? ` ${activeCount}` : ""}
+              </Button>
+            </Field>
+          )}
           {meta && <div className="whitespace-nowrap pb-1 text-[10px] text-muted-foreground">{meta}</div>}
-          {actions && <div className="flex flex-wrap items-end gap-2">{actions}</div>}
+          {actions && <div className="flex items-end gap-2">{actions}</div>}
         </div>
       </div>
 
       {/* Panel lateral de filtros */}
       <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
-        <SheetContent side="right" className="flex w-[min(92vw,360px)] flex-col gap-0 p-0">
+        <SheetContent
+          side="right"
+          className="flex w-[min(92vw,380px)] flex-col gap-0 p-0 [&_[data-filter-field]]:!w-full [&_[data-filter-field]]:!min-w-0"
+        >
           <SheetHeader className="border-b px-4 py-3 text-left">
             <SheetTitle className="text-[14px]">Filtros</SheetTitle>
           </SheetHeader>
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            <div className="flex flex-col gap-3 sm:hidden">{children}</div>
+            {children && <div className="flex flex-col gap-3">{children}</div>}
             {expanded && <div className="flex flex-col gap-3">{expanded}</div>}
             {actions && <div className="flex flex-col gap-2 border-t pt-3 sm:hidden">{actions}</div>}
           </div>
+
           <div className="flex items-center justify-between border-t px-4 py-3">
             {activeCount > 0 && onClear ? (
               <Button variant="ghost" size="sm" onClick={onClear}>
