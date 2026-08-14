@@ -775,8 +775,6 @@ export default function RepuestosSugerencias() {
         )}
       </Card>
 
-      
-
       <ModelConfigSheet open={configOpen} onOpenChange={setConfigOpen} model={modelQuery.data ?? null} segmentos={segmentsQuery.data ?? []} canManage={canManage} />
       <ResultDetailSheet row={selected} onClose={() => setSelected(null)} canManage={canManage} onSaved={() => {
         void queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
