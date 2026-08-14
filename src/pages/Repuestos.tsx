@@ -253,7 +253,15 @@ export default function Repuestos() {
         </CardContent>
       </Card>
 
-      <DetalleProductoSheet producto={seleccionado} onClose={() => setSeleccionado(null)} />
+      <DetalleRepuestoSheet
+        producto={seleccionado ? { ...seleccionado, stock: seleccionado } : null}
+        onClose={() => setSeleccionado(null)}
+        sugerencia={sugerenciaQuery.data ?? null}
+        sugerenciaCargando={sugerenciaQuery.isLoading}
+        canManage={canManage}
+        onSugerenciaGuardada={() => sugerenciaQuery.refetch()}
+      />
+
     </div>
   );
 }
