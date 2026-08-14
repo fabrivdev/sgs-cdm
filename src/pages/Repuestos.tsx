@@ -917,7 +917,7 @@ export default function Repuestos() {
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}
-        actions={<Button type="button" variant="outline" size="sm" className="h-9" onClick={exportar} disabled={exporting}><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Exportando…" : "Exportar"}</Button>}
+        actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting}><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Exportando…" : "Exportar"}</Button>}
       >
         <FilterSelect label="Marca" value={filtros.marca || "todas"} onChange={(value) => setFiltros((current) => ({ ...current, marca: value === "todas" ? "" : value }))} placeholder="Marca" width="w-[140px]" options={[{ value: "todas", label: "Todas" }, ...MARCAS.map((value) => ({ value, label: value }))]} />
         <FilterSelect label="Familia" value={filtros.familia || "todas"} onChange={(value) => setFiltros((current) => ({ ...current, familia: value === "todas" ? "" : value }))} placeholder="Familia" width="w-[180px]" options={[{ value: "todas", label: "Todas" }, ...(familiasQuery.data ?? []).map((value) => ({ value, label: value }))]} />

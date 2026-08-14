@@ -14,7 +14,7 @@ export interface MultiOption {
 
 /**
  * Multi-select compacto para usar dentro de FiltersBar.
- * Misma altura (h-9) que FilterSelect. Popover con checkboxes.
+ * Misma altura (h-8) que FilterSelect. Popover con checkboxes.
  */
 export function FilterMultiSelect({
   label,
@@ -46,8 +46,13 @@ export function FilterMultiSelect({
   };
 
   return (
-    <div className={cn("flex min-w-0 shrink-0 flex-col gap-0.5 max-sm:!w-full", width)}>
-      {label ? <span className={labelCls}>{label}</span> : <span className="h-3.5" aria-hidden />}
+    <div data-filter-field className={cn("flex min-w-0 shrink-0 flex-col gap-0.5 max-sm:!w-full", width)}>
+      {label ? (
+        <span className={cn(labelCls, "block h-3.5 truncate whitespace-nowrap")}>{label}</span>
+      ) : (
+        <span className="block h-3.5" aria-hidden />
+      )}
+
       <Popover>
         <PopoverTrigger asChild>
           <button

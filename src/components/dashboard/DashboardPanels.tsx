@@ -152,9 +152,10 @@ export function PeriodSelector({
   disabledModes?: Set<PeriodMode>;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5 max-sm:!w-full sm:w-[220px]">
-      <span className="text-[10px] font-medium uppercase tracking-[0.04em] text-muted-foreground">Agrupar por</span>
-      <div className="grid h-8 grid-cols-4 overflow-hidden rounded-md border bg-background text-[11px]">
+    <div data-filter-field className="flex min-w-0 shrink-0 flex-col gap-0.5 max-sm:!w-full sm:w-[200px]">
+      <span className="block h-3.5 truncate whitespace-nowrap text-[10px] font-medium uppercase leading-3.5 tracking-[0.04em] text-muted-foreground">Agrupar por</span>
+      <div className="grid h-8 grid-cols-4 overflow-hidden rounded-md border bg-background text-[12px]">
+
 
         {[
           { value: "dia", label: "Día" },

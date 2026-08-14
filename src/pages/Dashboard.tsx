@@ -3190,7 +3190,7 @@ export default function Dashboard() {
         activeCount={filtrosActivos}
         onClear={limpiar}
         expanded={(
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="flex flex-col gap-3">
             <FilterMultiSelect
               label="Marca"
               values={fMarcas}
@@ -3297,7 +3297,7 @@ export default function Dashboard() {
           <select
             value={activeDatePreset}
             onChange={(event) => applyDatePreset(event.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           >
             <option value="">Personalizado</option>
             {datePresets.map((preset) => (
