@@ -87,7 +87,7 @@ function fechaLocal(fecha: string | null | undefined): Date | null {
     return Number.isNaN(resultado.getTime()) ? null : resultado;
   }
 
-  const local = valor.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  const local = valor.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
   if (local) {
     const resultado = new Date(Number(local[3]), Number(local[2]) - 1, Number(local[1]), 12);
     return Number.isNaN(resultado.getTime()) ? null : resultado;
