@@ -86,6 +86,7 @@ import {
 import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
+import { cuadrillaIds, resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;

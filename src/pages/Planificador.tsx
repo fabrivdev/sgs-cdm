@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { pageShellWide, tableText } from "@/lib/ui-classes";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
+import { resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
 
 interface Servicio {
   id: string;
