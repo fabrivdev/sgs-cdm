@@ -86,6 +86,7 @@ import {
 import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
+import { cuadrillaIds, resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -1137,14 +1138,8 @@ export default function Dashboard() {
   // Resuelve la cuadrilla efectiva de una jornada con herencia desde el servicio padre,
   // igual que Planificador: si la jornada no tiene principal/auxiliares propios, hereda
   // los del servicio.
-  const jornadaCrewIds = (jornada: Jornada): string[] => {
-    const servicio = servicioById.get(jornada.servicio_id);
-    const principal = jornada.tecnico_responsable_id ?? servicio?.tecnico_responsable_id ?? null;
-    const aux = (jornada.auxiliares && jornada.auxiliares.length > 0)
-      ? jornada.auxiliares
-      : (servicio?.auxiliares ?? []);
-    return [principal, ...aux].filter(Boolean) as string[];
-  };
+  const jornadaCrewIds = (jornada: Jornada): string[] =>
+    cuadrillaIds(resolverCuadrillaJornada(jornada, servicioById.get(jornada.servicio_id)));
 
   const activeTechnicianIds = useMemo(() => {
     return new Set(servicioTecnicos.map((profile) => profile.id));
