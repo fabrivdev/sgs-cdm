@@ -1,17 +1,82 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import React, { Component, Suspense, useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import "./offline-experience.css";
 
-const loadLanyard = () => import("@/components/Lanyard");
-const Lanyard = lazy(loadLanyard);
+type LanyardModule = typeof import("@/components/Lanyard");
 
-// Start downloading the heavier 3D runtime without blocking the application.
-// If the connection drops first, Suspense immediately keeps the static card.
-void loadLanyard();
+let lanyardModule: LanyardModule | null = null;
+let lanyardReadyPromise: Promise<boolean> | null = null;
+let lanyardFailed = false;
+
+const CARD_IMAGES = ["/offline-card.svg", "/offline-lanyard.svg", "/sig-cdm-logo.png"] as const;
+
+// Images are inlined as data URLs while online: the 3D texture loader would
+// otherwise re-request them from the network at the exact moment there is none.
+const inlinedImages: Record<string, string> = {};
+
+function inlineImage(src: string) {
+  return fetch(src)
+    .then((res) => res.blob())
+    .then(
+      (blob) =>
+        new Promise<void>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            inlinedImages[src] = String(reader.result);
+            resolve();
+          };
+          reader.onerror = () => reject(new Error(src));
+          reader.readAsDataURL(blob);
+        })
+    );
+}
+
+
+// Warm up the heavy 3D runtime and its assets while the network is available.
+// Any failure is contained here: the offline card then falls back to the
+// static credential instead of bubbling up to the global ErrorBoundary.
+function ensureLanyardReady(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (lanyardFailed) return Promise.resolve(false);
+  if (!lanyardReadyPromise) {
+    lanyardReadyPromise = Promise.all([
+      import("@/components/Lanyard").then((mod) => {
+        lanyardModule = mod;
+      }),
+      // The physics engine chunk + its WASM are fetched lazily by
+      // @react-three/rapier when <Physics> mounts. Download and initialise them
+      // now, while the network is up, so an offline mount never hits the network.
+      import("@dimforge/rapier3d-compat").then((RAPIER) => RAPIER.init()),
+      import("@react-three/rapier"),
+      // Card model + lanyard texture.
+      (async () => {
+        const [drei, cardGLB, lanyardPng] = await Promise.all([
+          import("@react-three/drei"),
+          import("@/components/card.glb").then((m) => m.default),
+          import("@/components/lanyard.png").then((m) => m.default),
+        ]);
+        drei.useGLTF.preload(cardGLB);
+        drei.useTexture.preload(lanyardPng);
+      })(),
+
+      ...CARD_IMAGES.map(inlineImage),
+    ])
+      .then(() => true)
+      .catch(() => {
+        lanyardFailed = true;
+        lanyardReadyPromise = null;
+        return false;
+      });
+  }
+  return lanyardReadyPromise;
+}
+
+
 if (typeof window !== "undefined") {
-  ["/offline-card.svg", "/offline-lanyard.svg", "/sig-cdm-logo.png"].forEach((src) => {
-    const image = new Image();
-    image.src = src;
+  void ensureLanyardReady();
+  window.addEventListener("online", () => {
+    lanyardFailed = false;
+    void ensureLanyardReady();
   });
 }
 
@@ -24,16 +89,48 @@ const hasWebGL = () => {
   }
 };
 
+class Lanyard3DBoundary extends Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    lanyardFailed = true;
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    // Contained on purpose: the offline screen must never surface the global error view.
+  }
+
+  render() {
+    if (this.state.failed) return <StaticCredential />;
+    return this.props.children;
+  }
+}
+
 export function OfflineExperience() {
   const [showMotion, setShowMotion] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setShowMotion(!reducedMotion.matches && hasWebGL());
+    const update = () => {
+      if (reducedMotion.matches || !hasWebGL()) {
+        if (!cancelled) setShowMotion(false);
+        return;
+      }
+      void ensureLanyardReady().then((ready) => {
+        if (!cancelled) setShowMotion(ready);
+      });
+    };
     update();
     reducedMotion.addEventListener("change", update);
-    return () => reducedMotion.removeEventListener("change", update);
+    return () => {
+      cancelled = true;
+      reducedMotion.removeEventListener("change", update);
+    };
   }, []);
+
+  const Lanyard = lanyardModule?.default;
 
   return (
     <section className="offline-experience" role="alert" aria-live="assertive">
@@ -42,10 +139,12 @@ export function OfflineExperience() {
       <h1 className="sr-only">Sin conexión a internet</h1>
       <p className="sr-only">La aplicación se reanudará automáticamente cuando vuelva internet.</p>
       <div className="offline-lanyard-stage" aria-hidden="true">
-        {showMotion ? (
-          <Suspense fallback={<StaticCredential />}>
-            <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={22} frontImage="/offline-card.svg" backImage="/offline-card.svg" imageFit="cover" lanyardImage="/offline-lanyard.svg" logoImage="/sig-cdm-logo.png" lanyardWidth={0.58} />
-          </Suspense>
+        {showMotion && Lanyard ? (
+          <Lanyard3DBoundary>
+            <Suspense fallback={<StaticCredential />}>
+              <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={22} frontImage={inlinedImages["/offline-card.svg"]} backImage={inlinedImages["/offline-card.svg"]} imageFit="cover" lanyardImage={inlinedImages["/offline-lanyard.svg"]} logoImage={inlinedImages["/sig-cdm-logo.png"]} lanyardWidth={0.58} />
+            </Suspense>
+          </Lanyard3DBoundary>
         ) : (
           <StaticCredential />
         )}
@@ -57,10 +156,17 @@ export function OfflineExperience() {
 
 function StaticCredential() {
   return (
-    <div className="offline-static-card">
-      <img src="/sig-cdm-logo.png" alt="" />
-      <strong>SIN CONEXIÓN<br />A INTERNET</strong>
-      <span>SIG · CDM</span>
+    <div className="offline-static-wrap">
+      <span className="offline-static-strap" />
+      <div className="offline-static-card">
+        <span className="offline-static-clip" />
+        <img src="/sig-cdm-logo.png" alt="" />
+        <span className="offline-static-brand">SIG · CDM</span>
+        <span className="offline-static-rule" />
+        <strong>SIN CONEXIÓN<br />A INTERNET</strong>
+        <em>Esperando reconexión automática</em>
+        <span className="offline-static-tag">EL MAÑANA ES HOY</span>
+      </div>
     </div>
   );
 }

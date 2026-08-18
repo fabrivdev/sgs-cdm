@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { pageShellWide, tableText } from "@/lib/ui-classes";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
+import { resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
 
 interface Servicio {
   id: string;
@@ -245,6 +246,7 @@ export default function Planificador() {
 
         for (const j of lista) {
           const d = parseISO(j.fecha);
+          const crew = resolverCuadrillaJornada(j, s);
           expandidos.push({
             ...s,
             jornada_id: j.id,
@@ -254,9 +256,9 @@ export default function Planificador() {
             estado: j.estado,
             horas_trabajadas: j.horas_trabajadas,
             observaciones: j.observaciones,
-            // Cada jornada puede tener su propia cuadrilla; si no, hereda del servicio padre.
-            tecnico_responsable_id: j.tecnico_responsable_id ?? s.tecnico_responsable_id,
-            auxiliares: (j.auxiliares && j.auxiliares.length > 0) ? j.auxiliares : s.auxiliares,
+            // La cuadrilla de la jornada manda; solo las legado heredan del servicio.
+            tecnico_responsable_id: crew.principalId,
+            auxiliares: crew.auxiliares,
           });
         }
       }
