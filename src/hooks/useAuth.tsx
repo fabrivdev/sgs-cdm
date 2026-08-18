@@ -44,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [moduloAccess, setModuloAccess] = useState<string[]>([]);
+  /** Rol tecnico de emergencia, otorgado solo via user_roles (nunca asignable desde el UI de Admin). */
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const loadedUserRef = useRef<string | null>(null);
   const loadingUserRef = useRef<string | null>(null);
@@ -55,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setRoles([]);
     setModuloAccess([]);
+    setIsSuperAdmin(false);
     loadedUserRef.current = null;
     loadingUserRef.current = null;
     loadingPromiseRef.current = null;
@@ -132,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(loadedProfile);
       setRoles((roleRows ?? []).map((row: { role: Role }) => row.role));
       setModuloAccess(((moduloRows ?? []) as { modulo_id: string }[]).map((row) => row.modulo_id));
+      setIsSuperAdmin((roleRows ?? []).some((row: { role: string }) => row.role === "superadmin"));
       loadedUserRef.current = uid;
     })();
 
@@ -227,7 +231,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isJefatura = roles.includes("jefatura");
   const isOperativo = roles.includes("operativo");
-  const isSuperAdmin = (user?.email ?? "").toLowerCase() === "fabrizio.vega@cdm.com.py";
   const defaultRoute = firstAccessibleRoute(moduloAccess, roles, isSuperAdmin);
 
   return (
