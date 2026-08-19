@@ -333,6 +333,47 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(raw.valor_kilometraje_sin_tecnico).toBe(417.6);
   });
 
+  it("no deja que el TECNICO de una linea de piezas gane el responsable de la OS", () => {
+    // Caso real detectado en produccion (OS 01-00000060): la linea de
+    // piezas ("Piezas Solicitadas") aparece ANTES que la linea MA01 de
+    // mano de obra en el XML. El responsable debe salir de MA01
+    // (GARCETE), nunca del pedidor de repuestos (PATINO), aunque este
+    // aparezca primero en el archivo.
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000060",
+          GRUPO: "REPUESTOS",
+          CODIGO: "RE1234",
+          PRODUCTO: "CONTRATUERCA",
+          TECNICO: "JUAN PATINO",
+          CANTIDAD: "1",
+          TOTAL: "45",
+        },
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000060",
+          PRODUCTO: "MA01",
+          TECNICO: "JONATHAN GARCETE",
+          CANTIDAD: "7:00 Hs.",
+          TOTAL: "490",
+        },
+      ],
+    });
+
+    const [aggregated] = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    const raw = aggregated.raw_data as any;
+    expect(aggregated.responsable).toBe("JONATHAN GARCETE");
+    expect(raw.tecnicos_responsables).toEqual(["JONATHAN GARCETE"]);
+    expect(raw.tecnicos_participantes).toEqual(["JONATHAN GARCETE"]);
+    expect(raw.totales_por_tecnico["JONATHAN GARCETE"]).toMatchObject({ horas: 7 });
+    expect(raw.totales_por_tecnico["JUAN PATINO"]).toMatchObject({ horas: 0, valor_repuestos: 45 });
+    expect(raw.requiere_asignacion_tecnico).toBe(false);
+  });
+
   it("conserva como terceros el total de una linea realmente no clasificada", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",
@@ -365,9 +406,13 @@ describe("importacion XML de ordenes de servicio", () => {
       Cliente: ["0010010004798"],
       Garantia: ["0010010004797"],
     });
+    // GUSTAVO ARCE solo aparece en una linea de garantia de repuesto (0
+    // horas de servicio) -- no debe contar como participante de mano de
+    // obra ni ser candidato a responsable, aunque su TECNICO figure en la
+    // linea. Sigue registrado en totales_por_tecnico (para auditoria de
+    // esa linea), pero afuera de tecnicos_participantes.
     expect(raw.tecnicos_participantes).toEqual([
       "ME0017 - JUAN PATINO",
-      "ME0016 - GUSTAVO ARCE",
     ]);
     expect(raw.totales_por_tecnico["ME0017 - JUAN PATINO"].horas).toBe(2);
     expect(raw.totales_por_tecnico["ME0016 - GUSTAVO ARCE"].horas).toBe(0);

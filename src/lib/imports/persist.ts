@@ -580,14 +580,34 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
       }
     }
 
-    current.responsable = principals[0] || null;
+    // El responsable de la OS debe salir SOLO de quien fue TECNICO en una
+    // linea de mano de obra (MA01) -- nunca de un auxiliar, aunque tenga
+    // horas propias, y nunca de alguien cuya unica linea sea de piezas.
+    // Filtramos por horas > 0 en vez de por lineType porque
+    // totalsByTechnician ya tiene las horas correctamente gateadas por
+    // tipo de linea desde el parseo del XML (servicios_cantidad es 0 para
+    // lineas que no son "Servicio"). El orden de las listas se preserva
+    // (no se reordena), solo se filtra.
+    const laborPrincipals = principals.filter(
+      (technician) => (totalsByTechnician[technician]?.horas ?? 0) > 0,
+    );
+    const laborParticipants = participants.filter(
+      (technician) => (totalsByTechnician[technician]?.horas ?? 0) > 0,
+    );
+    const responsablePorHoras = laborPrincipals.length
+      ? [...laborPrincipals].sort(
+          (a, b) => totalsByTechnician[b].horas - totalsByTechnician[a].horas || a.localeCompare(b),
+        )[0]
+      : null;
+
+    current.responsable = responsablePorHoras;
     current.raw_data = {
       ...(current.raw_data ?? {}),
-      tecnicos_responsables: principals,
+      tecnicos_responsables: laborPrincipals,
       tecnicos_auxiliares: auxiliaries,
-      tecnicos_participantes: participants,
+      tecnicos_participantes: laborParticipants,
       totales_por_tecnico: totalsByTechnician,
-      requiere_asignacion_tecnico: principals.length === 0,
+      requiere_asignacion_tecnico: laborPrincipals.length === 0,
       kilometros_sin_tecnico: unassignedKilometres,
       valor_kilometraje_sin_tecnico: unassignedKilometreValue,
     };
