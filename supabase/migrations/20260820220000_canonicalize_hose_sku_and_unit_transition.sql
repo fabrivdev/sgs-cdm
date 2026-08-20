@@ -37,6 +37,36 @@ USING (public.has_module_access(auth.uid(), 'repuestos'));
 
 GRANT SELECT ON public.repuestos_productos_alias TO authenticated;
 
+-- Algunas instalaciones cargaron el maestro legacy mediante el flujo nuevo
+-- sin haber ejecutado la migracion que originalmente creaba esta tabla. La
+-- equivalencia se usa para que futuras reconstrucciones respeten la decision
+-- comprobada, por eso esta correccion debe poder instalarla por si sola.
+CREATE TABLE IF NOT EXISTS public.repuestos_codigo_equivalencias (
+  marca public.marca NOT NULL,
+  codigo_legacy text NOT NULL,
+  codigo_fabricante_legacy text NOT NULL DEFAULT '',
+  producto_codigo text NOT NULL
+    REFERENCES public.productos(codigo_interno) ON DELETE CASCADE,
+  metodo text NOT NULL,
+  confianza numeric NOT NULL DEFAULT 0
+    CHECK (confianza BETWEEN 0 AND 1),
+  requiere_revision boolean NOT NULL DEFAULT false,
+  manual boolean NOT NULL DEFAULT false,
+  actualizado_en timestamptz NOT NULL DEFAULT now(),
+  actualizado_por uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  PRIMARY KEY (marca, codigo_legacy, codigo_fabricante_legacy)
+);
+
+ALTER TABLE public.repuestos_codigo_equivalencias ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS repuestos_codigo_equivalencias_select
+  ON public.repuestos_codigo_equivalencias;
+CREATE POLICY repuestos_codigo_equivalencias_select
+ON public.repuestos_codigo_equivalencias FOR SELECT TO authenticated
+USING (public.has_module_access(auth.uid(), 'repuestos'));
+
+GRANT SELECT ON public.repuestos_codigo_equivalencias TO authenticated;
+
 INSERT INTO public.repuestos_productos_alias(
   alias_codigo, producto_canonico, motivo, activo, actualizado_en
 )
