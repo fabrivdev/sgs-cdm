@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MODULOS, MODULO_LABELS, ROLES, ROLE_LABELS, SUCURSALES, nivelLabel, type Modulo, type Role, type Sucursal } from "@/lib/constants";
+import { MODULOS, MODULO_LABELS, ROLES, ROLE_LABELS, SUCURSALES, nivelLabel, type AssignableRole, type Modulo, type Role, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ChevronDown, Database, Eye, EyeOff, KeyRound, Save, Settings2, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
@@ -96,7 +96,7 @@ export default function Admin() {
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
   const [nuSucursal, setNuSucursal] = useState<Sucursal>(SUCURSALES[0]);
-  const [nuRol, setNuRol] = useState<Role>("operativo");
+  const [nuRol, setNuRol] = useState<AssignableRole>("operativo");
   const [busy, setBusy] = useState(false);
 
   const [credUser, setCredUser] = useState<Profile | null>(null);
@@ -138,8 +138,21 @@ export default function Admin() {
   };
 
   const permissionOwnerId = (profile: Profile) => profile.auth_user_id || profile.id;
-  const modulesForProfile = (profile: Profile) =>
-    moduloAccesoByUser[permissionOwnerId(profile)] ?? moduloAccesoByUser[profile.id] ?? [];
+  const rolesForProfile = (profile: Profile) => Array.from(new Set([
+    ...(rolesByUser[permissionOwnerId(profile)] ?? []),
+    ...(rolesByUser[profile.id] ?? []),
+  ]));
+  const primaryRoleForProfile = (profile: Profile): Role | undefined => {
+    const profileRoles = rolesForProfile(profile);
+    return profileRoles.includes("superadmin")
+      ? "superadmin"
+      : profileRoles[0];
+  };
+  const isProtectedProfile = (profile: Profile) => rolesForProfile(profile).includes("superadmin");
+  const modulesForProfile = (profile: Profile) => Array.from(new Set([
+    ...(moduloAccesoByUser[permissionOwnerId(profile)] ?? []),
+    ...(moduloAccesoByUser[profile.id] ?? []),
+  ]));
 
   const profilesConAcceso = useMemo(
     () => profiles.filter((profile) => Boolean(emailByProfile(profile))),
@@ -261,6 +274,10 @@ export default function Admin() {
   };
 
   const toggleActivo = async (profile: Profile) => {
+    if (isProtectedProfile(profile)) {
+      toast.error("El superadministrador está protegido");
+      return;
+    }
     if (profile.activo) { setToggleActivoPending(profile); return; }
     const { error } = await updateProfileActive(profile.id, true);
     if (error) toast.error(error.message);
@@ -269,13 +286,22 @@ export default function Admin() {
 
   const confirmarToggleActivo = async () => {
     if (!toggleActivoPending) return;
+    if (isProtectedProfile(toggleActivoPending)) {
+      toast.error("El superadministrador está protegido");
+      setToggleActivoPending(null);
+      return;
+    }
     const { error } = await updateProfileActive(toggleActivoPending.id, false);
     if (error) toast.error(error.message);
     else { toast.success("Usuario desactivado"); load(); }
     setToggleActivoPending(null);
   };
 
-  const cambiarRol = async (userId: string, role: Role) => {
+  const cambiarRol = async (userId: string, role: AssignableRole) => {
+    if ((rolesByUser[userId] ?? []).includes("superadmin")) {
+      toast.error("El rol del superadministrador está protegido");
+      return;
+    }
     await supabase.from("user_roles").delete().eq("user_id", userId);
     const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
     if (error) toast.error(error.message);
@@ -286,6 +312,10 @@ export default function Admin() {
   };
 
   const cambiarModuloAcceso = async (userId: string, moduloId: Modulo, activo: boolean) => {
+    if ((rolesByUser[userId] ?? []).includes("superadmin")) {
+      toast.error("Los accesos del superadministrador están protegidos");
+      return;
+    }
     const query = activo
       ? (supabase as any).from("user_modulo_acceso").insert({ user_id: userId, modulo_id: moduloId })
       : (supabase as any).from("user_modulo_acceso").delete().eq("user_id", userId).eq("modulo_id", moduloId);
@@ -295,12 +325,21 @@ export default function Admin() {
   };
 
   const cambiarSucursal = async (id: string, sucursal: Sucursal) => {
+    const target = profiles.find((profile) => profile.id === id);
+    if (target && isProtectedProfile(target)) {
+      toast.error("El perfil del superadministrador está protegido");
+      return;
+    }
     const { error } = await supabase.from("profiles").update({ sucursal }).eq("id", id);
     if (error) toast.error(error.message);
     else load();
   };
 
   const openCred = (profile: Profile) => {
+    if (isProtectedProfile(profile)) {
+      toast.error("Las credenciales del superadministrador están protegidas");
+      return;
+    }
     setCredUser(profile);
     setCredEmail(emailByProfile(profile));
     setCredPassword("");
@@ -359,6 +398,11 @@ export default function Admin() {
 
   const eliminarUsuario = async () => {
     if (!delUser) return;
+    if (isProtectedProfile(delUser)) {
+      toast.error("El acceso del superadministrador está protegido");
+      setDelUser(null);
+      return;
+    }
     setDelBusy(true);
     const payload = hasLinkedSchema ? { profile_id: delUser.id } : { user_id: delUser.id };
     const { data, error } = await supabase.functions.invoke("admin-delete-user", { body: payload });
@@ -435,7 +479,7 @@ export default function Admin() {
                       {emailByProfile(profile) || "Sin acceso"}
                     </TableCell>
                     <TableCell>
-                      {canManageAdmin ? (
+                      {canManageAdmin && !isProtectedProfile(profile) ? (
                         <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
                           <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
                           <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -445,10 +489,10 @@ export default function Admin() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</Badge>
+                      <Badge variant="outline">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</Badge>
                     </TableCell>
                     <TableCell>
-                      {canManageAdmin ? (
+                      {canManageAdmin && !isProtectedProfile(profile) ? (
                         <Button variant={profile.activo ? "default" : "outline"} size="sm" onClick={() => toggleActivo(profile)}>
                           {profile.activo ? "Activo" : "Inactivo"}
                         </Button>
@@ -458,16 +502,20 @@ export default function Admin() {
                     </TableCell>
                     {canManageAdmin && (
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Credenciales">
-                            <KeyRound className="h-3.5 w-3.5" />
-                          </Button>
-                          {emailByProfile(profile) && (
-                            <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} title="Quitar acceso" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
+                        {isProtectedProfile(profile) ? (
+                          <Badge variant="outline">Protegido</Badge>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Credenciales">
+                              <KeyRound className="h-3.5 w-3.5" />
                             </Button>
-                          )}
-                        </div>
+                            {emailByProfile(profile) && (
+                              <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} title="Quitar acceso" className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>
@@ -487,7 +535,7 @@ export default function Admin() {
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-1.5">
-                    {canManageAdmin && (
+                    {canManageAdmin && !isProtectedProfile(profile) && (
                       <>
                         <Button variant="outline" size="sm" onClick={() => openCred(profile)} className="h-9 w-9 px-0">
                           <KeyRound className="h-4 w-4" />
@@ -507,7 +555,7 @@ export default function Admin() {
                         </Button>
                       </>
                     )}
-                    {!canManageAdmin && (
+                    {(!canManageAdmin || isProtectedProfile(profile)) && (
                       <Badge variant={profile.activo ? "default" : "outline"} className="text-[10px]">
                         {profile.activo ? "Activo" : "Inactivo"}
                       </Badge>
@@ -518,7 +566,7 @@ export default function Admin() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
-                    {canManageAdmin ? (
+                    {canManageAdmin && !isProtectedProfile(profile) ? (
                       <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
                         <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -529,7 +577,7 @@ export default function Admin() {
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Nivel</Label>
-                    <div className="py-1.5 text-[12px]">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
+                    <div className="py-1.5 text-[12px]">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</div>
                   </div>
                 </div>
               </Card>
@@ -584,7 +632,7 @@ export default function Admin() {
                 </div>
                 <div>
                   <Label className="text-[12px]">Rol</Label>
-                  <Select value={nuRol} onValueChange={(value) => setNuRol(value as Role)}>
+                  <Select value={nuRol} onValueChange={(value) => setNuRol(value as AssignableRole)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
                   </Select>
@@ -621,19 +669,19 @@ export default function Admin() {
                       <TableCell className="font-medium">{profile.nombre}</TableCell>
                       <TableCell className="text-[12px] text-muted-foreground">{emailByProfile(profile)}</TableCell>
                       <TableCell>
-                        {canManageAdmin ? (
-                          <Select value={rolesByUser[profile.id]?.[0] ?? ""} onValueChange={(value) => cambiarRol(profile.id, value as Role)}>
+                        {canManageAdmin && !isProtectedProfile(profile) ? (
+                          <Select value={primaryRoleForProfile(profile) ?? ""} onValueChange={(value) => cambiarRol(permissionOwnerId(profile), value as AssignableRole)}>
                             <SelectTrigger className="h-8 w-36"><SelectValue placeholder="—" /></SelectTrigger>
                             <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}</SelectContent>
                           </Select>
                         ) : (
-                          <Badge variant="outline">{nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</Badge>
+                          <Badge variant="outline">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         <ModuloChips
                           activos={modulesForProfile(profile)}
-                          editable={canManageAdmin}
+                          editable={canManageAdmin && !isProtectedProfile(profile)}
                           onToggle={(modulo, activo) => cambiarModuloAcceso(permissionOwnerId(profile), modulo, activo)}
                         />
                       </TableCell>
@@ -641,10 +689,14 @@ export default function Admin() {
                       <TableCell><Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
                       {canManageAdmin && (
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Editar acceso"><KeyRound className="h-3.5 w-3.5" /></Button>
-                            <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} title="Quitar acceso" className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                          </div>
+                          {isProtectedProfile(profile) ? (
+                            <Badge variant="outline">Protegido</Badge>
+                          ) : (
+                            <div className="flex gap-1">
+                              <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Editar acceso"><KeyRound className="h-3.5 w-3.5" /></Button>
+                              <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} title="Quitar acceso" className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
@@ -667,9 +719,9 @@ export default function Admin() {
                 <div key={profile.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-[13px] font-medium">{profile.nombre}</div>
-                    <div className="truncate text-[12px] text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(rolesByUser[profile.id]?.[0], modulesForProfile(profile))}</div>
+                    <div className="truncate text-[12px] text-muted-foreground">{profile.sucursal ?? "Sin sucursal"} - {nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</div>
                   </div>
-                  {canManageAdmin && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
+                  {canManageAdmin && !isProtectedProfile(profile) && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
                 </div>
               ))}
               {profilesSinAcceso.length > 12 && (

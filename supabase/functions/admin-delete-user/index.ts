@@ -27,7 +27,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: rolesData } = await admin.from("user_roles").select("role").eq("user_id", user.id);
-    const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
+    const isAdmin = (rolesData ?? []).some((r: { role: string }) =>
+      r.role === "admin" || r.role === "superadmin"
+    );
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin puede eliminar usuarios" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -67,6 +69,16 @@ Deno.serve(async (req) => {
 
     if (authUserId === user.id) {
       return new Response(JSON.stringify({ error: "No podés eliminar tu propio acceso" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: targetRoles } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authUserId);
+    if ((targetRoles ?? []).some((item: { role: string }) => item.role === "superadmin")) {
+      return new Response(JSON.stringify({ error: "El acceso del superadministrador está protegido" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -27,7 +27,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: rolesData } = await admin.from("user_roles").select("role").eq("user_id", user.id);
-    const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
+    const isAdmin = (rolesData ?? []).some((r: { role: string }) =>
+      r.role === "admin" || r.role === "superadmin"
+    );
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },

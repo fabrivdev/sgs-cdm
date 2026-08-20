@@ -17,6 +17,7 @@ describe("nivelLabel", () => {
   it("never aliases admin or gerencia, regardless of modulo access", () => {
     expect(nivelLabel("admin", ["servicios"])).toBe("Administrador");
     expect(nivelLabel("gerencia", ["servicios"])).toBe("Gerencia");
+    expect(nivelLabel("superadmin", ["servicios"])).toBe("Superadministrador");
   });
 
   it("returns a dash when there is no nivel", () => {

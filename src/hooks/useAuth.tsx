@@ -128,14 +128,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const roleOwnerId = loadedProfile?.id ?? uid;
       const permissionOwnerIds = Array.from(new Set([uid, roleOwnerId]));
       const [{ data: roleRows }, { data: moduloRows }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", roleOwnerId),
+        supabase.from("user_roles").select("role").in("user_id", permissionOwnerIds),
         (supabase as any).from("user_modulo_acceso").select("modulo_id").in("user_id", permissionOwnerIds),
       ]);
 
+      const loadedRoles = Array.from(
+        new Set((roleRows ?? []).map((row: { role: Role }) => row.role)),
+      );
       setProfile(loadedProfile);
-      setRoles((roleRows ?? []).map((row: { role: Role }) => row.role));
+      setRoles(loadedRoles);
       setModuloAccess(((moduloRows ?? []) as { modulo_id: string }[]).map((row) => row.modulo_id));
-      setIsSuperAdmin((roleRows ?? []).some((row: { role: string }) => row.role === "superadmin"));
+      setIsSuperAdmin(loadedRoles.includes("superadmin"));
       loadedUserRef.current = uid;
     })();
 
@@ -242,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         moduloAccess,
         loading,
-        isAdmin: roles.includes("admin"),
+        isAdmin: isSuperAdmin || roles.includes("admin"),
         isSuperAdmin,
         isGerencia: roles.includes("gerencia"),
         isJefatura,

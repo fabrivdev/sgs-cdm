@@ -9,6 +9,9 @@ describe("matriz de permisos", () => {
 
   it("reserva el acceso global para el superadministrador", () => {
     expect(firstAccessibleRoute([], ["admin"], true)).toBe("/");
+    expect(firstAccessibleRoute([], ["superadmin"], false)).toBe("/");
+    expect(roleHasCapability(["superadmin"], "administracion:gestionar")).toBe(true);
+    expect(roleHasCapability(["superadmin"], "parque:eliminar")).toBe(true);
   });
 
   it("diferencia consulta, gestion y ejecucion", () => {

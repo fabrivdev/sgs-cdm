@@ -11,6 +11,16 @@ export type Capability =
   | "datos:exportar";
 
 const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
+  superadmin: [
+    "administracion:gestionar",
+    "dashboard:ver",
+    "servicios:gestionar",
+    "servicios:ejecutar",
+    "parque:gestionar",
+    "parque:eliminar",
+    "repuestos:gestionar",
+    "datos:exportar",
+  ],
   admin: [
     "administracion:gestionar",
     "dashboard:ver",
@@ -41,7 +51,7 @@ export function firstAccessibleRoute(
   roles: readonly Role[],
   isSuperAdmin: boolean,
 ) {
-  if (isSuperAdmin || moduloAccess.includes("servicios")) return "/";
+  if (isSuperAdmin || roles.includes("superadmin") || moduloAccess.includes("servicios")) return "/";
   if (moduloAccess.includes("parque")) return "/parque-clientes";
   if (moduloAccess.includes("repuestos")) return "/repuestos";
   if (roles.includes("admin")) return "/admin";

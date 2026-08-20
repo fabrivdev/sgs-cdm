@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function ProtectedRoute({ children, requireRoles, requireModulo }: Props) {
-  const { user, roles, hasModuloAccess, loading, defaultRoute } = useAuth();
+  const { user, roles, isSuperAdmin, hasModuloAccess, loading, defaultRoute } = useAuth();
 
   if (loading) {
     return (
@@ -22,7 +22,7 @@ export function ProtectedRoute({ children, requireRoles, requireModulo }: Props)
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  if (requireRoles && !requireRoles.some((r) => roles.includes(r))) {
+  if (requireRoles && !isSuperAdmin && !requireRoles.some((r) => roles.includes(r))) {
     return <Navigate to={defaultRoute} replace />;
   }
 

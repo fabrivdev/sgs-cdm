@@ -27,7 +27,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: rolesData } = await admin.from("user_roles").select("role").eq("user_id", user.id);
-    const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
+    const isAdmin = (rolesData ?? []).some((r: { role: string }) =>
+      r.role === "admin" || r.role === "superadmin"
+    );
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin puede modificar usuarios" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -84,6 +86,16 @@ Deno.serve(async (req) => {
     } else {
       // Legacy path: user_id is the auth.users.id directly (also equals profile.id)
       authUserId = String(user_id);
+    }
+
+    const { data: targetRoles } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authUserId!);
+    if ((targetRoles ?? []).some((item: { role: string }) => item.role === "superadmin")) {
+      return new Response(JSON.stringify({ error: "Las credenciales del superadministrador están protegidas" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
 

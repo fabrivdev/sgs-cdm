@@ -41,12 +41,14 @@ export const MODULO_LABELS: Record<(typeof MODULOS)[number], string> = {
 export type Sucursal = (typeof SUCURSALES)[number];
 export type Marca = (typeof MARCAS)[number];
 export type Estado = (typeof ESTADOS)[number];
-export type Role = (typeof ROLES)[number];
+export type AssignableRole = (typeof ROLES)[number];
+export type Role = AssignableRole | "superadmin";
 export type Modulo = (typeof MODULOS)[number];
 export type TipoTrabajo = (typeof TIPOS_TRABAJO)[number];
 
 /** Nombres genericos del nivel. Para el alias usado en Servicios, ver nivelLabel() abajo. */
 export const ROLE_LABELS: Record<Role, string> = {
+  superadmin: "Superadministrador",
   admin: "Administrador",
   gerencia: "Gerencia",
   jefatura: "Jefatura",

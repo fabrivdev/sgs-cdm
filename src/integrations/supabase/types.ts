@@ -531,6 +531,7 @@ export type Database = {
         Row: {
           actualizado_en: string
           cantidad: number | null
+          cliente_id: string | null
           cod_mercaderia: string | null
           codigo_fabricante: string | null
           codigo_interno_factura: string | null
@@ -560,6 +561,7 @@ export type Database = {
         Insert: {
           actualizado_en?: string
           cantidad?: number | null
+          cliente_id?: string | null
           cod_mercaderia?: string | null
           codigo_fabricante?: string | null
           codigo_interno_factura?: string | null
@@ -589,6 +591,7 @@ export type Database = {
         Update: {
           actualizado_en?: string
           cantidad?: number | null
+          cliente_id?: string | null
           cod_mercaderia?: string | null
           codigo_fabricante?: string | null
           codigo_interno_factura?: string | null
@@ -616,6 +619,13 @@ export type Database = {
           valor_unitario?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "facturacion_lineas_importadas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "facturacion_lineas_importadas_importacion_id_fkey"
             columns: ["importacion_id"]
@@ -2997,7 +3007,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "jefatura" | "operativo" | "gerencia"
+      app_role: "admin" | "jefatura" | "operativo" | "gerencia" | "superadmin"
       estado_jornada: "en_curso" | "completada" | "incompleta"
       estado_programacion:
         | "programada"
@@ -3184,7 +3194,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "jefatura", "operativo", "gerencia"],
+      app_role: ["admin", "jefatura", "operativo", "gerencia", "superadmin"],
       estado_jornada: ["en_curso", "completada", "incompleta"],
       estado_programacion: [
         "programada",

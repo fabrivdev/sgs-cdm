@@ -28,7 +28,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: rolesData } = await admin.from("user_roles").select("role").eq("user_id", user.id);
-    const isAdmin = (rolesData ?? []).some((r: { role: string }) => r.role === "admin");
+    const isAdmin = (rolesData ?? []).some((r: { role: string }) =>
+      r.role === "admin" || r.role === "superadmin"
+    );
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Solo admin puede crear usuarios" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -44,6 +46,13 @@ Deno.serve(async (req) => {
 
     if (String(password).length < 6) {
       return new Response(JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const assignableRoles = new Set(["admin", "gerencia", "jefatura", "operativo"]);
+    if (role && !assignableRoles.has(String(role))) {
+      return new Response(JSON.stringify({ error: "El rol solicitado no se puede asignar desde la aplicación" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
