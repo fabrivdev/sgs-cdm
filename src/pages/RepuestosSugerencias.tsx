@@ -242,7 +242,7 @@ export default function RepuestosSugerencias() {
   const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
   const canLoadLegacyMaster = isAdmin || isSuperAdmin;
-  const [brand, setBrand] = useState<MarcaSugerencia>("CLAAS");
+  const [brand, setBrand] = useState<MarcaSugerencia>("TODAS");
   const [analysisDate, setAnalysisDate] = useState(analysisDateDefault);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
@@ -272,7 +272,7 @@ export default function RepuestosSugerencias() {
     page,
     Boolean(
       historyIsPrepared
-      && modelQuery.data
+      && (brand === "TODAS" || modelQuery.data)
       && legacyMasterQuery.data?.cargado
       && !historyRebuildRequired
     ),
@@ -282,9 +282,9 @@ export default function RepuestosSugerencias() {
   const leadTimeMeses = modelQuery.data?.lead_time_meses ?? 3;
   const liveSummary = liveQuery.data?.resumen;
   const totalPages = Math.max(1, Math.ceil((liveQuery.data?.total_filtrado ?? 0) / 50));
-  const segmentOptions = useMemo(() => [
-    ...(segmentsQuery.data?.map((segment) => segment.segmento) ?? []),
-  ], [segmentsQuery.data]);
+  const segmentOptions = useMemo(() => brand === "TODAS"
+    ? ["ESTRELLA", "DEMANDA VOLATIL", "FLUJO ESTABLE", "SERVICIO ECONOMICO", "BAJO PEDIDO"]
+    : (segmentsQuery.data?.map((segment) => segment.segmento) ?? []), [brand, segmentsQuery.data]);
 
   const refreshHistory = useMutation({
     mutationFn: () => refrescarHistorialUnificado((completed, total) => {
@@ -417,7 +417,7 @@ export default function RepuestosSugerencias() {
         title="Sugerencia de compra"
         actions={(
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)}>
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)} disabled={brand === "TODAS"} title={brand === "TODAS" ? "Elegí una marca para editar sus parámetros" : undefined}>
               <Settings2 className="mr-1 h-3.5 w-3.5" />Parámetros
             </Button>
             <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial">
@@ -429,7 +429,7 @@ export default function RepuestosSugerencias() {
 
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
-      {modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
+      {brand !== "TODAS" && modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
 
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
@@ -570,7 +570,12 @@ export default function RepuestosSugerencias() {
           value={brand}
           onChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}
           placeholder="Marca"
-          options={[{ value: "CLAAS", label: "CLAAS" }, { value: "HORSCH", label: "HORSCH" }]}
+          options={[
+            { value: "TODAS", label: "Todas" },
+            { value: "CLAAS", label: "CLAAS" },
+            { value: "HORSCH", label: "HORSCH" },
+            { value: "OTROS", label: "Otros" },
+          ]}
           width="w-[120px]"
         />
         <FilterDate
@@ -617,7 +622,7 @@ export default function RepuestosSugerencias() {
         ) : historyRebuildRequired || refreshHistory.isPending ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-[13px] text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
         ) : !historyIsPrepared ? (
-          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand}</h2><p className="mt-1 max-w-md text-[13px] text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand === "TODAS" ? "todas las marcas" : brand}</h2><p className="mt-1 max-w-md text-[13px] text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
         ) : liveQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : liveQuery.error ? (

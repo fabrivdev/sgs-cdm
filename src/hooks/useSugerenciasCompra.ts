@@ -5,7 +5,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type MarcaSugerencia = "CLAAS" | "HORSCH";
+export type MarcaModeloSugerencia = "CLAAS" | "HORSCH" | "OTROS";
+export type MarcaSugerencia = MarcaModeloSugerencia | "TODAS";
+
+const MARCAS_MODELO: MarcaModeloSugerencia[] = ["CLAAS", "HORSCH", "OTROS"];
 
 export interface EstadoMaestroLegacy {
   cargado: boolean;
@@ -64,7 +67,7 @@ export interface ResultadoVinculoLegacy {
 
 export interface ModeloSugerencia {
   id: string;
-  marca: MarcaSugerencia;
+  marca: MarcaModeloSugerencia;
   version: number;
   nombre: string;
   activa: boolean;
@@ -104,7 +107,7 @@ export interface SegmentoSugerencia {
 
 export interface CorridaSugerencia {
   id: string;
-  marca: MarcaSugerencia;
+  marca: MarcaModeloSugerencia;
   modelo_version_id: string;
   nombre: string;
   fecha_analisis: string;
@@ -127,7 +130,7 @@ export interface ResultadoSugerencia {
   codigo_fabricante: string | null;
   descripcion: string;
   familia: string | null;
-  marca: MarcaSugerencia;
+  marca: MarcaModeloSugerencia;
   origen: string;
   estado_datos: string;
   incorporado_en: string | null;
@@ -230,6 +233,7 @@ function aplicarFiltros(query: any, filtros: FiltrosResultados) {
 export function useModeloActivo(marca: MarcaSugerencia) {
   return useQuery({
     queryKey: ["repuestos", "sugerencias", "modelo", marca],
+    enabled: marca !== "TODAS",
     queryFn: async () => {
       const { data, error } = await (supabase.from("repuestos_modelo_versiones" as any) as any)
         .select("*")
@@ -260,6 +264,7 @@ export function useSegmentosModelo(modeloId?: string) {
 export function useCorridasSugerencia(marca: MarcaSugerencia) {
   return useQuery({
     queryKey: ["repuestos", "sugerencias", "corridas", marca],
+    enabled: marca !== "TODAS",
     queryFn: async () => {
       const { data, error } = await (supabase.from("repuestos_corridas" as any) as any)
         .select("*")
@@ -283,7 +288,7 @@ export function useCalidadHistorialRepuestos(
     enabled,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("repuestos_resumen_calidad_historial", {
-        p_marca: marca,
+        p_marca: marca === "TODAS" ? null : marca,
       });
       if (error) throw error;
       return data as CalidadHistorialRepuestos;
@@ -345,8 +350,8 @@ export function useResultadosSugerencia(
   });
 }
 
-async function consultarSugerenciaViva(
-  marca: MarcaSugerencia,
+async function consultarSugerenciaVivaMarca(
+  marca: MarcaModeloSugerencia,
   fechaAnalisis: string,
   filtros: FiltrosResultados,
   limite: number,
@@ -367,6 +372,56 @@ async function consultarSugerenciaViva(
     throw new Error(details.join(" | ") || "No se pudo calcular la sugerencia en vivo");
   }
   return data as SugerenciaVivaResponse;
+}
+
+function ordenarSugerencias(a: ResultadoSugerencia, b: ResultadoSugerencia) {
+  return b.sugerencia_unidades - a.sugerencia_unidades
+    || b.total_vendido_12m - a.total_vendido_12m
+    || a.producto_codigo.localeCompare(b.producto_codigo);
+}
+
+async function consultarSugerenciaViva(
+  marca: MarcaSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+  limite: number,
+  offset: number,
+) {
+  if (marca !== "TODAS") {
+    return consultarSugerenciaVivaMarca(marca, fechaAnalisis, filtros, limite, offset);
+  }
+
+  // Para conservar una paginacion global correcta, cada marca entrega sus
+  // mejores filas hasta el final de la pagina solicitada. Luego se ordenan y
+  // recortan en conjunto; los parametros siguen siendo los de cada marca.
+  const hasta = Math.max(1, offset + limite);
+  const respuestas = await Promise.all(
+    MARCAS_MODELO.map((item) => consultarSugerenciaVivaMarca(item, fechaAnalisis, filtros, hasta, 0)),
+  );
+  const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
+  const resumen = respuestas.reduce<ResumenSugerenciaViva>((total, response) => ({
+    total_piezas: total.total_piezas + (response.resumen?.total_piezas ?? 0),
+    piezas_sugeridas: total.piezas_sugeridas + (response.resumen?.piezas_sugeridas ?? 0),
+    unidades_sugeridas: total.unidades_sugeridas + (response.resumen?.unidades_sugeridas ?? 0),
+    piezas_nuevas_sin_historial: total.piezas_nuevas_sin_historial + (response.resumen?.piezas_nuevas_sin_historial ?? 0),
+    piezas_sin_ventas_recientes: total.piezas_sin_ventas_recientes + (response.resumen?.piezas_sin_ventas_recientes ?? 0),
+    piezas_confianza_baja: (total.piezas_confianza_baja ?? 0) + (response.resumen?.piezas_confianza_baja ?? 0),
+  }), {
+    total_piezas: 0,
+    piezas_sugeridas: 0,
+    unidades_sugeridas: 0,
+    piezas_nuevas_sin_historial: 0,
+    piezas_sin_ventas_recientes: 0,
+    piezas_confianza_baja: 0,
+  });
+
+  return {
+    modelo: { id: "TODAS", version: 1, nombre: "Modelos activos por marca" },
+    fecha_analisis: fechaAnalisis,
+    resumen,
+    total_filtrado: respuestas.reduce((total, response) => total + response.total_filtrado, 0),
+    rows: rows.slice(offset, offset + limite),
+  } satisfies SugerenciaVivaResponse;
 }
 
 export function useSugerenciaViva(
@@ -392,7 +447,7 @@ export function useSugerenciaViva(
 
 /** Sugerencia vigente de un único producto, para mostrar la recomendación de compra desde Catálogo y stock. */
 export function useSugerenciaProducto(
-  marca: MarcaSugerencia | null,
+  marca: MarcaModeloSugerencia | null,
   productoCodigo: string | null,
   fechaAnalisis?: string,
 ) {
@@ -409,7 +464,7 @@ export function useSugerenciaProducto(
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const response = await consultarSugerenciaViva(
-        marca as MarcaSugerencia,
+        marca as MarcaModeloSugerencia,
         fecha,
         { buscar: productoCodigo as string, segmento: "TODOS", estado: "TODOS", soloSugeridos: false },
         5,
@@ -428,6 +483,38 @@ export async function cargarSugerenciaViva(
   filtros: FiltrosResultados,
   onProgress?: (loaded: number, total: number) => void,
 ) {
+  if (marca === "TODAS") {
+    let completadas = 0;
+    const respuestas = await Promise.all(MARCAS_MODELO.map(async (item) => {
+      const response = await cargarSugerenciaViva(item, fechaAnalisis, filtros);
+      completadas += 1;
+      onProgress?.(completadas, MARCAS_MODELO.length);
+      return response;
+    }));
+    const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
+    return {
+      modelo: { id: "TODAS", version: 1, nombre: "Modelos activos por marca" },
+      fecha_analisis: fechaAnalisis,
+      resumen: respuestas.reduce<ResumenSugerenciaViva>((total, response) => ({
+        total_piezas: total.total_piezas + response.resumen.total_piezas,
+        piezas_sugeridas: total.piezas_sugeridas + response.resumen.piezas_sugeridas,
+        unidades_sugeridas: total.unidades_sugeridas + response.resumen.unidades_sugeridas,
+        piezas_nuevas_sin_historial: total.piezas_nuevas_sin_historial + response.resumen.piezas_nuevas_sin_historial,
+        piezas_sin_ventas_recientes: total.piezas_sin_ventas_recientes + response.resumen.piezas_sin_ventas_recientes,
+        piezas_confianza_baja: (total.piezas_confianza_baja ?? 0) + (response.resumen.piezas_confianza_baja ?? 0),
+      }), {
+        total_piezas: 0,
+        piezas_sugeridas: 0,
+        unidades_sugeridas: 0,
+        piezas_nuevas_sin_historial: 0,
+        piezas_sin_ventas_recientes: 0,
+        piezas_confianza_baja: 0,
+      }),
+      total_filtrado: rows.length,
+      rows,
+    } satisfies SugerenciaVivaResponse;
+  }
+
   const chunkSize = 1000;
   const rows: ResultadoSugerencia[] = [];
   let offset = 0;

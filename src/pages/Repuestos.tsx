@@ -28,7 +28,7 @@ import {
   type StockMatrizRow,
   type StockSortKey,
 } from "@/hooks/useRepuestos";
-import { useSugerenciaProducto, type MarcaSugerencia } from "@/hooks/useSugerenciasCompra";
+import { useSugerenciaProducto, type MarcaModeloSugerencia } from "@/hooks/useSugerenciasCompra";
 import { MARCAS } from "@/lib/constants";
 import { metaText, pageShellWide } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
@@ -74,8 +74,8 @@ export default function Repuestos() {
   const kpisQuery = useStockKpis();
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
-  const marcaSugerencia = seleccionado && (seleccionado.marca === "CLAAS" || seleccionado.marca === "HORSCH")
-    ? (seleccionado.marca as MarcaSugerencia)
+  const marcaSugerencia = seleccionado && (seleccionado.marca === "CLAAS" || seleccionado.marca === "HORSCH" || seleccionado.marca === "OTROS")
+    ? (seleccionado.marca as MarcaModeloSugerencia)
     : null;
   const sugerenciaQuery = useSugerenciaProducto(marcaSugerencia, seleccionado?.codigo_interno ?? null);
 
