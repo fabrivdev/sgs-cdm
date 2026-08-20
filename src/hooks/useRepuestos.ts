@@ -164,7 +164,8 @@ export function useStockKpis() {
       const [totalRes, conStockRes, ultimaRes] = await Promise.all([
         (supabase.from("productos" as any) as any)
           .select("codigo_interno", { count: "exact", head: true })
-          .ilike("codigo_interno", "REP%"),
+          .ilike("codigo_interno", "REP%")
+          .eq("activo", true),
         (supabase.from("v_repuestos_stock_matriz" as any) as any)
           .select("codigo_interno", { count: "exact", head: true })
           .gt("total", 0),
@@ -200,6 +201,7 @@ export function useFamiliasStock() {
         (supabase.from("productos" as any) as any)
           .select("familia")
           .ilike("codigo_interno", "REP%")
+          .eq("activo", true)
           .not("familia", "is", null),
       );
 
