@@ -636,7 +636,7 @@ export function DetalleRepuestoSheet({
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">
                   Código de fabricante compartido con{" "}
-                  {hermanos.map((h) => h.codigo_interno).join(", ")} — el motor excluye las ventas ambiguas hasta resolverlas.
+                  {hermanos.map((h) => h.codigo_interno).join(", ")} — el motor separa por código anterior y descripción; solo excluye lo irresoluble.
                 </span>
               </div>
             )}
