@@ -161,8 +161,14 @@ export interface ResultadoSugerencia {
   necesidad_neta: number;
   sugerencia_unidades: number;
   confianza_datos?: "ALTA" | "MEDIA" | "BAJA";
-  tipo_stock_seguridad?: "ESTADISTICA" | "ESTIMADA";
+  tipo_stock_seguridad?: "ESTADISTICA" | "ESTIMADA" | "NO APLICA";
   cobertura_aplicada_meses?: number;
+  meses_venta_24m?: number;
+  episodios_demanda_12m?: number;
+  episodios_demanda_24m?: number;
+  clientes_12m?: number;
+  concentracion_mes_12m?: number;
+  evidencia_recurrencia?: boolean;
   explicacion: Record<string, unknown>;
 }
 
@@ -201,6 +207,7 @@ export interface ResumenSugerenciaViva {
   piezas_nuevas_sin_historial: number;
   piezas_sin_ventas_recientes: number;
   piezas_confianza_baja?: number;
+  piezas_sin_recurrencia?: number;
 }
 
 export interface SugerenciaVivaResponse {
@@ -406,6 +413,7 @@ async function consultarSugerenciaViva(
     piezas_nuevas_sin_historial: total.piezas_nuevas_sin_historial + (response.resumen?.piezas_nuevas_sin_historial ?? 0),
     piezas_sin_ventas_recientes: total.piezas_sin_ventas_recientes + (response.resumen?.piezas_sin_ventas_recientes ?? 0),
     piezas_confianza_baja: (total.piezas_confianza_baja ?? 0) + (response.resumen?.piezas_confianza_baja ?? 0),
+    piezas_sin_recurrencia: (total.piezas_sin_recurrencia ?? 0) + (response.resumen?.piezas_sin_recurrencia ?? 0),
   }), {
     total_piezas: 0,
     piezas_sugeridas: 0,
@@ -413,6 +421,7 @@ async function consultarSugerenciaViva(
     piezas_nuevas_sin_historial: 0,
     piezas_sin_ventas_recientes: 0,
     piezas_confianza_baja: 0,
+    piezas_sin_recurrencia: 0,
   });
 
   return {
@@ -502,6 +511,7 @@ export async function cargarSugerenciaViva(
         piezas_nuevas_sin_historial: total.piezas_nuevas_sin_historial + response.resumen.piezas_nuevas_sin_historial,
         piezas_sin_ventas_recientes: total.piezas_sin_ventas_recientes + response.resumen.piezas_sin_ventas_recientes,
         piezas_confianza_baja: (total.piezas_confianza_baja ?? 0) + (response.resumen.piezas_confianza_baja ?? 0),
+        piezas_sin_recurrencia: (total.piezas_sin_recurrencia ?? 0) + (response.resumen.piezas_sin_recurrencia ?? 0),
       }), {
         total_piezas: 0,
         piezas_sugeridas: 0,
@@ -509,6 +519,7 @@ export async function cargarSugerenciaViva(
         piezas_nuevas_sin_historial: 0,
         piezas_sin_ventas_recientes: 0,
         piezas_confianza_baja: 0,
+        piezas_sin_recurrencia: 0,
       }),
       total_filtrado: rows.length,
       rows,

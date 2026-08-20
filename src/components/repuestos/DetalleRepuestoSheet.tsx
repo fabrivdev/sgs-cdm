@@ -318,6 +318,10 @@ function PanelPlanificacion({
           </p>
         )}
         <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px] text-muted-foreground">
+          <span>Meses con venta <strong className="float-right text-foreground">{sugerencia.meses_venta_12m ?? 0} / 12</strong></span>
+          <span>Episodios comerciales <strong className="float-right text-foreground">{sugerencia.episodios_demanda_12m ?? 0}</strong></span>
+          <span>Clientes distintos <strong className="float-right text-foreground">{sugerencia.clientes_12m ?? 0}</strong></span>
+          <span>Concentración mayor mes <strong className="float-right text-foreground">{decimal.format((sugerencia.concentracion_mes_12m ?? 0) * 100)}%</strong></span>
           <span>Demanda mensual <strong className="float-right text-foreground">{decimal.format(sugerencia.demanda_ponderada_mensual)}</strong></span>
           <span>Horizonte <strong className="float-right text-foreground">{sugerencia.horizonte_meses} meses</strong></span>
           <span>Demanda horizonte <strong className="float-right text-foreground">{decimal.format(sugerencia.demanda_horizonte)}</strong></span>
