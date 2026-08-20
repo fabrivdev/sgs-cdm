@@ -631,12 +631,12 @@ export function DetalleRepuestoSheet({
                 className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-900"
                 title={`Mismo código de fabricante que ${hermanos
                   .map((h) => `${h.codigo_interno} (${h.descripcion})`)
-                  .join(", ")}. La factura no distingue cuál se vendió realmente.`}
+                  .join(", ")}. Si la factura no distingue el SKU, esa venta queda fuera del cálculo hasta resolverla.`}
               >
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">
-                  Mismo código de fabricante que{" "}
-                  {hermanos.map((h) => h.codigo_interno).join(", ")} — las ventas pueden corresponder a cualquiera.
+                  Código de fabricante compartido con{" "}
+                  {hermanos.map((h) => h.codigo_interno).join(", ")} — el motor excluye las ventas ambiguas hasta resolverlas.
                 </span>
               </div>
             )}
@@ -667,7 +667,7 @@ export function DetalleRepuestoSheet({
                     Recuperar consumo del sistema anterior
                   </p>
                   <p className="mt-0.5 text-[11px] text-amber-800">
-                    Si este caso quedó ambiguo o sin coincidencia, ingresá su código interno anterior. La relación quedará guardada para futuras actualizaciones.
+                    Ingresá el código interno anterior solo después de comprobar a cuál SKU corresponde. La decisión reemplaza la ambigüedad y queda auditada para futuras actualizaciones.
                   </p>
                 </div>
                 <div className="flex w-full shrink-0 gap-2 sm:w-auto">
