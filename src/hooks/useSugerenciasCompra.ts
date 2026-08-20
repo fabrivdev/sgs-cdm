@@ -45,6 +45,23 @@ export interface ResultadoFacturacionHistorica {
   productos_vinculados: number;
 }
 
+export interface ResultadoReconciliacionLegacy {
+  cargado: boolean;
+  filas: number;
+  automaticas: number;
+  manuales: number;
+  ambiguas: number;
+  sin_coincidencia: number;
+  lineas_actualizadas: number;
+}
+
+export interface ResultadoVinculoLegacy {
+  producto_codigo: string;
+  codigo_legacy: string;
+  descripcion_legacy: string | null;
+  lineas_vinculadas: number;
+}
+
 export interface ModeloSugerencia {
   id: string;
   marca: MarcaSugerencia;
@@ -481,6 +498,14 @@ const sumarMesesFecha = (fecha: string, meses: number) => {
 export async function refrescarHistorialUnificado(
   onProgress?: (completed: number, total: number) => void,
 ) {
+  const reconciliacion = await (supabase.rpc as any)("repuestos_reconciliar_maestro_legacy_actual");
+  if (reconciliacion.error && reconciliacion.error.code !== "PGRST202") {
+    throw new Error(mensajeErrorSupabase(
+      reconciliacion.error,
+      "No se pudieron actualizar las equivalencias del sistema anterior",
+    ));
+  }
+
   const state = await (supabase.rpc as any)("repuestos_estado_facturacion_historica");
   if (!state.error && state.data?.cargado) {
     const start = await (supabase.rpc as any)("repuestos_iniciar_publicacion_historial");
@@ -533,6 +558,20 @@ export async function refrescarHistorialUnificado(
     throw new Error(details.join(" | ") || "No se pudo preparar el historial");
   }
   return data as ResultadoRefrescoHistorial;
+}
+
+export async function vincularCodigoLegacy(
+  productoCodigo: string,
+  codigoLegacy: string,
+) {
+  const { data, error } = await (supabase.rpc as any)("repuestos_vincular_codigo_legacy", {
+    p_producto_codigo: productoCodigo,
+    p_codigo_legacy: codigoLegacy,
+  });
+  if (error) {
+    throw new Error(mensajeErrorSupabase(error, "No se pudo vincular el código anterior"));
+  }
+  return data as ResultadoVinculoLegacy;
 }
 
 const textoMaestroLegacy = (value: unknown) => String(value ?? "").trim();

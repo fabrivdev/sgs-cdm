@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, Calculator, Loader2, RefreshCw } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, Calculator, Link2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,8 @@ import {
 } from "@/hooks/useRepuestos";
 import {
   guardarPlanificacionArticulo,
+  refrescarHistorialUnificado,
+  vincularCodigoLegacy,
   type ResultadoSugerencia,
 } from "@/hooks/useSugerenciasCompra";
 import { SUCURSALES } from "@/lib/constants";
@@ -380,13 +382,43 @@ export function DetalleRepuestoSheet({
   const hermanos = hermanosQuery.data ?? [];
   const stockQuery = useStockMatrizProducto(producto?.stock ? null : codigo);
   const stock = producto?.stock ?? stockQuery.data ?? null;
+  const queryClient = useQueryClient();
 
   const [vistaHistorial, setVistaHistorial] = useState<VistaHistorial>("facturas");
   const [tab, setTab] = useState(tabInicial);
+  const [codigoLegacy, setCodigoLegacy] = useState("");
 
   useEffect(() => {
-    if (producto) setTab(tabInicial);
-  }, [producto?.codigo_interno, tabInicial]);
+    if (codigo) {
+      setTab(tabInicial);
+      setCodigoLegacy("");
+    }
+  }, [codigo, tabInicial]);
+
+  const vincularLegacy = useMutation({
+    mutationFn: async () => {
+      if (!producto) throw new Error("No hay un repuesto seleccionado");
+      const resultado = await vincularCodigoLegacy(producto.codigo_interno, codigoLegacy.trim());
+      await refrescarHistorialUnificado();
+      return resultado;
+    },
+    onSuccess: async (resultado) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["repuestos", "ventas_unificadas", codigo] }),
+        queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] }),
+        queryClient.invalidateQueries({ queryKey: ["repuestos", "historial-unificado"] }),
+        queryClient.invalidateQueries({ queryKey: ["repuestos", "calidad-historial"] }),
+      ]);
+      await ventasQuery.refetch();
+      setCodigoLegacy("");
+      toast.success(
+        resultado.lineas_vinculadas > 0
+          ? `Código anterior ${resultado.codigo_legacy} vinculado: ${integer.format(resultado.lineas_vinculadas)} ventas recuperadas.`
+          : `Código anterior ${resultado.codigo_legacy} vinculado. No tenía líneas históricas cargadas.`,
+      );
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
 
   const historialCargando = ventasQuery.isLoading || ventasQuery.isFetching;
   const historialError = ventasQuery.isError;
@@ -624,6 +656,49 @@ export function DetalleRepuestoSheet({
                   <RefreshCw className="mr-1 h-3 w-3" />
                   Reintentar
                 </Button>
+              </div>
+            )}
+
+            {canManage && !historialCargando && !historialError && ventas.length === 0 && (
+              <div className="flex flex-col gap-2 border-b border-amber-200 bg-amber-50/70 px-4 py-2.5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-950">
+                    <Link2 className="h-3.5 w-3.5" />
+                    Recuperar consumo del sistema anterior
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-amber-800">
+                    Si este caso quedó ambiguo o sin coincidencia, ingresá su código interno anterior. La relación quedará guardada para futuras actualizaciones.
+                  </p>
+                </div>
+                <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+                  <Input
+                    value={codigoLegacy}
+                    onChange={(event) => setCodigoLegacy(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && codigoLegacy.trim() && !vincularLegacy.isPending) {
+                        vincularLegacy.mutate();
+                      }
+                    }}
+                    placeholder="Código anterior, ej. 22234"
+                    aria-label="Código interno del sistema anterior"
+                    className="h-8 min-w-0 bg-background text-[12px] sm:w-56"
+                    disabled={vincularLegacy.isPending}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 shrink-0"
+                    disabled={!codigoLegacy.trim() || vincularLegacy.isPending}
+                    onClick={() => vincularLegacy.mutate()}
+                  >
+                    {vincularLegacy.isPending ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    {vincularLegacy.isPending ? "Reconstruyendo…" : "Vincular"}
+                  </Button>
+                </div>
               </div>
             )}
 
