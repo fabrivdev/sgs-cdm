@@ -576,7 +576,7 @@ async function getBillingSummary(client: SupabaseClient, args: JsonRecord) {
 async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord) {
   const marca = cleanText(args.marca, 30);
   const tipo = cleanText(args.tipo_tiempo, 40);
-  const rawRows = await fetchPaged((from, to) => {
+  const rawRows = await fetchPaged(async (from, to) => {
     let query = client
       .from("ordenes_servicio_importadas")
       .select(ASSISTANT_SERVICE_ORDER_SELECT)
@@ -585,7 +585,10 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     query = dateFilter(query, "fecha_abierta_os", args);
     if (marca && marca.toLowerCase() !== "todos") query = query.ilike("marca", `%${marca}%`);
     if (tipo && tipo.toLowerCase() !== "todos") query = query.ilike("tipo_tiempo", `%${tipo}%`);
-    return query;
+    // El select no es un string literal, asi que el tipado no resuelve columnas:
+    // se normaliza el resultado a JsonRecord sin cambiar el comportamiento.
+    const { data, error } = await query;
+    return { data: (data ?? null) as JsonRecord[] | null, error };
   }, 30000);
   const [jobs, clients] = await Promise.all([
     fetchPaged((from, to) => client
@@ -603,7 +606,7 @@ async function getServiceOrdersSummary(client: SupabaseClient, args: JsonRecord)
     .map((row) => [serviceOrderClientKey(row.nombre), row] as const)
     .filter(([key]) => Boolean(key)));
   const branchContext = { jobsById, clientsById, clientsByName };
-  const rows = rawRows.map((row) => ({
+  const rows = rawRows.map((row): JsonRecord => ({
     ...row,
     sucursal: resolveServiceOrderBranch(row, branchContext),
   }));
@@ -899,7 +902,7 @@ async function getTechnicianSummary(client: SupabaseClient, args: JsonRecord) {
   const requestedMetrics = Array.isArray(args.metrics) ? args.metrics.map((metric) => normalizedKey(metric)) : [];
   const sortByHours = requestedMetrics.includes("HORAS") || normalizedKey(args.order_by) === "HORAS";
   const detail = technicians
-    .map((row) => ({ ...row, ...(activity[String(row.id)] ?? { jornadas: 0, horas: 0, pendientes: 0, realizadas: 0, no_realizadas: 0 }) }))
+    .map((row): JsonRecord => ({ ...row, ...(activity[String(row.id)] ?? { jornadas: 0, horas: 0, pendientes: 0, realizadas: 0, no_realizadas: 0 }) }))
     .sort((a, b) => Number(sortByHours ? b.horas : b.jornadas) - Number(sortByHours ? a.horas : a.jornadas)
       || Number(b.jornadas) - Number(a.jornadas)
       || cleanText(a.nombre, 160).localeCompare(cleanText(b.nombre, 160)));
@@ -1908,7 +1911,7 @@ async function resolveSemanticQuestion(
     (conversationalIntent.includes("TIPO DE TIEMPO") && (normalized.includes("DESGLOS") || normalized.includes("HABLO DE")));
 
   if (asksBilling && asksHours) {
-    const billingArgs = { ...args, rubro: "Servicio" };
+    const billingArgs: JsonRecord = { ...args, rubro: "Servicio" };
     delete billingArgs.tipo_tiempo;
     const result = await getBillingSummary(client, billingArgs) as JsonRecord;
     const byTimeType = result.horas_servicio_por_tipo_tiempo && typeof result.horas_servicio_por_tipo_tiempo === "object"
@@ -1935,7 +1938,7 @@ async function resolveSemanticQuestion(
   // En esta app, productividad tecnica es una metrica de Ordenes de Servicio.
   // Las jornadas se usan solo cuando el usuario las pide de forma explicita.
   if ((asksTechnician || asksProductivity) && asksProductivity && !asksJornadas) {
-    const orderArgs = {
+    const orderArgs: JsonRecord = {
       ...args,
       ...(asksInactiveTechnician ? { activo: "Inactivo" } : {}),
       order_by: "horas",
@@ -1966,7 +1969,7 @@ async function resolveSemanticQuestion(
   }
 
   if (asksOrders && asksTechnician && asksInactiveTechnician && (asksProductivity || asksTop || normalized.includes("POR OS"))) {
-    const orderArgs = { ...args, activo: "Inactivo", order_by: "ordenes" };
+    const orderArgs: JsonRecord = { ...args, activo: "Inactivo", order_by: "ordenes" };
     const result = await getServiceOrdersSummary(client, orderArgs) as JsonRecord;
     const ranking = Array.isArray(result.ranking_tecnicos)
       ? result.ranking_tecnicos as Array<{ tecnico?: string; ordenes?: number; abiertas?: number; cerradas?: number }>
@@ -1984,7 +1987,7 @@ async function resolveSemanticQuestion(
   }
 
   if ((asksTechnician || asksProductivity) && asksInactiveTechnician && asksJornadas && (asksProductivity || asksTop)) {
-    const technicianArgs = { ...args, activo: "Inactivo", metrics: ["horas"], order_by: "horas" };
+    const technicianArgs: JsonRecord = { ...args, activo: "Inactivo", metrics: ["horas"], order_by: "horas" };
     const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
     const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
     const leader = detail.find((row) => Number(row.horas) > 0 || Number(row.jornadas) > 0);
@@ -2000,7 +2003,7 @@ async function resolveSemanticQuestion(
   }
 
   if ((asksTechnician || asksProductivity) && asksJornadas && (asksProductivity || asksTop) && !asksOrders) {
-    const technicianArgs = { ...args, metrics: ["horas"], order_by: "horas" };
+    const technicianArgs: JsonRecord = { ...args, metrics: ["horas"], order_by: "horas" };
     const result = await getTechnicianSummary(client, technicianArgs) as JsonRecord;
     const detail = Array.isArray(result.detalle) ? result.detalle as JsonRecord[] : [];
     const leader = detail.find((row) => Number(row.horas) > 0 || Number(row.jornadas) > 0);
