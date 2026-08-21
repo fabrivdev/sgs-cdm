@@ -172,6 +172,10 @@ describe("commission entries", () => {
     ]);
 
     expect(entries.map((entry) => entry.tecnico_nombre).sort()).toEqual(["JUAN PATINO", "RUBEN CACERES"]);
-    expect(entries.find((entry) => entry.tecnico_nombre === "RUBEN CACERES")?.horas_calculadas).toBe(1);
+    const kilometreTechnician = entries.find((entry) => entry.tecnico_nombre === "RUBEN CACERES");
+    expect(kilometreTechnician?.horas_calculadas).toBe(4);
+    expect(kilometreTechnician?.fecha_inicio).toBe("2026-08-20");
+    expect(kilometreTechnician?.hora_inicio).toBe("08:00:00");
+    expect(kilometreTechnician?.raw_data.inherited_from_ma01).toBe(true);
   });
 });

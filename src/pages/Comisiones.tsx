@@ -100,6 +100,22 @@ function isClosed(row: CommissionRow) {
   return String(row.estado_os ?? "").toLowerCase().includes("cerrad") || Boolean(row.fecha_cierre);
 }
 
+function commissionBlockKey(row: CommissionRow) {
+  return [row.fecha_inicio, row.hora_inicio, row.fecha_fin, row.hora_fin, row.tipo_tiempo]
+    .map((value) => String(value ?? ""))
+    .join("|");
+}
+
+function uniqueBlockHours(rows: CommissionRow[]) {
+  const blocks = new Map<string, number>();
+  for (const row of rows) {
+    const key = commissionBlockKey(row);
+    const value = Number(row.horas_calculadas ?? 0);
+    blocks.set(key, Math.max(blocks.get(key) ?? 0, value));
+  }
+  return Array.from(blocks.values()).reduce((sum, value) => sum + value, 0);
+}
+
 function summarize(rows: CommissionRow[], paidIds: Set<string>) {
   const grouped = new Map<string, TechnicianSummary>();
   for (const row of rows) {
@@ -266,11 +282,12 @@ export default function Comisiones() {
       .map(([date, dayRows]) => ({
         date,
         rows: dayRows.sort((a, b) => String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? ""))),
-        total: dayRows.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0),
+        total: uniqueBlockHours(dayRows),
       }))
       .sort((a, b) => a.date === "sin-fecha" ? 1 : b.date === "sin-fecha" ? -1 : a.date.localeCompare(b.date));
   }, [selectedOsRows]);
-  const selectedOsTotal = selectedOsRows.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
+  const selectedOsTotal = uniqueBlockHours(selectedOsRows);
+  const selectedOsBlocks = new Set(selectedOsRows.map(commissionBlockKey)).size;
   const selectedOsTechnicians = new Set(selectedOsRows.map((row) => row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre))).size;
 
   const toggle = (id: string, checked: boolean) => setSelected((current) => {
@@ -440,7 +457,7 @@ export default function Comisiones() {
               </div>
               <div className="grid grid-cols-3 overflow-hidden rounded-lg border">
                 <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total horas técnicas</div><div className="mt-1 text-xl font-semibold tabular-nums">{hours(selectedOsTotal)}</div></div>
-                <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Jornadas</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsRows.length}</div></div>
+                <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Jornadas</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsBlocks}</div></div>
                 <div className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Técnicos</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsTechnicians}</div></div>
               </div>
               <div className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 rounded-lg border p-3">
@@ -449,7 +466,7 @@ export default function Comisiones() {
                 <span className="text-muted-foreground">Sucursal</span><span>{selectedOs.sucursal ?? "Sin sucursal"}</span>
               </div>
               <div>
-                <div className="mb-2"><div className="font-semibold">Desglose por día</div><p className="text-[11px] text-muted-foreground">El total suma las horas de cada técnico participante.</p></div>
+                <div className="mb-2"><div className="font-semibold">Desglose por día</div><p className="text-[11px] text-muted-foreground">Cada bloque horario se cuenta una sola vez; todos los participantes comparten esas horas.</p></div>
                 <div className="space-y-3">
                   {selectedOsDays.map((day) => <div key={day.date} className="overflow-hidden rounded-lg border">
                     <div className="flex items-center justify-between bg-muted/40 px-3 py-2">

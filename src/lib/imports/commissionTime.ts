@@ -165,14 +165,36 @@ function parseTechnician(value: string) {
   };
 }
 
-function isCommissionTimeLine(row: CanonicalServiceOrderRow) {
+function commissionProductToken(value: unknown) {
+  return String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function isLaborTimeLine(row: CanonicalServiceOrderRow) {
+  const productCode = commissionProductToken(row.productCode);
+  const productName = commissionProductToken(row.productName);
+  return productCode === "MA01" || productName === "MA01";
+}
+
+function isKilometreParticipantLine(row: CanonicalServiceOrderRow) {
   const productCode = String(row.productCode ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const productName = String(row.productName ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const isLabor = productCode === "MA01" || productName === "MA01";
-  const isKilometre = row.kilometreQuantity !== 0
+  return Number(row.kilometreQuantity ?? 0) !== 0
     || /^(?:KM|KM0*1)$/.test(productCode)
     || /^(?:KM|KM0*1)$/.test(productName);
-  return isLabor || isKilometre;
+}
+
+function isCommissionParticipantLine(row: CanonicalServiceOrderRow) {
+  return isLaborTimeLine(row) || isKilometreParticipantLine(row);
+}
+
+function timeBlockKey(row: CanonicalServiceOrderRow) {
+  return [
+    row.raw.canonical_start_date,
+    normalizeCommissionTime(row.raw.canonical_start_time),
+    row.raw.canonical_end_date,
+    normalizeCommissionTime(row.raw.canonical_end_time),
+    row.timeType,
+  ].map((value) => String(value ?? "").trim().toUpperCase()).join("|");
 }
 
 function sourceKey(row: CanonicalServiceOrderRow, technician: string, role: string) {
@@ -198,75 +220,108 @@ export function buildCommissionTimeEntries(
   technicians: TechnicianReference[] = [],
 ): CommissionTimeEntry[] {
   const entries = new Map<string, CommissionTimeEntry>();
+  const rowsByServiceOrder = new Map<string, CanonicalServiceOrderRow[]>();
 
   for (const row of rows) {
-    if (!isCommissionTimeLine(row)) continue;
+    if (!isCommissionParticipantLine(row)) continue;
+    const current = rowsByServiceOrder.get(row.serviceOrderNumber) ?? [];
+    current.push(row);
+    rowsByServiceOrder.set(row.serviceOrderNumber, current);
+  }
 
-    const startDate = String(row.raw.canonical_start_date ?? "").trim() || null;
-    const endDate = String(row.raw.canonical_end_date ?? "").trim() || null;
-    const startTime = normalizeCommissionTime(row.raw.canonical_start_time);
-    const endTime = normalizeCommissionTime(row.raw.canonical_end_time);
-    const reportedHours = Number.isFinite(row.serviceHours) ? row.serviceHours : null;
-    const duration = calculateCommissionDuration({ startDate, startTime, endDate, endTime, reportedHours });
-    const participants = new Map<string, { source: string; role: "PRINCIPAL" | "AUXILIAR" }>();
+  for (const serviceOrderRows of rowsByServiceOrder.values()) {
+    const laborRowsByBlock = new Map<string, CanonicalServiceOrderRow>();
+    for (const row of serviceOrderRows) {
+      if (!isLaborTimeLine(row)) continue;
+      const blockKey = timeBlockKey(row);
+      if (!laborRowsByBlock.has(blockKey)) laborRowsByBlock.set(blockKey, row);
+    }
+    const laborRows = Array.from(laborRowsByBlock.values());
 
-    const addParticipant = (source: string | null | undefined, role: "PRINCIPAL" | "AUXILIAR") => {
+    // KM identifica a un participante, pero nunca contiene un horario fiable.
+    // Sin al menos una linea MA01 no existe un bloque horario que se pueda heredar.
+    if (!laborRows.length) continue;
+
+    const participants = new Map<string, { source: string; origin: "MA01" | "KM" }>();
+    const addParticipant = (source: string | null | undefined, origin: "MA01" | "KM") => {
       const value = String(source ?? "").trim();
       const normalized = normalizeTechnicianName(value);
       if (!normalized) return;
       const current = participants.get(normalized);
-      if (!current || role === "PRINCIPAL") participants.set(normalized, { source: value, role });
+      if (!current || (current.origin === "KM" && origin === "MA01")) {
+        participants.set(normalized, { source: value, origin });
+      }
     };
-    addParticipant(row.technician, "PRINCIPAL");
-    row.auxiliaryTechnicians.forEach((value) => addParticipant(value, "AUXILIAR"));
 
-    for (const participant of participants.values()) {
-      const parsed = parseTechnician(participant.source);
-      const matched = matchTechnicianProfile(parsed.name, technicians);
-      const key = sourceKey(row, participant.source, participant.role);
-      const validationReasons = matched
-        ? duration.reasons
-        : Array.from(new Set([...duration.reasons, "TECNICO_FUERA_DE_NOMINA_ACTIVA"]));
-      const validationStatus = !matched && duration.status !== "INVALIDA"
-        ? "REVISAR"
-        : duration.status;
-      entries.set(key, {
-        fuente_clave: key,
-        importacion_id: importId,
-        origen_sistema: "new_xml_ordenes_servicio",
-        sucursal: row.branch,
-        os_numero: row.serviceOrderNumber,
-        cliente_nombre: row.ownerName ?? row.billedClientName,
-        nro_chasis: row.chassis,
-        estado_os: row.status,
-        fecha_cierre: row.closeDate,
-        fecha_inicio: startDate,
-        hora_inicio: startTime,
-        fecha_fin: endDate,
-        hora_fin: endTime,
-        tecnico_codigo: parsed.code,
-        tecnico_nombre: matched?.nombre ?? parsed.name,
-        tecnico_profile_id: matched?.id ?? null,
-        rol_tecnico: participant.role,
-        tipo_tiempo: row.timeType,
-        horas_reportadas: reportedHours,
-        horas_calculadas: duration.calculatedHours,
-        horas_validas: matched ? duration.validHours : null,
-        estado_validacion: validationStatus,
-        motivos_validacion: validationReasons,
-        raw_data: {
-          source_row_id: row.rowId,
-          source_os_number: row.sourceServiceOrderNumber,
-          source_branch_code: row.branchCode,
-          source_client_name: row.ownerName,
-          source_billed_client_name: row.billedClientName,
-          source_chassis: row.chassis,
-          source_product_code: row.productCode,
-          source_product_name: row.productName,
-          source_technician: participant.source,
-        },
-        vigente: true,
-      });
+    for (const row of serviceOrderRows) {
+      const origin = isLaborTimeLine(row) ? "MA01" : "KM";
+      addParticipant(row.technician, origin);
+      row.auxiliaryTechnicians.forEach((value) => addParticipant(value, origin));
+    }
+
+    const principalName = laborRows
+      .map((row) => normalizeTechnicianName(String(row.technician ?? "")))
+      .find(Boolean) ?? null;
+
+    for (const row of laborRows) {
+      const startDate = String(row.raw.canonical_start_date ?? "").trim() || null;
+      const endDate = String(row.raw.canonical_end_date ?? "").trim() || null;
+      const startTime = normalizeCommissionTime(row.raw.canonical_start_time);
+      const endTime = normalizeCommissionTime(row.raw.canonical_end_time);
+      const reportedHours = Number.isFinite(row.serviceHours) ? row.serviceHours : null;
+      const duration = calculateCommissionDuration({ startDate, startTime, endDate, endTime, reportedHours });
+
+      for (const [normalizedName, participant] of participants.entries()) {
+        const role = principalName === normalizedName ? "PRINCIPAL" : "AUXILIAR";
+        const parsed = parseTechnician(participant.source);
+        const matched = matchTechnicianProfile(parsed.name, technicians);
+        const key = sourceKey(row, participant.source, role);
+        const validationReasons = matched
+          ? duration.reasons
+          : Array.from(new Set([...duration.reasons, "TECNICO_FUERA_DE_NOMINA_ACTIVA"]));
+        const validationStatus = !matched && duration.status !== "INVALIDA"
+          ? "REVISAR"
+          : duration.status;
+        entries.set(key, {
+          fuente_clave: key,
+          importacion_id: importId,
+          origen_sistema: "new_xml_ordenes_servicio",
+          sucursal: row.branch,
+          os_numero: row.serviceOrderNumber,
+          cliente_nombre: row.ownerName ?? row.billedClientName,
+          nro_chasis: row.chassis,
+          estado_os: row.status,
+          fecha_cierre: row.closeDate,
+          fecha_inicio: startDate,
+          hora_inicio: startTime,
+          fecha_fin: endDate,
+          hora_fin: endTime,
+          tecnico_codigo: parsed.code,
+          tecnico_nombre: matched?.nombre ?? parsed.name,
+          tecnico_profile_id: matched?.id ?? null,
+          rol_tecnico: role,
+          tipo_tiempo: row.timeType,
+          horas_reportadas: reportedHours,
+          horas_calculadas: duration.calculatedHours,
+          horas_validas: matched ? duration.validHours : null,
+          estado_validacion: validationStatus,
+          motivos_validacion: validationReasons,
+          raw_data: {
+            source_row_id: row.rowId,
+            source_os_number: row.sourceServiceOrderNumber,
+            source_branch_code: row.branchCode,
+            source_client_name: row.ownerName,
+            source_billed_client_name: row.billedClientName,
+            source_chassis: row.chassis,
+            source_product_code: row.productCode,
+            source_product_name: row.productName,
+            source_technician: participant.source,
+            source_participant_origin: participant.origin,
+            inherited_from_ma01: participant.origin === "KM",
+          },
+          vigente: true,
+        });
+      }
     }
   }
 
