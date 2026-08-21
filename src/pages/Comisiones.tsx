@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
 
@@ -31,6 +32,8 @@ interface CommissionRow {
   id: string;
   sucursal: string | null;
   os_numero: string;
+  cliente_nombre: string | null;
+  nro_chasis: string | null;
   estado_os: string | null;
   fecha_cierre: string | null;
   fecha_inicio: string | null;
@@ -74,6 +77,22 @@ interface TechnicianSummary {
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const todayIso = () => format(new Date(), "yyyy-MM-dd");
 const monthStartIso = () => format(startOfMonth(new Date()), "yyyy-MM-dd");
+const DATE_RANGE_STORAGE_KEY = "sig:comisiones:date-range";
+const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+function storedDateRange() {
+  const fallback = { from: monthStartIso(), to: todayIso() };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DATE_RANGE_STORAGE_KEY) ?? "null") as { from?: unknown; to?: unknown } | null;
+    const from = typeof parsed?.from === "string" && isoDatePattern.test(parsed.from) ? parsed.from : fallback.from;
+    const to = typeof parsed?.to === "string" && isoDatePattern.test(parsed.to) ? parsed.to : fallback.to;
+    return from <= to ? { from, to } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const hours = (value: number | null | undefined) => value == null ? "—" : `${number.format(value)} h`;
 const dateLabel = (value: string | null) => value ? format(new Date(`${value}T12:00:00`), "dd/MM/yyyy") : "—";
 
@@ -146,9 +165,10 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
 export default function Comisiones() {
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [initialDateRange] = useState(storedDateRange);
   const [view, setView] = useState<View>("cerradas");
-  const [from, setFrom] = useState(monthStartIso);
-  const [to, setTo] = useState(todayIso);
+  const [from, setFrom] = useState(initialDateRange.from);
+  const [to, setTo] = useState(initialDateRange.to);
   const [rows, setRows] = useState<CommissionRow[]>([]);
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
   const [settlements, setSettlements] = useState<Settlement[]>([]);
@@ -159,6 +179,7 @@ export default function Comisiones() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [technicianFilter, setTechnicianFilter] = useState("");
   const [schemaMissing, setSchemaMissing] = useState(false);
+  const [selectedOs, setSelectedOs] = useState<CommissionRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +187,7 @@ export default function Comisiones() {
       const [journeys, detailResult, settlementResult, initialResult, technicianResult] = await Promise.all([
         cargarTodo<CommissionRow>(
           (supabase.from("comisiones_jornadas" as any) as any)
-            .select("id,sucursal,os_numero,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
+            .select("id,sucursal,os_numero,cliente_nombre,nro_chasis,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
             .eq("vigente", true)
             .order("fecha_inicio", { ascending: false }),
         ),
@@ -197,6 +218,9 @@ export default function Comisiones() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setSelected(new Set()); }, [view, from, to]);
+  useEffect(() => {
+    window.localStorage.setItem(DATE_RANGE_STORAGE_KEY, JSON.stringify({ from, to }));
+  }, [from, to]);
 
   const isActiveTechnician = useCallback((row: CommissionRow) => Boolean(
     row.tecnico_profile_id && activeTechnicianIds.has(row.tecnico_profile_id)
@@ -364,7 +388,7 @@ export default function Comisiones() {
                   const technicianActive = isActiveTechnician(row);
                   return <TableRow key={row.id} data-state={selected.has(row.id) ? "selected" : undefined}>
                     {view !== "abiertas" && <TableCell><Checkbox disabled={!selectable} checked={selected.has(row.id)} onCheckedChange={(checked) => toggle(row.id, Boolean(checked))} /></TableCell>}
-                    <TableCell><div className="font-medium">OS {row.os_numero}</div><div className="text-[10px] text-muted-foreground">{row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div>{!technicianActive && <Badge variant="outline" className="mt-1 border-amber-300 text-amber-700">Fuera de nómina activa</Badge>}</TableCell>
+                    <TableCell><button type="button" className="text-left font-medium hover:text-primary hover:underline" onClick={() => setSelectedOs(row)}>OS {row.os_numero}</button><div className="text-[10px] text-muted-foreground">{row.cliente_nombre ?? "Cliente no informado"} · {row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div>{!technicianActive && <Badge variant="outline" className="mt-1 border-amber-300 text-amber-700">Fuera de nómina activa</Badge>}</TableCell>
                     <TableCell><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"}>{row.estado_validacion}</Badge>{row.motivos_validacion?.length ? <div className="mt-1 max-w-56 text-[10px] text-muted-foreground">{row.motivos_validacion.join(", ")}</div> : null}</TableCell>
                     <TableCell>{row.tipo_tiempo}</TableCell>
                     <TableCell>{dateLabel(row.fecha_inicio)} {row.hora_inicio?.slice(0, 5) ?? ""}</TableCell>
@@ -380,6 +404,40 @@ export default function Comisiones() {
           </Panel>
         )}
       </>}
+
+      <Sheet open={Boolean(selectedOs)} onOpenChange={(open) => { if (!open) setSelectedOs(null); }}>
+        <SheetContent className="w-[min(92vw,520px)] overflow-y-auto p-0 sm:max-w-[520px]">
+          {selectedOs && <>
+            <SheetHeader className="border-b px-5 py-4 pr-12">
+              <SheetTitle>OS {selectedOs.os_numero}</SheetTitle>
+              <SheetDescription>{selectedOs.estado_os ?? "Estado no informado"} · {selectedOs.sucursal ?? "Sin sucursal"}</SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 p-5 text-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-3"><div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cliente</div><div className="mt-1 font-semibold">{selectedOs.cliente_nombre ?? "No informado"}</div></div>
+                <div className="rounded-lg border p-3"><div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Chasis</div><div className="mt-1 font-mono font-semibold">{selectedOs.nro_chasis ?? "No informado"}</div></div>
+              </div>
+              <div className="rounded-lg border">
+                <div className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-3 p-3">
+                  <span className="text-muted-foreground">Técnico</span><span className="font-medium">{selectedOs.tecnico_nombre}</span>
+                  <span className="text-muted-foreground">Participación</span><span>{selectedOs.rol_tecnico}</span>
+                  <span className="text-muted-foreground">Tipo de tiempo</span><span>{selectedOs.tipo_tiempo}</span>
+                  <span className="text-muted-foreground">Inicio</span><span>{dateLabel(selectedOs.fecha_inicio)} {selectedOs.hora_inicio?.slice(0, 5) ?? ""}</span>
+                  <span className="text-muted-foreground">Fin</span><span>{dateLabel(selectedOs.fecha_fin)} {selectedOs.hora_fin?.slice(0, 5) ?? ""}</span>
+                  <span className="text-muted-foreground">Cierre de OS</span><span>{dateLabel(selectedOs.fecha_cierre)}</span>
+                  <span className="text-muted-foreground">Horas reportadas</span><span>{hours(selectedOs.horas_reportadas)}</span>
+                  <span className="text-muted-foreground">Horas calculadas</span><span className="font-semibold">{hours(selectedOs.horas_calculadas)}</span>
+                  <span className="text-muted-foreground">Liquidación</span><span>{paidIds.has(selectedOs.id) ? "Pagada" : "Pendiente"}</span>
+                </div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Validación</span><Badge variant={selectedOs.estado_validacion === "VALIDA" ? "secondary" : selectedOs.estado_validacion === "INVALIDA" ? "destructive" : "outline"}>{selectedOs.estado_validacion}</Badge></div>
+                {selectedOs.motivos_validacion?.length ? <p className="mt-2 text-[12px] text-muted-foreground">{selectedOs.motivos_validacion.join(", ")}</p> : null}
+              </div>
+            </div>
+          </>}
+        </SheetContent>
+      </Sheet>
     </PageShell>
   );
 }

@@ -12,6 +12,8 @@ export interface CommissionTimeEntry {
   origen_sistema: string;
   sucursal: string | null;
   os_numero: string;
+  cliente_nombre: string | null;
+  nro_chasis: string | null;
   estado_os: string | null;
   fecha_cierre: string | null;
   fecha_inicio: string | null;
@@ -230,6 +232,8 @@ export function buildCommissionTimeEntries(
         origen_sistema: "new_xml_ordenes_servicio",
         sucursal: row.branch,
         os_numero: row.serviceOrderNumber,
+        cliente_nombre: row.ownerName ?? row.billedClientName,
+        nro_chasis: row.chassis,
         estado_os: row.status,
         fecha_cierre: row.closeDate,
         fecha_inicio: startDate,
@@ -250,6 +254,9 @@ export function buildCommissionTimeEntries(
           source_row_id: row.rowId,
           source_os_number: row.sourceServiceOrderNumber,
           source_branch_code: row.branchCode,
+          source_client_name: row.ownerName,
+          source_billed_client_name: row.billedClientName,
+          source_chassis: row.chassis,
           source_product_code: row.productCode,
           source_product_name: row.productName,
           source_technician: participant.source,

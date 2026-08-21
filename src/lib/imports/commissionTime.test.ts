@@ -52,6 +52,9 @@ describe("commission entries", () => {
       branchCode: "01",
       serviceOrderNumber: "01-123",
       branch: "Santa Rita",
+      ownerName: "CLIENTE PRUEBA",
+      billedClientName: "CLIENTE FACTURADO",
+      chassis: "CHASIS-123",
       status: "Cerrada",
       closeDate: "2026-08-20",
       technician: "001 - JUAN PEREZ",
@@ -78,6 +81,8 @@ describe("commission entries", () => {
     expect(entries.map((entry) => entry.rol_tecnico).sort()).toEqual(["AUXILIAR", "PRINCIPAL"]);
     expect(entries.every((entry) => entry.horas_calculadas === 4)).toBe(true);
     expect(entries.every((entry) => entry.estado_validacion === "REVISAR")).toBe(true);
+    expect(entries.every((entry) => entry.cliente_nombre === "CLIENTE PRUEBA")).toBe(true);
+    expect(entries.every((entry) => entry.nro_chasis === "CHASIS-123")).toBe(true);
   });
 
   it("keeps a technician outside the active roster auditable but not payable", () => {
