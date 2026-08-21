@@ -116,4 +116,62 @@ describe("commission entries", () => {
     expect(entry.horas_validas).toBeNull();
     expect(entry.motivos_validacion).toContain("TECNICO_FUERA_DE_NOMINA_ACTIVA");
   });
+
+  it("includes technicians from MA01 and KM lines but excludes spare-parts lines", () => {
+    const base = {
+      sourceServiceOrderNumber: "200",
+      branchCode: "01",
+      serviceOrderNumber: "01-200",
+      branch: "Santa Rita",
+      ownerName: "CLIENTE PRUEBA",
+      billedClientName: null,
+      chassis: "CHASIS-200",
+      status: "Cerrada",
+      closeDate: "2026-08-20",
+      auxiliaryTechnicians: [],
+      timeType: "Cliente",
+      documentNumber: "90200",
+    };
+    const rows = [
+      {
+        ...base,
+        rowId: "labor-row",
+        technician: "001 - JUAN PATINO",
+        productCode: "MA01",
+        productName: "MA01",
+        serviceHours: 4,
+        kilometreQuantity: 0,
+        raw: { ITEM: "1", canonical_start_date: "2026-08-20", canonical_start_time: "0800", canonical_end_date: "2026-08-20", canonical_end_time: "1200" },
+      },
+      {
+        ...base,
+        rowId: "kilometre-row",
+        technician: "002 - RUBEN CACERES",
+        productCode: "KM01",
+        productName: "KM",
+        serviceHours: 0,
+        kilometreQuantity: 25,
+        raw: { ITEM: "2", canonical_start_date: "2026-08-20", canonical_start_time: "1300", canonical_end_date: "2026-08-20", canonical_end_time: "1400" },
+      },
+      {
+        ...base,
+        rowId: "part-row",
+        technician: "003 - PEDIDOR REPUESTOS",
+        productCode: "REP001",
+        productName: "FILTRO",
+        serviceHours: 0,
+        kilometreQuantity: 0,
+        raw: { ITEM: "3", canonical_start_date: "2026-08-20", canonical_start_time: "1400", canonical_end_date: "2026-08-20", canonical_end_time: "1500" },
+      },
+    ] as CanonicalServiceOrderRow[];
+
+    const entries = buildCommissionTimeEntries(rows, "import-2", [
+      { id: "profile-1", nombre: "JUAN PATINO" },
+      { id: "profile-2", nombre: "RUBEN CACERES" },
+      { id: "profile-3", nombre: "PEDIDOR REPUESTOS" },
+    ]);
+
+    expect(entries.map((entry) => entry.tecnico_nombre).sort()).toEqual(["JUAN PATINO", "RUBEN CACERES"]);
+    expect(entries.find((entry) => entry.tecnico_nombre === "RUBEN CACERES")?.horas_calculadas).toBe(1);
+  });
 });

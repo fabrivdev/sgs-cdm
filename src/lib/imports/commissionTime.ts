@@ -168,7 +168,11 @@ function parseTechnician(value: string) {
 function isCommissionTimeLine(row: CanonicalServiceOrderRow) {
   const productCode = String(row.productCode ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const productName = String(row.productName ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return productCode === "MA01" || productName === "MA01" || row.serviceHours !== 0;
+  const isLabor = productCode === "MA01" || productName === "MA01";
+  const isKilometre = row.kilometreQuantity !== 0
+    || /^(?:KM|KM0*1)$/.test(productCode)
+    || /^(?:KM|KM0*1)$/.test(productName);
+  return isLabor || isKilometre;
 }
 
 function sourceKey(row: CanonicalServiceOrderRow, technician: string, role: string) {

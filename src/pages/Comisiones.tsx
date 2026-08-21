@@ -337,9 +337,9 @@ export default function Comisiones() {
         meta="Horas de técnicos recalculadas desde las marcas de tiempo de cada OS. Acceso exclusivo para administradores."
         actions={<>
           <input ref={fileRef} type="file" accept=".xml,text/xml" className="hidden" onChange={(event) => event.target.files?.[0] && void uploadInitialXml(event.target.files[0])} />
-          <Button variant="outline" size="sm" disabled={busy || initialLoadDone} onClick={() => fileRef.current?.click()} title={initialLoadDone ? "La carga histórica inicial ya fue realizada" : "Solo completa el ledger de comisiones; no reimporta otras tablas"}>
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()} title="Actualiza únicamente las jornadas de Comisiones; no reimporta clientes, productos, facturación ni el resumen de la OS">
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : initialLoadDone ? <FileCheck2 className="mr-2 h-4 w-4" /> : <Upload className="mr-2 h-4 w-4" />}
-            {initialLoadDone ? "Carga inicial realizada" : "Carga inicial de OS"}
+            {initialLoadDone ? "Actualizar jornadas desde XML" : "Carga inicial de OS"}
           </Button>
           <Button variant="outline" size="icon" disabled={loading} onClick={() => void load()} title="Actualizar datos"><RefreshCw className="h-4 w-4" /></Button>
         </>}
