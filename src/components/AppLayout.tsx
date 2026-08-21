@@ -15,6 +15,7 @@ import {
   Package,
   ShoppingCart,
   Sparkles,
+  HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +56,7 @@ import { nivelLabel } from "@/lib/constants";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 import { HelpDrawer } from "@/components/layout/HelpDrawer";
 
-type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; managementOnly?: boolean };
+type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; managementOnly?: boolean; adminOnly?: boolean };
 type NavGroup = { modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
 
 // Temporary kill switch: preserves the assistant configuration and history for a future re-enable.
@@ -71,6 +72,7 @@ const navGroups: NavGroup[] = [
       { to: "/trabajos", label: "Trabajos", icon: Wrench },
       { to: "/calendario", label: "Calendario", icon: CalendarDays },
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, managementOnly: true },
+      { to: "/comisiones", label: "Comisiones", icon: HandCoins, adminOnly: true },
     ],
   },
   {
@@ -181,7 +183,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
     .filter((group) => hasModuloAccess(group.modulo))
     .map((group) => ({
       ...group,
-      items: group.items.filter((it) => !(it.managementOnly && !can("dashboard:ver"))),
+      items: group.items.filter((it) => !(it.managementOnly && !can("dashboard:ver")) && !(it.adminOnly && !isAdmin)),
     }))
     .filter((group) => group.items.length > 0);
 

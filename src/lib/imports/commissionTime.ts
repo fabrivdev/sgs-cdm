@@ -1,0 +1,358 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- las tablas/RPC de esta migración aún no están en los tipos generados de Supabase */
+import { supabase } from "@/integrations/supabase/client";
+import type { CanonicalServiceOrderRow } from "@/lib/imports/canonical";
+import { matchTechnicianProfile, normalizeTechnicianName } from "@/lib/technicianMatching";
+import { mapOrdenesServicioSheet, parseNewSystemWorkbook } from "@/lib/imports/newSystemXml";
+
+export type CommissionValidationStatus = "VALIDA" | "REVISAR" | "INVALIDA";
+
+export interface CommissionTimeEntry {
+  fuente_clave: string;
+  importacion_id: string | null;
+  origen_sistema: string;
+  sucursal: string | null;
+  os_numero: string;
+  estado_os: string | null;
+  fecha_cierre: string | null;
+  fecha_inicio: string | null;
+  hora_inicio: string | null;
+  fecha_fin: string | null;
+  hora_fin: string | null;
+  tecnico_codigo: string | null;
+  tecnico_nombre: string;
+  tecnico_profile_id: string | null;
+  rol_tecnico: "PRINCIPAL" | "AUXILIAR";
+  tipo_tiempo: "Cliente" | "Garantia" | "Interno" | "Desconocido";
+  horas_reportadas: number | null;
+  horas_calculadas: number | null;
+  horas_validas: number | null;
+  estado_validacion: CommissionValidationStatus;
+  motivos_validacion: string[];
+  raw_data: Record<string, unknown>;
+  vigente: boolean;
+}
+
+interface TechnicianReference {
+  id: string;
+  nombre: string;
+}
+
+const roundHours = (value: number) => Math.round(value * 10_000) / 10_000;
+
+function rawText(raw: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = raw[key];
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (text && !/^[-_.]+$/.test(text)) return text;
+  }
+  return null;
+}
+
+export function normalizeCommissionTime(value: unknown): string | null {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const colon = raw.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+  if (colon) {
+    const hour = Number(colon[1]);
+    const minute = Number(colon[2]);
+    const second = Number(colon[3] ?? 0);
+    if (hour > 23 || minute > 59 || second > 59) return null;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
+  }
+
+  const digits = raw.replace(/\D/g, "");
+  if (!digits || digits.length > 6) return null;
+  const padded = digits.padStart(4, "0");
+  const hour = Number(padded.slice(0, padded.length - 2));
+  const minute = Number(padded.slice(-2));
+  if (hour > 23 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+}
+
+function utcDay(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(timestamp) ? timestamp / 86_400_000 : null;
+}
+
+function timeMinutes(value: string | null) {
+  if (!value) return null;
+  const [hour, minute, second] = value.split(":").map(Number);
+  if (![hour, minute, second].every(Number.isFinite)) return null;
+  return hour * 60 + minute + second / 60;
+}
+
+export function calculateCommissionDuration(args: {
+  startDate: string | null;
+  startTime: string | null;
+  endDate: string | null;
+  endTime: string | null;
+  reportedHours: number | null;
+}) {
+  const reasons: string[] = [];
+  const startDay = utcDay(args.startDate);
+  const endDay = utcDay(args.endDate);
+  const startMinutes = timeMinutes(args.startTime);
+  const endMinutes = timeMinutes(args.endTime);
+
+  if (startDay == null || endDay == null || startMinutes == null || endMinutes == null) {
+    return { calculatedHours: null, validHours: null, status: "INVALIDA" as const, reasons: ["MARCAS_DE_TIEMPO_INCOMPLETAS"] };
+  }
+
+  let durationMinutes = (endDay - startDay) * 1_440 + endMinutes - startMinutes;
+  if (durationMinutes <= 0 && startDay === endDay && endMinutes < startMinutes) {
+    durationMinutes += 1_440;
+    reasons.push("CRUCE_DE_MEDIANOCHE_INFERIDO");
+  }
+
+  if (durationMinutes <= 0) {
+    return { calculatedHours: null, validHours: null, status: "INVALIDA" as const, reasons: ["DURACION_NO_POSITIVA"] };
+  }
+  if (durationMinutes > 16 * 60) {
+    return { calculatedHours: roundHours(durationMinutes / 60), validHours: null, status: "INVALIDA" as const, reasons: ["DURACION_MAYOR_A_16_HORAS"] };
+  }
+
+  const calculatedHours = roundHours(durationMinutes / 60);
+  const reported = args.reportedHours;
+  if (reported == null || reported <= 0) {
+    reasons.push("CANTIDAD_REPORTADA_AUSENTE");
+    return { calculatedHours, validHours: calculatedHours, status: "REVISAR" as const, reasons };
+  }
+  if (Math.abs(calculatedHours - reported) > 0.25) {
+    reasons.push("DIFERENCIA_MAYOR_A_15_MINUTOS");
+    return { calculatedHours, validHours: calculatedHours, status: "REVISAR" as const, reasons };
+  }
+
+  return { calculatedHours, validHours: calculatedHours, status: "VALIDA" as const, reasons };
+}
+
+function parseTechnician(value: string) {
+  const trimmed = value.trim();
+  const codeMatch = trimmed.match(/^([A-Z]{0,6}\d{2,})\s*(?:[-:|/]\s*)?/i);
+  return {
+    code: codeMatch?.[1] ?? null,
+    name: normalizeTechnicianName(trimmed) || trimmed,
+  };
+}
+
+function isCommissionTimeLine(row: CanonicalServiceOrderRow) {
+  const productCode = String(row.productCode ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const productName = String(row.productName ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return productCode === "MA01" || productName === "MA01" || row.serviceHours !== 0;
+}
+
+function sourceKey(row: CanonicalServiceOrderRow, technician: string, role: string) {
+  const raw = row.raw;
+  return [
+    "COMISION",
+    row.serviceOrderNumber,
+    rawText(raw, ["ITEM", "Item"]),
+    row.documentNumber,
+    raw.canonical_start_date,
+    raw.canonical_start_time,
+    raw.canonical_end_date,
+    raw.canonical_end_time,
+    row.timeType,
+    normalizeTechnicianName(technician),
+    role,
+  ].map((value) => String(value ?? "").trim().toUpperCase()).join("|");
+}
+
+export function buildCommissionTimeEntries(
+  rows: CanonicalServiceOrderRow[],
+  importId: string | null,
+  technicians: TechnicianReference[] = [],
+): CommissionTimeEntry[] {
+  const entries = new Map<string, CommissionTimeEntry>();
+
+  for (const row of rows) {
+    if (!isCommissionTimeLine(row)) continue;
+
+    const startDate = String(row.raw.canonical_start_date ?? "").trim() || null;
+    const endDate = String(row.raw.canonical_end_date ?? "").trim() || null;
+    const startTime = normalizeCommissionTime(row.raw.canonical_start_time);
+    const endTime = normalizeCommissionTime(row.raw.canonical_end_time);
+    const reportedHours = Number.isFinite(row.serviceHours) ? row.serviceHours : null;
+    const duration = calculateCommissionDuration({ startDate, startTime, endDate, endTime, reportedHours });
+    const participants = new Map<string, { source: string; role: "PRINCIPAL" | "AUXILIAR" }>();
+
+    const addParticipant = (source: string | null | undefined, role: "PRINCIPAL" | "AUXILIAR") => {
+      const value = String(source ?? "").trim();
+      const normalized = normalizeTechnicianName(value);
+      if (!normalized) return;
+      const current = participants.get(normalized);
+      if (!current || role === "PRINCIPAL") participants.set(normalized, { source: value, role });
+    };
+    addParticipant(row.technician, "PRINCIPAL");
+    row.auxiliaryTechnicians.forEach((value) => addParticipant(value, "AUXILIAR"));
+
+    for (const participant of participants.values()) {
+      const parsed = parseTechnician(participant.source);
+      const matched = matchTechnicianProfile(parsed.name, technicians);
+      const key = sourceKey(row, participant.source, participant.role);
+      entries.set(key, {
+        fuente_clave: key,
+        importacion_id: importId,
+        origen_sistema: "new_xml_ordenes_servicio",
+        sucursal: row.branch,
+        os_numero: row.serviceOrderNumber,
+        estado_os: row.status,
+        fecha_cierre: row.closeDate,
+        fecha_inicio: startDate,
+        hora_inicio: startTime,
+        fecha_fin: endDate,
+        hora_fin: endTime,
+        tecnico_codigo: parsed.code,
+        tecnico_nombre: matched?.nombre ?? parsed.name,
+        tecnico_profile_id: matched?.id ?? null,
+        rol_tecnico: participant.role,
+        tipo_tiempo: row.timeType,
+        horas_reportadas: reportedHours,
+        horas_calculadas: duration.calculatedHours,
+        horas_validas: duration.validHours,
+        estado_validacion: duration.status,
+        motivos_validacion: duration.reasons,
+        raw_data: {
+          source_row_id: row.rowId,
+          source_os_number: row.sourceServiceOrderNumber,
+          source_product_code: row.productCode,
+          source_product_name: row.productName,
+          source_technician: participant.source,
+        },
+        vigente: true,
+      });
+    }
+  }
+
+  return Array.from(entries.values());
+}
+
+function isMissingCommissionSchema(error: unknown) {
+  const message = String((error as { message?: string })?.message ?? error ?? "");
+  return /comisiones_(jornadas|preparar_reimportacion)/i.test(message) && /does not exist|schema cache|could not find/i.test(message);
+}
+
+export async function persistCommissionTimeEntries(args: {
+  rows: CanonicalServiceOrderRow[];
+  importId: string | null;
+  strict?: boolean;
+}) {
+  const { data: technicianRows, error: technicianError } = await (supabase.rpc as any)("servicios_listar_tecnicos_activos");
+  if (technicianError) throw technicianError;
+  const technicians = ((technicianRows ?? []) as Array<{ id: string; nombre: string }>).map((row) => ({
+    id: row.id,
+    nombre: row.nombre,
+  }));
+  const entries = buildCommissionTimeEntries(args.rows, args.importId, technicians);
+  const osNumbers = Array.from(new Set(entries.map((row) => row.os_numero)));
+
+  if (!entries.length) return { inserted: 0, review: 0, invalid: 0, schemaAvailable: true };
+
+  const { error: prepareError } = await (supabase.rpc as any)("comisiones_preparar_reimportacion", {
+    p_os_numeros: osNumbers,
+  });
+  if (prepareError) {
+    if (!args.strict && isMissingCommissionSchema(prepareError)) {
+      console.info("Comisiones no se persistieron: falta aplicar la migración del módulo.");
+      return { inserted: 0, review: 0, invalid: 0, schemaAvailable: false };
+    }
+    throw prepareError;
+  }
+
+  const existingByKey = new Map<string, any>();
+  for (let index = 0; index < entries.length; index += 500) {
+    const keys = entries.slice(index, index + 500).map((row) => row.fuente_clave);
+    const { data, error } = await (supabase
+      .from("comisiones_jornadas" as any)
+      .select("id,fuente_clave,estado_validacion,horas_validas,validado_por,validado_en")
+      .in("fuente_clave", keys) as any);
+    if (error) throw error;
+    for (const row of data ?? []) existingByKey.set(row.fuente_clave, row);
+  }
+
+  const paidExistingIds = new Set<string>();
+  const existingIds = Array.from(existingByKey.values()).map((row) => String(row.id));
+  for (let index = 0; index < existingIds.length; index += 500) {
+    const { data, error } = await (supabase
+      .from("comisiones_liquidacion_detalle" as any)
+      .select("jornada_id")
+      .in("jornada_id", existingIds.slice(index, index + 500)) as any);
+    if (error) throw error;
+    for (const row of data ?? []) paidExistingIds.add(String(row.jornada_id));
+  }
+
+  const payload = entries.flatMap((entry) => {
+    const existing = existingByKey.get(entry.fuente_clave);
+    if (existing && paidExistingIds.has(String(existing.id))) return [];
+    return [existing?.validado_por
+      ? {
+          ...entry,
+          estado_validacion: existing.estado_validacion,
+          horas_validas: existing.horas_validas,
+          validado_por: existing.validado_por,
+          validado_en: existing.validado_en,
+        }
+      : entry];
+  });
+
+  for (let index = 0; index < payload.length; index += 500) {
+    const { error } = await (supabase.from("comisiones_jornadas" as any).upsert(payload.slice(index, index + 500) as any, {
+      onConflict: "fuente_clave",
+    }) as any);
+    if (error) throw error;
+  }
+
+  return {
+    inserted: payload.length,
+    review: payload.filter((row) => row.estado_validacion === "REVISAR").length,
+    invalid: payload.filter((row) => row.estado_validacion === "INVALIDA").length,
+    schemaAvailable: true,
+  };
+}
+
+export async function importCommissionXmlOnly(args: {
+  file: File;
+  userId: string;
+}) {
+  const workbook = parseNewSystemWorkbook(await args.file.text());
+  const sheet = workbook.sheets[0];
+  if (!sheet) throw new Error("El XML no contiene una hoja utilizable.");
+  const envelope = mapOrdenesServicioSheet(args.file.name, sheet);
+
+  const { data: importRow, error: importError } = await supabase
+    .from("importaciones")
+    .insert({
+      tipo: "facturacion",
+      archivo_nombre: args.file.name,
+      origen_sistema: "comisiones_os_backfill",
+      total_filas: envelope.rows.length,
+      insertados: 0,
+      duplicados: 0,
+      usuario_id: args.userId,
+      metadata: {
+        modulo: "comisiones",
+        alcance: "solo_jornadas_tecnicos",
+        no_reimporta: ["clientes", "productos", "facturacion", "ordenes_servicio_resumen"],
+        worksheet: sheet.name,
+      },
+    } as any)
+    .select("id")
+    .single();
+  if (importError) throw importError;
+
+  const result = await persistCommissionTimeEntries({
+    rows: envelope.rows,
+    importId: importRow.id,
+    strict: true,
+  });
+  const { error: updateError } = await supabase
+    .from("importaciones")
+    .update({ insertados: result.inserted, duplicados: envelope.rows.length - result.inserted } as any)
+    .eq("id", importRow.id);
+  if (updateError) throw updateError;
+
+  return { ...result, sourceRows: envelope.rows.length };
+}

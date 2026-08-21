@@ -16,6 +16,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Comisiones = lazy(() => import("./pages/Comisiones"));
 const Historial = lazy(() => import("./pages/Historial"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
 const Agenda = lazy(() => import("./pages/Agenda"));
@@ -64,6 +65,14 @@ const App = () => (
                   element={
                     <ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios">
                       <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/comisiones"
+                  element={
+                    <ProtectedRoute requireRoles={["admin"]} requireModulo="servicios">
+                      <Comisiones />
                     </ProtectedRoute>
                   }
                 />

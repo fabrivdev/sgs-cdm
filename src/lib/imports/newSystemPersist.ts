@@ -16,6 +16,7 @@ import {
   matchSucursalFromRegion,
   normCode,
   normText,
+  persistCommissionTimeEntries,
   type NewSystemImportBundle,
 } from "@/lib/imports";
 
@@ -256,6 +257,16 @@ export async function persistNewSystemBundle({
       throw error;
     }
   }
+
+  // El mismo XML alimenta el detalle de comisiones sin volver a importar
+  // clientes, productos, facturacion ni el resumen de la OS. Hasta que la
+  // migracion se aplique, esta extension es opcional y no bloquea el flujo
+  // historico del importador.
+  await persistCommissionTimeEntries({
+    rows: bundle.ordenesServicio.rows,
+    importId: osImp.id,
+    strict: false,
+  });
 
   const { error: updateFactImpError } = await supabase
     .from("importaciones")
