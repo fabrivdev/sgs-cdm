@@ -179,7 +179,7 @@ export default function Comisiones() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [technicianFilter, setTechnicianFilter] = useState("");
   const [schemaMissing, setSchemaMissing] = useState(false);
-  const [selectedOs, setSelectedOs] = useState<CommissionRow | null>(null);
+  const [selectedOsNumber, setSelectedOsNumber] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -251,6 +251,27 @@ export default function Comisiones() {
   const totalOpen = openAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
   const totalPendingPayment = closedAll.filter((row) => !paidIds.has(row.id) && row.estado_validacion === "VALIDA").reduce((sum, row) => sum + Number(row.horas_validas ?? 0), 0);
   const totalReview = rows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
+  const selectedOsRows = useMemo(
+    () => selectedOsNumber ? rows.filter((row) => row.os_numero === selectedOsNumber) : [],
+    [rows, selectedOsNumber],
+  );
+  const selectedOs = selectedOsRows.find((row) => row.cliente_nombre || row.nro_chasis) ?? selectedOsRows[0] ?? null;
+  const selectedOsDays = useMemo(() => {
+    const grouped = new Map<string, CommissionRow[]>();
+    for (const row of selectedOsRows) {
+      const key = row.fecha_inicio ?? "sin-fecha";
+      grouped.set(key, [...(grouped.get(key) ?? []), row]);
+    }
+    return Array.from(grouped.entries())
+      .map(([date, dayRows]) => ({
+        date,
+        rows: dayRows.sort((a, b) => String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? ""))),
+        total: dayRows.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0),
+      }))
+      .sort((a, b) => a.date === "sin-fecha" ? 1 : b.date === "sin-fecha" ? -1 : a.date.localeCompare(b.date));
+  }, [selectedOsRows]);
+  const selectedOsTotal = selectedOsRows.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
+  const selectedOsTechnicians = new Set(selectedOsRows.map((row) => row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre))).size;
 
   const toggle = (id: string, checked: boolean) => setSelected((current) => {
     const next = new Set(current);
@@ -388,7 +409,7 @@ export default function Comisiones() {
                   const technicianActive = isActiveTechnician(row);
                   return <TableRow key={row.id} data-state={selected.has(row.id) ? "selected" : undefined}>
                     {view !== "abiertas" && <TableCell><Checkbox disabled={!selectable} checked={selected.has(row.id)} onCheckedChange={(checked) => toggle(row.id, Boolean(checked))} /></TableCell>}
-                    <TableCell><button type="button" className="text-left font-medium hover:text-primary hover:underline" onClick={() => setSelectedOs(row)}>OS {row.os_numero}</button><div className="text-[10px] text-muted-foreground">{row.cliente_nombre ?? "Cliente no informado"} · {row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div>{!technicianActive && <Badge variant="outline" className="mt-1 border-amber-300 text-amber-700">Fuera de nómina activa</Badge>}</TableCell>
+                    <TableCell><button type="button" className="text-left font-medium hover:text-primary hover:underline" onClick={() => setSelectedOsNumber(row.os_numero)}>OS {row.os_numero}</button><div className="text-[10px] text-muted-foreground">{row.cliente_nombre ?? "Cliente no informado"} · {row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div>{!technicianActive && <Badge variant="outline" className="mt-1 border-amber-300 text-amber-700">Fuera de nómina activa</Badge>}</TableCell>
                     <TableCell><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"}>{row.estado_validacion}</Badge>{row.motivos_validacion?.length ? <div className="mt-1 max-w-56 text-[10px] text-muted-foreground">{row.motivos_validacion.join(", ")}</div> : null}</TableCell>
                     <TableCell>{row.tipo_tiempo}</TableCell>
                     <TableCell>{dateLabel(row.fecha_inicio)} {row.hora_inicio?.slice(0, 5) ?? ""}</TableCell>
@@ -405,8 +426,8 @@ export default function Comisiones() {
         )}
       </>}
 
-      <Sheet open={Boolean(selectedOs)} onOpenChange={(open) => { if (!open) setSelectedOs(null); }}>
-        <SheetContent className="w-[min(92vw,520px)] overflow-y-auto p-0 sm:max-w-[520px]">
+      <Sheet open={Boolean(selectedOsNumber)} onOpenChange={(open) => { if (!open) setSelectedOsNumber(null); }}>
+        <SheetContent className="w-[min(94vw,680px)] overflow-y-auto p-0 sm:max-w-[680px]">
           {selectedOs && <>
             <SheetHeader className="border-b px-5 py-4 pr-12">
               <SheetTitle>OS {selectedOs.os_numero}</SheetTitle>
@@ -417,22 +438,36 @@ export default function Comisiones() {
                 <div className="rounded-lg border p-3"><div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cliente</div><div className="mt-1 font-semibold">{selectedOs.cliente_nombre ?? "No informado"}</div></div>
                 <div className="rounded-lg border p-3"><div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Chasis</div><div className="mt-1 font-mono font-semibold">{selectedOs.nro_chasis ?? "No informado"}</div></div>
               </div>
-              <div className="rounded-lg border">
-                <div className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-3 p-3">
-                  <span className="text-muted-foreground">Técnico</span><span className="font-medium">{selectedOs.tecnico_nombre}</span>
-                  <span className="text-muted-foreground">Participación</span><span>{selectedOs.rol_tecnico}</span>
-                  <span className="text-muted-foreground">Tipo de tiempo</span><span>{selectedOs.tipo_tiempo}</span>
-                  <span className="text-muted-foreground">Inicio</span><span>{dateLabel(selectedOs.fecha_inicio)} {selectedOs.hora_inicio?.slice(0, 5) ?? ""}</span>
-                  <span className="text-muted-foreground">Fin</span><span>{dateLabel(selectedOs.fecha_fin)} {selectedOs.hora_fin?.slice(0, 5) ?? ""}</span>
-                  <span className="text-muted-foreground">Cierre de OS</span><span>{dateLabel(selectedOs.fecha_cierre)}</span>
-                  <span className="text-muted-foreground">Horas reportadas</span><span>{hours(selectedOs.horas_reportadas)}</span>
-                  <span className="text-muted-foreground">Horas calculadas</span><span className="font-semibold">{hours(selectedOs.horas_calculadas)}</span>
-                  <span className="text-muted-foreground">Liquidación</span><span>{paidIds.has(selectedOs.id) ? "Pagada" : "Pendiente"}</span>
-                </div>
+              <div className="grid grid-cols-3 overflow-hidden rounded-lg border">
+                <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total horas técnicas</div><div className="mt-1 text-xl font-semibold tabular-nums">{hours(selectedOsTotal)}</div></div>
+                <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Jornadas</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsRows.length}</div></div>
+                <div className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Técnicos</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsTechnicians}</div></div>
               </div>
-              <div className="rounded-lg border p-3">
-                <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Validación</span><Badge variant={selectedOs.estado_validacion === "VALIDA" ? "secondary" : selectedOs.estado_validacion === "INVALIDA" ? "destructive" : "outline"}>{selectedOs.estado_validacion}</Badge></div>
-                {selectedOs.motivos_validacion?.length ? <p className="mt-2 text-[12px] text-muted-foreground">{selectedOs.motivos_validacion.join(", ")}</p> : null}
+              <div className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 rounded-lg border p-3">
+                <span className="text-muted-foreground">Cierre de OS</span><span className="font-medium">{dateLabel(selectedOs.fecha_cierre)}</span>
+                <span className="text-muted-foreground">Estado</span><span>{selectedOs.estado_os ?? "No informado"}</span>
+                <span className="text-muted-foreground">Sucursal</span><span>{selectedOs.sucursal ?? "Sin sucursal"}</span>
+              </div>
+              <div>
+                <div className="mb-2"><div className="font-semibold">Desglose por día</div><p className="text-[11px] text-muted-foreground">El total suma las horas de cada técnico participante.</p></div>
+                <div className="space-y-3">
+                  {selectedOsDays.map((day) => <div key={day.date} className="overflow-hidden rounded-lg border">
+                    <div className="flex items-center justify-between bg-muted/40 px-3 py-2">
+                      <span className="font-medium">{day.date === "sin-fecha" ? "Sin fecha" : dateLabel(day.date)}</span>
+                      <span className="font-semibold tabular-nums">{hours(day.total)}</span>
+                    </div>
+                    <div className="divide-y">
+                      {day.rows.map((row) => <div key={row.id} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{row.tecnico_nombre} <span className="font-normal text-muted-foreground">· {row.rol_tecnico}</span></div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"} · {row.tipo_tiempo} · {paidIds.has(row.id) ? "Pagada" : "Pendiente"}</div>
+                          {row.motivos_validacion?.length ? <div className="mt-1 text-[10px] text-amber-700">{row.motivos_validacion.join(", ")}</div> : null}
+                        </div>
+                        <div className="text-right"><div className="font-semibold tabular-nums">{hours(row.horas_calculadas)}</div><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"} className="mt-1">{row.estado_validacion}</Badge></div>
+                      </div>)}
+                    </div>
+                  </div>)}
+                </div>
               </div>
             </div>
           </>}
