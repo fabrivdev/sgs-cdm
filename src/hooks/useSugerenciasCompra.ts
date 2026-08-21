@@ -494,7 +494,7 @@ export async function cargarSugerenciaViva(
 ) {
   if (marca === "TODAS") {
     let completadas = 0;
-    const respuestas = await Promise.all(MARCAS_MODELO.map(async (item) => {
+    const respuestas: SugerenciaVivaResponse[] = await Promise.all(MARCAS_MODELO.map(async (item) => {
       const response = await cargarSugerenciaViva(item, fechaAnalisis, filtros);
       completadas += 1;
       onProgress?.(completadas, MARCAS_MODELO.length);

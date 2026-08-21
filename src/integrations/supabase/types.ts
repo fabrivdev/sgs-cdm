@@ -221,6 +221,195 @@ export type Database = {
         }
         Relationships: []
       }
+      comisiones_jornadas: {
+        Row: {
+          actualizado_en: string
+          cliente_nombre: string | null
+          creado_en: string
+          estado_os: string | null
+          estado_validacion: string
+          fecha_cierre: string | null
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          fuente_clave: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          horas_calculadas: number | null
+          horas_reportadas: number | null
+          horas_validas: number | null
+          id: string
+          importacion_id: string | null
+          motivos_validacion: string[]
+          nro_chasis: string | null
+          origen_sistema: string
+          os_numero: string
+          raw_data: Json
+          rol_tecnico: string
+          sucursal: string | null
+          tecnico_codigo: string | null
+          tecnico_nombre: string
+          tecnico_profile_id: string | null
+          tipo_tiempo: string
+          validado_en: string | null
+          validado_por: string | null
+          vigente: boolean
+        }
+        Insert: {
+          actualizado_en?: string
+          cliente_nombre?: string | null
+          creado_en?: string
+          estado_os?: string | null
+          estado_validacion?: string
+          fecha_cierre?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          fuente_clave: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          horas_calculadas?: number | null
+          horas_reportadas?: number | null
+          horas_validas?: number | null
+          id?: string
+          importacion_id?: string | null
+          motivos_validacion?: string[]
+          nro_chasis?: string | null
+          origen_sistema?: string
+          os_numero: string
+          raw_data?: Json
+          rol_tecnico?: string
+          sucursal?: string | null
+          tecnico_codigo?: string | null
+          tecnico_nombre: string
+          tecnico_profile_id?: string | null
+          tipo_tiempo?: string
+          validado_en?: string | null
+          validado_por?: string | null
+          vigente?: boolean
+        }
+        Update: {
+          actualizado_en?: string
+          cliente_nombre?: string | null
+          creado_en?: string
+          estado_os?: string | null
+          estado_validacion?: string
+          fecha_cierre?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          fuente_clave?: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          horas_calculadas?: number | null
+          horas_reportadas?: number | null
+          horas_validas?: number | null
+          id?: string
+          importacion_id?: string | null
+          motivos_validacion?: string[]
+          nro_chasis?: string | null
+          origen_sistema?: string
+          os_numero?: string
+          raw_data?: Json
+          rol_tecnico?: string
+          sucursal?: string | null
+          tecnico_codigo?: string | null
+          tecnico_nombre?: string
+          tecnico_profile_id?: string | null
+          tipo_tiempo?: string
+          validado_en?: string | null
+          validado_por?: string | null
+          vigente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comisiones_jornadas_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comisiones_jornadas_tecnico_profile_id_fkey"
+            columns: ["tecnico_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comisiones_liquidacion_detalle: {
+        Row: {
+          creado_en: string
+          horas_pagadas: number
+          id: string
+          jornada_id: string
+          liquidacion_id: string
+        }
+        Insert: {
+          creado_en?: string
+          horas_pagadas: number
+          id?: string
+          jornada_id: string
+          liquidacion_id: string
+        }
+        Update: {
+          creado_en?: string
+          horas_pagadas?: number
+          id?: string
+          jornada_id?: string
+          liquidacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comisiones_liquidacion_detalle_jornada_id_fkey"
+            columns: ["jornada_id"]
+            isOneToOne: true
+            referencedRelation: "comisiones_jornadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comisiones_liquidacion_detalle_liquidacion_id_fkey"
+            columns: ["liquidacion_id"]
+            isOneToOne: false
+            referencedRelation: "comisiones_liquidaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comisiones_liquidaciones: {
+        Row: {
+          creado_en: string
+          creado_por: string
+          estado: string
+          id: string
+          observacion: string | null
+          pagado_en: string | null
+          periodo_desde: string
+          periodo_hasta: string
+          total_horas: number
+        }
+        Insert: {
+          creado_en?: string
+          creado_por?: string
+          estado?: string
+          id?: string
+          observacion?: string | null
+          pagado_en?: string | null
+          periodo_desde: string
+          periodo_hasta: string
+          total_horas?: number
+        }
+        Update: {
+          creado_en?: string
+          creado_por?: string
+          estado?: string
+          id?: string
+          observacion?: string | null
+          pagado_en?: string | null
+          periodo_desde?: string
+          periodo_hasta?: string
+          total_horas?: number
+        }
+        Relationships: []
+      }
       compras_pedidos: {
         Row: {
           cantidad: number | null
@@ -627,6 +816,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "facturacion_lineas_importadas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "facturacion_lineas_importadas_importacion_id_fkey"
             columns: ["importacion_id"]
             isOneToOne: false
@@ -881,6 +1077,39 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trabajos_horas"
             referencedColumns: ["trabajo_id"]
+          },
+        ]
+      }
+      parque_factura_os_cliente: {
+        Row: {
+          cliente_id: string
+          factura_clave: string
+          marca: string | null
+        }
+        Insert: {
+          cliente_id: string
+          factura_clave: string
+          marca?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          factura_clave?: string
+          marca?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parque_factura_os_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_factura_os_cliente_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1309,6 +1538,67 @@ export type Database = {
             foreignKeyName: "repuestos_articulo_planificacion_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: true
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
+      repuestos_codigo_equivalencias: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          codigo_fabricante_legacy: string
+          codigo_legacy: string
+          confianza: number
+          manual: boolean
+          marca: Database["public"]["Enums"]["marca"]
+          metodo: string
+          producto_codigo: string
+          requiere_revision: boolean
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          codigo_fabricante_legacy?: string
+          codigo_legacy: string
+          confianza?: number
+          manual?: boolean
+          marca: Database["public"]["Enums"]["marca"]
+          metodo: string
+          producto_codigo: string
+          requiere_revision?: boolean
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          codigo_fabricante_legacy?: string
+          codigo_legacy?: string
+          confianza?: number
+          manual?: boolean
+          marca?: Database["public"]["Enums"]["marca"]
+          metodo?: string
+          producto_codigo?: string
+          requiere_revision?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_codigo_equivalencias_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_codigo_equivalencias_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_codigo_equivalencias_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
             referencedRelation: "v_repuestos_ventas_unificadas"
             referencedColumns: ["producto_codigo"]
           },
@@ -1748,6 +2038,55 @@ export type Database = {
         }
         Relationships: []
       }
+      repuestos_legacy_vinculos_manuales: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          codigo_legacy: string
+          codigo_legacy_norm: string
+          creado_en: string
+          producto_codigo: string
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          codigo_legacy: string
+          codigo_legacy_norm: string
+          creado_en?: string
+          producto_codigo: string
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          codigo_legacy?: string
+          codigo_legacy_norm?: string
+          creado_en?: string
+          producto_codigo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_legacy_vinculos_manuales_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_legacy_vinculos_manuales_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_legacy_vinculos_manuales_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
       repuestos_maestro_legacy: {
         Row: {
           actualizado_en: string
@@ -2024,6 +2363,76 @@ export type Database = {
         }
         Relationships: []
       }
+      repuestos_productos_alias: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          alias_codigo: string
+          creado_en: string
+          motivo: string
+          producto_canonico: string
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          alias_codigo: string
+          creado_en?: string
+          motivo: string
+          producto_canonico: string
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          alias_codigo?: string
+          creado_en?: string
+          motivo?: string
+          producto_canonico?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_productos_alias_alias_codigo_fkey"
+            columns: ["alias_codigo"]
+            isOneToOne: true
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_alias_codigo_fkey"
+            columns: ["alias_codigo"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_alias_codigo_fkey"
+            columns: ["alias_codigo"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_producto_canonico_fkey"
+            columns: ["producto_canonico"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_producto_canonico_fkey"
+            columns: ["producto_canonico"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_producto_canonico_fkey"
+            columns: ["producto_canonico"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
       repuestos_stock: {
         Row: {
           codigo_fabricante: string | null
@@ -2059,6 +2468,62 @@ export type Database = {
           unidad?: string | null
         }
         Relationships: []
+      }
+      repuestos_ventas_duplicadas: {
+        Row: {
+          clave_comercial: string
+          detectado_en: string
+          linea_canonica_id: string
+          linea_id: string
+          origen_canonico: string | null
+          origen_descartado: string | null
+        }
+        Insert: {
+          clave_comercial: string
+          detectado_en?: string
+          linea_canonica_id: string
+          linea_id: string
+          origen_canonico?: string | null
+          origen_descartado?: string | null
+        }
+        Update: {
+          clave_comercial?: string
+          detectado_en?: string
+          linea_canonica_id?: string
+          linea_id?: string
+          origen_canonico?: string | null
+          origen_descartado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_ventas_duplicadas_linea_canonica_id_fkey"
+            columns: ["linea_canonica_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_duplicadas_linea_canonica_id_fkey"
+            columns: ["linea_canonica_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_duplicadas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_duplicadas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
       }
       repuestos_ventas_vinculacion: {
         Row: {
@@ -2591,6 +3056,68 @@ export type Database = {
       }
     }
     Views: {
+      repuestos_ventas_duplicados_detectados: {
+        Row: {
+          clave_comercial: string | null
+          linea_canonica_id: string | null
+          linea_id: string | null
+          origen_canonico: string | null
+          origen_descartado: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      repuestos_ventas_posibles_duplicadas_mismo_origen: {
+        Row: {
+          cantidad: number | null
+          cliente_norm: string | null
+          factura_norm: string | null
+          fecha_efectiva: string | null
+          lineas: string[] | null
+          lineas_fuente: string[] | null
+          origen_sistema: string | null
+          producto_codigo: string | null
+          repeticiones: number | null
+          total_venta: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_stock_matriz"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["producto_codigo"]
+          },
+        ]
+      }
       trabajos_horas: {
         Row: {
           horas_reales_total: number | null
@@ -2684,6 +3211,23 @@ export type Database = {
       }
     }
     Functions: {
+      comisiones_marcar_pagadas: {
+        Args: {
+          p_jornada_ids: string[]
+          p_observacion?: string
+          p_periodo_desde: string
+          p_periodo_hasta: string
+        }
+        Returns: string
+      }
+      comisiones_preparar_reimportacion: {
+        Args: { p_os_numeros: string[] }
+        Returns: number
+      }
+      comisiones_validar_jornadas: {
+        Args: { p_jornada_ids: string[]; p_observacion?: string }
+        Returns: number
+      }
       es_linea_facturacion_repuesto: {
         Args: {
           p_grupo_normalizado: string
@@ -2723,6 +3267,11 @@ export type Database = {
         Args: { p_codigo: string }
         Returns: string
       }
+      normalizar_descripcion_repuesto_comparable: {
+        Args: { p_texto: string }
+        Returns: string
+      }
+      normalizar_texto_repuesto: { Args: { p_texto: string }; Returns: string }
       parque_actividad_os_chasis: {
         Args: never
         Returns: {
@@ -2763,6 +3312,17 @@ export type Database = {
           total_venta: number
         }[]
       }
+      parque_facturacion_legacy_fallback_rango: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          cliente_id: string
+          fecha: string
+          grupo_fx: string
+          marca: string
+          rubro: string
+          total_venta: number
+        }[]
+      }
       parque_facturas_chasis_atribuidas: {
         Args: never
         Returns: {
@@ -2784,6 +3344,20 @@ export type Database = {
       parque_modelo_clave: { Args: { p_modelo: string }; Returns: string }
       parque_modelo_nombre: { Args: { p_modelo: string }; Returns: string }
       parque_normalizar_clave: { Args: { p_valor: string }; Returns: string }
+      parque_refrescar_factura_os_cliente: { Args: never; Returns: number }
+      parque_resolver_cliente_linea_facturacion: {
+        Args: {
+          p_codigo_interno_factura: string
+          p_entidad_nombre: string
+          p_factura: string
+          p_fecha_factura: string
+          p_sucursal: Database["public"]["Enums"]["sucursal"]
+        }
+        Returns: {
+          cliente_id: string
+          marca: string
+        }[]
+      }
       parque_resumen_facturacion: {
         Args: {
           p_desde: string
@@ -2897,6 +3471,7 @@ export type Database = {
       }
       repuestos_estado_facturacion_historica: { Args: never; Returns: Json }
       repuestos_estado_maestro_legacy: { Args: never; Returns: Json }
+      repuestos_excluir_ventas_duplicadas: { Args: never; Returns: number }
       repuestos_finalizar_facturacion_historica: {
         Args: { p_carga_id: string }
         Returns: Json
@@ -2949,6 +3524,10 @@ export type Database = {
         Args: { p_desde: string; p_hasta_exclusiva: string }
         Returns: Json
       }
+      repuestos_reconciliar_maestro_legacy_actual: {
+        Args: never
+        Returns: Json
+      }
       repuestos_refrescar_historial_unificado: { Args: never; Returns: Json }
       repuestos_resumen_calidad_historial: {
         Args: { p_marca?: string }
@@ -2996,6 +3575,27 @@ export type Database = {
           p_solo_sugeridos?: boolean
         }
         Returns: Json
+      }
+      repuestos_sugerencia_viva_base_v4: {
+        Args: {
+          p_buscar?: string
+          p_estado?: string
+          p_fecha_analisis: string
+          p_limite?: number
+          p_marca: string
+          p_offset?: number
+          p_segmento?: string
+          p_solo_sugeridos?: boolean
+        }
+        Returns: Json
+      }
+      repuestos_vincular_codigo_legacy: {
+        Args: { p_codigo_legacy: string; p_producto_codigo: string }
+        Returns: Json
+      }
+      servicios_es_tecnico_activo: {
+        Args: { p_profile_id: string }
+        Returns: boolean
       }
       servicios_listar_tecnicos_activos: {
         Args: never

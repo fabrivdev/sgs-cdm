@@ -71,7 +71,7 @@ describe("commission entries", () => {
         canonical_end_date: "2026-08-20",
         canonical_end_time: "1600",
       },
-    } as CanonicalServiceOrderRow;
+    } as unknown as CanonicalServiceOrderRow;
 
     const entries = buildCommissionTimeEntries([row], "import-1", [
       { id: "profile-1", nombre: "JUAN PEREZ" },
@@ -108,7 +108,7 @@ describe("commission entries", () => {
         canonical_end_date: "2026-08-20",
         canonical_end_time: "1200",
       },
-    } as CanonicalServiceOrderRow;
+    } as unknown as CanonicalServiceOrderRow;
 
     const [entry] = buildCommissionTimeEntries([row], "import-1", []);
     expect(entry.tecnico_profile_id).toBeNull();
