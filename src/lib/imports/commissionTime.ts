@@ -218,6 +218,12 @@ export function buildCommissionTimeEntries(
       const parsed = parseTechnician(participant.source);
       const matched = matchTechnicianProfile(parsed.name, technicians);
       const key = sourceKey(row, participant.source, participant.role);
+      const validationReasons = matched
+        ? duration.reasons
+        : Array.from(new Set([...duration.reasons, "TECNICO_FUERA_DE_NOMINA_ACTIVA"]));
+      const validationStatus = !matched && duration.status !== "INVALIDA"
+        ? "REVISAR"
+        : duration.status;
       entries.set(key, {
         fuente_clave: key,
         importacion_id: importId,
@@ -237,9 +243,9 @@ export function buildCommissionTimeEntries(
         tipo_tiempo: row.timeType,
         horas_reportadas: reportedHours,
         horas_calculadas: duration.calculatedHours,
-        horas_validas: duration.validHours,
-        estado_validacion: duration.status,
-        motivos_validacion: duration.reasons,
+        horas_validas: matched ? duration.validHours : null,
+        estado_validacion: validationStatus,
+        motivos_validacion: validationReasons,
         raw_data: {
           source_row_id: row.rowId,
           source_os_number: row.sourceServiceOrderNumber,
@@ -312,7 +318,7 @@ export async function persistCommissionTimeEntries(args: {
   const payload = entries.flatMap((entry) => {
     const existing = existingByKey.get(entry.fuente_clave);
     if (existing && paidExistingIds.has(String(existing.id))) return [];
-    return [existing?.validado_por
+    return [existing?.validado_por && entry.tecnico_profile_id
       ? {
           ...entry,
           estado_validacion: existing.estado_validacion,

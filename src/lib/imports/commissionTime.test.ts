@@ -79,4 +79,36 @@ describe("commission entries", () => {
     expect(entries.every((entry) => entry.horas_calculadas === 4)).toBe(true);
     expect(entries.every((entry) => entry.estado_validacion === "REVISAR")).toBe(true);
   });
+
+  it("keeps a technician outside the active roster auditable but not payable", () => {
+    const row = {
+      rowId: "row-inactive",
+      sourceServiceOrderNumber: "124",
+      branchCode: "01",
+      serviceOrderNumber: "01-124",
+      branch: "Santa Rita",
+      status: "Cerrada",
+      closeDate: "2026-08-20",
+      technician: "999 - TECNICO ANTERIOR",
+      auxiliaryTechnicians: [],
+      timeType: "Cliente",
+      documentNumber: "90002",
+      productCode: "MA01",
+      productName: "MANO DE OBRA",
+      serviceHours: 4,
+      raw: {
+        ITEM: "1",
+        canonical_start_date: "2026-08-20",
+        canonical_start_time: "0800",
+        canonical_end_date: "2026-08-20",
+        canonical_end_time: "1200",
+      },
+    } as CanonicalServiceOrderRow;
+
+    const [entry] = buildCommissionTimeEntries([row], "import-1", []);
+    expect(entry.tecnico_profile_id).toBeNull();
+    expect(entry.estado_validacion).toBe("REVISAR");
+    expect(entry.horas_validas).toBeNull();
+    expect(entry.motivos_validacion).toContain("TECNICO_FUERA_DE_NOMINA_ACTIVA");
+  });
 });

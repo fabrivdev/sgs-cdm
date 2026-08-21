@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import { importCommissionXmlOnly } from "@/lib/imports";
+import { normalizeTechnicianName } from "@/lib/technicianMatching";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "@/components/layout/AppPrimitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ interface CommissionRow {
   hora_fin: string | null;
   tecnico_codigo: string | null;
   tecnico_nombre: string;
+  tecnico_profile_id: string | null;
   rol_tecnico: "PRINCIPAL" | "AUXILIAR";
   tipo_tiempo: "Cliente" | "Garantia" | "Interno" | "Desconocido";
   horas_reportadas: number | null;
@@ -60,7 +62,7 @@ interface Settlement {
 interface TechnicianSummary {
   key: string;
   technician: string;
-  branch: string;
+  branches: string[];
   cliente: number;
   garantia: number;
   interno: number;
@@ -82,11 +84,11 @@ function isClosed(row: CommissionRow) {
 function summarize(rows: CommissionRow[], paidIds: Set<string>) {
   const grouped = new Map<string, TechnicianSummary>();
   for (const row of rows) {
-    const key = `${row.tecnico_nombre}|${row.sucursal ?? ""}`;
+    const key = row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre);
     const current = grouped.get(key) ?? {
       key,
       technician: row.tecnico_nombre,
-      branch: row.sucursal ?? "Sin sucursal",
+      branches: [],
       cliente: 0,
       garantia: 0,
       interno: 0,
@@ -94,6 +96,8 @@ function summarize(rows: CommissionRow[], paidIds: Set<string>) {
       total: 0,
       lines: 0,
     };
+    const branch = row.sucursal ?? "Sin sucursal";
+    if (!current.branches.includes(branch)) current.branches.push(branch);
     const value = Number((paidIds.has(row.id) ? row.horas_validas : row.horas_calculadas ?? row.horas_validas) ?? 0);
     if (row.tipo_tiempo === "Cliente") current.cliente += value;
     else if (row.tipo_tiempo === "Garantia") current.garantia += value;
@@ -126,7 +130,7 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
         ) : rows.map((row) => (
           <TableRow key={row.key} className="cursor-pointer" onClick={() => onTechnician(row.technician)}>
             <TableCell><div className="font-medium">{row.technician}</div><div className="text-[10px] text-muted-foreground">{row.lines} jornadas</div></TableCell>
-            <TableCell>{row.branch}</TableCell>
+            <TableCell>{row.branches.sort().join(", ")}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.cliente)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.garantia)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.interno)}</TableCell>
@@ -148,6 +152,7 @@ export default function Comisiones() {
   const [rows, setRows] = useState<CommissionRow[]>([]);
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [activeTechnicianIds, setActiveTechnicianIds] = useState<Set<string>>(new Set());
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -158,21 +163,25 @@ export default function Comisiones() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [journeys, detailResult, settlementResult, initialResult] = await Promise.all([
+      const [journeys, detailResult, settlementResult, initialResult, technicianResult] = await Promise.all([
         cargarTodo<CommissionRow>(
           (supabase.from("comisiones_jornadas" as any) as any)
-            .select("id,sucursal,os_numero,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,rol_tecnico,tipo_tiempo,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
+            .select("id,sucursal,os_numero,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
             .eq("vigente", true)
             .order("fecha_inicio", { ascending: false }),
         ),
         cargarTodo<{ jornada_id: string }>((supabase.from("comisiones_liquidacion_detalle" as any) as any).select("jornada_id")),
         cargarTodo<Settlement>((supabase.from("comisiones_liquidaciones" as any) as any).select("id,periodo_desde,periodo_hasta,estado,total_horas,observacion,pagado_en").order("pagado_en", { ascending: false })),
         (supabase.from("importaciones") as any).select("id").eq("origen_sistema", "comisiones_os_backfill").gt("insertados", 0).limit(1),
+        (supabase.rpc as any)("servicios_listar_tecnicos_activos"),
       ]);
+      if (initialResult.error) throw initialResult.error;
+      if (technicianResult.error) throw technicianResult.error;
       setRows(journeys);
       setPaidIds(new Set(detailResult.map((row) => row.jornada_id)));
       setSettlements(settlementResult);
       setInitialLoadDone(Boolean(initialResult.data?.length));
+      setActiveTechnicianIds(new Set((technicianResult.data ?? []).map((row: { id: string }) => row.id)));
       setSchemaMissing(false);
     } catch (error) {
       const message = String((error as { message?: string })?.message ?? error);
@@ -189,28 +198,35 @@ export default function Comisiones() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setSelected(new Set()); }, [view, from, to]);
 
-  const periodRows = useMemo(() => rows.filter((row) => {
+  const isActiveTechnician = useCallback((row: CommissionRow) => Boolean(
+    row.tecnico_profile_id && activeTechnicianIds.has(row.tecnico_profile_id)
+  ), [activeTechnicianIds]);
+
+  const eligibleRows = useMemo(() => rows.filter(isActiveTechnician), [isActiveTechnician, rows]);
+  const periodRows = useMemo(() => (view === "revisar" ? rows : eligibleRows).filter((row) => {
     if (technicianFilter && row.tecnico_nombre !== technicianFilter) return false;
     if (view === "abiertas") {
       return !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to);
     }
     if (view === "revisar") {
-      return row.estado_validacion !== "VALIDA" && (!row.fecha_inicio || row.fecha_inicio <= to);
+      return !paidIds.has(row.id)
+        && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")
+        && (!row.fecha_inicio || row.fecha_inicio <= to);
     }
     if (!isClosed(row) || !row.fecha_cierre) return false;
     return row.fecha_cierre >= from && row.fecha_cierre <= to;
-  }), [from, rows, technicianFilter, to, view]);
+  }), [eligibleRows, from, isActiveTechnician, paidIds, rows, technicianFilter, to, view]);
 
   const unpaidClosedRows = useMemo(() => periodRows.filter((row) => !paidIds.has(row.id)), [paidIds, periodRows]);
   const payableRows = useMemo(() => unpaidClosedRows.filter((row) => row.estado_validacion === "VALIDA" && Number(row.horas_validas ?? 0) > 0), [unpaidClosedRows]);
   const reviewRows = useMemo(() => periodRows.filter((row) => row.estado_validacion !== "VALIDA"), [periodRows]);
   const summaryRows = useMemo(() => summarize(periodRows, paidIds), [paidIds, periodRows]);
-  const closedAll = useMemo(() => rows.filter((row) => isClosed(row) && row.fecha_cierre && row.fecha_cierre >= from && row.fecha_cierre <= to), [from, rows, to]);
-  const openAll = useMemo(() => rows.filter((row) => !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to)), [rows, to]);
+  const closedAll = useMemo(() => eligibleRows.filter((row) => isClosed(row) && row.fecha_cierre && row.fecha_cierre >= from && row.fecha_cierre <= to), [eligibleRows, from, to]);
+  const openAll = useMemo(() => eligibleRows.filter((row) => !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to)), [eligibleRows, to]);
   const totalClosed = closedAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
   const totalOpen = openAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
   const totalPendingPayment = closedAll.filter((row) => !paidIds.has(row.id) && row.estado_validacion === "VALIDA").reduce((sum, row) => sum + Number(row.horas_validas ?? 0), 0);
-  const totalReview = rows.filter((row) => row.estado_validacion !== "VALIDA").length;
+  const totalReview = rows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
 
   const toggle = (id: string, checked: boolean) => setSelected((current) => {
     const next = new Set(current);
@@ -266,7 +282,7 @@ export default function Comisiones() {
   };
 
   const detailRows = view === "cerradas" ? unpaidClosedRows : view === "revisar" ? reviewRows : periodRows;
-  const selectableIds = view === "cerradas" ? payableRows.map((row) => row.id) : view === "revisar" ? reviewRows.filter((row) => Number(row.horas_calculadas ?? 0) > 0 && row.estado_validacion !== "INVALIDA").map((row) => row.id) : [];
+  const selectableIds = view === "cerradas" ? payableRows.map((row) => row.id) : view === "revisar" ? reviewRows.filter((row) => isActiveTechnician(row) && Number(row.horas_calculadas ?? 0) > 0 && row.estado_validacion !== "INVALIDA").map((row) => row.id) : [];
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
 
   return (
@@ -293,7 +309,7 @@ export default function Comisiones() {
           <KpiItem label="Horas cerradas" value={hours(totalClosed)} detail={`${closedAll.length} jornadas en el rango`} tone="info" icon={<CheckCircle2 />} />
           <KpiItem label="Pendientes de pago" value={hours(totalPendingPayment)} detail="Validadas y todavía no liquidadas" tone="positive" icon={<WalletCards />} />
           <KpiItem label="Horas abiertas" value={hours(totalOpen)} detail={`${openAll.length} jornadas al corte`} tone="warning" icon={<Clock3 />} />
-          <KpiItem label="Requieren revisión" value={number.format(totalReview)} detail="Diferencia, falta o error de horario" tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
+          <KpiItem label="Requieren revisión" value={number.format(totalReview)} detail="Incluye técnicos fuera de la nómina activa" tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
         </KpiStrip>
 
         <Panel className="flex flex-wrap items-end gap-3 py-2.5">
@@ -318,7 +334,7 @@ export default function Comisiones() {
             <Panel className="p-0"><div className="px-3 py-2"><SectionHeader title="Horas abiertas por técnico y tipo" meta={`OS abiertas al ${dateLabel(to)}.`} /></div><SummaryTable rows={summaryRows} onTechnician={setTechnicianFilter} /></Panel>
           </TabsContent>
           <TabsContent value="revisar" className="space-y-3">
-            <Panel className="border-amber-200 bg-amber-50/40 text-[12px]">Las horas mostradas fueron recalculadas con inicio y fin. Validar confirma ese cálculo; las jornadas inválidas deben corregirse en el origen.</Panel>
+            <Panel className="border-amber-200 bg-amber-50/40 text-[12px]">Las horas mostradas fueron recalculadas con inicio y fin. Los técnicos fuera de la nómina activa quedan visibles para auditoría, pero no pueden validarse ni pagarse.</Panel>
           </TabsContent>
           <TabsContent value="liquidaciones">
             <Panel className="p-0">
@@ -345,9 +361,10 @@ export default function Comisiones() {
               <TableBody>
                 {loading ? <TableRow><TableCell colSpan={9} className="h-24 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow> : detailRows.length === 0 ? <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">No hay registros para mostrar.</TableCell></TableRow> : detailRows.slice(0, 500).map((row) => {
                   const selectable = selectableIds.includes(row.id);
+                  const technicianActive = isActiveTechnician(row);
                   return <TableRow key={row.id} data-state={selected.has(row.id) ? "selected" : undefined}>
                     {view !== "abiertas" && <TableCell><Checkbox disabled={!selectable} checked={selected.has(row.id)} onCheckedChange={(checked) => toggle(row.id, Boolean(checked))} /></TableCell>}
-                    <TableCell><div className="font-medium">OS {row.os_numero}</div><div className="text-[10px] text-muted-foreground">{row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div></TableCell>
+                    <TableCell><div className="font-medium">OS {row.os_numero}</div><div className="text-[10px] text-muted-foreground">{row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div>{!technicianActive && <Badge variant="outline" className="mt-1 border-amber-300 text-amber-700">Fuera de nómina activa</Badge>}</TableCell>
                     <TableCell><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"}>{row.estado_validacion}</Badge>{row.motivos_validacion?.length ? <div className="mt-1 max-w-56 text-[10px] text-muted-foreground">{row.motivos_validacion.join(", ")}</div> : null}</TableCell>
                     <TableCell>{row.tipo_tiempo}</TableCell>
                     <TableCell>{dateLabel(row.fecha_inicio)} {row.hora_inicio?.slice(0, 5) ?? ""}</TableCell>
