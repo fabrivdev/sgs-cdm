@@ -59,7 +59,10 @@ function normalizeXmlSucursal(value: unknown) {
   const upper = sample.toUpperCase();
   if (!sample) return null;
   if (upper.includes("SANTA RITA") || sample === "01") return "Santa Rita";
-  if (upper.includes("SANTA ROSA") || sample === "02") return "Santa Rosa";
+  // Codificacion de sucursales del sistema nuevo (TOTVS). No debe
+  // confundirse con la numeracion del sistema anterior: en los XML nuevos
+  // 02 corresponde a Katuete y 06 a Santa Rosa.
+  if (upper.includes("KATUETE") || upper.includes("KATUETÉ") || sample === "02") return "Katuete";
   if (upper.includes("CAMPO 9") || upper.includes("CAMPO NUEVE") || sample === "03") return "Campo 9";
   // "San Juan Bautista" es la localidad cabecera del departamento de
   // Misiones -- TOTVS a veces manda la localidad en vez del nombre de
@@ -67,7 +70,7 @@ function normalizeXmlSucursal(value: unknown) {
   // no una nueva (confirmado en pedidos/solicitudes de compra).
   if (upper.includes("MISIONES") || upper.includes("SAN JUAN BAUTISTA") || sample === "04") return "Misiones";
   if (upper.includes("LOMA PLATA") || sample === "05") return "Loma Plata";
-  if (upper.includes("KATUETE") || upper.includes("KATUETÉ") || sample === "06") return "Katuete";
+  if (upper.includes("SANTA ROSA") || sample === "06") return "Santa Rosa";
   return null;
 }
 

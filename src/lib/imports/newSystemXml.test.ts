@@ -75,8 +75,31 @@ describe("importacion XML de ordenes de servicio", () => {
       "01-00000021",
       "02-00000021",
     ]);
+    expect(result.rows.map((row) => row.branch)).toEqual([
+      "Santa Rita",
+      "Santa Rita",
+      "Katuete",
+    ]);
     expect(result.rows[2].timeType).toBe("Interno");
     expect(result.rows[2].serviceHours).toBe(5);
+  });
+
+  it("usa la numeracion de sucursales del sistema nuevo sin inferir el codigo legacy", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        { Sucursal: "02", "Nº OS": "1" },
+        { Sucursal: "06", "Nº OS": "2" },
+        { Sucursal: "07", "Nº OS": "3" },
+      ],
+    });
+
+    expect(result.rows.map((row) => row.branch)).toEqual([
+      "Katuete",
+      "Santa Rosa",
+      null,
+    ]);
   });
 
   it("normaliza una OS liberada como abierta y conserva sus nuevos metadatos", () => {

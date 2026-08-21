@@ -249,6 +249,7 @@ export function buildCommissionTimeEntries(
         raw_data: {
           source_row_id: row.rowId,
           source_os_number: row.sourceServiceOrderNumber,
+          source_branch_code: row.branchCode,
           source_product_code: row.productCode,
           source_product_name: row.productName,
           source_technician: participant.source,
