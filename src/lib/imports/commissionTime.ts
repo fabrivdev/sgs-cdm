@@ -38,6 +38,31 @@ interface TechnicianReference {
 }
 
 const roundHours = (value: number) => Math.round(value * 10_000) / 10_000;
+// PostgREST serializa los filtros `.in(...)` dentro de la URL. Las claves de
+// comisiones son deliberadamente descriptivas y un lote grande supera con
+// facilidad el limite del proxy (el XML de referencia producia una URL de
+// unos 34 KB y respondia solamente `400 Bad Request`).
+const SOURCE_KEY_LOOKUP_BATCH_SIZE = 40;
+const UUID_LOOKUP_BATCH_SIZE = 100;
+const UPSERT_BATCH_SIZE = 100;
+
+function commissionRequestError(stage: string, error: unknown) {
+  const candidate = error as {
+    message?: string;
+    code?: string;
+    details?: string;
+    hint?: string;
+    status?: number;
+  } | null;
+  const parts = [
+    candidate?.message,
+    candidate?.code ? `codigo ${candidate.code}` : null,
+    candidate?.details,
+    candidate?.hint,
+    candidate?.status ? `HTTP ${candidate.status}` : null,
+  ].filter((value): value is string => Boolean(value));
+  return new Error(`${stage}: ${parts.join(" | ") || String(error)}`);
+}
 
 function rawText(raw: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
@@ -241,7 +266,7 @@ export async function persistCommissionTimeEntries(args: {
   strict?: boolean;
 }) {
   const { data: technicianRows, error: technicianError } = await (supabase.rpc as any)("servicios_listar_tecnicos_activos");
-  if (technicianError) throw technicianError;
+  if (technicianError) throw commissionRequestError("No se pudo consultar el plantel de tecnicos", technicianError);
   const technicians = ((technicianRows ?? []) as Array<{ id: string; nombre: string }>).map((row) => ({
     id: row.id,
     nombre: row.nombre,
@@ -259,28 +284,28 @@ export async function persistCommissionTimeEntries(args: {
       console.info("Comisiones no se persistieron: falta aplicar la migración del módulo.");
       return { inserted: 0, review: 0, invalid: 0, schemaAvailable: false };
     }
-    throw prepareError;
+    throw commissionRequestError("No se pudo preparar la reimportacion de las OS", prepareError);
   }
 
   const existingByKey = new Map<string, any>();
-  for (let index = 0; index < entries.length; index += 500) {
-    const keys = entries.slice(index, index + 500).map((row) => row.fuente_clave);
+  for (let index = 0; index < entries.length; index += SOURCE_KEY_LOOKUP_BATCH_SIZE) {
+    const keys = entries.slice(index, index + SOURCE_KEY_LOOKUP_BATCH_SIZE).map((row) => row.fuente_clave);
     const { data, error } = await (supabase
       .from("comisiones_jornadas" as any)
       .select("id,fuente_clave,estado_validacion,horas_validas,validado_por,validado_en")
       .in("fuente_clave", keys) as any);
-    if (error) throw error;
+    if (error) throw commissionRequestError("No se pudieron comprobar las jornadas ya cargadas", error);
     for (const row of data ?? []) existingByKey.set(row.fuente_clave, row);
   }
 
   const paidExistingIds = new Set<string>();
   const existingIds = Array.from(existingByKey.values()).map((row) => String(row.id));
-  for (let index = 0; index < existingIds.length; index += 500) {
+  for (let index = 0; index < existingIds.length; index += UUID_LOOKUP_BATCH_SIZE) {
     const { data, error } = await (supabase
       .from("comisiones_liquidacion_detalle" as any)
       .select("jornada_id")
-      .in("jornada_id", existingIds.slice(index, index + 500)) as any);
-    if (error) throw error;
+      .in("jornada_id", existingIds.slice(index, index + UUID_LOOKUP_BATCH_SIZE)) as any);
+    if (error) throw commissionRequestError("No se pudo comprobar si las jornadas ya fueron pagadas", error);
     for (const row of data ?? []) paidExistingIds.add(String(row.jornada_id));
   }
 
@@ -298,11 +323,11 @@ export async function persistCommissionTimeEntries(args: {
       : entry];
   });
 
-  for (let index = 0; index < payload.length; index += 500) {
-    const { error } = await (supabase.from("comisiones_jornadas" as any).upsert(payload.slice(index, index + 500) as any, {
+  for (let index = 0; index < payload.length; index += UPSERT_BATCH_SIZE) {
+    const { error } = await (supabase.from("comisiones_jornadas" as any).upsert(payload.slice(index, index + UPSERT_BATCH_SIZE) as any, {
       onConflict: "fuente_clave",
     }) as any);
-    if (error) throw error;
+    if (error) throw commissionRequestError("No se pudieron guardar las jornadas recalculadas", error);
   }
 
   return {
@@ -341,7 +366,7 @@ export async function importCommissionXmlOnly(args: {
     } as any)
     .select("id")
     .single();
-  if (importError) throw importError;
+  if (importError) throw commissionRequestError("No se pudo registrar la carga inicial", importError);
 
   const result = await persistCommissionTimeEntries({
     rows: envelope.rows,
@@ -352,7 +377,7 @@ export async function importCommissionXmlOnly(args: {
     .from("importaciones")
     .update({ insertados: result.inserted, duplicados: envelope.rows.length - result.inserted } as any)
     .eq("id", importRow.id);
-  if (updateError) throw updateError;
+  if (updateError) throw commissionRequestError("Las jornadas se guardaron, pero no se pudo cerrar la importacion", updateError);
 
   return { ...result, sourceRows: envelope.rows.length };
 }

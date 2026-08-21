@@ -258,7 +258,7 @@ export default function Comisiones() {
       toast.success(`${result.inserted} jornadas cargadas; ${result.review} requieren revisión.`);
       await load();
     } catch (error) {
-      toast.error(String((error as { message?: string })?.message ?? error));
+      toast.error(`No se pudo completar la carga inicial. ${String((error as { message?: string })?.message ?? error)}`);
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
