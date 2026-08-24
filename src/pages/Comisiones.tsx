@@ -586,18 +586,18 @@ export default function Comisiones() {
                 <div className="border-b px-3 py-1.5"><SectionHeader title="Desglose por día" /></div>
                 <Table className={cn("w-full table-fixed", tableTextDense)}>
                   <TableHeader><TableRow>
-                    <TableHead className={cn(tableHeadText, "w-[64px] whitespace-nowrap px-2")}>Fecha</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[88px] whitespace-nowrap px-2 pr-3")}>Fecha</TableHead>
                     <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Horario</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[78px] whitespace-nowrap px-2")}>Tipo</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[74px] whitespace-nowrap px-2")}>Estado</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>Tipo</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[70px] whitespace-nowrap px-2")}>Estado</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>Pago</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[66px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {selectedOsDays.map((day) => <Fragment key={day.date}>
                       {day.rows.map((row, index) => <TableRow key={row.id} className="h-8">
-                        <TableCell className="whitespace-nowrap px-2 py-1 text-muted-foreground tabular-nums">{index === 0 ? (day.date === "sin-fecha" ? "s/f" : dateLabel(day.date)) : ""}</TableCell>
+                        <TableCell className="overflow-hidden px-2 py-1 pr-3 text-muted-foreground"><span className="block truncate tabular-nums" title={day.date === "sin-fecha" ? "Sin fecha" : dateLabel(day.date)}>{index === 0 ? (day.date === "sin-fecha" ? "s/f" : format(new Date(`${day.date}T00:00:00`), "dd/MM/yy")) : ""}</span></TableCell>
                         <TableCell className="min-w-0 overflow-hidden px-2 py-1">
                           <span className="flex min-w-0 items-center gap-1.5" title={`${row.tecnico_nombre} · ${row.rol_tecnico}${row.motivos_validacion?.length ? ` · ${row.motivos_validacion.join(", ")}` : ""}`}>
                             {row.motivos_validacion?.length ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" /> : null}
