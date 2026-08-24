@@ -56,13 +56,6 @@ function shortDate(value: string | null) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function billingTone(status: string) {
-  const normalized = status.toLowerCase();
-  if (normalized.includes("factur")) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (normalized.includes("pend")) return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-border bg-muted/40 text-muted-foreground";
-}
-
 export function ServiciosDashboard({
   data,
   loading,
@@ -484,86 +477,66 @@ export function ServiciosDashboard({
                 {row.horasPersona !== row.horas && <Badge variant="outline">{decimal.format(row.horasPersona)} h-persona</Badge>}
                 <Badge variant="secondary">USD {usd.format(row.valorOS)}</Badge>
               </div>
-              <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>{row.estadoOS === "Cerrada" ? "Cierre" : "Apertura"}: {shortDate(row.fechaOperacion)}</span>
-                <span>{row.factura ? `Factura ${row.factura}` : row.estadoFacturacion || "Sin facturar"}</span>
+              <div className="mt-2 grid grid-cols-2 gap-2 border-t pt-2 text-[10px] text-muted-foreground">
+                <span>Inicio: <strong className="font-medium text-foreground">{shortDate(row.fechaApertura)}</strong></span>
+                <span>Cierre: <strong className="font-medium text-foreground">{shortDate(row.fechaCierre)}</strong></span>
               </div>
             </article>
           ))}
           {visibleOrders.length === 0 && <div className="py-10 text-center text-[12px] text-muted-foreground">Sin órdenes para los filtros actuales.</div>}
         </div>
 
-        <div className="hidden max-h-[520px] overflow-auto rounded-md border md:block">
-          <table className="w-full min-w-[1240px] text-[12px]">
+        <div className="hidden max-h-[480px] overflow-auto rounded-md border md:block">
+          <table className="w-full min-w-[1180px] table-fixed text-[11px]">
             <thead className="sticky top-0 z-10 bg-muted text-left text-[9px] uppercase tracking-wide text-muted-foreground shadow-sm">
               <tr>
-                <th className="px-3 py-2">OS / fecha</th>
-                <th className="px-3 py-2">Cliente / máquina</th>
-                <th className="px-3 py-2">Equipo técnico</th>
-                <th className="px-3 py-2">Operación</th>
-                <th className="px-3 py-2">Estado / factura</th>
-                <th className="px-3 py-2 text-right">Horas</th>
-                <th className="px-3 py-2 text-right">Importe OS</th>
+                <th className="w-[112px] px-2.5 py-2">OS</th>
+                <th className="w-[180px] px-2.5 py-2">Cliente</th>
+                <th className="w-[105px] px-2.5 py-2">Chasis</th>
+                <th className="w-[210px] px-2.5 py-2">Equipo técnico</th>
+                <th className="w-[135px] px-2.5 py-2">Operación</th>
+                <th className="w-[170px] px-2.5 py-2">Estado</th>
+                <th className="w-[82px] px-2.5 py-2">Inicio</th>
+                <th className="w-[82px] px-2.5 py-2">Cierre</th>
+                <th className="w-[82px] px-2.5 py-2 text-right">Hs OS</th>
+                <th className="w-[82px] px-2.5 py-2 text-right">H-persona</th>
+                <th className="w-[110px] px-2.5 py-2 text-right">Total</th>
               </tr>
             </thead>
             <tbody>
               {visibleOrders.map((row) => (
-                <tr key={row.key} className="border-t hover:bg-muted/30">
-                  <td className="whitespace-nowrap px-3 py-2 align-top">
-                    <div className="font-mono font-semibold">{row.os}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {row.estadoOS === "Cerrada" ? "Cierre" : "Apertura"} {shortDate(row.fechaOperacion)}
-                    </div>
-                    <Badge variant="outline" className="mt-1 px-1.5 py-0 text-[9px]">{row.marca}</Badge>
+                <tr key={row.key} className="h-10 border-t hover:bg-muted/30">
+                  <td className="truncate px-2.5 py-2 font-mono font-semibold" title={`${row.os} · ${row.marca}`}>{row.os}</td>
+                  <td className="truncate px-2.5 py-2 font-medium" title={`${row.cliente}${row.problema ? ` · ${row.problema}` : ""}`}>{row.cliente}</td>
+                  <td className="truncate px-2.5 py-2 font-mono text-[10px] text-muted-foreground" title={row.chasis || "Sin chasis informado"}>{row.chasis || "-"}</td>
+                  <td className="truncate px-2.5 py-2" title={row.tecnicos.join(", ")}>
+                    {row.tecnicos[0] ?? "Sin técnico"}
+                    {row.tecnicos.length > 1 && <span className="ml-1 text-primary">+{row.tecnicos.length - 1}</span>}
                   </td>
-                  <td className="max-w-[270px] px-3 py-2 align-top">
-                    <div className="truncate font-medium" title={row.cliente}>{row.cliente}</div>
-                    <div className="mt-0.5 truncate text-[10px] text-muted-foreground" title={row.chasis || row.problema}>
-                      {row.chasis ? `Chasis ${row.chasis}` : row.problema || "Sin chasis informado"}
-                    </div>
+                  <td className="truncate px-2.5 py-2" title={`${row.sucursal ?? "Sin sucursal"} · ${timeLabel(row.tipoTiempo)}`}>
+                    {row.sucursal ?? "-"} · {timeLabel(row.tipoTiempo)}
                   </td>
-                  <td className="max-w-[260px] px-3 py-2 align-top">
-                    <div className="truncate font-medium" title={row.tecnicos.join(", ")}>
-                      {row.tecnicos[0] ?? "Sin técnico asignado"}
-                    </div>
-                    <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                      {row.tecnicos.length > 1
-                        ? `+${row.tecnicos.length - 1} participante${row.tecnicos.length > 2 ? "s" : ""}`
-                        : "Responsable único"}
+                  <td className="px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge>
+                      <span className={cn("truncate text-[10px]", row.factura ? "text-emerald-700" : "text-muted-foreground")} title={row.factura || row.estadoFacturacion}>
+                        {row.factura ? `F ${row.factura}` : row.estadoFacturacion || "Sin factura"}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-3 py-2 align-top">
-                    <Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge>
-                    <div className="mt-1 text-[10px] text-muted-foreground">{row.sucursal ?? "Sin sucursal"}</div>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge>
-                    <div className="mt-1">
-                      <Badge className={billingTone(row.estadoFacturacion)} variant="outline">
-                        {row.factura ? `Fact. ${row.factura}` : row.estadoFacturacion || "Sin factura"}
-                      </Badge>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums">
-                    <div className="font-semibold">{decimal.format(row.horas)} hs OS</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {decimal.format(row.horasPersona)} h-persona{row.km > 0 ? ` · ${decimal.format(row.km)} km` : ""}
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums">
-                    <div className="font-semibold">USD {usd.format(row.valorOS)}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      MO {usd.format(row.servicios)} · Rep. {usd.format(row.repuestos)}
-                    </div>
-                    {(row.kilometraje > 0 || row.terceros > 0) && (
-                      <div className="text-[10px] text-muted-foreground">
-                        Km {usd.format(row.kilometraje)} · Terc. {usd.format(row.terceros)}
-                      </div>
-                    )}
+                  <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">{shortDate(row.fechaApertura)}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">{shortDate(row.fechaCierre)}</td>
+                  <td className="px-2.5 py-2 text-right font-medium tabular-nums">{decimal.format(row.horas)}</td>
+                  <td className="px-2.5 py-2 text-right tabular-nums">{decimal.format(row.horasPersona)}</td>
+                  <td
+                    className="whitespace-nowrap px-2.5 py-2 text-right font-semibold tabular-nums"
+                    title={`MO ${usd.format(row.servicios)} · Repuestos ${usd.format(row.repuestos)} · Km ${usd.format(row.kilometraje)} · Terceros ${usd.format(row.terceros)}`}
+                  >
+                    USD {usd.format(row.valorOS)}
                   </td>
                 </tr>
               ))}
-              {visibleOrders.length === 0 && <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
+              {visibleOrders.length === 0 && <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
             </tbody>
           </table>
         </div>
