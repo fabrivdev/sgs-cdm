@@ -457,7 +457,7 @@ export default function Comisiones() {
       <div className="w-full overflow-x-auto"><div className="max-h-[480px] overflow-y-auto"><Table className={cn("w-full min-w-[860px] table-fixed", tableTextDense)}>
         <TableHeader><TableRow>
           {view !== "abiertas" && <TableHead className="w-8 px-2"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
-          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2")}>Orden</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[104px] whitespace-nowrap px-2")}>Orden</TableHead>
           <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Cliente</TableHead>
           <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Equipo técnico</TableHead>
           <TableHead className={cn(tableHeadText, "w-[68px] whitespace-nowrap px-2")}>Suc.</TableHead>
