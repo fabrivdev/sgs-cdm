@@ -50,6 +50,33 @@ function importedValue(row: Record<string, unknown>): number {
   );
 }
 
+function resolveParticipantTotals(
+  participant: ServiceOrderParticipant,
+  totalsByTechnician: ImportedTechnicianTotals,
+  normalizedEntries: Map<string, Record<string, unknown>>,
+): Record<string, unknown> | undefined {
+  // The canonical technician key is written by the historical backfill and is
+  // the authoritative row. Raw aliases may still coexist in the imported JSON;
+  // they represent the same technician and must never be added together.
+  const exactCanonical = totalsByTechnician[participant.key];
+  if (exactCanonical) return exactCanonical;
+
+  for (const source of participant.sources) {
+    const direct = totalsByTechnician[source];
+    if (direct) return direct;
+  }
+
+  const normalizedCanonical = normalizedEntries.get(normalizeTechnicianName(participant.key));
+  if (normalizedCanonical) return normalizedCanonical;
+
+  for (const source of participant.sources) {
+    const normalized = normalizedEntries.get(normalizeTechnicianName(source));
+    if (normalized) return normalized;
+  }
+
+  return undefined;
+}
+
 /**
  * Attributes a service order to every participant.
  *
@@ -69,39 +96,26 @@ export function attributeServiceOrderMetrics(
   }
 
   return participants.map((participant) => {
-    let hasIndividualHours = false;
-    let hasIndividualKilometers = false;
-    let hasIndividualValue = false;
-    const individualTotals = participant.sources.reduce<ServiceOrderMetricTotals>(
-      (sum, source) => {
-        const direct = totalsByTechnician[source];
-        const normalized = normalizedEntries.get(normalizeTechnicianName(source));
-        const sourceTotals = direct ?? normalized;
-
-        if (!sourceTotals) return sum;
-
-        if (hasOwn(sourceTotals, "horas")) {
-          hasIndividualHours = true;
-          sum.hours += numeric(sourceTotals.horas);
-        }
-        if (hasOwn(sourceTotals, "kilometros")) {
-          hasIndividualKilometers = true;
-          sum.kilometers += numeric(sourceTotals.kilometros);
-        }
-        if (individualValueKeys.some((key) => hasOwn(sourceTotals, key))) {
-          hasIndividualValue = true;
-          sum.value += importedValue(sourceTotals);
-        }
-        return sum;
-      },
-      { hours: 0, kilometers: 0, value: 0 },
+    const individualTotals = resolveParticipantTotals(
+      participant,
+      totalsByTechnician,
+      normalizedEntries,
+    );
+    const hasIndividualHours = Boolean(individualTotals && hasOwn(individualTotals, "horas"));
+    const hasIndividualKilometers = Boolean(
+      individualTotals && hasOwn(individualTotals, "kilometros"),
+    );
+    const hasIndividualValue = Boolean(
+      individualTotals && individualValueKeys.some((key) => hasOwn(individualTotals, key)),
     );
 
     return {
       key: participant.key,
-      hours: hasIndividualHours ? individualTotals.hours : orderTotals.hours,
-      kilometers: hasIndividualKilometers ? individualTotals.kilometers : orderTotals.kilometers,
-      value: hasIndividualValue ? individualTotals.value : orderTotals.value,
+      hours: hasIndividualHours ? numeric(individualTotals?.horas) : orderTotals.hours,
+      kilometers: hasIndividualKilometers
+        ? numeric(individualTotals?.kilometros)
+        : orderTotals.kilometers,
+      value: hasIndividualValue ? importedValue(individualTotals ?? {}) : orderTotals.value,
       source: hasIndividualHours ? "individual" : "order",
     };
   });

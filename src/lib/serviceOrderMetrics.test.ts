@@ -97,6 +97,59 @@ describe("service order participant metrics", () => {
 
     expect(result).toMatchObject({ hours: 7.5, kilometers: 15, value: 200, source: "individual" });
   });
+
+  it("does not add a canonical technician row and its raw aliases twice", () => {
+    const [result] = attributeServiceOrderMetrics(
+      [
+        {
+          key: "JONATHAN EZEQUIEL GARCETE MARTINEZ",
+          sources: [
+            "ME0016 - JONATHAN EZEQUIEL GARCETE MARTINEZ",
+            "JONATHAN EZEQUIEL GARCETE MARTINEZ",
+          ],
+        },
+      ],
+      {
+        "ME0016 - JONATHAN EZEQUIEL GARCETE MARTINEZ": {
+          horas: 7,
+          kilometros: 20,
+          valor_servicio: 100,
+        },
+        "JONATHAN EZEQUIEL GARCETE MARTINEZ": {
+          horas: 4,
+          kilometros: 10,
+          valor_servicio: 60,
+        },
+      },
+      orderTotals,
+    );
+
+    expect(result).toEqual({
+      key: "JONATHAN EZEQUIEL GARCETE MARTINEZ",
+      hours: 4,
+      kilometers: 10,
+      value: 60,
+      source: "individual",
+    });
+  });
+
+  it("uses only one raw alias when no canonical total exists", () => {
+    const [result] = attributeServiceOrderMetrics(
+      [
+        {
+          key: "tecnico",
+          sources: ["TECNICO 001", "TECNICO UNO"],
+        },
+      ],
+      {
+        "TECNICO 001": { horas: 5 },
+        "TECNICO UNO": { horas: 5 },
+      },
+      orderTotals,
+    );
+
+    expect(result).toMatchObject({ hours: 5, source: "individual" });
+  });
 });
 
 describe("service team capacity", () => {
