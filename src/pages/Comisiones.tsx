@@ -247,11 +247,12 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
             <TableCell className="px-2 py-1 text-right tabular-nums" title={`${row.lines} jornadas`}>{row.orders.size}</TableCell>
             <TableCell className="px-2 py-1"><span className="block truncate" title={row.branches.join(", ")}>{row.branches.sort().map(branchInitials).join(" ")}</span></TableCell>
 
-            <TableCell className="text-right tabular-nums">{hours(row.cliente)}</TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.garantia)}</TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.interno)}</TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.desconocido)}</TableCell>
-            <TableCell className="text-right font-semibold tabular-nums">{hours(row.total)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.cliente)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.garantia)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.interno)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.desconocido)}</TableCell>
+            <TableCell className="px-2 py-1 text-right font-semibold tabular-nums">{hours(row.total)}</TableCell>
+
           </TableRow>
         ))}
       </TableBody>
