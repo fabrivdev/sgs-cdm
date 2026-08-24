@@ -217,6 +217,7 @@ interface OrdenServicioImportada {
   fecha_cierre_os: string | null;
   fecha_emision_factura: string | null;
   factura: string | null;
+  nro_chasis: string | null;
   responsable: string | null;
   marca: string | null;
   problema: string | null;
@@ -1082,7 +1083,7 @@ export default function Dashboard() {
     (async () => {
       setOrdenesLoading(true);
       try {
-        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_cierre_os, fecha_emision_factura, factura, responsable, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion, raw_data";
+        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_cierre_os, fecha_emision_factura, factura, nro_chasis, responsable, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion, raw_data";
         const [rowsByOpenDate, rowsByCloseDate, rowsByInvoiceDate] = await Promise.all([
           cargarTodo<OrdenServicioImportada>(
             (supabase
@@ -1483,8 +1484,11 @@ export default function Dashboard() {
 
       const horas = Number(row.servicios_cantidad || 0);
       const km = Number(row.km_cantidad || 0);
-      const valorOS = Number(row.servicios_valor || 0) + Number(row.repuesto_valor || 0) +
-        Number(row.kilometro_valor || 0) + Number(row.terceros_valor || 0);
+      const serviciosValor = Number(row.servicios_valor || 0);
+      const repuestosValor = Number(row.repuesto_valor || 0);
+      const kilometrajeValor = Number(row.kilometro_valor || 0);
+      const tercerosValor = Number(row.terceros_valor || 0);
+      const valorOS = serviciosValor + repuestosValor + kilometrajeValor + tercerosValor;
       const totalsByTechnician = (rawData.totales_por_tecnico ?? {}) as Record<string, Record<string, unknown>>;
       const participantsForMetrics = responsablesSeleccionados.size > 0
         ? participants.filter((participant) => responsablesSeleccionados.has(participant.tecnico))
@@ -1580,21 +1584,30 @@ export default function Dashboard() {
         os: row.os_numero,
         tecnico,
         tecnicoProfileId: responsibleMatch?.id ?? null,
+        tecnicos: participantNames,
         cliente,
+        chasis: String(row.nro_chasis ?? "").trim(),
         sucursal,
         marca,
         tipoTiempo,
-        fechaApertura: fechaAnalisis,
+        fechaApertura: row.fecha_abierta_os ? String(row.fecha_abierta_os).slice(0, 10) : null,
+        fechaCierre: row.fecha_cierre_os ? String(row.fecha_cierre_os).slice(0, 10) : null,
+        fechaOperacion: fechaAnalisis,
         estadoOS,
         estadoFacturacion: canonicalSituacion(row.situacion_facturacion),
         origen,
         factura: String(row.factura ?? "").trim(),
         problema: String(row.problema ?? "").trim(),
         horas,
+        horasPersona: horasPersonaOS,
         km,
+        servicios: serviciosValor,
+        repuestos: repuestosValor,
+        kilometraje: kilometrajeValor,
+        terceros: tercerosValor,
         valorOS,
       }];
-    }).sort((a, b) => (b.fechaApertura ?? "").localeCompare(a.fechaApertura ?? "") || a.os.localeCompare(b.os));
+    }).sort((a, b) => b.fechaOperacion.localeCompare(a.fechaOperacion) || a.os.localeCompare(b.os));
 
     const cerradas = ordenes.filter((row) => row.estadoOS === "Cerrada").length;
     const otras = ordenes.filter((row) => row.estadoOS === "Cancelada" || row.estadoOS === "Anulada").length;

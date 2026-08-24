@@ -108,18 +108,27 @@ export interface ServicioOSRow {
   os: string;
   tecnico: string;
   tecnicoProfileId: string | null;
+  tecnicos: string[];
   cliente: string;
+  chasis: string;
   sucursal: Sucursal | null;
   marca: Marca;
   tipoTiempo: string;
   fechaApertura: string | null;
+  fechaCierre: string | null;
+  fechaOperacion: string;
   estadoOS: string;
   estadoFacturacion: string;
   origen: string;
   factura: string;
   problema: string;
   horas: number;
+  horasPersona: number;
   km: number;
+  servicios: number;
+  repuestos: number;
+  kilometraje: number;
+  terceros: number;
   valorOS: number;
 }
 
