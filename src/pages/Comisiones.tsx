@@ -21,7 +21,7 @@ import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeletonRows } from "@/components/LoadingSkeletons";
 import { cn } from "@/lib/utils";
-import { cardLabel, iconSm, kpiValue, metaText, tableHeadText, tableText } from "@/lib/ui-classes";
+import { cardLabel, iconSm, kpiValue, metaText, tableHeadText, tableText, tableTextDense } from "@/lib/ui-classes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -116,6 +116,12 @@ function storedDateRange() {
 
 const hours = (value: number | null | undefined) => value == null ? "—" : `${number.format(value)} h`;
 const dateLabel = (value: string | null) => value ? format(new Date(`${value}T12:00:00`), "dd/MM/yyyy") : "—";
+const shortDate = (value: string | null) => value ? format(new Date(`${value}T12:00:00`), "dd/MM") : "—";
+const periodLabel = (fromDate: string | null, toDate: string | null) => {
+  if (!fromDate && !toDate) return "—";
+  if (!fromDate || !toDate || fromDate === toDate) return format(new Date(`${(fromDate ?? toDate) as string}T12:00:00`), "dd/MM/yy");
+  return `${shortDate(fromDate)} – ${format(new Date(`${toDate}T12:00:00`), "dd/MM/yy")}`;
+};
 
 function branchInitials(value: string) {
   const known: Record<string, string> = {
@@ -219,30 +225,34 @@ function summarizeOrders(rows: CommissionRow[], paidIds: Set<string>): Commissio
 
 function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTechnician: (name: string) => void }) {
   return (
-    <Table className={tableText}>
+    <Table className={cn("w-full", tableTextDense)}>
       <TableHeader>
         <TableRow>
-          <TableHead className={tableHeadText}>Técnico</TableHead>
-          <TableHead className={tableHeadText}>Sucursal</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Cliente</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Garantía</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Interno</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Sin tipo</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Total</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2 text-right")}>OS</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[110px] whitespace-nowrap px-2")}>Sucursal</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Cliente</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Garantía</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Interno</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Sin tipo</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Total</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (
-          <TableRow><TableCell colSpan={7} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
+          <TableRow><TableCell colSpan={8} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
         ) : rows.map((row) => (
-          <TableRow key={row.key} className="cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
-            <TableCell className="py-1.5"><div className="font-medium">{row.technician}</div><div className={metaText}>{row.orders.size} OS · {row.lines} jornadas</div></TableCell>
-            <TableCell className="py-1.5"><div className="flex flex-wrap gap-1">{row.branches.sort().map((branch) => <Badge key={branch} variant="outline" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.cliente)}</TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.garantia)}</TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.interno)}</TableCell>
-            <TableCell className="text-right tabular-nums">{hours(row.desconocido)}</TableCell>
-            <TableCell className="text-right font-semibold tabular-nums">{hours(row.total)}</TableCell>
+          <TableRow key={row.key} className="h-8 cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
+            <TableCell className="px-2 py-1"><span className="block truncate font-medium" title={row.technician}>{row.technician}</span></TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums" title={`${row.lines} jornadas`}>{row.orders.size}</TableCell>
+            <TableCell className="px-2 py-1"><span className="block truncate" title={row.branches.join(", ")}>{row.branches.sort().map(branchInitials).join(" ")}</span></TableCell>
+
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.cliente)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.garantia)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.interno)}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.desconocido)}</TableCell>
+            <TableCell className="px-2 py-1 text-right font-semibold tabular-nums">{hours(row.total)}</TableCell>
+
           </TableRow>
         ))}
       </TableBody>
@@ -444,41 +454,44 @@ export default function Comisiones() {
           actions={view === "cerradas" ? <Button size="sm" disabled={busy || selected.size === 0} onClick={() => void markPaid()}><WalletCards className={cn(iconSm, "mr-2")} />Marcar pagadas ({selected.size})</Button> : view === "revisar" ? <Button size="sm" disabled={busy || selected.size === 0} onClick={() => void validateSelected()}><CheckCircle2 className={cn(iconSm, "mr-2")} />Validar cálculo ({selected.size})</Button> : undefined}
         />
       </div>
-      <div className="max-h-[480px] overflow-auto"><Table className={cn("min-w-[1080px]", tableText)}>
+      <div className="w-full overflow-x-auto"><div className="max-h-[480px] overflow-y-auto"><Table className={cn("w-full min-w-[860px] table-fixed", tableTextDense)}>
         <TableHeader><TableRow>
-          {view !== "abiertas" && <TableHead className="w-10"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
-          <TableHead className={cn(tableHeadText, "w-36")}>Orden</TableHead>
-          <TableHead className={cn(tableHeadText, "min-w-52")}>Cliente / chasis</TableHead>
-          <TableHead className={cn(tableHeadText, "min-w-48")}>Equipo técnico</TableHead>
-          <TableHead className={cn(tableHeadText, "w-24")}>Suc.</TableHead>
-          <TableHead className={cn(tableHeadText, "w-28")}>Tipo</TableHead>
-          <TableHead className={cn(tableHeadText, "w-40")}>Período</TableHead>
-          <TableHead className={cn(tableHeadText, "w-20 text-right")}>Horas</TableHead>
-          <TableHead className={cn(tableHeadText, "w-28")}>Estado</TableHead>
-          <TableHead className={cn(tableHeadText, "w-24")}>Pago</TableHead>
+          {view !== "abiertas" && <TableHead className="w-8 px-2"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2")}>Orden</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Cliente</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Equipo técnico</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[68px] whitespace-nowrap px-2")}>Suc.</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[96px] whitespace-nowrap px-2")}>Tipo</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[112px] whitespace-nowrap px-2")}>Período</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[54px] whitespace-nowrap px-2 text-right")}>Jorn.</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[76px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Estado</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Pago</TableHead>
         </TableRow></TableHeader>
         <TableBody>
-          {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 10 : 9} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={10} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
+          {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 11 : 10} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={11} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
             const orderIds = order.rows.filter((row) => selectableIdSet.has(row.id)).map((row) => row.id);
             const orderSelected = orderIds.length > 0 && orderIds.every((id) => selected.has(id));
             const inactiveTechnician = order.rows.some((row) => !isActiveTechnician(row));
-            const period = order.dateFrom === order.dateTo ? dateLabel(order.dateFrom) : `${dateLabel(order.dateFrom)} – ${dateLabel(order.dateTo)}`;
+            const period = periodLabel(order.dateFrom, order.dateTo);
             const payment = order.paidCount === order.rows.length ? "Pagada" : order.paidCount > 0 ? "Parcial" : "Pendiente";
-            return <TableRow key={order.key} data-state={orderSelected ? "selected" : undefined}>
-              {view !== "abiertas" && <TableCell className="py-1.5"><Checkbox disabled={orderIds.length === 0} checked={orderSelected} onCheckedChange={(checked) => toggleOrder(order, Boolean(checked))} /></TableCell>}
-              <TableCell className="py-1.5"><button type="button" className="font-semibold hover:text-primary hover:underline" onClick={() => setSelectedOsKey(order.key)}>OS {order.osNumber}</button><div className={metaText}>{order.rows.length} jornadas</div></TableCell>
-              <TableCell className="max-w-64 py-1.5"><div className="truncate font-medium" title={order.client}>{order.client}</div><div className={cn(metaText, "truncate font-mono")} title={order.chassis ?? undefined}>Chasis {order.chassis ?? "—"}</div></TableCell>
-              <TableCell className="max-w-56 py-1.5"><div className="truncate font-medium" title={order.technicians.join(", ")}>{order.technicians[0]}{order.technicians.length > 1 ? ` +${order.technicians.length - 1}` : ""}</div>{inactiveTechnician && <div className="text-[11px] leading-4 text-amber-700">Técnico inactivo</div>}</TableCell>
-              <TableCell className="py-1.5"><div className="flex flex-wrap gap-1">{order.branches.map((branch) => <Badge key={branch} variant="outline" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
-              <TableCell className="py-1.5"><div className="truncate" title={order.timeTypes.join(", ")}>{order.timeTypes.join(", ")}</div></TableCell>
-              <TableCell className="py-1.5 tabular-nums">{period}</TableCell>
-              <TableCell className="py-1.5 text-right font-semibold tabular-nums">{hours(order.totalHours)}</TableCell>
-              <TableCell className="py-1.5"><Badge variant={order.validation === "VALIDA" ? "secondary" : order.validation === "INVALIDA" ? "destructive" : "outline"}>{order.validation === "VALIDA" ? "Válida" : order.validation === "INVALIDA" ? "Inválida" : "Revisar"}</Badge></TableCell>
-              <TableCell className="py-1.5">{payment === "Pagada" ? <Badge className="bg-emerald-600">Pagada</Badge> : payment === "Parcial" ? <Badge variant="outline" className="border-amber-300 text-amber-700">Parcial</Badge> : <span className="text-muted-foreground">Pendiente</span>}</TableCell>
+            return <TableRow key={order.key} className="h-8" data-state={orderSelected ? "selected" : undefined}>
+              {view !== "abiertas" && <TableCell className="px-2 py-1"><Checkbox disabled={orderIds.length === 0} checked={orderSelected} onCheckedChange={(checked) => toggleOrder(order, Boolean(checked))} /></TableCell>}
+              <TableCell className="whitespace-nowrap px-2 py-1"><button type="button" className="font-semibold tabular-nums hover:text-primary hover:underline" onClick={() => setSelectedOsKey(order.key)}>OS {order.osNumber}</button></TableCell>
+              <TableCell className="px-2 py-1"><span className="block truncate" title={`${order.client}${order.chassis ? ` · Chasis ${order.chassis}` : ""}`}>{order.client}</span></TableCell>
+              <TableCell className="px-2 py-1"><span className="flex min-w-0 items-center gap-1.5" title={order.technicians.join(", ")}>{inactiveTechnician && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="Incluye técnico inactivo" />}<span className="truncate">{order.technicians[0]}{order.technicians.length > 1 ? ` +${order.technicians.length - 1}` : ""}</span></span></TableCell>
+              <TableCell className="px-2 py-1"><span className="block truncate" title={order.branches.join(", ")}>{order.branches.map(branchInitials).join(" ")}</span></TableCell>
+              <TableCell className="px-2 py-1"><span className="block truncate" title={order.timeTypes.join(", ")}>{order.timeTypes.join(", ")}</span></TableCell>
+              <TableCell className="whitespace-nowrap px-2 py-1 tabular-nums">{period}</TableCell>
+              <TableCell className="px-2 py-1 text-right tabular-nums">{order.rows.length}</TableCell>
+              <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(order.totalHours)}</TableCell>
+              <TableCell className="px-2 py-1"><Badge variant={order.validation === "VALIDA" ? "secondary" : order.validation === "INVALIDA" ? "destructive" : "outline"} className="whitespace-nowrap">{order.validation === "VALIDA" ? "Válida" : order.validation === "INVALIDA" ? "Inválida" : "Revisar"}</Badge></TableCell>
+              <TableCell className="px-2 py-1">{payment === "Pagada" ? <Badge className="whitespace-nowrap bg-emerald-600">Pagada</Badge> : payment === "Parcial" ? <Badge variant="outline" className="whitespace-nowrap border-amber-300 text-amber-700">Parcial</Badge> : <span className="text-muted-foreground">Pendiente</span>}</TableCell>
             </TableRow>;
           })}
         </TableBody>
-      </Table></div>
+      </Table></div></div>
+
       {detailOrders.length > 500 && <div className={cn(metaText, "border-t px-3 py-2")}>Se muestran las primeras 500 OS.</div>}
     </Panel>
   );
