@@ -28,7 +28,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
 
@@ -245,7 +246,8 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
       <TableHeader>
         <TableRow>
           <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2 text-right")}>OS</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[58px] whitespace-nowrap px-2 text-right")}>OS</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[76px] whitespace-nowrap px-2 text-right")}>Jornadas</TableHead>
           <TableHead className={cn(tableHeadText, "w-[110px] whitespace-nowrap px-2")}>Sucursal</TableHead>
           <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Cliente</TableHead>
           <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Garantía</TableHead>
@@ -256,11 +258,12 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (
-          <TableRow><TableCell colSpan={8} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
+          <TableRow><TableCell colSpan={9} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
         ) : rows.map((row) => (
           <TableRow key={row.key} className="h-8 cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
             <TableCell className="px-2 py-1"><span className="block truncate font-medium" title={row.technician}>{row.technician}</span></TableCell>
-            <TableCell className="px-2 py-1 text-right tabular-nums" title={`${row.lines} jornadas`}>{row.orders.size}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{row.orders.size}</TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums">{row.lines}</TableCell>
             <TableCell className="px-2 py-1"><span className="block truncate" title={row.branches.join(", ")}>{row.branches.sort().map(branchInitials).join(" ")}</span></TableCell>
 
             <TableCell className="px-2 py-1 text-right tabular-nums">{hours(row.cliente)}</TableCell>
@@ -293,8 +296,8 @@ export default function Comisiones() {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searchFilter, setSearchFilter] = useState("");
-  const [osStateFilter, setOsStateFilter] = useState("all");
-  const [technicianFilter, setTechnicianFilter] = useState("");
+  const [osStateFilters, setOsStateFilters] = useState<string[]>([]);
+  const [technicianFilters, setTechnicianFilters] = useState<string[]>([]);
   const [schemaMissing, setSchemaMissing] = useState(false);
   const [selectedOsKey, setSelectedOsKey] = useState<string | null>(null);
 
@@ -363,8 +366,8 @@ export default function Comisiones() {
     const query = normalizeFilterText(searchFilter);
     const queryOrder = normalizeOrderNumber(searchFilter);
     return rows.filter((row) => {
-      if (technicianFilter && row.tecnico_nombre !== technicianFilter) return false;
-      if (osStateFilter !== "all" && normalizeFilterText(row.estado_os) !== osStateFilter) return false;
+      if (technicianFilters.length > 0 && !technicianFilters.includes(row.tecnico_nombre)) return false;
+      if (osStateFilters.length > 0 && !osStateFilters.includes(normalizeFilterText(row.estado_os))) return false;
       if (!query) return true;
 
       const matchesText = [
@@ -377,7 +380,7 @@ export default function Comisiones() {
       const matchesOrder = Boolean(queryOrder) && normalizeOrderNumber(row.os_numero).includes(queryOrder);
       return matchesText || matchesOrder;
     });
-  }, [osStateFilter, rows, searchFilter, technicianFilter]);
+  }, [osStateFilters, rows, searchFilter, technicianFilters]);
 
   const eligibleRows = useMemo(() => filteredRows.filter(isActiveTechnician), [filteredRows, isActiveTechnician]);
   const periodRows = useMemo(() => (view === "revisar" ? filteredRows : eligibleRows).filter((row) => {
@@ -482,13 +485,13 @@ export default function Comisiones() {
   const detailOrders = useMemo(() => summarizeOrders(detailRows, paidIds), [detailRows, paidIds]);
   const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
   const activeFilterCount = Number(Boolean(searchFilter.trim()))
-    + Number(Boolean(technicianFilter))
-    + Number(osStateFilter !== "all");
+    + Number(technicianFilters.length > 0)
+    + Number(osStateFilters.length > 0);
 
   const clearFilters = () => {
     setSearchFilter("");
-    setTechnicianFilter("");
-    setOsStateFilter("all");
+    setTechnicianFilters([]);
+    setOsStateFilters([]);
   };
 
   const toggleOrder = (order: CommissionOsSummary, checked: boolean) => {
@@ -503,7 +506,7 @@ export default function Comisiones() {
   const resumenPanel = (
     <Panel className="overflow-hidden p-0">
       <div className="border-b px-3 py-2"><SectionHeader title="Horas por técnico y tipo" /></div>
-      <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} onTechnician={setTechnicianFilter} /></div>
+      <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>
     </Panel>
   );
 
@@ -605,24 +608,21 @@ export default function Comisiones() {
           >
             <FilterDate label="Desde" value={from} onChange={setFrom} />
             <FilterDate label="Hasta" value={to} onChange={setTo} />
-            <FilterSelect
+            <FilterMultiSelect
               label="Estado OS"
-              value={osStateFilter}
-              onChange={setOsStateFilter}
+              values={osStateFilters}
+              onChange={setOsStateFilters}
               placeholder="Todos"
               width="w-[145px]"
-              options={[{ value: "all", label: "Todos" }, ...osStateOptions]}
+              options={osStateOptions}
             />
-            <FilterSelect
+            <FilterMultiSelect
               label="Técnico"
-              value={technicianFilter || "all"}
-              onChange={(value) => setTechnicianFilter(value === "all" ? "" : value)}
+              values={technicianFilters}
+              onChange={setTechnicianFilters}
               placeholder="Todos"
               width="w-[210px]"
-              options={[
-                { value: "all", label: "Todos" },
-                ...technicianOptions.map((technician) => ({ value: technician, label: technician })),
-              ]}
+              options={technicianOptions.map((technician) => ({ value: technician, label: technician }))}
             />
           </FiltersBar>
 
