@@ -566,40 +566,55 @@ export default function Comisiones() {
       </Tabs>
 
       <Sheet open={Boolean(selectedOsKey)} onOpenChange={(open) => { if (!open) setSelectedOsKey(null); }}>
-        <SheetContent className="w-[min(94vw,680px)] overflow-y-auto p-0 sm:max-w-[680px]">
+        <SheetContent className="w-[min(94vw,640px)] overflow-y-auto p-0 sm:max-w-[640px]">
           {selectedOs && <>
-            <SheetHeader className="border-b px-4 py-3 pr-12 text-left">
-              <SheetTitle className="text-[14px]">OS {selectedOs.os_numero} · {selectedOs.cliente_nombre ?? "Cliente no informado"}</SheetTitle>
-              <div className={metaText}>{selectedOs.estado_os ?? "Estado no informado"} · {selectedOs.sucursal ?? "Sin sucursal"} · Chasis {selectedOs.nro_chasis ?? "—"}</div>
+            <SheetHeader className="border-b px-4 py-2.5 pr-12 text-left">
+              <SheetTitle className="text-[14px] leading-5">OS {selectedOs.os_numero}</SheetTitle>
+              <div className={cn(metaText, "truncate")} title={selectedOs.cliente_nombre ?? "Cliente no informado"}>
+                {selectedOs.cliente_nombre ?? "Cliente no informado"} · {selectedOs.sucursal ?? "Sin sucursal"} · {selectedOs.estado_os ?? "Sin estado"} · Chasis {selectedOs.nro_chasis ?? "—"}
+              </div>
             </SheetHeader>
-            <div className={cn("space-y-3 p-4", tableText)}>
+            <div className="space-y-2.5 p-4">
               <KpiStrip>
-                <KpiItem label="Horas de la OS" value={hours(selectedOsTotal)} />
-                <KpiItem label="Bloques" value={selectedOsBlocks} />
+                <KpiItem label="Horas" value={hours(selectedOsTotal)} />
+                <KpiItem label="Jornadas" value={selectedOsBlocks} />
                 <KpiItem label="Técnicos" value={selectedOsTechnicians} />
                 <KpiItem label="Cierre" value={dateLabel(selectedOs.fecha_cierre)} />
               </KpiStrip>
 
-              <div>
-                <div className={cn(cardLabel, "mb-1.5")}>Desglose por día</div>
-                <div className="space-y-2">
-                  {selectedOsDays.map((day) => <div key={day.date} className="overflow-hidden rounded-md border">
-                    <div className="flex items-center justify-between bg-muted/40 px-3 py-1.5">
-                      <span className="font-medium">{day.date === "sin-fecha" ? "Sin fecha" : dateLabel(day.date)}</span>
-                      <span className="font-semibold tabular-nums">{hours(day.total)}</span>
-                    </div>
-                    <div className="divide-y">
-                      {day.rows.map((row) => <div key={row.id} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{row.tecnico_nombre} <span className="font-normal text-muted-foreground">· {row.rol_tecnico}</span></div>
-                          <div className={cn(metaText, "mt-0.5")}>{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"} · {row.tipo_tiempo} · {paidIds.has(row.id) ? "Pagada" : "Pendiente"}</div>
-                          {row.motivos_validacion?.length ? <div className="mt-1 text-[11px] leading-4 text-amber-700">{row.motivos_validacion.join(", ")}</div> : null}
-                        </div>
-                        <div className="text-right"><div className={cn(kpiValue, "text-[15px] leading-5")}>{hours(row.horas_calculadas)}</div><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"} className="mt-1">{row.estado_validacion === "VALIDA" ? "Válida" : row.estado_validacion === "INVALIDA" ? "Inválida" : "Revisar"}</Badge></div>
-                      </div>)}
-                    </div>
-                  </div>)}
-                </div>
+              <div className="overflow-hidden rounded-md border">
+                <div className="border-b px-3 py-1.5"><SectionHeader title="Desglose por día" /></div>
+                <Table className={cn("w-full table-fixed", tableTextDense)}>
+                  <TableHeader><TableRow>
+                    <TableHead className={cn(tableHeadText, "w-[64px] whitespace-nowrap px-2")}>Fecha</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Horario</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[78px] whitespace-nowrap px-2")}>Tipo</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[74px] whitespace-nowrap px-2")}>Estado</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[66px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {selectedOsDays.map((day) => <>
+                      {day.rows.map((row, index) => <TableRow key={row.id} className="h-8">
+                        <TableCell className="whitespace-nowrap px-2 py-1 text-muted-foreground tabular-nums">{index === 0 ? (day.date === "sin-fecha" ? "s/f" : dateLabel(day.date)) : ""}</TableCell>
+                        <TableCell className="min-w-0 overflow-hidden px-2 py-1">
+                          <span className="flex min-w-0 items-center gap-1.5" title={`${row.tecnico_nombre} · ${row.rol_tecnico}${row.motivos_validacion?.length ? ` · ${row.motivos_validacion.join(", ")}` : ""}`}>
+                            {row.motivos_validacion?.length ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" /> : null}
+                            <span className="truncate font-medium">{row.tecnico_nombre}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-2 py-1 tabular-nums">{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"}</TableCell>
+                        <TableCell className="px-2 py-1"><span className="block truncate" title={row.tipo_tiempo}>{row.tipo_tiempo}</span></TableCell>
+                        <TableCell className="px-2 py-1"><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"} className="whitespace-nowrap">{row.estado_validacion === "VALIDA" ? "Válida" : row.estado_validacion === "INVALIDA" ? "Inválida" : "Revisar"}</Badge></TableCell>
+                        <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(row.horas_calculadas)}</TableCell>
+                      </TableRow>)}
+                      <TableRow key={`${day.date}-total`} className="h-7 bg-muted/40 hover:bg-muted/40">
+                        <TableCell colSpan={5} className={cn(metaText, "px-2 py-1")}>Total {day.date === "sin-fecha" ? "sin fecha" : dateLabel(day.date)}</TableCell>
+                        <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(day.total)}</TableCell>
+                      </TableRow>
+                    </>)}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           </>}
