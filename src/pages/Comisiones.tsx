@@ -21,7 +21,7 @@ import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeletonRows } from "@/components/LoadingSkeletons";
 import { cn } from "@/lib/utils";
-import { cardLabel, iconSm, kpiValue, metaText, tableHeadText, tableText } from "@/lib/ui-classes";
+import { cardLabel, iconSm, kpiValue, metaText, tableHeadText, tableText, tableTextDense } from "@/lib/ui-classes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
