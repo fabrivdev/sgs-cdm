@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- las tablas/RPC de esta migración aún no están en los tipos generados de Supabase */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, startOfMonth } from "date-fns";
 import {
   AlertTriangle,
@@ -591,10 +591,11 @@ export default function Comisiones() {
                     <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Horario</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[78px] whitespace-nowrap px-2")}>Tipo</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[74px] whitespace-nowrap px-2")}>Estado</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>Pago</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[66px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {selectedOsDays.map((day) => <>
+                    {selectedOsDays.map((day) => <Fragment key={day.date}>
                       {day.rows.map((row, index) => <TableRow key={row.id} className="h-8">
                         <TableCell className="whitespace-nowrap px-2 py-1 text-muted-foreground tabular-nums">{index === 0 ? (day.date === "sin-fecha" ? "s/f" : dateLabel(day.date)) : ""}</TableCell>
                         <TableCell className="min-w-0 overflow-hidden px-2 py-1">
@@ -606,13 +607,14 @@ export default function Comisiones() {
                         <TableCell className="whitespace-nowrap px-2 py-1 tabular-nums">{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"}</TableCell>
                         <TableCell className="px-2 py-1"><span className="block truncate" title={row.tipo_tiempo}>{row.tipo_tiempo}</span></TableCell>
                         <TableCell className="px-2 py-1"><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"} className="whitespace-nowrap">{row.estado_validacion === "VALIDA" ? "Válida" : row.estado_validacion === "INVALIDA" ? "Inválida" : "Revisar"}</Badge></TableCell>
+                        <TableCell className="whitespace-nowrap px-2 py-1">{paidIds.has(row.id) ? <Badge className="whitespace-nowrap bg-emerald-600">Pagada</Badge> : <span className="text-muted-foreground">Pendiente</span>}</TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(row.horas_calculadas)}</TableCell>
                       </TableRow>)}
                       <TableRow key={`${day.date}-total`} className="h-7 bg-muted/40 hover:bg-muted/40">
-                        <TableCell colSpan={5} className={cn(metaText, "px-2 py-1")}>Total {day.date === "sin-fecha" ? "sin fecha" : dateLabel(day.date)}</TableCell>
+                        <TableCell colSpan={6} className={cn(metaText, "px-2 py-1")}>Total {day.date === "sin-fecha" ? "sin fecha" : dateLabel(day.date)}</TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(day.total)}</TableCell>
                       </TableRow>
-                    </>)}
+                    </Fragment>)}
                   </TableBody>
                 </Table>
               </div>
