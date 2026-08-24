@@ -215,25 +215,25 @@ function summarizeOrders(rows: CommissionRow[], paidIds: Set<string>): Commissio
 
 function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTechnician: (name: string) => void }) {
   return (
-    <Table className="text-[11px]">
+    <Table className={tableText}>
       <TableHeader>
         <TableRow>
-          <TableHead>Técnico</TableHead>
-          <TableHead>Sucursal</TableHead>
-          <TableHead className="text-right">Cliente</TableHead>
-          <TableHead className="text-right">Garantía</TableHead>
-          <TableHead className="text-right">Interno</TableHead>
-          <TableHead className="text-right">Sin tipo</TableHead>
-          <TableHead className="text-right">Total</TableHead>
+          <TableHead className={tableHeadText}>Técnico</TableHead>
+          <TableHead className={tableHeadText}>Sucursal</TableHead>
+          <TableHead className={cn(tableHeadText, "text-right")}>Cliente</TableHead>
+          <TableHead className={cn(tableHeadText, "text-right")}>Garantía</TableHead>
+          <TableHead className={cn(tableHeadText, "text-right")}>Interno</TableHead>
+          <TableHead className={cn(tableHeadText, "text-right")}>Sin tipo</TableHead>
+          <TableHead className={cn(tableHeadText, "text-right")}>Total</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (
-          <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No hay horas para el período seleccionado.</TableCell></TableRow>
+          <TableRow><TableCell colSpan={7} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
         ) : rows.map((row) => (
-          <TableRow key={row.key} className="h-11 cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
-            <TableCell className="py-2"><div className="font-medium">{row.technician}</div><div className="text-[10px] text-muted-foreground">{row.orders.size} OS · {row.lines} jornadas</div></TableCell>
-            <TableCell className="py-2"><div className="flex flex-wrap gap-1">{row.branches.sort().map((branch) => <Badge key={branch} variant="outline" className="px-1.5 text-[9px]" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
+          <TableRow key={row.key} className="cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
+            <TableCell className="py-1.5"><div className="font-medium">{row.technician}</div><div className={metaText}>{row.orders.size} OS · {row.lines} jornadas</div></TableCell>
+            <TableCell className="py-1.5"><div className="flex flex-wrap gap-1">{row.branches.sort().map((branch) => <Badge key={branch} variant="outline" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.cliente)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.garantia)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.interno)}</TableCell>
@@ -245,6 +245,7 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
     </Table>
   );
 }
+
 
 export default function Comisiones() {
   const { user } = useAuth();
