@@ -26,6 +26,7 @@ import {
   inferProductBrand,
   normalizeStableKey,
 } from "@/lib/imports/mappings";
+import { calculateCommissionDuration } from "@/lib/imports/workDuration";
 import { parseSpreadsheetXml, type SpreadsheetXmlSheet } from "@/lib/imports/xmlSpreadsheet";
 
 const firstValue = (row: Record<string, unknown>, candidates: string[]) => {
@@ -215,6 +216,29 @@ export function mapOrdenesServicioSheet(
     });
     const quantity = number(row, ["CANTIDAD", "CNTFAC"]);
     const lineTotal = number(row, ["TOTAL"]);
+    const canonicalStartDate = normalizeDateLike(firstValue(row, ["Fch. Inicial"]));
+    const canonicalStartTime = text(row, ["Hora Inicial"]);
+    const canonicalEndDate = normalizeDateLike(firstValue(row, ["Fch. Final"]));
+    const canonicalEndTime = text(row, ["Hora Final"]);
+    const workDuration = lineType === "Servicio"
+      ? calculateCommissionDuration({
+          startDate: canonicalStartDate,
+          startTime: canonicalStartTime,
+          endDate: canonicalEndDate,
+          endTime: canonicalEndTime,
+          reportedHours: quantity,
+        })
+      : null;
+    // El reloj es la fuente primaria. CANTIDAD queda como respaldo cuando
+    // las marcas estan incompletas o forman una duracion invalida.
+    const serviceHours = lineType === "Servicio"
+      ? workDuration?.validHours ?? quantity
+      : 0;
+    const serviceHoursSource = lineType !== "Servicio"
+      ? null
+      : workDuration?.validHours != null
+        ? "RELOJ"
+        : "CANTIDAD";
 
     return {
       rowId:
@@ -248,7 +272,7 @@ export function mapOrdenesServicioSheet(
       quantity,
       lineTotal,
       currency: resolveCurrency(firstValue(row, ["MONEDA"])),
-      serviceHours: lineType === "Servicio" ? quantity : 0,
+      serviceHours,
       kilometreQuantity: lineType === "Kilometraje" ? quantity : 0,
       thirdPartyValue: lineType === "Otros" ? lineTotal : 0,
       kilometreValue: lineType === "Kilometraje" ? lineTotal : 0,
@@ -257,10 +281,15 @@ export function mapOrdenesServicioSheet(
       raw: {
         ...row,
         canonical_internal_number: text(row, ["Nro. Interno"]),
-        canonical_start_date: normalizeDateLike(firstValue(row, ["Fch. Inicial"])),
-        canonical_start_time: text(row, ["Hora Inicial"]),
-        canonical_end_date: normalizeDateLike(firstValue(row, ["Fch. Final"])),
-        canonical_end_time: text(row, ["Hora Final"]),
+        canonical_start_date: canonicalStartDate,
+        canonical_start_time: canonicalStartTime,
+        canonical_end_date: canonicalEndDate,
+        canonical_end_time: canonicalEndTime,
+        canonical_reported_service_hours: lineType === "Servicio" ? quantity : null,
+        canonical_clock_service_hours: workDuration?.calculatedHours ?? null,
+        canonical_service_hours_source: serviceHoursSource,
+        canonical_duration_status: workDuration?.status ?? null,
+        canonical_duration_reasons: workDuration?.reasons ?? [],
         canonical_parts_status: text(row, ["PIEZAS"]),
         canonical_origin: text(row, ["ORIGEN"]),
         canonical_auxiliary_technicians: auxiliaryTechnicians,

@@ -84,6 +84,69 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(result.rows[2].serviceHours).toBe(5);
   });
 
+  it("prioriza las horas de reloj sobre una CANTIDAD reportada incorrecta", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "01",
+        "Nº OS": "00000129",
+        ESTADO: "Cerrada",
+        PRODUCTO: "MA01",
+        TECNICO: "ME0017 - JUAN PATINO",
+        CANTIDAD: "3,27",
+        "Fch. Inicial": "2026-08-20T00:00:00.000",
+        "Hora Inicial": "1200",
+        "Fch. Final": "2026-08-20T00:00:00.000",
+        "Hora Final": "1600",
+      }],
+    });
+
+    expect(result.rows[0].serviceHours).toBe(4);
+    expect(result.rows[0].raw).toMatchObject({
+      canonical_reported_service_hours: 3.27,
+      canonical_clock_service_hours: 4,
+      canonical_service_hours_source: "RELOJ",
+      canonical_duration_status: "REVISAR",
+      canonical_duration_reasons: ["DIFERENCIA_MAYOR_A_15_MINUTOS"],
+    });
+
+    const aggregated = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    expect(aggregated[0].servicios_cantidad).toBe(4);
+    const technicianTotals = Object.values(
+      (aggregated[0].raw_data as any).totales_por_tecnico,
+    ) as Array<{ horas: number }>;
+    expect(technicianTotals).toHaveLength(1);
+    expect(technicianTotals[0].horas).toBe(4);
+  });
+
+  it("usa CANTIDAD cuando las marcas de tiempo estan incompletas", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "01",
+        "Nº OS": "00000130",
+        PRODUCTO: "MA01",
+        TECNICO: "ME0017 - JUAN PATINO",
+        CANTIDAD: "3:30 Hs.",
+        "Fch. Inicial": "2026-08-20T00:00:00.000",
+        "Hora Inicial": "0800",
+        "Fch. Final": "2026-08-20T00:00:00.000",
+        "Hora Final": "",
+      }],
+    });
+
+    expect(result.rows[0].serviceHours).toBe(3.5);
+    expect(result.rows[0].raw).toMatchObject({
+      canonical_reported_service_hours: 3.5,
+      canonical_clock_service_hours: null,
+      canonical_service_hours_source: "CANTIDAD",
+      canonical_duration_status: "INVALIDA",
+      canonical_duration_reasons: ["MARCAS_DE_TIEMPO_INCOMPLETAS"],
+    });
+  });
+
   it("usa la numeracion de sucursales del sistema nuevo sin inferir el codigo legacy", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",
