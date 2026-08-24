@@ -1,21 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- las tablas/RPC de esta migración aún no están en los tipos generados de Supabase */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { format, startOfMonth } from "date-fns";
 import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  FileCheck2,
   Loader2,
-  RefreshCw,
-  Upload,
   WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { cargarTodo } from "@/hooks/useCatalogos";
-import { importCommissionXmlOnly } from "@/lib/imports";
 import { normalizeTechnicianName } from "@/lib/technicianMatching";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "@/components/layout/AppPrimitives";
 import { EmptyState } from "@/components/EmptyState";
@@ -287,8 +282,6 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
 
 
 export default function Comisiones() {
-  const { user } = useAuth();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [initialDateRange] = useState(storedDateRange);
   const [view, setView] = useState<View>("cerradas");
   const [from, setFrom] = useState(initialDateRange.from);
@@ -297,7 +290,6 @@ export default function Comisiones() {
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [activeTechnicianIds, setActiveTechnicianIds] = useState<Set<string>>(new Set());
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -311,7 +303,7 @@ export default function Comisiones() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [journeys, detailResult, settlementResult, initialResult, technicianResult] = await Promise.all([
+      const [journeys, detailResult, settlementResult, technicianResult] = await Promise.all([
         cargarTodo<CommissionRow>(
           (supabase.from("comisiones_jornadas" as any) as any)
             .select("id,sucursal,os_numero,cliente_nombre,nro_chasis,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,tipo_tiempo_importado,tipo_tiempo_ajustado,tipo_tiempo_ajustado_por,tipo_tiempo_ajustado_en,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
@@ -320,15 +312,12 @@ export default function Comisiones() {
         ),
         cargarTodo<{ jornada_id: string }>((supabase.from("comisiones_liquidacion_detalle" as any) as any).select("jornada_id")),
         cargarTodo<Settlement>((supabase.from("comisiones_liquidaciones" as any) as any).select("id,periodo_desde,periodo_hasta,estado,total_horas,observacion,pagado_en").order("pagado_en", { ascending: false })),
-        (supabase.from("importaciones") as any).select("id").eq("origen_sistema", "comisiones_os_backfill").gt("insertados", 0).limit(1),
         (supabase.rpc as any)("servicios_listar_tecnicos_activos"),
       ]);
-      if (initialResult.error) throw initialResult.error;
       if (technicianResult.error) throw technicianResult.error;
       setRows(journeys);
       setPaidIds(new Set(detailResult.map((row) => row.jornada_id)));
       setSettlements(settlementResult);
-      setInitialLoadDone(Boolean(initialResult.data?.length));
       setActiveTechnicianIds(new Set((technicianResult.data ?? []).map((row: { id: string }) => row.id)));
       setSchemaMissing(false);
     } catch (error) {
@@ -489,21 +478,6 @@ export default function Comisiones() {
     await load();
   };
 
-  const uploadInitialXml = async (file: File) => {
-    if (!user) return;
-    setBusy(true);
-    try {
-      const result = await importCommissionXmlOnly({ file, userId: user.id });
-      toast.success(`${result.inserted} jornadas cargadas; ${result.review} requieren revisión.`);
-      await load();
-    } catch (error) {
-      toast.error(`No se pudo completar la carga inicial. ${String((error as { message?: string })?.message ?? error)}`);
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
-
   const detailRows = view === "cerradas" ? unpaidClosedRows : view === "revisar" ? reviewRows : periodRows;
   const selectableIds = view === "cerradas" ? payableRows.map((row) => row.id) : view === "revisar" ? reviewRows.filter((row) => isActiveTechnician(row) && Number(row.horas_calculadas ?? 0) > 0 && row.estado_validacion !== "INVALIDA").map((row) => row.id) : [];
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
@@ -597,14 +571,6 @@ export default function Comisiones() {
             <TabsTrigger value="revisar">Revisar{totalReview ? ` (${totalReview})` : ""}</TabsTrigger>
             <TabsTrigger value="liquidaciones">Pagos</TabsTrigger>
           </TabsList>}
-          actions={<>
-            <input ref={fileRef} type="file" accept=".xml,text/xml" className="hidden" onChange={(event) => event.target.files?.[0] && void uploadInitialXml(event.target.files[0])} />
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-              {busy ? <Loader2 className={cn(iconSm, "mr-2 animate-spin")} /> : initialLoadDone ? <FileCheck2 className={cn(iconSm, "mr-2")} /> : <Upload className={cn(iconSm, "mr-2")} />}
-              {initialLoadDone ? "Importar XML" : "Carga inicial"}
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={loading} onClick={() => void load()} title="Actualizar"><RefreshCw className={iconSm} /></Button>
-          </>}
         />
 
         {schemaMissing ? (
