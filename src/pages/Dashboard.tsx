@@ -87,6 +87,7 @@ import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { cuadrillaIds, resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
+import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -3183,11 +3184,182 @@ export default function Dashboard() {
     (filtrosServiciosActivos && fResponsablesOS.length > 0 ? 1 : 0) +
     (filtrosServiciosActivos && fEstadosOS.length > 0 ? 1 : 0);
 
+  const dashboardExportOptions = useMemo<TableExportOption[]>(() => {
+    const suffix = `${dateFrom}-a-${dateTo}`;
+
+    if (section === "facturación") {
+      return [
+        {
+          label: "Facturación detallada",
+          filename: `dashboard-facturacion-${suffix}`,
+          sheetName: "Facturación",
+          rowCount: allPeriodFacts.length,
+          rows: () => allPeriodFacts.map((row) => ({
+            Fecha: row.fecha,
+            Factura: row.cod_factura,
+            Cliente: row.cliente_id ? clienteById.get(row.cliente_id)?.nombre ?? row.entidad_nombre : row.entidad_nombre,
+            Sucursal: row.sucursal ?? "",
+            Rubro: concept(row),
+            Tipo: row.tipo,
+            "Tipo de tiempo": row.tipo_tiempo,
+            Marca: row.marca ?? clasificarMarcaFacturacion(row.grupo),
+            "Código mercadería": row.cod_mercaderia ?? "",
+            "Código fabricante": row.codigo_fabricante ?? "",
+            Mercadería: row.mercaderia ?? "",
+            Cantidad: row.cantidad,
+            "Total USD": row.total_venta,
+            Origen: row.origen_sistema ?? "",
+          })),
+        },
+        {
+          label: `Resumen por ${periodoLabel}`,
+          filename: `dashboard-facturacion-resumen-${suffix}`,
+          sheetName: "Resumen",
+          rowCount: weeklyRows.length,
+          rows: () => weeklyRows.map((row) => ({
+            Período: row.label,
+            "Total USD": row.total,
+            Repuestos: row.repuestos,
+            Servicios: row.servicio,
+            Kilometraje: row.kilometraje,
+            Maquinarias: row.maquinarias,
+            Otros: row.otros,
+            Facturas: row.facturas,
+            Clientes: row.clientes,
+            "Variación %": row.variacion,
+          })),
+        },
+      ];
+    }
+
+    if (section === "trabajos") {
+      return [
+        {
+          label: "Seguimiento por OS/TR",
+          filename: `dashboard-trabajos-${suffix}`,
+          sheetName: "Seguimiento",
+          rowCount: trabajosResumen.length,
+          rows: () => trabajosResumen.map((row) => ({
+            "OS/TR": row.ref,
+            Cliente: row.cliente,
+            Trabajo: row.descripcion,
+            Sucursal: row.sucursal,
+            Marca: row.marca,
+            Estado: estadoTrabajoLabel(row.estado as EstadoTrabajo),
+            "Jornadas realizadas": row.realizadasPeriodo,
+            "Jornadas pendientes": row.pendientesPeriodo,
+            "Jornadas totales": row.totalJornadasPeriodo,
+            Técnicos: row.participantes,
+            Horas: row.horasPeriodo,
+            "Última fecha": row.ultimaFechaPeriodo || row.ultimaFecha,
+            "Pendientes vencidas": row.pendientesPeriodoVencidas,
+          })),
+        },
+        {
+          label: "Trabajos abiertos sin cierre",
+          filename: `dashboard-trabajos-abiertos-${suffix}`,
+          sheetName: "Abiertos",
+          rowCount: trabajosAbiertosSinCierre.length,
+          rows: () => trabajosAbiertosSinCierre.map((row) => ({
+            "OS/TR": row.ref,
+            Cliente: row.cliente,
+            Sucursal: row.sucursal,
+            Estado: row.estado,
+            "Última fecha": row.ultimaFecha,
+            "Días sin cierre": row.díasSinCierre,
+            Pendientes: row.pendientes,
+            Programados: row.programados,
+            Iniciados: row.iniciados,
+          })),
+        },
+        {
+          label: "Carga por sucursal",
+          filename: `dashboard-trabajos-sucursales-${suffix}`,
+          sheetName: "Sucursales",
+          rowCount: cargaSucursal.length,
+          rows: () => cargaSucursal.map((row) => ({
+            Sucursal: row.sucursal,
+            Cerrados: row.cerrados,
+            Abiertos: row.abiertos,
+            Pausados: row.pausados,
+            Total: row.total,
+            "Participación %": row.pct,
+          })),
+        },
+      ];
+    }
+
+    if (section === "servicios") {
+      return [
+        {
+          label: "Órdenes de servicio",
+          filename: `dashboard-ordenes-servicio-${suffix}`,
+          sheetName: "Órdenes de servicio",
+          rowCount: serviciosDashboardData.ordenes.length,
+          rows: () => serviciosDashboardData.ordenes.map((row) => ({
+            OS: row.os,
+            Cliente: row.cliente,
+            Chasis: row.chasis ?? "",
+            "Equipo técnico": row.tecnicos.join(", "),
+            Sucursal: row.sucursal ?? "",
+            Marca: row.marca,
+            Tipo: row.tipoTiempo,
+            Estado: row.estadoOS,
+            "Estado facturación": row.estadoFacturacion,
+            Factura: row.factura,
+            "Fecha de apertura": row.fechaApertura ?? "",
+            "Fecha de cierre": row.fechaCierre ?? "",
+            Horas: row.horas,
+            "Mano de obra USD": row.servicios,
+            "Repuestos USD": row.repuestos,
+            "Kilometraje USD": row.kilometraje,
+            "Terceros USD": row.terceros,
+            "Total OS USD": row.valorOS,
+            Problema: row.problema ?? "",
+          })),
+        },
+        {
+          label: "Carga por técnico",
+          filename: `dashboard-servicios-tecnicos-${suffix}`,
+          sheetName: "Técnicos",
+          rowCount: serviciosDashboardData.tecnicos.length,
+          rows: () => serviciosDashboardData.tecnicos.map((row) => ({
+            Técnico: row.tecnico,
+            Activo: row.activo ? "Sí" : "No",
+            OS: row.totalOS,
+            Cerradas: row.cerradas,
+            Abiertas: row.abiertas,
+            Otras: row.otras,
+            Horas: row.horas,
+            Kilómetros: row.km,
+            "Valor OS USD": row.valorOS,
+            Productividad: row.productividad,
+          })),
+        },
+        {
+          label: "Carga por sucursal",
+          filename: `dashboard-servicios-sucursales-${suffix}`,
+          sheetName: "Sucursales",
+          rowCount: serviciosDashboardData.sucursales.length,
+          rows: () => serviciosDashboardData.sucursales.map((row) => ({
+            Sucursal: row.sucursal,
+            Cerradas: row.cerradas,
+            Abiertas: row.abiertas,
+            Otras: row.otras,
+            Total: row.total,
+          })),
+        },
+      ];
+    }
+
+    return [];
+  }, [allPeriodFacts, cargaSucursal, clienteById, dateFrom, dateTo, periodoLabel, section, serviciosDashboardData, trabajosAbiertosSinCierre, trabajosResumen, weeklyRows]);
+
   return (
     <PageShell className="overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-      <PageHeader title="Dashboard ejecutivo" tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
+      <PageHeader title="Dashboard ejecutivo" actions={dashboardExportOptions.length > 0 ? <TableExportButton options={dashboardExportOptions} /> : undefined} tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-[12px]">Vista general</TabsTrigger>
           <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-[12px]">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-[12px]">Trabajos</TabsTrigger>

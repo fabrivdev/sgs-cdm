@@ -26,6 +26,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
+import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
 type CommissionTimeType = "Cliente" | "Garantia" | "Interno" | "Desconocido";
@@ -482,6 +483,72 @@ export default function Comisiones() {
   const selectableIds = view === "cerradas" ? payableRows.map((row) => row.id) : view === "revisar" ? reviewRows.filter((row) => isActiveTechnician(row) && Number(row.horas_calculadas ?? 0) > 0 && row.estado_validacion !== "INVALIDA").map((row) => row.id) : [];
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
   const detailOrders = useMemo(() => summarizeOrders(detailRows, paidIds), [detailRows, paidIds]);
+  const exportOptions = useMemo<TableExportOption[]>(() => {
+    if (view === "liquidaciones") {
+      return [{
+        label: "Liquidaciones registradas",
+        filename: `comisiones-liquidaciones-${from}-a-${to}`,
+        sheetName: "Liquidaciones",
+        rows: settlements.map((row) => ({
+          "Período desde": row.periodo_desde,
+          "Período hasta": row.periodo_hasta,
+          Estado: row.estado,
+          "Fecha de pago": row.pagado_en ?? "",
+          Observación: row.observacion ?? "",
+          Horas: Number(row.total_horas),
+        })),
+      }];
+    }
+
+    const orderRows = detailOrders.map((order) => ({
+      OS: order.osNumber,
+      Cliente: order.client,
+      Chasis: order.chassis ?? "",
+      Técnicos: order.technicians.join(", "),
+      Sucursales: order.branches.join(", "),
+      "Tipos de tiempo": order.timeTypes.join(", "),
+      "Fecha desde": order.dateFrom ?? "",
+      "Fecha hasta / cierre": order.dateTo ?? "",
+      Jornadas: order.rows.length,
+      Horas: order.totalHours,
+      Validación: order.validation,
+      Pago: order.paidCount === order.rows.length ? "Pagada" : order.paidCount > 0 ? "Parcial" : "Pendiente",
+    }));
+
+    if (view === "revisar") {
+      return [{
+        label: "OS por validar",
+        filename: `comisiones-os-por-validar-${from}-a-${to}`,
+        sheetName: "OS por validar",
+        rows: orderRows,
+      }];
+    }
+
+    return [
+      {
+        label: "Resumen por técnico",
+        filename: `comisiones-resumen-${view}-${from}-a-${to}`,
+        sheetName: "Resumen técnicos",
+        rows: summaryRows.map((row) => ({
+          Técnico: row.technician,
+          OS: row.orders.size,
+          Jornadas: row.lines,
+          Sucursales: row.branches.join(", "),
+          "Horas cliente": row.cliente,
+          "Horas garantía": row.garantia,
+          "Horas internas": row.interno,
+          "Horas sin tipo": row.desconocido,
+          "Horas totales": row.total,
+        })),
+      },
+      {
+        label: view === "abiertas" ? "OS abiertas" : "OS pendientes de liquidación",
+        filename: `comisiones-os-${view}-${from}-a-${to}`,
+        sheetName: view === "abiertas" ? "OS abiertas" : "OS pendientes",
+        rows: orderRows,
+      },
+    ];
+  }, [detailOrders, from, settlements, summaryRows, to, view]);
   const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
   const activeFilterCount = Number(Boolean(searchFilter.trim()))
     + Number(technicianFilters.length > 0)
@@ -565,6 +632,7 @@ export default function Comisiones() {
       <Tabs value={view} onValueChange={(value) => setView(value as View)} className="space-y-3">
         <PageHeader
           title="Comisiones"
+          actions={<TableExportButton options={exportOptions} />}
           tabs={<TabsList>
             <TabsTrigger value="cerradas">Cerradas</TabsTrigger>
             <TabsTrigger value="abiertas">Abiertas</TabsTrigger>

@@ -29,6 +29,7 @@ import { ImportarTotvsTab } from "@/components/parque/ImportarTotvsTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
+import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
 interface Profile {
   id: string;
@@ -166,6 +167,36 @@ export default function Admin() {
     () => profiles.filter((profile) => profile.activo).length,
     [profiles],
   );
+
+  const exportOptions = useMemo<TableExportOption[]>(() => [
+    {
+      label: "Equipo operativo",
+      filename: `administracion-equipo-${new Date().toISOString().slice(0, 10)}`,
+      sheetName: "Equipo",
+      rows: profiles.map((profile) => ({
+        Nombre: profile.nombre,
+        Email: emailByProfile(profile),
+        Sucursal: profile.sucursal ?? "",
+        Nivel: nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile)),
+        Módulos: modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(", "),
+        Estado: profile.activo ? "Activo" : "Inactivo",
+      })),
+    },
+    {
+      label: "Accesos al sistema",
+      filename: `administracion-accesos-${new Date().toISOString().slice(0, 10)}`,
+      sheetName: "Accesos",
+      rows: profilesConAcceso.map((profile) => ({
+        Persona: profile.nombre,
+        Email: emailByProfile(profile),
+        Nivel: nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile)),
+        Rol: primaryRoleForProfile(profile) ? ROLE_LABELS[primaryRoleForProfile(profile) as Role] : "",
+        Módulos: modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(", "),
+        Sucursal: profile.sucursal ?? "",
+        Estado: profile.activo ? "Activo" : "Inactivo",
+      })),
+    },
+  ], [emails, moduloAccesoByUser, profiles, profilesConAcceso, rolesByUser]);
 
   const load = async () => {
     const [profileResult, roleResult, moduloAccesoResult] = await Promise.all([
@@ -418,7 +449,7 @@ export default function Admin() {
 
   return (
     <PageShell>
-      <PageHeader title="Administración" />
+      <PageHeader title="Administración" actions={<TableExportButton options={exportOptions} />} />
 
       <Tabs defaultValue="equipo">
         <TabsList>

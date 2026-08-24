@@ -38,6 +38,7 @@ import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
+import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
 type PedidoSortKey =
   | "sucursal"
@@ -199,6 +200,61 @@ export function ComprasPedidosTab() {
     });
   }, [filasFiltradas, sortKey, sortDir]);
 
+  const exportOptions = useMemo<TableExportOption[]>(() => {
+    const filteredKeys = new Set(filasOrdenadas.map(rowKey));
+    const lineas = (pedidosLineasQuery.data ?? []).filter((linea) =>
+      filteredKeys.has(`${linea.sucursal}-${linea.nroPedido}`),
+    );
+
+    return [
+      {
+        label: "Resumen de pedidos",
+        filename: `compras-pedidos-${new Date().toISOString().slice(0, 10)}`,
+        sheetName: "Pedidos",
+        rows: filasOrdenadas.map((row) => ({
+          Sucursal: row.sucursal ?? "",
+          "N° pedido": row.nro_pedido,
+          "Fecha de emisión": row.fecha_emision ?? "",
+          Proveedor: row.proveedor_nombre ?? "",
+          Moneda: row.moneda ?? "",
+          Ítems: row.cantidad_items,
+          "Valor total": Number(row.valor_total),
+          "Cantidad pendiente": Number(row.cantidad_pendiente_total),
+          Seguimiento: row.estado_seguimiento,
+          "Llegada estimada": row.fecha_estimada_llegada ?? "",
+          "N° seguimiento": row.nro_seguimiento ?? "",
+          Notas: row.notas ?? "",
+        })),
+      },
+      {
+        label: "Ítems de pedidos",
+        filename: `compras-pedidos-items-${new Date().toISOString().slice(0, 10)}`,
+        sheetName: "Ítems",
+        rows: lineas.map((linea) => {
+          const solicitudes = solicitudesPorPedidoMap.get(
+            `${linea.sucursal}|${linea.nroPedido}|${linea.item}`,
+          ) as { sucursal: string; nroSolicitud: string; esManual: boolean }[] | undefined;
+          return {
+            Sucursal: linea.sucursal,
+            "N° pedido": linea.nroPedido,
+            Ítem: linea.item,
+            Fecha: linea.fecha ?? "",
+            Proveedor: linea.proveedorNombre ?? "",
+            Producto: linea.productoCodigo,
+            Descripción: linea.descripcion ?? "",
+            Unidad: linea.unidad ?? "",
+            Cantidad: linea.cantidad,
+            "Precio unitario": linea.precioUnitario,
+            Total: linea.valorTotal,
+            Entregado: linea.cantidadEntregada,
+            Pendiente: linea.cantidadPendiente,
+            Solicitudes: (solicitudes ?? []).map((row) => `${row.sucursal}-${row.nroSolicitud}`).join(", "),
+          };
+        }),
+      },
+    ];
+  }, [filasOrdenadas, pedidosLineasQuery.data, solicitudesPorPedidoMap]);
+
   const abrirEdicion = (row: PedidoResumenRow) => {
     setEditing(row);
     setForm({
@@ -252,6 +308,7 @@ export function ComprasPedidosTab() {
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN003187, 06673230, casquillo…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroPedido)) + Number(Boolean(filtros.proveedor))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
+          actions={<TableExportButton options={exportOptions} />}
         >
           <FilterMultiSelect
             label="Sucursal"

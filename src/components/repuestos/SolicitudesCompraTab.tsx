@@ -22,6 +22,7 @@ import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
+import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
 interface Filtros {
   busqueda: string;
@@ -154,6 +155,51 @@ export function SolicitudesCompraTab() {
     });
   }, [gruposFiltrados, sortKey, sortDir]);
 
+  const exportOptions = useMemo<TableExportOption[]>(() => [
+    {
+      label: "Resumen de solicitudes",
+      filename: `compras-solicitudes-${new Date().toISOString().slice(0, 10)}`,
+      sheetName: "Solicitudes",
+      rows: gruposOrdenados.map((grupo) => ({
+        Sucursal: grupo.sucursal,
+        "N° solicitud": grupo.nroSolicitud,
+        "Fecha de emisión": grupo.fechaEmision ?? "",
+        Solicitante: grupo.solicitante ?? "",
+        Moneda: grupo.moneda ?? "",
+        Ítems: grupo.lineas.length,
+        "Valor total": grupo.lineas.reduce((sum, linea) => sum + linea.valorTotal, 0),
+      })),
+    },
+    {
+      label: "Ítems de solicitudes",
+      filename: `compras-solicitudes-items-${new Date().toISOString().slice(0, 10)}`,
+      sheetName: "Ítems",
+      rows: gruposOrdenados.flatMap((grupo) => grupo.lineas.map((linea) => {
+        const resolucion = resolucionPorLinea.get(`${linea.sucursal}|${linea.nroSolicitud}|${linea.item}`);
+        return {
+          Sucursal: linea.sucursal,
+          "N° solicitud": linea.nroSolicitud,
+          Ítem: linea.item,
+          "Fecha de emisión": linea.fechaEmision ?? "",
+          Solicitante: linea.solicitante ?? "",
+          Producto: linea.productoCodigo,
+          "Código fabricante": linea.codigoFabricante ?? "",
+          Marca: linea.marcaSolicitada ?? "",
+          Descripción: linea.descripcion ?? "",
+          Unidad: linea.unidad ?? "",
+          Cantidad: linea.cantidad,
+          "Precio unitario": linea.precioUnitario,
+          Total: linea.valorTotal,
+          Estado: resolucion?.estado === "reposicion_stock" ? "Reposición de stock" : "Cotizada",
+          Pedido: resolucion?.pedidoVinculado
+            ? `${resolucion.pedidoVinculado.sucursal}-${resolucion.pedidoVinculado.nroPedido}`
+            : "",
+          Observación: linea.observacion ?? "",
+        };
+      })),
+    },
+  ], [gruposOrdenados, resolucionPorLinea]);
+
   const guardarVinculo = async (pedido: PedidoCandidato) => {
     if (!vinculando || !user) return;
     setGuardandoVinculo(true);
@@ -196,6 +242,7 @@ export function SolicitudesCompraTab() {
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN000406, 2181800, anillo…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroSolicitud)) + Number(Boolean(filtros.solicitante))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
+          actions={<TableExportButton options={exportOptions} />}
         >
           <FilterMultiSelect
             label="Sucursal"
