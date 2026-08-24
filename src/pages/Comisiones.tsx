@@ -72,6 +72,23 @@ interface TechnicianSummary {
   desconocido: number;
   total: number;
   lines: number;
+  orders: Set<string>;
+}
+
+interface CommissionOsSummary {
+  key: string;
+  osNumber: string;
+  client: string;
+  chassis: string | null;
+  branches: string[];
+  technicians: string[];
+  timeTypes: string[];
+  rows: CommissionRow[];
+  dateFrom: string | null;
+  dateTo: string | null;
+  totalHours: number;
+  validation: CommissionRow["estado_validacion"];
+  paidCount: number;
 }
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
@@ -95,6 +112,19 @@ function storedDateRange() {
 
 const hours = (value: number | null | undefined) => value == null ? "—" : `${number.format(value)} h`;
 const dateLabel = (value: string | null) => value ? format(new Date(`${value}T12:00:00`), "dd/MM/yyyy") : "—";
+
+function branchInitials(value: string) {
+  const known: Record<string, string> = {
+    "Santa Rita": "SR",
+    "Santa Rosa": "SRO",
+    Katuete: "KT",
+    "Loma Plata": "LP",
+    "Campo 9": "C9",
+    Misiones: "MI",
+    "Sin sucursal": "—",
+  };
+  return known[value] ?? value.split(/\s+/).map((part) => part[0]).join("").toUpperCase();
+}
 
 function isClosed(row: CommissionRow) {
   return String(row.estado_os ?? "").toLowerCase().includes("cerrad") || Boolean(row.fecha_cierre);
@@ -130,6 +160,7 @@ function summarize(rows: CommissionRow[], paidIds: Set<string>) {
       desconocido: 0,
       total: 0,
       lines: 0,
+      orders: new Set<string>(),
     };
     const branch = row.sucursal ?? "Sin sucursal";
     if (!current.branches.includes(branch)) current.branches.push(branch);
@@ -140,14 +171,51 @@ function summarize(rows: CommissionRow[], paidIds: Set<string>) {
     else current.desconocido += value;
     current.total += value;
     current.lines += 1;
+    current.orders.add(row.os_numero);
     grouped.set(key, current);
   }
   return Array.from(grouped.values()).sort((a, b) => b.total - a.total || a.technician.localeCompare(b.technician));
 }
 
+function summarizeOrders(rows: CommissionRow[], paidIds: Set<string>): CommissionOsSummary[] {
+  const grouped = new Map<string, CommissionRow[]>();
+  for (const row of rows) {
+    const key = `${row.sucursal ?? ""}|${row.os_numero}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), row]);
+  }
+
+  return Array.from(grouped.entries()).map(([key, orderRows]) => {
+    const representative = orderRows.find((row) => row.cliente_nombre || row.nro_chasis) ?? orderRows[0];
+    const dates = orderRows
+      .flatMap((row) => [row.fecha_inicio, row.fecha_fin])
+      .filter((value): value is string => Boolean(value))
+      .sort();
+    const validation = orderRows.some((row) => row.estado_validacion === "INVALIDA")
+      ? "INVALIDA"
+      : orderRows.some((row) => row.estado_validacion === "REVISAR")
+        ? "REVISAR"
+        : "VALIDA";
+    return {
+      key,
+      osNumber: representative.os_numero,
+      client: representative.cliente_nombre ?? "Cliente no informado",
+      chassis: representative.nro_chasis,
+      branches: Array.from(new Set(orderRows.map((row) => row.sucursal ?? "Sin sucursal"))),
+      technicians: Array.from(new Set(orderRows.map((row) => row.tecnico_nombre))),
+      timeTypes: Array.from(new Set(orderRows.map((row) => row.tipo_tiempo))),
+      rows: orderRows,
+      dateFrom: dates[0] ?? null,
+      dateTo: representative.fecha_cierre ?? dates[dates.length - 1] ?? null,
+      totalHours: uniqueBlockHours(orderRows),
+      validation,
+      paidCount: orderRows.filter((row) => paidIds.has(row.id)).length,
+    } satisfies CommissionOsSummary;
+  }).sort((a, b) => String(b.dateTo ?? b.dateFrom ?? "").localeCompare(String(a.dateTo ?? a.dateFrom ?? "")) || a.osNumber.localeCompare(b.osNumber));
+}
+
 function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTechnician: (name: string) => void }) {
   return (
-    <Table>
+    <Table className="text-[11px]">
       <TableHeader>
         <TableRow>
           <TableHead>Técnico</TableHead>
@@ -163,9 +231,9 @@ function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTec
         {rows.length === 0 ? (
           <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No hay horas para el período seleccionado.</TableCell></TableRow>
         ) : rows.map((row) => (
-          <TableRow key={row.key} className="cursor-pointer" onClick={() => onTechnician(row.technician)}>
-            <TableCell><div className="font-medium">{row.technician}</div><div className="text-[10px] text-muted-foreground">{row.lines} jornadas</div></TableCell>
-            <TableCell>{row.branches.sort().join(", ")}</TableCell>
+          <TableRow key={row.key} className="h-11 cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
+            <TableCell className="py-2"><div className="font-medium">{row.technician}</div><div className="text-[10px] text-muted-foreground">{row.orders.size} OS · {row.lines} jornadas</div></TableCell>
+            <TableCell className="py-2"><div className="flex flex-wrap gap-1">{row.branches.sort().map((branch) => <Badge key={branch} variant="outline" className="px-1.5 text-[9px]" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.cliente)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.garantia)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.interno)}</TableCell>
@@ -195,7 +263,7 @@ export default function Comisiones() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [technicianFilter, setTechnicianFilter] = useState("");
   const [schemaMissing, setSchemaMissing] = useState(false);
-  const [selectedOsNumber, setSelectedOsNumber] = useState<string | null>(null);
+  const [selectedOsKey, setSelectedOsKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,9 +335,12 @@ export default function Comisiones() {
   const totalOpen = openAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
   const totalPendingPayment = closedAll.filter((row) => !paidIds.has(row.id) && row.estado_validacion === "VALIDA").reduce((sum, row) => sum + Number(row.horas_validas ?? 0), 0);
   const totalReview = rows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
+  const closedOrderCount = new Set(closedAll.map((row) => row.os_numero)).size;
+  const openOrderCount = new Set(openAll.map((row) => row.os_numero)).size;
+  const reviewOrderCount = new Set(rows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).map((row) => row.os_numero)).size;
   const selectedOsRows = useMemo(
-    () => selectedOsNumber ? rows.filter((row) => row.os_numero === selectedOsNumber) : [],
-    [rows, selectedOsNumber],
+    () => selectedOsKey ? rows.filter((row) => `${row.sucursal ?? ""}|${row.os_numero}` === selectedOsKey) : [],
+    [rows, selectedOsKey],
   );
   const selectedOs = selectedOsRows.find((row) => row.cliente_nombre || row.nro_chasis) ?? selectedOsRows[0] ?? null;
   const selectedOsDays = useMemo(() => {
@@ -289,12 +360,6 @@ export default function Comisiones() {
   const selectedOsTotal = uniqueBlockHours(selectedOsRows);
   const selectedOsBlocks = new Set(selectedOsRows.map(commissionBlockKey)).size;
   const selectedOsTechnicians = new Set(selectedOsRows.map((row) => row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre))).size;
-
-  const toggle = (id: string, checked: boolean) => setSelected((current) => {
-    const next = new Set(current);
-    if (checked) next.add(id); else next.delete(id);
-    return next;
-  });
 
   const validateSelected = async () => {
     if (!selected.size) return;
@@ -346,12 +411,23 @@ export default function Comisiones() {
   const detailRows = view === "cerradas" ? unpaidClosedRows : view === "revisar" ? reviewRows : periodRows;
   const selectableIds = view === "cerradas" ? payableRows.map((row) => row.id) : view === "revisar" ? reviewRows.filter((row) => isActiveTechnician(row) && Number(row.horas_calculadas ?? 0) > 0 && row.estado_validacion !== "INVALIDA").map((row) => row.id) : [];
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const detailOrders = useMemo(() => summarizeOrders(detailRows, paidIds), [detailRows, paidIds]);
+  const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
+
+  const toggleOrder = (order: CommissionOsSummary, checked: boolean) => {
+    const orderIds = order.rows.filter((row) => selectableIdSet.has(row.id)).map((row) => row.id);
+    setSelected((current) => {
+      const next = new Set(current);
+      orderIds.forEach((id) => checked ? next.add(id) : next.delete(id));
+      return next;
+    });
+  };
 
   return (
     <PageShell>
       <PageHeader
         title="Comisiones"
-        meta="Horas de técnicos recalculadas desde las marcas de tiempo de cada OS. Acceso exclusivo para administradores."
+        meta="Control de horas, validación y liquidación por técnico y orden de servicio."
         actions={<>
           <input ref={fileRef} type="file" accept=".xml,text/xml" className="hidden" onChange={(event) => event.target.files?.[0] && void uploadInitialXml(event.target.files[0])} />
           <Button variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()} title="Actualiza únicamente las jornadas de Comisiones; no reimporta clientes, productos, facturación ni el resumen de la OS">
@@ -368,17 +444,17 @@ export default function Comisiones() {
         </Panel>
       ) : <>
         <KpiStrip>
-          <KpiItem label="Horas cerradas" value={hours(totalClosed)} detail={`${closedAll.length} jornadas en el rango`} tone="info" icon={<CheckCircle2 />} />
+          <KpiItem label="Horas cerradas" value={hours(totalClosed)} detail={`${closedOrderCount} OS · ${closedAll.length} jornadas`} tone="info" icon={<CheckCircle2 />} />
           <KpiItem label="Pendientes de pago" value={hours(totalPendingPayment)} detail="Validadas y todavía no liquidadas" tone="positive" icon={<WalletCards />} />
-          <KpiItem label="Horas abiertas" value={hours(totalOpen)} detail={`${openAll.length} jornadas al corte`} tone="warning" icon={<Clock3 />} />
-          <KpiItem label="Requieren revisión" value={number.format(totalReview)} detail="Incluye técnicos fuera de la nómina activa" tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
+          <KpiItem label="Horas abiertas" value={hours(totalOpen)} detail={`${openOrderCount} OS · ${openAll.length} jornadas`} tone="warning" icon={<Clock3 />} />
+          <KpiItem label="Requieren revisión" value={number.format(totalReview)} detail={`${reviewOrderCount} OS, incluida nómina inactiva`} tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
         </KpiStrip>
 
-        <Panel className="flex flex-wrap items-end gap-3 py-2.5">
+        <Panel className="flex flex-wrap items-end gap-2.5 py-2.5">
           <label className="grid gap-1 text-[11px] font-medium text-muted-foreground">Desde<Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="h-8 w-40" /></label>
           <label className="grid gap-1 text-[11px] font-medium text-muted-foreground">Hasta / corte<Input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="h-8 w-40" /></label>
           {technicianFilter && <Button variant="secondary" size="sm" onClick={() => setTechnicianFilter("")}>Técnico: {technicianFilter} ×</Button>}
-          <span className="ml-auto text-[11px] text-muted-foreground">Las cerradas usan fecha de cierre; las abiertas son una fotografía al corte.</span>
+          <span className="ml-auto hidden text-[10px] text-muted-foreground lg:block">Cerradas por fecha de cierre · abiertas al corte.</span>
         </Panel>
 
         <Tabs value={view} onValueChange={(value) => { setView(value as View); setTechnicianFilter(""); }}>
@@ -390,10 +466,10 @@ export default function Comisiones() {
           </TabsList>
 
           <TabsContent value="cerradas" className="space-y-3">
-            <Panel className="p-0"><div className="px-3 py-2"><SectionHeader title="Horas cerradas por técnico y tipo" meta="Seleccioná un técnico para filtrar el detalle." /></div><SummaryTable rows={summaryRows} onTechnician={setTechnicianFilter} /></Panel>
+            <Panel className="overflow-hidden p-0"><div className="border-b px-3 py-2"><SectionHeader title="Horas cerradas por técnico y tipo" meta="Seleccioná un técnico para ver sus OS consolidadas." /></div><div className="max-h-[360px] overflow-auto"><SummaryTable rows={summaryRows} onTechnician={setTechnicianFilter} /></div></Panel>
           </TabsContent>
           <TabsContent value="abiertas" className="space-y-3">
-            <Panel className="p-0"><div className="px-3 py-2"><SectionHeader title="Horas abiertas por técnico y tipo" meta={`OS abiertas al ${dateLabel(to)}.`} /></div><SummaryTable rows={summaryRows} onTechnician={setTechnicianFilter} /></Panel>
+            <Panel className="overflow-hidden p-0"><div className="border-b px-3 py-2"><SectionHeader title="Horas abiertas por técnico y tipo" meta={`OS abiertas al ${dateLabel(to)}.`} /></div><div className="max-h-[360px] overflow-auto"><SummaryTable rows={summaryRows} onTechnician={setTechnicianFilter} /></div></Panel>
           </TabsContent>
           <TabsContent value="revisar" className="space-y-3">
             <Panel className="border-amber-200 bg-amber-50/40 text-[12px]">Las horas mostradas fueron recalculadas con inicio y fin. Los técnicos fuera de la nómina activa quedan visibles para auditoría, pero no pueden validarse ni pagarse.</Panel>
@@ -409,72 +485,76 @@ export default function Comisiones() {
         </Tabs>
 
         {view !== "liquidaciones" && (
-          <Panel className="p-0">
-            <div className="px-3 py-2"><SectionHeader
-                title={view === "revisar" ? "Jornadas por validar" : view === "abiertas" ? "Detalle de horas abiertas" : "Detalle pendiente de liquidación"}
-                meta={`${detailRows.length} registros`}
+          <Panel className="overflow-hidden p-0">
+            <div className="border-b px-3 py-2"><SectionHeader
+                title={view === "revisar" ? "OS por validar" : view === "abiertas" ? "OS abiertas" : "OS pendientes de liquidación"}
+                meta={`${detailOrders.length} OS · ${detailRows.length} jornadas`}
                 actions={view === "cerradas" ? <Button size="sm" disabled={busy || selected.size === 0} onClick={() => void markPaid()}><WalletCards className="mr-2 h-4 w-4" />Marcar pagadas ({selected.size})</Button> : view === "revisar" ? <Button size="sm" disabled={busy || selected.size === 0} onClick={() => void validateSelected()}><CheckCircle2 className="mr-2 h-4 w-4" />Validar cálculo ({selected.size})</Button> : undefined}
               /></div>
-            <Table>
+            <div className="max-h-[480px] overflow-auto"><Table className="min-w-[1080px] text-[11px]">
               <TableHeader><TableRow>
                 {view !== "abiertas" && <TableHead className="w-10"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
-                <TableHead>OS / técnico</TableHead><TableHead>Estado</TableHead><TableHead>Tipo</TableHead><TableHead>Inicio</TableHead><TableHead>Fin</TableHead><TableHead className="text-right">Reportada</TableHead><TableHead className="text-right">Calculada</TableHead><TableHead>Pago</TableHead>
+                <TableHead className="w-36">Orden</TableHead><TableHead className="min-w-52">Cliente / chasis</TableHead><TableHead className="min-w-48">Equipo técnico</TableHead><TableHead className="w-24">Suc.</TableHead><TableHead className="w-28">Tipo</TableHead><TableHead className="w-40">Período</TableHead><TableHead className="w-20 text-right">Horas</TableHead><TableHead className="w-28">Estado</TableHead><TableHead className="w-24">Pago</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {loading ? <TableRow><TableCell colSpan={9} className="h-24 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow> : detailRows.length === 0 ? <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">No hay registros para mostrar.</TableCell></TableRow> : detailRows.slice(0, 500).map((row) => {
-                  const selectable = selectableIds.includes(row.id);
-                  const technicianActive = isActiveTechnician(row);
-                  return <TableRow key={row.id} data-state={selected.has(row.id) ? "selected" : undefined}>
-                    {view !== "abiertas" && <TableCell><Checkbox disabled={!selectable} checked={selected.has(row.id)} onCheckedChange={(checked) => toggle(row.id, Boolean(checked))} /></TableCell>}
-                    <TableCell><button type="button" className="text-left font-medium hover:text-primary hover:underline" onClick={() => setSelectedOsNumber(row.os_numero)}>OS {row.os_numero}</button><div className="text-[10px] text-muted-foreground">{row.cliente_nombre ?? "Cliente no informado"} · {row.tecnico_nombre} · {row.rol_tecnico} · {row.sucursal ?? "Sin sucursal"}</div>{!technicianActive && <Badge variant="outline" className="mt-1 border-amber-300 text-amber-700">Fuera de nómina activa</Badge>}</TableCell>
-                    <TableCell><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"}>{row.estado_validacion}</Badge>{row.motivos_validacion?.length ? <div className="mt-1 max-w-56 text-[10px] text-muted-foreground">{row.motivos_validacion.join(", ")}</div> : null}</TableCell>
-                    <TableCell>{row.tipo_tiempo}</TableCell>
-                    <TableCell>{dateLabel(row.fecha_inicio)} {row.hora_inicio?.slice(0, 5) ?? ""}</TableCell>
-                    <TableCell>{dateLabel(row.fecha_fin)} {row.hora_fin?.slice(0, 5) ?? ""}</TableCell>
-                    <TableCell className="text-right tabular-nums">{hours(row.horas_reportadas)}</TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">{hours(row.horas_calculadas)}</TableCell>
-                    <TableCell>{paidIds.has(row.id) ? <Badge className="bg-emerald-600">Pagada</Badge> : <span className="text-muted-foreground">Pendiente</span>}</TableCell>
+                {loading ? <TableRow><TableCell colSpan={10} className="h-24 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></TableCell></TableRow> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={10} className="h-24 text-center text-muted-foreground">No hay órdenes para mostrar.</TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
+                  const orderIds = order.rows.filter((row) => selectableIdSet.has(row.id)).map((row) => row.id);
+                  const orderSelected = orderIds.length > 0 && orderIds.every((id) => selected.has(id));
+                  const inactiveTechnician = order.rows.some((row) => !isActiveTechnician(row));
+                  const period = order.dateFrom === order.dateTo ? dateLabel(order.dateFrom) : `${dateLabel(order.dateFrom)} – ${dateLabel(order.dateTo)}`;
+                  const payment = order.paidCount === order.rows.length ? "Pagada" : order.paidCount > 0 ? "Parcial" : "Pendiente";
+                  return <TableRow key={order.key} data-state={orderSelected ? "selected" : undefined} className="h-12">
+                    {view !== "abiertas" && <TableCell className="py-1.5"><Checkbox disabled={orderIds.length === 0} checked={orderSelected} onCheckedChange={(checked) => toggleOrder(order, Boolean(checked))} /></TableCell>}
+                    <TableCell className="py-1.5"><button type="button" className="font-semibold hover:text-primary hover:underline" onClick={() => setSelectedOsKey(order.key)}>OS {order.osNumber}</button><div className="text-[10px] text-muted-foreground">{order.rows.length} jornadas</div></TableCell>
+                    <TableCell className="max-w-64 py-1.5"><div className="truncate font-medium" title={order.client}>{order.client}</div><div className="truncate font-mono text-[10px] text-muted-foreground" title={order.chassis ?? undefined}>Chasis {order.chassis ?? "—"}</div></TableCell>
+                    <TableCell className="max-w-56 py-1.5"><div className="truncate font-medium" title={order.technicians.join(", ")}>{order.technicians[0]}{order.technicians.length > 1 ? ` +${order.technicians.length - 1}` : ""}</div>{inactiveTechnician && <div className="text-[10px] text-amber-700">Incluye técnico inactivo</div>}</TableCell>
+                    <TableCell className="py-1.5"><div className="flex flex-wrap gap-1">{order.branches.map((branch) => <Badge key={branch} variant="outline" className="px-1.5 py-0 text-[9px]" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
+                    <TableCell className="py-1.5"><div className="truncate" title={order.timeTypes.join(", ")}>{order.timeTypes.join(", ")}</div></TableCell>
+                    <TableCell className="py-1.5 tabular-nums">{period}</TableCell>
+                    <TableCell className="py-1.5 text-right font-semibold tabular-nums">{hours(order.totalHours)}</TableCell>
+                    <TableCell className="py-1.5"><Badge variant={order.validation === "VALIDA" ? "secondary" : order.validation === "INVALIDA" ? "destructive" : "outline"} className="text-[9px]">{order.validation}</Badge></TableCell>
+                    <TableCell className="py-1.5">{payment === "Pagada" ? <Badge className="bg-emerald-600 text-[9px]">Pagada</Badge> : payment === "Parcial" ? <Badge variant="outline" className="border-amber-300 text-[9px] text-amber-700">Parcial</Badge> : <span className="text-muted-foreground">Pendiente</span>}</TableCell>
                   </TableRow>;
                 })}
               </TableBody>
-            </Table>
-            {detailRows.length > 500 && <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">Se muestran los primeros 500 registros. Filtrá por técnico para revisar el resto.</div>}
+            </Table></div>
+            {detailOrders.length > 500 && <div className="border-t px-3 py-2 text-[11px] text-muted-foreground">Se muestran las primeras 500 OS. Filtrá por técnico para revisar el resto.</div>}
           </Panel>
         )}
       </>}
 
-      <Sheet open={Boolean(selectedOsNumber)} onOpenChange={(open) => { if (!open) setSelectedOsNumber(null); }}>
+      <Sheet open={Boolean(selectedOsKey)} onOpenChange={(open) => { if (!open) setSelectedOsKey(null); }}>
         <SheetContent className="w-[min(94vw,680px)] overflow-y-auto p-0 sm:max-w-[680px]">
           {selectedOs && <>
-            <SheetHeader className="border-b px-5 py-4 pr-12">
+            <SheetHeader className="border-b px-4 py-3 pr-12">
               <SheetTitle>OS {selectedOs.os_numero}</SheetTitle>
               <SheetDescription>{selectedOs.estado_os ?? "Estado no informado"} · {selectedOs.sucursal ?? "Sin sucursal"}</SheetDescription>
             </SheetHeader>
-            <div className="space-y-4 p-5 text-sm">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border p-3"><div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cliente</div><div className="mt-1 font-semibold">{selectedOs.cliente_nombre ?? "No informado"}</div></div>
-                <div className="rounded-lg border p-3"><div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Chasis</div><div className="mt-1 font-mono font-semibold">{selectedOs.nro_chasis ?? "No informado"}</div></div>
+            <div className="space-y-3 p-4 text-[12px]">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-md border p-2.5"><div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cliente</div><div className="mt-0.5 font-semibold">{selectedOs.cliente_nombre ?? "No informado"}</div></div>
+                <div className="rounded-md border p-2.5"><div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Chasis</div><div className="mt-0.5 font-mono font-semibold">{selectedOs.nro_chasis ?? "No informado"}</div></div>
               </div>
-              <div className="grid grid-cols-3 overflow-hidden rounded-lg border">
-                <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total horas técnicas</div><div className="mt-1 text-xl font-semibold tabular-nums">{hours(selectedOsTotal)}</div></div>
-                <div className="border-r p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Jornadas</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsBlocks}</div></div>
-                <div className="p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Técnicos</div><div className="mt-1 text-xl font-semibold tabular-nums">{selectedOsTechnicians}</div></div>
+              <div className="grid grid-cols-3 overflow-hidden rounded-md border">
+                <div className="border-r p-2.5"><div className="text-[9px] uppercase tracking-wide text-muted-foreground">Horas de la OS</div><div className="mt-0.5 text-lg font-semibold tabular-nums">{hours(selectedOsTotal)}</div></div>
+                <div className="border-r p-2.5"><div className="text-[9px] uppercase tracking-wide text-muted-foreground">Bloques</div><div className="mt-0.5 text-lg font-semibold tabular-nums">{selectedOsBlocks}</div></div>
+                <div className="p-2.5"><div className="text-[9px] uppercase tracking-wide text-muted-foreground">Técnicos</div><div className="mt-0.5 text-lg font-semibold tabular-nums">{selectedOsTechnicians}</div></div>
               </div>
-              <div className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 rounded-lg border p-3">
+              <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1.5 rounded-md border p-2.5">
                 <span className="text-muted-foreground">Cierre de OS</span><span className="font-medium">{dateLabel(selectedOs.fecha_cierre)}</span>
                 <span className="text-muted-foreground">Estado</span><span>{selectedOs.estado_os ?? "No informado"}</span>
                 <span className="text-muted-foreground">Sucursal</span><span>{selectedOs.sucursal ?? "Sin sucursal"}</span>
               </div>
               <div>
                 <div className="mb-2"><div className="font-semibold">Desglose por día</div><p className="text-[11px] text-muted-foreground">Cada bloque horario se cuenta una sola vez; todos los participantes comparten esas horas.</p></div>
-                <div className="space-y-3">
-                  {selectedOsDays.map((day) => <div key={day.date} className="overflow-hidden rounded-lg border">
-                    <div className="flex items-center justify-between bg-muted/40 px-3 py-2">
+                <div className="space-y-2">
+                  {selectedOsDays.map((day) => <div key={day.date} className="overflow-hidden rounded-md border">
+                    <div className="flex items-center justify-between bg-muted/40 px-3 py-1.5">
                       <span className="font-medium">{day.date === "sin-fecha" ? "Sin fecha" : dateLabel(day.date)}</span>
                       <span className="font-semibold tabular-nums">{hours(day.total)}</span>
                     </div>
                     <div className="divide-y">
-                      {day.rows.map((row) => <div key={row.id} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2.5">
+                      {day.rows.map((row) => <div key={row.id} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-2">
                         <div className="min-w-0">
                           <div className="truncate font-medium">{row.tecnico_nombre} <span className="font-normal text-muted-foreground">· {row.rol_tecnico}</span></div>
                           <div className="mt-0.5 text-[11px] text-muted-foreground">{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"} · {row.tipo_tiempo} · {paidIds.has(row.id) ? "Pagada" : "Pendiente"}</div>
