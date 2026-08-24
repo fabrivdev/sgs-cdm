@@ -225,25 +225,28 @@ function summarizeOrders(rows: CommissionRow[], paidIds: Set<string>): Commissio
 
 function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTechnician: (name: string) => void }) {
   return (
-    <Table className={tableText}>
+    <Table className={cn("w-full", tableTextDense)}>
       <TableHeader>
         <TableRow>
-          <TableHead className={tableHeadText}>Técnico</TableHead>
-          <TableHead className={tableHeadText}>Sucursal</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Cliente</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Garantía</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Interno</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Sin tipo</TableHead>
-          <TableHead className={cn(tableHeadText, "text-right")}>Total</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2 text-right")}>OS</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[110px] whitespace-nowrap px-2")}>Sucursal</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Cliente</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Garantía</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Interno</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Sin tipo</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Total</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (
-          <TableRow><TableCell colSpan={7} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
+          <TableRow><TableCell colSpan={8} className="h-20 p-0"><EmptyState title="Sin horas en el período" className="border-0 bg-transparent" /></TableCell></TableRow>
         ) : rows.map((row) => (
-          <TableRow key={row.key} className="cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
-            <TableCell className="py-1.5"><div className="font-medium">{row.technician}</div><div className={metaText}>{row.orders.size} OS · {row.lines} jornadas</div></TableCell>
-            <TableCell className="py-1.5"><div className="flex flex-wrap gap-1">{row.branches.sort().map((branch) => <Badge key={branch} variant="outline" title={branch}>{branchInitials(branch)}</Badge>)}</div></TableCell>
+          <TableRow key={row.key} className="h-8 cursor-pointer hover:bg-muted/40" onClick={() => onTechnician(row.technician)}>
+            <TableCell className="px-2 py-1"><span className="block truncate font-medium" title={row.technician}>{row.technician}</span></TableCell>
+            <TableCell className="px-2 py-1 text-right tabular-nums" title={`${row.lines} jornadas`}>{row.orders.size}</TableCell>
+            <TableCell className="px-2 py-1"><span className="block truncate" title={row.branches.join(", ")}>{row.branches.sort().map(branchInitials).join(" ")}</span></TableCell>
+
             <TableCell className="text-right tabular-nums">{hours(row.cliente)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.garantia)}</TableCell>
             <TableCell className="text-right tabular-nums">{hours(row.interno)}</TableCell>
