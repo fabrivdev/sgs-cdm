@@ -56,6 +56,35 @@ function shortDate(value: string | null) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
+function compactInvoice(value: string) {
+  return value
+    .split(";")
+    .map((part) => {
+      const raw = part.trim();
+      const digits = raw.replace(/\D/g, "");
+      if (digits.length !== 13) return raw;
+      const establishment = Number(digits.slice(0, 3));
+      const point = Number(digits.slice(3, 6));
+      const number = Number(digits.slice(6));
+      return `${establishment}-${point}-${number}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+function branchInitials(value: string | null) {
+  if (!value) return "-";
+  const known: Record<string, string> = {
+    "Santa Rita": "SR",
+    "Santa Rosa": "SRO",
+    Katuete: "KT",
+    "Loma Plata": "LP",
+    "Campo 9": "C9",
+    Misiones: "MI",
+  };
+  return known[value] ?? value.split(/\s+/).map((part) => part[0]).join("").toUpperCase();
+}
+
 export function ServiciosDashboard({
   data,
   loading,
@@ -474,7 +503,6 @@ export function ServiciosDashboard({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge variant="outline">{timeLabel(row.tipoTiempo)}</Badge>
                 <Badge variant="outline"><Timer className="mr-1 h-3 w-3" />{decimal.format(row.horas)} hs</Badge>
-                {row.horasPersona !== row.horas && <Badge variant="outline">{decimal.format(row.horasPersona)} h-persona</Badge>}
                 <Badge variant="secondary">USD {usd.format(row.valorOS)}</Badge>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 border-t pt-2 text-[10px] text-muted-foreground">
@@ -487,19 +515,20 @@ export function ServiciosDashboard({
         </div>
 
         <div className="hidden max-h-[480px] overflow-auto rounded-md border md:block">
-          <table className="w-full min-w-[1180px] table-fixed text-[11px]">
+          <table className="w-full min-w-[1240px] table-fixed text-[11px]">
             <thead className="sticky top-0 z-10 bg-muted text-left text-[9px] uppercase tracking-wide text-muted-foreground shadow-sm">
               <tr>
                 <th className="w-[112px] px-2.5 py-2">OS</th>
                 <th className="w-[180px] px-2.5 py-2">Cliente</th>
                 <th className="w-[105px] px-2.5 py-2">Chasis</th>
-                <th className="w-[210px] px-2.5 py-2">Equipo técnico</th>
-                <th className="w-[135px] px-2.5 py-2">Operación</th>
-                <th className="w-[170px] px-2.5 py-2">Estado</th>
+                <th className="w-[205px] px-2.5 py-2">Equipo técnico</th>
+                <th className="w-[58px] px-2.5 py-2">Suc.</th>
+                <th className="w-[92px] px-2.5 py-2">Tipo</th>
+                <th className="w-[92px] px-2.5 py-2">Estado</th>
+                <th className="w-[100px] px-2.5 py-2">Factura</th>
                 <th className="w-[82px] px-2.5 py-2">Inicio</th>
                 <th className="w-[82px] px-2.5 py-2">Cierre</th>
-                <th className="w-[82px] px-2.5 py-2 text-right">Hs OS</th>
-                <th className="w-[82px] px-2.5 py-2 text-right">H-persona</th>
+                <th className="w-[65px] px-2.5 py-2 text-right">Horas</th>
                 <th className="w-[110px] px-2.5 py-2 text-right">Total</th>
               </tr>
             </thead>
@@ -513,21 +542,17 @@ export function ServiciosDashboard({
                     {row.tecnicos[0] ?? "Sin técnico"}
                     {row.tecnicos.length > 1 && <span className="ml-1 text-primary">+{row.tecnicos.length - 1}</span>}
                   </td>
-                  <td className="truncate px-2.5 py-2" title={`${row.sucursal ?? "Sin sucursal"} · ${timeLabel(row.tipoTiempo)}`}>
-                    {row.sucursal ?? "-"} · {timeLabel(row.tipoTiempo)}
-                  </td>
+                  <td className="truncate px-2.5 py-2 font-semibold" title={row.sucursal ?? "Sin sucursal"}>{branchInitials(row.sucursal)}</td>
+                  <td className="truncate px-2.5 py-2" title={timeLabel(row.tipoTiempo)}>{timeLabel(row.tipoTiempo)}</td>
                   <td className="px-2.5 py-2">
-                    <div className="flex items-center gap-1.5 whitespace-nowrap">
-                      <Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge>
-                      <span className={cn("truncate text-[10px]", row.factura ? "text-emerald-700" : "text-muted-foreground")} title={row.factura || row.estadoFacturacion}>
-                        {row.factura ? `F ${row.factura}` : row.estadoFacturacion || "Sin factura"}
-                      </span>
-                    </div>
+                    <Badge className={statusTone(row.estadoOS)} variant="outline">{row.estadoOS}</Badge>
+                  </td>
+                  <td className={cn("truncate px-2.5 py-2 font-mono text-[10px]", row.factura ? "text-emerald-700" : "text-muted-foreground")} title={row.factura || row.estadoFacturacion}>
+                    {row.factura ? compactInvoice(row.factura) : "-"}
                   </td>
                   <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">{shortDate(row.fechaApertura)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2 tabular-nums">{shortDate(row.fechaCierre)}</td>
                   <td className="px-2.5 py-2 text-right font-medium tabular-nums">{decimal.format(row.horas)}</td>
-                  <td className="px-2.5 py-2 text-right tabular-nums">{decimal.format(row.horasPersona)}</td>
                   <td
                     className="whitespace-nowrap px-2.5 py-2 text-right font-semibold tabular-nums"
                     title={`MO ${usd.format(row.servicios)} · Repuestos ${usd.format(row.repuestos)} · Km ${usd.format(row.kilometraje)} · Terceros ${usd.format(row.terceros)}`}
@@ -536,7 +561,7 @@ export function ServiciosDashboard({
                   </td>
                 </tr>
               ))}
-              {visibleOrders.length === 0 && <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
+              {visibleOrders.length === 0 && <tr><td colSpan={12} className="px-3 py-10 text-center text-muted-foreground">Sin órdenes para los filtros actuales.</td></tr>}
             </tbody>
           </table>
         </div>

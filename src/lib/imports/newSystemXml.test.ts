@@ -84,6 +84,21 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(result.rows[2].serviceHours).toBe(5);
   });
 
+  it("prioriza el chasis real del vehiculo sobre el identificador interno", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{
+        Sucursal: "01",
+        "Nº OS": "00000142",
+        "Chasis Inter": "000021",
+        "Chasis Vehic": "C7601234",
+      }],
+    });
+
+    expect(result.rows[0].chassis).toBe("C7601234");
+  });
+
   it("prioriza las horas de reloj sobre una CANTIDAD reportada incorrecta", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",

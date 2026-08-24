@@ -257,7 +257,9 @@ export function mapOrdenesServicioSheet(
       ownerName: text(row, ["Nombre"]),
       billedClientCode: text(row, ["CLIFAC"]),
       billedClientName: text(row, ["NOMCLI"]),
-      chassis: text(row, ["Chasis Inter", "Chasis Vehic"]),
+      // "Chasis Inter" es el identificador interno del equipo en TOTVS.
+      // Para el usuario necesitamos el chasis/serie real del vehiculo.
+      chassis: text(row, ["Chasis Vehic", "Chasis Inter"]),
       brand: normalizeXmlMarca(firstValue(row, ["MARCA"])) ?? "OTROS",
       group: productGroup,
       model: text(row, ["MODELO"]),

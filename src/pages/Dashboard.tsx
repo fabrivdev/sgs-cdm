@@ -455,6 +455,23 @@ function normalizeOSLookup(value: string | null | undefined) {
     .trim();
 }
 
+function realChassisOS(row: OrdenServicioImportada) {
+  const raw = (row.raw_data ?? {}) as Record<string, unknown>;
+  const candidates = [
+    raw["Chasis Vehic"],
+    raw["CHASIS VEHIC"],
+    raw.chasis_vehic,
+    raw.chasis_vehiculo,
+    row.nro_chasis,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate ?? "").trim();
+    if (value && value.replace(/[-_.\s]/g, "")) return value;
+  }
+  return "";
+}
+
 function canonicalTipoTiempo(value: string | null | undefined) {
   const normalized = normalizeOSLookup(value);
   if (!normalized) return "Sin tipo";
@@ -1586,7 +1603,7 @@ export default function Dashboard() {
         tecnicoProfileId: responsibleMatch?.id ?? null,
         tecnicos: participantNames,
         cliente,
-        chasis: String(row.nro_chasis ?? "").trim(),
+        chasis: realChassisOS(row),
         sucursal,
         marca,
         tipoTiempo,
