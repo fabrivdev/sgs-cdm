@@ -83,6 +83,8 @@ describe("commission entries", () => {
     expect(entries.every((entry) => entry.estado_validacion === "REVISAR")).toBe(true);
     expect(entries.every((entry) => entry.cliente_nombre === "CLIENTE PRUEBA")).toBe(true);
     expect(entries.every((entry) => entry.nro_chasis === "CHASIS-123")).toBe(true);
+    expect(entries.every((entry) => entry.tipo_tiempo_importado === "Cliente")).toBe(true);
+    expect(entries.every((entry) => entry.tipo_tiempo_ajustado === false)).toBe(true);
   });
 
   it("keeps a technician outside the active roster auditable but not payable", () => {

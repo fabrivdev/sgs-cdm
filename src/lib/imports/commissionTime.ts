@@ -31,11 +31,17 @@ export interface CommissionTimeEntry {
   tecnico_profile_id: string | null;
   rol_tecnico: "PRINCIPAL" | "AUXILIAR";
   tipo_tiempo: "Cliente" | "Garantia" | "Interno" | "Desconocido";
+  tipo_tiempo_importado: "Cliente" | "Garantia" | "Interno" | "Desconocido";
+  tipo_tiempo_ajustado: boolean;
+  tipo_tiempo_ajustado_por: string | null;
+  tipo_tiempo_ajustado_en: string | null;
   horas_reportadas: number | null;
   horas_calculadas: number | null;
   horas_validas: number | null;
   estado_validacion: CommissionValidationStatus;
   motivos_validacion: string[];
+  validado_por?: string | null;
+  validado_en?: string | null;
   raw_data: Record<string, unknown>;
   vigente: boolean;
 }
@@ -240,6 +246,10 @@ export function buildCommissionTimeEntries(
           tecnico_profile_id: matched?.id ?? null,
           rol_tecnico: role,
           tipo_tiempo: row.timeType,
+          tipo_tiempo_importado: row.timeType,
+          tipo_tiempo_ajustado: false,
+          tipo_tiempo_ajustado_por: null,
+          tipo_tiempo_ajustado_en: null,
           horas_reportadas: reportedHours,
           horas_calculadas: duration.calculatedHours,
           horas_validas: matched ? duration.validHours : null,
@@ -304,7 +314,7 @@ export async function persistCommissionTimeEntries(args: {
     const keys = entries.slice(index, index + SOURCE_KEY_LOOKUP_BATCH_SIZE).map((row) => row.fuente_clave);
     const { data, error } = await (supabase
       .from("comisiones_jornadas" as any)
-      .select("id,fuente_clave,estado_validacion,horas_validas,validado_por,validado_en")
+      .select("id,fuente_clave,estado_validacion,horas_validas,validado_por,validado_en,tipo_tiempo,tipo_tiempo_importado,tipo_tiempo_ajustado,tipo_tiempo_ajustado_por,tipo_tiempo_ajustado_en")
       .in("fuente_clave", keys) as any);
     if (error) throw commissionRequestError("No se pudieron comprobar las jornadas ya cargadas", error);
     for (const row of data ?? []) existingByKey.set(row.fuente_clave, row);
@@ -324,15 +334,26 @@ export async function persistCommissionTimeEntries(args: {
   const payload = entries.flatMap((entry) => {
     const existing = existingByKey.get(entry.fuente_clave);
     if (existing && paidExistingIds.has(String(existing.id))) return [];
-    return [existing?.validado_por && entry.tecnico_profile_id
-      ? {
-          ...entry,
-          estado_validacion: existing.estado_validacion,
-          horas_validas: existing.horas_validas,
-          validado_por: existing.validado_por,
-          validado_en: existing.validado_en,
-        }
-      : entry];
+    let next = { ...entry };
+    if (existing?.validado_por && entry.tecnico_profile_id) {
+      next = {
+        ...next,
+        estado_validacion: existing.estado_validacion,
+        horas_validas: existing.horas_validas,
+        validado_por: existing.validado_por,
+        validado_en: existing.validado_en,
+      };
+    }
+    if (existing?.tipo_tiempo_ajustado) {
+      next = {
+        ...next,
+        tipo_tiempo: existing.tipo_tiempo,
+        tipo_tiempo_ajustado: true,
+        tipo_tiempo_ajustado_por: existing.tipo_tiempo_ajustado_por,
+        tipo_tiempo_ajustado_en: existing.tipo_tiempo_ajustado_en,
+      };
+    }
+    return [next];
   });
 
   for (let index = 0; index < payload.length; index += UPSERT_BATCH_SIZE) {

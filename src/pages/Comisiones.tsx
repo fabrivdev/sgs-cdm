@@ -28,10 +28,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
+type CommissionTimeType = "Cliente" | "Garantia" | "Interno" | "Desconocido";
 
 interface CommissionRow {
   id: string;
@@ -49,7 +51,11 @@ interface CommissionRow {
   tecnico_nombre: string;
   tecnico_profile_id: string | null;
   rol_tecnico: "PRINCIPAL" | "AUXILIAR";
-  tipo_tiempo: "Cliente" | "Garantia" | "Interno" | "Desconocido";
+  tipo_tiempo: CommissionTimeType;
+  tipo_tiempo_importado: CommissionTimeType;
+  tipo_tiempo_ajustado: boolean;
+  tipo_tiempo_ajustado_por: string | null;
+  tipo_tiempo_ajustado_en: string | null;
   horas_reportadas: number | null;
   horas_calculadas: number | null;
   horas_validas: number | null;
@@ -300,6 +306,7 @@ export default function Comisiones() {
   const [technicianFilters, setTechnicianFilters] = useState<string[]>([]);
   const [schemaMissing, setSchemaMissing] = useState(false);
   const [selectedOsKey, setSelectedOsKey] = useState<string | null>(null);
+  const [updatingTimeTypeId, setUpdatingTimeTypeId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -307,7 +314,7 @@ export default function Comisiones() {
       const [journeys, detailResult, settlementResult, initialResult, technicianResult] = await Promise.all([
         cargarTodo<CommissionRow>(
           (supabase.from("comisiones_jornadas" as any) as any)
-            .select("id,sucursal,os_numero,cliente_nombre,nro_chasis,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
+            .select("id,sucursal,os_numero,cliente_nombre,nro_chasis,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,tipo_tiempo_importado,tipo_tiempo_ajustado,tipo_tiempo_ajustado_por,tipo_tiempo_ajustado_en,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
             .eq("vigente", true)
             .order("fecha_inicio", { ascending: false }),
         ),
@@ -431,6 +438,24 @@ export default function Comisiones() {
   const selectedOsTotal = uniqueBlockHours(selectedOsRows);
   const selectedOsBlocks = new Set(selectedOsRows.map(commissionBlockKey)).size;
   const selectedOsTechnicians = new Set(selectedOsRows.map((row) => row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre))).size;
+
+  const updateTimeType = async (row: CommissionRow, value: CommissionTimeType) => {
+    if (value === row.tipo_tiempo || updatingTimeTypeId) return;
+    setUpdatingTimeTypeId(row.id);
+    const { error } = await (supabase.rpc as any)("comisiones_actualizar_tipo_tiempo", {
+      p_jornada_id: row.id,
+      p_tipo_tiempo: value,
+    });
+    setUpdatingTimeTypeId(null);
+    if (error) {
+      toast.error(`No se pudo cambiar el tipo de tiempo: ${error.message}`);
+      return;
+    }
+    toast.success(value === row.tipo_tiempo_importado
+      ? "Se restauró el tipo recibido de la importación."
+      : "Tipo de tiempo corregido y protegido ante futuras importaciones.");
+    await load();
+  };
 
   const validateSelected = async () => {
     if (!selected.size) return;
@@ -650,7 +675,7 @@ export default function Comisiones() {
       </Tabs>
 
       <Sheet open={Boolean(selectedOsKey)} onOpenChange={(open) => { if (!open) setSelectedOsKey(null); }}>
-        <SheetContent className="w-[min(94vw,640px)] overflow-y-auto p-0 sm:max-w-[640px]">
+        <SheetContent className="w-[min(96vw,720px)] overflow-y-auto p-0 sm:max-w-[720px]">
           {selectedOs && <>
             <SheetHeader className="border-b px-4 py-2.5 pr-12 text-left">
               <SheetTitle className="text-[14px] leading-5">OS {selectedOs.os_numero}</SheetTitle>
@@ -673,7 +698,7 @@ export default function Comisiones() {
                     <TableHead className={cn(tableHeadText, "w-[88px] whitespace-nowrap px-2 pr-3")}>Fecha</TableHead>
                     <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Horario</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>Tipo</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[118px] whitespace-nowrap px-2")}>Tipo</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[70px] whitespace-nowrap px-2")}>Estado</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>Pago</TableHead>
                     <TableHead className={cn(tableHeadText, "w-[66px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
@@ -689,7 +714,28 @@ export default function Comisiones() {
                           </span>
                         </TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1 tabular-nums">{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"}</TableCell>
-                        <TableCell className="px-2 py-1"><span className="block truncate" title={row.tipo_tiempo}>{row.tipo_tiempo}</span></TableCell>
+                        <TableCell className="px-2 py-1">
+                          <Select
+                            value={row.tipo_tiempo}
+                            disabled={Boolean(updatingTimeTypeId)}
+                            onValueChange={(value) => void updateTimeType(row, value as CommissionTimeType)}
+                          >
+                            <SelectTrigger
+                              className={cn("h-7 w-full px-2 text-[11px]", row.tipo_tiempo_ajustado && "border-amber-400 bg-amber-50")}
+                              title={row.tipo_tiempo_ajustado
+                                ? `Corrección manual. Importado: ${row.tipo_tiempo_importado}`
+                                : `Valor importado: ${row.tipo_tiempo_importado}`}
+                            >
+                              {updatingTimeTypeId === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SelectValue />}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Cliente">Cliente</SelectItem>
+                              <SelectItem value="Garantia">Garantía</SelectItem>
+                              <SelectItem value="Interno">Interno</SelectItem>
+                              <SelectItem value="Desconocido">Sin tipo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell className="px-2 py-1"><Badge variant={row.estado_validacion === "VALIDA" ? "secondary" : row.estado_validacion === "INVALIDA" ? "destructive" : "outline"} className="whitespace-nowrap">{row.estado_validacion === "VALIDA" ? "Válida" : row.estado_validacion === "INVALIDA" ? "Inválida" : "Revisar"}</Badge></TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1">{paidIds.has(row.id) ? <Badge className="whitespace-nowrap bg-emerald-600">Pagada</Badge> : <span className="text-muted-foreground">Pendiente</span>}</TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(row.horas_calculadas)}</TableCell>

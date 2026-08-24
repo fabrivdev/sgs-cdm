@@ -250,6 +250,10 @@ export type Database = {
           tecnico_nombre: string
           tecnico_profile_id: string | null
           tipo_tiempo: string
+          tipo_tiempo_ajustado: boolean
+          tipo_tiempo_ajustado_en: string | null
+          tipo_tiempo_ajustado_por: string | null
+          tipo_tiempo_importado: string
           validado_en: string | null
           validado_por: string | null
           vigente: boolean
@@ -282,6 +286,10 @@ export type Database = {
           tecnico_nombre: string
           tecnico_profile_id?: string | null
           tipo_tiempo?: string
+          tipo_tiempo_ajustado?: boolean
+          tipo_tiempo_ajustado_en?: string | null
+          tipo_tiempo_ajustado_por?: string | null
+          tipo_tiempo_importado?: string
           validado_en?: string | null
           validado_por?: string | null
           vigente?: boolean
@@ -314,6 +322,10 @@ export type Database = {
           tecnico_nombre?: string
           tecnico_profile_id?: string | null
           tipo_tiempo?: string
+          tipo_tiempo_ajustado?: boolean
+          tipo_tiempo_ajustado_en?: string | null
+          tipo_tiempo_ajustado_por?: string | null
+          tipo_tiempo_importado?: string
           validado_en?: string | null
           validado_por?: string | null
           vigente?: boolean
@@ -3211,6 +3223,10 @@ export type Database = {
       }
     }
     Functions: {
+      comisiones_actualizar_tipo_tiempo: {
+        Args: { p_jornada_id: string; p_tipo_tiempo: string }
+        Returns: string
+      }
       comisiones_marcar_pagadas: {
         Args: {
           p_jornada_ids: string[]
