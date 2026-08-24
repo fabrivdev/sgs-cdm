@@ -116,6 +116,12 @@ function storedDateRange() {
 
 const hours = (value: number | null | undefined) => value == null ? "—" : `${number.format(value)} h`;
 const dateLabel = (value: string | null) => value ? format(new Date(`${value}T12:00:00`), "dd/MM/yyyy") : "—";
+const shortDate = (value: string | null) => value ? format(new Date(`${value}T12:00:00`), "dd/MM") : "—";
+const periodLabel = (fromDate: string | null, toDate: string | null) => {
+  if (!fromDate && !toDate) return "—";
+  if (!fromDate || !toDate || fromDate === toDate) return format(new Date(`${(fromDate ?? toDate) as string}T12:00:00`), "dd/MM/yy");
+  return `${shortDate(fromDate)} – ${format(new Date(`${toDate}T12:00:00`), "dd/MM/yy")}`;
+};
 
 function branchInitials(value: string) {
   const known: Record<string, string> = {
