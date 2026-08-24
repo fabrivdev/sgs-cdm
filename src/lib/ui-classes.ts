@@ -18,6 +18,8 @@ export const sectionTitle = "text-[13px] font-semibold leading-5 tracking-[-0.01
 export const kpiValue = "text-[20px] font-semibold leading-6 tabular-nums tracking-[-0.02em]";
 export const bodyText = "text-[13px] leading-5";
 export const tableText = "text-[13px] leading-5";
+// Tablas operativas densas (muchas columnas, una línea por fila).
+export const tableTextDense = "text-[12px] leading-4";
 export const tableHeadText = "text-[11px] leading-4 font-medium tracking-[0.02em] text-muted-foreground";
 
 // Etiqueta de campo/filtro: "Sucursal", "Período rápido", etc.
