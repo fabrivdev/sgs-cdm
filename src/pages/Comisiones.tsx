@@ -18,13 +18,17 @@ import { cargarTodo } from "@/hooks/useCatalogos";
 import { importCommissionXmlOnly } from "@/lib/imports";
 import { normalizeTechnicianName } from "@/lib/technicianMatching";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "@/components/layout/AppPrimitives";
+import { EmptyState } from "@/components/EmptyState";
+import { TableSkeletonRows } from "@/components/LoadingSkeletons";
+import { cn } from "@/lib/utils";
+import { cardLabel, iconSm, kpiValue, metaText, tableHeadText, tableText } from "@/lib/ui-classes";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { FiltersBar, FilterCustom, FilterDate } from "@/components/filters/FiltersBar";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
 
