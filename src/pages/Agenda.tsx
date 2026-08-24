@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AgendaTab } from "@/components/parque/AgendaTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { pageShell, pageTitle } from "@/lib/ui-classes";
+import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 
 export default function Agenda() {
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
@@ -13,15 +13,10 @@ export default function Agenda() {
   };
 
   return (
-    <div className={pageShell}>
-      <div className="mb-4">
-        <h1 className={pageTitle}>Agenda comercial</h1>
-      </div>
+    <PageShell>
+      <PageHeader title="Agenda comercial" />
 
-      <AgendaTab
-        onOpenCliente={handleOpenCliente}
-        onChanged={() => {}}
-      />
+      <AgendaTab onOpenCliente={handleOpenCliente} onChanged={() => {}} />
 
       <ClientePanel
         clienteId={clienteAbierto}
@@ -29,6 +24,7 @@ export default function Agenda() {
         onOpenChange={setPanelOpen}
         onChanged={() => {}}
       />
-    </div>
+    </PageShell>
   );
 }
+

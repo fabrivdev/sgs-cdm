@@ -163,7 +163,7 @@ describe("commission entries", () => {
         kilometreQuantity: 0,
         raw: { ITEM: "3", canonical_start_date: "2026-08-20", canonical_start_time: "1400", canonical_end_date: "2026-08-20", canonical_end_time: "1500" },
       },
-    ] as CanonicalServiceOrderRow[];
+    ] as unknown as CanonicalServiceOrderRow[];
 
     const entries = buildCommissionTimeEntries(rows, "import-2", [
       { id: "profile-1", nombre: "JUAN PATINO" },
