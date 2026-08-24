@@ -379,6 +379,46 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(raw.kilometros_sin_tecnico).toBe(0);
   });
 
+  it("incluye al tecnico que aparece solo en KM y le atribuye el reloj completo de MA01", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000129",
+          PRODUCTO: "MA01",
+          TECNICO: "ME0017 - JUAN PATINO",
+          "Fch. Inicial": "2026-08-14",
+          "Hora Inicial": "16:30",
+          "Fch. Final": "2026-08-14",
+          "Hora Final": "21:30",
+          CANTIDAD: "4:37 Hs.",
+          TOTAL: "350",
+        },
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000129",
+          PRODUCTO: "KM01",
+          TECNICO: "ME0022 - RUBEN CACERES",
+          CANTIDAD: "25 Km.",
+          TOTAL: "15",
+        },
+      ],
+    });
+
+    const [aggregated] = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+    const raw = aggregated.raw_data as any;
+    expect(aggregated.responsable).toBe("ME0017 - JUAN PATINO");
+    expect(aggregated.servicios_cantidad).toBe(5);
+    expect(raw.tecnicos_participantes).toEqual([
+      "ME0017 - JUAN PATINO",
+      "ME0022 - RUBEN CACERES",
+    ]);
+    expect(raw.totales_por_tecnico["ME0017 - JUAN PATINO"].horas).toBe(5);
+    expect(raw.totales_por_tecnico["ME0022 - RUBEN CACERES"].horas).toBe(5);
+  });
+
   it("mantiene una OS sin responsable aunque tenga auxiliares", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",

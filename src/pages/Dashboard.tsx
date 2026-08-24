@@ -214,6 +214,7 @@ interface OrdenServicioImportada {
   trabajo_id: string | null;
   cliente_nombre: string | null;
   fecha_abierta_os: string | null;
+  fecha_cierre_os: string | null;
   fecha_emision_factura: string | null;
   factura: string | null;
   responsable: string | null;
@@ -1081,8 +1082,8 @@ export default function Dashboard() {
     (async () => {
       setOrdenesLoading(true);
       try {
-        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_emision_factura, factura, responsable, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion, raw_data";
-        const [rowsByOpenDate, rowsByInvoiceDate] = await Promise.all([
+        const osSelect = "os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_cierre_os, fecha_emision_factura, factura, responsable, marca, problema, tipo_tiempo, servicios_cantidad, servicios_valor, repuesto_valor, km_cantidad, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion, raw_data";
+        const [rowsByOpenDate, rowsByCloseDate, rowsByInvoiceDate] = await Promise.all([
           cargarTodo<OrdenServicioImportada>(
             (supabase
               .from("ordenes_servicio_importadas" as any)
@@ -1095,13 +1096,21 @@ export default function Dashboard() {
             (supabase
               .from("ordenes_servicio_importadas" as any)
               .select(osSelect)
+              .gte("fecha_cierre_os", dateKey(queryStart))
+              .lte("fecha_cierre_os", `${dateKey(queryEnd)}T23:59:59`)
+              .order("fecha_cierre_os", { ascending: false }) as any),
+          ),
+          cargarTodo<OrdenServicioImportada>(
+            (supabase
+              .from("ordenes_servicio_importadas" as any)
+              .select(osSelect)
               .gte("fecha_emision_factura", dateKey(queryStart))
               .lte("fecha_emision_factura", `${dateKey(queryEnd)}T23:59:59`)
               .order("fecha_emision_factura", { ascending: false }) as any),
           ),
         ]);
         const rows = Array.from(
-          new Map([...rowsByOpenDate, ...rowsByInvoiceDate].map((row) => {
+          new Map([...rowsByOpenDate, ...rowsByCloseDate, ...rowsByInvoiceDate].map((row) => {
             const key = [
               row.os_numero,
               row.fecha_abierta_os,
@@ -1345,9 +1354,6 @@ export default function Dashboard() {
     }
 
     const ordenes = ordenesServicio.flatMap((row, index) => {
-      const fechaApertura = String(row.fecha_abierta_os ?? "").slice(0, 10);
-      if (!fechaApertura || !inRange(fechaApertura, periodStart, periodEnd)) return [];
-
       const trabajo = row.trabajo_id ? trabajoById.get(row.trabajo_id) : null;
       const clienteTrabajo = trabajo?.cliente_id ? clienteById.get(trabajo.cliente_id)?.nombre : null;
       const cliente = String(clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente").trim() || "Sin cliente";
@@ -1406,7 +1412,18 @@ export default function Dashboard() {
           ? "otra"
           : "abierta";
 
-      const bucketDate = parseISO(fechaApertura);
+      // Una OS cerrada pertenece operativamente al periodo en que se cerro.
+      // Las abiertas siguen siendo una fotografia por fecha de apertura. Este
+      // mismo criterio permite reconciliar las horas cerradas con Comisiones,
+      // que por definicion liquida usando fecha_cierre.
+      const fechaAnalisis = String(
+        estadoGrupo === "cerrada"
+          ? row.fecha_cierre_os ?? row.fecha_abierta_os ?? ""
+          : row.fecha_abierta_os ?? row.fecha_cierre_os ?? "",
+      ).slice(0, 10);
+      if (!fechaAnalisis || !inRange(fechaAnalisis, periodStart, periodEnd)) return [];
+
+      const bucketDate = parseISO(fechaAnalisis);
       const rawBucketStart = periodMode === "dia"
         ? bucketDate
         : periodMode === "semana"
@@ -1423,7 +1440,7 @@ export default function Dashboard() {
             : endOfMonth(bucketDate);
       const bucket = {
         key: periodMode === "dia"
-          ? fechaApertura
+          ? fechaAnalisis
           : periodMode === "semana"
             ? `${getISOWeekYear(bucketDate)}-W${String(getISOWeek(bucketDate)).padStart(2, "0")}`
             : periodMode === "anio"
@@ -1559,7 +1576,7 @@ export default function Dashboard() {
       });
 
       return [{
-        key: [row.os_numero, fechaApertura, tipoTiempo, tecnico, index].join("||"),
+        key: [row.os_numero, fechaAnalisis, tipoTiempo, tecnico, index].join("||"),
         os: row.os_numero,
         tecnico,
         tecnicoProfileId: responsibleMatch?.id ?? null,
@@ -1567,7 +1584,7 @@ export default function Dashboard() {
         sucursal,
         marca,
         tipoTiempo,
-        fechaApertura,
+        fechaApertura: fechaAnalisis,
         estadoOS,
         estadoFacturacion: canonicalSituacion(row.situacion_facturacion),
         origen,

@@ -424,6 +424,39 @@ const sameTechnicianSet = (left: string[], right: string[]) =>
   left.length === right.length &&
   left.every((technician) => right.includes(technician));
 
+const serviceOrderProductToken = (value: unknown) =>
+  String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+const isLaborParticipantRow = (row: ServiceOrderInsert) => {
+  const raw = (row.raw_data ?? {}) as Record<string, unknown>;
+  return serviceOrderProductToken(raw.CODIGO) === "MA01"
+    || serviceOrderProductToken(raw.PRODUCTO) === "MA01"
+    || Number(row.servicios_cantidad ?? 0) !== 0;
+};
+
+const isKilometreParticipantRow = (row: ServiceOrderInsert) => {
+  const raw = (row.raw_data ?? {}) as Record<string, unknown>;
+  const productCode = serviceOrderProductToken(raw.CODIGO);
+  const productName = serviceOrderProductToken(raw.PRODUCTO);
+  return Number(row.km_cantidad ?? 0) !== 0
+    || /^(?:KM|KM0*1)$/.test(productCode)
+    || /^(?:KM|KM0*1)$/.test(productName);
+};
+
+const laborTimeBlockKey = (row: ServiceOrderInsert, index: number) => {
+  const raw = (row.raw_data ?? {}) as Record<string, unknown>;
+  const clockParts = [
+    raw.canonical_start_date,
+    raw.canonical_start_time,
+    raw.canonical_end_date,
+    raw.canonical_end_time,
+    row.tipo_tiempo,
+  ].map((value) => String(value ?? "").trim().toUpperCase());
+  return clockParts.slice(0, 4).some(Boolean)
+    ? clockParts.join("|")
+    : `SIN_RELOJ|${index}`;
+};
+
 export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
   const byOs = new Map<string, any>();
   const sourceRowsByOs = new Map<string, ServiceOrderInsert[]>();
@@ -520,6 +553,18 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
       new Set(sourceRows.flatMap(auxiliaryTechniciansForRow)),
     );
     const participants = Array.from(new Set([...principals, ...auxiliaries]));
+    const commissionRows = sourceRows.filter(
+      (row) => isLaborParticipantRow(row) || isKilometreParticipantRow(row),
+    );
+    const commissionPrincipals = Array.from(
+      new Set(commissionRows.map((row) => cleanTechnician(row.responsable)).filter(Boolean)),
+    );
+    const commissionAuxiliaries = Array.from(
+      new Set(commissionRows.flatMap(auxiliaryTechniciansForRow)),
+    );
+    const commissionParticipants = Array.from(
+      new Set([...commissionPrincipals, ...commissionAuxiliaries]),
+    );
     const totalsByTechnician: Record<string, Record<string, number>> = Object.fromEntries(
       participants.map((technician) => [technician, serviceOrderTechnicianTotals({})]),
     );
@@ -537,6 +582,28 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
       for (const technician of lineParticipants) {
         addTechnicianTotals(totalsByTechnician, technician, totalsWithoutKilometres);
       }
+    }
+
+    // Una jornada de la OS representa tiempo transcurrido, no horas sumadas
+    // por persona. Se cuentan una sola vez los bloques MA01 repetidos y todos
+    // los participantes MA01/KM heredan la duracion completa de la OS.
+    const laborBlocks = new Map<string, number>();
+    sourceRows.forEach((row, index) => {
+      if (!isLaborParticipantRow(row)) return;
+      const key = laborTimeBlockKey(row, index);
+      if (!laborBlocks.has(key)) laborBlocks.set(key, Number(row.servicios_cantidad ?? 0));
+    });
+    const orderClockHours = Array.from(laborBlocks.values()).reduce(
+      (sum, hours) => sumImportNumber(sum, hours, 4),
+      0,
+    );
+    current.servicios_cantidad = orderClockHours;
+    for (const technician of commissionParticipants) {
+      const previous = totalsByTechnician[technician] ?? serviceOrderTechnicianTotals({});
+      totalsByTechnician[technician] = {
+        ...previous,
+        horas: orderClockHours,
+      };
     }
 
     let unassignedKilometres = 0;
@@ -588,11 +655,13 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     // tipo de linea desde el parseo del XML (servicios_cantidad es 0 para
     // lineas que no son "Servicio"). El orden de las listas se preserva
     // (no se reordena), solo se filtra.
-    const laborPrincipals = principals.filter(
-      (technician) => (totalsByTechnician[technician]?.horas ?? 0) > 0,
-    );
-    const laborParticipants = participants.filter(
-      (technician) => (totalsByTechnician[technician]?.horas ?? 0) > 0,
+    const laborPrincipals = Array.from(
+      new Set(
+        sourceRows
+          .filter(isLaborParticipantRow)
+          .map((row) => cleanTechnician(row.responsable))
+          .filter((technician) => technician && orderClockHours > 0),
+      ),
     );
     const responsablePorHoras = laborPrincipals.length
       ? [...laborPrincipals].sort(
@@ -604,8 +673,8 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     current.raw_data = {
       ...(current.raw_data ?? {}),
       tecnicos_responsables: laborPrincipals,
-      tecnicos_auxiliares: auxiliaries,
-      tecnicos_participantes: laborParticipants,
+      tecnicos_auxiliares: commissionAuxiliaries,
+      tecnicos_participantes: commissionParticipants,
       totales_por_tecnico: totalsByTechnician,
       requiere_asignacion_tecnico: laborPrincipals.length === 0,
       kilometros_sin_tecnico: unassignedKilometres,
