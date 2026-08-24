@@ -430,17 +430,19 @@ const serviceOrderProductToken = (value: unknown) =>
 const isLaborParticipantRow = (row: ServiceOrderInsert) => {
   const raw = (row.raw_data ?? {}) as Record<string, unknown>;
   return serviceOrderProductToken(raw.CODIGO) === "MA01"
-    || serviceOrderProductToken(raw.PRODUCTO) === "MA01"
-    || Number(row.servicios_cantidad ?? 0) !== 0;
+    || serviceOrderProductToken(raw.PRODUCTO) === "MA01";
 };
 
-const isKilometreParticipantRow = (row: ServiceOrderInsert) => {
+const isInheritedParticipantRow = (row: ServiceOrderInsert) => {
   const raw = (row.raw_data ?? {}) as Record<string, unknown>;
   const productCode = serviceOrderProductToken(raw.CODIGO);
   const productName = serviceOrderProductToken(raw.PRODUCTO);
   return Number(row.km_cantidad ?? 0) !== 0
     || /^(?:KM|KM0*1)$/.test(productCode)
-    || /^(?:KM|KM0*1)$/.test(productName);
+    || /^(?:KM|KM0*1)$/.test(productName)
+    || /^(?:SE|SE0*1)$/.test(productCode)
+    || /^(?:SE|SE0*1)$/.test(productName)
+    || productName === "SERVICIOTERCERIZADO";
 };
 
 const laborTimeBlockKey = (row: ServiceOrderInsert, index: number) => {
@@ -554,7 +556,7 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     );
     const participants = Array.from(new Set([...principals, ...auxiliaries]));
     const commissionRows = sourceRows.filter(
-      (row) => isLaborParticipantRow(row) || isKilometreParticipantRow(row),
+      (row) => isLaborParticipantRow(row) || isInheritedParticipantRow(row),
     );
     const commissionPrincipals = Array.from(
       new Set(commissionRows.map((row) => cleanTechnician(row.responsable)).filter(Boolean)),
@@ -586,7 +588,7 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
 
     // Una jornada de la OS representa tiempo transcurrido, no horas sumadas
     // por persona. Se cuentan una sola vez los bloques MA01 repetidos y todos
-    // los participantes MA01/KM heredan la duracion completa de la OS.
+    // los participantes MA01/KM/SE heredan la duracion completa de la OS.
     const laborBlocks = new Map<string, number>();
     sourceRows.forEach((row, index) => {
       if (!isLaborParticipantRow(row)) return;
@@ -650,11 +652,8 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
     // El responsable de la OS debe salir SOLO de quien fue TECNICO en una
     // linea de mano de obra (MA01) -- nunca de un auxiliar, aunque tenga
     // horas propias, y nunca de alguien cuya unica linea sea de piezas.
-    // Filtramos por horas > 0 en vez de por lineType porque
-    // totalsByTechnician ya tiene las horas correctamente gateadas por
-    // tipo de linea desde el parseo del XML (servicios_cantidad es 0 para
-    // lineas que no son "Servicio"). El orden de las listas se preserva
-    // (no se reordena), solo se filtra.
+    // Solo MA01 define al responsable y aporta los bloques horarios. KM y SE
+    // pueden sumar participantes, pero nunca reemplazan al responsable MA01.
     const laborPrincipals = Array.from(
       new Set(
         sourceRows

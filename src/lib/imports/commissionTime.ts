@@ -100,16 +100,26 @@ function isLaborTimeLine(row: CanonicalServiceOrderRow) {
   return productCode === "MA01" || productName === "MA01";
 }
 
-function isKilometreParticipantLine(row: CanonicalServiceOrderRow) {
-  const productCode = String(row.productCode ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const productName = String(row.productName ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return Number(row.kilometreQuantity ?? 0) !== 0
+type InheritedParticipantOrigin = "KM" | "SE";
+
+function inheritedParticipantOrigin(row: CanonicalServiceOrderRow): InheritedParticipantOrigin | null {
+  const productCode = commissionProductToken(row.productCode);
+  const productName = commissionProductToken(row.productName);
+  if (
+    Number(row.kilometreQuantity ?? 0) !== 0
     || /^(?:KM|KM0*1)$/.test(productCode)
-    || /^(?:KM|KM0*1)$/.test(productName);
+    || /^(?:KM|KM0*1)$/.test(productName)
+  ) return "KM";
+  if (
+    /^(?:SE|SE0*1)$/.test(productCode)
+    || /^(?:SE|SE0*1)$/.test(productName)
+    || productName === "SERVICIOTERCERIZADO"
+  ) return "SE";
+  return null;
 }
 
 function isCommissionParticipantLine(row: CanonicalServiceOrderRow) {
-  return isLaborTimeLine(row) || isKilometreParticipantLine(row);
+  return isLaborTimeLine(row) || inheritedParticipantOrigin(row) !== null;
 }
 
 function timeBlockKey(row: CanonicalServiceOrderRow) {
@@ -163,23 +173,27 @@ export function buildCommissionTimeEntries(
     }
     const laborRows = Array.from(laborRowsByBlock.values());
 
-    // KM identifica a un participante, pero nunca contiene un horario fiable.
+    // KM y SE identifican participantes, pero no contienen un horario fiable.
     // Sin al menos una linea MA01 no existe un bloque horario que se pueda heredar.
     if (!laborRows.length) continue;
 
-    const participants = new Map<string, { source: string; origin: "MA01" | "KM" }>();
-    const addParticipant = (source: string | null | undefined, origin: "MA01" | "KM") => {
+    type ParticipantOrigin = "MA01" | InheritedParticipantOrigin;
+    const participants = new Map<string, { source: string; origin: ParticipantOrigin }>();
+    const addParticipant = (source: string | null | undefined, origin: ParticipantOrigin) => {
       const value = String(source ?? "").trim();
       const normalized = normalizeTechnicianName(value);
       if (!normalized) return;
       const current = participants.get(normalized);
-      if (!current || (current.origin === "KM" && origin === "MA01")) {
+      if (!current || (current.origin !== "MA01" && origin === "MA01")) {
         participants.set(normalized, { source: value, origin });
       }
     };
 
     for (const row of serviceOrderRows) {
-      const origin = isLaborTimeLine(row) ? "MA01" : "KM";
+      const origin: ParticipantOrigin | null = isLaborTimeLine(row)
+        ? "MA01"
+        : inheritedParticipantOrigin(row);
+      if (!origin) continue;
       addParticipant(row.technician, origin);
       row.auxiliaryTechnicians.forEach((value) => addParticipant(value, origin));
     }
@@ -242,7 +256,7 @@ export function buildCommissionTimeEntries(
             source_product_name: row.productName,
             source_technician: participant.source,
             source_participant_origin: participant.origin,
-            inherited_from_ma01: participant.origin === "KM",
+            inherited_from_ma01: participant.origin !== "MA01",
           },
           vigente: true,
         });

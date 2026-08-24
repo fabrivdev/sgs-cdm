@@ -117,7 +117,7 @@ describe("commission entries", () => {
     expect(entry.motivos_validacion).toContain("TECNICO_FUERA_DE_NOMINA_ACTIVA");
   });
 
-  it("includes technicians from MA01 and KM lines but excludes spare-parts lines", () => {
+  it("includes technicians from MA01, KM and SE lines but excludes spare-parts lines", () => {
     const base = {
       sourceServiceOrderNumber: "200",
       branchCode: "01",
@@ -155,13 +155,23 @@ describe("commission entries", () => {
       },
       {
         ...base,
+        rowId: "third-party-row",
+        technician: "004 - PABLO DIAZ",
+        productCode: "SE",
+        productName: "SERVICIO TERCERIZADO",
+        serviceHours: 0,
+        kilometreQuantity: 0,
+        raw: { ITEM: "3" },
+      },
+      {
+        ...base,
         rowId: "part-row",
         technician: "003 - PEDIDOR REPUESTOS",
         productCode: "REP001",
         productName: "FILTRO",
         serviceHours: 0,
         kilometreQuantity: 0,
-        raw: { ITEM: "3", canonical_start_date: "2026-08-20", canonical_start_time: "1400", canonical_end_date: "2026-08-20", canonical_end_time: "1500" },
+        raw: { ITEM: "4", canonical_start_date: "2026-08-20", canonical_start_time: "1400", canonical_end_date: "2026-08-20", canonical_end_time: "1500" },
       },
     ] as unknown as CanonicalServiceOrderRow[];
 
@@ -169,13 +179,20 @@ describe("commission entries", () => {
       { id: "profile-1", nombre: "JUAN PATINO" },
       { id: "profile-2", nombre: "RUBEN CACERES" },
       { id: "profile-3", nombre: "PEDIDOR REPUESTOS" },
+      { id: "profile-4", nombre: "PABLO DIAZ" },
     ]);
 
-    expect(entries.map((entry) => entry.tecnico_nombre).sort()).toEqual(["JUAN PATINO", "RUBEN CACERES"]);
+    expect(entries.map((entry) => entry.tecnico_nombre).sort()).toEqual(["JUAN PATINO", "PABLO DIAZ", "RUBEN CACERES"]);
     const kilometreTechnician = entries.find((entry) => entry.tecnico_nombre === "RUBEN CACERES");
     expect(kilometreTechnician?.horas_calculadas).toBe(4);
     expect(kilometreTechnician?.fecha_inicio).toBe("2026-08-20");
     expect(kilometreTechnician?.hora_inicio).toBe("08:00:00");
     expect(kilometreTechnician?.raw_data.inherited_from_ma01).toBe(true);
+    const thirdPartyTechnician = entries.find((entry) => entry.tecnico_nombre === "PABLO DIAZ");
+    expect(thirdPartyTechnician?.horas_calculadas).toBe(4);
+    expect(thirdPartyTechnician?.fecha_inicio).toBe("2026-08-20");
+    expect(thirdPartyTechnician?.hora_inicio).toBe("08:00:00");
+    expect(thirdPartyTechnician?.raw_data.source_participant_origin).toBe("SE");
+    expect(thirdPartyTechnician?.raw_data.inherited_from_ma01).toBe(true);
   });
 });

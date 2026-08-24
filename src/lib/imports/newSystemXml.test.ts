@@ -394,7 +394,7 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(raw.kilometros_sin_tecnico).toBe(0);
   });
 
-  it("incluye al tecnico que aparece solo en KM y le atribuye el reloj completo de MA01", () => {
+  it("incluye a los tecnicos que aparecen solo en KM o SE y les atribuye el reloj completo de MA01", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",
       headers: [],
@@ -419,6 +419,15 @@ describe("importacion XML de ordenes de servicio", () => {
           CANTIDAD: "25 Km.",
           TOTAL: "15",
         },
+        {
+          Sucursal: "01",
+          "NÂº OS": "00000129",
+          CODIGO: "SE",
+          PRODUCTO: "SERVICIO TERCERIZADO",
+          TECNICO: "ME0030 - PABLO DIAZ",
+          CANTIDAD: "1",
+          TOTAL: "80",
+        },
       ],
     });
 
@@ -429,9 +438,11 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(raw.tecnicos_participantes).toEqual([
       "ME0017 - JUAN PATINO",
       "ME0022 - RUBEN CACERES",
+      "ME0030 - PABLO DIAZ",
     ]);
     expect(raw.totales_por_tecnico["ME0017 - JUAN PATINO"].horas).toBe(5);
     expect(raw.totales_por_tecnico["ME0022 - RUBEN CACERES"].horas).toBe(5);
+    expect(raw.totales_por_tecnico["ME0030 - PABLO DIAZ"].horas).toBe(5);
   });
 
   it("mantiene una OS sin responsable aunque tenga auxiliares", () => {
