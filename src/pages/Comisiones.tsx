@@ -28,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { FiltersBar, FilterCustom, FilterDate } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
 
@@ -138,6 +138,22 @@ function branchInitials(value: string) {
 
 function isClosed(row: CommissionRow) {
   return String(row.estado_os ?? "").toLowerCase().includes("cerrad") || Boolean(row.fecha_cierre);
+}
+
+function normalizeFilterText(value: string | null | undefined) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es")
+    .trim();
+}
+
+function normalizeOrderNumber(value: string | null | undefined) {
+  return String(value ?? "")
+    .split(/\D+/)
+    .filter(Boolean)
+    .map((part) => part.replace(/^0+(?=\d)/, ""))
+    .join("-");
 }
 
 function commissionBlockKey(row: CommissionRow) {
@@ -276,6 +292,8 @@ export default function Comisiones() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [searchFilter, setSearchFilter] = useState("");
+  const [osStateFilter, setOsStateFilter] = useState("all");
   const [technicianFilter, setTechnicianFilter] = useState("");
   const [schemaMissing, setSchemaMissing] = useState(false);
   const [selectedOsKey, setSelectedOsKey] = useState<string | null>(null);
@@ -325,9 +343,44 @@ export default function Comisiones() {
     row.tecnico_profile_id && activeTechnicianIds.has(row.tecnico_profile_id)
   ), [activeTechnicianIds]);
 
-  const eligibleRows = useMemo(() => rows.filter(isActiveTechnician), [isActiveTechnician, rows]);
-  const periodRows = useMemo(() => (view === "revisar" ? rows : eligibleRows).filter((row) => {
-    if (technicianFilter && row.tecnico_nombre !== technicianFilter) return false;
+  const technicianOptions = useMemo(() => Array.from(new Set(rows
+    .map((row) => row.tecnico_nombre?.trim())
+    .filter((value): value is string => Boolean(value))))
+    .sort((a, b) => a.localeCompare(b, "es")), [rows]);
+
+  const osStateOptions = useMemo(() => {
+    const states = new Map<string, string>();
+    for (const row of rows) {
+      const label = row.estado_os?.trim();
+      if (label) states.set(normalizeFilterText(label), label);
+    }
+    return Array.from(states.entries())
+      .sort(([, a], [, b]) => a.localeCompare(b, "es"))
+      .map(([value, label]) => ({ value, label }));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const query = normalizeFilterText(searchFilter);
+    const queryOrder = normalizeOrderNumber(searchFilter);
+    return rows.filter((row) => {
+      if (technicianFilter && row.tecnico_nombre !== technicianFilter) return false;
+      if (osStateFilter !== "all" && normalizeFilterText(row.estado_os) !== osStateFilter) return false;
+      if (!query) return true;
+
+      const matchesText = [
+        row.os_numero,
+        row.cliente_nombre,
+        row.nro_chasis,
+        row.estado_os,
+        row.tecnico_nombre,
+      ].some((value) => normalizeFilterText(value).includes(query));
+      const matchesOrder = Boolean(queryOrder) && normalizeOrderNumber(row.os_numero).includes(queryOrder);
+      return matchesText || matchesOrder;
+    });
+  }, [osStateFilter, rows, searchFilter, technicianFilter]);
+
+  const eligibleRows = useMemo(() => filteredRows.filter(isActiveTechnician), [filteredRows, isActiveTechnician]);
+  const periodRows = useMemo(() => (view === "revisar" ? filteredRows : eligibleRows).filter((row) => {
     if (view === "abiertas") {
       return !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to);
     }
@@ -338,7 +391,7 @@ export default function Comisiones() {
     }
     if (!isClosed(row) || !row.fecha_cierre) return false;
     return row.fecha_cierre >= from && row.fecha_cierre <= to;
-  }), [eligibleRows, from, isActiveTechnician, paidIds, rows, technicianFilter, to, view]);
+  }), [eligibleRows, filteredRows, from, isActiveTechnician, paidIds, to, view]);
 
   const unpaidClosedRows = useMemo(() => periodRows.filter((row) => !paidIds.has(row.id)), [paidIds, periodRows]);
   const payableRows = useMemo(() => unpaidClosedRows.filter((row) => row.estado_validacion === "VALIDA" && Number(row.horas_validas ?? 0) > 0), [unpaidClosedRows]);
@@ -349,10 +402,10 @@ export default function Comisiones() {
   const totalClosed = closedAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
   const totalOpen = openAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
   const totalPendingPayment = closedAll.filter((row) => !paidIds.has(row.id) && row.estado_validacion === "VALIDA").reduce((sum, row) => sum + Number(row.horas_validas ?? 0), 0);
-  const totalReview = rows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
+  const totalReview = filteredRows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
   const closedOrderCount = new Set(closedAll.map((row) => row.os_numero)).size;
   const openOrderCount = new Set(openAll.map((row) => row.os_numero)).size;
-  const reviewOrderCount = new Set(rows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).map((row) => row.os_numero)).size;
+  const reviewOrderCount = new Set(filteredRows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).map((row) => row.os_numero)).size;
   const selectedOsRows = useMemo(
     () => selectedOsKey ? rows.filter((row) => `${row.sucursal ?? ""}|${row.os_numero}` === selectedOsKey) : [],
     [rows, selectedOsKey],
@@ -428,6 +481,15 @@ export default function Comisiones() {
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
   const detailOrders = useMemo(() => summarizeOrders(detailRows, paidIds), [detailRows, paidIds]);
   const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
+  const activeFilterCount = Number(Boolean(searchFilter.trim()))
+    + Number(Boolean(technicianFilter))
+    + Number(osStateFilter !== "all");
+
+  const clearFilters = () => {
+    setSearchFilter("");
+    setTechnicianFilter("");
+    setOsStateFilter("all");
+  };
 
   const toggleOrder = (order: CommissionOsSummary, checked: boolean) => {
     const orderIds = order.rows.filter((row) => selectableIdSet.has(row.id)).map((row) => row.id);
@@ -498,7 +560,7 @@ export default function Comisiones() {
 
   return (
     <PageShell>
-      <Tabs value={view} onValueChange={(value) => { setView(value as View); setTechnicianFilter(""); }} className="space-y-3">
+      <Tabs value={view} onValueChange={(value) => setView(value as View)} className="space-y-3">
         <PageHeader
           title="Comisiones"
           tabs={<TabsList>
@@ -530,16 +592,38 @@ export default function Comisiones() {
           </KpiStrip>
 
           <FiltersBar
-            activeCount={technicianFilter ? 1 : 0}
-            onClear={() => setTechnicianFilter("")}
+            search={{
+              value: searchFilter,
+              onChange: setSearchFilter,
+              label: "Buscar",
+              placeholder: "OS, cliente, chasis o técnico…",
+              width: "w-[280px] min-w-[180px] shrink",
+            }}
+            activeCount={activeFilterCount}
+            onClear={clearFilters}
+            meta={`${detailOrders.length} OS`}
           >
             <FilterDate label="Desde" value={from} onChange={setFrom} />
             <FilterDate label="Hasta" value={to} onChange={setTo} />
-            {technicianFilter && (
-              <FilterCustom label="Técnico" width="w-auto">
-                <Button variant="secondary" size="sm" className="h-8" onClick={() => setTechnicianFilter("")}>{technicianFilter} ×</Button>
-              </FilterCustom>
-            )}
+            <FilterSelect
+              label="Estado OS"
+              value={osStateFilter}
+              onChange={setOsStateFilter}
+              placeholder="Todos"
+              width="w-[145px]"
+              options={[{ value: "all", label: "Todos" }, ...osStateOptions]}
+            />
+            <FilterSelect
+              label="Técnico"
+              value={technicianFilter || "all"}
+              onChange={(value) => setTechnicianFilter(value === "all" ? "" : value)}
+              placeholder="Todos"
+              width="w-[210px]"
+              options={[
+                { value: "all", label: "Todos" },
+                ...technicianOptions.map((technician) => ({ value: technician, label: technician })),
+              ]}
+            />
           </FiltersBar>
 
           <TabsContent value="cerradas" className="space-y-3">{resumenPanel}{ordenesPanel}</TabsContent>
