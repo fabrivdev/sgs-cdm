@@ -14,6 +14,7 @@ import { ServicioFormDialog } from "@/components/ServicioFormDialog";
 import { ServicioDetalleDialog } from "@/components/ServicioDetalleDialog";
 import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarIntervencionDialog";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMultiSelect";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
@@ -118,10 +119,10 @@ export default function Planificador() {
 
   const currentWeek = useMemo(() => String(getISOWeek(new Date())), []);
   const [fSemana, setFSemana] = useState<string>(currentWeek);
-  const [fSucursal, setFSucursal] = useState<string>("all");
-  const [fTecnico, setFTecnico] = useState<string>("all");
-  const [fMarca, setFMarca] = useState<string>("all");
-  const [fEstado, setFEstado] = useState<string>("all");
+  const [fSucursales, setFSucursales] = useState<string[]>([]);
+  const [fTecnicos, setFTecnicos] = useState<string[]>([]);
+  const [fMarcas, setFMarcas] = useState<string[]>([]);
+  const [fEstados, setFEstados] = useState<string[]>([]);
   const [fCliente, setFCliente] = useState<string>("");
   const [fVencidas, setFVencidas] = useState<string>("all");
   const [fDatos, setFDatos] = useState<string>("all");
@@ -144,20 +145,20 @@ export default function Planificador() {
       vista,
       semana: fSemana === "all" ? undefined : fSemana,
       ...assistantWeekRange,
-      sucursal: fSucursal === "all" ? undefined : fSucursal,
-      tecnico: fTecnico === "all" ? undefined : fTecnico,
-      marca: fMarca === "all" ? undefined : fMarca,
-      estado: fEstado === "all" ? undefined : fEstado,
+      sucursales: fSucursales.length ? fSucursales : undefined,
+      tecnicos: fTecnicos.length ? fTecnicos : undefined,
+      marcas: fMarcas.length ? fMarcas : undefined,
+      estados: fEstados.length ? fEstados : undefined,
       cliente: fCliente || undefined,
       vencimiento: fVencidas === "all" ? undefined : fVencidas,
     });
     return clearPageFilters;
-  }, [assistantWeekRange, clearPageFilters, fCliente, fEstado, fMarca, fSemana, fSucursal, fTecnico, fVencidas, setPageFilters, vista]);
+  }, [assistantWeekRange, clearPageFilters, fCliente, fEstados, fMarcas, fSemana, fSucursales, fTecnicos, fVencidas, setPageFilters, vista]);
 
   // Default sucursal por perfil al primer load
   useEffect(() => {
     if (!defaultsApplied && profile) {
-      if (profile.sucursal && !isAdmin && !searchParams.get("sucursal")) setFSucursal(profile.sucursal);
+      if (profile.sucursal && !isAdmin && !searchParams.get("sucursal")) setFSucursales([profile.sucursal]);
       // Para admins no filtrar por sucursal (dejar "all" para ver todas)
       setDefaultsApplied(true);
     }
@@ -170,16 +171,16 @@ export default function Planificador() {
     const sinHoras = searchParams.get("sin_horas");
     const semana = searchParams.get("semana");
 
-    if (estado && ESTADOS.includes(estado as Estado)) setFEstado(estado);
-    if (sucursal && SUCURSALES.includes(sucursal as Sucursal)) setFSucursal(sucursal);
+    if (estado && ESTADOS.includes(estado as Estado)) setFEstados([estado]);
+    if (sucursal && SUCURSALES.includes(sucursal as Sucursal)) setFSucursales([sucursal]);
     if (overdue === "7") {
       setFVencidas("7");
-      setFEstado("Pendiente");
+      setFEstados(["Pendiente"]);
       setFSemana("all");
     }
     if (sinHoras === "1") {
       setFDatos("sin_horas");
-      setFEstado("Completado");
+      setFEstados(["Completado"]);
       setFSemana("all");
     }
     if (semana) setFSemana(semana);
@@ -333,10 +334,10 @@ export default function Planificador() {
     const q = fCliente.trim().toLowerCase();
     return servicios.filter((s) => {
       if (fSemana !== "all" && s.semana !== Number(fSemana)) return false;
-      if (fSucursal !== "all" && s.sucursal !== fSucursal) return false;
-      if (fTecnico !== "all" && s.tecnico_responsable_id !== fTecnico && !s.auxiliares.includes(fTecnico)) return false;
-      if (fMarca !== "all" && s.marca !== fMarca) return false;
-      if (fEstado !== "all" && s.estado !== fEstado) return false;
+      if (!matchesMulti(fSucursales, s.sucursal)) return false;
+      if (fTecnicos.length > 0 && !fTecnicos.some((id) => s.tecnico_responsable_id === id || s.auxiliares.includes(id))) return false;
+      if (!matchesMulti(fMarcas, s.marca)) return false;
+      if (!matchesMulti(fEstados, s.estado)) return false;
       if (fDatos === "sin_horas" && !(s.estado === "Completado" && !Number(s.horas_trabajadas))) return false;
       if (fVencidas === "7") {
         if (s.estado !== "Pendiente") return false;
@@ -360,7 +361,7 @@ export default function Planificador() {
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursal, fTecnico, fMarca, fEstado, fDatos, fVencidas, fCliente, cliById, refByServicio]);
+  }, [servicios, fSemana, fSucursales, fTecnicos, fMarcas, fEstados, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
   const displayed = useMemo(() => {
     if (!soloPrincipalesSemana || fSemana === "all") return filtered;
@@ -471,8 +472,8 @@ export default function Planificador() {
         }
 
         const tecnicosSemana = (
-          fTecnico !== "all"
-            ? tecnicosSolo.filter((profile) => profile.id === fTecnico)
+          fTecnicos.length > 0
+            ? tecnicosSolo.filter((profile) => fTecnicos.includes(profile.id))
             : tecnicosSolo.filter((profile) => tecnicoIds.has(profile.id))
         ).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -537,10 +538,10 @@ export default function Planificador() {
 
   const limpiarFiltros = () => {
     setFSemana("all");
-    setFSucursal("all");
-    setFTecnico("all");
-    setFMarca("all");
-    setFEstado("all");
+    setFSucursales([]);
+    setFTecnicos([]);
+    setFMarcas([]);
+    setFEstados([]);
     setFVencidas("all");
     setFDatos("all");
     setFCliente("");
@@ -549,10 +550,10 @@ export default function Planificador() {
 
   const activeChips: { label: string; clear: () => void }[] = [];
   if (fSemana !== "all") activeChips.push({ label: `Semana ${fSemana}`, clear: () => setFSemana("all") });
-  if (fSucursal !== "all") activeChips.push({ label: fSucursal, clear: () => setFSucursal("all") });
-  if (fTecnico !== "all") activeChips.push({ label: profById[fTecnico]?.nombre ?? "Técnico", clear: () => setFTecnico("all") });
-  if (fMarca !== "all") activeChips.push({ label: fMarca, clear: () => setFMarca("all") });
-  if (fEstado !== "all") activeChips.push({ label: fEstado, clear: () => setFEstado("all") });
+  if (fSucursales.length) activeChips.push({ label: `${fSucursales.length} sucursal${fSucursales.length > 1 ? "es" : ""}`, clear: () => setFSucursales([]) });
+  if (fTecnicos.length) activeChips.push({ label: fTecnicos.length === 1 ? profById[fTecnicos[0]]?.nombre ?? "Técnico" : `${fTecnicos.length} técnicos`, clear: () => setFTecnicos([]) });
+  if (fMarcas.length) activeChips.push({ label: fMarcas.length === 1 ? fMarcas[0] : `${fMarcas.length} marcas`, clear: () => setFMarcas([]) });
+  if (fEstados.length) activeChips.push({ label: fEstados.length === 1 ? fEstados[0] : `${fEstados.length} estados`, clear: () => setFEstados([]) });
   if (fVencidas === "7") activeChips.push({ label: "+7d sin cierre", clear: () => setFVencidas("all") });
   if (fDatos === "sin_horas") activeChips.push({ label: "Sin horas", clear: () => setFDatos("all") });
   if (soloPrincipalesSemana && fSemana !== "all") activeChips.push({ label: "Solo principales", clear: () => setSoloPrincipalesSemana(false) });
@@ -577,18 +578,18 @@ export default function Planificador() {
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
         expanded={<>
-          <FilterSelect label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-full" options={[{ value: "all", label: "Todos" }, ...MARCAS.map(m => ({ value: m, label: m }))]} />
-          <FilterSelect label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full" options={[{ value: "all", label: "Todos" }, ...ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))]} />
+          <FilterMultiSelect label="Marca" values={fMarcas} onChange={setFMarcas} placeholder="Todas" width="w-full" options={MARCAS.map(m => ({ value: m, label: m }))} />
+          <FilterMultiSelect label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-full" options={ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))} />
           <FilterCustom label="Lectura" width="w-full"><Button type="button" variant={soloPrincipalesSemana ? "default" : "outline"} size="sm" className="h-8 w-full" disabled={fSemana === "all"} onClick={() => setSoloPrincipalesSemana((value) => !value)}>Solo principales</Button></FilterCustom>
         </>}
       >
-        <FilterSelect
-          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        <FilterMultiSelect
+          label="Sucursal" values={fSucursales} onChange={setFSucursales} placeholder="Todas" width="w-[150px]"
+          options={SUCURSALES.map(s => ({ value: s, label: s }))}
         />
-        <FilterSelect
-          label="Técnico" value={fTecnico} onChange={setFTecnico} placeholder="Técnico" width="w-[160px]"
-          options={[{ value: "all", label: "Todos" }, ...tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))]}
+        <FilterMultiSelect
+          label="Técnico" values={fTecnicos} onChange={setFTecnicos} placeholder="Todos" width="w-[160px]"
+          options={tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))}
         />
         <FilterCustom label="Semana" width="w-[230px]">
           <div className="flex h-8 overflow-hidden rounded-md border bg-background">

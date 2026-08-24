@@ -28,7 +28,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
-import { FiltersBar, FilterCustom, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom, FilterDate } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { useAuth } from "@/hooks/useAuth";
 import {
   cargarSugerenciaViva,
@@ -38,7 +39,7 @@ import {
   importarMaestroLegacy,
   refrescarHistorialUnificado,
   type FiltrosResultados,
-  type MarcaSugerencia,
+  type MarcaModeloSugerencia,
   type ModeloSugerencia,
   type ResultadoSugerencia,
   type SegmentoSugerencia,
@@ -242,10 +243,10 @@ export default function RepuestosSugerencias() {
   const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
   const canLoadLegacyMaster = isAdmin || isSuperAdmin;
-  const [brand, setBrand] = useState<MarcaSugerencia>("TODAS");
+  const [brands, setBrands] = useState<MarcaModeloSugerencia[]>([]);
   const [analysisDate, setAnalysisDate] = useState(analysisDateDefault);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<FiltrosResultados>({ segmento: "TODOS", estado: "TODOS", soloSugeridos: false });
+  const [filters, setFilters] = useState<FiltrosResultados>({ segmentos: [], estados: [], soloSugeridos: false });
   const [selected, setSelected] = useState<ResultadoSugerencia | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -254,25 +255,26 @@ export default function RepuestosSugerencias() {
   const [historyPublishProgress, setHistoryPublishProgress] = useState<{ completed: number; total: number } | null>(null);
   const [historyRebuildRequired, setHistoryRebuildRequired] = useState(false);
 
-  const modelQuery = useModeloActivo(brand);
+  const modelBrand = brands.length === 1 ? brands[0] : "TODAS";
+  const modelQuery = useModeloActivo(modelBrand);
   const segmentsQuery = useSegmentosModelo(modelQuery.data?.id);
   const legacyMasterQuery = useEstadoMaestroLegacy();
   const legacyBillingQuery = useEstadoFacturacionHistorica();
   const historySourceVersion = legacyBillingQuery.data?.publicado_en ?? legacyBillingQuery.data?.completado_en ?? null;
   const historyIsPersisted = legacyBillingQuery.data?.publicacion_estado === "COMPLETADO"
     || Boolean(legacyBillingQuery.data?.publicado_en);
-  const historyQualityQuery = useCalidadHistorialRepuestos(brand, historySourceVersion, !historyIsPersisted);
+  const historyQualityQuery = useCalidadHistorialRepuestos(modelBrand, historySourceVersion, !historyIsPersisted);
   const historyIsPrepared = historyIsPersisted || Boolean(historyQualityQuery.data?.preparado);
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
   const liveQuery = useSugerenciaViva(
-    brand,
+    brands,
     analysisDate,
     liveFilters,
     page,
     Boolean(
       historyIsPrepared
-      && (brand === "TODAS" || modelQuery.data)
+      && (brands.length !== 1 || modelQuery.data)
       && legacyMasterQuery.data?.cargado
       && !historyRebuildRequired
     ),
@@ -282,9 +284,9 @@ export default function RepuestosSugerencias() {
   const leadTimeMeses = modelQuery.data?.lead_time_meses ?? 3;
   const liveSummary = liveQuery.data?.resumen;
   const totalPages = Math.max(1, Math.ceil((liveQuery.data?.total_filtrado ?? 0) / 50));
-  const segmentOptions = useMemo(() => brand === "TODAS"
+  const segmentOptions = useMemo(() => brands.length !== 1
     ? ["ESTRELLA", "DEMANDA VOLATIL", "FLUJO ESTABLE", "SERVICIO ECONOMICO", "BAJO PEDIDO"]
-    : (segmentsQuery.data?.map((segment) => segment.segmento) ?? []), [brand, segmentsQuery.data]);
+    : (segmentsQuery.data?.map((segment) => segment.segmento) ?? []), [brands.length, segmentsQuery.data]);
 
   const refreshHistory = useMutation({
     mutationFn: () => refrescarHistorialUnificado((completed, total) => {
@@ -359,7 +361,7 @@ export default function RepuestosSugerencias() {
       const toastId = toast.loading("Preparando exportación…");
       try {
         const exportFilters = { ...liveFilters, soloSugeridos: true };
-        const response = await cargarSugerenciaViva(brand, analysisDate, exportFilters, (loaded, total) => {
+        const response = await cargarSugerenciaViva(brands, analysisDate, exportFilters, (loaded, total) => {
           toast.loading(`Descargando ${integer.format(Math.min(loaded, total))} de ${integer.format(total)} piezas…`, { id: toastId });
         });
         const XLSX = await import("xlsx");
@@ -397,7 +399,8 @@ export default function RepuestosSugerencias() {
         const sheet = XLSX.utils.json_to_sheet(exportRows);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, sheet, "Sugerencia");
-        XLSX.writeFile(workbook, `sugerencia-compra-${brand.toLowerCase()}-${analysisDate}.xlsx`);
+        const marcasArchivo = brands.length ? brands.join("-").toLowerCase() : "todas";
+        XLSX.writeFile(workbook, `sugerencia-compra-${marcasArchivo}-${analysisDate}.xlsx`);
       } finally {
         toast.dismiss(toastId);
       }
@@ -417,7 +420,7 @@ export default function RepuestosSugerencias() {
         title="Sugerencia de compra"
         actions={(
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)} disabled={brand === "TODAS"} title={brand === "TODAS" ? "Elegí una marca para editar sus parámetros" : undefined}>
+            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)} disabled={brands.length !== 1} title={brands.length !== 1 ? "Elegí una sola marca para editar sus parámetros" : undefined}>
               <Settings2 className="mr-1 h-3.5 w-3.5" />Parámetros
             </Button>
             <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial">
@@ -429,7 +432,7 @@ export default function RepuestosSugerencias() {
 
 
       {!canManage && <Alert><AlertTriangle className="h-4 w-4" /><AlertTitle>Modo consulta</AlertTitle><AlertDescription>La sugerencia se actualiza automáticamente. Solo Admin y Jefatura pueden modificar parámetros o mínimos estratégicos.</AlertDescription></Alert>}
-      {brand !== "TODAS" && modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
+      {brands.length === 1 && modelQuery.error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Motor aún no disponible</AlertTitle><AlertDescription>Aplicá la migración SQL para habilitar el modelo de sugerencia.</AlertDescription></Alert>}
 
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
@@ -561,17 +564,16 @@ export default function RepuestosSugerencias() {
 
       <FiltersBar
         search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción…", width: "w-[min(360px,26vw)]" }}
-        activeCount={[filters.buscar, filters.segmento !== "TODOS", filters.estado !== "TODOS", filters.soloSugeridos].filter(Boolean).length}
-        onClear={() => { setFilters({ buscar: "", segmento: "TODOS", estado: "TODOS", soloSugeridos: false }); setPage(1); }}
+        activeCount={Number(Boolean(filters.buscar)) + Number(brands.length > 0) + Number(Boolean(filters.segmentos?.length)) + Number(Boolean(filters.estados?.length)) + Number(Boolean(filters.soloSugeridos))}
+        onClear={() => { setBrands([]); setFilters({ buscar: "", segmentos: [], estados: [], soloSugeridos: false }); setPage(1); }}
         actions={<Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-1 h-3.5 w-3.5" />Exportar</Button>}
       >
-        <FilterSelect
+        <FilterMultiSelect
           label="Marca"
-          value={brand}
-          onChange={(value) => { setBrand(value as MarcaSugerencia); setPage(1); }}
-          placeholder="Marca"
+          values={brands}
+          onChange={(next) => { setBrands(next.length === 3 ? [] : next as MarcaModeloSugerencia[]); setPage(1); }}
+          placeholder="Todas"
           options={[
-            { value: "TODAS", label: "Todas" },
             { value: "CLAAS", label: "CLAAS" },
             { value: "HORSCH", label: "HORSCH" },
             { value: "OTROS", label: "Otros" },
@@ -584,22 +586,21 @@ export default function RepuestosSugerencias() {
           onChange={(value) => { setAnalysisDate(value); setPage(1); }}
           width="w-[150px]"
         />
-        <FilterSelect
+        <FilterMultiSelect
           label="Segmento"
-          value={filters.segmento}
-          onChange={(segmento) => { setFilters((current) => ({ ...current, segmento })); setPage(1); }}
-          placeholder="Segmento"
-          options={[{ value: "TODOS", label: "Todos los segmentos" }, ...segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))]}
+          values={filters.segmentos ?? []}
+          onChange={(segmentos) => { setFilters((current) => ({ ...current, segmentos: segmentos.length === segmentOptions.length ? [] : segmentos })); setPage(1); }}
+          placeholder="Todos los segmentos"
+          options={segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))}
           width="w-[180px]"
         />
 
-        <FilterSelect
+        <FilterMultiSelect
           label="Estado de datos"
-          value={filters.estado}
-          onChange={(estado) => { setFilters((current) => ({ ...current, estado })); setPage(1); }}
-          placeholder="Estado de datos"
+          values={filters.estados ?? []}
+          onChange={(estados) => { setFilters((current) => ({ ...current, estados: estados.length === 3 ? [] : estados })); setPage(1); }}
+          placeholder="Todos los estados"
           options={[
-            { value: "TODOS", label: "Todos los estados" },
             { value: "LISTO", label: "Con historial reciente" },
             { value: "CODIGO_NUEVO_SIN_HISTORIAL", label: "Nuevos sin historial" },
             { value: "SIN_VENTAS_RECIENTES", label: "Anteriores sin ventas 24m" },
@@ -622,7 +623,7 @@ export default function RepuestosSugerencias() {
         ) : historyRebuildRequired || refreshHistory.isPending ? (
           <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><Loader2 className="mb-3 h-7 w-7 animate-spin text-primary" /><h2 className="font-semibold">Reconstruyendo el historial</h2><p className="mt-1 text-[13px] text-muted-foreground">La sugerencia se reactivará automáticamente al terminar.</p></div>
         ) : !historyIsPrepared ? (
-          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brand === "TODAS" ? "todas las marcas" : brand}</h2><p className="mt-1 max-w-md text-[13px] text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
+          <div className="flex min-h-72 flex-col items-center justify-center p-8 text-center"><ShoppingCart className="mb-3 h-10 w-10 text-primary/50" /><h2 className="font-semibold">Prepará el historial de {brands.length ? brands.join(", ") : "todas las marcas"}</h2><p className="mt-1 max-w-md text-[13px] text-muted-foreground">El motor en vivo necesita primero consolidar las vinculaciones confirmadas.</p></div>
         ) : liveQuery.isLoading ? (
           <div className="flex min-h-72 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>
         ) : liveQuery.error ? (

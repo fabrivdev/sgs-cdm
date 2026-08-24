@@ -32,7 +32,8 @@ import { useSugerenciaProducto, type MarcaModeloSugerencia } from "@/hooks/useSu
 import { MARCAS } from "@/lib/constants";
 import { metaText, pageShellWide } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
-import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { cn } from "@/lib/utils";
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
@@ -82,9 +83,9 @@ export default function Repuestos() {
 
   const filtrosActivos =
     (filtros.busqueda ? 1 : 0) +
-    (filtros.marca ? 1 : 0) +
-    (filtros.familia ? 1 : 0) +
-    (filtros.estadoStock !== "con_stock" ? 1 : 0);
+    (filtros.marcas.length ? 1 : 0) +
+    (filtros.familias.length ? 1 : 0) +
+    (!(filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "con_stock") ? 1 : 0);
 
   const limpiarFiltros = () => {
     setBusquedaInput("");
@@ -146,9 +147,9 @@ export default function Repuestos() {
         onClear={limpiarFiltros}
         actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting}><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Exportando…" : "Exportar"}</Button>}
       >
-        <FilterSelect label="Marca" value={filtros.marca || "todas"} onChange={(value) => setFiltros((current) => ({ ...current, marca: value === "todas" ? "" : value }))} placeholder="Marca" width="w-[140px]" options={[{ value: "todas", label: "Todas" }, ...MARCAS.map((value) => ({ value, label: value }))]} />
-        <FilterSelect label="Familia" value={filtros.familia || "todas"} onChange={(value) => setFiltros((current) => ({ ...current, familia: value === "todas" ? "" : value }))} placeholder="Familia" width="w-[180px]" options={[{ value: "todas", label: "Todas" }, ...(familiasQuery.data ?? []).map((value) => ({ value, label: value }))]} />
-        <FilterSelect label="Existencia" value={filtros.estadoStock} onChange={(value) => setFiltros((current) => ({ ...current, estadoStock: value as StockFiltros["estadoStock"] }))} placeholder="Existencia" width="w-[140px]" options={[{ value: "con_stock", label: "Con stock" }, { value: "sin_stock", label: "Sin stock" }, { value: "todos", label: "Todos" }]} />
+        <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
+        <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />
+        <FilterMultiSelect label="Existencia" values={filtros.estadosStock} onChange={(estadosStock) => setFiltros((current) => ({ ...current, estadosStock: estadosStock as StockFiltros["estadosStock"] }))} placeholder="Todos" width="w-[140px]" options={[{ value: "con_stock", label: "Con stock" }, { value: "sin_stock", label: "Sin stock" }]} />
       </FiltersBar>
 
       <Card className="overflow-hidden">

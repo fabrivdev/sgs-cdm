@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
-import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMultiSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { KanbanSkeleton } from "@/components/LoadingSkeletons";
 import { parseISO, format } from "date-fns";
@@ -48,11 +49,11 @@ export default function Trabajos() {
   const [loading, setLoading] = useState(true);
 
   const [q, setQ] = useState("");
-  const [fSucursal, setFSucursal] = useState<string>(
-    isTecnico && !isAdmin && profile?.sucursal ? profile.sucursal : "all",
+  const [fSucursales, setFSucursales] = useState<string[]>(
+    isTecnico && !isAdmin && profile?.sucursal ? [profile.sucursal] : [],
   );
-  const [fPrio, setFPrio] = useState<string>("all");
-  const [fEstado, setFEstado] = useState<string>("all");
+  const [fPrioridades, setFPrioridades] = useState<string[]>([]);
+  const [fEstados, setFEstados] = useState<string[]>([]);
   const [fFecha, setFFecha] = useState<string>("");
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
 
@@ -62,19 +63,19 @@ export default function Trabajos() {
   useEffect(() => {
     setPageFilters({
       busqueda: q || undefined,
-      sucursal: fSucursal === "all" ? undefined : fSucursal,
-      prioridad: fPrio === "all" ? undefined : fPrio,
-      estado: fEstado === "all" ? undefined : fEstado,
+      sucursales: fSucursales.length ? fSucursales : undefined,
+      prioridades: fPrioridades.length ? fPrioridades : undefined,
+      estados: fEstados.length ? fEstados : undefined,
       fecha: fFecha || undefined,
     });
     return clearPageFilters;
-  }, [clearPageFilters, fEstado, fFecha, fPrio, fSucursal, q, setPageFilters]);
+  }, [clearPageFilters, fEstados, fFecha, fPrioridades, fSucursales, q, setPageFilters]);
 
   useEffect(() => {
-    if (isTecnico && !isAdmin && profile?.sucursal && fSucursal === "all") {
-      setFSucursal(profile.sucursal);
+    if (isTecnico && !isAdmin && profile?.sucursal && fSucursales.length === 0) {
+      setFSucursales([profile.sucursal]);
     }
-  }, [isTecnico, isAdmin, profile?.sucursal]);
+  }, [isTecnico, isAdmin, profile?.sucursal, fSucursales.length]);
 
   const load = async () => {
     setLoading(true);
@@ -116,10 +117,10 @@ export default function Trabajos() {
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return trabajos.filter(t => {
-      if (fSucursal !== "all" && t.sucursal !== fSucursal) return false;
-      if (fPrio !== "all" && t.prioridad !== fPrio) return false;
+      if (!matchesMulti(fSucursales, t.sucursal)) return false;
+      if (!matchesMulti(fPrioridades, t.prioridad)) return false;
       const estadoVisible = estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general);
-      if (fEstado !== "all" && estadoVisible !== fEstado) return false;
+      if (!matchesMulti(fEstados, estadoVisible)) return false;
       if (query) {
         const cli = t.cliente_id ? clienteMap.get(t.cliente_id)?.nombre ?? "" : "";
         if (!cli.toLowerCase().includes(query)
@@ -147,18 +148,18 @@ export default function Trabajos() {
       }
       return true;
     });
-  }, [trabajos, q, fSucursal, fPrio, fEstado, fFecha, clienteMap, agendasByTrabajo]);
+  }, [trabajos, q, fSucursales, fPrioridades, fEstados, fFecha, clienteMap, agendasByTrabajo]);
 
   const limpiar = () => {
-    setQ(""); setFSucursal("all"); setFPrio("all"); setFEstado("all");
+    setQ(""); setFSucursales([]); setFPrioridades([]); setFEstados([]);
     setFFecha("");
   };
 
   const activosCount =
     (q ? 1 : 0) +
-    (fSucursal !== "all" ? 1 : 0) +
-    (fPrio !== "all" ? 1 : 0) +
-    (fEstado !== "all" ? 1 : 0) +
+    (fSucursales.length ? 1 : 0) +
+    (fPrioridades.length ? 1 : 0) +
+    (fEstados.length ? 1 : 0) +
     (fFecha ? 1 : 0);
 
   return (
@@ -174,15 +175,15 @@ export default function Trabajos() {
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
-        expanded={<><FilterSelect label="Prioridad" value={fPrio} onChange={setFPrio} placeholder="Prioridad" width="w-full" options={[{ value: "all", label: "Todos" }, ...PRIORIDADES.map(p => ({ value: p.key, label: p.label }))]} /><FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" width="w-full" /></>}
+        expanded={<><FilterMultiSelect label="Prioridad" values={fPrioridades} onChange={setFPrioridades} placeholder="Todas" width="w-full" options={PRIORIDADES.map(p => ({ value: p.key, label: p.label }))} /><FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" width="w-full" /></>}
       >
-        <FilterSelect
-          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        <FilterMultiSelect
+          label="Sucursal" values={fSucursales} onChange={setFSucursales} placeholder="Todas" width="w-[150px]"
+          options={SUCURSALES.map(s => ({ value: s, label: s }))}
         />
-        <FilterSelect
-          label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-[130px]"
-          options={[{ value: "all", label: "Todos" }, ...ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))]}
+        <FilterMultiSelect
+          label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-[130px]"
+          options={ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))}
         />
       </FiltersBar>
 

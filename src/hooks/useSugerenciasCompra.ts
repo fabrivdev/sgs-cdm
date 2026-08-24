@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type MarcaModeloSugerencia = "CLAAS" | "HORSCH" | "OTROS";
 export type MarcaSugerencia = MarcaModeloSugerencia | "TODAS";
+export type MarcaConsultaSugerencia = MarcaSugerencia | MarcaModeloSugerencia[];
 
 const MARCAS_MODELO: MarcaModeloSugerencia[] = ["CLAAS", "HORSCH", "OTROS"];
 
@@ -176,6 +177,8 @@ export interface FiltrosResultados {
   buscar?: string;
   segmento?: string;
   estado?: string;
+  segmentos?: string[];
+  estados?: string[];
   soloSugeridos?: boolean;
 }
 
@@ -231,8 +234,14 @@ function aplicarFiltros(query: any, filtros: FiltrosResultados) {
       `producto_codigo.ilike.%${search}%,codigo_fabricante.ilike.%${search}%,descripcion.ilike.%${search}%`,
     );
   }
-  if (filtros.segmento && filtros.segmento !== "TODOS") query = query.eq("segmento", filtros.segmento);
-  if (filtros.estado && filtros.estado !== "TODOS") query = query.eq("estado_datos", filtros.estado);
+  const segmentos = filtros.segmentos?.length
+    ? filtros.segmentos
+    : filtros.segmento && filtros.segmento !== "TODOS" ? [filtros.segmento] : [];
+  const estados = filtros.estados?.length
+    ? filtros.estados
+    : filtros.estado && filtros.estado !== "TODOS" ? [filtros.estado] : [];
+  if (segmentos.length) query = query.in("segmento", segmentos);
+  if (estados.length) query = query.in("estado_datos", estados);
   if (filtros.soloSugeridos) query = query.gt("sugerencia_unidades", 0);
   return query;
 }
@@ -357,19 +366,21 @@ export function useResultadosSugerencia(
   });
 }
 
-async function consultarSugerenciaVivaMarca(
+async function consultarSugerenciaVivaMarcaCombinacion(
   marca: MarcaModeloSugerencia,
   fechaAnalisis: string,
   filtros: FiltrosResultados,
   limite: number,
   offset: number,
+  segmento: string,
+  estado: string,
 ) {
   const { data, error } = await (supabase.rpc as any)("repuestos_sugerencia_viva", {
     p_marca: marca,
     p_fecha_analisis: fechaAnalisis,
     p_buscar: filtros.buscar?.trim() || null,
-    p_segmento: filtros.segmento || "TODOS",
-    p_estado: filtros.estado || "TODOS",
+    p_segmento: segmento,
+    p_estado: estado,
     p_solo_sugeridos: Boolean(filtros.soloSugeridos),
     p_limite: limite,
     p_offset: offset,
@@ -381,21 +392,119 @@ async function consultarSugerenciaVivaMarca(
   return data as SugerenciaVivaResponse;
 }
 
+async function consultarCombinacionHasta(
+  marca: MarcaModeloSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+  segmento: string,
+  estado: string,
+  hasta: number,
+) {
+  const rows: ResultadoSugerencia[] = [];
+  let latest: SugerenciaVivaResponse | null = null;
+
+  while (rows.length < hasta) {
+    const response = await consultarSugerenciaVivaMarcaCombinacion(
+      marca,
+      fechaAnalisis,
+      filtros,
+      Math.min(1000, hasta - rows.length),
+      rows.length,
+      segmento,
+      estado,
+    );
+    latest = response;
+    rows.push(...response.rows);
+    if (response.rows.length === 0 || rows.length >= response.total_filtrado) break;
+  }
+
+  if (!latest) throw new Error("No se pudo consultar la sugerencia en vivo");
+  return { ...latest, rows };
+}
+
+function opcionesFiltro(valores: string[] | undefined, valorLegacy: string | undefined) {
+  if (valores?.length) return valores;
+  if (valorLegacy && valorLegacy !== "TODOS") return [valorLegacy];
+  return ["TODOS"];
+}
+
+async function consultarSugerenciaVivaMarca(
+  marca: MarcaModeloSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+  limite: number,
+  offset: number,
+) {
+  const segmentos = opcionesFiltro(filtros.segmentos, filtros.segmento);
+  const estados = opcionesFiltro(filtros.estados, filtros.estado);
+  const combinaciones = segmentos.flatMap((segmento) => estados.map((estado) => ({ segmento, estado })));
+
+  if (combinaciones.length === 1) {
+    const [{ segmento, estado }] = combinaciones;
+    return consultarSugerenciaVivaMarcaCombinacion(marca, fechaAnalisis, filtros, limite, offset, segmento, estado);
+  }
+
+  // La RPC actual recibe un valor por dimensión. Para mantener paginación
+  // correcta, cada combinación entrega sus mejores filas hasta el fin de la
+  // página solicitada; las combinaciones son disjuntas y se unen en memoria.
+  const hasta = Math.max(1, offset + limite);
+  const respuestas = await Promise.all(combinaciones.map(({ segmento, estado }) =>
+    consultarCombinacionHasta(marca, fechaAnalisis, filtros, segmento, estado, hasta),
+  ));
+  const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
+  const primera = respuestas[0];
+  return {
+    ...primera,
+    total_filtrado: respuestas.reduce((total, response) => total + response.total_filtrado, 0),
+    rows: rows.slice(offset, offset + limite),
+  } satisfies SugerenciaVivaResponse;
+}
+
 function ordenarSugerencias(a: ResultadoSugerencia, b: ResultadoSugerencia) {
   return b.sugerencia_unidades - a.sugerencia_unidades
     || b.total_vendido_12m - a.total_vendido_12m
     || a.producto_codigo.localeCompare(b.producto_codigo);
 }
 
+async function consultarMarcaHasta(
+  marca: MarcaModeloSugerencia,
+  fechaAnalisis: string,
+  filtros: FiltrosResultados,
+  hasta: number,
+) {
+  const rows: ResultadoSugerencia[] = [];
+  let latest: SugerenciaVivaResponse | null = null;
+
+  while (rows.length < hasta) {
+    const response = await consultarSugerenciaVivaMarca(
+      marca,
+      fechaAnalisis,
+      filtros,
+      Math.min(1000, hasta - rows.length),
+      rows.length,
+    );
+    latest = response;
+    rows.push(...response.rows);
+    if (response.rows.length === 0 || rows.length >= response.total_filtrado) break;
+  }
+
+  if (!latest) throw new Error("No se pudo consultar la sugerencia en vivo");
+  return { ...latest, rows };
+}
+
 async function consultarSugerenciaViva(
-  marca: MarcaSugerencia,
+  marca: MarcaConsultaSugerencia,
   fechaAnalisis: string,
   filtros: FiltrosResultados,
   limite: number,
   offset: number,
 ) {
-  if (marca !== "TODAS") {
-    return consultarSugerenciaVivaMarca(marca, fechaAnalisis, filtros, limite, offset);
+  const marcas = Array.isArray(marca)
+    ? (marca.length ? marca : MARCAS_MODELO)
+    : marca === "TODAS" ? MARCAS_MODELO : [marca];
+
+  if (marcas.length === 1) {
+    return consultarSugerenciaVivaMarca(marcas[0], fechaAnalisis, filtros, limite, offset);
   }
 
   // Para conservar una paginacion global correcta, cada marca entrega sus
@@ -403,7 +512,7 @@ async function consultarSugerenciaViva(
   // recortan en conjunto; los parametros siguen siendo los de cada marca.
   const hasta = Math.max(1, offset + limite);
   const respuestas = await Promise.all(
-    MARCAS_MODELO.map((item) => consultarSugerenciaVivaMarca(item, fechaAnalisis, filtros, hasta, 0)),
+    marcas.map((item) => consultarMarcaHasta(item, fechaAnalisis, filtros, hasta)),
   );
   const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
   const resumen = respuestas.reduce<ResumenSugerenciaViva>((total, response) => ({
@@ -434,7 +543,7 @@ async function consultarSugerenciaViva(
 }
 
 export function useSugerenciaViva(
-  marca: MarcaSugerencia,
+  marca: MarcaConsultaSugerencia,
   fechaAnalisis: string,
   filtros: FiltrosResultados,
   page: number,
@@ -487,17 +596,21 @@ export function useSugerenciaProducto(
 
 
 export async function cargarSugerenciaViva(
-  marca: MarcaSugerencia,
+  marca: MarcaConsultaSugerencia,
   fechaAnalisis: string,
   filtros: FiltrosResultados,
   onProgress?: (loaded: number, total: number) => void,
 ) {
-  if (marca === "TODAS") {
+  const marcas = Array.isArray(marca)
+    ? (marca.length ? marca : MARCAS_MODELO)
+    : marca === "TODAS" ? MARCAS_MODELO : [marca];
+
+  if (marcas.length > 1) {
     let completadas = 0;
-    const respuestas: SugerenciaVivaResponse[] = await Promise.all(MARCAS_MODELO.map(async (item) => {
+    const respuestas: SugerenciaVivaResponse[] = await Promise.all(marcas.map(async (item) => {
       const response = await cargarSugerenciaViva(item, fechaAnalisis, filtros);
       completadas += 1;
-      onProgress?.(completadas, MARCAS_MODELO.length);
+      onProgress?.(completadas, marcas.length);
       return response;
     }));
     const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
@@ -536,7 +649,7 @@ export async function cargarSugerenciaViva(
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        response = await consultarSugerenciaViva(marca, fechaAnalisis, filtros, chunkSize, offset);
+        response = await consultarSugerenciaViva(marcas[0], fechaAnalisis, filtros, chunkSize, offset);
         break;
       } catch (error) {
         lastError = error;

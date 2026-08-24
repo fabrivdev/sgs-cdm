@@ -36,7 +36,8 @@ import { SUCURSALES } from "@/lib/constants";
 import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
-import { FiltersBar, FilterCustom, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 
 type PedidoSortKey =
   | "sucursal"
@@ -80,12 +81,12 @@ interface SeguimientoForm {
 
 interface Filtros {
   busqueda: string;
-  sucursal: string;
+  sucursales: string[];
   nroPedido: string;
   proveedor: string;
 }
 
-const FILTROS_VACIOS: Filtros = { busqueda: "", sucursal: "", nroPedido: "", proveedor: "" };
+const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], nroPedido: "", proveedor: "" };
 
 const rowKey = (row: { sucursal: string | null; nro_pedido: string }) => `${row.sucursal}-${row.nro_pedido}`;
 
@@ -150,7 +151,7 @@ export function ComprasPedidosTab() {
     return solicitudesPorPedido(resoluciones);
   }, [pedidosLineasQuery.data, solicitudesLineasQuery.data, vinculosQuery.data]);
 
-  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursal || filtros.nroPedido || filtros.proveedor);
+  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursales.length || filtros.nroPedido || filtros.proveedor);
 
   const filasFiltradas = useMemo(() => {
     const rows = resumenQuery.data ?? [];
@@ -160,7 +161,7 @@ export function ComprasPedidosTab() {
     const fabricanteMap = fabricanteMapQuery.data;
 
     return rows.filter((row) => {
-      if (filtros.sucursal && row.sucursal !== filtros.sucursal) return false;
+      if (filtros.sucursales.length > 0 && (!row.sucursal || !filtros.sucursales.includes(row.sucursal))) return false;
       if (filtros.nroPedido && !row.nro_pedido.toLowerCase().includes(filtros.nroPedido.trim().toLowerCase())) return false;
       if (filtros.proveedor && !(row.proveedor_nombre ?? "").toLowerCase().includes(filtros.proveedor.trim().toLowerCase())) return false;
 
@@ -249,15 +250,15 @@ export function ComprasPedidosTab() {
       <div className="space-y-3">
         <FiltersBar
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN003187, 06673230, casquillo…", width: "min-w-0 flex-1" }}
-          activeCount={[filtros.busqueda, filtros.sucursal, filtros.nroPedido, filtros.proveedor].filter(Boolean).length}
+          activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroPedido)) + Number(Boolean(filtros.proveedor))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
         >
-          <FilterSelect
+          <FilterMultiSelect
             label="Sucursal"
-            value={filtros.sucursal || "todas"}
-            onChange={(value) => setFiltros((f) => ({ ...f, sucursal: value === "todas" ? "" : value }))}
-            placeholder="Sucursal"
-            options={[{ value: "todas", label: "Todas" }, ...SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))]}
+            values={filtros.sucursales}
+            onChange={(sucursales) => setFiltros((f) => ({ ...f, sucursales }))}
+            placeholder="Todas"
+            options={SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))}
             width="w-40"
           />
           <FilterCustom label="N° Pedido" width="w-32">

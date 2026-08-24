@@ -20,18 +20,19 @@ import { SUCURSALES } from "@/lib/constants";
 import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
-import { FiltersBar, FilterCustom, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 
 interface Filtros {
   busqueda: string;
-  sucursal: string;
+  sucursales: string[];
   nroSolicitud: string;
   solicitante: string;
 }
 
 type SolicitudSortKey = "sucursal" | "nroSolicitud" | "fechaEmision" | "solicitante" | "itemsCount";
 
-const FILTROS_VACIOS: Filtros = { busqueda: "", sucursal: "", nroSolicitud: "", solicitante: "" };
+const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], nroSolicitud: "", solicitante: "" };
 
 const rowKey = (row: { sucursal: string; nroSolicitud: string }) => `${row.sucursal}-${row.nroSolicitud}`;
 
@@ -110,7 +111,7 @@ export function SolicitudesCompraTab() {
     return Array.from(grupos.values()).sort((a, b) => (b.fechaEmision ?? "").localeCompare(a.fechaEmision ?? ""));
   }, [solicitudesLineasQuery.data]);
 
-  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursal || filtros.nroSolicitud || filtros.solicitante);
+  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursales.length || filtros.nroSolicitud || filtros.solicitante);
 
   const gruposFiltrados = useMemo(() => {
     if (!filtrosActivos) return solicitudesAgrupadas;
@@ -118,7 +119,7 @@ export function SolicitudesCompraTab() {
     const busqueda = filtros.busqueda.trim().toLowerCase();
 
     return solicitudesAgrupadas.filter((grupo) => {
-      if (filtros.sucursal && grupo.sucursal !== filtros.sucursal) return false;
+      if (filtros.sucursales.length > 0 && !filtros.sucursales.includes(grupo.sucursal)) return false;
       if (filtros.nroSolicitud && !grupo.nroSolicitud.toLowerCase().includes(filtros.nroSolicitud.trim().toLowerCase()))
         return false;
       if (filtros.solicitante && !(grupo.solicitante ?? "").toLowerCase().includes(filtros.solicitante.trim().toLowerCase()))
@@ -193,15 +194,15 @@ export function SolicitudesCompraTab() {
       <div className="space-y-3">
         <FiltersBar
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN000406, 2181800, anillo…", width: "min-w-0 flex-1" }}
-          activeCount={[filtros.busqueda, filtros.sucursal, filtros.nroSolicitud, filtros.solicitante].filter(Boolean).length}
+          activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroSolicitud)) + Number(Boolean(filtros.solicitante))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
         >
-          <FilterSelect
+          <FilterMultiSelect
             label="Sucursal"
-            value={filtros.sucursal || "todas"}
-            onChange={(value) => setFiltros((f) => ({ ...f, sucursal: value === "todas" ? "" : value }))}
-            placeholder="Sucursal"
-            options={[{ value: "todas", label: "Todas" }, ...SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))]}
+            values={filtros.sucursales}
+            onChange={(sucursales) => setFiltros((f) => ({ ...f, sucursales }))}
+            placeholder="Todas"
+            options={SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))}
             width="w-40"
           />
           <FilterCustom label="N° Solicitud" width="w-32">

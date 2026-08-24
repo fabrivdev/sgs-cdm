@@ -58,16 +58,16 @@ export interface VentaRepuestoHistorial {
 
 export interface StockFiltros {
   busqueda: string;
-  marca: string;
-  familia: string;
-  estadoStock: "con_stock" | "sin_stock" | "todos";
+  marcas: string[];
+  familias: string[];
+  estadosStock: Array<"con_stock" | "sin_stock">;
 }
 
 export const STOCK_FILTROS_VACIOS: StockFiltros = {
   busqueda: "",
-  marca: "",
-  familia: "",
-  estadoStock: "con_stock",
+  marcas: [],
+  familias: [],
+  estadosStock: ["con_stock"],
 };
 
 export type StockSortKey =
@@ -88,10 +88,10 @@ function aplicarFiltrosStock(qb: any, filtros: StockFiltros) {
   if (busqueda) {
     query = query.or(`codigo_interno.ilike.%${busqueda}%,descripcion.ilike.%${busqueda}%,codigo_fabricante.ilike.%${busqueda}%`);
   }
-  if (filtros.marca) query = query.eq("marca", filtros.marca);
-  if (filtros.familia) query = query.eq("familia", filtros.familia);
-  if (filtros.estadoStock === "con_stock") query = query.gt("total", 0);
-  if (filtros.estadoStock === "sin_stock") query = query.eq("total", 0);
+  if (filtros.marcas.length) query = query.in("marca", filtros.marcas);
+  if (filtros.familias.length) query = query.in("familia", filtros.familias);
+  if (filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "con_stock") query = query.gt("total", 0);
+  if (filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "sin_stock") query = query.eq("total", 0);
   return query;
 }
 

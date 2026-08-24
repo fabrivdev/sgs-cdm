@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown } from "lucide-react";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { trabajoReferencia } from "@/lib/trabajos";
-import { FiltersBar, FilterSelect, FilterDate } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMultiSelect";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -97,9 +98,9 @@ export function TrabajosOSTab({
   const [detalleId, setDetalleId] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
-  const [fSucursal, setFSucursal] = useState("all");
-  const [fSitOs, setFSitOs] = useState("all");
-  const [fSitFac, setFSitFac] = useState("all");
+  const [fSucursales, setFSucursales] = useState<string[]>([]);
+  const [fSitOs, setFSitOs] = useState<string[]>([]);
+  const [fSitFac, setFSitFac] = useState<string[]>([]);
   const [fDesde, setFDesde] = useState("");
   const [fHasta, setFHasta] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("fecha");
@@ -151,9 +152,9 @@ export function TrabajosOSTab({
     const query = q.trim().toLowerCase();
     return os.filter(o => {
       const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null;
-      if (fSucursal !== "all" && t?.sucursal !== fSucursal) return false;
-      if (fSitOs !== "all" && o.situacion_os !== fSitOs) return false;
-      if (fSitFac !== "all" && o.situacion_facturacion !== fSitFac) return false;
+      if (!matchesMulti(fSucursales, t?.sucursal)) return false;
+      if (!matchesMulti(fSitOs, o.situacion_os)) return false;
+      if (!matchesMulti(fSitFac, o.situacion_facturacion)) return false;
       if (fDesde && (!o.fecha_abierta_os || o.fecha_abierta_os < fDesde)) return false;
       if (fHasta && (!o.fecha_abierta_os || o.fecha_abierta_os > fHasta + "T23:59:59")) return false;
       if (query) {
@@ -167,7 +168,7 @@ export function TrabajosOSTab({
       }
       return true;
     });
-  }, [os, q, fSucursal, fSitOs, fSitFac, fDesde, fHasta, trabajoMap, clienteMap]);
+  }, [os, q, fSucursales, fSitOs, fSitFac, fDesde, fHasta, trabajoMap, clienteMap]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
@@ -199,14 +200,14 @@ export function TrabajosOSTab({
   }, [filtered]);
 
   const limpiar = () => {
-    setQ(""); setFSucursal("all"); setFSitOs("all"); setFSitFac("all"); setFDesde(""); setFHasta("");
+    setQ(""); setFSucursales([]); setFSitOs([]); setFSitFac([]); setFDesde(""); setFHasta("");
   };
 
   const activosCount =
     (q ? 1 : 0) +
-    (fSucursal !== "all" ? 1 : 0) +
-    (fSitOs !== "all" ? 1 : 0) +
-    (fSitFac !== "all" ? 1 : 0) +
+    (fSucursales.length ? 1 : 0) +
+    (fSitOs.length ? 1 : 0) +
+    (fSitFac.length ? 1 : 0) +
     (fDesde ? 1 : 0) +
     (fHasta ? 1 : 0);
 
@@ -232,17 +233,17 @@ export function TrabajosOSTab({
         onClear={limpiar}
         meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} · ${fmtNum(totales.horas)} h`}
       >
-        <FilterSelect
-          label="Sucursal" value={fSucursal} onChange={setFSucursal} placeholder="Sucursal" width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...SUCURSALES.map(s => ({ value: s, label: s }))]}
+        <FilterMultiSelect
+          label="Sucursal" values={fSucursales} onChange={setFSucursales} placeholder="Todas" width="w-[150px]"
+          options={SUCURSALES.map(s => ({ value: s, label: s }))}
         />
-        <FilterSelect
-          label="Sit. OS" value={fSitOs} onChange={setFSitOs} placeholder="Situación OS" width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...sitOsOpts.map(s => ({ value: s, label: s }))]}
+        <FilterMultiSelect
+          label="Sit. OS" values={fSitOs} onChange={setFSitOs} placeholder="Todas" width="w-[150px]"
+          options={sitOsOpts.map(s => ({ value: s, label: s }))}
         />
-        <FilterSelect
-          label="Sit. Fact." value={fSitFac} onChange={setFSitFac} placeholder="Sit. Fact." width="w-[150px]"
-          options={[{ value: "all", label: "Todos" }, ...sitFacOpts.map(s => ({ value: s, label: s }))]}
+        <FilterMultiSelect
+          label="Sit. Fact." values={fSitFac} onChange={setFSitFac} placeholder="Todas" width="w-[150px]"
+          options={sitFacOpts.map(s => ({ value: s, label: s }))}
         />
         <FilterDate label="Desde" value={fDesde} onChange={setFDesde} title="Fecha apertura OS desde" />
         <FilterDate label="Hasta" value={fHasta} onChange={setFHasta} title="Fecha apertura OS hasta" />
