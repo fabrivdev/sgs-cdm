@@ -269,8 +269,7 @@ export function ParqueTab({
         supabase
           .from("clientes")
           .select("id, nombre, sucursal, activo")
-          .in("id", clienteIds)
-          .eq("activo", true),
+          .in("id", clienteIds),
 
         supabase
           .from("contactos_cliente")
