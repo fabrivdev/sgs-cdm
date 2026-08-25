@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
 export function useUnseen() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -12,28 +12,39 @@ export function useUnseen() {
     let lastNotified = 0;
 
     const load = async () => {
-      const { data } = await supabase
+      const servicesResult = await supabase
         .from("servicios")
         .select("id, visto_por, tecnico_responsable_id, auxiliares")
         .or(`tecnico_responsable_id.eq.${user.id},auxiliares.cs.{${user.id}}`);
-      const unseen = (data ?? []).filter((s: { visto_por: string[] | null }) => !(s.visto_por ?? []).includes(user.id));
-      setCount(unseen.length);
-      if (unseen.length > lastNotified && lastNotified !== 0) {
-        toast(`Tenés ${unseen.length} servicio(s) nuevo(s) asignado(s)`);
+      const notificationsResult = isAdmin
+        ? await supabase.from("notificaciones")
+            .select("id, visto_por")
+            .eq("estado", "pendiente")
+        : { data: [] };
+      const unseenServices = (servicesResult.data ?? [])
+        .filter((service: { visto_por: string[] | null }) => !(service.visto_por ?? []).includes(user.id));
+      const unseenNotifications = (notificationsResult.data ?? [])
+        .filter((notification: { visto_por: string[] | null }) => !(notification.visto_por ?? []).includes(user.id));
+      const nextCount = unseenServices.length + unseenNotifications.length;
+      setCount(nextCount);
+      if (nextCount > lastNotified && lastNotified !== 0) {
+        const delta = nextCount - lastNotified;
+        toast(delta === 1 ? "Tenés una notificación nueva" : `Tenés ${delta} notificaciones nuevas`);
       }
-      lastNotified = unseen.length;
+      lastNotified = nextCount;
     };
 
     load();
     const channel = supabase
-      .channel("servicios-changes")
+      .channel(`notificaciones-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "servicios" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notificaciones" }, load)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [isAdmin, user]);
 
   return count;
 }

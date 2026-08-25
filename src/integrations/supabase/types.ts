@@ -987,6 +987,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notificaciones: {
+        Row: {
+          accionada_en: string | null
+          accionada_por: string | null
+          actualizado_en: string
+          clave_unica: string
+          creado_en: string
+          datos: Json
+          destinatario_roles: Database["public"]["Enums"]["app_role"][]
+          estado: string
+          id: string
+          mensaje: string | null
+          tipo: string
+          titulo: string
+          visto_por: string[]
+        }
+        Insert: {
+          accionada_en?: string | null
+          accionada_por?: string | null
+          actualizado_en?: string
+          clave_unica: string
+          creado_en?: string
+          datos?: Json
+          destinatario_roles?: Database["public"]["Enums"]["app_role"][]
+          estado?: string
+          id?: string
+          mensaje?: string | null
+          tipo: string
+          titulo: string
+          visto_por?: string[]
+        }
+        Update: {
+          accionada_en?: string | null
+          accionada_por?: string | null
+          actualizado_en?: string
+          clave_unica?: string
+          creado_en?: string
+          datos?: Json
+          destinatario_roles?: Database["public"]["Enums"]["app_role"][]
+          estado?: string
+          id?: string
+          mensaje?: string | null
+          tipo?: string
+          titulo?: string
+          visto_por?: string[]
+        }
+        Relationships: []
+      }
       ordenes_servicio_importadas: {
         Row: {
           actualizado_en: string
@@ -3223,6 +3271,30 @@ export type Database = {
       }
     }
     Functions: {
+      confirmar_notificacion_alta_maquina: {
+        Args: {
+          p_anio?: number | null
+          p_cliente_id: string
+          p_localidad?: string | null
+          p_marca: Database["public"]["Enums"]["marca"]
+          p_modelo_tipo: string | null
+          p_notas?: string | null
+          p_notificacion_id: string
+          p_serie: string
+          p_subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+          p_sucursal?: Database["public"]["Enums"]["sucursal"] | null
+          p_vendedor?: string | null
+        }
+        Returns: string
+      }
+      descartar_notificacion_venta_maquina: {
+        Args: { p_notificacion_id: string }
+        Returns: undefined
+      }
+      notificaciones_marcar_vista: {
+        Args: { p_notificacion_id: string }
+        Returns: undefined
+      }
       comisiones_actualizar_tipo_tiempo: {
         Args: { p_jornada_id: string; p_tipo_tiempo: string }
         Returns: string
