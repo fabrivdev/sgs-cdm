@@ -3359,7 +3359,7 @@ export default function Dashboard() {
     <PageShell className="overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-      <PageHeader title="Dashboard ejecutivo" actions={dashboardExportOptions.length > 0 ? <TableExportButton options={dashboardExportOptions} /> : undefined} tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
+      <PageHeader title="Dashboard ejecutivo" tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-[12px]">Vista general</TabsTrigger>
           <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-[12px]">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-[12px]">Trabajos</TabsTrigger>
@@ -3369,6 +3369,7 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
+        actions={dashboardExportOptions.length > 0 ? <TableExportButton options={dashboardExportOptions} /> : undefined}
         expanded={(
           <div className="flex flex-col gap-3">
             <FilterMultiSelect

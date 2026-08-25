@@ -560,23 +560,22 @@ export default function Planificador() {
 
   return (
     <div className={pageShellWide}>
-      <PageHeader title="Planificador" actions={<>
-          <Button variant="outline" size="sm" onClick={exportExcel} className="hidden sm:inline-flex">
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
-          </Button>
-
-          {canCreate && (
+      <PageHeader title="Planificador" actions={canCreate ? <>
             <Button size="sm" onClick={() => setOpenProgramar(true)}>
               <CalendarPlus className="mr-2 h-4 w-4" /> Programar jornada
             </Button>
-          )}
-      </>} />
+      </> : undefined} />
 
       <FiltersBar
         search={{ value: fCliente, onChange: setFCliente, placeholder: "Cliente, OS o folio…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
+        actions={(
+          <Button variant="outline" size="sm" onClick={exportExcel}>
+            <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Exportar
+          </Button>
+        )}
         expanded={<>
           <FilterMultiSelect label="Marca" values={fMarcas} onChange={setFMarcas} placeholder="Todas" width="w-full" options={MARCAS.map(m => ({ value: m, label: m }))} />
           <FilterMultiSelect label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-full" options={ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))} />

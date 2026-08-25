@@ -568,15 +568,6 @@ export default function Calendario() {
           )}
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 gap-2"
-            onClick={exportarExcel}
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Excel
-          </Button>
-          <Button
-            variant="outline"
             size="icon"
             className="h-9 w-9"
             onClick={() => setCursor(vista === "mes" ? addMonths(cursor, 1) : addWeeks(cursor, 1))}
@@ -589,6 +580,11 @@ export default function Calendario() {
       <FiltersBar
         activeCount={fTecnicos.length > 0 ? 1 : 0}
         onClear={() => setFTecnicos([])}
+        actions={(
+          <Button variant="outline" size="sm" onClick={exportarExcel}>
+            <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Exportar
+          </Button>
+        )}
       >
         <FilterSelect
           label="Vista"

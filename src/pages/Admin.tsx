@@ -30,6 +30,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
+import { FiltersBar } from "@/components/filters/FiltersBar";
 
 interface Profile {
   id: string;
@@ -48,6 +49,12 @@ interface UserModuloAcceso {
   user_id: string;
   modulo_id: Modulo;
 }
+
+const normalizeAdminSearch = (value: string) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase("es")
+  .trim();
 
 function ModuloChips({
   activos,
@@ -112,6 +119,8 @@ export default function Admin() {
   const [showCredPassword, setShowCredPassword] = useState(false);
   const [monthlyProductivityGoal, setMonthlyProductivityGoal] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
   const [savingParameters, setSavingParameters] = useState(false);
+  const [adminTab, setAdminTab] = useState("equipo");
+  const [tableSearch, setTableSearch] = useState("");
 
   const rolesByUser = useMemo(
     () =>
@@ -168,12 +177,30 @@ export default function Admin() {
     [profiles],
   );
 
-  const exportOptions = useMemo<TableExportOption[]>(() => [
+  const normalizedTableSearch = normalizeAdminSearch(tableSearch);
+  const profileMatchesSearch = (profile: Profile) => {
+    if (!normalizedTableSearch) return true;
+    const role = primaryRoleForProfile(profile);
+    return normalizeAdminSearch([
+      profile.nombre,
+      emailByProfile(profile),
+      profile.sucursal ?? "",
+      nivelLabel(role, modulesForProfile(profile)),
+      role ? ROLE_LABELS[role] : "",
+      ...modulesForProfile(profile).map((module) => MODULO_LABELS[module]),
+      profile.activo ? "Activo" : "Inactivo",
+    ].join(" ")).includes(normalizedTableSearch);
+  };
+  const filteredProfiles = profiles.filter(profileMatchesSearch);
+  const filteredProfilesConAcceso = profilesConAcceso.filter(profileMatchesSearch);
+  const filteredProfilesSinAcceso = profilesSinAcceso.filter(profileMatchesSearch);
+
+  const exportOptions: TableExportOption[] = [
     {
       label: "Equipo operativo",
       filename: `administracion-equipo-${new Date().toISOString().slice(0, 10)}`,
       sheetName: "Equipo",
-      rows: profiles.map((profile) => ({
+      rows: filteredProfiles.map((profile) => ({
         Nombre: profile.nombre,
         Email: emailByProfile(profile),
         Sucursal: profile.sucursal ?? "",
@@ -186,7 +213,7 @@ export default function Admin() {
       label: "Accesos al sistema",
       filename: `administracion-accesos-${new Date().toISOString().slice(0, 10)}`,
       sheetName: "Accesos",
-      rows: profilesConAcceso.map((profile) => ({
+      rows: filteredProfilesConAcceso.map((profile) => ({
         Persona: profile.nombre,
         Email: emailByProfile(profile),
         Nivel: nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile)),
@@ -196,7 +223,7 @@ export default function Admin() {
         Estado: profile.activo ? "Activo" : "Inactivo",
       })),
     },
-  ], [emails, moduloAccesoByUser, profiles, profilesConAcceso, rolesByUser]);
+  ];
 
   const load = async () => {
     const [profileResult, roleResult, moduloAccesoResult] = await Promise.all([
@@ -449,9 +476,9 @@ export default function Admin() {
 
   return (
     <PageShell>
-      <PageHeader title="Administración" actions={<TableExportButton options={exportOptions} />} />
+      <PageHeader title="Administración" />
 
-      <Tabs defaultValue="equipo">
+      <Tabs value={adminTab} onValueChange={(value) => { setAdminTab(value); setTableSearch(""); }}>
         <TabsList>
           <TabsTrigger value="equipo">
             <Users className="mr-2 h-4 w-4" />
@@ -470,6 +497,22 @@ export default function Admin() {
             Parámetros
           </TabsTrigger>
         </TabsList>
+
+        {(adminTab === "equipo" || adminTab === "accesos") && (
+          <FiltersBar
+            search={{
+              value: tableSearch,
+              onChange: setTableSearch,
+              label: "Buscar",
+              placeholder: adminTab === "equipo" ? "Nombre, sucursal o nivel…" : "Persona, email, rol o módulo…",
+              width: "w-[min(420px,34vw)]",
+            }}
+            activeCount={normalizedTableSearch ? 1 : 0}
+            onClear={() => setTableSearch("")}
+            meta={`${adminTab === "equipo" ? filteredProfiles.length : filteredProfilesConAcceso.length} registro${(adminTab === "equipo" ? filteredProfiles.length : filteredProfilesConAcceso.length) === 1 ? "" : "s"}`}
+            actions={<TableExportButton options={adminTab === "equipo" ? [exportOptions[0]] : [exportOptions[1]]} />}
+          />
+        )}
 
         <TabsContent value="equipo" className="space-y-4">
           {!canManageAdmin && (
@@ -503,7 +546,7 @@ export default function Admin() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {profiles.map((profile) => (
+                {filteredProfiles.map((profile) => (
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">{profile.nombre}</TableCell>
                     <TableCell className="text-[12px] text-muted-foreground">
@@ -556,7 +599,7 @@ export default function Admin() {
           </Card>
 
           <div className="space-y-2 md:hidden">
-            {profiles.map((profile) => (
+            {filteredProfiles.map((profile) => (
               <Card key={profile.id} className="space-y-2 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -695,7 +738,7 @@ export default function Admin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {profilesConAcceso.map((profile) => (
+                  {filteredProfilesConAcceso.map((profile) => (
                     <TableRow key={profile.id}>
                       <TableCell className="font-medium">{profile.nombre}</TableCell>
                       <TableCell className="text-[12px] text-muted-foreground">{emailByProfile(profile)}</TableCell>
@@ -743,10 +786,10 @@ export default function Admin() {
                 <div className="text-[13px] font-semibold">Equipo sin acceso</div>
                 <div className="text-[12px] text-muted-foreground">Siguen disponibles para planificador, calendario y jornadas, pero no pueden iniciar sesion.</div>
               </div>
-              <Badge variant="outline">{profilesSinAcceso.length} perfiles</Badge>
+              <Badge variant="outline">{filteredProfilesSinAcceso.length} perfiles</Badge>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
-              {profilesSinAcceso.slice(0, 12).map((profile) => (
+              {filteredProfilesSinAcceso.slice(0, 12).map((profile) => (
                 <div key={profile.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
                   <div className="min-w-0">
                     <div className="truncate text-[13px] font-medium">{profile.nombre}</div>
@@ -755,8 +798,8 @@ export default function Admin() {
                   {canManageAdmin && !isProtectedProfile(profile) && <Button variant="outline" size="sm" className="shrink-0" onClick={() => openCred(profile)}>Crear acceso</Button>}
                 </div>
               ))}
-              {profilesSinAcceso.length > 12 && (
-                <div className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">+{profilesSinAcceso.length - 12} perfiles sin acceso. Buscalos en Equipo para asociarlos.</div>
+              {filteredProfilesSinAcceso.length > 12 && (
+                <div className="rounded-md border border-dashed px-3 py-2 text-[12px] text-muted-foreground">+{filteredProfilesSinAcceso.length - 12} perfiles sin acceso. Buscalos en Equipo para asociarlos.</div>
               )}
             </div>
           </Card>

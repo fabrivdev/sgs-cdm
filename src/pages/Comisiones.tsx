@@ -632,7 +632,6 @@ export default function Comisiones() {
       <Tabs value={view} onValueChange={(value) => setView(value as View)} className="space-y-3">
         <PageHeader
           title="Comisiones"
-          actions={<TableExportButton options={exportOptions} />}
           tabs={<TabsList>
             <TabsTrigger value="cerradas">Cerradas</TabsTrigger>
             <TabsTrigger value="abiertas">Abiertas</TabsTrigger>
@@ -664,6 +663,7 @@ export default function Comisiones() {
             activeCount={activeFilterCount}
             onClear={clearFilters}
             meta={`${detailOrders.length} OS`}
+            actions={<TableExportButton options={exportOptions} />}
           >
             <FilterDate label="Desde" value={from} onChange={setFrom} />
             <FilterDate label="Hasta" value={to} onChange={setTo} />
