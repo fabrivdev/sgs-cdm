@@ -3,6 +3,7 @@ import type { CanonicalServiceOrderRow } from "@/lib/imports/canonical";
 import {
   buildCommissionTimeEntries,
   calculateCommissionDuration,
+  historicalInheritedParticipantOrigin,
   normalizeCommissionTime,
 } from "@/lib/imports/commissionTime";
 
@@ -45,6 +46,14 @@ describe("commission time calculation", () => {
 });
 
 describe("commission entries", () => {
+  it("recovers legacy KM/SE participant metadata saved before the explicit origin field existed", () => {
+    expect(historicalInheritedParticipantOrigin({ source_product_code: "KM01" })).toBe("KM");
+    expect(historicalInheritedParticipantOrigin({ source_product_name: "Servicio tercerizado" })).toBe("SE");
+    expect(historicalInheritedParticipantOrigin({ source_product_code: "SE" })).toBe("SE");
+    expect(historicalInheritedParticipantOrigin({ source_product_code: "MA01" })).toBeNull();
+    expect(historicalInheritedParticipantOrigin({ source_product_code: "REP001" })).toBeNull();
+  });
+
   it("creates one ledger line per participating technician without duplicating a repeated name", () => {
     const row = {
       rowId: "row-1",

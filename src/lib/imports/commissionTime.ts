@@ -129,6 +129,25 @@ function inheritedParticipantOrigin(row: CanonicalServiceOrderRow): InheritedPar
   return null;
 }
 
+export function historicalInheritedParticipantOrigin(rawData: Record<string, unknown>): InheritedParticipantOrigin | null {
+  const explicitOrigin = rawData.source_participant_origin;
+  if (explicitOrigin === "KM" || explicitOrigin === "SE") return explicitOrigin;
+
+  // Las primeras jornadas del módulo se guardaron antes de incorporar
+  // `source_participant_origin`, pero ya conservaban el código y el nombre del
+  // producto original. Recuperar el origen desde esos campos evita perder al
+  // técnico en una reimportación posterior de una OS histórica.
+  const productCode = commissionProductToken(rawData.source_product_code);
+  const productName = commissionProductToken(rawData.source_product_name);
+  if (/^(?:KM|KM0*1)$/.test(productCode) || /^(?:KM|KM0*1)$/.test(productName)) return "KM";
+  if (
+    /^(?:SE|SE0*1)$/.test(productCode)
+    || /^(?:SE|SE0*1)$/.test(productName)
+    || productName === "SERVICIOTERCERIZADO"
+  ) return "SE";
+  return null;
+}
+
 function isCommissionParticipantLine(row: CanonicalServiceOrderRow) {
   return isLaborTimeLine(row) || inheritedParticipantOrigin(row) !== null;
 }
@@ -334,8 +353,8 @@ export async function persistCommissionTimeEntries(args: {
     }
     for (const row of data ?? []) {
       const rawData = row.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
-      const origin = rawData.source_participant_origin;
-      if (origin !== "KM" && origin !== "SE") continue;
+      const origin = historicalInheritedParticipantOrigin(rawData);
+      if (!origin) continue;
       const source = String(rawData.source_technician ?? row.tecnico_nombre ?? "").trim();
       if (!source) continue;
       historicalInheritedParticipants.push({ os_numero: row.os_numero, source, origin });
