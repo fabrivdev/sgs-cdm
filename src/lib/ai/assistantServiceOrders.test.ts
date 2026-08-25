@@ -24,11 +24,11 @@ describe("assistant service-order branch resolution", () => {
   });
 
   it("reads the source branch code persisted in raw_data", () => {
-    expect(resolveServiceOrderBranch({ raw_data: { source_branch_code: "02" } })).toBe("Santa Rosa");
+    expect(resolveServiceOrderBranch({ raw_data: { source_branch_code: "02" } })).toBe("Katuete");
   });
 
   it("derives the branch from the qualified OS prefix", () => {
-    expect(resolveServiceOrderBranch({ os_numero: "06-00000019" })).toBe("Katuete");
+    expect(resolveServiceOrderBranch({ os_numero: "06-00000019" })).toBe("Santa Rosa");
   });
 
   it("uses the stable client lookup when available", () => {

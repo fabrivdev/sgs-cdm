@@ -168,6 +168,7 @@ export function mapCanonicalOsToImportRow(row: CanonicalServiceOrderRow): Servic
       ...row.raw,
       source_os_number: row.sourceServiceOrderNumber,
       source_branch_code: row.branchCode,
+      canonical_branch: row.branch,
       canonical_group: row.group,
       canonical_model: row.model,
       canonical_auxiliary_technicians: row.auxiliaryTechnicians,

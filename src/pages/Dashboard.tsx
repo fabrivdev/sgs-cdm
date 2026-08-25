@@ -541,10 +541,11 @@ function marcaDesdeOS(marca: string | null | undefined): Marca {
 
 function normalizeClienteKey(name: string): string {
   return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\bS\.?A\.?(C\.?I\.?)?\b/g, "")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\b(?:S A C I|SACI|S A|SA|S R L|SRL|E A S|EAS)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -1378,13 +1379,6 @@ export default function Dashboard() {
       const cliente = String(clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente").trim() || "Sin cliente";
       const clienteMatched = clienteByName.get(normalizeClienteKey(cliente));
       const rawData = (row.raw_data ?? {}) as Record<string, any>;
-      const sucursal = resolveDashboardServiceOrderBranch({
-        jobBranch: trabajo?.sucursal,
-        rawData,
-        orderNumber: row.os_numero,
-        clientBranch: clienteMatched?.sucursal,
-        clientName: cliente,
-      });
       const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
       const origen = String(
         rawData.canonical_origin ?? rawData.ORIGEN ?? rawData.Origen ?? "",
@@ -1414,6 +1408,20 @@ export default function Dashboard() {
       }
       const participants = Array.from(participantMap.values());
       const participantNames = participants.map((participant) => participant.tecnico);
+      const participantBranches = Array.from(new Set(
+        participants
+          .map((participant) => participant.profileId ? profileById.get(participant.profileId)?.sucursal : null)
+          .filter((branch): branch is Sucursal => !!branch),
+      ));
+      const technicianBranch = participantBranches.length === 1 ? participantBranches[0] : null;
+      const sucursal = resolveDashboardServiceOrderBranch({
+        jobBranch: trabajo?.sucursal,
+        rawData,
+        orderNumber: row.os_numero,
+        clientBranch: clienteMatched?.sucursal,
+        clientName: cliente,
+        technicianBranch,
+      });
       const responsibleSource = String(row.responsable ?? "").trim();
       const responsibleMatch = responsibleSource
         ? matchTechnicianProfile(responsibleSource, allTechnicianProfiles)

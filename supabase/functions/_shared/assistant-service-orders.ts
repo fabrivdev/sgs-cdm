@@ -29,7 +29,16 @@ export const ASSISTANT_SERVICE_ORDER_SELECT = [
   "raw_data",
 ].join(",");
 
-const BRANCH_BY_CODE: Record<string, string> = {
+const NEW_BRANCH_BY_CODE: Record<string, string> = {
+  "01": "Santa Rita",
+  "02": "Katuete",
+  "03": "Campo 9",
+  "04": "Misiones",
+  "05": "Loma Plata",
+  "06": "Santa Rosa",
+};
+
+const LEGACY_BRANCH_BY_CODE: Record<string, string> = {
   "01": "Santa Rita",
   "02": "Santa Rosa",
   "03": "Campo 9",
@@ -38,7 +47,10 @@ const BRANCH_BY_CODE: Record<string, string> = {
   "06": "Katuete",
 };
 
-const BRANCHES = Object.values(BRANCH_BY_CODE);
+const BRANCHES = Array.from(new Set([
+  ...Object.values(NEW_BRANCH_BY_CODE),
+  ...Object.values(LEGACY_BRANCH_BY_CODE),
+]));
 
 const TECHNICIAN_CODE_PREFIX = /^(?:[A-Z]{1,6}[\s-]*)?\d{2,}\s*(?:[-:|/]\s*)?/;
 
@@ -110,12 +122,9 @@ export function serviceOrderClientKey(value: unknown) {
     .trim();
 }
 
-function canonicalBranch(value: unknown) {
+function canonicalBranchName(value: unknown) {
   const normalized = normalizeServiceOrderText(value);
   if (!normalized) return null;
-
-  const numericCode = normalized.match(/^0?([1-6])$/)?.[1];
-  if (numericCode) return BRANCH_BY_CODE[numericCode.padStart(2, "0")] ?? null;
 
   if (normalized.includes("SANTA RITA")) return "Santa Rita";
   if (normalized.includes("SANTA ROSA")) return "Santa Rosa";
@@ -127,21 +136,43 @@ function canonicalBranch(value: unknown) {
   return null;
 }
 
+function branchFromCode(value: unknown, source: "new" | "legacy") {
+  const normalized = normalizeServiceOrderText(value);
+  const numericCode = normalized.match(/^0?([1-6])$/)?.[1];
+  if (!numericCode) return null;
+  const mapping = source === "new" ? NEW_BRANCH_BY_CODE : LEGACY_BRANCH_BY_CODE;
+  return mapping[numericCode.padStart(2, "0")] ?? null;
+}
+
+function canonicalBranch(value: unknown) {
+  return canonicalBranchName(value) ?? branchFromCode(value, "legacy");
+}
+
 function branchFromRawData(rawData: unknown) {
   if (!rawData || typeof rawData !== "object" || Array.isArray(rawData)) return null;
 
+  const entries = Object.entries(rawData as ServiceOrderBranchRow);
+  const normalizedEntries = new Map(
+    entries.map(([key, value]) => [normalizeServiceOrderText(key), value]),
+  );
+  const canonical = canonicalBranchName(normalizedEntries.get("CANONICAL BRANCH"));
+  if (canonical) return canonical;
+  const sourceCode = branchFromCode(normalizedEntries.get("SOURCE BRANCH CODE"), "new");
+  if (sourceCode) return sourceCode;
+
   const acceptedKeys = new Set([
     "SOURCE BRANCH",
-    "SOURCE BRANCH CODE",
     "BRANCH",
     "BRANCH CODE",
     "SUCURSAL",
     "FILIAL",
     "LOJA",
   ]);
-  for (const [key, value] of Object.entries(rawData as ServiceOrderBranchRow)) {
-    if (!acceptedKeys.has(normalizeServiceOrderText(key))) continue;
-    const branch = canonicalBranch(value);
+  for (const [key, value] of entries) {
+    const normalizedKey = normalizeServiceOrderText(key);
+    if (!acceptedKeys.has(normalizedKey)) continue;
+    const branch = canonicalBranchName(value)
+      ?? branchFromCode(value, normalizedKey === "SOURCE BRANCH CODE" ? "new" : "legacy");
     if (branch) return branch;
   }
   return null;
@@ -150,7 +181,7 @@ function branchFromRawData(rawData: unknown) {
 function branchFromOrderNumber(value: unknown) {
   const orderNumber = String(value ?? "").trim();
   const code = orderNumber.match(/^0?([1-6])[-_/]/)?.[1];
-  return code ? BRANCH_BY_CODE[code.padStart(2, "0")] ?? null : null;
+  return code ? NEW_BRANCH_BY_CODE[code.padStart(2, "0")] ?? null : null;
 }
 
 function branchFromClientName(value: unknown) {
