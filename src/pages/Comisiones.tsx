@@ -12,6 +12,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import { normalizeTechnicianName } from "@/lib/technicianMatching";
+import {
+  commissionClockBlockKey,
+  totalUniqueCommissionOrderHours,
+  uniqueCommissionBlockHours,
+} from "@/lib/commissionMetrics";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "@/components/layout/AppPrimitives";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeletonRows } from "@/components/LoadingSkeletons";
@@ -159,22 +164,6 @@ function normalizeOrderNumber(value: string | null | undefined) {
     .join("-");
 }
 
-function commissionBlockKey(row: CommissionRow) {
-  return [row.fecha_inicio, row.hora_inicio, row.fecha_fin, row.hora_fin, row.tipo_tiempo]
-    .map((value) => String(value ?? ""))
-    .join("|");
-}
-
-function uniqueBlockHours(rows: CommissionRow[]) {
-  const blocks = new Map<string, number>();
-  for (const row of rows) {
-    const key = commissionBlockKey(row);
-    const value = Number(row.horas_calculadas ?? 0);
-    blocks.set(key, Math.max(blocks.get(key) ?? 0, value));
-  }
-  return Array.from(blocks.values()).reduce((sum, value) => sum + value, 0);
-}
-
 function summarize(rows: CommissionRow[], paidIds: Set<string>) {
   const grouped = new Map<string, TechnicianSummary>();
   for (const row of rows) {
@@ -235,7 +224,7 @@ function summarizeOrders(rows: CommissionRow[], paidIds: Set<string>): Commissio
       rows: orderRows,
       dateFrom: dates[0] ?? null,
       dateTo: representative.fecha_cierre ?? dates[dates.length - 1] ?? null,
-      totalHours: uniqueBlockHours(orderRows),
+      totalHours: uniqueCommissionBlockHours(orderRows),
       validation,
       paidCount: orderRows.filter((row) => paidIds.has(row.id)).length,
     } satisfies CommissionOsSummary;
@@ -399,8 +388,8 @@ export default function Comisiones() {
   const summaryRows = useMemo(() => summarize(periodRows, paidIds), [paidIds, periodRows]);
   const closedAll = useMemo(() => eligibleRows.filter((row) => isClosed(row) && row.fecha_cierre && row.fecha_cierre >= from && row.fecha_cierre <= to), [eligibleRows, from, to]);
   const openAll = useMemo(() => eligibleRows.filter((row) => !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to)), [eligibleRows, to]);
-  const totalClosed = closedAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
-  const totalOpen = openAll.reduce((sum, row) => sum + Number(row.horas_calculadas ?? 0), 0);
+  const totalClosed = totalUniqueCommissionOrderHours(closedAll);
+  const totalOpen = totalUniqueCommissionOrderHours(openAll);
   const totalPendingPayment = closedAll.filter((row) => !paidIds.has(row.id) && row.estado_validacion === "VALIDA").reduce((sum, row) => sum + Number(row.horas_validas ?? 0), 0);
   const totalReview = filteredRows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
   const closedOrderCount = new Set(closedAll.map((row) => row.os_numero)).size;
@@ -421,12 +410,12 @@ export default function Comisiones() {
       .map(([date, dayRows]) => ({
         date,
         rows: dayRows.sort((a, b) => String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? ""))),
-        total: uniqueBlockHours(dayRows),
+        total: uniqueCommissionBlockHours(dayRows),
       }))
       .sort((a, b) => a.date === "sin-fecha" ? 1 : b.date === "sin-fecha" ? -1 : a.date.localeCompare(b.date));
   }, [selectedOsRows]);
-  const selectedOsTotal = uniqueBlockHours(selectedOsRows);
-  const selectedOsBlocks = new Set(selectedOsRows.map(commissionBlockKey)).size;
+  const selectedOsTotal = uniqueCommissionBlockHours(selectedOsRows);
+  const selectedOsBlocks = new Set(selectedOsRows.map(commissionClockBlockKey)).size;
   const selectedOsTechnicians = new Set(selectedOsRows.map((row) => row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre))).size;
 
   const updateTimeType = async (row: CommissionRow, value: CommissionTimeType) => {
@@ -646,9 +635,9 @@ export default function Comisiones() {
           </Panel>
         ) : <>
           <KpiStrip>
-            <KpiItem label="Horas cerradas" value={hours(totalClosed)} detail={`${closedOrderCount} OS · ${closedAll.length} jornadas`} tone="info" icon={<CheckCircle2 />} />
-            <KpiItem label="Pendientes de pago" value={hours(totalPendingPayment)} detail="Validadas sin liquidar" tone="positive" icon={<WalletCards />} />
-            <KpiItem label="Horas abiertas" value={hours(totalOpen)} detail={`${openOrderCount} OS · ${openAll.length} jornadas`} tone="warning" icon={<Clock3 />} />
+            <KpiItem label="Horas cerradas" value={hours(totalClosed)} detail={`${closedOrderCount} OS · duración sin multiplicar técnicos`} tone="info" icon={<CheckCircle2 />} />
+            <KpiItem label="Horas a liquidar" value={hours(totalPendingPayment)} detail="Horas-persona validadas sin liquidar" tone="positive" icon={<WalletCards />} />
+            <KpiItem label="Horas abiertas" value={hours(totalOpen)} detail={`${openOrderCount} OS · duración sin multiplicar técnicos`} tone="warning" icon={<Clock3 />} />
             <KpiItem label="Requieren revisión" value={number.format(totalReview)} detail={`${reviewOrderCount} OS`} tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
           </KpiStrip>
 
