@@ -63,7 +63,6 @@ interface TechnicianReference {
 // unos 34 KB y respondia solamente `400 Bad Request`).
 const SOURCE_KEY_LOOKUP_BATCH_SIZE = 40;
 const UUID_LOOKUP_BATCH_SIZE = 100;
-const UPSERT_BATCH_SIZE = 100;
 
 function commissionRequestError(stage: string, error: unknown) {
   const candidate = error as {
@@ -296,7 +295,8 @@ export function buildCommissionTimeEntries(
 
 function isMissingCommissionSchema(error: unknown) {
   const message = String((error as { message?: string })?.message ?? error ?? "");
-  return /comisiones_(jornadas|preparar_reimportacion)/i.test(message) && /does not exist|schema cache|could not find/i.test(message);
+  return /comisiones_(jornadas|preparar_reimportacion|reemplazar_jornadas)/i.test(message)
+    && /does not exist|schema cache|could not find/i.test(message);
 }
 
 export async function persistCommissionTimeEntries(args: {
@@ -352,17 +352,6 @@ export async function persistCommissionTimeEntries(args: {
 
   if (!entries.length) return { inserted: 0, review: 0, invalid: 0, schemaAvailable: true };
 
-  const { error: prepareError } = await (supabase.rpc as any)("comisiones_preparar_reimportacion", {
-    p_os_numeros: osNumbers,
-  });
-  if (prepareError) {
-    if (!args.strict && isMissingCommissionSchema(prepareError)) {
-      console.info("Comisiones no se persistieron: falta aplicar la migración del módulo.");
-      return { inserted: 0, review: 0, invalid: 0, schemaAvailable: false };
-    }
-    throw commissionRequestError("No se pudo preparar la reimportacion de las OS", prepareError);
-  }
-
   const existingByKey = new Map<string, any>();
   for (let index = 0; index < entries.length; index += SOURCE_KEY_LOOKUP_BATCH_SIZE) {
     const keys = entries.slice(index, index + SOURCE_KEY_LOOKUP_BATCH_SIZE).map((row) => row.fuente_clave);
@@ -410,11 +399,19 @@ export async function persistCommissionTimeEntries(args: {
     return [next];
   });
 
-  for (let index = 0; index < payload.length; index += UPSERT_BATCH_SIZE) {
-    const { error } = await (supabase.from("comisiones_jornadas" as any).upsert(payload.slice(index, index + UPSERT_BATCH_SIZE) as any, {
-      onConflict: "fuente_clave",
-    }) as any);
-    if (error) throw commissionRequestError("No se pudieron guardar las jornadas recalculadas", error);
+  // El reemplazo se realiza dentro de una sola transacción de PostgreSQL. Así
+  // una falla de red o un XML parcial nunca puede dejar una OS desactivada a
+  // mitad del proceso: o se desactivan y recrean todas las jornadas, o ninguna.
+  const { error: replaceError } = await (supabase.rpc as any)("comisiones_reemplazar_jornadas", {
+    p_os_numeros: osNumbers,
+    p_jornadas: payload,
+  });
+  if (replaceError) {
+    if (!args.strict && isMissingCommissionSchema(replaceError)) {
+      console.info("Comisiones no se persistieron: falta aplicar la migración del reemplazo atómico.");
+      return { inserted: 0, review: 0, invalid: 0, schemaAvailable: false };
+    }
+    throw commissionRequestError("No se pudieron reemplazar atomícamente las jornadas", replaceError);
   }
 
   return {
