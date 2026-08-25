@@ -46,6 +46,12 @@ export interface CommissionTimeEntry {
   vigente: boolean;
 }
 
+export interface HistoricalInheritedParticipant {
+  os_numero: string;
+  source: string;
+  origin: "KM" | "SE";
+}
+
 interface TechnicianReference {
   id: string;
   nombre: string;
@@ -159,6 +165,7 @@ export function buildCommissionTimeEntries(
   rows: CanonicalServiceOrderRow[],
   importId: string | null,
   technicians: TechnicianReference[] = [],
+  historicalInheritedParticipants: HistoricalInheritedParticipant[] = [],
 ): CommissionTimeEntry[] {
   const entries = new Map<string, CommissionTimeEntry>();
   const rowsByServiceOrder = new Map<string, CanonicalServiceOrderRow[]>();
@@ -202,6 +209,16 @@ export function buildCommissionTimeEntries(
       if (!origin) continue;
       addParticipant(row.technician, origin);
       row.auxiliaryTechnicians.forEach((value) => addParticipant(value, origin));
+    }
+
+    // Los reportes diarios pueden volver a incluir una OS sin repetir todas sus
+    // lineas KM/SE historicas. Esos renglones identifican participantes, no
+    // horarios: conservar el ultimo participante conocido evita que una carga
+    // parcial borre comisiones ya reconstruidas correctamente.
+    const serviceOrderNumber = serviceOrderRows[0]?.serviceOrderNumber;
+    for (const participant of historicalInheritedParticipants) {
+      if (participant.os_numero !== serviceOrderNumber) continue;
+      addParticipant(participant.source, participant.origin);
     }
 
     const principalName = laborRows
@@ -293,7 +310,44 @@ export async function persistCommissionTimeEntries(args: {
     id: row.id,
     nombre: row.nombre,
   }));
-  const entries = buildCommissionTimeEntries(args.rows, args.importId, technicians);
+  const candidateOsNumbers = Array.from(new Set(
+    args.rows
+      .filter(isCommissionParticipantLine)
+      .map((row) => row.serviceOrderNumber)
+      .filter(Boolean),
+  ));
+  const historicalInheritedParticipants: HistoricalInheritedParticipant[] = [];
+  for (let index = 0; index < candidateOsNumbers.length; index += UUID_LOOKUP_BATCH_SIZE) {
+    const { data, error } = await (supabase
+      .from("comisiones_jornadas" as any)
+      .select("os_numero,tecnico_nombre,raw_data,actualizado_en")
+      .eq("origen_sistema", "new_xml_ordenes_servicio")
+      .eq("vigente", true)
+      .in("os_numero", candidateOsNumbers.slice(index, index + UUID_LOOKUP_BATCH_SIZE))
+      .order("actualizado_en", { ascending: false }) as any);
+    if (error) {
+      if (!args.strict && isMissingCommissionSchema(error)) {
+        console.info("Comisiones no se persistieron: falta aplicar la migración del módulo.");
+        return { inserted: 0, review: 0, invalid: 0, schemaAvailable: false };
+      }
+      throw commissionRequestError("No se pudieron recuperar los participantes historicos", error);
+    }
+    for (const row of data ?? []) {
+      const rawData = row.raw_data && typeof row.raw_data === "object" ? row.raw_data : {};
+      const origin = rawData.source_participant_origin;
+      if (origin !== "KM" && origin !== "SE") continue;
+      const source = String(rawData.source_technician ?? row.tecnico_nombre ?? "").trim();
+      if (!source) continue;
+      historicalInheritedParticipants.push({ os_numero: row.os_numero, source, origin });
+    }
+  }
+
+  const entries = buildCommissionTimeEntries(
+    args.rows,
+    args.importId,
+    technicians,
+    historicalInheritedParticipants,
+  );
   const osNumbers = Array.from(new Set(entries.map((row) => row.os_numero)));
 
   if (!entries.length) return { inserted: 0, review: 0, invalid: 0, schemaAvailable: true };

@@ -197,4 +197,54 @@ describe("commission entries", () => {
     expect(thirdPartyTechnician?.raw_data.source_participant_origin).toBe("SE");
     expect(thirdPartyTechnician?.raw_data.inherited_from_ma01).toBe(true);
   });
+
+  it("keeps previously known KM/SE participants when a later OS report is partial", () => {
+    const laborRow = {
+      rowId: "labor-row-current",
+      sourceServiceOrderNumber: "201",
+      branchCode: "01",
+      serviceOrderNumber: "01-201",
+      branch: "Santa Rita",
+      ownerName: "CLIENTE PRUEBA",
+      status: "Cerrada",
+      closeDate: "2026-08-20",
+      technician: "001 - JUAN PATINO",
+      auxiliaryTechnicians: [],
+      timeType: "Interno",
+      documentNumber: "90201",
+      productCode: "MA01",
+      productName: "MANO DE OBRA",
+      serviceHours: 5,
+      kilometreQuantity: 0,
+      raw: {
+        ITEM: "1",
+        canonical_start_date: "2026-08-14",
+        canonical_start_time: "1630",
+        canonical_end_date: "2026-08-14",
+        canonical_end_time: "2130",
+      },
+    } as unknown as CanonicalServiceOrderRow;
+
+    const entries = buildCommissionTimeEntries(
+      [laborRow],
+      "import-current",
+      [
+        { id: "profile-1", nombre: "JUAN PATINO" },
+        { id: "profile-2", nombre: "RUBEN CACERES" },
+        { id: "profile-3", nombre: "PABLO DIAZ" },
+      ],
+      [
+        { os_numero: "01-201", source: "002 - RUBEN CACERES", origin: "KM" },
+        { os_numero: "01-201", source: "003 - PABLO DIAZ", origin: "SE" },
+      ],
+    );
+
+    expect(entries.map((entry) => entry.tecnico_nombre).sort()).toEqual([
+      "JUAN PATINO",
+      "PABLO DIAZ",
+      "RUBEN CACERES",
+    ]);
+    expect(entries.every((entry) => entry.horas_calculadas === 5)).toBe(true);
+    expect(entries.filter((entry) => entry.rol_tecnico === "AUXILIAR")).toHaveLength(2);
+  });
 });
