@@ -43,8 +43,30 @@ const INVOICE_SCHEMA = `{
 
 function extractJson(raw: string) {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-  const candidate = fenced ?? raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
-  return JSON.parse(candidate);
+  const source = (fenced ?? raw).trim();
+  const start = source.indexOf("{");
+  if (start < 0) throw new Error("Model response did not contain JSON");
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === "{") depth += 1;
+    else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) return JSON.parse(source.slice(start, index + 1));
+    }
+  }
+
+  throw new Error("Model response contained incomplete JSON");
 }
 
 async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl: string) {
@@ -61,7 +83,7 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_completion_tokens: 1800,
+        max_completion_tokens: 3000,
         messages: [{
           role: "user",
           content: [
@@ -72,15 +94,33 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
       }),
     });
 
-    if (response.ok) return await response.json();
+    if (response.ok) {
+      const completion = await response.json();
+      const raw = completion?.choices?.[0]?.message?.content;
+      if (typeof raw === "string" && raw.trim()) {
+        try {
+          return { data: extractJson(raw), model: completion?.model ?? model };
+        } catch (parseError) {
+          console.error(
+            "[machine-document-extractor] Invalid model JSON",
+            model,
+            completion?.choices?.[0]?.finish_reason,
+            parseError,
+          );
+          continue;
+        }
+      }
+      console.error("[machine-document-extractor] Empty model response", model);
+      continue;
+    }
 
     const failureBody = await response.text();
     lastFailure = { status: response.status, body: failureBody };
     console.error("[machine-document-extractor] Groq", response.status, model, failureBody);
 
-    // A second vision model also protects the workflow from model retirement
-    // and short-lived, model-specific capacity limits.
-    if (response.status !== 404 && response.status !== 429) break;
+    // Authentication failures are shared by every model. Other failures can be
+    // model-specific, so allow the fallback model to handle them.
+    if (response.status === 401 || response.status === 403) break;
   }
 
   throw new Error(`Groq request failed (${lastFailure?.status ?? "unknown"})`);
@@ -126,10 +166,8 @@ Deno.serve(async (req) => {
       `En facturas busca especialmente chasis, numero de factura y valor total facturado.\n` +
       `Responde exclusivamente JSON valido con esta forma:\n${schema}`;
 
-    const completion = await requestDocumentExtraction(apiKey, prompt, dataUrl);
-    const raw = completion?.choices?.[0]?.message?.content;
-    if (!raw) return json({ error: "El documento no devolvio datos legibles." }, 422);
-    return json({ data: extractJson(raw), documentType, model: completion?.model });
+    const extraction = await requestDocumentExtraction(apiKey, prompt, dataUrl);
+    return json({ data: extraction.data, documentType, model: extraction.model });
   } catch (error) {
     console.error("[machine-document-extractor]", error);
     return json({ error: "No se pudo procesar el documento. Podes continuar con carga manual." }, 500);
