@@ -62,7 +62,6 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
         model,
         temperature: 0,
         max_completion_tokens: 1800,
-        response_format: { type: "json_object" },
         messages: [{
           role: "user",
           content: [
