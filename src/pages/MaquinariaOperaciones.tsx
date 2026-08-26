@@ -38,6 +38,7 @@ type OperationSummary = {
 };
 type DraftLine = {
   linea_numero: number; marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
+  anio?: number | null; cabezal?: string;
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
   subgrupo: string; chasis: string[]; confianza?: Record<string, unknown>; datos_extraidos?: Record<string, unknown>;
 };
@@ -45,7 +46,7 @@ type OperationDetail = OperationSummary & { observaciones?: string | null; lines
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
-  condicion: "NUEVA", abastecimiento: "DEFINIR", subgrupo: "OTRO", chasis: [],
+  anio: null, cabezal: "", condicion: "NUEVA", abastecimiento: "DEFINIR", subgrupo: "OTRO", chasis: [],
 });
 
 function formatDate(value?: string | null) {
@@ -65,6 +66,16 @@ function safeSubgroup(value: unknown) {
     ? normalized : "OTRO";
 }
 
+function safeExtractedDate(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
+}
+
+function safeExtractedText(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return normalized && normalized.toLowerCase() !== "null" ? normalized : "";
+}
+
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -79,7 +90,15 @@ async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTA
   const { data, error } = await supabase.functions.invoke("machine-document-extractor", {
     body: { documentType, mimeType: file.type, dataUrl: await fileToDataUrl(file) },
   });
-  if (error) throw error;
+  if (error) {
+    const raw = [error.message, (error as any).context?.status, (error as any).context?.statusText]
+      .filter(Boolean)
+      .join(" ");
+    if (/404|not[_ ]found|function.*not.*found|failed to send/i.test(raw)) {
+      throw new Error("El lector automático todavía no está desplegado en Supabase. Podés completar los datos manualmente o publicar la función machine-document-extractor.");
+    }
+    throw error;
+  }
   if (data?.error) throw new Error(data.error);
   return data?.data ?? {};
 }
@@ -170,22 +189,31 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
   const [reading, setReading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [extracted, setExtracted] = useState<any>({});
-  const [form, setForm] = useState({ np_numero: "", np_fecha: TODAY, cliente_nombre: "", comercial: "", observaciones: "" });
+  const [form, setForm] = useState({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" });
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
-  useEffect(() => { if (!open) return; setFile(null); setExtracted({}); setForm({ np_numero: "", np_fecha: TODAY, cliente_nombre: "", comercial: "", observaciones: "" }); setLines([blankLine()]); }, [open]);
+  useEffect(() => { if (!open) return; setFile(null); setExtracted({}); setForm({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" }); setLines([blankLine()]); }, [open]);
 
   const chooseFile = async (picked?: File) => {
     if (!picked) return;
     setFile(picked); setReading(true);
     try {
       const data = await extractDocument(picked, "NP"); setExtracted(data);
-      setForm((old) => ({ ...old, np_numero: data.np_numero ?? old.np_numero, np_fecha: data.np_fecha ?? old.np_fecha, cliente_nombre: data.cliente_nombre ?? old.cliente_nombre, comercial: data.comercial ?? old.comercial, observaciones: data.observaciones ?? old.observaciones }));
+      setForm((old) => ({
+        ...old,
+        np_numero: safeExtractedText(data.np_numero) || old.np_numero,
+        np_fecha: safeExtractedDate(data.np_fecha) || old.np_fecha,
+        cliente_nombre: safeExtractedText(data.cliente_nombre) || old.cliente_nombre,
+        comercial: safeExtractedText(data.comercial) || old.comercial,
+        observaciones: safeExtractedText(data.observaciones) || old.observaciones,
+      }));
       if (Array.isArray(data.lineas) && data.lineas.length) {
         setLines(data.lineas.map((l: any, i: number) => ({
           linea_numero: i + 1,
           marca: safeMarca(l.marca),
-          producto: String(l.producto ?? ""),
-          modelo: String(l.modelo ?? ""),
+          producto: safeExtractedText(l.producto),
+          modelo: safeExtractedText(l.modelo),
+          anio: l.anio == null || l.anio === "" || !Number.isInteger(Number(l.anio)) ? null : Number(l.anio),
+          cabezal: safeExtractedText(l.cabezal),
           cantidad: Math.max(1, Number(l.cantidad) || 1),
           condicion: l.condicion === "USADA" ? "USADA" : "NUEVA",
           abastecimiento: ["STOCK", "IMPORTAR"].includes(l.abastecimiento) ? l.abastecimiento : "DEFINIR",
@@ -207,7 +235,11 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
     setSaving(true);
     try {
       const operationId = crypto.randomUUID();
-      const { data, error } = await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: operationId, ...form }, p_lineas: lines });
+      const linesForSave = lines.map((line) => ({
+        ...line,
+        datos_extraidos: { ...(line.datos_extraidos ?? {}), anio: line.anio ?? null, cabezal: line.cabezal || null },
+      }));
+      const { data, error } = await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: operationId, ...form }, p_lineas: linesForSave });
       if (error) throw error;
       if (file) {
         try { await uploadEvidence(file, data ?? operationId, "NP", extracted); }
@@ -222,8 +254,8 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
     <ResponsiveDrawerBody className="space-y-4">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
       <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left hover:bg-muted/40"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Upload className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[13px] font-medium">{reading ? "Leyendo la NP..." : file?.name ?? "Subir foto nítida de la NP"}</span><span className="block text-[11px] text-muted-foreground">La lectura propone datos; nada se confirma automáticamente.</span></span>{reading && <Sparkles className="h-4 w-4 animate-pulse text-primary" />}</button>
-      <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} /></Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
-      <div className="space-y-2"><div className="flex items-center justify-between"><h3 className="text-[13px] font-semibold">Máquinas de la NP</h3><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"] })} /></Field><Field label="Producto / modelo"><Input value={line.producto || line.modelo} onChange={(e) => updateLine(i, { producto: e.target.value })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => !["PLATAFORMAS/CABEZALES", "SUELO"].includes(v))} onChange={(v) => updateLine(i, { subgrupo: v })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
+      <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
+      <div className="space-y-2"><div className="flex items-center justify-between"><h3 className="text-[13px] font-semibold">Máquinas de la NP</h3><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"] })} /></Field><Field label="Producto / tipo"><Input value={line.producto} onChange={(e) => updateLine(i, { producto: e.target.value })} /></Field><Field label="Modelo"><Input value={line.modelo} onChange={(e) => updateLine(i, { modelo: e.target.value })} placeholder="Ej. Tucano 710" /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cabezal / plataforma"><Input value={line.cabezal ?? ""} onChange={(e) => updateLine(i, { cabezal: e.target.value })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => !["PLATAFORMAS/CABEZALES", "SUELO"].includes(v))} onChange={(v) => updateLine(i, { subgrupo: v })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading}>{saving ? "Guardando..." : "Validar y crear"}</Button></ResponsiveDrawerFooter>
@@ -279,7 +311,7 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
     <ResponsiveDrawerBody className="space-y-4">
       {detail && <>
         <KpiStrip className="grid-cols-3"><KpiItem label="Máquinas" value={detail.unidades} /><KpiItem label="Documentos" value={detail.documentos} /><KpiItem label="Fecha NP" value={formatDate(detail.np_fecha)} /></KpiStrip>
-        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => <div key={line.id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="text-[12px] font-medium">{line.producto || line.modelo || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{line.marca} · {line.condicion} · {line.abastecimiento}</div></div><Badge variant={line.elegible_parque ? "secondary" : "outline"}>{line.elegible_parque ? "Admitida al Parque" : "Solo operación"}</Badge></div>)}</div></div>
+        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => { const extracted = line.datos_extraidos ?? {}; const model = line.modelo || extracted.modelo; const product = line.producto || extracted.producto; const year = line.anio ?? extracted.anio; const head = line.cabezal || extracted.cabezal; return <div key={line.id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`, line.marca, line.condicion, line.abastecimiento].filter(Boolean).join(" · ")}</div></div><Badge variant={line.elegible_parque ? "secondary" : "outline"}>{line.elegible_parque ? "Admitida al Parque" : "Solo operación"}</Badge></div>; })}</div></div>
         <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="truncate">{doc.archivo_nombre}</span><Badge variant="outline">{doc.tipo}</Badge></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
         {(detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
           {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}

@@ -21,8 +21,10 @@ const NP_SCHEMA = `{
   "comercial": "texto o null",
   "lineas": [{
     "marca": "CLAAS | HORSCH | OTROS",
-    "producto": "texto o null",
-    "modelo": "texto o null",
+    "producto": "tipo o descripcion de la maquina tal como aparece, por ejemplo Cosechadora",
+    "modelo": "modelo exacto tal como aparece en el campo Modelo, por ejemplo Tucano 710",
+    "anio": "numero o null",
+    "cabezal": "texto exacto o null",
     "cantidad": 1,
     "condicion": "NUEVA | USADA",
     "abastecimiento": "DEFINIR | STOCK | IMPORTAR",
@@ -171,7 +173,25 @@ Deno.serve(async (req) => {
     const purpose = documentType === "NP"
       ? "una nota de pedido (NP) de maquinaria agricola"
       : "una factura de importacion de maquinaria agricola";
-    const prompt = `Lee ${purpose}. Extrae solo lo visible, sin inventar. Si un dato no es legible usa null.\n` +
+    const prompt = `Lee ${purpose} completo y con atencion, incluyendo encabezado impreso, campos manuscritos, tablas, casillas y pie de pagina. ` +
+      `Recorre el documento dos veces antes de responder. Extrae solamente lo visible, sin completar por contexto ni inventar. ` +
+      `Si un dato no aparece o no se puede leer con seguridad, devuelve null (no uses la fecha actual ni nombres supuestos). ` +
+      `La respuesta se revisara manualmente.\n` +
+      `Para una NP, usa exactamente estos campos: el numero junto a N°, la fecha escrita en FECHA/FECHA DE OPERACION, ` +
+      `cliente debe ser exclusivamente el texto escrito por el comprador junto a Apellido y Nombre/Razon Social. ` +
+      `No uses el membrete CAMPOS DEL MANANA S.A., la empresa vendedora CDM, un nombre de firma, vendedor, operativo, ` +
+      `domicilio ni destinatario como cliente. Conserva exactamente el nombre visible, incluidas las palabras S.A. ` +
+      `Si el campo del comprador no se puede leer con seguridad, devuelve null y anotalo en campos_dudosos. ` +
+      `comercial solo si hay un nombre escrito junto a Vendedor, ` +
+      `Comercial u Operativo comercial. Nunca deduzcas el comercial a partir de una firma, sello o nombre del cliente. ` +
+      `En cada linea lee por separado Marca, Tipo, Modelo, Año y Cabezal/Plataforma: producto debe ser el tipo o descripcion ` +
+      `(por ejemplo Cosechadora), modelo debe conservar el texto exacto del campo Modelo (por ejemplo Tucano 710), ` +
+      `anio solo el año visible y cabezal solo el texto visible del campo correspondiente. No pongas el tipo dentro de modelo ` +
+      `ni el modelo dentro de producto. Si el manuscrito es dudoso, deja ese campo en null y anotala en campos_dudosos. ` +
+      `La condicion USADA solo se marca si la maquina de esa linea se describe explicitamente como usada. ` +
+      `No marques como USADA la maquina ofertada por una mencion separada de toma, permuta o entrega de otra maquina usada; ` +
+      `si la condicion de la maquina listada no aparece, usa NUEVA para que quede pendiente de revision manual. ` +
+      `El abastecimiento solo es STOCK o IMPORTAR cuando hay evidencia explicita; en caso contrario usa DEFINIR.\n` +
       `CLAAS y HORSCH son las unicas marcas representadas inicialmente; cualquier otra es OTROS.\n` +
       `En facturas busca especialmente chasis, numero de factura y valor total facturado. ` +
       `Se conciso: observaciones maximo 120 caracteres y no agregues explicaciones.\n` +
