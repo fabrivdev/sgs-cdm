@@ -79,8 +79,9 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
     lastFailure = { status: response.status, body: failureBody };
     console.error("[machine-document-extractor] Groq", response.status, model, failureBody);
 
-    // Retry another model only when the configured/current model is unavailable.
-    if (response.status !== 404) break;
+    // A second vision model also protects the workflow from model retirement
+    // and short-lived, model-specific capacity limits.
+    if (response.status !== 404 && response.status !== 429) break;
   }
 
   throw new Error(`Groq request failed (${lastFailure?.status ?? "unknown"})`);
