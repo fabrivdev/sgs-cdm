@@ -25,7 +25,6 @@ import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
-const OPERATION_STATES = ["BORRADOR", "REVISION_NP", "NP_VALIDADA", "ABASTECIMIENTO", "EN_IMPORTACION", "DISPONIBLE", "FACTURADA", "CERRADA", "CANCELADA"];
 const STATE_LABEL: Record<string, string> = {
   BORRADOR: "Borrador", REVISION_NP: "Revisar NP", NP_VALIDADA: "NP validada",
   ABASTECIMIENTO: "Abastecimiento", EN_IMPORTACION: "En importación", DISPONIBLE: "Disponible",
@@ -33,9 +32,12 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 type OperationSummary = {
-  id: string; np_numero: string | null; np_fecha: string | null; cliente_nombre: string;
-  comercial: string | null; estado: string; creado_en: string; lineas: number; unidades: number;
-  documentos: number; requiere_importacion: boolean; incluye_marca_admitida: boolean; marcas: string | null;
+  id: string; tipo_registro: "PEDIDO" | "IMPORTACION"; operation_id: string | null; importacion_linea_id: string | null;
+  np_numero: string | null; cliente_nombre: string; marca: string | null; producto: string | null; modelo: string | null;
+  cantidad: number | null; estado_fuente: string | null; abastecimiento: string | null; oc: string | null; po: string | null;
+  eta: string | null; ata: string | null; proveedor: string | null; invoice_supplier: string | null; costo_final: number | null;
+  chasis: string | null; venta_facturada: string | null; valor_venta: number | null; situacion_vinculo: string | null;
+  fecha_referencia: string | null;
 };
 type DraftLine = {
   linea_numero: number; marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
@@ -183,22 +185,22 @@ export default function MaquinariaOperaciones() {
   const operationsQuery = useQuery({
     queryKey: ["machine-operations"],
     queryFn: async () => {
-      const { data, error } = await db.from("maquinaria_operaciones_resumen").select("*").order("actualizado_en", { ascending: false }).limit(500);
+      const { data, error } = await db.from("maquinaria_planificador_resumen").select("*").order("fecha_referencia", { ascending: false, nullsFirst: false }).limit(1000);
       if (error) throw error;
       return (data ?? []) as OperationSummary[];
     },
   });
   const rows = useMemo(() => (operationsQuery.data ?? []).filter((row) => {
-    if (importsView && !row.requiere_importacion) return false;
-    if (state !== "TODOS" && row.estado !== state) return false;
+    if (importsView && row.tipo_registro !== "IMPORTACION") return false;
+    if (state !== "TODOS" && row.estado_fuente !== state) return false;
     const q = search.trim().toUpperCase();
-    return !q || [row.np_numero, row.cliente_nombre, row.comercial, row.marcas].some((v) => String(v ?? "").toUpperCase().includes(q));
+    return !q || [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.proveedor, row.oc, row.po, row.chasis].some((v) => String(v ?? "").toUpperCase().includes(q));
   }), [operationsQuery.data, importsView, search, state]);
   const totals = useMemo(() => ({
-    active: rows.filter((r) => !["CERRADA", "CANCELADA"].includes(r.estado)).length,
-    import: rows.filter((r) => r.requiere_importacion && r.estado !== "CERRADA").length,
-    units: rows.reduce((sum, r) => sum + Number(r.unidades || 0), 0),
-    docs: rows.reduce((sum, r) => sum + Number(r.documentos || 0), 0),
+    active: rows.filter((r) => r.tipo_registro === "PEDIDO").length,
+    import: rows.filter((r) => r.tipo_registro === "IMPORTACION").length,
+    units: rows.reduce((sum, r) => sum + Number(r.cantidad || 0), 0),
+    sourceRows: rows.length,
   }), [rows]);
 
   return <main className={pageShell}>
@@ -208,24 +210,23 @@ export default function MaquinariaOperaciones() {
       actions={!importsView ? <Button size="sm" onClick={() => setNewOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Nueva operación</Button> : undefined}
     />
     <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
-      <KpiItem label="Operaciones activas" value={totals.active} icon={<FileCheck2 />} tone="info" />
-      <KpiItem label="En importación" value={totals.import} icon={<Ship />} tone="warning" />
+      <KpiItem label="Líneas de pedido" value={totals.active} icon={<FileCheck2 />} tone="info" />
+      <KpiItem label="Líneas de importación" value={totals.import} icon={<Ship />} tone="warning" />
       <KpiItem label="Unidades visibles" value={totals.units} icon={<PackageCheck />} tone="positive" />
-      <KpiItem label="Documentos" value={totals.docs} icon={<FileText />} />
+      <KpiItem label="Filas fuente" value={totals.sourceRows} icon={<FileText />} />
     </KpiStrip>
     <Panel className="p-0 overflow-hidden">
       <div className="flex flex-wrap items-end gap-2 border-b p-3">
         <div className="min-w-[240px] flex-1"><Label className="text-[11px]">Buscar</Label><div className="relative"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" /><Input className="h-8 pl-8 text-[12px]" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="NP, cliente, comercial o marca..." /></div></div>
-        <div className="w-[190px]"><Label className="text-[11px]">Estado</Label><Select value={state} onValueChange={setState}><SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos</SelectItem>{OPERATION_STATES.map((s) => <SelectItem key={s} value={s}>{STATE_LABEL[s]}</SelectItem>)}</SelectContent></Select></div>
-        <span className="pb-2 text-[11px] text-muted-foreground">{rows.length} operaciones</span>
+        <div className="w-[190px]"><Label className="text-[11px]">Estado planilla</Label><Select value={state} onValueChange={setState}><SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos</SelectItem>{Array.from(new Set((operationsQuery.data ?? []).map((r) => r.estado_fuente).filter(Boolean))).sort().map((s) => <SelectItem key={s} value={s!}>{s}</SelectItem>)}</SelectContent></Select></div>
+        <span className="pb-2 text-[11px] text-muted-foreground">{rows.length} líneas físicas</span>
       </div>
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
       <div className="max-h-[calc(100vh-280px)] overflow-auto">
         <Table className={tableTextDense}>
-          <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className={tableHeadText}>NP</TableHead><TableHead className={tableHeadText}>Cliente</TableHead><TableHead className={tableHeadText}>Marca</TableHead><TableHead className={tableHeadText}>Abastecimiento</TableHead><TableHead className={tableHeadText}>Un.</TableHead><TableHead className={tableHeadText}>Estado</TableHead><TableHead className={tableHeadText}>Fecha</TableHead></TableRow></TableHeader>
-          <TableBody>{rows.map((row) => <TableRow key={row.id} className="cursor-pointer" onClick={() => setSelected(row.id)}>
-            <TableCell className="font-mono font-medium">{row.np_numero || "Sin número"}</TableCell><TableCell className="max-w-[280px] truncate font-medium">{row.cliente_nombre}</TableCell><TableCell>{row.marcas || "—"}</TableCell>
-            <TableCell>{row.requiere_importacion ? <Badge variant="outline" className="text-amber-700">Importar</Badge> : "Stock / definir"}</TableCell><TableCell className="tabular-nums">{row.unidades}</TableCell><TableCell><Badge variant="secondary">{STATE_LABEL[row.estado] ?? row.estado}</Badge></TableCell><TableCell>{formatDate(row.np_fecha ?? row.creado_en)}</TableCell>
+          <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className={tableHeadText}>Tipo</TableHead><TableHead className={tableHeadText}>NP</TableHead><TableHead className={tableHeadText}>Cliente</TableHead><TableHead className={tableHeadText}>Producto / modelo</TableHead><TableHead className={tableHeadText}>OC / PO</TableHead><TableHead className={tableHeadText}>ETA / ATA</TableHead><TableHead className={tableHeadText}>Proveedor</TableHead><TableHead className={tableHeadText}>Factura proveedor</TableHead><TableHead className={tableHeadText}>Costo final</TableHead><TableHead className={tableHeadText}>Valor venta</TableHead><TableHead className={tableHeadText}>Chasis</TableHead><TableHead className={tableHeadText}>Estado planilla</TableHead><TableHead className={tableHeadText}>Vínculo</TableHead></TableRow></TableHeader>
+          <TableBody>{rows.map((row) => <TableRow key={`${row.tipo_registro}-${row.id}`} className={row.operation_id ? "cursor-pointer" : undefined} onClick={() => row.operation_id && setSelected(row.operation_id)}>
+            <TableCell><Badge variant={row.tipo_registro === "IMPORTACION" ? "outline" : "secondary"}>{row.tipo_registro}</Badge></TableCell><TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell><TableCell className="max-w-[220px] truncate font-medium">{row.cliente_nombre}</TableCell><TableCell className="min-w-[240px]"><div className="font-medium">{row.modelo || "—"}</div><div className="text-[10px] text-muted-foreground">{row.producto || "—"} · {row.marca || "—"}</div></TableCell><TableCell className="whitespace-nowrap">{[row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`].filter(Boolean).join(" · ") || "—"}</TableCell><TableCell className="whitespace-nowrap">{[row.eta && `ETA ${formatDate(row.eta)}`, row.ata && `ATA ${formatDate(row.ata)}`].filter(Boolean).join(" · ") || "—"}</TableCell><TableCell>{row.proveedor || "—"}</TableCell><TableCell className="font-mono">{row.invoice_supplier || "—"}</TableCell><TableCell className="tabular-nums">{row.costo_final ?? "—"}</TableCell><TableCell className="tabular-nums">{row.valor_venta ?? "—"}</TableCell><TableCell className="font-mono">{row.chasis || "—"}</TableCell><TableCell>{row.estado_fuente || "—"}</TableCell><TableCell>{row.situacion_vinculo || "—"}</TableCell>
           </TableRow>)}</TableBody>
         </Table>
         {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay operaciones con estos filtros.</div>}
