@@ -18,7 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
 
@@ -35,6 +35,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [marcasAdmitidas, setMarcasAdmitidas] = useState<Marca[]>(["CLAAS", "HORSCH"]);
   const [form, setForm] = useState<{
     cliente_id: string;
     marca: Marca;
@@ -90,6 +91,17 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
         if (rows.length < pageSize) break;
       }
       setClientes(all);
+    })();
+    (async () => {
+      // La tabla estará disponible en los tipos generados después de aplicar la migración.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("maquinaria_marcas_admitidas")
+        .select("marca")
+        .eq("activa", true)
+        .eq("admitida_parque", true)
+        .order("marca");
+      if (!error && data?.length) setMarcasAdmitidas(data.map((row: { marca: Marca }) => row.marca));
     })();
   }, [open]);
 
@@ -175,7 +187,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
                 <Select value={form.marca} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: "" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {marcasAdmitidas.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

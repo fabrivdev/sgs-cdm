@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.ai-data-assistant]
 verify_jwt = true
+
+[functions.machine-document-extractor]
+verify_jwt = true

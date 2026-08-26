@@ -16,6 +16,8 @@ import {
   ShoppingCart,
   Sparkles,
   HandCoins,
+  ClipboardList,
+  Ship,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,6 +85,8 @@ const navGroups: NavGroup[] = [
       { to: "/parque-clientes", label: "Clientes", icon: Users, end: true },
       { to: "/parque-maquinas", label: "Máquinas", icon: Tractor, end: true },
       { to: "/parque-stock", label: "Stock", icon: Package, end: true },
+      { to: "/parque-operaciones", label: "Operaciones", icon: ClipboardList, end: true },
+      { to: "/parque-importaciones", label: "Importaciones", icon: Ship, end: true },
     ],
   },
   {
