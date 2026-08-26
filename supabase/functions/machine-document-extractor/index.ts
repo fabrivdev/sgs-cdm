@@ -1,10 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const DEFAULT_VISION_MODELS = ["qwen/qwen3.6-27b", "qwen/qwen3.8-27b"];
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -50,6 +47,46 @@ function extractJson(raw: string) {
   return JSON.parse(candidate);
 }
 
+async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl: string) {
+  const configuredModel = Deno.env.get("GROQ_VISION_MODEL")?.trim();
+  const models = configuredModel
+    ? [configuredModel, ...DEFAULT_VISION_MODELS.filter((model) => model !== configuredModel)]
+    : DEFAULT_VISION_MODELS;
+  let lastFailure: { status: number; body: string } | undefined;
+
+  for (const model of models) {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_completion_tokens: 1800,
+        response_format: { type: "json_object" },
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        }],
+      }),
+    });
+
+    if (response.ok) return await response.json();
+
+    const failureBody = await response.text();
+    lastFailure = { status: response.status, body: failureBody };
+    console.error("[machine-document-extractor] Groq", response.status, model, failureBody);
+
+    // A second vision model also protects the workflow from model retirement
+    // and short-lived, model-specific capacity limits.
+    if (response.status !== 404 && response.status !== 429) break;
+  }
+
+  throw new Error(`Groq request failed (${lastFailure?.status ?? "unknown"})`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Metodo no permitido" }, 405);
@@ -90,27 +127,7 @@ Deno.serve(async (req) => {
       `En facturas busca especialmente chasis, numero de factura y valor total facturado.\n` +
       `Responde exclusivamente JSON valido con esta forma:\n${schema}`;
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: Deno.env.get("GROQ_VISION_MODEL") ?? "meta-llama/llama-4-scout-17b-16e-instruct",
-        temperature: 0,
-        max_completion_tokens: 1800,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        }],
-      }),
-    });
-    if (!response.ok) {
-      console.error("[machine-document-extractor] Groq", response.status, await response.text());
-      return json({ error: "No se pudo leer el documento. Podes completar los campos manualmente." }, 502);
-    }
-    const completion = await response.json();
+    const completion = await requestDocumentExtraction(apiKey, prompt, dataUrl);
     const raw = completion?.choices?.[0]?.message?.content;
     if (!raw) return json({ error: "El documento no devolvio datos legibles." }, 422);
     return json({ data: extractJson(raw), documentType, model: completion?.model });
