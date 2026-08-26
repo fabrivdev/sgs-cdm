@@ -3,6 +3,12 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const DEFAULT_VISION_MODELS = ["qwen/qwen3.6-27b", "qwen/qwen3.8-27b"];
 
+class ExtractionError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -83,7 +89,8 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_completion_tokens: 3000,
+        max_completion_tokens: 2200,
+        reasoning_effort: "none",
         messages: [{
           role: "user",
           content: [
@@ -118,12 +125,15 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
     lastFailure = { status: response.status, body: failureBody };
     console.error("[machine-document-extractor] Groq", response.status, model, failureBody);
 
-    // Authentication failures are shared by every model. Other failures can be
-    // model-specific, so allow the fallback model to handle them.
-    if (response.status === 401 || response.status === 403) break;
+    // Authentication and rate limits are shared across models. Retrying them
+    // immediately only increases pressure on the same account quota.
+    if (response.status === 401 || response.status === 403 || response.status === 429) break;
   }
 
-  throw new Error(`Groq request failed (${lastFailure?.status ?? "unknown"})`);
+  throw new ExtractionError(
+    `Groq request failed (${lastFailure?.status ?? "unknown"})`,
+    lastFailure?.status === 429 ? 429 : 422,
+  );
 }
 
 Deno.serve(async (req) => {
@@ -163,13 +173,20 @@ Deno.serve(async (req) => {
       : "una factura de importacion de maquinaria agricola";
     const prompt = `Lee ${purpose}. Extrae solo lo visible, sin inventar. Si un dato no es legible usa null.\n` +
       `CLAAS y HORSCH son las unicas marcas representadas inicialmente; cualquier otra es OTROS.\n` +
-      `En facturas busca especialmente chasis, numero de factura y valor total facturado.\n` +
+      `En facturas busca especialmente chasis, numero de factura y valor total facturado. ` +
+      `Se conciso: observaciones maximo 120 caracteres y no agregues explicaciones.\n` +
       `Responde exclusivamente JSON valido con esta forma:\n${schema}`;
 
     const extraction = await requestDocumentExtraction(apiKey, prompt, dataUrl);
     return json({ data: extraction.data, documentType, model: extraction.model });
   } catch (error) {
     console.error("[machine-document-extractor]", error);
+    if (error instanceof ExtractionError) {
+      if (error.status === 429) {
+        return json({ error: "La lectura automatica esta ocupada. Espera unos segundos e intenta de nuevo." }, 429);
+      }
+      return json({ error: "No se encontraron datos legibles. Proba con una imagen mas nitida o completa los campos manualmente." }, 422);
+    }
     return json({ error: "No se pudo procesar el documento. Podes continuar con carga manual." }, 500);
   }
 });
