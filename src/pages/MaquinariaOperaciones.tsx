@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileCheck2, FileText, PackageCheck, Plus, Search, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Eye, FileCheck2, FileText, PackageCheck, Plus, Search, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   ResponsiveDrawerHeader,
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
+import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
 import { pageShell, tableHeadText, tableTextDense } from "@/lib/ui-classes";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
@@ -62,7 +63,7 @@ function safeMarca(value: unknown): DraftLine["marca"] {
 
 function safeSubgroup(value: unknown) {
   const normalized = String(value ?? "").toUpperCase();
-  return (MACHINE_SUBGROUPS as readonly string[]).includes(normalized) && normalized !== "PLATAFORMAS/CABEZALES" && normalized !== "SUELO"
+  return (MACHINE_SUBGROUPS as readonly string[]).includes(normalized) && normalized !== "SUELO"
     ? normalized : "OTRO";
 }
 
@@ -74,6 +75,58 @@ function safeExtractedDate(value: unknown) {
 function safeExtractedText(value: unknown) {
   const normalized = String(value ?? "").trim();
   return normalized && normalized.toLowerCase() !== "null" ? normalized : "";
+}
+
+function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, unknown> = {}) {
+  const result: DraftLine[] = [];
+  rawLines.forEach((raw) => {
+    const line = (raw ?? {}) as Record<string, any>;
+    const quantity = Math.max(1, Number(line.cantidad) || 1);
+    const condition: DraftLine["condicion"] = line.condicion === "USADA" ? "USADA" : "NUEVA";
+    const supply: DraftLine["abastecimiento"] = line.abastecimiento === "STOCK" || line.abastecimiento === "IMPORTAR"
+      ? line.abastecimiento
+      : "DEFINIR";
+    const brand = safeMarca(line.marca);
+    const head = safeExtractedText(line.cabezal);
+
+    result.push({
+      linea_numero: result.length + 1,
+      marca: brand,
+      producto: safeExtractedText(line.producto),
+      modelo: safeExtractedText(line.modelo),
+      anio: line.anio == null || line.anio === "" || !Number.isInteger(Number(line.anio)) ? null : Number(line.anio),
+      cabezal: "",
+      cantidad: quantity,
+      condicion: condition,
+      abastecimiento: supply,
+      subgrupo: safeSubgroup(line.subgrupo),
+      chasis: Array.isArray(line.chasis) ? line.chasis.map(String) : [],
+      confianza: confidence,
+      datos_extraidos: line,
+    });
+
+    // En la NP una máquina y su cabezal son activos independientes. La
+    // compatibilidad con `cabezal` permite separar también lecturas hechas
+    // con versiones anteriores de la función OCR.
+    if (head) {
+      result.push({
+        linea_numero: result.length + 1,
+        marca: brand,
+        producto: "Cabezal / plataforma",
+        modelo: head,
+        anio: null,
+        cabezal: "",
+        cantidad: quantity,
+        condicion: condition,
+        abastecimiento: supply,
+        subgrupo: "PLATAFORMAS/CABEZALES",
+        chasis: [],
+        confianza: confidence,
+        datos_extraidos: { ...line, cabezal: null, origen_linea: "CABEZAL_DE_NP" },
+      });
+    }
+  });
+  return result;
 }
 
 function fileToDataUrl(file: File) {
@@ -186,12 +239,19 @@ export default function MaquinariaOperaciones() {
 function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [extracted, setExtracted] = useState<any>({});
   const [form, setForm] = useState({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" });
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
   useEffect(() => { if (!open) return; setFile(null); setExtracted({}); setForm({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" }); setLines([blankLine()]); }, [open]);
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return undefined; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const chooseFile = async (picked?: File) => {
     if (!picked) return;
@@ -207,21 +267,7 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
         observaciones: safeExtractedText(data.observaciones) || old.observaciones,
       }));
       if (Array.isArray(data.lineas) && data.lineas.length) {
-        setLines(data.lineas.map((l: any, i: number) => ({
-          linea_numero: i + 1,
-          marca: safeMarca(l.marca),
-          producto: safeExtractedText(l.producto),
-          modelo: safeExtractedText(l.modelo),
-          anio: l.anio == null || l.anio === "" || !Number.isInteger(Number(l.anio)) ? null : Number(l.anio),
-          cabezal: safeExtractedText(l.cabezal),
-          cantidad: Math.max(1, Number(l.cantidad) || 1),
-          condicion: l.condicion === "USADA" ? "USADA" : "NUEVA",
-          abastecimiento: ["STOCK", "IMPORTAR"].includes(l.abastecimiento) ? l.abastecimiento : "DEFINIR",
-          subgrupo: safeSubgroup(l.subgrupo),
-          chasis: Array.isArray(l.chasis) ? l.chasis.map(String) : [],
-          confianza: data.confianza ?? {},
-          datos_extraidos: l,
-        })));
+        setLines(extractedLinesToDraft(data.lineas, data.confianza ?? {}));
       }
       toast.success("Lectura terminada. Revisá los datos antes de guardar.");
     } catch (error: any) { toast.warning(error?.message ?? "No se pudo leer; completá los datos manualmente."); }
@@ -253,9 +299,16 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
     <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">Nueva operación</h2><p className="text-[11px] text-muted-foreground">Subí la foto de la NP, verificá lo leído y completá solamente lo faltante.</p></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
-      <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left hover:bg-muted/40"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Upload className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-[13px] font-medium">{reading ? "Leyendo la NP..." : file?.name ?? "Subir foto nítida de la NP"}</span><span className="block text-[11px] text-muted-foreground">La lectura propone datos; nada se confirma automáticamente.</span></span>{reading && <Sparkles className="h-4 w-4 animate-pulse text-primary" />}</button>
+      <div className="flex items-center gap-2 rounded-xl border border-dashed p-3">
+        <button type="button" onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Upload className="h-4 w-4" /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{reading ? "Leyendo la NP..." : file?.name ?? "Subir foto nítida de la NP"}</span><span className="block text-[11px] text-muted-foreground">La lectura propone datos; nada se confirma automáticamente.</span></span>
+          {reading && <Sparkles className="h-4 w-4 animate-pulse text-primary" />}
+        </button>
+        {previewUrl && <Button type="button" variant="outline" size="sm" onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><Eye className="mr-1.5 h-3.5 w-3.5" />Ver documento</Button>}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
-      <div className="space-y-2"><div className="flex items-center justify-between"><h3 className="text-[13px] font-semibold">Máquinas de la NP</h3><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"] })} /></Field><Field label="Producto / tipo"><Input value={line.producto} onChange={(e) => updateLine(i, { producto: e.target.value })} /></Field><Field label="Modelo"><Input value={line.modelo} onChange={(e) => updateLine(i, { modelo: e.target.value })} placeholder="Ej. Tucano 710" /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cabezal / plataforma"><Input value={line.cabezal ?? ""} onChange={(e) => updateLine(i, { cabezal: e.target.value })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => !["PLATAFORMAS/CABEZALES", "SUELO"].includes(v))} onChange={(v) => updateLine(i, { subgrupo: v })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
+      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"], modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => v !== "SUELO")} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Producto / tipo"><Input value={line.producto} onChange={(e) => updateLine(i, { producto: e.target.value })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading}>{saving ? "Guardando..." : "Validar y crear"}</Button></ResponsiveDrawerFooter>
@@ -310,9 +363,9 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
     <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">NP {detail?.np_numero ?? "—"}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."} · {detail ? STATE_LABEL[detail.estado] : ""}</p></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       {detail && <>
-        <KpiStrip className="grid-cols-3"><KpiItem label="Máquinas" value={detail.unidades} /><KpiItem label="Documentos" value={detail.documentos} /><KpiItem label="Fecha NP" value={formatDate(detail.np_fecha)} /></KpiStrip>
+        <KpiStrip className="grid-cols-3"><KpiItem label="Unidades" value={detail.unidades} /><KpiItem label="Documentos" value={detail.documentos} /><KpiItem label="Fecha NP" value={formatDate(detail.np_fecha)} /></KpiStrip>
         <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => { const extracted = line.datos_extraidos ?? {}; const model = line.modelo || extracted.modelo; const product = line.producto || extracted.producto; const year = line.anio ?? extracted.anio; const head = line.cabezal || extracted.cabezal; return <div key={line.id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`, line.marca, line.condicion, line.abastecimiento].filter(Boolean).join(" · ")}</div></div><Badge variant={line.elegible_parque ? "secondary" : "outline"}>{line.elegible_parque ? "Admitida al Parque" : "Solo operación"}</Badge></div>; })}</div></div>
-        <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="truncate">{doc.archivo_nombre}</span><Badge variant="outline">{doc.tipo}</Badge></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
+        <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
         {(detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
           {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}
         </div>}

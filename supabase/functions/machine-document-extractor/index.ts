@@ -24,11 +24,11 @@ const NP_SCHEMA = `{
     "producto": "tipo o descripcion de la maquina tal como aparece, por ejemplo Cosechadora",
     "modelo": "modelo exacto tal como aparece en el campo Modelo, por ejemplo Tucano 710",
     "anio": "numero o null",
-    "cabezal": "texto exacto o null",
+    "cabezal": "solo compatibilidad: usa null y crea otra linea para el cabezal",
     "cantidad": 1,
     "condicion": "NUEVA | USADA",
     "abastecimiento": "DEFINIR | STOCK | IMPORTAR",
-    "subgrupo": "TRACTORES | COSECHADORAS | PICADORAS | SEMBRADORAS | PLATAFORMAS | PULVERIZADORAS | OTRO",
+    "subgrupo": "TRACTORES | COSECHADORAS | PICADORAS | SEMBRADORAS | PLATAFORMAS | PLATAFORMAS/CABEZALES | PULVERIZADORAS | OTRO",
     "chasis": []
   }],
   "confianza": {"global": 0.0, "campos_dudosos": []},
@@ -184,9 +184,13 @@ Deno.serve(async (req) => {
       `Si el campo del comprador no se puede leer con seguridad, devuelve null y anotalo en campos_dudosos. ` +
       `comercial solo si hay un nombre escrito junto a Vendedor, ` +
       `Comercial u Operativo comercial. Nunca deduzcas el comercial a partir de una firma, sello o nombre del cliente. ` +
-      `En cada linea lee por separado Marca, Tipo, Modelo, Año y Cabezal/Plataforma: producto debe ser el tipo o descripcion ` +
+      `En cada linea lee por separado Marca, Tipo, Modelo y Año: producto debe ser el tipo o descripcion ` +
       `(por ejemplo Cosechadora), modelo debe conservar el texto exacto del campo Modelo (por ejemplo Tucano 710), ` +
-      `anio solo el año visible y cabezal solo el texto visible del campo correspondiente. No pongas el tipo dentro de modelo ` +
+      `y anio solo el año visible. Si el campo Cabezal/Plataforma de la maquina vendida tiene contenido, crea una SEGUNDA ` +
+      `linea independiente: producto Cabezal / plataforma, modelo con ese texto exacto, subgrupo PLATAFORMAS/CABEZALES, ` +
+      `misma marca, cantidad, condicion y abastecimiento; deja cabezal en null en ambas lineas. No conviertas en linea un ` +
+      `cabezal mencionado solamente dentro de una toma, permuta o maquina usada entregada como parte de pago. ` +
+      `No pongas el tipo dentro de modelo ` +
       `ni el modelo dentro de producto. Si el manuscrito es dudoso, deja ese campo en null y anotala en campos_dudosos. ` +
       `La condicion USADA solo se marca si la maquina de esa linea se describe explicitamente como usada. ` +
       `No marques como USADA la maquina ofertada por una mencion separada de toma, permuta o entrega de otra maquina usada; ` +

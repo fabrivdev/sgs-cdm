@@ -70,7 +70,7 @@ export function ModeloMaquinaSelect({
       </datalist>
       <p className={esModeloNuevo ? "text-[11px] text-amber-700 dark:text-amber-400" : "text-[11px] text-muted-foreground"}>
         {esModeloNuevo
-          ? "Modelo nuevo: se agregará al catálogo al guardar la máquina."
+          ? "Modelo nuevo: verificá el texto antes de continuar."
           : "Seleccioná una opción o escribí un modelo nuevo."}
       </p>
     </div>
