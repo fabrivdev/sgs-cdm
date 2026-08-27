@@ -319,18 +319,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       if (machineStockRows.length > 0) {
         const cargaId = crypto.randomUUID();
-        const rowsWithBatch = machineStockRows.map((row) => ({ ...row, carga_id: cargaId }));
-
-        for (let i = 0; i < rowsWithBatch.length; i += 500) {
-          const { error } = await (supabase.from("parque_stock_maquinas" as any).upsert(rowsWithBatch.slice(i, i + 500), { onConflict: "producto_codigo" }) as any);
-          if (error) throw error;
-        }
-
-        // Solo después de guardar correctamente la foto nueva se eliminan
-        // las unidades que ya no aparecen. Así una falla de inserción nunca
-        // deja el stock vacío.
-        const { error: deleteError } = await (supabase.from("parque_stock_maquinas" as any).delete().neq("carga_id", cargaId) as any);
-        if (deleteError) throw deleteError;
+        // La RPC reemplaza la foto completa en una sola transacción y conserva
+        // cada fila física/chasis aunque varias compartan producto_codigo.
+        const { error } = await (supabase as any).rpc("parque_reemplazar_stock_maquinas", {
+          p_carga_id: cargaId,
+          p_filas: machineStockRows,
+        });
+        if (error) throw error;
       }
 
       for (let i = 0; i < pedidoRows.length; i += 500) {

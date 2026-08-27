@@ -21,6 +21,18 @@ describe("stock de maquinarias TOTVS", () => {
       condition: "Nuevo",
       chassis: "24491382",
       balance: 1,
+      sourceRow: 2,
     });
+  });
+
+  it("conserva unidades con el mismo producto cuando tienen chasis distintos", () => {
+    const duplicatedProduct = SAMPLE.replace(
+      "</Table>",
+      '<Row><Cell><Data ss:Type="String">01 - Santa Rita</Data></Cell><Cell><Data ss:Type="String">MN - MAQUINAS NUEVAS</Data></Cell><Cell><Data ss:Type="String">VEIC_000033</Data></Cell><Cell><Data ss:Type="String">SEMBRADORA</Data></Cell><Cell><Data ss:Type="String">HORSCH</Data></Cell><Cell><Data ss:Type="String">MAESTRO CF 18.45</Data></Cell><Cell><Data ss:Type="String">Nuevo</Data></Cell><Cell><Data ss:Type="String">24491383</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell></Row></Table>',
+    );
+    const result = parseMachineStockXml("stock_de_maquinarias.xml", duplicatedProduct);
+
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows.map((row) => row.chassis)).toEqual(["24491382", "24491383"]);
   });
 });

@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
-import { pageShell, tableHeadText, tableTextDense } from "@/lib/ui-classes";
+import { pageShell } from "@/lib/ui-classes";
+import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
 const db = supabase as any;
@@ -31,13 +32,21 @@ const STATE_LABEL: Record<string, string> = {
   FACTURADA: "Facturada", CERRADA: "Cerrada", CANCELADA: "Cancelada",
 };
 
-type OperationSummary = {
-  id: string; tipo_registro: "PEDIDO" | "IMPORTACION"; operation_id: string | null; importacion_linea_id: string | null;
-  np_numero: string | null; cliente_nombre: string; marca: string | null; producto: string | null; modelo: string | null;
-  cantidad: number | null; estado_fuente: string | null; abastecimiento: string | null; oc: string | null; po: string | null;
-  eta: string | null; ata: string | null; proveedor: string | null; invoice_supplier: string | null; costo_final: number | null;
-  chasis: string | null; venta_facturada: string | null; valor_venta: number | null; situacion_vinculo: string | null;
-  fecha_referencia: string | null;
+type OrderRow = {
+  id: string; operacion_id: string; np_numero: string | null; np_fecha: string | null; cliente_nombre: string;
+  comercial: string | null; marca: string | null; producto: string | null; modelo: string | null; cantidad: number | null;
+  condicion: string | null; abastecimiento: string | null; estado_fuente: string | null; chasis: string | null;
+  estado_disponibilidad: string | null; disponibilidad_detalle: string | null; estado_importacion_fuente: string | null;
+  eta: string | null; ata: string | null; proveedor: string | null; factura_venta: string | null; factura_fecha: string | null;
+  costo_producto: number | null; valor_venta: number | null; observaciones: string | null; actualizado_en: string;
+};
+type ImportRow = {
+  id: string; operacion_id: string | null; linea_id: string | null; np_numero: string | null; np_fecha: string | null;
+  cliente_nombre: string | null; comercial: string | null; marca: string | null; producto: string | null; modelo: string | null;
+  cantidad: number | null; estado_fuente: string | null; oc: string | null; po: string | null; eta: string | null; ata: string | null;
+  proveedor: string | null; invoice_supplier: string | null; costo_final: number | null; chasis: string | null;
+  venta_facturada: string | null; valor_venta: number | null; situacion_vinculo: string | null; estado_disponibilidad: string | null;
+  disponibilidad_detalle: string | null; stock_sucursal: string | null; stock_deposito: string | null; stock_saldo: number | null;
 };
 type DraftLine = {
   linea_numero: number; marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
@@ -45,7 +54,13 @@ type DraftLine = {
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
   subgrupo: string; chasis: string[]; confianza?: Record<string, unknown>; datos_extraidos?: Record<string, unknown>;
 };
-type OperationDetail = OperationSummary & { observaciones?: string | null; lines: any[]; units: any[]; docs: any[]; importation?: any };
+type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; docs: any[]; importation?: any };
+
+const AVAILABILITY_LABEL: Record<string, string> = {
+  DISPONIBLE: "Disponible", RESERVADO: "Reservado", VENDIDO_PENDIENTE_ENTREGA: "Vendido · por entregar",
+  EN_PARQUE: "En parque", CONFLICTO: "Conflicto", SIN_CHASIS: "Sin chasis",
+};
+const availabilityClass = (state?: string | null) => cn("text-[10px]", state === "DISPONIBLE" && "border-emerald-200 bg-emerald-50 text-emerald-700", state === "RESERVADO" && "border-blue-200 bg-blue-50 text-blue-700", state === "VENDIDO_PENDIENTE_ENTREGA" && "border-violet-200 bg-violet-50 text-violet-700", state === "CONFLICTO" && "border-red-200 bg-red-50 text-red-700", (!state || state === "SIN_CHASIS") && "border-amber-200 bg-amber-50 text-amber-700");
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
@@ -181,60 +196,89 @@ export default function MaquinariaOperaciones() {
   const [state, setState] = useState("TODOS");
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedImport, setSelectedImport] = useState<ImportRow | null>(null);
 
   const operationsQuery = useQuery({
-    queryKey: ["machine-operations"],
+    queryKey: ["machine-operations", importsView ? "imports" : "orders"],
     queryFn: async () => {
-      const { data, error } = await db.from("maquinaria_planificador_resumen").select("*").order("fecha_referencia", { ascending: false, nullsFirst: false }).limit(1000);
+      const table = importsView ? "maquinaria_importaciones_lineas_operativas" : "maquinaria_pedidos_lineas_operativas";
+      const orderColumn = importsView ? "eta" : "np_fecha";
+      const { data, error } = await db.from(table).select("*").order(orderColumn, { ascending: false, nullsFirst: false }).limit(1000);
       if (error) throw error;
-      return (data ?? []) as OperationSummary[];
+      return (data ?? []) as (OrderRow | ImportRow)[];
     },
   });
   const rows = useMemo(() => (operationsQuery.data ?? []).filter((row) => {
-    if (importsView && row.tipo_registro !== "IMPORTACION") return false;
     if (state !== "TODOS" && row.estado_fuente !== state) return false;
     const q = search.trim().toUpperCase();
-    return !q || [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.proveedor, row.oc, row.po, row.chasis].some((v) => String(v ?? "").toUpperCase().includes(q));
+    const common = [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
+    const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
+    return !q || [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
   }), [operationsQuery.data, importsView, search, state]);
-  const totals = useMemo(() => ({
-    active: rows.filter((r) => r.tipo_registro === "PEDIDO").length,
-    import: rows.filter((r) => r.tipo_registro === "IMPORTACION").length,
-    units: rows.reduce((sum, r) => sum + Number(r.cantidad || 0), 0),
-    sourceRows: rows.length,
-  }), [rows]);
+  const totals = useMemo(() => importsView ? {
+    first: rows.length,
+    second: rows.filter((row) => !(row as ImportRow).ata).length,
+    third: rows.filter((row) => !!(row as ImportRow).ata).length,
+    fourth: rows.filter((row) => !!row.estado_disponibilidad).length,
+  } : {
+    first: rows.length,
+    second: rows.filter((row) => String(row.estado_fuente ?? "").toLowerCase() === "pendiente").length,
+    third: rows.filter((row) => row.estado_disponibilidad === "RESERVADO").length,
+    fourth: rows.filter((row) => row.estado_disponibilidad === "VENDIDO_PENDIENTE_ENTREGA").length,
+  }, [rows, importsView]);
+  const stateOptions = Array.from(new Set((operationsQuery.data ?? []).map((row) => row.estado_fuente).filter((value): value is string => !!value))).sort();
 
   return <main className={pageShell}>
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
-      meta={importsView ? "Seguimiento documental desde la NP hasta la disponibilidad." : "Expediente comercial desde la nota de pedido hasta la venta y el Parque."}
+      meta={importsView ? "Logística y documentación de las unidades importadas." : "Pedidos comerciales y asignación de unidades por chasis."}
       actions={!importsView ? <Button size="sm" onClick={() => setNewOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Nueva operación</Button> : undefined}
     />
     <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
-      <KpiItem label="Líneas de pedido" value={totals.active} icon={<FileCheck2 />} tone="info" />
-      <KpiItem label="Líneas de importación" value={totals.import} icon={<Ship />} tone="warning" />
-      <KpiItem label="Unidades visibles" value={totals.units} icon={<PackageCheck />} tone="positive" />
-      <KpiItem label="Filas fuente" value={totals.sourceRows} icon={<FileText />} />
+      <KpiItem label={importsView ? "Importaciones" : "Pedidos"} value={totals.first} icon={importsView ? <Ship /> : <FileCheck2 />} tone="info" />
+      <KpiItem label={importsView ? "En tránsito / sin ATA" : "Pendientes"} value={totals.second} icon={<FileText />} tone="warning" />
+      <KpiItem label={importsView ? "Con arribo" : "Reservados en stock"} value={totals.third} icon={<PackageCheck />} tone="positive" />
+      <KpiItem label={importsView ? "Vinculados a stock" : "Vendidos por entregar"} value={totals.fourth} />
     </KpiStrip>
     <Panel className="p-0 overflow-hidden">
       <div className="flex flex-wrap items-end gap-2 border-b p-3">
         <div className="min-w-[240px] flex-1"><Label className="text-[11px]">Buscar</Label><div className="relative"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" /><Input className="h-8 pl-8 text-[12px]" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="NP, cliente, comercial o marca..." /></div></div>
-        <div className="w-[190px]"><Label className="text-[11px]">Estado planilla</Label><Select value={state} onValueChange={setState}><SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos</SelectItem>{Array.from(new Set((operationsQuery.data ?? []).map((r) => r.estado_fuente).filter(Boolean))).sort().map((s) => <SelectItem key={s} value={s!}>{s}</SelectItem>)}</SelectContent></Select></div>
-        <span className="pb-2 text-[11px] text-muted-foreground">{rows.length} líneas físicas</span>
+        <div className="w-[190px]"><Label className="text-[11px]">Estado de origen</Label><Select value={state} onValueChange={setState}><SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos</SelectItem>{stateOptions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
+        <span className="pb-2 text-[11px] text-muted-foreground">{rows.length} {importsView ? "importaciones" : "pedidos"}</span>
       </div>
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
-      <div className="max-h-[calc(100vh-280px)] overflow-auto">
-        <Table className={tableTextDense}>
-          <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className={tableHeadText}>Tipo</TableHead><TableHead className={tableHeadText}>NP</TableHead><TableHead className={tableHeadText}>Cliente</TableHead><TableHead className={tableHeadText}>Producto / modelo</TableHead><TableHead className={tableHeadText}>OC / PO</TableHead><TableHead className={tableHeadText}>ETA / ATA</TableHead><TableHead className={tableHeadText}>Proveedor</TableHead><TableHead className={tableHeadText}>Factura proveedor</TableHead><TableHead className={tableHeadText}>Costo final</TableHead><TableHead className={tableHeadText}>Valor venta</TableHead><TableHead className={tableHeadText}>Chasis</TableHead><TableHead className={tableHeadText}>Estado planilla</TableHead><TableHead className={tableHeadText}>Vínculo</TableHead></TableRow></TableHeader>
-          <TableBody>{rows.map((row) => <TableRow key={`${row.tipo_registro}-${row.id}`} className={row.operation_id ? "cursor-pointer" : undefined} onClick={() => row.operation_id && setSelected(row.operation_id)}>
-            <TableCell><Badge variant={row.tipo_registro === "IMPORTACION" ? "outline" : "secondary"}>{row.tipo_registro}</Badge></TableCell><TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell><TableCell className="max-w-[220px] truncate font-medium">{row.cliente_nombre}</TableCell><TableCell className="min-w-[240px]"><div className="font-medium">{row.modelo || "—"}</div><div className="text-[10px] text-muted-foreground">{row.producto || "—"} · {row.marca || "—"}</div></TableCell><TableCell className="whitespace-nowrap">{[row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`].filter(Boolean).join(" · ") || "—"}</TableCell><TableCell className="whitespace-nowrap">{[row.eta && `ETA ${formatDate(row.eta)}`, row.ata && `ATA ${formatDate(row.ata)}`].filter(Boolean).join(" · ") || "—"}</TableCell><TableCell>{row.proveedor || "—"}</TableCell><TableCell className="font-mono">{row.invoice_supplier || "—"}</TableCell><TableCell className="tabular-nums">{row.costo_final ?? "—"}</TableCell><TableCell className="tabular-nums">{row.valor_venta ?? "—"}</TableCell><TableCell className="font-mono">{row.chasis || "—"}</TableCell><TableCell>{row.estado_fuente || "—"}</TableCell><TableCell>{row.situacion_vinculo || "—"}</TableCell>
-          </TableRow>)}</TableBody>
-        </Table>
-        {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay operaciones con estos filtros.</div>}
-      </div>}
+      <>
+        <div className="hidden max-h-[calc(100vh-300px)] overflow-y-auto md:block">
+          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} />}
+        </div>
+        <div className="space-y-2 p-3 md:hidden">{rows.map((row) => <button type="button" key={row.id} onClick={() => importsView ? setSelectedImport(row as ImportRow) : setSelected((row as OrderRow).operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left"><div className="flex items-start justify-between gap-2"><span className="font-mono text-[12px] font-semibold">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP"}</span><Badge variant="outline" className="text-[10px]">{row.estado_fuente ?? "Sin estado"}</Badge></div><div className="mt-2 text-[13px] font-medium">{row.modelo || row.producto || "Sin descripción"}</div><div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.cliente_nombre || (importsView ? (row as ImportRow).proveedor : "Sin cliente") || "—"}</div><div className="mt-2 flex items-center justify-between font-mono text-[10px]"><span>{row.chasis || "Sin chasis"}</span><Eye className="h-4 w-4" /></div></button>)}</div>
+        {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "pedidos"} con estos filtros.</div>}
+      </>}
     </Panel>
     <NewOperationDrawer open={newOpen} onOpenChange={setNewOpen} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
     <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onChanged={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
+    <ImportDetailDrawer row={selectedImport} onOpenChange={(open) => !open && setSelectedImport(null)} />
   </main>;
+}
+
+function OrdersTable({ rows, onSelect }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void }) {
+  return <Table className="table-fixed text-[12px]"><TableHeader className="sticky top-0 z-10 bg-card"><TableRow><TableHead className="w-[125px]">NP / fecha</TableHead><TableHead>Cliente</TableHead><TableHead>Máquina</TableHead><TableHead className="w-[130px]">Comercial</TableHead><TableHead className="w-[115px]">Abastecimiento</TableHead><TableHead className="w-[130px]">Estado</TableHead><TableHead className="w-[175px]">Chasis / stock</TableHead><TableHead className="w-[52px]" /></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}><TableCell><div className="font-mono font-medium">{row.np_numero || "Sin NP"}</div><div className="text-[10px] text-muted-foreground">{formatDate(row.np_fecha)}</div></TableCell><TableCell><div className="truncate font-medium">{row.cliente_nombre}</div></TableCell><TableCell><div className="truncate font-medium">{row.modelo || row.producto || "—"}</div><div className="truncate text-[10px] text-muted-foreground">{[row.producto !== row.modelo && row.producto, row.marca].filter(Boolean).join(" · ")}</div></TableCell><TableCell className="truncate">{row.comercial || "—"}</TableCell><TableCell><Badge variant="outline" className="text-[10px]">{row.abastecimiento || "Sin definir"}</Badge></TableCell><TableCell className="truncate">{row.estado_fuente || "—"}</TableCell><TableCell><div className="truncate font-mono text-[10px]">{row.chasis || "Sin chasis"}</div>{row.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge>}</TableCell><TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell></TableRow>)}</TableBody></Table>;
+}
+
+function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: ImportRow) => void }) {
+  return <Table className="table-fixed text-[12px]"><TableHeader className="sticky top-0 z-10 bg-card"><TableRow><TableHead className="w-[125px]">Estado</TableHead><TableHead className="w-[115px]">NP</TableHead><TableHead>Máquina</TableHead><TableHead className="w-[145px]">Proveedor</TableHead><TableHead className="w-[135px]">OC / PO</TableHead><TableHead className="w-[145px]">ETA / ATA</TableHead><TableHead className="w-[180px]">Chasis / stock</TableHead><TableHead className="w-[52px]" /></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}><TableCell><Badge variant="outline" className="max-w-full truncate text-[10px]">{row.estado_fuente || "Sin estado"}</Badge></TableCell><TableCell><div className="truncate font-mono font-medium">{row.np_numero || "Sin NP"}</div><div className="truncate text-[10px] text-muted-foreground">{row.cliente_nombre || "Sin cliente"}</div></TableCell><TableCell><div className="truncate font-medium">{row.modelo || row.producto || "—"}</div><div className="truncate text-[10px] text-muted-foreground">{[row.producto !== row.modelo && row.producto, row.marca].filter(Boolean).join(" · ")}</div></TableCell><TableCell className="truncate">{row.proveedor || "—"}</TableCell><TableCell><div className="truncate">{[row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`].filter(Boolean).join(" · ") || "—"}</div></TableCell><TableCell><div className="text-[10px]">ETA {formatDate(row.eta)}</div><div className="text-[10px] text-muted-foreground">ATA {formatDate(row.ata)}</div></TableCell><TableCell><div className="truncate font-mono text-[10px]">{row.chasis || "Sin chasis"}</div>{row.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge>}</TableCell><TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell></TableRow>)}</TableBody></Table>;
+}
+
+function ImportDetailDrawer({ row, onOpenChange }: { row: ImportRow | null; onOpenChange: (open: boolean) => void }) {
+  if (!row) return null;
+  const groups = [
+    { title: "Unidad importada", values: [["Máquina", row.modelo || row.producto], ["Producto", row.producto], ["Marca", row.marca], ["Chasis", row.chasis], ["Cantidad", row.cantidad]] },
+    { title: "Pedido vinculado", values: [["NP", row.np_numero], ["Cliente", row.cliente_nombre], ["Comercial", row.comercial], ["Situación del vínculo", row.situacion_vinculo]] },
+    { title: "Logística", values: [["Estado", row.estado_fuente], ["Proveedor", row.proveedor], ["OC", row.oc], ["PO", row.po], ["ETA", formatDate(row.eta)], ["ATA", formatDate(row.ata)]] },
+    { title: "Documentación y valores", values: [["Factura proveedor", row.invoice_supplier], ["Costo final", row.costo_final], ["Venta facturada", row.venta_facturada], ["Valor de venta", row.valor_venta]] },
+    { title: "Stock vinculado", values: [["Disponibilidad", row.estado_disponibilidad ? AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad : null], ["Sucursal", row.stock_sucursal], ["Depósito", row.stock_deposito], ["Saldo", row.stock_saldo], ["Detalle", row.disponibilidad_detalle]] },
+  ].map((group) => ({ ...group, values: group.values.filter(([, value]) => value !== null && value !== undefined && value !== "" && value !== "—") })).filter((group) => group.values.length);
+  return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg"><ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP vinculada"} · {row.estado_fuente || "Sin estado"}</p></ResponsiveDrawerHeader><ResponsiveDrawerBody className="space-y-4">{groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}</ResponsiveDrawerBody></ResponsiveDrawer>;
 }
 
 function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {

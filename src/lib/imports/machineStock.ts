@@ -35,15 +35,21 @@ export function mapMachineStockSheet(
   sourceFileName: string,
   sheet: SpreadsheetXmlSheet,
 ): CanonicalImportEnvelope<CanonicalMachineStockRow> {
-  const byProduct = new Map<string, CanonicalMachineStockRow>();
+  const rows: CanonicalMachineStockRow[] = [];
 
   sheet.rows.forEach((raw, index) => {
     const productCode = text(raw, ["Producto", "CODIGO", "Código"]);
     if (!productCode) return;
 
     const branchRaw = text(raw, ["FILIAL"]);
+    const chassis = text(raw, ["CHASIS", "CHASSIS", "SERIE"]);
+    const sourceRow = index + 2;
+    const identity = chassis
+      ? `CHASIS-${normalizeStableKey(chassis)}`
+      : `PRODUCTO-${normalizeStableKey(productCode)}-${normalizeStableKey(branchRaw)}-${normalizeStableKey(text(raw, ["DEPOSITO", "DEPÓSITO", "LOCAL"]))}`;
     const row: CanonicalMachineStockRow = {
-      rowId: normalizeStableKey(productCode) || `machine-stock-${index + 1}`,
+      rowId: `${identity}-FILA-${sourceRow}`,
+      sourceRow,
       productCode: productCode.trim(),
       branch: normalizeBranch(branchRaw),
       branchRaw,
@@ -52,13 +58,12 @@ export function mapMachineStockSheet(
       brand: text(raw, ["MARCA"]),
       model: text(raw, ["MODELO"]),
       condition: normalizeCondition(value(raw, ["ESTADO"])),
-      chassis: text(raw, ["CHASIS", "CHASSIS", "SERIE"]),
+      chassis,
       balance: parseFlexibleNumber(value(raw, ["Saldo Actual", "SALDO ACTUAL", "SALDO"])) ?? 0,
       raw,
     };
 
-    const previous = byProduct.get(row.rowId);
-    byProduct.set(row.rowId, previous ? { ...row, balance: previous.balance + row.balance } : row);
+    rows.push(row);
   });
 
   return {
@@ -66,13 +71,18 @@ export function mapMachineStockSheet(
     sourceFileName,
     worksheetName: sheet.name,
     importedAt: new Date().toISOString(),
-    rows: [...byProduct.values()],
+    rows,
   };
 }
 
 export function mapCanonicalMachineStockToRow(row: CanonicalMachineStockRow) {
+  const stockKey = row.chassis
+    ? `CHASIS:${normalizeStableKey(row.chassis)}`
+    : `PRODUCTO:${normalizeStableKey(row.productCode)}:${normalizeStableKey(row.branch)}:${normalizeStableKey(row.warehouse)}:FILA:${row.sourceRow}`;
   return {
     producto_codigo: row.productCode,
+    stock_key: stockKey,
+    source_row: row.sourceRow,
     sucursal: row.branch,
     filial_original: row.branchRaw,
     deposito: row.warehouse,
@@ -82,6 +92,7 @@ export function mapCanonicalMachineStockToRow(row: CanonicalMachineStockRow) {
     estado: row.condition,
     chasis: row.chassis,
     saldo_actual: row.balance,
+    datos_fuente: row.raw,
     importado_en: new Date().toISOString(),
   };
 }

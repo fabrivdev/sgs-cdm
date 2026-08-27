@@ -111,6 +111,7 @@ export interface CanonicalStockRow {
 
 export interface CanonicalMachineStockRow {
   rowId: string;
+  sourceRow: number;
   productCode: string;
   branch: string | null;
   branchRaw: string | null;
