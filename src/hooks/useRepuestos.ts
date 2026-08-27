@@ -150,18 +150,12 @@ export async function fetchStockMatrizCompleto(
   return cargarTodo<StockMatrizRow>(query);
 }
 
-const STOCK_SALES_EXPORT_COLUMNS = [
-  "codigo", "codigos_anteriores", "codigo_fabricante", "descripcion", "marca", "familia", "unidad",
-  "santa_rita", "santa_rosa", "campo_9", "misiones", "loma_plata", "katuete", "stock_total",
-  "ventas_12m", "ventas_24m", "ventas_36m", "origen", "estado_producto", "estado_vinculo", "fecha_corte",
-].join(",");
-
 /** Exportación maestra: deliberadamente no recibe los filtros de pantalla. */
 export async function fetchFullPartsStockSales(): Promise<FullPartsStockSalesRow[]> {
-  const query = (supabase.from("v_repuestos_stock_ventas_exportacion" as any) as any)
-    .select(STOCK_SALES_EXPORT_COLUMNS)
-    .order("codigo", { ascending: true });
-  return cargarTodo<FullPartsStockSalesRow>(query);
+  const { data, error } = await (supabase.rpc as any)("repuestos_exportar_stock_ventas_completo");
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("La exportación completa devolvió un formato inválido");
+  return data as FullPartsStockSalesRow[];
 }
 
 export interface StockKpis {
