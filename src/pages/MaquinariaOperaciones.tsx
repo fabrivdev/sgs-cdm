@@ -124,11 +124,23 @@ const entregaClass = (state: EntregaState | null) =>
       ? "border-slate-300 bg-slate-100 text-slate-600"
       : "border-blue-200 bg-blue-50 text-blue-700";
 
-function entregaStateFromUnit(unitEstado: string | null | undefined): EntregaState | null {
-  if (!unitEstado) return null;
+// Sub-etapa A (diseno_flujo_maquinas.md): las marcas no admitidas a Parque
+// (OTROS) nunca van a generar una fila en parque_maquinas -- para ellas
+// "EN_PARQUE"/"TRANSFERIDA" nunca va a llegar, aunque la venta este 100%
+// cerrada. Confirmado con datos reales: 3 pedidos OTROS con la operacion
+// en FACTURADA/CERRADA quedaban "En stock" para siempre. Para esas marcas,
+// la operacion cerrada/facturada YA es la señal de entrega real. CLAAS y
+// HORSCH no cambian: siguen dependiendo solo de entrar al Parque.
+function entregaStateFromUnit(
+  unitEstado: string | null | undefined,
+  marca: string | null | undefined,
+  operacionEstado: string | null | undefined,
+): EntregaState | null {
   if (unitEstado === "EN_PARQUE" || unitEstado === "TRANSFERIDA") return "ENTREGADO";
   if (unitEstado === "CANCELADA") return "CANCELADA";
-  if (["PENDIENTE", "EN_TRANSITO", "DISPONIBLE", "FACTURADA"].includes(unitEstado)) return "EN_STOCK";
+  const esParqueEligible = marca === "CLAAS" || marca === "HORSCH";
+  if (!esParqueEligible && (operacionEstado === "FACTURADA" || operacionEstado === "CERRADA")) return "ENTREGADO";
+  if (unitEstado && ["PENDIENTE", "EN_TRANSITO", "DISPONIBLE", "FACTURADA"].includes(unitEstado)) return "EN_STOCK";
   return null;
 }
 
@@ -379,12 +391,35 @@ export default function MaquinariaOperaciones() {
     },
   });
 
+  // Sub-etapa A: para marcas OTROS, "entrega" tambien depende del estado
+  // real de la OPERACION (FACTURADA/CERRADA) -- se busca aparte por
+  // operacion_id, igual patron que entregaQuery, sin tocar la base.
+  const operacionIds = useMemo(
+    () => importsView ? [] : Array.from(new Set((operationsQuery.data ?? []).map((row) => (row as OrderRow).operacion_id).filter(Boolean))),
+    [importsView, operationsQuery.data],
+  );
+  const operacionEstadoQuery = useQuery({
+    queryKey: ["machine-operations-estado-operacion", operacionIds],
+    enabled: !importsView && operacionIds.length > 0,
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      for (let i = 0; i < operacionIds.length; i += 200) {
+        const chunk = operacionIds.slice(i, i + 200);
+        const { data, error } = await db.from("maquinaria_operaciones").select("id,estado").in("id", chunk);
+        if (error) throw error;
+        for (const op of data ?? []) map.set(op.id, op.estado);
+      }
+      return map;
+    },
+  });
+
   const marcaOptions = useMemo(
     () => Array.from(new Set((operationsQuery.data ?? []).map((row) => row.marca).filter((v): v is string => !!v))).sort(),
     [operationsQuery.data],
   );
 
   const entregaByUnitId = entregaQuery.data;
+  const estadoByOperacionId = operacionEstadoQuery.data;
   const rows = useMemo(() => (operationsQuery.data ?? []).filter((row) => {
     if (importsView) {
       const importRow = row as ImportRow;
@@ -394,7 +429,7 @@ export default function MaquinariaOperaciones() {
       const orderRow = row as OrderRow;
       if (orderState !== "TODOS" && simpleOrderState(orderRow.estado_fuente) !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
-      if (entrega !== "TODOS" && entregaStateFromUnit(entregaByUnitId?.get(orderRow.id)) !== entrega) return false;
+      if (entrega !== "TODOS" && entregaStateFromUnit(entregaByUnitId?.get(orderRow.id), orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id)) !== entrega) return false;
     }
     if (marca !== "TODOS" && row.marca !== marca) return false;
     const q = search.trim().toUpperCase();
@@ -402,7 +437,7 @@ export default function MaquinariaOperaciones() {
     const common = [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId]);
+  }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId]);
 
   const activeCount = (marca !== "TODOS" ? 1 : 0)
     + (importsView ? (llegada !== "TODOS" ? 1 : 0) + (situacion !== "TODOS" ? 1 : 0) : (condicion !== "TODOS" ? 1 : 0) + (entrega !== "TODOS" ? 1 : 0));
@@ -512,7 +547,7 @@ export default function MaquinariaOperaciones() {
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
       <>
         <div className="hidden overflow-x-auto md:block">
-          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} />}
+          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} />}
         </div>
         <div className="space-y-2 p-3 md:hidden">{rows.map((row) => {
           if (importsView) {
@@ -534,7 +569,7 @@ export default function MaquinariaOperaciones() {
           }
           const orderRow = row as OrderRow;
           const state = simpleOrderState(orderRow.estado_fuente);
-          const entregaState = entregaStateFromUnit(entregaByUnitId?.get(orderRow.id));
+          const entregaState = entregaStateFromUnit(entregaByUnitId?.get(orderRow.id), orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id));
           return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
             <div className="flex items-start justify-between gap-2">
               <span className="font-mono text-[12px] font-semibold">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP"}</span>
@@ -561,7 +596,7 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-function OrdersTable({ rows, onSelect, entregaByUnitId }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, string> }) {
+function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, string>; estadoByOperacionId?: Map<string, string> }) {
   return <Table className="text-[12px]">
     <TableHeader><TableRow>
       <TableHead>NP</TableHead>
@@ -578,7 +613,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId }: { rows: OrderRow[]; on
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {
       const state = simpleOrderState(row.estado_fuente);
-      const entregaState = entregaStateFromUnit(entregaByUnitId?.get(row.id));
+      const entregaState = entregaStateFromUnit(entregaByUnitId?.get(row.id), row.marca, estadoByOperacionId?.get(row.operacion_id));
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
