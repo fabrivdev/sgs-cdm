@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildClaasStockSalesReport,
   buildPartsStockSalesExport,
+  shouldExportClaasReport,
   type FullPartsStockSalesRow,
 } from "./partsStockSales";
 
@@ -52,6 +53,13 @@ describe("buildClaasStockSalesReport", () => {
       "Ventas 36M": 9,
       "Origen sistema": "SISTEMA VIEJO",
     }]);
+  });
+
+  it("solo activa el reporte especial cuando CLAAS es la unica marca", () => {
+    expect(shouldExportClaasReport(["CLAAS"])).toBe(true);
+    expect(shouldExportClaasReport(["HORSCH"])).toBe(false);
+    expect(shouldExportClaasReport(["CLAAS", "HORSCH"])).toBe(false);
+    expect(shouldExportClaasReport([])).toBe(false);
   });
 });
 

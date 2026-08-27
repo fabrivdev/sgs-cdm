@@ -19,6 +19,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSortable } from "@/hooks/useSortable";
 import {
   fetchClaasStockSalesReport,
+  fetchStockMatrizCompleto,
   STOCK_FILTROS_VACIOS,
   STOCK_PAGE_SIZE,
   useFamiliasStock,
@@ -35,7 +36,7 @@ import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives
 import { FiltersBar } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { cn } from "@/lib/utils";
-import { buildClaasStockSalesReport } from "@/lib/exports/partsStockSales";
+import { buildClaasStockSalesReport, shouldExportClaasReport } from "@/lib/exports/partsStockSales";
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
@@ -73,7 +74,7 @@ export default function Repuestos() {
 
   const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
-  const kpisQuery = useStockKpis();
+  const kpisQuery = useStockKpis(filtros);
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
   const marcaSugerencia = seleccionado && (seleccionado.marca === "CLAAS" || seleccionado.marca === "HORSCH" || seleccionado.marca === "OTROS")
@@ -97,20 +98,37 @@ export default function Repuestos() {
     setExporting(true);
     try {
       const XLSX = await import("xlsx");
-      const rows = await fetchClaasStockSalesReport();
-      if (!rows.length) throw new Error("El reporte no devolvió productos CLAAS");
-      const data = buildClaasStockSalesReport(rows);
+      const isClaasReport = shouldExportClaasReport(filtros.marcas);
+      const rows = isClaasReport
+        ? await fetchClaasStockSalesReport()
+        : await fetchStockMatrizCompleto(filtros, sortKey, sortDir);
+      if (!rows.length) throw new Error("La vista filtrada no devolvió productos");
+      const data = isClaasReport
+        ? buildClaasStockSalesReport(rows as Awaited<ReturnType<typeof fetchClaasStockSalesReport>>)
+        : (rows as StockMatrizRow[]).map((row) => ({
+          "Código interno": row.codigo_interno,
+          "Código fabricante": row.codigo_fabricante ?? "",
+          "Descripción": row.descripcion,
+          "Marca": row.marca,
+          "Familia": row.familia ?? "",
+          "Santa Rita": row.santa_rita,
+          "Santa Rosa": row.santa_rosa,
+          "Campo 9": row.campo_9,
+          "Misiones": row.misiones,
+          "Loma Plata": row.loma_plata,
+          "Katuete": row.katuete,
+          "Stock total": row.total,
+        }));
       const ws = XLSX.utils.json_to_sheet(data);
-      ws["!autofilter"] = { ref: ws["!ref"] ?? "A1:H1" };
+      ws["!autofilter"] = { ref: ws["!ref"] ?? (isClaasReport ? "A1:H1" : "A1:L1") };
       ws["!freeze"] = { xSplit: 0, ySplit: 1 };
-      ws["!cols"] = [
-        { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 14 },
-        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 },
-      ];
+      ws["!cols"] = isClaasReport
+        ? [{ wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 }]
+        : [{ wch: 20 }, { wch: 22 }, { wch: 46 }, { wch: 14 }, { wch: 22 }, ...Array.from({ length: 7 }, () => ({ wch: 14 }))];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Reporte CLAAS");
-      XLSX.writeFile(wb, `reporte-claas-stock-ventas-${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success(`${rows.length.toLocaleString("es-PY")} códigos CLAAS exportados`);
+      XLSX.utils.book_append_sheet(wb, ws, isClaasReport ? "Reporte CLAAS" : "Stock filtrado");
+      XLSX.writeFile(wb, `${isClaasReport ? "reporte-claas-stock-ventas" : "stock-filtrado"}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(`${rows.length.toLocaleString("es-PY")} productos exportados`);
     } catch (e) {
       toast.error("Error exportando: " + (e as Error).message);
     } finally {
@@ -141,7 +159,7 @@ export default function Repuestos() {
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}
-        actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting} title="Reporte específico CLAAS con stock y ventas históricas"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Preparando reporte…" : "Exportar reporte CLAAS"}</Button>}
+        actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting} title={shouldExportClaasReport(filtros.marcas) ? "Reporte CLAAS con stock y ventas históricas" : "Exporta los productos que coinciden con los filtros visibles"}><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Preparando reporte…" : shouldExportClaasReport(filtros.marcas) ? "Exportar reporte CLAAS" : "Exportar vista filtrada"}</Button>}
       >
         <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
         <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />

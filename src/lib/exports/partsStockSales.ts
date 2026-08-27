@@ -35,6 +35,10 @@ export interface ClaasStockSalesRow {
 
 const number = (value: unknown) => Number(value) || 0;
 
+export function shouldExportClaasReport(brands: string[]) {
+  return brands.length === 1 && brands[0] === "CLAAS";
+}
+
 export function buildPartsStockSalesExport(rows: FullPartsStockSalesRow[]) {
   const detail = rows.map((row) => ({
     "Código": row.codigo,

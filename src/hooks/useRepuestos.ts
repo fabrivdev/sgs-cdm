@@ -83,7 +83,7 @@ export type StockSortKey =
   | "total";
 
 /** Aplica los mismos filtros a cualquier query builder contra v_repuestos_stock_matriz, para que la página paginada y el export completo nunca queden desincronizados. */
-function aplicarFiltrosStock(qb: any, filtros: StockFiltros) {
+function aplicarFiltrosStockBase(qb: any, filtros: StockFiltros) {
   let query = qb;
   const busqueda = filtros.busqueda.trim();
   if (busqueda) {
@@ -91,6 +91,11 @@ function aplicarFiltrosStock(qb: any, filtros: StockFiltros) {
   }
   if (filtros.marcas.length) query = query.in("marca", filtros.marcas);
   if (filtros.familias.length) query = query.in("familia", filtros.familias);
+  return query;
+}
+
+function aplicarFiltrosStock(qb: any, filtros: StockFiltros) {
+  let query = aplicarFiltrosStockBase(qb, filtros);
   if (filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "con_stock") query = query.gt("total", 0);
   if (filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "sin_stock") query = query.eq("total", 0);
   return query;
@@ -172,19 +177,24 @@ export interface StockKpis {
   ultimaImportacion: string | null;
 }
 
-export function useStockKpis() {
+export function useStockKpis(filtros: StockFiltros) {
   return useQuery({
-    queryKey: ["repuestos", "stock_kpis"],
+    queryKey: ["repuestos", "stock_kpis", filtros],
     staleTime: STALE_TIME,
     queryFn: async (): Promise<StockKpis> => {
-      const [totalRes, conStockRes, ultimaRes] = await Promise.all([
-        (supabase.from("productos" as any) as any)
-          .select("codigo_interno", { count: "exact", head: true })
-          .ilike("codigo_interno", "REP%")
-          .eq("activo", true),
+      const totalQuery = aplicarFiltrosStock(
         (supabase.from("v_repuestos_stock_matriz" as any) as any)
-          .select("codigo_interno", { count: "exact", head: true })
-          .gt("total", 0),
+          .select("codigo_interno", { count: "exact", head: true }),
+        filtros,
+      );
+      const conStockQuery = aplicarFiltrosStock(
+        (supabase.from("v_repuestos_stock_matriz" as any) as any)
+          .select("codigo_interno", { count: "exact", head: true }),
+        filtros,
+      ).gt("total", 0);
+      const [totalRes, conStockRes, ultimaRes] = await Promise.all([
+        totalQuery,
+        conStockQuery,
         (supabase.from("repuestos_stock" as any) as any)
           .select("importado_en")
           .order("importado_en", { ascending: false })
