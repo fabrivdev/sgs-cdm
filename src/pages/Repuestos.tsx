@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Building2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -18,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSortable } from "@/hooks/useSortable";
 import {
+  fetchFullPartsStockSales,
   fetchStockMatrizCompleto,
   STOCK_FILTROS_VACIOS,
   STOCK_PAGE_SIZE,
@@ -35,6 +38,15 @@ import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives
 import { FiltersBar } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { cn } from "@/lib/utils";
+import { buildStockSalesReport, filterPartsStockSalesByBrands } from "@/lib/exports/partsStockSales";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
@@ -47,6 +59,7 @@ const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
 
 const th = "px-2 py-1.5 text-[11px] font-medium";
 const td = "px-2 py-1.5 text-[12px]";
+type ExportMode = "sucursales" | "historico";
 
 
 
@@ -72,7 +85,7 @@ export default function Repuestos() {
 
   const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
-  const kpisQuery = useStockKpis();
+  const kpisQuery = useStockKpis(filtros);
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
   const marcaSugerencia = seleccionado && (seleccionado.marca === "CLAAS" || seleccionado.marca === "HORSCH" || seleccionado.marca === "OTROS")
@@ -92,29 +105,43 @@ export default function Repuestos() {
     setFiltros(STOCK_FILTROS_VACIOS);
   };
 
-  const exportar = async () => {
+  const exportar = async (mode: ExportMode) => {
     setExporting(true);
     try {
       const XLSX = await import("xlsx");
-      const rows = await fetchStockMatrizCompleto(filtros, sortKey, sortDir);
-      const data = rows.map((r) => ({
-        Código: r.codigo_interno,
-        Descripción: r.descripcion,
-        Fabricante: r.codigo_fabricante ?? "",
-        Marca: r.marca,
-        Familia: r.familia ?? "",
-        "Santa Rita": r.santa_rita,
-        "Santa Rosa": r.santa_rosa,
-        "Campo 9": r.campo_9,
-        Misiones: r.misiones,
-        "Loma Plata": r.loma_plata,
-        Katuete: r.katuete,
-        Total: r.total,
-      }));
+      const isBranchBreakdown = mode === "sucursales";
+      const rows = isBranchBreakdown
+        ? await fetchStockMatrizCompleto(filtros, sortKey, sortDir)
+        : filterPartsStockSalesByBrands(await fetchFullPartsStockSales(), filtros.marcas);
+      if (!rows.length) throw new Error("El reporte no devolvió productos para los filtros seleccionados");
+      const data = isBranchBreakdown
+        ? (rows as StockMatrizRow[]).map((row) => ({
+          "Código interno": row.codigo_interno,
+          "Código fabricante": row.codigo_fabricante ?? "",
+          "Descripción": row.descripcion,
+          "Marca": row.marca,
+          "Familia": row.familia ?? "",
+          "Santa Rita": row.santa_rita,
+          "Santa Rosa": row.santa_rosa,
+          "Campo 9": row.campo_9,
+          "Misiones": row.misiones,
+          "Loma Plata": row.loma_plata,
+          "Katuete": row.katuete,
+          "Stock total": row.total,
+        }))
+        : buildStockSalesReport(rows as Awaited<ReturnType<typeof fetchFullPartsStockSales>>);
       const ws = XLSX.utils.json_to_sheet(data);
+      ws["!autofilter"] = { ref: ws["!ref"] ?? (isBranchBreakdown ? "A1:L1" : "A1:I1") };
+      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+      ws["!cols"] = isBranchBreakdown
+        ? [{ wch: 20 }, { wch: 22 }, { wch: 46 }, { wch: 14 }, { wch: 22 }, ...Array.from({ length: 7 }, () => ({ wch: 14 }))]
+        : [{ wch: 20 }, { wch: 22 }, { wch: 46 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 }];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Stock");
-      XLSX.writeFile(wb, `stock-repuestos-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, isBranchBreakdown ? "Stock por sucursal" : "Stock y ventas");
+      const marcaArchivo = filtros.marcas.length === 1 ? `-${filtros.marcas[0].toLowerCase()}` : "";
+      const nombreReporte = isBranchBreakdown ? "stock-por-sucursal" : "stock-total-ventas-historicas";
+      XLSX.writeFile(wb, `${nombreReporte}${marcaArchivo}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(`${rows.length.toLocaleString("es-PY")} productos exportados`);
     } catch (e) {
       toast.error("Error exportando: " + (e as Error).message);
     } finally {
@@ -145,7 +172,33 @@ export default function Repuestos() {
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}
-        actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting}><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Exportando…" : "Exportar"}</Button>}
+        actions={(
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" disabled={exporting}>
+                <Download className="mr-1 h-3.5 w-3.5" />Exportar<ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel className="text-[11px] text-muted-foreground">Elegí cómo presentar el stock</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="items-start gap-2 py-2" onSelect={() => void exportar("sucursales")}>
+                <Building2 className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="text-[12px] font-medium">Stock por sucursal</p>
+                  <p className="text-[11px] text-muted-foreground">Desglosa cada sucursal y respeta todos los filtros visibles.</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="items-start gap-2 py-2" onSelect={() => void exportar("historico")}>
+                <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="text-[12px] font-medium">Stock total + ventas históricas</p>
+                  <p className="text-[11px] text-muted-foreground">Totaliza el stock e incluye ventas 12M, 24M y 36M.</p>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       >
         <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
         <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />
