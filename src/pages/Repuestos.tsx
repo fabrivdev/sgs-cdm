@@ -120,10 +120,10 @@ export default function Repuestos() {
           "Stock total": row.total,
         }));
       const ws = XLSX.utils.json_to_sheet(data);
-      ws["!autofilter"] = { ref: ws["!ref"] ?? (isClaasReport ? "A1:H1" : "A1:L1") };
+      ws["!autofilter"] = { ref: ws["!ref"] ?? (isClaasReport ? "A1:I1" : "A1:L1") };
       ws["!freeze"] = { xSplit: 0, ySplit: 1 };
       ws["!cols"] = isClaasReport
-        ? [{ wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 }]
+        ? [{ wch: 20 }, { wch: 22 }, { wch: 46 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 }]
         : [{ wch: 20 }, { wch: 22 }, { wch: 46 }, { wch: 14 }, { wch: 22 }, ...Array.from({ length: 7 }, () => ({ wch: 14 }))];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, isClaasReport ? "Reporte CLAAS" : "Stock filtrado");

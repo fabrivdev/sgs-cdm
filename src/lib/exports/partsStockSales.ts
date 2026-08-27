@@ -25,6 +25,7 @@ export interface FullPartsStockSalesRow {
 export interface ClaasStockSalesRow {
   codigo_interno: string;
   codigo_fabricante: string | null;
+  descripcion: string;
   marca: "CLAAS";
   stock: number;
   ventas_12m: number;
@@ -93,6 +94,7 @@ export function buildClaasStockSalesReport(rows: ClaasStockSalesRow[]) {
   return rows.map((row) => ({
     "Código interno": row.codigo_interno,
     "Código fabricante": row.codigo_fabricante ?? "",
+    "Descripción": row.descripcion,
     "Marca": "CLAAS",
     "Stock": number(row.stock),
     "Ventas 12M": number(row.ventas_12m),

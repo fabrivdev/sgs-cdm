@@ -36,6 +36,7 @@ describe("buildClaasStockSalesReport", () => {
     const result = buildClaasStockSalesReport([{
       codigo_interno: "000778",
       codigo_fabricante: "778.1",
+      descripcion: "FILTRO DE COMBUSTIBLE",
       marca: "CLAAS",
       stock: 0,
       ventas_12m: 1,
@@ -46,6 +47,7 @@ describe("buildClaasStockSalesReport", () => {
     expect(result).toEqual([{
       "Código interno": "000778",
       "Código fabricante": "778.1",
+      "Descripción": "FILTRO DE COMBUSTIBLE",
       "Marca": "CLAAS",
       "Stock": 0,
       "Ventas 12M": 1,

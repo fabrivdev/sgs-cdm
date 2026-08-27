@@ -1,3 +1,5 @@
+-- Actualiza el reporte CLAAS existente para completar descripcion y codigo de
+-- fabricante desde el maestro o la facturacion historica.
 -- Correccion autosuficiente: algunas bases no poseen la funcion historica
 -- facturacion_marca_por_grupo. Esta regla local clasifica la marca del sistema
 -- viejo exclusivamente desde su subgrupo.
