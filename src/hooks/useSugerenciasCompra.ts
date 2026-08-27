@@ -840,7 +840,7 @@ export async function importarMaestroLegacy(
       codigo_fabricante: textoMaestroLegacy(campoMaestroLegacy(row, "Cód. Fabricante", "Cod. Fabricante")) || null,
       descripcion: textoMaestroLegacy(campoMaestroLegacy(row, "Nombre", "Nombre Impresión", "Nombre Impresion")),
       situacion: textoMaestroLegacy(campoMaestroLegacy(row, "Situación", "Situacion")) || null,
-      tipo: textoMaestroLegacy(campoMaestroLegacy(row, "Tipo")) || null,
+      tipo: textoMaestroLegacy(campoMaestroLegacy(row, "Subgrupo", "Sub Grupo", "Tipo")) || null,
     }];
   });
   if (rows.length === 0) {

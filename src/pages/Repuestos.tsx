@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSortable } from "@/hooks/useSortable";
 import {
-  fetchFullPartsStockSales,
+  fetchClaasStockSalesReport,
   STOCK_FILTROS_VACIOS,
   STOCK_PAGE_SIZE,
   useFamiliasStock,
@@ -35,7 +35,7 @@ import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives
 import { FiltersBar } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { cn } from "@/lib/utils";
-import { buildPartsStockSalesExport } from "@/lib/exports/partsStockSales";
+import { buildClaasStockSalesReport } from "@/lib/exports/partsStockSales";
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
@@ -97,27 +97,20 @@ export default function Repuestos() {
     setExporting(true);
     try {
       const XLSX = await import("xlsx");
-      const rows = await fetchFullPartsStockSales();
-      if (!rows.length) throw new Error("La base completa no devolvió productos");
-      const { detail, pending, control } = buildPartsStockSalesExport(rows);
-      const ws = XLSX.utils.json_to_sheet(detail);
-      ws["!autofilter"] = { ref: ws["!ref"] ?? "A1:U1" };
+      const rows = await fetchClaasStockSalesReport();
+      if (!rows.length) throw new Error("El reporte no devolvió productos CLAAS");
+      const data = buildClaasStockSalesReport(rows);
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws["!autofilter"] = { ref: ws["!ref"] ?? "A1:H1" };
       ws["!freeze"] = { xSplit: 0, ySplit: 1 };
       ws["!cols"] = [
-        { wch: 18 }, { wch: 28 }, { wch: 20 }, { wch: 48 }, { wch: 14 }, { wch: 20 }, { wch: 10 },
-        ...Array.from({ length: 10 }, () => ({ wch: 14 })),
-        { wch: 20 }, { wch: 18 }, { wch: 22 }, { wch: 14 },
+        { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 14 },
+        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 32 },
       ];
-      const pendingSheet = XLSX.utils.json_to_sheet(pending);
-      pendingSheet["!autofilter"] = { ref: pendingSheet["!ref"] ?? "A1:U1" };
-      const controlSheet = XLSX.utils.json_to_sheet(control);
-      controlSheet["!cols"] = [{ wch: 34 }, { wch: 20 }];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Stock y ventas");
-      XLSX.utils.book_append_sheet(wb, pendingSheet, "Códigos pendientes");
-      XLSX.utils.book_append_sheet(wb, controlSheet, "Control");
-      XLSX.writeFile(wb, `stock-ventas-completo-${new Date().toISOString().slice(0, 10)}.xlsx`);
-      toast.success(`${rows.length.toLocaleString("es-PY")} productos exportados con ventas 12M, 24M y 36M`);
+      XLSX.utils.book_append_sheet(wb, ws, "Reporte CLAAS");
+      XLSX.writeFile(wb, `reporte-claas-stock-ventas-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(`${rows.length.toLocaleString("es-PY")} códigos CLAAS exportados`);
     } catch (e) {
       toast.error("Error exportando: " + (e as Error).message);
     } finally {
@@ -148,7 +141,7 @@ export default function Repuestos() {
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}
-        actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting} title="Incluye catálogo, stock cero y códigos del sistema anterior"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Preparando base…" : "Exportar base completa"}</Button>}
+        actions={<Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" onClick={exportar} disabled={exporting} title="Reporte específico CLAAS con stock y ventas históricas"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "Preparando reporte…" : "Exportar reporte CLAAS"}</Button>}
       >
         <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
         <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />

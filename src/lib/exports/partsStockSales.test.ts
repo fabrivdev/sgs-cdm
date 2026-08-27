@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPartsStockSalesExport, type FullPartsStockSalesRow } from "./partsStockSales";
+import {
+  buildClaasStockSalesReport,
+  buildPartsStockSalesExport,
+  type FullPartsStockSalesRow,
+} from "./partsStockSales";
 
 const row = (patch: Partial<FullPartsStockSalesRow> = {}): FullPartsStockSalesRow => ({
   codigo: "REP001",
@@ -24,6 +28,31 @@ const row = (patch: Partial<FullPartsStockSalesRow> = {}): FullPartsStockSalesRo
   estado_vinculo: "NO_APLICA",
   fecha_corte: "2026-08-27",
   ...patch,
+});
+
+describe("buildClaasStockSalesReport", () => {
+  it("produce un reporte minimo y conserva el origen historico", () => {
+    const result = buildClaasStockSalesReport([{
+      codigo_interno: "000778",
+      codigo_fabricante: "778.1",
+      marca: "CLAAS",
+      stock: 0,
+      ventas_12m: 1,
+      ventas_24m: 4,
+      ventas_36m: 9,
+      origen_sistema: "SISTEMA VIEJO",
+    }]);
+    expect(result).toEqual([{
+      "Código interno": "000778",
+      "Código fabricante": "778.1",
+      "Marca": "CLAAS",
+      "Stock": 0,
+      "Ventas 12M": 1,
+      "Ventas 24M": 4,
+      "Ventas 36M": 9,
+      "Origen sistema": "SISTEMA VIEJO",
+    }]);
+  });
 });
 
 describe("buildPartsStockSalesExport", () => {

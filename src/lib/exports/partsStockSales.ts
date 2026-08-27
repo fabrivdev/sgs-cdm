@@ -22,6 +22,17 @@ export interface FullPartsStockSalesRow {
   fecha_corte: string;
 }
 
+export interface ClaasStockSalesRow {
+  codigo_interno: string;
+  codigo_fabricante: string | null;
+  marca: "CLAAS";
+  stock: number;
+  ventas_12m: number;
+  ventas_24m: number;
+  ventas_36m: number;
+  origen_sistema: "SISTEMA NUEVO" | "SISTEMA VIEJO" | "SISTEMA NUEVO + SISTEMA VIEJO";
+}
+
 const number = (value: unknown) => Number(value) || 0;
 
 export function buildPartsStockSalesExport(rows: FullPartsStockSalesRow[]) {
@@ -72,4 +83,17 @@ export function buildPartsStockSalesExport(rows: FullPartsStockSalesRow[]) {
   ];
 
   return { detail, pending, control };
+}
+
+export function buildClaasStockSalesReport(rows: ClaasStockSalesRow[]) {
+  return rows.map((row) => ({
+    "Código interno": row.codigo_interno,
+    "Código fabricante": row.codigo_fabricante ?? "",
+    "Marca": "CLAAS",
+    "Stock": number(row.stock),
+    "Ventas 12M": number(row.ventas_12m),
+    "Ventas 24M": number(row.ventas_24m),
+    "Ventas 36M": number(row.ventas_36m),
+    "Origen sistema": row.origen_sistema,
+  }));
 }
