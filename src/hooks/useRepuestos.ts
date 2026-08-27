@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import type { Marca } from "@/lib/constants";
+import type { FullPartsStockSalesRow } from "@/lib/exports/partsStockSales";
 
 const STALE_TIME = 5 * 60 * 1000;
 export const STOCK_PAGE_SIZE = 50;
@@ -147,6 +148,20 @@ export async function fetchStockMatrizCompleto(
   query = aplicarFiltrosStock(query, filtros);
 
   return cargarTodo<StockMatrizRow>(query);
+}
+
+const STOCK_SALES_EXPORT_COLUMNS = [
+  "codigo", "codigos_anteriores", "codigo_fabricante", "descripcion", "marca", "familia", "unidad",
+  "santa_rita", "santa_rosa", "campo_9", "misiones", "loma_plata", "katuete", "stock_total",
+  "ventas_12m", "ventas_24m", "ventas_36m", "origen", "estado_producto", "estado_vinculo", "fecha_corte",
+].join(",");
+
+/** Exportación maestra: deliberadamente no recibe los filtros de pantalla. */
+export async function fetchFullPartsStockSales(): Promise<FullPartsStockSalesRow[]> {
+  const query = (supabase.from("v_repuestos_stock_ventas_exportacion" as any) as any)
+    .select(STOCK_SALES_EXPORT_COLUMNS)
+    .order("codigo", { ascending: true });
+  return cargarTodo<FullPartsStockSalesRow>(query);
 }
 
 export interface StockKpis {
