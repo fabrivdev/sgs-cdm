@@ -4,7 +4,7 @@ import { ParqueTab } from "@/components/parque/ParqueTab";
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
 import { StockMaquinasTab, type StockMaquinasResumen } from "@/components/parque/StockMaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { Tractor, CheckCircle2, PackageCheck, Users, LockKeyhole, CircleDollarSign, AlertTriangle } from "lucide-react";
+import { Tractor, CheckCircle2, PackageCheck, Users, Sparkles, RefreshCw } from "lucide-react";
 import { pageShell } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import type { KpiResult } from "@/lib/contacto-utils";
@@ -32,7 +32,7 @@ export default function ParqueClientes() {
     totalHorsch: 0,
     totalClaas: 0,
   });
-  const [stockResumen, setStockResumen] = useState<StockMaquinasResumen>({ total: 0, disponibles: 0, reservadas: 0, vendidasPendientes: 0, conflictos: 0 });
+  const [stockResumen, setStockResumen] = useState<StockMaquinasResumen>({ total: 0, nuevas: 0, usadas: 0, marcas: 0 });
   const [refreshCounter, setRefreshCounter] = useState(0);
   const vistaParque = location.pathname === "/parque-stock" ? "stock" : location.pathname === "/parque-maquinas" ? "maquinas" : "clientes";
 
@@ -80,10 +80,10 @@ export default function ParqueClientes() {
       { label: "Máquinas HORSCH", value: maquinasResumen.totalHorsch.toLocaleString(), icon: Tractor, accent: "text-red-600" },
       { label: "Máquinas CLAAS", value: maquinasResumen.totalClaas.toLocaleString(), icon: Tractor, accent: "text-emerald-600" },
     ] : [
-      { label: "Unidades físicas", value: stockResumen.total.toLocaleString(), icon: Tractor, accent: "text-primary" },
-      { label: "Disponibles", value: stockResumen.disponibles.toLocaleString(), icon: CheckCircle2, accent: "text-emerald-600" },
-      { label: "Reservadas", value: stockResumen.reservadas.toLocaleString(), icon: LockKeyhole, accent: "text-blue-600" },
-      { label: stockResumen.conflictos ? "Conflictos de chasis" : "Vendidas por entregar", value: (stockResumen.conflictos || stockResumen.vendidasPendientes).toLocaleString(), icon: stockResumen.conflictos ? AlertTriangle : CircleDollarSign, accent: stockResumen.conflictos ? "text-red-600" : "text-violet-600" },
+      { label: "Unidades en stock", value: stockResumen.total.toLocaleString(), icon: Tractor, accent: "text-primary" },
+      { label: "Máquinas nuevas", value: stockResumen.nuevas.toLocaleString(), icon: Sparkles, accent: "text-emerald-600" },
+      { label: "Máquinas usadas", value: stockResumen.usadas.toLocaleString(), icon: RefreshCw, accent: "text-amber-600" },
+      { label: "Marcas", value: stockResumen.marcas.toLocaleString(), icon: CheckCircle2, accent: "text-blue-600" },
     ],
     [metricasMostradas, maquinasResumen, stockResumen, vistaParque],
   );
