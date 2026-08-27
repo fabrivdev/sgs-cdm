@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileCheck2, FileText, PackageCheck, Plus, Search, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Plus, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import {
   ResponsiveDrawer,
   ResponsiveDrawerBody,
@@ -26,11 +27,153 @@ import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
+
+// Las 9 etapas reales de una operacion -- se muestran completas solo en el
+// detalle. En la lista se usa el estado simplificado (ver simpleOrderState).
 const STATE_LABEL: Record<string, string> = {
   BORRADOR: "Borrador", REVISION_NP: "Revisar NP", NP_VALIDADA: "NP validada",
   ABASTECIMIENTO: "Abastecimiento", EN_IMPORTACION: "En importación", DISPONIBLE: "Disponible",
   FACTURADA: "Facturada", CERRADA: "Cerrada", CANCELADA: "Cancelada",
 };
+const OPERATION_ENUM_VALUES = new Set(Object.keys(STATE_LABEL));
+
+const usdFormatter = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const formatUsd = (value: unknown) => {
+  const number = Number(value);
+  return value == null || value === "" || !Number.isFinite(number) ? "—" : usdFormatter.format(number);
+};
+
+const brandClass = (marca: string | null) => {
+  const normalized = (marca ?? "").toUpperCase();
+  if (normalized === "CLAAS") return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
+  if (normalized === "HORSCH") return "border-marca-horsch/30 bg-marca-horsch-bg text-marca-horsch";
+  return "border-border bg-muted text-muted-foreground";
+};
+
+// El proveedor de una importacion suele SER el fabricante (CLAAS/HORSCH
+// importan sus propias maquinas), pero no siempre -- puede ser un tercero.
+// Se reusa la paleta de marca cuando el nombre la contiene, y un color propio
+// para el resto, para que "Proveedor" tenga su propia identidad visual sin
+// inventar una paleta arbitraria por cada proveedor distinto.
+const supplierClass = (proveedor: string | null) => {
+  const normalized = (proveedor ?? "").toUpperCase();
+  if (normalized.includes("CLAAS")) return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
+  if (normalized.includes("HORSCH")) return "border-marca-horsch/30 bg-marca-horsch-bg text-marca-horsch";
+  if (!normalized) return "border-border bg-muted text-muted-foreground";
+  return "border-indigo-200 bg-indigo-50 text-indigo-700";
+};
+
+// "Tipo de venta" del diseño = la condicion que ya existe en la base.
+const CONDITION_LABEL: Record<string, string> = { NUEVA: "Nueva", USADA: "Usada" };
+const conditionClass = (condicion: string | null) =>
+  condicion === "USADA"
+    ? "border-amber-200 bg-amber-50 text-amber-700"
+    : "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+const SUPPLY_LABEL: Record<string, string> = { STOCK: "Stock", IMPORTAR: "Importar", DEFINIR: "Sin definir" };
+const supplyClass = (abastecimiento: string | null) => {
+  if (abastecimiento === "STOCK") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (abastecimiento === "IMPORTAR") return "border-violet-200 bg-violet-50 text-violet-700";
+  return "border-border bg-muted text-muted-foreground";
+};
+
+// Estado simplificado de la lista (Pendiente/Completado/Cancelada). Hoy el
+// dato de origen mezcla el enum real de la operacion con texto libre heredado
+// de la planilla historica ("Pendiente"/"Completado" tal cual lo tipeaban) --
+// esta funcion normaliza ambos vocabularios a un solo resultado, sin tocar
+// la base. Ante la duda (texto irreconocible) se asume Pendiente, para no
+// esconder algo que en realidad falta revisar.
+type SimpleOrderState = "PENDIENTE" | "COMPLETADO" | "CANCELADA";
+const SIMPLE_STATE_LABEL: Record<SimpleOrderState, string> = {
+  PENDIENTE: "Pendiente", COMPLETADO: "Facturado", CANCELADA: "Cancelada",
+};
+const simpleStateClass = (state: SimpleOrderState) =>
+  state === "COMPLETADO"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : state === "CANCELADA"
+      ? "border-slate-300 bg-slate-100 text-slate-600"
+      : "border-amber-200 bg-amber-50 text-amber-700";
+
+function simpleOrderState(estadoFuente: string | null): SimpleOrderState {
+  const raw = String(estadoFuente ?? "").trim().toUpperCase();
+  if (!raw) return "PENDIENTE";
+  if (OPERATION_ENUM_VALUES.has(raw)) {
+    if (raw === "FACTURADA" || raw === "CERRADA") return "COMPLETADO";
+    if (raw === "CANCELADA") return "CANCELADA";
+    return "PENDIENTE";
+  }
+  if (raw.includes("CANCEL")) return "CANCELADA";
+  if (raw.includes("COMPLET")) return "COMPLETADO";
+  return "PENDIENTE";
+}
+
+// Estado de entrega de UNA UNIDAD fisica (Entregado/En stock) -- distinto y
+// enteramente independiente del estado de facturacion: una maquina puede
+// estar facturada y seguir en nuestro stock. Sale de
+// maquinaria_unidades_operacion.estado, que ya existe en la base -- no
+// se persiste nada nuevo, solo se consulta aparte (ver fetchEntregaByUnitId)
+// porque la vista de la lista no lo expone todavia.
+type EntregaState = "ENTREGADO" | "EN_STOCK" | "CANCELADA";
+const ENTREGA_LABEL: Record<EntregaState, string> = {
+  ENTREGADO: "Entregado", EN_STOCK: "En stock", CANCELADA: "Cancelada",
+};
+const entregaClass = (state: EntregaState | null) =>
+  state === "ENTREGADO"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : state === "CANCELADA"
+      ? "border-slate-300 bg-slate-100 text-slate-600"
+      : "border-blue-200 bg-blue-50 text-blue-700";
+
+function entregaStateFromUnit(unitEstado: string | null | undefined): EntregaState | null {
+  if (!unitEstado) return null;
+  if (unitEstado === "EN_PARQUE" || unitEstado === "TRANSFERIDA") return "ENTREGADO";
+  if (unitEstado === "CANCELADA") return "CANCELADA";
+  if (["PENDIENTE", "EN_TRANSITO", "DISPONIBLE", "FACTURADA"].includes(unitEstado)) return "EN_STOCK";
+  return null;
+}
+
+// Estado de llegada de una importacion (Planificado/En transito/Completado).
+// Prioriza estado_fuente (texto de la planilla historica, ya viene limpio:
+// "Planificado"/"Completado") sobre el calculo por ETA/ATA -- confirmado con
+// datos reales que casi todas las filas tienen ETA cargado de entrada (no
+// solo cuando el envio ya salio), asi que "hay ETA y no hay ATA" NO significa
+// "en transito" de forma confiable. El calculo por fechas queda como
+// respaldo unicamente cuando el texto de origen no dice nada reconocible.
+type ArrivalState = "PLANIFICADO" | "EN_TRANSITO" | "COMPLETADO";
+const ARRIVAL_LABEL: Record<ArrivalState, string> = {
+  PLANIFICADO: "Planificado", EN_TRANSITO: "En tránsito", COMPLETADO: "Completado",
+};
+const arrivalClass = (state: ArrivalState) =>
+  state === "COMPLETADO"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : state === "EN_TRANSITO"
+      ? "border-blue-200 bg-blue-50 text-blue-700"
+      : "border-slate-200 bg-slate-100 text-slate-600";
+
+function arrivalState(row: Pick<ImportRow, "eta" | "ata" | "estado_fuente">): ArrivalState {
+  const raw = String(row.estado_fuente ?? "").trim().toUpperCase();
+  if (raw.includes("COMPLET") || raw.includes("ARRIB") || raw.includes("RECIB")) return "COMPLETADO";
+  if (raw.includes("TRANSIT") || raw.includes("EMBARC")) return "EN_TRANSITO";
+  if (raw.includes("PLANIFIC")) return "PLANIFICADO";
+  if (row.ata) return "COMPLETADO";
+  if (row.eta) return "EN_TRANSITO";
+  return "PLANIFICADO";
+}
+
+// Situacion comercial (Reservado/Vendido/Stock) -- ya se calcula sola desde
+// maquinaria_stock_trazabilidad, se reusa tal cual.
+const AVAILABILITY_LABEL: Record<string, string> = {
+  DISPONIBLE: "Stock", RESERVADO: "Reservado", VENDIDO_PENDIENTE_ENTREGA: "Vendido · por entregar",
+  EN_PARQUE: "En parque", CONFLICTO: "Conflicto", SIN_CHASIS: "Sin chasis",
+};
+const availabilityClass = (state?: string | null) => cn(
+  "text-[10px]",
+  state === "DISPONIBLE" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+  state === "RESERVADO" && "border-blue-200 bg-blue-50 text-blue-700",
+  state === "VENDIDO_PENDIENTE_ENTREGA" && "border-violet-200 bg-violet-50 text-violet-700",
+  state === "CONFLICTO" && "border-red-200 bg-red-50 text-red-700",
+  (!state || state === "SIN_CHASIS" || state === "EN_PARQUE") && "border-slate-200 bg-slate-100 text-slate-600",
+);
 
 type OrderRow = {
   id: string; operacion_id: string; np_numero: string | null; np_fecha: string | null; cliente_nombre: string;
@@ -44,7 +187,7 @@ type ImportRow = {
   id: string; operacion_id: string | null; linea_id: string | null; np_numero: string | null; np_fecha: string | null;
   cliente_nombre: string | null; comercial: string | null; marca: string | null; producto: string | null; modelo: string | null;
   cantidad: number | null; estado_fuente: string | null; oc: string | null; po: string | null; eta: string | null; ata: string | null;
-  proveedor: string | null; invoice_supplier: string | null; costo_final: number | null; chasis: string | null;
+  proveedor: string | null; invoice_supplier: string | null; precio_oc: number | null; costo_final: number | null; chasis: string | null;
   venta_facturada: string | null; valor_venta: number | null; situacion_vinculo: string | null; estado_disponibilidad: string | null;
   disponibilidad_detalle: string | null; stock_sucursal: string | null; stock_deposito: string | null; stock_saldo: number | null;
 };
@@ -55,12 +198,6 @@ type DraftLine = {
   subgrupo: string; chasis: string[]; confianza?: Record<string, unknown>; datos_extraidos?: Record<string, unknown>;
 };
 type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; docs: any[]; importation?: any };
-
-const AVAILABILITY_LABEL: Record<string, string> = {
-  DISPONIBLE: "Disponible", RESERVADO: "Reservado", VENDIDO_PENDIENTE_ENTREGA: "Vendido · por entregar",
-  EN_PARQUE: "En parque", CONFLICTO: "Conflicto", SIN_CHASIS: "Sin chasis",
-};
-const availabilityClass = (state?: string | null) => cn("text-[10px]", state === "DISPONIBLE" && "border-emerald-200 bg-emerald-50 text-emerald-700", state === "RESERVADO" && "border-blue-200 bg-blue-50 text-blue-700", state === "VENDIDO_PENDIENTE_ENTREGA" && "border-violet-200 bg-violet-50 text-violet-700", state === "CONFLICTO" && "border-red-200 bg-red-50 text-red-700", (!state || state === "SIN_CHASIS") && "border-amber-200 bg-amber-50 text-amber-700");
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
@@ -193,10 +330,19 @@ export default function MaquinariaOperaciones() {
   const queryClient = useQueryClient();
   const importsView = location.pathname === "/parque-importaciones";
   const [search, setSearch] = useState("");
-  const [state, setState] = useState("TODOS");
+  const [orderState, setOrderState] = useState<SimpleOrderState | "TODOS">("PENDIENTE");
+  const [marca, setMarca] = useState("TODOS");
+  const [condicion, setCondicion] = useState("TODOS");
+  const [llegada, setLlegada] = useState<ArrivalState | "TODOS">("TODOS");
+  const [situacion, setSituacion] = useState("TODOS");
+  const [entrega, setEntrega] = useState<EntregaState | "TODOS">("TODOS");
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedImport, setSelectedImport] = useState<ImportRow | null>(null);
+
+  // Los filtros son independientes por pantalla: cambiar de pestaña no debe
+  // arrastrar un filtro que no existe del otro lado.
+  useEffect(() => { setSearch(""); }, [importsView]);
 
   const operationsQuery = useQuery({
     queryKey: ["machine-operations", importsView ? "imports" : "orders"],
@@ -208,50 +354,204 @@ export default function MaquinariaOperaciones() {
       return (data ?? []) as (OrderRow | ImportRow)[];
     },
   });
+
+  // El "estado de entrega" (Entregado/En stock) sale de
+  // maquinaria_unidades_operacion.estado -- la vista de la lista todavia no
+  // lo expone, asi que se busca aparte por el id de cada fila (que coincide
+  // con el id de la unidad fisica) en vez de tocar la base para agregar la
+  // columna a la vista.
+  const unitIds = useMemo(
+    () => importsView ? [] : Array.from(new Set((operationsQuery.data ?? []).map((row) => row.id).filter(Boolean))),
+    [importsView, operationsQuery.data],
+  );
+  const entregaQuery = useQuery({
+    queryKey: ["machine-operations-entrega", unitIds],
+    enabled: !importsView && unitIds.length > 0,
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      for (let i = 0; i < unitIds.length; i += 200) {
+        const chunk = unitIds.slice(i, i + 200);
+        const { data, error } = await db.from("maquinaria_unidades_operacion").select("id,estado").in("id", chunk);
+        if (error) throw error;
+        for (const unit of data ?? []) map.set(unit.id, unit.estado);
+      }
+      return map;
+    },
+  });
+
+  const marcaOptions = useMemo(
+    () => Array.from(new Set((operationsQuery.data ?? []).map((row) => row.marca).filter((v): v is string => !!v))).sort(),
+    [operationsQuery.data],
+  );
+
+  const entregaByUnitId = entregaQuery.data;
   const rows = useMemo(() => (operationsQuery.data ?? []).filter((row) => {
-    if (state !== "TODOS" && row.estado_fuente !== state) return false;
+    if (importsView) {
+      const importRow = row as ImportRow;
+      if (llegada !== "TODOS" && arrivalState(importRow) !== llegada) return false;
+      if (situacion !== "TODOS" && (importRow.estado_disponibilidad ?? "SIN_CHASIS") !== situacion) return false;
+    } else {
+      const orderRow = row as OrderRow;
+      if (orderState !== "TODOS" && simpleOrderState(orderRow.estado_fuente) !== orderState) return false;
+      if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
+      if (entrega !== "TODOS" && entregaStateFromUnit(entregaByUnitId?.get(orderRow.id)) !== entrega) return false;
+    }
+    if (marca !== "TODOS" && row.marca !== marca) return false;
     const q = search.trim().toUpperCase();
+    if (!q) return true;
     const common = [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
-    return !q || [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [operationsQuery.data, importsView, search, state]);
-  const totals = useMemo(() => importsView ? {
-    first: rows.length,
-    second: rows.filter((row) => !(row as ImportRow).ata).length,
-    third: rows.filter((row) => !!(row as ImportRow).ata).length,
-    fourth: rows.filter((row) => !!row.estado_disponibilidad).length,
-  } : {
-    first: rows.length,
-    second: rows.filter((row) => String(row.estado_fuente ?? "").toLowerCase() === "pendiente").length,
-    third: rows.filter((row) => row.estado_disponibilidad === "RESERVADO").length,
-    fourth: rows.filter((row) => row.estado_disponibilidad === "VENDIDO_PENDIENTE_ENTREGA").length,
-  }, [rows, importsView]);
-  const stateOptions = Array.from(new Set((operationsQuery.data ?? []).map((row) => row.estado_fuente).filter((value): value is string => !!value))).sort();
+    return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
+  }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId]);
+
+  const activeCount = (marca !== "TODOS" ? 1 : 0)
+    + (importsView ? (llegada !== "TODOS" ? 1 : 0) + (situacion !== "TODOS" ? 1 : 0) : (condicion !== "TODOS" ? 1 : 0) + (entrega !== "TODOS" ? 1 : 0));
+  const clearFilters = () => { setMarca("TODOS"); setCondicion("TODOS"); setLlegada("TODOS"); setSituacion("TODOS"); setEntrega("TODOS"); };
+
+  const orderTotals = useMemo(() => {
+    const orderRows = rows as OrderRow[];
+    return {
+      total: orderRows.length,
+      pendientes: orderRows.filter((row) => simpleOrderState(row.estado_fuente) === "PENDIENTE").length,
+      facturados: orderRows.filter((row) => simpleOrderState(row.estado_fuente) === "COMPLETADO").length,
+      facturado: orderRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0), 0),
+    };
+  }, [rows]);
+  const importTotals = useMemo(() => {
+    const importRows = rows as ImportRow[];
+    return {
+      total: importRows.length,
+      planificadas: importRows.filter((row) => arrivalState(row) === "PLANIFICADO").length,
+      transito: importRows.filter((row) => arrivalState(row) === "EN_TRANSITO").length,
+      completadas: importRows.filter((row) => arrivalState(row) === "COMPLETADO").length,
+    };
+  }, [rows]);
 
   return <main className={pageShell}>
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
-      meta={importsView ? "Logística y documentación de las unidades importadas." : "Pedidos comerciales y asignación de unidades por chasis."}
-      actions={!importsView ? <Button size="sm" onClick={() => setNewOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Nueva operación</Button> : undefined}
+      meta={importsView ? "Qué está planificado y qué ya llegó, con su situación comercial." : "Qué pedidos faltan facturar y cuáles ya se completaron."}
+      actions={!importsView ? <Button size="sm" onClick={() => setNewOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Nuevo pedido</Button> : undefined}
     />
-    <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
-      <KpiItem label={importsView ? "Importaciones" : "Pedidos"} value={totals.first} icon={importsView ? <Ship /> : <FileCheck2 />} tone="info" />
-      <KpiItem label={importsView ? "En tránsito / sin ATA" : "Pendientes"} value={totals.second} icon={<FileText />} tone="warning" />
-      <KpiItem label={importsView ? "Con arribo" : "Reservados en stock"} value={totals.third} icon={<PackageCheck />} tone="positive" />
-      <KpiItem label={importsView ? "Vinculados a stock" : "Vendidos por entregar"} value={totals.fourth} />
-    </KpiStrip>
-    <Panel className="p-0 overflow-hidden">
-      <div className="flex flex-wrap items-end gap-2 border-b p-3">
-        <div className="min-w-[240px] flex-1"><Label className="text-[11px]">Buscar</Label><div className="relative"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" /><Input className="h-8 pl-8 text-[12px]" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="NP, cliente, comercial o marca..." /></div></div>
-        <div className="w-[190px]"><Label className="text-[11px]">Estado de origen</Label><Select value={state} onValueChange={setState}><SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos</SelectItem>{stateOptions.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
-        <span className="pb-2 text-[11px] text-muted-foreground">{rows.length} {importsView ? "importaciones" : "pedidos"}</span>
-      </div>
+    {importsView ? (
+      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
+        <KpiItem label="Importaciones" value={importTotals.total} icon={<Ship />} tone="info" />
+        <KpiItem label="Planificadas" value={importTotals.planificadas} icon={<FileText />} />
+        <KpiItem label="En tránsito" value={importTotals.transito} icon={<FileText />} tone="info" />
+        <KpiItem label="Completadas" value={importTotals.completadas} icon={<PackageCheck />} tone="positive" />
+      </KpiStrip>
+    ) : (
+      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
+        <KpiItem label="Pedidos" value={orderTotals.total} icon={<FileCheck2 />} tone="info" />
+        <KpiItem label="Pendientes de facturar" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
+        <KpiItem label="Facturados" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
+        <KpiItem label="Facturación (USD)" value={formatUsd(orderTotals.facturado)} />
+      </KpiStrip>
+    )}
+    <FiltersBar
+      search={{ value: search, onChange: setSearch, placeholder: importsView ? "NP, proveedor, OC/PO..." : "NP, cliente o comercial...", label: "Buscar", width: "w-[240px]" }}
+      activeCount={activeCount}
+      onClear={clearFilters}
+      meta={`${rows.length} ${importsView ? "importaciones" : "pedidos"}`}
+    >
+      {!importsView && (
+        <FilterSelect
+          label="Facturación"
+          value={orderState}
+          onChange={(v) => setOrderState(v as SimpleOrderState | "TODOS")}
+          placeholder="Facturación"
+          width="w-[150px]"
+          options={[
+            { value: "PENDIENTE", label: "Pendientes" },
+            { value: "COMPLETADO", label: "Facturados" },
+            { value: "CANCELADA", label: "Canceladas" },
+            { value: "TODOS", label: "Todos" },
+          ]}
+        />
+      )}
+      {!importsView && (
+        <FilterSelect
+          label="Entrega"
+          value={entrega}
+          onChange={(v) => setEntrega(v as EntregaState | "TODOS")}
+          placeholder="Entrega"
+          width="w-[130px]"
+          options={[
+            { value: "TODOS", label: "Todas" },
+            { value: "EN_STOCK", label: "En stock" },
+            { value: "ENTREGADO", label: "Entregado" },
+          ]}
+        />
+      )}
+      {importsView && (
+        <FilterSelect
+          label="Llegada"
+          value={llegada}
+          onChange={(v) => setLlegada(v as ArrivalState | "TODOS")}
+          placeholder="Llegada"
+          width="w-[150px]"
+          options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(ARRIVAL_LABEL).map(([value, label]) => ({ value, label }))]}
+        />
+      )}
+      {importsView && (
+        <FilterSelect
+          label="Situación"
+          value={situacion}
+          onChange={setSituacion}
+          placeholder="Situación"
+          width="w-[150px]"
+          options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(AVAILABILITY_LABEL).map(([value, label]) => ({ value, label }))]}
+        />
+      )}
+      <FilterSelect label="Marca" value={marca} onChange={setMarca} placeholder="Marca" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...marcaOptions.map((value) => ({ value, label: value }))]} />
+      {!importsView && (
+        <FilterSelect label="Condición" value={condicion} onChange={setCondicion} placeholder="Condición" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(CONDITION_LABEL).map(([value, label]) => ({ value, label }))]} />
+      )}
+    </FiltersBar>
+    <Panel className="p-0">
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
       <>
-        <div className="hidden max-h-[calc(100vh-300px)] overflow-y-auto md:block">
-          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} />}
+        <div className="hidden overflow-x-auto md:block">
+          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} />}
         </div>
-        <div className="space-y-2 p-3 md:hidden">{rows.map((row) => <button type="button" key={row.id} onClick={() => importsView ? setSelectedImport(row as ImportRow) : setSelected((row as OrderRow).operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left"><div className="flex items-start justify-between gap-2"><span className="font-mono text-[12px] font-semibold">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP"}</span><Badge variant="outline" className="text-[10px]">{row.estado_fuente ?? "Sin estado"}</Badge></div><div className="mt-2 text-[13px] font-medium">{row.modelo || row.producto || "Sin descripción"}</div><div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.cliente_nombre || (importsView ? (row as ImportRow).proveedor : "Sin cliente") || "—"}</div><div className="mt-2 flex items-center justify-between font-mono text-[10px]"><span>{row.chasis || "Sin chasis"}</span><Eye className="h-4 w-4" /></div></button>)}</div>
+        <div className="space-y-2 p-3 md:hidden">{rows.map((row) => {
+          if (importsView) {
+            const importRow = row as ImportRow;
+            const arrival = arrivalState(importRow);
+            return <button type="button" key={row.id} onClick={() => setSelectedImport(importRow)} className="w-full rounded-xl border bg-card p-3 text-left">
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-mono text-[12px] font-semibold">{importRow.oc ? `OC ${importRow.oc}` : row.np_numero ? `NP ${row.np_numero}` : "Sin OC"}</span>
+                <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>
+              </div>
+              <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
+              <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className={cn("text-[10px]", supplierClass(importRow.proveedor))}>{importRow.proveedor || "Sin proveedor"}</Badge>
+                {importRow.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(importRow.estado_disponibilidad)}>{AVAILABILITY_LABEL[importRow.estado_disponibilidad] ?? importRow.estado_disponibilidad}</Badge>}
+              </div>
+              <div className="mt-2 font-mono text-[10px] text-muted-foreground">{row.chasis || "Sin chasis"}</div>
+            </button>;
+          }
+          const orderRow = row as OrderRow;
+          const state = simpleOrderState(orderRow.estado_fuente);
+          const entregaState = entregaStateFromUnit(entregaByUnitId?.get(orderRow.id));
+          return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-mono text-[12px] font-semibold">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP"}</span>
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge>
+                {entregaState && <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge>}
+              </div>
+            </div>
+            <div className="mt-2 text-[13px] font-medium">{row.modelo || row.producto || "Sin descripción"}</div>
+            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{orderRow.cliente_nombre || "Sin cliente"}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge>
+              {orderRow.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(orderRow.condicion))}>{CONDITION_LABEL[orderRow.condicion] ?? orderRow.condicion}</Badge>}
+              <span className="ml-auto text-[11px] font-medium tabular-nums">{formatUsd(orderRow.valor_venta)}</span>
+            </div>
+          </button>;
+        })}</div>
         {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "pedidos"} con estos filtros.</div>}
       </>}
     </Panel>
@@ -261,24 +561,136 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-function OrdersTable({ rows, onSelect }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void }) {
-  return <Table className="table-fixed text-[12px]"><TableHeader className="sticky top-0 z-10 bg-card"><TableRow><TableHead className="w-[125px]">NP / fecha</TableHead><TableHead>Cliente</TableHead><TableHead>Máquina</TableHead><TableHead className="w-[130px]">Comercial</TableHead><TableHead className="w-[115px]">Abastecimiento</TableHead><TableHead className="w-[130px]">Estado</TableHead><TableHead className="w-[175px]">Chasis / stock</TableHead><TableHead className="w-[52px]" /></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}><TableCell><div className="font-mono font-medium">{row.np_numero || "Sin NP"}</div><div className="text-[10px] text-muted-foreground">{formatDate(row.np_fecha)}</div></TableCell><TableCell><div className="truncate font-medium">{row.cliente_nombre}</div></TableCell><TableCell><div className="truncate font-medium">{row.modelo || row.producto || "—"}</div><div className="truncate text-[10px] text-muted-foreground">{[row.producto !== row.modelo && row.producto, row.marca].filter(Boolean).join(" · ")}</div></TableCell><TableCell className="truncate">{row.comercial || "—"}</TableCell><TableCell><Badge variant="outline" className="text-[10px]">{row.abastecimiento || "Sin definir"}</Badge></TableCell><TableCell className="truncate">{row.estado_fuente || "—"}</TableCell><TableCell><div className="truncate font-mono text-[10px]">{row.chasis || "Sin chasis"}</div>{row.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge>}</TableCell><TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell></TableRow>)}</TableBody></Table>;
+function OrdersTable({ rows, onSelect, entregaByUnitId }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, string> }) {
+  return <Table className="text-[12px]">
+    <TableHeader><TableRow>
+      <TableHead>NP</TableHead>
+      <TableHead>Fecha</TableHead>
+      <TableHead>Cliente</TableHead>
+      <TableHead>Máquina</TableHead>
+      <TableHead>Marca</TableHead>
+      <TableHead>Condición</TableHead>
+      <TableHead>Origen</TableHead>
+      <TableHead>Facturación</TableHead>
+      <TableHead>Entrega</TableHead>
+      <TableHead className="text-right">Valor (USD)</TableHead>
+      <TableHead className="w-[40px]" />
+    </TableRow></TableHeader>
+    <TableBody>{rows.map((row) => {
+      const state = simpleOrderState(row.estado_fuente);
+      const entregaState = entregaStateFromUnit(entregaByUnitId?.get(row.id));
+      return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
+        <TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell>
+        <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
+        <TableCell className="max-w-[220px] truncate">{row.cliente_nombre}</TableCell>
+        <TableCell className="max-w-[220px] truncate">{row.modelo || row.producto || "—"}</TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge></TableCell>
+        <TableCell>{row.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(row.condicion))}>{CONDITION_LABEL[row.condicion] ?? row.condicion}</Badge>}</TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", supplyClass(row.abastecimiento))}>{SUPPLY_LABEL[row.abastecimiento ?? ""] ?? "Sin definir"}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
+        <TableCell>{entregaState ? <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
+        <TableCell className="text-right tabular-nums">{formatUsd(row.valor_venta)}</TableCell>
+        <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
+      </TableRow>;
+    })}</TableBody>
+  </Table>;
 }
 
 function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: ImportRow) => void }) {
-  return <Table className="table-fixed text-[12px]"><TableHeader className="sticky top-0 z-10 bg-card"><TableRow><TableHead className="w-[125px]">Estado</TableHead><TableHead className="w-[115px]">NP</TableHead><TableHead>Máquina</TableHead><TableHead className="w-[145px]">Proveedor</TableHead><TableHead className="w-[135px]">OC / PO</TableHead><TableHead className="w-[145px]">ETA / ATA</TableHead><TableHead className="w-[180px]">Chasis / stock</TableHead><TableHead className="w-[52px]" /></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}><TableCell><Badge variant="outline" className="max-w-full truncate text-[10px]">{row.estado_fuente || "Sin estado"}</Badge></TableCell><TableCell><div className="truncate font-mono font-medium">{row.np_numero || "Sin NP"}</div><div className="truncate text-[10px] text-muted-foreground">{row.cliente_nombre || "Sin cliente"}</div></TableCell><TableCell><div className="truncate font-medium">{row.modelo || row.producto || "—"}</div><div className="truncate text-[10px] text-muted-foreground">{[row.producto !== row.modelo && row.producto, row.marca].filter(Boolean).join(" · ")}</div></TableCell><TableCell className="truncate">{row.proveedor || "—"}</TableCell><TableCell><div className="truncate">{[row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`].filter(Boolean).join(" · ") || "—"}</div></TableCell><TableCell><div className="text-[10px]">ETA {formatDate(row.eta)}</div><div className="text-[10px] text-muted-foreground">ATA {formatDate(row.ata)}</div></TableCell><TableCell><div className="truncate font-mono text-[10px]">{row.chasis || "Sin chasis"}</div>{row.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge>}</TableCell><TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell></TableRow>)}</TableBody></Table>;
+  return <Table className="text-[12px]">
+    <TableHeader><TableRow>
+      <TableHead>OC</TableHead>
+      <TableHead>Proveedor</TableHead>
+      <TableHead>Máquina</TableHead>
+      <TableHead>Modelo</TableHead>
+      <TableHead className="text-right">Cant.</TableHead>
+      <TableHead>Embarque (est.)</TableHead>
+      <TableHead>Arribo</TableHead>
+      <TableHead>Llegada</TableHead>
+      <TableHead>Situación</TableHead>
+      <TableHead>Chasis</TableHead>
+      <TableHead className="w-[40px]" />
+    </TableRow></TableHeader>
+    <TableBody>{rows.map((row) => {
+      const arrival = arrivalState(row);
+      return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
+        <TableCell className="font-mono font-medium">{row.oc || "—"}</TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", supplierClass(row.proveedor))}>{row.proveedor || "Sin proveedor"}</Badge></TableCell>
+        <TableCell className="max-w-[200px] truncate">{row.producto || "—"}</TableCell>
+        <TableCell className="max-w-[200px] truncate font-medium">{row.modelo || "—"}</TableCell>
+        <TableCell className="text-right tabular-nums">{row.cantidad ?? "—"}</TableCell>
+        <TableCell className="whitespace-nowrap">{formatDate(row.eta)}</TableCell>
+        <TableCell className="whitespace-nowrap">{formatDate(row.ata)}</TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge></TableCell>
+        <TableCell>{row.estado_disponibilidad ? <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
+        <TableCell className="font-mono text-[11px]">{row.chasis || "Sin chasis"}</TableCell>
+        <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
+      </TableRow>;
+    })}</TableBody>
+  </Table>;
+}
+
+/** Adjuntar un documento suelto (sin lectura OCR) a una operacion ya creada. */
+function AttachDocumentButton({ operationId, onUploaded, disabledTitle }: { operationId: string | null; onUploaded: () => void; disabledTitle?: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const choose = async (file?: File) => {
+    if (!file || !operationId) return;
+    setBusy(true);
+    try {
+      await uploadEvidence(file, operationId, "OTRO", {});
+      toast.success("Documento adjuntado");
+      onUploaded();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo adjuntar el documento");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+  return <>
+    <input ref={fileRef} type="file" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
+    <Button
+      variant="outline" size="sm" disabled={busy || !operationId}
+      title={!operationId ? disabledTitle : undefined}
+      onClick={() => fileRef.current?.click()}
+    >
+      <Paperclip className="mr-1.5 h-3.5 w-3.5" />{busy ? "Subiendo..." : "Adjuntar documento"}
+    </Button>
+  </>;
 }
 
 function ImportDetailDrawer({ row, onOpenChange }: { row: ImportRow | null; onOpenChange: (open: boolean) => void }) {
   if (!row) return null;
+  const arrival = arrivalState(row);
   const groups = [
-    { title: "Unidad importada", values: [["Máquina", row.modelo || row.producto], ["Producto", row.producto], ["Marca", row.marca], ["Chasis", row.chasis], ["Cantidad", row.cantidad]] },
+    { title: "Unidad importada", values: [["Máquina", row.producto], ["Modelo", row.modelo], ["Marca", row.marca], ["Chasis", row.chasis], ["Cantidad", row.cantidad]] },
+    { title: "Logística", values: [["OC", row.oc], ["PO", row.po], ["Proveedor", row.proveedor], ["Estado de origen", row.estado_fuente], ["Embarque estimado", formatDate(row.eta)], ["Arribo", formatDate(row.ata)]] },
     { title: "Pedido vinculado", values: [["NP", row.np_numero], ["Cliente", row.cliente_nombre], ["Comercial", row.comercial], ["Situación del vínculo", row.situacion_vinculo]] },
-    { title: "Logística", values: [["Estado", row.estado_fuente], ["Proveedor", row.proveedor], ["OC", row.oc], ["PO", row.po], ["ETA", formatDate(row.eta)], ["ATA", formatDate(row.ata)]] },
-    { title: "Documentación y valores", values: [["Factura proveedor", row.invoice_supplier], ["Costo final", row.costo_final], ["Venta facturada", row.venta_facturada], ["Valor de venta", row.valor_venta]] },
-    { title: "Stock vinculado", values: [["Disponibilidad", row.estado_disponibilidad ? AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad : null], ["Sucursal", row.stock_sucursal], ["Depósito", row.stock_deposito], ["Saldo", row.stock_saldo], ["Detalle", row.disponibilidad_detalle]] },
+    { title: "Documentación y valores", values: [["Valor de OC", row.precio_oc != null ? formatUsd(row.precio_oc) : null], ["Valor facturado por el proveedor", row.costo_final != null ? formatUsd(row.costo_final) : null], ["Factura del proveedor", row.invoice_supplier], ["Venta facturada", row.venta_facturada], ["Valor de venta", row.valor_venta != null ? formatUsd(row.valor_venta) : null]] },
+    { title: "Stock vinculado", values: [["Sucursal", row.stock_sucursal], ["Depósito", row.stock_deposito], ["Saldo", row.stock_saldo], ["Detalle", row.disponibilidad_detalle]] },
   ].map((group) => ({ ...group, values: group.values.filter(([, value]) => value !== null && value !== undefined && value !== "" && value !== "—") })).filter((group) => group.values.length);
-  return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg"><ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP vinculada"} · {row.estado_fuente || "Sin estado"}</p></ResponsiveDrawerHeader><ResponsiveDrawerBody className="space-y-4">{groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}</ResponsiveDrawerBody></ResponsiveDrawer>;
+  return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg">
+    <ResponsiveDrawerHeader>
+      <div className="flex items-start justify-between gap-3">
+        <div><h2 className="text-[16px] font-semibold">{row.producto || row.modelo || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{row.oc ? `OC ${row.oc}` : row.np_numero ? `NP ${row.np_numero}` : "Sin OC"}</p></div>
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>
+          {row.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge>}
+        </div>
+      </div>
+    </ResponsiveDrawerHeader>
+    <ResponsiveDrawerBody className="space-y-4">
+      {groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}
+    </ResponsiveDrawerBody>
+    <ResponsiveDrawerFooter>
+      <AttachDocumentButton
+        operationId={row.operacion_id}
+        disabledTitle="Esta importación todavía no está vinculada a un pedido; vinculala primero para poder adjuntar documentos."
+        onUploaded={() => undefined}
+      />
+    </ResponsiveDrawerFooter>
+  </ResponsiveDrawer>;
 }
 
 function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
@@ -341,7 +753,7 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
     finally { setSaving(false); }
   };
   return <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="xl">
-    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">Nueva operación</h2><p className="text-[11px] text-muted-foreground">Subí la foto de la NP, verificá lo leído y completá solamente lo faltante.</p></ResponsiveDrawerHeader>
+    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">Nuevo pedido</h2><p className="text-[11px] text-muted-foreground">Subí la foto de la NP, verificá lo leído y completá solamente lo faltante.</p></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
       <div className="flex items-center gap-2 rounded-xl border border-dashed p-3">
@@ -404,12 +816,21 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
     } catch (e: any) { toast.error(e?.message ?? "No se pudo guardar la factura"); } finally { setSaving(false); }
   };
   const detail = detailQuery.data;
+  const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
-    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">NP {detail?.np_numero ?? "—"}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."} · {detail ? STATE_LABEL[detail.estado] : ""}</p></ResponsiveDrawerHeader>
+    <ResponsiveDrawerHeader>
+      <div className="flex items-start justify-between gap-3">
+        <div><h2 className="text-[16px] font-semibold">NP {detail?.np_numero ?? "—"}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
+        {detail && <div className="flex flex-col items-end gap-1">
+          <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge>
+          <span className="text-[10px] text-muted-foreground" title="Etapa real del pedido">{STATE_LABEL[detail.estado] ?? detail.estado}</span>
+        </div>}
+      </div>
+    </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       {detail && <>
         <KpiStrip className="grid-cols-3"><KpiItem label="Unidades" value={detail.unidades} /><KpiItem label="Documentos" value={detail.documentos} /><KpiItem label="Fecha NP" value={formatDate(detail.np_fecha)} /></KpiStrip>
-        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => { const extracted = line.datos_extraidos ?? {}; const model = line.modelo || extracted.modelo; const product = line.producto || extracted.producto; const year = line.anio ?? extracted.anio; const head = line.cabezal || extracted.cabezal; return <div key={line.id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`, line.marca, line.condicion, line.abastecimiento].filter(Boolean).join(" · ")}</div></div><Badge variant={line.elegible_parque ? "secondary" : "outline"}>{line.elegible_parque ? "Admitida al Parque" : "Solo operación"}</Badge></div>; })}</div></div>
+        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => { const extracted = line.datos_extraidos ?? {}; const model = line.modelo || extracted.modelo; const product = line.producto || extracted.producto; const year = line.anio ?? extracted.anio; const head = line.cabezal || extracted.cabezal; return <div key={line.id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex items-center gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge><Badge variant="outline" className={cn("text-[10px]", supplyClass(line.abastecimiento))}>{SUPPLY_LABEL[line.abastecimiento] ?? line.abastecimiento}</Badge></div></div>; })}</div></div>
         <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
         {(detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
           {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}
@@ -417,6 +838,9 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
         {detail.observaciones && <div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div>}
       </>}
     </ResponsiveDrawerBody>
+    {detail && <ResponsiveDrawerFooter>
+      <AttachDocumentButton operationId={operationId} onUploaded={() => detailQuery.refetch()} />
+    </ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
 }
 
