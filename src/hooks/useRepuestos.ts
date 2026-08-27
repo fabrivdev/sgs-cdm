@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import type { Marca } from "@/lib/constants";
-import type { ClaasStockSalesRow, FullPartsStockSalesRow } from "@/lib/exports/partsStockSales";
+import type { FullPartsStockSalesRow } from "@/lib/exports/partsStockSales";
 
 const STALE_TIME = 5 * 60 * 1000;
 export const STOCK_PAGE_SIZE = 50;
@@ -161,13 +161,6 @@ export async function fetchFullPartsStockSales(): Promise<FullPartsStockSalesRow
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error("La exportación completa devolvió un formato inválido");
   return data as FullPartsStockSalesRow[];
-}
-
-export async function fetchClaasStockSalesReport(): Promise<ClaasStockSalesRow[]> {
-  const { data, error } = await (supabase.rpc as any)("repuestos_exportar_reporte_claas");
-  if (error) throw error;
-  if (!Array.isArray(data)) throw new Error("El reporte CLAAS devolvió un formato inválido");
-  return data as ClaasStockSalesRow[];
 }
 
 export interface StockKpis {

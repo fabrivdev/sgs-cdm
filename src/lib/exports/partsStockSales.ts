@@ -22,22 +22,12 @@ export interface FullPartsStockSalesRow {
   fecha_corte: string;
 }
 
-export interface ClaasStockSalesRow {
-  codigo_interno: string;
-  codigo_fabricante: string | null;
-  descripcion: string;
-  marca: "CLAAS";
-  stock: number;
-  ventas_12m: number;
-  ventas_24m: number;
-  ventas_36m: number;
-  origen_sistema: "SISTEMA NUEVO" | "SISTEMA VIEJO" | "SISTEMA NUEVO + SISTEMA VIEJO";
-}
-
 const number = (value: unknown) => Number(value) || 0;
 
-export function shouldExportClaasReport(brands: string[]) {
-  return brands.length === 1 && brands[0] === "CLAAS";
+export function filterPartsStockSalesByBrands(rows: FullPartsStockSalesRow[], brands: string[]) {
+  if (!brands.length) return rows;
+  const selected = new Set(brands);
+  return rows.filter((row) => selected.has(row.marca));
 }
 
 export function buildPartsStockSalesExport(rows: FullPartsStockSalesRow[]) {
@@ -90,16 +80,22 @@ export function buildPartsStockSalesExport(rows: FullPartsStockSalesRow[]) {
   return { detail, pending, control };
 }
 
-export function buildClaasStockSalesReport(rows: ClaasStockSalesRow[]) {
+function reportOrigin(row: FullPartsStockSalesRow) {
+  if (row.codigos_anteriores || row.origen === "CATALOGO_MIXTO") return "SISTEMA NUEVO + SISTEMA VIEJO";
+  if (["MAESTRO_ANTERIOR", "VENTA_HISTORICA"].includes(row.origen)) return "SISTEMA VIEJO";
+  return "SISTEMA NUEVO";
+}
+
+export function buildStockSalesReport(rows: FullPartsStockSalesRow[]) {
   return rows.map((row) => ({
-    "Código interno": row.codigo_interno,
+    "Código interno": row.codigo,
     "Código fabricante": row.codigo_fabricante ?? "",
     "Descripción": row.descripcion,
-    "Marca": "CLAAS",
-    "Stock": number(row.stock),
+    "Marca": row.marca,
+    "Stock": number(row.stock_total),
     "Ventas 12M": number(row.ventas_12m),
     "Ventas 24M": number(row.ventas_24m),
     "Ventas 36M": number(row.ventas_36m),
-    "Origen sistema": row.origen_sistema,
+    "Origen sistema": reportOrigin(row),
   }));
 }

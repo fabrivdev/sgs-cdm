@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildClaasStockSalesReport,
   buildPartsStockSalesExport,
-  shouldExportClaasReport,
+  buildStockSalesReport,
+  filterPartsStockSalesByBrands,
   type FullPartsStockSalesRow,
 } from "./partsStockSales";
 
@@ -31,24 +31,24 @@ const row = (patch: Partial<FullPartsStockSalesRow> = {}): FullPartsStockSalesRo
   ...patch,
 });
 
-describe("buildClaasStockSalesReport", () => {
-  it("produce un reporte minimo y conserva el origen historico", () => {
-    const result = buildClaasStockSalesReport([{
-      codigo_interno: "000778",
+describe("buildStockSalesReport", () => {
+  it("produce el mismo formato para cualquier marca y conserva el origen historico", () => {
+    const result = buildStockSalesReport([row({
+      codigo: "000778",
       codigo_fabricante: "778.1",
       descripcion: "FILTRO DE COMBUSTIBLE",
-      marca: "CLAAS",
-      stock: 0,
+      marca: "HORSCH",
+      stock_total: 0,
       ventas_12m: 1,
       ventas_24m: 4,
       ventas_36m: 9,
-      origen_sistema: "SISTEMA VIEJO",
-    }]);
+      origen: "MAESTRO_ANTERIOR",
+    })]);
     expect(result).toEqual([{
       "Código interno": "000778",
       "Código fabricante": "778.1",
       "Descripción": "FILTRO DE COMBUSTIBLE",
-      "Marca": "CLAAS",
+      "Marca": "HORSCH",
       "Stock": 0,
       "Ventas 12M": 1,
       "Ventas 24M": 4,
@@ -57,11 +57,16 @@ describe("buildClaasStockSalesReport", () => {
     }]);
   });
 
-  it("solo activa el reporte especial cuando CLAAS es la unica marca", () => {
-    expect(shouldExportClaasReport(["CLAAS"])).toBe(true);
-    expect(shouldExportClaasReport(["HORSCH"])).toBe(false);
-    expect(shouldExportClaasReport(["CLAAS", "HORSCH"])).toBe(false);
-    expect(shouldExportClaasReport([])).toBe(false);
+  it("filtra cualquier combinacion de marcas y deja todo cuando no se selecciona ninguna", () => {
+    const rows = [row({ marca: "CLAAS" }), row({ codigo: "REP002", marca: "HORSCH" })];
+    expect(filterPartsStockSalesByBrands(rows, ["HORSCH"])).toEqual([rows[1]]);
+    expect(filterPartsStockSalesByBrands(rows, ["CLAAS", "HORSCH"])).toEqual(rows);
+    expect(filterPartsStockSalesByBrands(rows, [])).toEqual(rows);
+  });
+
+  it("identifica productos actuales con ventas del sistema viejo", () => {
+    const [result] = buildStockSalesReport([row({ origen: "CATALOGO_MIXTO" })]);
+    expect(result["Origen sistema"]).toBe("SISTEMA NUEVO + SISTEMA VIEJO");
   });
 });
 
