@@ -28,6 +28,13 @@ import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
 
+// Estado de una UNIDAD fisica (maquinaria_unidades_operacion.estado) --
+// distinto del estado de la operacion (STATE_LABEL, mas abajo).
+const UNIT_STATE_LABEL: Record<string, string> = {
+  PENDIENTE: "Pendiente", EN_TRANSITO: "En tránsito", DISPONIBLE: "Disponible",
+  FACTURADA: "Facturada", EN_PARQUE: "En parque", TRANSFERIDA: "Transferida", CANCELADA: "Cancelada",
+};
+
 // Las 9 etapas reales de una operacion -- se muestran completas solo en el
 // detalle. En la lista se usa el estado simplificado (ver simpleOrderState).
 const STATE_LABEL: Record<string, string> = {
@@ -107,22 +114,29 @@ function simpleOrderState(estadoFuente: string | null): SimpleOrderState {
   return "PENDIENTE";
 }
 
-// Estado de entrega de UNA UNIDAD fisica (Entregado/En stock) -- distinto y
-// enteramente independiente del estado de facturacion: una maquina puede
-// estar facturada y seguir en nuestro stock. Sale de
-// maquinaria_unidades_operacion.estado, que ya existe en la base -- no
-// se persiste nada nuevo, solo se consulta aparte (ver fetchEntregaByUnitId)
-// porque la vista de la lista no lo expone todavia.
-type EntregaState = "ENTREGADO" | "EN_STOCK" | "CANCELADA";
+// Estado de entrega de UNA UNIDAD fisica (Entregado/En stock/No disponible)
+// -- distinto y enteramente independiente del estado de facturacion: una
+// maquina puede estar facturada y seguir en nuestro stock. "En stock" exige
+// prueba real: el chasis de la unidad tiene que existir fisicamente en
+// parque_stock_maquinas (el inventario que sube el Excel de TOTVS), no
+// alcanza con que la unidad este en un estado "todavia no entregada" --
+// antes de este ajuste, cualquier unidad sin chasis (la mayoria de los
+// pedidos activos, con o sin origen STOCK) mostraba "En stock" sin ninguna
+// prueba de que la maquina estuviera fisicamente en el deposito.
+type EntregaState = "ENTREGADO" | "EN_STOCK" | "NO_DISPONIBLE" | "CANCELADA";
 const ENTREGA_LABEL: Record<EntregaState, string> = {
-  ENTREGADO: "Entregado", EN_STOCK: "En stock", CANCELADA: "Cancelada",
+  ENTREGADO: "Entregado", EN_STOCK: "En stock", NO_DISPONIBLE: "No disponible", CANCELADA: "Cancelada",
 };
 const entregaClass = (state: EntregaState | null) =>
   state === "ENTREGADO"
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : state === "CANCELADA"
-      ? "border-slate-300 bg-slate-100 text-slate-600"
-      : "border-blue-200 bg-blue-50 text-blue-700";
+    : state === "EN_STOCK"
+      ? "border-blue-200 bg-blue-50 text-blue-700"
+      : state === "CANCELADA"
+        ? "border-slate-300 bg-slate-100 text-slate-600"
+        : "border-amber-200 bg-amber-50 text-amber-700";
+
+const normalizarChasis = (value: string | null | undefined) => String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 // Sub-etapa A (diseno_flujo_maquinas.md): las marcas no admitidas a Parque
 // (OTROS) nunca van a generar una fila en parque_maquinas -- para ellas
@@ -133,15 +147,18 @@ const entregaClass = (state: EntregaState | null) =>
 // HORSCH no cambian: siguen dependiendo solo de entrar al Parque.
 function entregaStateFromUnit(
   unitEstado: string | null | undefined,
+  unitChasis: string | null | undefined,
   marca: string | null | undefined,
   operacionEstado: string | null | undefined,
-): EntregaState | null {
+  stockChasisSet: Set<string> | undefined,
+): EntregaState {
   if (unitEstado === "EN_PARQUE" || unitEstado === "TRANSFERIDA") return "ENTREGADO";
   if (unitEstado === "CANCELADA") return "CANCELADA";
   const esParqueEligible = marca === "CLAAS" || marca === "HORSCH";
   if (!esParqueEligible && (operacionEstado === "FACTURADA" || operacionEstado === "CERRADA")) return "ENTREGADO";
-  if (unitEstado && ["PENDIENTE", "EN_TRANSITO", "DISPONIBLE", "FACTURADA"].includes(unitEstado)) return "EN_STOCK";
-  return null;
+  const normalizado = normalizarChasis(unitChasis);
+  if (normalizado && stockChasisSet?.has(normalizado)) return "EN_STOCK";
+  return "NO_DISPONIBLE";
 }
 
 // Estado de llegada de una importacion (Planificado/En transito/Completado).
@@ -367,11 +384,11 @@ export default function MaquinariaOperaciones() {
     },
   });
 
-  // El "estado de entrega" (Entregado/En stock) sale de
-  // maquinaria_unidades_operacion.estado -- la vista de la lista todavia no
-  // lo expone, asi que se busca aparte por el id de cada fila (que coincide
-  // con el id de la unidad fisica) en vez de tocar la base para agregar la
-  // columna a la vista.
+  // El "estado de entrega" (Entregado/En stock/No disponible) sale de
+  // maquinaria_unidades_operacion (estado + chasis) -- la vista de la lista
+  // todavia no lo expone, asi que se busca aparte por el id de cada fila
+  // (que coincide con el id de la unidad fisica) en vez de tocar la base
+  // para agregar la columna a la vista.
   const unitIds = useMemo(
     () => importsView ? [] : Array.from(new Set((operationsQuery.data ?? []).map((row) => row.id).filter(Boolean))),
     [importsView, operationsQuery.data],
@@ -380,14 +397,38 @@ export default function MaquinariaOperaciones() {
     queryKey: ["machine-operations-entrega", unitIds],
     enabled: !importsView && unitIds.length > 0,
     queryFn: async () => {
-      const map = new Map<string, string>();
+      const map = new Map<string, { estado: string; chasis: string | null }>();
       for (let i = 0; i < unitIds.length; i += 200) {
         const chunk = unitIds.slice(i, i + 200);
-        const { data, error } = await db.from("maquinaria_unidades_operacion").select("id,estado").in("id", chunk);
+        const { data, error } = await db.from("maquinaria_unidades_operacion").select("id,estado,chasis").in("id", chunk);
         if (error) throw error;
-        for (const unit of data ?? []) map.set(unit.id, unit.estado);
+        for (const unit of data ?? []) map.set(unit.id, { estado: unit.estado, chasis: unit.chasis });
       }
       return map;
+    },
+  });
+
+  // "En stock" exige prueba real: el chasis de la unidad tiene que existir
+  // en el inventario fisico (parque_stock_maquinas, el Excel de TOTVS). Se
+  // trae el set completo de chasis normalizados una sola vez -- es liviano
+  // (una sola columna) y se reusa para todas las filas.
+  const stockChasisQuery = useQuery({
+    queryKey: ["machine-operations-stock-chasis"],
+    enabled: !importsView,
+    queryFn: async () => {
+      const set = new Set<string>();
+      let from = 0;
+      for (;;) {
+        const { data, error } = await db.from("parque_stock_maquinas").select("chasis").range(from, from + 999);
+        if (error) throw error;
+        for (const row of data ?? []) {
+          const normalizado = normalizarChasis(row.chasis);
+          if (normalizado) set.add(normalizado);
+        }
+        if (!data || data.length < 1000) break;
+        from += 1000;
+      }
+      return set;
     },
   });
 
@@ -420,6 +461,7 @@ export default function MaquinariaOperaciones() {
 
   const entregaByUnitId = entregaQuery.data;
   const estadoByOperacionId = operacionEstadoQuery.data;
+  const stockChasisSet = stockChasisQuery.data;
   const rows = useMemo(() => (operationsQuery.data ?? []).filter((row) => {
     if (importsView) {
       const importRow = row as ImportRow;
@@ -429,7 +471,8 @@ export default function MaquinariaOperaciones() {
       const orderRow = row as OrderRow;
       if (orderState !== "TODOS" && simpleOrderState(orderRow.estado_fuente) !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
-      if (entrega !== "TODOS" && entregaStateFromUnit(entregaByUnitId?.get(orderRow.id), orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id)) !== entrega) return false;
+      const unit = entregaByUnitId?.get(orderRow.id);
+      if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet) !== entrega) return false;
     }
     if (marca !== "TODOS" && row.marca !== marca) return false;
     const q = search.trim().toUpperCase();
@@ -437,7 +480,7 @@ export default function MaquinariaOperaciones() {
     const common = [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId]);
+  }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
 
   const activeCount = (marca !== "TODOS" ? 1 : 0)
     + (importsView ? (llegada !== "TODOS" ? 1 : 0) + (situacion !== "TODOS" ? 1 : 0) : (condicion !== "TODOS" ? 1 : 0) + (entrega !== "TODOS" ? 1 : 0));
@@ -514,6 +557,7 @@ export default function MaquinariaOperaciones() {
           options={[
             { value: "TODOS", label: "Todas" },
             { value: "EN_STOCK", label: "En stock" },
+            { value: "NO_DISPONIBLE", label: "No disponible" },
             { value: "ENTREGADO", label: "Entregado" },
           ]}
         />
@@ -547,7 +591,7 @@ export default function MaquinariaOperaciones() {
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
       <>
         <div className="hidden overflow-x-auto md:block">
-          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} />}
+          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
         </div>
         <div className="space-y-2 p-3 md:hidden">{rows.map((row) => {
           if (importsView) {
@@ -569,7 +613,8 @@ export default function MaquinariaOperaciones() {
           }
           const orderRow = row as OrderRow;
           const state = simpleOrderState(orderRow.estado_fuente);
-          const entregaState = entregaStateFromUnit(entregaByUnitId?.get(orderRow.id), orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id));
+          const orderUnit = entregaByUnitId?.get(orderRow.id);
+          const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet);
           return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
             <div className="flex items-start justify-between gap-2">
               <span className="font-mono text-[12px] font-semibold">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP"}</span>
@@ -596,7 +641,7 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, string>; estadoByOperacionId?: Map<string, string> }) {
+function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
   return <Table className="text-[12px]">
     <TableHeader><TableRow>
       <TableHead>NP</TableHead>
@@ -613,7 +658,8 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId }: {
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {
       const state = simpleOrderState(row.estado_fuente);
-      const entregaState = entregaStateFromUnit(entregaByUnitId?.get(row.id), row.marca, estadoByOperacionId?.get(row.operacion_id));
+      const unit = entregaByUnitId?.get(row.id);
+      const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet);
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
@@ -865,7 +911,24 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
     <ResponsiveDrawerBody className="space-y-4">
       {detail && <>
         <KpiStrip className="grid-cols-3"><KpiItem label="Unidades" value={detail.unidades} /><KpiItem label="Documentos" value={detail.documentos} /><KpiItem label="Fecha NP" value={formatDate(detail.np_fecha)} /></KpiStrip>
-        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => { const extracted = line.datos_extraidos ?? {}; const model = line.modelo || extracted.modelo; const product = line.producto || extracted.producto; const year = line.anio ?? extracted.anio; const head = line.cabezal || extracted.cabezal; return <div key={line.id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex items-center gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge><Badge variant="outline" className={cn("text-[10px]", supplyClass(line.abastecimiento))}>{SUPPLY_LABEL[line.abastecimiento] ?? line.abastecimiento}</Badge></div></div>; })}</div></div>
+        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => {
+          const extracted = line.datos_extraidos ?? {};
+          const model = line.modelo || extracted.modelo;
+          const product = line.producto || extracted.producto;
+          const year = line.anio ?? extracted.anio;
+          const head = line.cabezal || extracted.cabezal;
+          const unidadesDeLinea = detail.units.filter((u: any) => u.linea_id === line.id);
+          return <div key={line.id} className="rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`].filter(Boolean).join(" · ")}</div></div>
+              <div className="flex shrink-0 items-center gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge><Badge variant="outline" className={cn("text-[10px]", supplyClass(line.abastecimiento))}>{SUPPLY_LABEL[line.abastecimiento] ?? line.abastecimiento}</Badge></div>
+            </div>
+            {unidadesDeLinea.length > 0 && <div className="mt-2 space-y-1 border-t pt-2">{unidadesDeLinea.map((u: any) => <div key={u.id} className="flex items-center justify-between gap-2 text-[11px]">
+              <span className="font-mono text-muted-foreground">{u.chasis || "Sin chasis"}</span>
+              <span className="text-muted-foreground">{UNIT_STATE_LABEL[u.estado] ?? u.estado}</span>
+            </div>)}</div>}
+          </div>;
+        })}</div></div>
         <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
         {(detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
           {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}
