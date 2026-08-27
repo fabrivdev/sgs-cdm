@@ -28,8 +28,8 @@ AS $function$
 $function$;
 
 -- Reporte puntual solicitado por CLAAS. Para datos del sistema anterior la
--- marca se deriva del subgrupo mediante facturacion_marca_por_grupo, que es la
--- tabla de reglas historica acordada con CDM.
+-- marca se deriva del subgrupo mediante la regla local autosuficiente definida
+-- arriba, sin depender de funciones historicas ausentes en algunas bases.
 
 CREATE OR REPLACE VIEW public.v_repuestos_reporte_claas
 WITH (security_invoker = true)
@@ -63,14 +63,14 @@ WITH stock AS (
 ), maestro_claas AS (
   SELECT m.*
   FROM maestro_anterior m
-  WHERE public.facturacion_marca_por_grupo(m.tipo) = 'CLAAS'::public.marca
+  WHERE public.repuestos_marca_legacy_por_subgrupo(m.tipo) = 'CLAAS'::public.marca
 ), ventas_claas_confirmadas AS (
   SELECT DISTINCT v.producto_codigo
   FROM public.repuestos_ventas_vinculacion v
   JOIN public.facturacion_lineas_importadas f ON f.id = v.linea_id
   WHERE v.estado_vinculo = 'CONFIRMADA'
     AND v.producto_codigo IS NOT NULL
-    AND public.facturacion_marca_por_grupo(f.subgrupo_original) = 'CLAAS'::public.marca
+    AND public.repuestos_marca_legacy_por_subgrupo(f.subgrupo_original) = 'CLAAS'::public.marca
 ), productos_claas AS (
   SELECT p.*
   FROM public.productos p
@@ -117,7 +117,7 @@ WITH stock AS (
   WHERE v.estado_vinculo <> 'CONFIRMADA'
     AND nullif(trim(f.cod_mercaderia), '') IS NOT NULL
     AND coalesce(f.fecha_factura::date, v.fecha_efectiva) IS NOT NULL
-    AND public.facturacion_marca_por_grupo(f.subgrupo_original) = 'CLAAS'::public.marca
+    AND public.repuestos_marca_legacy_por_subgrupo(f.subgrupo_original) = 'CLAAS'::public.marca
 ), ventas_claas_sin_vincular AS (
   SELECT
     b.codigo_norm,
