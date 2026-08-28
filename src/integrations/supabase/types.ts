@@ -1133,7 +1133,275 @@ export type Database = {
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
         ]
+      }
+      maquinaria_importacion_lineas: {
+        Row: {
+          actualizado_en: string
+          ata: string | null
+          cantidad: number | null
+          chasis: string | null
+          costo_final: number | null
+          costo_final_sin_iva: number | null
+          creado_en: string
+          datos_fuente: Json
+          descuento_especial: number | null
+          descuentos: number | null
+          destino: string | null
+          diferencia: number | null
+          estado_fuente: string | null
+          eta: string | null
+          factura_venta: string | null
+          flete_seguro: number | null
+          id: string
+          invoice_supplier: string | null
+          linea_id: string | null
+          llave_interna: string | null
+          margen_porcentaje: number | null
+          modelo: string | null
+          notas: string | null
+          np_numero: string | null
+          oc: string | null
+          operacion_id: string | null
+          origen: string | null
+          po: string | null
+          precio_oc: number | null
+          precio_teorico_oc: number | null
+          prioridad: string | null
+          producto: string | null
+          producto_facturado: string | null
+          proveedor: string | null
+          proveedor_flete: string | null
+          situacion_vinculo: string
+          source_id: string
+          source_row: number | null
+          source_sheet: string
+          tipo_cambio: number | null
+          transporte: string | null
+          unidad_id: string | null
+          utilidad: number | null
+          valor_venta: number | null
+          venta_facturada: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          ata?: string | null
+          cantidad?: number | null
+          chasis?: string | null
+          costo_final?: number | null
+          costo_final_sin_iva?: number | null
+          creado_en?: string
+          datos_fuente?: Json
+          descuento_especial?: number | null
+          descuentos?: number | null
+          destino?: string | null
+          diferencia?: number | null
+          estado_fuente?: string | null
+          eta?: string | null
+          factura_venta?: string | null
+          flete_seguro?: number | null
+          id?: string
+          invoice_supplier?: string | null
+          linea_id?: string | null
+          llave_interna?: string | null
+          margen_porcentaje?: number | null
+          modelo?: string | null
+          notas?: string | null
+          np_numero?: string | null
+          oc?: string | null
+          operacion_id?: string | null
+          origen?: string | null
+          po?: string | null
+          precio_oc?: number | null
+          precio_teorico_oc?: number | null
+          prioridad?: string | null
+          producto?: string | null
+          producto_facturado?: string | null
+          proveedor?: string | null
+          proveedor_flete?: string | null
+          situacion_vinculo?: string
+          source_id: string
+          source_row?: number | null
+          source_sheet?: string
+          tipo_cambio?: number | null
+          transporte?: string | null
+          unidad_id?: string | null
+          utilidad?: number | null
+          valor_venta?: number | null
+          venta_facturada?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          ata?: string | null
+          cantidad?: number | null
+          chasis?: string | null
+          costo_final?: number | null
+          costo_final_sin_iva?: number | null
+          creado_en?: string
+          datos_fuente?: Json
+          descuento_especial?: number | null
+          descuentos?: number | null
+          destino?: string | null
+          diferencia?: number | null
+          estado_fuente?: string | null
+          eta?: string | null
+          factura_venta?: string | null
+          flete_seguro?: number | null
+          id?: string
+          invoice_supplier?: string | null
+          linea_id?: string | null
+          llave_interna?: string | null
+          margen_porcentaje?: number | null
+          modelo?: string | null
+          notas?: string | null
+          np_numero?: string | null
+          oc?: string | null
+          operacion_id?: string | null
+          origen?: string | null
+          po?: string | null
+          precio_oc?: number | null
+          precio_teorico_oc?: number | null
+          prioridad?: string | null
+          producto?: string | null
+          producto_facturado?: string | null
+          proveedor?: string | null
+          proveedor_flete?: string | null
+          situacion_vinculo?: string
+          source_id?: string
+          source_row?: number | null
+          source_sheet?: string
+          tipo_cambio?: number | null
+          transporte?: string | null
+          unidad_id?: string | null
+          utilidad?: number | null
+          valor_venta?: number | null
+          venta_facturada?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maquinaria_importacion_status_fuente: {
+        Row: {
+          actualizado_en: string
+          completado: number | null
+          datos_fuente: Json
+          modelo: string | null
+          planificado: number | null
+          producto: string | null
+          proveedor: string | null
+          source_row: number
+          source_sheet: string
+          total: number | null
+        }
+        Insert: {
+          actualizado_en?: string
+          completado?: number | null
+          datos_fuente?: Json
+          modelo?: string | null
+          planificado?: number | null
+          producto?: string | null
+          proveedor?: string | null
+          source_row: number
+          source_sheet?: string
+          total?: number | null
+        }
+        Update: {
+          actualizado_en?: string
+          completado?: number | null
+          datos_fuente?: Json
+          modelo?: string | null
+          planificado?: number | null
+          producto?: string | null
+          proveedor?: string | null
+          source_row?: number
+          source_sheet?: string
+          total?: number | null
+        }
+        Relationships: []
       }
       maquinaria_importaciones_operativas: {
         Row: {
@@ -1186,6 +1454,20 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importaciones_operativas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importaciones_operativas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
           },
         ]
       }
@@ -1282,6 +1564,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
           },
         ]
       }
@@ -1392,6 +1688,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_operacion_lineas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_unidades_operacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_unidades_operacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_unidades_operacion_parque_maquina_id_fkey"
+            columns: ["parque_maquina_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["parque_maquina_id"]
           },
           {
             foreignKeyName: "maquinaria_unidades_operacion_parque_maquina_id_fkey"
@@ -1673,6 +1990,13 @@ export type Database = {
             foreignKeyName: "parque_historial_propiedad_maquina_id_fkey"
             columns: ["maquina_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["parque_maquina_id"]
+          },
+          {
+            foreignKeyName: "parque_historial_propiedad_maquina_id_fkey"
+            columns: ["maquina_id"]
+            isOneToOne: false
             referencedRelation: "parque_maquinas"
             referencedColumns: ["id"]
           },
@@ -1689,6 +2013,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_historial_propiedad_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "parque_historial_propiedad_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
           },
         ]
       }
@@ -1836,6 +2174,7 @@ export type Database = {
         Row: {
           carga_id: string
           chasis: string | null
+          datos_fuente: Json
           deposito: string | null
           estado: string | null
           filial_original: string | null
@@ -1845,12 +2184,16 @@ export type Database = {
           modelo: string | null
           producto_codigo: string
           saldo_actual: number
+          source_row: number | null
+          stock_key: string
           sucursal: Database["public"]["Enums"]["sucursal"] | null
           tipo: string | null
+          unidad_operacion_id: string | null
         }
         Insert: {
           carga_id: string
           chasis?: string | null
+          datos_fuente?: Json
           deposito?: string | null
           estado?: string | null
           filial_original?: string | null
@@ -1860,12 +2203,16 @@ export type Database = {
           modelo?: string | null
           producto_codigo: string
           saldo_actual?: number
+          source_row?: number | null
+          stock_key: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           tipo?: string | null
+          unidad_operacion_id?: string | null
         }
         Update: {
           carga_id?: string
           chasis?: string | null
+          datos_fuente?: Json
           deposito?: string | null
           estado?: string | null
           filial_original?: string | null
@@ -1875,10 +2222,35 @@ export type Database = {
           modelo?: string | null
           producto_codigo?: string
           saldo_actual?: number
+          source_row?: number | null
+          stock_key?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           tipo?: string | null
+          unidad_operacion_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       parque_ultima_actividad: {
         Row: {
@@ -3635,6 +4007,136 @@ export type Database = {
       }
     }
     Views: {
+      maquinaria_importaciones_lineas_operativas: {
+        Row: {
+          actualizado_en: string | null
+          ata: string | null
+          cantidad: number | null
+          chasis: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          costo_final: number | null
+          costo_final_sin_iva: number | null
+          creado_en: string | null
+          datos_fuente: Json | null
+          descuento_especial: number | null
+          descuentos: number | null
+          destino: string | null
+          diferencia: number | null
+          disponibilidad_detalle: string | null
+          estado_disponibilidad: string | null
+          estado_fuente: string | null
+          eta: string | null
+          factura_venta: string | null
+          flete_seguro: number | null
+          id: string | null
+          invoice_supplier: string | null
+          linea_id: string | null
+          llave_interna: string | null
+          marca: string | null
+          margen_porcentaje: number | null
+          modelo: string | null
+          notas: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          oc: string | null
+          operacion_id: string | null
+          origen: string | null
+          po: string | null
+          precio_oc: number | null
+          precio_teorico_oc: number | null
+          prioridad: string | null
+          producto: string | null
+          producto_facturado: string | null
+          proveedor: string | null
+          proveedor_flete: string | null
+          situacion_vinculo: string | null
+          source_id: string | null
+          source_row: number | null
+          source_sheet: string | null
+          stock_deposito: string | null
+          stock_saldo: number | null
+          stock_sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo_cambio: number | null
+          transporte: string | null
+          unidad_id: string | null
+          utilidad: number | null
+          valor_venta: number | null
+          venta_facturada: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maquinaria_operaciones_resumen: {
         Row: {
           actualizado_en: string | null
@@ -3667,6 +4169,154 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maquinaria_pedidos_lineas_operativas: {
+        Row: {
+          abastecimiento: string | null
+          actualizado_en: string | null
+          ata: string | null
+          cantidad: number | null
+          chasis: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          condicion: string | null
+          costo_producto: number | null
+          disponibilidad_detalle: string | null
+          estado_disponibilidad: string | null
+          estado_fuente: string | null
+          estado_importacion_fuente: string | null
+          eta: string | null
+          factura_fecha: string | null
+          factura_venta: string | null
+          id: string | null
+          importacion_linea_id: string | null
+          linea_id: string | null
+          linea_numero: number | null
+          marca: string | null
+          modelo: string | null
+          moneda: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          observaciones: string | null
+          operacion_id: string | null
+          producto: string | null
+          proveedor: string | null
+          unidad_id: string | null
+          valor_facturado: number | null
+          valor_venta: number | null
+        }
+        Relationships: []
+      }
+      maquinaria_planificador_resumen: {
+        Row: {
+          abastecimiento: string | null
+          ata: string | null
+          cantidad: number | null
+          chasis: string | null
+          cliente_nombre: string | null
+          costo_final: number | null
+          estado_fuente: string | null
+          eta: string | null
+          fecha_referencia: string | null
+          id: string | null
+          importacion_linea_id: string | null
+          invoice_supplier: string | null
+          marca: string | null
+          modelo: string | null
+          np_numero: string | null
+          oc: string | null
+          operacion_id: string | null
+          po: string | null
+          producto: string | null
+          proveedor: string | null
+          situacion_vinculo: string | null
+          tipo_registro: string | null
+          valor_venta: number | null
+          venta_facturada: string | null
+        }
+        Relationships: []
+      }
+      maquinaria_stock_trazabilidad: {
+        Row: {
+          ata: string | null
+          carga_id: string | null
+          chasis: string | null
+          chasis_normalizado: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          datos_fuente: Json | null
+          deposito: string | null
+          disponibilidad_detalle: string | null
+          estado: string | null
+          estado_disponibilidad: string | null
+          estado_importacion_fuente: string | null
+          estado_operacion: string | null
+          estado_pedido_fuente: string | null
+          eta: string | null
+          filial_original: string | null
+          id: string | null
+          importacion_linea_id: string | null
+          importado_en: string | null
+          linea_operacion_id: string | null
+          marca: string | null
+          modelo: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          oc: string | null
+          operacion_id: string | null
+          parque_cliente_id: string | null
+          parque_maquina_id: string | null
+          po: string | null
+          producto_codigo: string | null
+          proveedor: string | null
+          repeticiones_chasis: number | null
+          saldo_actual: number | null
+          situacion_vinculo: string | null
+          source_row: number | null
+          stock_key: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo: string | null
+          unidad_operacion_id: string | null
+          unidad_vinculada_id: string | null
+          vinculo_persistente: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            columns: ["parque_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_maquinas_cliente_id_fkey"
+            columns: ["parque_cliente_id"]
+            isOneToOne: false
+            referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
             referencedColumns: ["id"]
           },
         ]
@@ -3784,6 +4434,20 @@ export type Database = {
         }
         Relationships: []
       }
+      v_repuestos_reporte_claas: {
+        Row: {
+          codigo_fabricante: string | null
+          codigo_interno: string | null
+          descripcion: string | null
+          marca: string | null
+          origen_sistema: string | null
+          stock: number | null
+          ventas_12m: number | null
+          ventas_24m: number | null
+          ventas_36m: number | null
+        }
+        Relationships: []
+      }
       v_repuestos_stock_matriz: {
         Row: {
           campo_9: number | null
@@ -3799,6 +4463,32 @@ export type Database = {
           santa_rosa: number | null
           total: number | null
           unidad: string | null
+        }
+        Relationships: []
+      }
+      v_repuestos_stock_ventas_exportacion: {
+        Row: {
+          campo_9: number | null
+          codigo: string | null
+          codigo_fabricante: string | null
+          codigos_anteriores: string | null
+          descripcion: string | null
+          estado_producto: string | null
+          estado_vinculo: string | null
+          familia: string | null
+          fecha_corte: string | null
+          katuete: number | null
+          loma_plata: number | null
+          marca: string | null
+          misiones: number | null
+          origen: string | null
+          santa_rita: number | null
+          santa_rosa: number | null
+          stock_total: number | null
+          unidad: string | null
+          ventas_12m: number | null
+          ventas_24m: number | null
+          ventas_36m: number | null
         }
         Relationships: []
       }
@@ -3931,6 +4621,18 @@ export type Database = {
         Args: { p_texto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
       }
+      maquinaria_asignar_stock: {
+        Args: { p_chasis?: string; p_stock_id: string; p_unidad_id: string }
+        Returns: Json
+      }
+      maquinaria_importar_historico_pedidos: {
+        Args: { p_filas: Json }
+        Returns: Json
+      }
+      maquinaria_importar_maestro_importaciones: {
+        Args: { p_filas: Json }
+        Returns: Json
+      }
       maquinaria_marca_admitida: {
         Args: { p_marca: Database["public"]["Enums"]["marca"] }
         Returns: boolean
@@ -4032,6 +4734,10 @@ export type Database = {
       parque_modelo_clave: { Args: { p_modelo: string }; Returns: string }
       parque_modelo_nombre: { Args: { p_modelo: string }; Returns: string }
       parque_normalizar_clave: { Args: { p_valor: string }; Returns: string }
+      parque_reemplazar_stock_maquinas: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
       parque_refrescar_factura_os_cliente: { Args: never; Returns: number }
       parque_resolver_cliente_linea_facturacion: {
         Args: {
@@ -4157,9 +4863,15 @@ export type Database = {
         Args: { p_fecha_analisis?: string; p_marca: string; p_nombre?: string }
         Returns: string
       }
+      repuestos_es_subgrupo_legacy_repuesto: {
+        Args: { p_subgrupo: string }
+        Returns: boolean
+      }
       repuestos_estado_facturacion_historica: { Args: never; Returns: Json }
       repuestos_estado_maestro_legacy: { Args: never; Returns: Json }
       repuestos_excluir_ventas_duplicadas: { Args: never; Returns: number }
+      repuestos_exportar_reporte_claas: { Args: never; Returns: Json }
+      repuestos_exportar_stock_ventas_completo: { Args: never; Returns: Json }
       repuestos_finalizar_facturacion_historica: {
         Args: { p_carga_id: string }
         Returns: Json
@@ -4199,6 +4911,10 @@ export type Database = {
         Returns: string
       }
       repuestos_iniciar_publicacion_historial: { Args: never; Returns: Json }
+      repuestos_marca_legacy_por_subgrupo: {
+        Args: { p_subgrupo: string }
+        Returns: Database["public"]["Enums"]["marca"]
+      }
       repuestos_preparar_criticidades_automaticas: {
         Args: { p_marca: string }
         Returns: Json
