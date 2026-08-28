@@ -1196,6 +1196,7 @@ export type Database = {
           utilidad: number | null
           valor_venta: number | null
           venta_facturada: string | null
+          vinculo_manual: boolean
         }
         Insert: {
           actualizado_en?: string
@@ -1243,6 +1244,7 @@ export type Database = {
           utilidad?: number | null
           valor_venta?: number | null
           venta_facturada?: string | null
+          vinculo_manual?: boolean
         }
         Update: {
           actualizado_en?: string
@@ -1290,6 +1292,7 @@ export type Database = {
           utilidad?: number | null
           valor_venta?: number | null
           venta_facturada?: string | null
+          vinculo_manual?: boolean
         }
         Relationships: [
           {
@@ -4620,6 +4623,10 @@ export type Database = {
       inferir_subgrupo_maquina_notificacion: {
         Args: { p_texto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
+      }
+      maquinaria_asignar_importacion: {
+        Args: { p_importacion_id: string; p_unidad_id: string }
+        Returns: Json
       }
       maquinaria_asignar_stock: {
         Args: { p_chasis?: string; p_stock_id: string; p_unidad_id: string }
