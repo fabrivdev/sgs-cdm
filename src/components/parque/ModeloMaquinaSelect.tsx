@@ -2,6 +2,7 @@ import { useId, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Marca } from "@/lib/constants";
 import { normalizeMachineModelKey } from "@/lib/machineModels";
 
@@ -16,12 +17,16 @@ export function ModeloMaquinaSelect({
   value,
   onValueChange,
   className,
+  allowCustom = true,
+  disabled = false,
 }: {
   marca: Marca;
   subgrupo: string;
   value?: string | null;
   onValueChange: (value: string) => void;
   className?: string;
+  allowCustom?: boolean;
+  disabled?: boolean;
 }) {
   const listId = useId();
   const { data = [], isLoading } = useQuery({
@@ -54,6 +59,15 @@ export function ModeloMaquinaSelect({
     !data.some((modelo) => normalizeMachineModelKey(modelo.nombre) === normalizeMachineModelKey(value)),
   );
 
+  if (!allowCustom) {
+    return (
+      <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled || isLoading || !subgrupo}>
+        <SelectTrigger className={className}><SelectValue placeholder={isLoading ? "Cargando modelos..." : "Seleccionar modelo"} /></SelectTrigger>
+        <SelectContent>{opciones.map((modelo) => <SelectItem key={normalizeMachineModelKey(modelo)} value={modelo}>{modelo}</SelectItem>)}</SelectContent>
+      </Select>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <Input
@@ -62,6 +76,7 @@ export function ModeloMaquinaSelect({
         onChange={(event) => onValueChange(event.target.value)}
         placeholder={isLoading ? "Cargando modelos..." : "Seleccionar o escribir modelo"}
         className={className}
+        disabled={disabled}
       />
       <datalist id={listId}>
         {opciones.map((modelo) => (

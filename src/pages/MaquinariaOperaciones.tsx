@@ -59,19 +59,6 @@ const brandClass = (marca: string | null) => {
   return "border-border bg-muted text-muted-foreground";
 };
 
-// El proveedor de una importacion suele SER el fabricante (CLAAS/HORSCH
-// importan sus propias maquinas), pero no siempre -- puede ser un tercero.
-// Se reusa la paleta de marca cuando el nombre la contiene, y un color propio
-// para el resto, para que "Proveedor" tenga su propia identidad visual sin
-// inventar una paleta arbitraria por cada proveedor distinto.
-const supplierClass = (proveedor: string | null) => {
-  const normalized = (proveedor ?? "").toUpperCase();
-  if (normalized.includes("CLAAS")) return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
-  if (normalized.includes("HORSCH")) return "border-marca-horsch/30 bg-marca-horsch-bg text-marca-horsch";
-  if (!normalized) return "border-border bg-muted text-muted-foreground";
-  return "border-indigo-200 bg-indigo-50 text-indigo-700";
-};
-
 // "Tipo de venta" del diseño = la condicion que ya existe en la base.
 const CONDITION_LABEL: Record<string, string> = { NUEVA: "Nueva", USADA: "Usada" };
 const conditionClass = (condicion: string | null) =>
@@ -218,7 +205,8 @@ type ImportRow = {
   id: string; importacion_linea_id: string; numero_unidad: number; cantidad_lote: number | null;
   operacion_id: string | null; linea_id: string | null; unidad_id: string | null; np_numero: string | null; np_fecha: string | null;
   cliente_nombre: string | null; comercial: string | null; marca: string | null; producto: string | null; modelo: string | null;
-  cantidad: number | null; estado_fuente: string | null; oc: string | null; po: string | null; eta: string | null; ata: string | null;
+  cantidad: number | null; estado_fuente: string | null; oc: string | null; po: string | null; fecha_pedido: string | null; eta: string | null; ata: string | null;
+  llave_interna: string | null;
   proveedor: string | null; invoice_supplier: string | null; factura_proveedor_fecha: string | null; precio_oc: number | null; costo_final: number | null; chasis: string | null;
   venta_facturada: string | null; valor_venta: number | null; situacion_vinculo: string | null; estado_disponibilidad: string | null;
   disponibilidad_detalle: string | null; stock_sucursal: string | null; stock_deposito: string | null; stock_saldo: number | null;
@@ -245,9 +233,14 @@ type ImportAssignmentRow = {
   invoice_supplier: string | null; factura_proveedor_fecha: string | null; costo_final: number | null;
 };
 type ImportDraft = {
-  marca: "CLAAS" | "HORSCH" | "OTROS"; proveedor: string; producto: string; modelo: string;
-  cantidad: number; estado_fuente: string; np_numero: string; oc: string; po: string; eta: string;
-  transporte: string; origen: string; destino: string; notas: string;
+  marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
+  cantidad: number; estado_fuente: string; linea_id: string; np_numero: string; llave_interna: string;
+  oc: string; fecha_pedido: string; eta: string; notas: string;
+};
+type AvailableImportNp = {
+  operacion_id: string; linea_id: string; np_numero: string; cliente_nombre: string | null;
+  marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string | null; modelo: string | null;
+  unidades_disponibles: number;
 };
 type LinkSuggestionRow = {
   unidad_id: string; linea_id: string; operacion_id: string; tipo: "STOCK" | "IMPORTAR";
@@ -261,9 +254,9 @@ const blankLine = (n = 1): DraftLine => ({
   anio: null, cabezal: "", condicion: "NUEVA", abastecimiento: "DEFINIR", subgrupo: "OTRO", chasis: [],
 });
 const blankImport = (): ImportDraft => ({
-  marca: "CLAAS", proveedor: "", producto: "", modelo: "", cantidad: 1,
-  estado_fuente: "PLANIFICADA", np_numero: "", oc: "", po: "", eta: "",
-  transporte: "", origen: "", destino: "", notas: "",
+  marca: "CLAAS", producto: "COSECHADORAS", modelo: "", cantidad: 1,
+  estado_fuente: "PLANIFICADA", linea_id: "", np_numero: "", llave_interna: "",
+  oc: "", fecha_pedido: "", eta: "", notas: "",
 });
 
 function formatDate(value?: string | null) {
@@ -386,6 +379,28 @@ async function uploadEvidence(file: File, operationId: string, type: string, ext
   }).select("id").single();
   if (docError) throw docError;
   return document;
+}
+
+async function uploadImportDocument(file: File, importLineId: string, operationId?: string | null) {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error("Sesión no válida");
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  const path = `${auth.user.id}/importaciones/${importLineId}/${crypto.randomUUID()}-${safeName}`;
+  const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
+  if (storageError) throw storageError;
+  const { error: docError } = await db.from("maquinaria_documentos").insert({
+    operacion_id: operationId || null, importacion_linea_id: importLineId, tipo: "OC",
+    archivo_nombre: file.name, storage_path: path, mime_type: file.type,
+    tamano_bytes: file.size, estado_extraccion: "REVISADO", datos_extraidos: {},
+    revisado_por: auth.user.id, revisado_en: new Date().toISOString(),
+  });
+  if (docError) throw docError;
+}
+
+async function openMachineDocument(storagePath: string) {
+  const { data, error } = await supabase.storage.from("maquinaria-documentos").createSignedUrl(storagePath, 90);
+  if (error) throw error;
+  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
 }
 
 export default function MaquinariaOperaciones() {
@@ -638,13 +653,13 @@ export default function MaquinariaOperaciones() {
             const arrival = arrivalState(importRow);
             return <button type="button" key={row.id} onClick={() => setSelectedImport(importRow)} className="w-full rounded-xl border bg-card p-3 text-left">
               <div className="flex items-start justify-between gap-2">
-                <span className="font-mono text-[12px] font-semibold">{importRow.oc ? `OC ${importRow.oc}` : row.np_numero ? `NP ${row.np_numero}` : "Sin OC"}</span>
+                <span className="font-mono text-[12px] font-semibold">{importRow.llave_interna || (importRow.oc ? `OC ${importRow.oc}` : "Sin llave interna")}</span>
                 <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>
               </div>
               <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
               <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className={cn("text-[10px]", supplierClass(importRow.proveedor))}>{importRow.proveedor || "Sin proveedor"}</Badge>
+                <Badge variant="outline" className={cn("text-[10px]", brandClass(importRow.marca))}>{importRow.marca || importRow.proveedor || "OTROS"}</Badge>
                 <Badge variant="outline" className="text-[10px]">Unidad {importRow.numero_unidad}/{Math.max(1, Number(importRow.cantidad_lote) || 1)}</Badge>
                 {importRow.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(importRow.estado_disponibilidad)}>{AVAILABILITY_LABEL[importRow.estado_disponibilidad] ?? importRow.estado_disponibilidad}</Badge>}
               </div>
@@ -734,11 +749,13 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
 function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: ImportRow) => void }) {
   return <Table className="text-[12px]">
     <TableHeader><TableRow>
+      <TableHead>Llave interna</TableHead>
       <TableHead>OC</TableHead>
-      <TableHead>Proveedor</TableHead>
+      <TableHead>Marca / proveedor</TableHead>
       <TableHead>Máquina</TableHead>
       <TableHead>Modelo</TableHead>
       <TableHead>Unidad</TableHead>
+      <TableHead>Fecha pedido</TableHead>
       <TableHead>Embarque (est.)</TableHead>
       <TableHead>Arribo</TableHead>
       <TableHead>Llegada</TableHead>
@@ -749,11 +766,13 @@ function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: I
     <TableBody>{rows.map((row) => {
       const arrival = arrivalState(row);
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
+        <TableCell className="font-mono font-semibold">{row.llave_interna || "—"}</TableCell>
         <TableCell className="font-mono font-medium">{row.oc || "—"}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", supplierClass(row.proveedor))}>{row.proveedor || "Sin proveedor"}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca || row.proveedor || "OTROS"}</Badge></TableCell>
         <TableCell className="max-w-[200px] truncate">{row.producto || "—"}</TableCell>
         <TableCell className="max-w-[200px] truncate font-medium">{row.modelo || "—"}</TableCell>
         <TableCell className="whitespace-nowrap tabular-nums">{row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</TableCell>
+        <TableCell className="whitespace-nowrap">{formatDate(row.fecha_pedido)}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.eta)}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.ata)}</TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge></TableCell>
@@ -798,25 +817,84 @@ function AttachDocumentButton({ operationId, onUploaded, disabledTitle }: { oper
 function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean; row: ImportRow | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
   const [form, setForm] = useState<ImportDraft>(blankImport());
   const [saving, setSaving] = useState(false);
+  const [ocFile, setOcFile] = useState<File | null>(null);
+  const ocFileRef = useRef<HTMLInputElement>(null);
+  const importLineId = row?.importacion_linea_id ?? null;
+  const availableNpQuery = useQuery({
+    queryKey: ["machine-import-available-nps", importLineId],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await db.from("maquinaria_importacion_np_disponibles").select("*").order("np_numero");
+      if (error) throw error;
+      return (data ?? []) as AvailableImportNp[];
+    },
+  });
+  const ocDocumentsQuery = useQuery({
+    queryKey: ["machine-import-oc-documents", importLineId],
+    enabled: open && Boolean(importLineId),
+    queryFn: async () => {
+      const { data, error } = await db.from("maquinaria_documentos")
+        .select("id,archivo_nombre,storage_path,creado_en")
+        .eq("importacion_linea_id", importLineId)
+        .eq("tipo", "OC")
+        .order("creado_en", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const npOptions = useMemo(() => {
+    const options = [...(availableNpQuery.data ?? [])];
+    if (row?.linea_id && row.np_numero && !options.some((option) => option.linea_id === row.linea_id)) {
+      options.unshift({
+        operacion_id: row.operacion_id ?? "", linea_id: row.linea_id, np_numero: row.np_numero,
+        cliente_nombre: row.cliente_nombre, marca: safeMarca(row.marca), producto: row.producto,
+        modelo: row.modelo, unidades_disponibles: Math.max(1, Number(row.cantidad_lote) || 1),
+      });
+    }
+    return options;
+  }, [availableNpQuery.data, row]);
+  const selectedNp = npOptions.find((option) => option.linea_id === form.linea_id);
   useEffect(() => {
     if (!open) return;
+    setOcFile(null);
     setForm(row ? {
-      marca: safeMarca(row.marca), proveedor: row.proveedor ?? "", producto: row.producto ?? "",
+      marca: safeMarca(row.marca), producto: safeSubgroup(row.producto),
       modelo: row.modelo ?? "", cantidad: Math.max(1, Number(row.cantidad_lote) || 1),
-      estado_fuente: row.estado_fuente ?? "PLANIFICADA", np_numero: row.np_numero ?? "",
-      oc: row.oc ?? "", po: row.po ?? "", eta: row.eta ?? "", transporte: (row as any).transporte ?? "",
-      origen: (row as any).origen ?? "", destino: (row as any).destino ?? "", notas: (row as any).notas ?? "",
+      estado_fuente: row.estado_fuente ?? "PLANIFICADA", linea_id: row.linea_id ?? "", np_numero: row.np_numero ?? "",
+      llave_interna: row.llave_interna ?? "", oc: row.oc ?? "", fecha_pedido: row.fecha_pedido ?? "",
+      eta: row.eta ?? "", notas: (row as any).notas ?? "",
     } : blankImport());
   }, [open, row]);
+  const selectNp = (lineId: string) => {
+    if (lineId === "NONE") {
+      setForm((value) => ({ ...value, linea_id: "", np_numero: "" }));
+      return;
+    }
+    const option = npOptions.find((candidate) => candidate.linea_id === lineId);
+    if (!option) return;
+    setForm((value) => ({
+      ...value, linea_id: option.linea_id, np_numero: option.np_numero,
+      marca: safeMarca(option.marca), producto: safeSubgroup(option.producto), modelo: option.modelo ?? "",
+      cantidad: Math.min(value.cantidad, Math.max(1, Number(option.unidades_disponibles) || 1)),
+    }));
+  };
   const save = async () => {
-    if (!form.producto.trim() && !form.modelo.trim()) return toast.error("Ingresá el producto o modelo");
+    if (!form.llave_interna.trim()) return toast.error("Ingresá la llave interna");
+    if (!form.producto || !form.modelo) return toast.error("Seleccioná el producto y el modelo");
     setSaving(true);
     try {
-      const { error } = await db.rpc("maquinaria_guardar_importacion", {
+      const { data: savedId, error } = await db.rpc("maquinaria_guardar_importacion", {
         p_importacion_id: row?.importacion_linea_id ?? null,
         p_datos: form,
       });
       if (error) throw error;
+      if (ocFile) {
+        try {
+          await uploadImportDocument(ocFile, savedId, npOptions.find((option) => option.linea_id === form.linea_id)?.operacion_id ?? row?.operacion_id);
+        } catch (uploadError: any) {
+          toast.warning(`La importación se guardó, pero la OC no pudo subirse: ${uploadError?.message ?? "error desconocido"}`);
+        }
+      }
       toast.success(row ? "Importación actualizada" : "Importación creada y desglosada por unidad");
       onSaved(); onOpenChange(false);
     } catch (error: any) {
@@ -829,20 +907,18 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
     <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{row ? "Editar importación" : "Nueva importación"}</h2><p className="text-[11px] text-muted-foreground">La cantidad se desglosa automáticamente en máquinas físicas independientes.</p></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Marca"><CompactSelect value={form.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(marca) => setForm((value) => ({ ...value, marca: marca as ImportDraft["marca"] }))} /></Field>
-        <Field label="Proveedor"><Input value={form.proveedor} onChange={(event) => setForm((value) => ({ ...value, proveedor: event.target.value }))} /></Field>
-        <Field label="Producto / tipo"><Input value={form.producto} onChange={(event) => setForm((value) => ({ ...value, producto: event.target.value }))} /></Field>
-        <Field label="Modelo"><Input value={form.modelo} onChange={(event) => setForm((value) => ({ ...value, modelo: event.target.value }))} /></Field>
-        <Field label="Cantidad"><Input type="number" min={1} max={500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.max(1, Number(event.target.value) || 1) }))} /></Field>
-        <Field label="Estado"><Input value={form.estado_fuente} onChange={(event) => setForm((value) => ({ ...value, estado_fuente: event.target.value }))} placeholder="PLANIFICADA / EN TRANSITO" /></Field>
-        <Field label="NP de referencia"><Input value={form.np_numero} onChange={(event) => setForm((value) => ({ ...value, np_numero: event.target.value }))} /></Field>
+        <Field label="Llave interna *"><Input autoFocus value={form.llave_interna} onChange={(event) => setForm((value) => ({ ...value, llave_interna: event.target.value }))} placeholder="Ej. 26.61L2" /></Field>
+        <Field label="Marca / proveedor"><CompactSelect value={form.marca} values={["CLAAS", "HORSCH", "OTROS"]} disabled={Boolean(selectedNp)} onChange={(marca) => setForm((value) => ({ ...value, marca: marca as ImportDraft["marca"], modelo: "" }))} /></Field>
+        <Field label="Producto / tipo"><CompactSelect value={form.producto} values={(MACHINE_SUBGROUPS as readonly string[]).filter((value) => value !== "SUELO")} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
+        <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo) => setForm((value) => ({ ...value, modelo }))} allowCustom={false} disabled={Boolean(selectedNp)} /></Field>
+        <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
+        <Field label="Estado"><Select value={form.estado_fuente} onValueChange={(estado_fuente) => setForm((value) => ({ ...value, estado_fuente }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PLANIFICADA">Planificada</SelectItem><SelectItem value="PEDIDA">Pedida</SelectItem><SelectItem value="EN_TRANSITO">En tránsito</SelectItem><SelectItem value="RECIBIDA">Recibida</SelectItem><SelectItem value="CANCELADA">Cancelada</SelectItem></SelectContent></Select></Field>
+        <Field label="NP de referencia"><Select value={form.linea_id || "NONE"} onValueChange={selectNp}><SelectTrigger><SelectValue placeholder={availableNpQuery.isLoading ? "Cargando NP..." : "Seleccionar NP disponible"} /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin NP asignada</SelectItem>{npOptions.map((option) => <SelectItem key={option.linea_id} value={option.linea_id}>NP {option.np_numero} · {option.modelo || option.producto} · {option.unidades_disponibles} libre{option.unidades_disponibles === 1 ? "" : "s"}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="OC"><Input value={form.oc} onChange={(event) => setForm((value) => ({ ...value, oc: event.target.value }))} /></Field>
-        <Field label="PO"><Input value={form.po} onChange={(event) => setForm((value) => ({ ...value, po: event.target.value }))} /></Field>
+        <Field label="Fecha de pedido"><Input type="date" value={form.fecha_pedido} onChange={(event) => setForm((value) => ({ ...value, fecha_pedido: event.target.value }))} /></Field>
         <Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field>
-        <Field label="Transporte"><Input value={form.transporte} onChange={(event) => setForm((value) => ({ ...value, transporte: event.target.value }))} /></Field>
-        <Field label="Origen"><Input value={form.origen} onChange={(event) => setForm((value) => ({ ...value, origen: event.target.value }))} /></Field>
-        <Field label="Destino"><Input value={form.destino} onChange={(event) => setForm((value) => ({ ...value, destino: event.target.value }))} /></Field>
       </div>
+      <section className="rounded-xl border p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Documento de OC</h3><p className="text-[10px] text-muted-foreground">PDF o imagen de la orden de compra.</p></div><><input ref={ocFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setOcFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" size="sm" onClick={() => ocFileRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocFile ? "Cambiar archivo" : "Subir OC"}</Button></></div>{ocFile && <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-[11px]"><span className="truncate">{ocFile.name}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOcFile(null)}>Quitar</Button></div>}{ocDocumentsQuery.data?.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="mt-2 flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</section>
       <Field label="Notas"><Textarea rows={3} value={form.notas} onChange={(event) => setForm((value) => ({ ...value, notas: event.target.value }))} /></Field>
       {row && <p className="rounded-lg bg-muted/50 p-3 text-[11px] text-muted-foreground">Los chasis, facturas, costos y fechas de arribo se editan por cada máquina física desde su detalle.</p>}
     </ResponsiveDrawerBody>
@@ -856,8 +932,23 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receiving, setReceiving] = useState(false);
+  const [uploadingOc, setUploadingOc] = useState(false);
+  const detailOcRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ chasis: "", eta: "", invoice_supplier: "", factura_proveedor_fecha: "", costo_final: "" });
   const [receipt, setReceipt] = useState({ fecha: TODAY });
+  const detailOcQuery = useQuery({
+    queryKey: ["machine-import-oc-documents", row?.importacion_linea_id],
+    enabled: Boolean(row?.importacion_linea_id),
+    queryFn: async () => {
+      const { data, error } = await db.from("maquinaria_documentos")
+        .select("id,archivo_nombre,storage_path,creado_en")
+        .eq("importacion_linea_id", row?.importacion_linea_id)
+        .eq("tipo", "OC")
+        .order("creado_en", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   useEffect(() => {
     setEditing(false);
     setForm({
@@ -870,6 +961,20 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   }, [row?.id, row?.chasis, row?.eta, row?.ata, row?.invoice_supplier, row?.factura_proveedor_fecha, row?.costo_final]);
   if (!row) return null;
   const arrival = arrivalState(row);
+  const uploadOc = async (file?: File) => {
+    if (!file) return;
+    setUploadingOc(true);
+    try {
+      await uploadImportDocument(file, row.importacion_linea_id, row.operacion_id);
+      await detailOcQuery.refetch();
+      toast.success("Documento de OC adjuntado");
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo adjuntar la OC");
+    } finally {
+      setUploadingOc(false);
+      if (detailOcRef.current) detailOcRef.current.value = "";
+    }
+  };
   const saveUnit = async () => {
     setSaving(true);
     try {
@@ -911,8 +1016,8 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     }
   };
   const groups = [
-    { title: "Unidad importada", values: [["Máquina", row.producto], ["Modelo", row.modelo], ["Marca", row.marca], ["Unidad del lote", `${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`], ["Chasis", row.chasis]] },
-    { title: "Logística", values: [["OC", row.oc], ["PO", row.po], ["Proveedor", row.proveedor], ["Estado de origen", row.estado_fuente], ["Embarque estimado", formatDate(row.eta)], ["Arribo", formatDate(row.ata)]] },
+    { title: "Unidad importada", values: [["Llave interna", row.llave_interna], ["Máquina", row.producto], ["Modelo", row.modelo], ["Marca / proveedor", row.marca], ["Unidad del lote", `${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`], ["Chasis", row.chasis]] },
+    { title: "Pedido y logística", values: [["OC", row.oc], ["Fecha de pedido", formatDate(row.fecha_pedido)], ["Estado", row.estado_fuente], ["Embarque estimado", formatDate(row.eta)], ["Arribo", formatDate(row.ata)]] },
     { title: "Pedido vinculado", values: [["NP", row.np_numero], ["Cliente", row.cliente_nombre], ["Comercial", row.comercial], ["Situación del vínculo", row.situacion_vinculo]] },
     { title: "Documentación y valores", values: [["Valor de OC", row.precio_oc != null ? formatUsd(row.precio_oc) : null], ["Valor facturado por el proveedor", row.costo_final != null ? formatUsd(row.costo_final) : null], ["Factura del proveedor", row.invoice_supplier], ["Fecha factura proveedor", formatDate(row.factura_proveedor_fecha)], ["Venta facturada", row.venta_facturada], ["Valor de venta", row.valor_venta != null ? formatUsd(row.valor_venta) : null]] },
     { title: "Stock vinculado", values: [["Sucursal", row.stock_sucursal], ["Depósito", row.stock_deposito], ["Saldo", row.stock_saldo], ["Detalle", row.disponibilidad_detalle]] },
@@ -929,6 +1034,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       {editing && <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">Datos propios de esta máquina</h3><p className="text-[10px] text-muted-foreground">Estos valores no se aplican a las demás unidades del lote.</p></div><div className="grid gap-2 sm:grid-cols-2"><Field label="Chasis"><Input value={form.chasis} onChange={(e) => setForm((v) => ({ ...v, chasis: e.target.value }))} /></Field><Field label="Factura proveedor"><Input value={form.invoice_supplier} onChange={(e) => setForm((v) => ({ ...v, invoice_supplier: e.target.value }))} /></Field><Field label="Fecha factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(e) => setForm((v) => ({ ...v, factura_proveedor_fecha: e.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(e) => setForm((v) => ({ ...v, costo_final: e.target.value }))} /></Field><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(e) => setForm((v) => ({ ...v, eta: e.target.value }))} /></Field></div><div className="mt-3 flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar unidad"}</Button></div></section>}
+      <section><div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Orden de compra</h3>{canEdit && <><input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} /><Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{uploadingOc ? "Subiendo..." : "Adjuntar OC"}</Button></>}</div>{detailOcQuery.data?.length ? <div className="space-y-1">{detailOcQuery.data.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</div> : <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">Todavía no hay un documento de OC adjunto.</p>}</section>
       {canEdit && <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">{row.ata ? "Arribo registrado" : "Registrar arribo"}</h3><p className="text-[10px] text-muted-foreground">Registrar el arribo no crea stock. La máquina ingresará y, si corresponde, quedará reservada solo cuando una importación del stock del sistema contenga una coincidencia única y exacta de este chasis.</p></div><div className="max-w-xs"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt({ fecha: event.target.value })} /></Field></div><div className="mt-3 flex justify-end"><Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackageCheck className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : row.ata ? "Actualizar arribo" : "Registrar arribo"}</Button></div>{!row.chasis && <p className="mt-2 text-[10px] text-amber-700">Primero guardá el chasis de esta máquina.</p>}</section>}
       {groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}
     </ResponsiveDrawerBody>
@@ -1454,4 +1560,4 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">{label}</Label>{children}</div>; }
-function CompactSelect({ value, values, onChange }: { value: string; values: readonly string[]; onChange: (v: string) => void }) { return <Select value={value} onValueChange={onChange}><SelectTrigger className="h-9 text-[12px]"><SelectValue /></SelectTrigger><SelectContent>{values.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>; }
+function CompactSelect({ value, values, onChange, disabled = false }: { value: string; values: readonly string[]; onChange: (v: string) => void; disabled?: boolean }) { return <Select value={value} onValueChange={onChange} disabled={disabled}><SelectTrigger className="h-9 text-[12px]"><SelectValue /></SelectTrigger><SelectContent>{values.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>; }
