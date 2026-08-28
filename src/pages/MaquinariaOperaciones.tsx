@@ -196,7 +196,7 @@ const availabilityClass = (state?: string | null) => cn(
 type OrderRow = {
   id: string; operacion_id: string; np_numero: string | null; np_fecha: string | null; cliente_nombre: string;
   comercial: string | null; marca: string | null; producto: string | null; modelo: string | null; cantidad: number | null;
-  condicion: string | null; abastecimiento: string | null; estado_fuente: string | null; chasis: string | null;
+  condicion: string | null; abastecimiento: string | null; estado_fuente: string | null; estado_operacion: string | null; chasis: string | null;
   estado_disponibilidad: string | null; disponibilidad_detalle: string | null; estado_importacion_fuente: string | null;
   eta: string | null; ata: string | null; proveedor: string | null; factura_venta: string | null; factura_fecha: string | null;
   costo_producto: number | null; valor_venta: number | null; observaciones: string | null; actualizado_en: string;
@@ -233,6 +233,10 @@ type ImportAssignmentRow = {
   invoice_supplier: string | null; factura_proveedor_fecha: string | null; costo_final: number | null;
   asignable?: boolean;
 };
+
+function orderBillingState(row: Pick<OrderRow, "estado_operacion" | "estado_fuente">): SimpleOrderState {
+  return simpleOrderState(row.estado_operacion || row.estado_fuente);
+}
 type ImportDraft = {
   marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
   cantidad: number; estado_fuente: string; linea_id: string; np_numero: string; llave_interna: string;
@@ -429,7 +433,7 @@ export default function MaquinariaOperaciones() {
   const operationsQuery = useQuery({
     queryKey: ["machine-operations", importsView ? "imports" : "orders"],
     queryFn: async () => {
-      const table = importsView ? "maquinaria_importacion_unidades_operativas" : "maquinaria_pedidos_lineas_operativas";
+      const table = importsView ? "maquinaria_importacion_unidades_operativas" : "maquinaria_pedidos_lineas_estado_actual";
       const orderColumn = importsView ? "eta" : "np_fecha";
       const { data, error } = await db.from(table).select("*").order(orderColumn, { ascending: false, nullsFirst: false }).limit(1000);
       if (error) throw error;
@@ -522,7 +526,7 @@ export default function MaquinariaOperaciones() {
       if (situacion !== "TODOS" && (importRow.estado_disponibilidad ?? "SIN_CHASIS") !== situacion) return false;
     } else {
       const orderRow = row as OrderRow;
-      if (orderState !== "TODOS" && simpleOrderState(orderRow.estado_fuente) !== orderState) return false;
+      if (orderState !== "TODOS" && orderBillingState(orderRow) !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
       const unit = entregaByUnitId?.get(orderRow.id);
       if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet) !== entrega) return false;
@@ -543,8 +547,8 @@ export default function MaquinariaOperaciones() {
     const orderRows = rows as OrderRow[];
     return {
       total: orderRows.length,
-      pendientes: orderRows.filter((row) => simpleOrderState(row.estado_fuente) === "PENDIENTE").length,
-      facturados: orderRows.filter((row) => simpleOrderState(row.estado_fuente) === "COMPLETADO").length,
+      pendientes: orderRows.filter((row) => orderBillingState(row) === "PENDIENTE").length,
+      facturados: orderRows.filter((row) => orderBillingState(row) === "COMPLETADO").length,
       facturado: orderRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0), 0),
     };
   }, [rows]);
@@ -668,7 +672,7 @@ export default function MaquinariaOperaciones() {
             </button>;
           }
           const orderRow = row as OrderRow;
-          const state = simpleOrderState(orderRow.estado_fuente);
+          const state = orderBillingState(orderRow);
           const orderUnit = entregaByUnitId?.get(orderRow.id);
           const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet);
           return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
@@ -727,7 +731,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
       <TableHead className="w-[40px]" />
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {
-      const state = simpleOrderState(row.estado_fuente);
+      const state = orderBillingState(row);
       const unit = entregaByUnitId?.get(row.id);
       const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet);
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
