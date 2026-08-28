@@ -231,6 +231,7 @@ type ImportAssignmentRow = {
   estado_fuente: string | null; oc: string | null; po: string | null; eta: string | null; ata: string | null;
   chasis: string | null; situacion_vinculo: string | null; vinculo_manual: boolean;
   invoice_supplier: string | null; factura_proveedor_fecha: string | null; costo_final: number | null;
+  asignable?: boolean;
 };
 type ImportDraft = {
   marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
@@ -1195,19 +1196,25 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       ]);
       if (summary.error) throw summary.error; if (lines.error) throw lines.error;
       const lineIds = (lines.data ?? []).map((l: any) => l.id);
-      const [units, stock, imports, suggestions] = await Promise.all([
+      const importColumns = "id,importacion_linea_id,numero_unidad,cantidad_lote,operacion_id,linea_id,unidad_id,np_numero,proveedor,producto,modelo,estado_fuente,oc,po,eta,ata,chasis,situacion_vinculo,vinculo_manual,invoice_supplier,factura_proveedor_fecha,costo_final";
+      const [units, stock, linkedImports, availableImports, suggestions] = await Promise.all([
         lineIds.length ? db.from("maquinaria_unidades_operacion").select("*").in("linea_id", lineIds).order("numero_unidad") : Promise.resolve({ data: [], error: null }),
         db.from("maquinaria_stock_trazabilidad")
           .select("id,producto_codigo,marca,modelo,sucursal,deposito,chasis,saldo_actual,estado_disponibilidad,disponibilidad_detalle,unidad_operacion_id")
           .or("saldo_actual.gt.0,unidad_operacion_id.not.is.null")
           .order("marca").order("modelo").limit(1000),
         db.from("maquinaria_importacion_unidades_operativas")
-          .select("id,importacion_linea_id,numero_unidad,cantidad_lote,operacion_id,linea_id,unidad_id,np_numero,proveedor,producto,modelo,estado_fuente,oc,po,eta,ata,chasis,situacion_vinculo,vinculo_manual,invoice_supplier,factura_proveedor_fecha,costo_final")
-          .order("eta", { ascending: true, nullsFirst: false }).limit(1000),
+          .select(importColumns).eq("operacion_id", operationId)
+          .order("eta", { ascending: true, nullsFirst: false }),
+        db.from("maquinaria_importacion_unidades_asignables")
+          .select(importColumns).order("eta", { ascending: true, nullsFirst: false }).limit(500),
         db.from("maquinaria_vinculos_sugeridos").select("*").eq("operacion_id", operationId),
       ]);
-      if (units.error) throw units.error; if (stock.error) throw stock.error; if (imports.error) throw imports.error; if (suggestions.error) throw suggestions.error;
-      return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: imports.data ?? [], suggestions: suggestions.data ?? [], importation: importation.data };
+      if (units.error) throw units.error; if (stock.error) throw stock.error; if (linkedImports.error) throw linkedImports.error; if (availableImports.error) throw availableImports.error; if (suggestions.error) throw suggestions.error;
+      const importsById = new Map<string, ImportAssignmentRow>();
+      (linkedImports.data ?? []).forEach((item: ImportAssignmentRow) => importsById.set(item.id, { ...item, asignable: false }));
+      (availableImports.data ?? []).forEach((item: ImportAssignmentRow) => importsById.set(item.id, { ...item, asignable: true }));
+      return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: [...importsById.values()], suggestions: suggestions.data ?? [], importation: importation.data };
     },
   });
   useEffect(() => { setInvoiceFile(null); setInvoiceData(null); setInvoiceUnits({}); }, [operationId]);
@@ -1519,7 +1526,7 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
   const expected = normalizeAssignmentText([line?.marca, line?.modelo, line?.producto].filter(Boolean).join(" "));
   const query = normalizeAssignmentText(searchImport);
   const candidates = imports
-    .filter((row) => row.unidad_id === unit.id || (!row.unidad_id && (!row.operacion_id || row.operacion_id === line?.operacion_id)))
+    .filter((row) => row.unidad_id === unit.id || row.asignable === true)
     .filter((row) => !query || normalizeAssignmentText([row.np_numero, row.proveedor, row.producto, row.modelo, row.estado_fuente, row.oc, row.po, row.chasis].join(" ")).includes(query))
     .sort((a, b) => {
       const aMatch = expected && normalizeAssignmentText([a.modelo, a.producto].join(" ")).split(" ").some((part) => part.length > 2 && expected.includes(part)) ? 1 : 0;
@@ -1528,6 +1535,7 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
     })
     .slice(0, 60);
   if (linked && !candidates.some((row) => row.id === linked.id)) candidates.unshift(linked);
+  const validSuggestion = suggestion && candidates.some((row) => row.id === suggestion.recurso_id) ? suggestion : undefined;
 
   const saveAssignment = async (suggestedImportId?: string) => {
     const effectiveImportId = suggestedImportId ?? importId;
@@ -1550,7 +1558,7 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
   const dirty = importId !== (linked?.id ?? "NONE");
   return <div className="rounded-xl border p-3">
     <div className="mb-2 flex flex-wrap items-start justify-between gap-2"><div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">{[line?.marca, "Importar", unit.chasis && `Ch. ${unit.chasis}`].filter(Boolean).join(" · ")}</div></div>{linked && <Badge variant="outline" className="border-violet-200 bg-violet-50 text-[10px] text-violet-700">{linked.vinculo_manual ? "Importación confirmada" : "Importación sugerida"}</Badge>}</div>
-    {!linked && suggestion && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50/50 p-2.5"><div><p className="text-[11px] font-medium text-violet-800">Coincidencia exacta de chasis</p><p className="text-[10px] text-violet-700">{[suggestion.modelo, suggestion.ubicacion, suggestion.chasis].filter(Boolean).join(" · ")}</p></div><Button size="sm" variant="outline" onClick={() => saveAssignment(suggestion.recurso_id)} disabled={savingAssignment}>Confirmar sugerencia</Button></div>}
+    {!linked && validSuggestion && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50/50 p-2.5"><div><p className="text-[11px] font-medium text-violet-800">Coincidencia exacta de chasis</p><p className="text-[10px] text-violet-700">{[validSuggestion.modelo, validSuggestion.ubicacion, validSuggestion.chasis].filter(Boolean).join(" · ")}</p></div><Button size="sm" variant="outline" onClick={() => saveAssignment(validSuggestion.recurso_id)} disabled={savingAssignment}>Confirmar sugerencia</Button></div>}
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Máquina importada</Label><Input className="h-8 text-[11px]" value={searchImport} onChange={(event) => setSearchImport(event.target.value)} placeholder="Buscar por modelo, NP, proveedor, OC, PO o chasis" /><Select value={importId} onValueChange={setImportId}><SelectTrigger className="h-9 text-[11px]"><SelectValue placeholder="Sin importación vinculada" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin importación vinculada</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto || "Importación", `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`, row.chasis && `Ch. ${row.chasis}`, row.np_numero && `NP ${row.np_numero}`, row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`, row.eta && `ETA ${formatDate(row.eta)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
       <Button size="sm" onClick={() => saveAssignment()} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button>
