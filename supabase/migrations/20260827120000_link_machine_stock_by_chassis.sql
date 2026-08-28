@@ -59,7 +59,8 @@ BEGIN
 
   -- La funcion corre en una sola transaccion: si una fila falla, la foto
   -- anterior permanece intacta.
-  DELETE FROM public.parque_stock_maquinas;
+  DELETE FROM public.parque_stock_maquinas
+  WHERE id IS NOT NULL;
 
   FOR v_fila IN SELECT value FROM jsonb_array_elements(p_filas)
   LOOP

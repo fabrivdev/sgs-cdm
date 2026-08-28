@@ -795,10 +795,18 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.nombre) cliMap.set(normText(c.nombre), c.id);
       }
 
-      const validos = nuevos.filter((r) => cliMap.has(normText(r.cliente_nombre)));
-      const omitidos = nuevos.length - validos.length;
+      // Parque representa equipos de clientes de marcas admitidas. Las filas
+      // OTROS siguen siendo validas en Operaciones, pero no deben hacer fallar
+      // atomicamente una importacion completa del Excel de Parque.
+      const marcasAdmitidas = nuevos.filter((r) => r.marca === "CLAAS" || r.marca === "HORSCH");
+      const omitidosMarca = nuevos.length - marcasAdmitidas.length;
+      const validos = marcasAdmitidas.filter((r) => cliMap.has(normText(r.cliente_nombre)));
+      const omitidosCliente = marcasAdmitidas.length - validos.length;
 
       if (validos.length === 0) {
+        if (marcasAdmitidas.length === 0) {
+          return toast.error("El archivo no contiene máquinas CLAAS o HORSCH admitidas al Parque");
+        }
         return toast.error("Ninguna máquina coincide exactamente con un cliente existente");
       }
 
@@ -827,10 +835,12 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         archivo_nombre: parqueFile,
       });
 
-      if (omitidos > 0) {
-        toast.success(
-          `Importadas ${validos.length} máquinas. ${omitidos} fueron omitidas por no coincidir exactamente con un cliente.`,
-        );
+      if (omitidosMarca > 0 || omitidosCliente > 0) {
+        const motivos = [
+          omitidosMarca > 0 ? `${omitidosMarca} de marcas no admitidas al Parque` : null,
+          omitidosCliente > 0 ? `${omitidosCliente} sin coincidencia exacta de cliente` : null,
+        ].filter(Boolean).join("; ");
+        toast.success(`Importadas ${validos.length} máquinas. Omitidas: ${motivos}.`);
       } else {
         toast.success(`Importadas ${validos.length} máquinas`);
       }

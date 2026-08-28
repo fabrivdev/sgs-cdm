@@ -318,7 +318,7 @@ function isMissingCommissionSchema(error: unknown) {
     && /does not exist|schema cache|could not find/i.test(message);
 }
 
-export async function persistCommissionTimeEntries(args: {
+async function persistCommissionTimeEntriesInternal(args: {
   rows: CanonicalServiceOrderRow[];
   importId: string | null;
   strict?: boolean;
@@ -439,6 +439,25 @@ export async function persistCommissionTimeEntries(args: {
     invalid: payload.filter((row) => row.estado_validacion === "INVALIDA").length,
     schemaAvailable: true,
   };
+}
+
+export async function persistCommissionTimeEntries(args: {
+  rows: CanonicalServiceOrderRow[];
+  importId: string | null;
+  strict?: boolean;
+}) {
+  try {
+    return await persistCommissionTimeEntriesInternal(args);
+  } catch (error) {
+    // Comisiones complementa al importador principal. Si su esquema esta a
+    // medio desplegar, el trio Facturacion + OS + Productos debe completar
+    // igual; el importador exclusivo de Comisiones conserva strict=true.
+    if (!args.strict && isMissingCommissionSchema(error)) {
+      console.info("Comisiones no se persistieron: el modulo no esta completamente migrado.");
+      return { inserted: 0, review: 0, invalid: 0, schemaAvailable: false };
+    }
+    throw error;
+  }
 }
 
 export async function importCommissionXmlOnly(args: {

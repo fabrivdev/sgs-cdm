@@ -981,7 +981,7 @@ function MaquinaForm({
           <Label className="text-[11px]">Marca</Label>
           <Select value={form.marca ?? "CLAAS"} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: null })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{MARCAS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+            <SelectContent>{MARCAS.filter((m) => m !== "OTROS" || form.marca === "OTROS").map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
