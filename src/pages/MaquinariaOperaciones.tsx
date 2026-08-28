@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
@@ -240,6 +241,7 @@ type ImportAssignmentRow = {
   np_numero: string | null; proveedor: string | null; producto: string | null; modelo: string | null;
   estado_fuente: string | null; oc: string | null; po: string | null; eta: string | null; ata: string | null;
   chasis: string | null; situacion_vinculo: string | null; vinculo_manual: boolean;
+  invoice_supplier: string | null; factura_proveedor_fecha: string | null; costo_final: number | null;
 };
 type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; docs: any[]; importation?: any };
 
@@ -361,12 +363,13 @@ async function uploadEvidence(file: File, operationId: string, type: string, ext
   const path = `${auth.user.id}/${operationId}/${crypto.randomUUID()}-${safeName}`;
   const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
   if (storageError) throw storageError;
-  const { error: docError } = await db.from("maquinaria_documentos").insert({
+  const { data: document, error: docError } = await db.from("maquinaria_documentos").insert({
     operacion_id: operationId, tipo: type, archivo_nombre: file.name, storage_path: path,
     mime_type: file.type, tamano_bytes: file.size, estado_extraccion: "REVISADO",
     datos_extraidos: extracted ?? {}, revisado_por: auth.user.id, revisado_en: new Date().toISOString(),
-  });
+  }).select("id").single();
   if (docError) throw docError;
+  return document;
 }
 
 export default function MaquinariaOperaciones() {
@@ -924,6 +927,7 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
   const invoiceRef = useRef<HTMLInputElement>(null);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceData, setInvoiceData] = useState<any>(null);
+  const [invoiceUnits, setInvoiceUnits] = useState<Record<string, { selected: boolean; chasis: string; costo: string }>>({});
   const [reading, setReading] = useState(false); const [saving, setSaving] = useState(false);
   const [chasisEdits, setChasisEdits] = useState<Record<string, string>>({});
   const [savingChasisId, setSavingChasisId] = useState<string | null>(null);
@@ -946,20 +950,60 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
           .or("saldo_actual.gt.0,unidad_operacion_id.not.is.null")
           .order("marca").order("modelo").limit(1000),
         db.from("maquinaria_importacion_unidades_operativas")
-          .select("id,importacion_linea_id,numero_unidad,cantidad_lote,operacion_id,linea_id,unidad_id,np_numero,proveedor,producto,modelo,estado_fuente,oc,po,eta,ata,chasis,situacion_vinculo,vinculo_manual")
+          .select("id,importacion_linea_id,numero_unidad,cantidad_lote,operacion_id,linea_id,unidad_id,np_numero,proveedor,producto,modelo,estado_fuente,oc,po,eta,ata,chasis,situacion_vinculo,vinculo_manual,invoice_supplier,factura_proveedor_fecha,costo_final")
           .order("eta", { ascending: true, nullsFirst: false }).limit(1000),
       ]);
       if (units.error) throw units.error; if (stock.error) throw stock.error; if (imports.error) throw imports.error;
       return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: imports.data ?? [], importation: importation.data };
     },
   });
-  useEffect(() => { setInvoiceFile(null); setInvoiceData(null); }, [operationId]);
+  useEffect(() => { setInvoiceFile(null); setInvoiceData(null); setInvoiceUnits({}); }, [operationId]);
   const openDocument = async (storagePath: string) => {
     const { data, error } = await supabase.storage.from("maquinaria-documentos").createSignedUrl(storagePath, 90);
     if (error || !data?.signedUrl) return toast.error("No se pudo abrir el documento");
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
-  const chooseInvoice = async (file?: File) => { if (!file) return; setInvoiceFile(file); setReading(true); try { setInvoiceData(await extractDocument(file, "FACTURA_IMPORTACION")); toast.success("Factura leída. Revisá chasis y valor antes de confirmar."); } catch (e: any) { toast.warning(e?.message ?? "No se pudo leer la factura"); setInvoiceData({ factura_fecha: TODAY, chasis: [] }); } finally { setReading(false); } };
+  const prepareInvoiceUnits = (extracted: any) => {
+    const candidates = (detailQuery.data?.imports ?? []).filter((row) => row.operacion_id === operationId && row.unidad_id);
+    const chassis = Array.isArray(extracted?.chasis)
+      ? extracted.chasis.map((value: unknown) => String(value).trim()).filter(Boolean)
+      : [];
+    const selectedTarget = chassis.length > 0 ? Math.min(chassis.length, candidates.length) : candidates.length === 1 ? 1 : 0;
+    const drafts: Record<string, { selected: boolean; chasis: string; costo: string }> = {};
+    candidates.forEach((row, index) => {
+      const selected = index < selectedTarget;
+      drafts[row.id] = {
+        selected,
+        chasis: row.chasis ?? chassis[index] ?? "",
+        costo: row.costo_final == null ? "" : String(row.costo_final),
+      };
+    });
+    if (selectedTarget === 1 && extracted?.valor_facturado != null) {
+      const selectedId = Object.keys(drafts).find((id) => drafts[id].selected);
+      if (selectedId) drafts[selectedId].costo = String(extracted.valor_facturado);
+    }
+    setInvoiceUnits(drafts);
+    return candidates.length;
+  };
+  const chooseInvoice = async (file?: File) => {
+    if (!file) return;
+    setInvoiceFile(file);
+    setReading(true);
+    try {
+      const extracted = await extractDocument(file, "FACTURA_IMPORTACION");
+      setInvoiceData(extracted);
+      const candidates = prepareInvoiceUnits(extracted);
+      if (!candidates) toast.warning("Primero vinculá una máquina importada a las unidades de este pedido.");
+      else toast.success("Factura leída. Confirmá exactamente qué máquinas incluye.");
+    } catch (e: any) {
+      toast.warning(e?.message ?? "No se pudo leer la factura");
+      const fallback = { factura_fecha: TODAY, chasis: [] };
+      setInvoiceData(fallback);
+      prepareInvoiceUnits(fallback);
+    } finally {
+      setReading(false);
+    }
+  };
   const saveChasis = async (unitId: string, rawValue: string) => {
     const value = rawValue.trim() || null;
     setSavingChasisId(unitId);
@@ -982,20 +1026,65 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
   };
   const confirmInvoice = async () => {
     if (!operationId || !invoiceFile || !invoiceData) return;
+    const selected = Object.entries(invoiceUnits).filter(([, value]) => value.selected);
+    if (!String(invoiceData.factura_numero ?? "").trim()) return toast.error("Completá el número de factura");
+    if (!selected.length) return toast.error("Seleccioná al menos una máquina incluida en esta factura");
     setSaving(true);
     try {
-      const payload = { proveedor: invoiceData.proveedor || null, factura_numero: invoiceData.factura_numero || null, factura_fecha: invoiceData.factura_fecha || null, moneda: invoiceData.moneda || null, valor_facturado: Number(invoiceData.valor_facturado) || null, estado: "FACTURA_REVISADA", actualizado_en: new Date().toISOString() };
-      const existing = detailQuery.data?.importation;
-      const result = existing ? await db.from("maquinaria_importaciones_operativas").update(payload).eq("id", existing.id) : await db.from("maquinaria_importaciones_operativas").insert({ operacion_id: operationId, ...payload });
-      if (result.error) throw result.error;
-      const chassis = Array.isArray(invoiceData.chasis) ? invoiceData.chasis.map((v: unknown) => String(v).trim()).filter(Boolean) : [];
-      for (let i = 0; i < chassis.length && i < (detailQuery.data?.units.length ?? 0); i++) { const update = await db.from("maquinaria_unidades_operacion").update({ chasis: chassis[i], estado: "EN_TRANSITO" }).eq("id", detailQuery.data!.units[i].id); if (update.error) throw update.error; }
-      await uploadEvidence(invoiceFile, operationId, "FACTURA_IMPORTACION", invoiceData);
-      const op = await db.from("maquinaria_operaciones").update({ estado: "EN_IMPORTACION", actualizado_en: new Date().toISOString() }).eq("id", operationId); if (op.error) throw op.error;
-      toast.success("Factura validada y vinculada a la operación"); setInvoiceData(null); setInvoiceFile(null); detailQuery.refetch(); onChanged();
+      const unitsPayload = selected.map(([id, value]) => ({
+        importacion_unidad_id: id,
+        chasis: value.chasis.trim() || null,
+        costo_unidad: value.costo === "" ? null : Number(value.costo),
+      }));
+      if (unitsPayload.some((unit) => unit.costo_unidad != null && !Number.isFinite(unit.costo_unidad))) {
+        throw new Error("Revisá los costos unitarios ingresados");
+      }
+      const total = invoiceData.valor_facturado === "" || invoiceData.valor_facturado == null
+        ? null : Number(invoiceData.valor_facturado);
+      if (total != null && !Number.isFinite(total)) throw new Error("Revisá el valor total de la factura");
+
+      const { data: applied, error } = await db.rpc("maquinaria_aplicar_factura_importacion", {
+        p_operacion_id: operationId,
+        p_factura_numero: String(invoiceData.factura_numero).trim(),
+        p_factura_fecha: invoiceData.factura_fecha || null,
+        p_proveedor: invoiceData.proveedor || null,
+        p_moneda: invoiceData.moneda || null,
+        p_valor_total: total,
+        p_unidades: unitsPayload,
+      });
+      if (error) throw error;
+
+      try {
+        const document = await uploadEvidence(invoiceFile, operationId, "FACTURA_IMPORTACION", {
+          ...invoiceData,
+          unidades_confirmadas: unitsPayload,
+        });
+        if (document?.id && applied?.factura_id) {
+          const [invoiceUpdate, documentUpdate] = await Promise.all([
+            db.from("maquinaria_facturas_importacion").update({ documento_id: document.id }).eq("id", applied.factura_id),
+            applied.importacion_operativa_id
+              ? db.from("maquinaria_documentos").update({ importacion_id: applied.importacion_operativa_id }).eq("id", document.id)
+              : Promise.resolve({ error: null }),
+          ]);
+          if (invoiceUpdate.error) throw invoiceUpdate.error;
+          if (documentUpdate.error) throw documentUpdate.error;
+        }
+      } catch (documentError: any) {
+        toast.warning(`La factura se guardó, pero el archivo no quedó vinculado: ${documentError?.message ?? "error desconocido"}`);
+      }
+
+      toast.success(`Factura aplicada a ${selected.length} ${selected.length === 1 ? "máquina" : "máquinas"}`);
+      setInvoiceData(null); setInvoiceFile(null); setInvoiceUnits({}); detailQuery.refetch(); onChanged();
     } catch (e: any) { toast.error(e?.message ?? "No se pudo guardar la factura"); } finally { setSaving(false); }
   };
   const detail = detailQuery.data;
+  const invoiceCandidates = (detail?.imports ?? []).filter((row) => row.operacion_id === operationId && row.unidad_id);
+  const invoiceSelectedCount = Object.values(invoiceUnits).filter((value) => value.selected).length;
+  const invoiceAssignedCost = Object.values(invoiceUnits).reduce((sum, value) => {
+    if (!value.selected || value.costo === "") return sum;
+    const amount = Number(value.costo);
+    return Number.isFinite(amount) ? sum + amount : sum;
+  }, 0);
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
@@ -1053,8 +1142,18 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
         })}</div></div>
         {canEditChasis && <div><div className="mb-2"><h3 className="text-[13px] font-semibold">Asignación de unidades</h3><p className="text-[10px] text-muted-foreground">Stock reserva una máquina disponible; Importar vincula la unidad en tránsito correspondiente.</p></div><div className="space-y-2">{detail.units.map((unit) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div></div>}
         <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
-        {canEditChasis && (detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
-          {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}
+        {canEditChasis && (detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Elegí solo las máquinas incluidas. Las demás no se modifican.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
+          {invoiceData && <div className="mt-3 space-y-3 border-t pt-3">
+            <div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Proveedor"><Input value={invoiceData.proveedor ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, proveedor: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field><Field label="Total de la factura"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field></div>
+            <div className="space-y-2"><div className="flex items-center justify-between"><div><h4 className="text-[12px] font-semibold">Máquinas incluidas</h4><p className="text-[10px] text-muted-foreground">El costo por máquina no se completa automáticamente cuando la factura incluye varias.</p></div><Badge variant="outline">{invoiceSelectedCount}/{invoiceCandidates.length} seleccionadas</Badge></div>
+              {!invoiceCandidates.length && <p className="rounded-lg bg-amber-50 p-3 text-[11px] text-amber-800">Este pedido todavía no tiene máquinas importadas vinculadas. Asignalas arriba antes de confirmar la factura.</p>}
+              {invoiceCandidates.map((row) => {
+                const draft = invoiceUnits[row.id] ?? { selected: false, chasis: row.chasis ?? "", costo: row.costo_final == null ? "" : String(row.costo_final) };
+                return <div key={row.id} className={cn("rounded-lg border p-3", draft.selected && "border-violet-200 bg-violet-50/40")}><div className="flex items-start gap-2"><Checkbox id={`invoice-unit-${row.id}`} checked={draft.selected} onCheckedChange={(checked) => setInvoiceUnits((current) => ({ ...current, [row.id]: { ...draft, selected: checked === true } }))} /><label htmlFor={`invoice-unit-${row.id}`} className="min-w-0 flex-1 cursor-pointer"><span className="block text-[11px] font-medium">{row.modelo || row.producto || "Máquina importada"} · Unidad {row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</span><span className="block truncate text-[10px] text-muted-foreground">{[row.oc && `OC ${row.oc}`, row.invoice_supplier && `Factura actual ${row.invoice_supplier}`].filter(Boolean).join(" · ") || "Sin factura asignada"}</span></label></div><div className="mt-2 grid gap-2 sm:grid-cols-2"><Field label="Chasis de esta máquina"><Input disabled={!draft.selected} value={draft.chasis} onChange={(e) => setInvoiceUnits((current) => ({ ...current, [row.id]: { ...draft, chasis: e.target.value } }))} /></Field><Field label="Costo de esta máquina"><Input disabled={!draft.selected} type="number" value={draft.costo} onChange={(e) => setInvoiceUnits((current) => ({ ...current, [row.id]: { ...draft, costo: e.target.value } }))} /></Field></div></div>;
+              })}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3"><p className="text-[10px] text-muted-foreground">Costo distribuido: {formatUsd(invoiceAssignedCost)}{invoiceData.valor_facturado != null && invoiceData.valor_facturado !== "" ? ` · Total factura: ${formatUsd(invoiceData.valor_facturado)}` : ""}</p><Button size="sm" onClick={confirmInvoice} disabled={saving || !invoiceSelectedCount}>{saving ? "Guardando..." : `Confirmar para ${invoiceSelectedCount} ${invoiceSelectedCount === 1 ? "máquina" : "máquinas"}`}</Button></div>
+          </div>}
         </div>}
         {detail.observaciones && <div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div>}
       </>}
