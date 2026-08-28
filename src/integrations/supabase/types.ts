@@ -1353,7 +1353,7 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
-            referencedColumns: ["unidad_operacion_id"]
+            referencedColumns: ["unidad_vinculada_id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
@@ -2188,6 +2188,7 @@ export type Database = {
           stock_key: string
           sucursal: Database["public"]["Enums"]["sucursal"] | null
           tipo: string | null
+          unidad_operacion_id: string | null
         }
         Insert: {
           carga_id: string
@@ -2206,6 +2207,7 @@ export type Database = {
           stock_key: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           tipo?: string | null
+          unidad_operacion_id?: string | null
         }
         Update: {
           carga_id?: string
@@ -2224,8 +2226,31 @@ export type Database = {
           stock_key?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           tipo?: string | null
+          unidad_operacion_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       parque_ultima_actividad: {
         Row: {
@@ -4101,7 +4126,7 @@ export type Database = {
             columns: ["unidad_id"]
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
-            referencedColumns: ["unidad_operacion_id"]
+            referencedColumns: ["unidad_vinculada_id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
@@ -4255,6 +4280,8 @@ export type Database = {
           sucursal: Database["public"]["Enums"]["sucursal"] | null
           tipo: string | null
           unidad_operacion_id: string | null
+          unidad_vinculada_id: string | null
+          vinculo_persistente: boolean | null
         }
         Relationships: [
           {
@@ -4269,6 +4296,27 @@ export type Database = {
             columns: ["parque_cliente_id"]
             isOneToOne: false
             referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
             referencedColumns: ["id"]
           },
         ]
@@ -4572,6 +4620,10 @@ export type Database = {
       inferir_subgrupo_maquina_notificacion: {
         Args: { p_texto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
+      }
+      maquinaria_asignar_stock: {
+        Args: { p_chasis?: string; p_stock_id: string; p_unidad_id: string }
+        Returns: Json
       }
       maquinaria_importar_historico_pedidos: {
         Args: { p_filas: Json }
