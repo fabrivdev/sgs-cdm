@@ -331,8 +331,8 @@ BEGIN
 END;
 $function$;
 
--- Una unidad cuyo origen es IMPORTAR solo puede ocupar stock luego de que
--- su unidad de importacion vinculada haya sido recibida.
+-- Una unidad cuyo origen es IMPORTAR solo puede ocupar stock cuando el arribo
+-- fue registrado y el chasis coincide exactamente con una fila real de stock.
 CREATE OR REPLACE FUNCTION public.maquinaria_validar_origen_stock()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -352,9 +352,12 @@ BEGIN
     SELECT 1 FROM public.maquinaria_importacion_unidades iu
     WHERE iu.unidad_id = NEW.unidad_operacion_id
       AND iu.activa
+      AND iu.vinculo_manual
       AND iu.ata IS NOT NULL
+      AND public.normalizar_chasis_notificacion(iu.chasis)
+        = public.normalizar_chasis_notificacion(NEW.chasis)
   ) THEN
-    RAISE EXCEPTION 'La maquina importada debe registrarse como recibida antes de entrar al stock'
+    RAISE EXCEPTION 'La maquina importada requiere arribo registrado y coincidencia exacta de chasis para entrar al stock'
       USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
@@ -369,10 +372,15 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_stock_id uuid;
+  v_coincidencias integer;
 BEGIN
   IF TG_OP = 'UPDATE'
      AND OLD.unidad_id IS NOT NULL
-     AND OLD.unidad_id IS DISTINCT FROM NEW.unidad_id THEN
+     AND (
+       OLD.unidad_id IS DISTINCT FROM NEW.unidad_id
+       OR public.normalizar_chasis_notificacion(OLD.chasis)
+          IS DISTINCT FROM public.normalizar_chasis_notificacion(NEW.chasis)
+     ) THEN
     UPDATE public.parque_stock_maquinas
     SET unidad_operacion_id = NULL
     WHERE unidad_operacion_id = OLD.unidad_id
@@ -382,16 +390,15 @@ BEGIN
 
   IF NEW.unidad_id IS NOT NULL
      AND NEW.ata IS NOT NULL
+     AND NEW.vinculo_manual
      AND public.normalizar_chasis_notificacion(NEW.chasis) IS NOT NULL THEN
-    SELECT s.id INTO v_stock_id
+    SELECT count(*), min(s.id::text)::uuid
+    INTO v_coincidencias, v_stock_id
     FROM public.parque_stock_maquinas s
     WHERE public.normalizar_chasis_notificacion(s.chasis)
-      = public.normalizar_chasis_notificacion(NEW.chasis)
-    ORDER BY (s.unidad_operacion_id = NEW.unidad_id) DESC, s.importado_en DESC
-    LIMIT 1
-    FOR UPDATE;
+      = public.normalizar_chasis_notificacion(NEW.chasis);
 
-    IF v_stock_id IS NOT NULL THEN
+    IF v_coincidencias = 1 THEN
       UPDATE public.parque_stock_maquinas
       SET unidad_operacion_id = NEW.unidad_id
       WHERE id = v_stock_id
@@ -409,11 +416,176 @@ AFTER INSERT OR UPDATE OF unidad_id, ata, chasis
 ON public.maquinaria_importacion_unidades
 FOR EACH ROW EXECUTE FUNCTION public.maquinaria_sincronizar_reserva_importada();
 
+-- Al importar el stock del sistema, reserva automaticamente solo si existe una
+-- unica unidad importada, recibida y vinculada con el mismo chasis. Una
+-- coincidencia duplicada se deja sin reserva para revision manual.
+CREATE OR REPLACE FUNCTION public.maquinaria_vincular_stock_importado_recibido()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_unidad_id uuid;
+  v_coincidencias integer;
+  v_abastecimiento text;
+BEGIN
+  IF public.normalizar_chasis_notificacion(NEW.chasis) IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.unidad_operacion_id IS NOT NULL THEN
+    SELECT l.abastecimiento INTO v_abastecimiento
+    FROM public.maquinaria_unidades_operacion u
+    JOIN public.maquinaria_operacion_lineas l ON l.id = u.linea_id
+    WHERE u.id = NEW.unidad_operacion_id;
+    IF v_abastecimiento IS DISTINCT FROM 'IMPORTAR' THEN RETURN NEW; END IF;
+    -- Las reservas IMPORTAR preservadas por el reemplazo de stock tambien
+    -- deben volver a demostrar que el chasis es unico y exacto.
+    NEW.unidad_operacion_id := NULL;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.parque_stock_maquinas s
+    WHERE s.id IS DISTINCT FROM NEW.id
+      AND public.normalizar_chasis_notificacion(s.chasis)
+        = public.normalizar_chasis_notificacion(NEW.chasis)
+  ) THEN
+    UPDATE public.parque_stock_maquinas
+    SET unidad_operacion_id = NULL
+    WHERE id IS DISTINCT FROM NEW.id
+      AND public.normalizar_chasis_notificacion(chasis)
+        = public.normalizar_chasis_notificacion(NEW.chasis)
+      AND unidad_operacion_id IS NOT NULL;
+    NEW.unidad_operacion_id := NULL;
+    RETURN NEW;
+  END IF;
+
+  SELECT count(*), min(iu.unidad_id::text)::uuid
+  INTO v_coincidencias, v_unidad_id
+  FROM public.maquinaria_importacion_unidades iu
+  JOIN public.maquinaria_unidades_operacion u ON u.id = iu.unidad_id
+  JOIN public.maquinaria_operacion_lineas l ON l.id = u.linea_id
+  JOIN public.maquinaria_operaciones o ON o.id = l.operacion_id
+  WHERE iu.activa
+    AND iu.vinculo_manual
+    AND iu.ata IS NOT NULL
+    AND l.abastecimiento = 'IMPORTAR'
+    AND o.estado <> 'CANCELADA'
+    AND public.normalizar_chasis_notificacion(iu.chasis)
+      = public.normalizar_chasis_notificacion(NEW.chasis);
+
+  IF v_coincidencias = 1 AND NOT EXISTS (
+    SELECT 1 FROM public.parque_stock_maquinas s
+    WHERE s.unidad_operacion_id = v_unidad_id
+      AND s.id IS DISTINCT FROM NEW.id
+  ) THEN
+    NEW.unidad_operacion_id := v_unidad_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS maquinaria_asignar_stock_importado_recibido_trigger
+  ON public.parque_stock_maquinas;
+CREATE TRIGGER maquinaria_asignar_stock_importado_recibido_trigger
+BEFORE INSERT OR UPDATE OF chasis
+ON public.parque_stock_maquinas
+FOR EACH ROW EXECUTE FUNCTION public.maquinaria_vincular_stock_importado_recibido();
+
+-- El pedido pasa a disponible recien despues de la confirmacion del stock. Si
+-- una coincidencia deja de ser unica, revierte a en transito.
+CREATE OR REPLACE FUNCTION public.maquinaria_confirmar_stock_importado()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_operacion_id uuid;
+  v_abastecimiento text;
+BEGIN
+  IF TG_OP IN ('UPDATE', 'DELETE')
+     AND OLD.unidad_operacion_id IS NOT NULL
+     AND (TG_OP = 'DELETE' OR OLD.unidad_operacion_id IS DISTINCT FROM NEW.unidad_operacion_id) THEN
+    SELECT l.operacion_id, l.abastecimiento
+    INTO v_operacion_id, v_abastecimiento
+    FROM public.maquinaria_unidades_operacion u
+    JOIN public.maquinaria_operacion_lineas l ON l.id = u.linea_id
+    WHERE u.id = OLD.unidad_operacion_id;
+
+    IF v_abastecimiento = 'IMPORTAR' AND NOT EXISTS (
+      SELECT 1 FROM public.parque_stock_maquinas s
+      WHERE s.unidad_operacion_id = OLD.unidad_operacion_id
+    ) THEN
+      UPDATE public.maquinaria_unidades_operacion
+      SET estado = CASE WHEN estado = 'DISPONIBLE' THEN 'EN_TRANSITO' ELSE estado END,
+          actualizado_en = now()
+      WHERE id = OLD.unidad_operacion_id;
+      UPDATE public.maquinaria_operaciones
+      SET estado = CASE WHEN estado = 'DISPONIBLE' THEN 'EN_IMPORTACION' ELSE estado END,
+          actualizado_en = now()
+      WHERE id = v_operacion_id;
+    END IF;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  IF NEW.unidad_operacion_id IS NULL THEN RETURN NEW; END IF;
+
+  SELECT l.operacion_id, l.abastecimiento
+  INTO v_operacion_id, v_abastecimiento
+  FROM public.maquinaria_unidades_operacion u
+  JOIN public.maquinaria_operacion_lineas l ON l.id = u.linea_id
+  WHERE u.id = NEW.unidad_operacion_id;
+
+  IF v_abastecimiento <> 'IMPORTAR' OR NOT EXISTS (
+    SELECT 1
+    FROM public.maquinaria_importacion_unidades iu
+    WHERE iu.unidad_id = NEW.unidad_operacion_id
+      AND iu.activa
+      AND iu.vinculo_manual
+      AND iu.ata IS NOT NULL
+      AND public.normalizar_chasis_notificacion(iu.chasis)
+        = public.normalizar_chasis_notificacion(NEW.chasis)
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  UPDATE public.maquinaria_unidades_operacion
+  SET chasis = coalesce(nullif(btrim(chasis), ''), NEW.chasis),
+      estado = CASE WHEN estado IN ('PENDIENTE','EN_TRANSITO') THEN 'DISPONIBLE' ELSE estado END,
+      actualizado_en = now()
+  WHERE id = NEW.unidad_operacion_id;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.maquinaria_operacion_lineas l
+    JOIN public.maquinaria_unidades_operacion u ON u.linea_id = l.id
+    LEFT JOIN public.parque_stock_maquinas s ON s.unidad_operacion_id = u.id
+    WHERE l.operacion_id = v_operacion_id
+      AND l.abastecimiento IN ('STOCK','IMPORTAR')
+      AND s.id IS NULL
+  ) THEN
+    UPDATE public.maquinaria_operaciones
+    SET estado = CASE WHEN estado IN ('FACTURADA','CERRADA','CANCELADA') THEN estado ELSE 'DISPONIBLE' END,
+        actualizado_en = now()
+    WHERE id = v_operacion_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS maquinaria_confirmar_stock_importado_trigger
+  ON public.parque_stock_maquinas;
+CREATE TRIGGER maquinaria_confirmar_stock_importado_trigger
+AFTER INSERT OR DELETE OR UPDATE OF unidad_operacion_id
+ON public.parque_stock_maquinas
+FOR EACH ROW EXECUTE FUNCTION public.maquinaria_confirmar_stock_importado();
+
 CREATE OR REPLACE FUNCTION public.maquinaria_recibir_unidad_importacion(
   p_importacion_unidad_id uuid,
-  p_fecha date,
-  p_sucursal public.sucursal,
-  p_deposito text
+  p_fecha date
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -422,20 +594,14 @@ SET search_path = public, pg_temp
 AS $function$
 DECLARE
   v_unidad public.maquinaria_importacion_unidades%ROWTYPE;
-  v_linea public.maquinaria_importacion_lineas%ROWTYPE;
-  v_marca public.marca;
-  v_condicion text;
   v_stock_id uuid;
-  v_stock_unidad uuid;
-  v_stock_key text;
-  v_producto_codigo text;
 BEGIN
   IF NOT public.maquinaria_puede_gestionar_flujo() THEN
     RAISE EXCEPTION 'Solo admin o jefatura pueden recibir importaciones'
       USING ERRCODE = '42501';
   END IF;
-  IF p_fecha IS NULL OR p_sucursal IS NULL THEN
-    RAISE EXCEPTION 'La fecha y sucursal de recepcion son obligatorias';
+  IF p_fecha IS NULL THEN
+    RAISE EXCEPTION 'La fecha de arribo es obligatoria';
   END IF;
 
   SELECT * INTO v_unidad
@@ -447,36 +613,6 @@ BEGIN
     RAISE EXCEPTION 'Carga el chasis antes de registrar el arribo';
   END IF;
 
-  SELECT * INTO v_linea
-  FROM public.maquinaria_importacion_lineas
-  WHERE id = v_unidad.importacion_linea_id;
-
-  SELECT coalesce(l.marca, v_linea.marca_importacion), l.condicion
-  INTO v_marca, v_condicion
-  FROM public.maquinaria_operacion_lineas l
-  WHERE l.id = v_unidad.linea_id;
-  v_marca := coalesce(v_marca, v_linea.marca_importacion, 'OTROS'::public.marca);
-  v_condicion := coalesce(v_condicion, 'NUEVA');
-  v_stock_key := 'CHASIS:' || public.normalizar_chasis_notificacion(v_unidad.chasis);
-  v_producto_codigo := coalesce(
-    nullif(btrim(v_linea.llave_interna), ''),
-    nullif(btrim(v_linea.source_id), ''),
-    'IMPORTACION-' || v_unidad.id::text
-  );
-
-  SELECT s.id, s.unidad_operacion_id INTO v_stock_id, v_stock_unidad
-  FROM public.parque_stock_maquinas s
-  WHERE public.normalizar_chasis_notificacion(s.chasis)
-    = public.normalizar_chasis_notificacion(v_unidad.chasis)
-  ORDER BY (s.unidad_operacion_id = v_unidad.unidad_id) DESC, s.importado_en DESC
-  LIMIT 1
-  FOR UPDATE;
-
-  IF v_stock_unidad IS NOT NULL
-     AND v_stock_unidad IS DISTINCT FROM v_unidad.unidad_id THEN
-    RAISE EXCEPTION 'El chasis ya esta reservado para otro pedido';
-  END IF;
-
   UPDATE public.maquinaria_importacion_unidades
   SET ata = p_fecha,
       estado_fuente = 'RECIBIDA',
@@ -484,67 +620,35 @@ BEGIN
       actualizado_en = now()
   WHERE id = v_unidad.id;
 
-  IF v_stock_id IS NULL THEN
-    INSERT INTO public.parque_stock_maquinas (
-      producto_codigo, stock_key, source_row, sucursal, filial_original,
-      deposito, tipo, marca, modelo, estado, chasis, saldo_actual, carga_id,
-      datos_fuente, unidad_operacion_id, importado_en
-    ) VALUES (
-      v_producto_codigo, v_stock_key, NULL, p_sucursal, NULL,
-      nullif(btrim(p_deposito), ''), v_linea.producto, v_marca::text,
-      v_linea.modelo, CASE WHEN v_condicion = 'USADA' THEN 'Usado' ELSE 'Nuevo' END,
-      v_unidad.chasis, 1, gen_random_uuid(),
-      jsonb_build_object(
-        'origen', 'RECEPCION_IMPORTACION',
-        'importacion_unidad_id', v_unidad.id,
-        'importacion_linea_id', v_linea.id
-      ),
-      v_unidad.unidad_id, now()
-    ) RETURNING id INTO v_stock_id;
-  ELSE
-    UPDATE public.parque_stock_maquinas
-    SET sucursal = p_sucursal,
-        deposito = nullif(btrim(p_deposito), ''),
-        saldo_actual = greatest(saldo_actual, 1),
-        unidad_operacion_id = v_unidad.unidad_id,
-        importado_en = now()
-    WHERE id = v_stock_id;
-  END IF;
-
-  IF v_unidad.unidad_id IS NOT NULL THEN
-    UPDATE public.maquinaria_unidades_operacion
-    SET chasis = coalesce(nullif(btrim(chasis), ''), v_unidad.chasis),
-        estado = CASE WHEN estado IN ('PENDIENTE','EN_TRANSITO') THEN 'DISPONIBLE' ELSE estado END,
-        actualizado_en = now()
-    WHERE id = v_unidad.unidad_id;
-  END IF;
-
   IF v_unidad.operacion_id IS NOT NULL THEN
     UPDATE public.maquinaria_importaciones_operativas
-    SET estado = 'RECIBIDA', actualizado_en = now()
+    SET estado = CASE
+          WHEN NOT EXISTS (
+            SELECT 1
+            FROM public.maquinaria_importacion_unidades pendiente
+            WHERE pendiente.operacion_id = v_unidad.operacion_id
+              AND pendiente.activa
+              AND pendiente.ata IS NULL
+          ) THEN 'RECIBIDA'
+          ELSE 'EN_TRANSITO'
+        END,
+        actualizado_en = now()
     WHERE operacion_id = v_unidad.operacion_id;
 
-    IF NOT EXISTS (
-      SELECT 1
-      FROM public.maquinaria_operacion_lineas l
-      JOIN public.maquinaria_unidades_operacion u ON u.linea_id = l.id
-      LEFT JOIN public.parque_stock_maquinas s ON s.unidad_operacion_id = u.id
-      WHERE l.operacion_id = v_unidad.operacion_id
-        AND l.abastecimiento IN ('STOCK','IMPORTAR')
-        AND s.id IS NULL
-    ) THEN
-      UPDATE public.maquinaria_operaciones
-      SET estado = CASE WHEN estado IN ('FACTURADA','CERRADA') THEN estado ELSE 'DISPONIBLE' END,
-          actualizado_en = now()
-      WHERE id = v_unidad.operacion_id;
-    END IF;
   END IF;
+
+  SELECT min(s.id::text)::uuid INTO v_stock_id
+  FROM public.parque_stock_maquinas s
+  WHERE s.unidad_operacion_id = v_unidad.unidad_id
+    AND public.normalizar_chasis_notificacion(s.chasis)
+      = public.normalizar_chasis_notificacion(v_unidad.chasis);
 
   RETURN jsonb_build_object(
     'importacion_unidad_id', v_unidad.id,
     'stock_id', v_stock_id,
     'unidad_operacion_id', v_unidad.unidad_id,
-    'reservada', v_unidad.unidad_id IS NOT NULL
+    'stock_confirmado', v_stock_id IS NOT NULL,
+    'reservada', v_stock_id IS NOT NULL AND v_unidad.unidad_id IS NOT NULL
   );
 END;
 $function$;
@@ -552,11 +656,11 @@ $function$;
 REVOKE ALL ON FUNCTION public.maquinaria_puede_gestionar_flujo() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.maquinaria_actualizar_operacion(uuid, jsonb, jsonb) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.maquinaria_guardar_importacion(uuid, jsonb) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.maquinaria_recibir_unidad_importacion(uuid, date, public.sucursal, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.maquinaria_recibir_unidad_importacion(uuid, date) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.maquinaria_puede_gestionar_flujo() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.maquinaria_actualizar_operacion(uuid, jsonb, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.maquinaria_guardar_importacion(uuid, jsonb) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.maquinaria_recibir_unidad_importacion(uuid, date, public.sucursal, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.maquinaria_recibir_unidad_importacion(uuid, date) TO authenticated;
 
 DROP VIEW IF EXISTS public.maquinaria_importacion_unidades_operativas;
 CREATE VIEW public.maquinaria_importacion_unidades_operativas

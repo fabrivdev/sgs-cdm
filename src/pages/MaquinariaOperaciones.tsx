@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileCheck2, FileText, PackagePlus, Paperclip, PackageCheck, Pencil, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Pencil, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +26,6 @@ import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
-import { SUCURSALES } from "@/lib/constants";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -858,7 +857,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const [saving, setSaving] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [form, setForm] = useState({ chasis: "", eta: "", invoice_supplier: "", factura_proveedor_fecha: "", costo_final: "" });
-  const [receipt, setReceipt] = useState({ fecha: TODAY, sucursal: SUCURSALES[0], deposito: "" });
+  const [receipt, setReceipt] = useState({ fecha: TODAY });
   useEffect(() => {
     setEditing(false);
     setForm({
@@ -867,8 +866,8 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
       factura_proveedor_fecha: row?.factura_proveedor_fecha ?? "",
       costo_final: row?.costo_final == null ? "" : String(row.costo_final),
     });
-    setReceipt({ fecha: row?.ata ?? TODAY, sucursal: (SUCURSALES.includes(row?.stock_sucursal as any) ? row?.stock_sucursal : SUCURSALES[0]) as typeof SUCURSALES[number], deposito: row?.stock_deposito ?? "" });
-  }, [row?.id, row?.chasis, row?.eta, row?.ata, row?.invoice_supplier, row?.factura_proveedor_fecha, row?.costo_final, row?.stock_sucursal, row?.stock_deposito]);
+    setReceipt({ fecha: row?.ata ?? TODAY });
+  }, [row?.id, row?.chasis, row?.eta, row?.ata, row?.invoice_supplier, row?.factura_proveedor_fecha, row?.costo_final]);
   if (!row) return null;
   const arrival = arrivalState(row);
   const saveUnit = async () => {
@@ -896,14 +895,14 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const receiveUnit = async () => {
     setReceiving(true);
     try {
-      const { error } = await db.rpc("maquinaria_recibir_unidad_importacion", {
+      const { data, error } = await db.rpc("maquinaria_recibir_unidad_importacion", {
         p_importacion_unidad_id: row.id,
         p_fecha: receipt.fecha,
-        p_sucursal: receipt.sucursal,
-        p_deposito: receipt.deposito.trim() || null,
       });
       if (error) throw error;
-      toast.success(row.ata ? "Recepción actualizada y reserva conservada" : "Máquina recibida, ingresada al stock y reservada");
+      toast.success(data?.stock_confirmado
+        ? "Arribo registrado; el chasis ya fue confirmado por el stock del sistema y quedó reservado."
+        : "Arribo registrado. Queda pendiente hasta que el chasis aparezca en el stock importado del sistema.");
       onSaved();
     } catch (error: any) {
       toast.error(error?.message ?? "No se pudo registrar la recepción");
@@ -930,7 +929,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       {editing && <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">Datos propios de esta máquina</h3><p className="text-[10px] text-muted-foreground">Estos valores no se aplican a las demás unidades del lote.</p></div><div className="grid gap-2 sm:grid-cols-2"><Field label="Chasis"><Input value={form.chasis} onChange={(e) => setForm((v) => ({ ...v, chasis: e.target.value }))} /></Field><Field label="Factura proveedor"><Input value={form.invoice_supplier} onChange={(e) => setForm((v) => ({ ...v, invoice_supplier: e.target.value }))} /></Field><Field label="Fecha factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(e) => setForm((v) => ({ ...v, factura_proveedor_fecha: e.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(e) => setForm((v) => ({ ...v, costo_final: e.target.value }))} /></Field><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(e) => setForm((v) => ({ ...v, eta: e.target.value }))} /></Field></div><div className="mt-3 flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar unidad"}</Button></div></section>}
-      {canEdit && <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">{row.ata ? "Recepción registrada" : "Registrar llegada al stock"}</h3><p className="text-[10px] text-muted-foreground">Al confirmar, esta máquina entra al stock físico. Si ya tiene pedido, queda reservada para ese pedido.</p></div><div className="grid gap-2 sm:grid-cols-3"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt((value) => ({ ...value, fecha: event.target.value }))} /></Field><Field label="Sucursal"><CompactSelect value={receipt.sucursal} values={SUCURSALES} onChange={(sucursal) => setReceipt((value) => ({ ...value, sucursal: sucursal as typeof SUCURSALES[number] }))} /></Field><Field label="Depósito"><Input value={receipt.deposito} onChange={(event) => setReceipt((value) => ({ ...value, deposito: event.target.value }))} /></Field></div><div className="mt-3 flex justify-end"><Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackagePlus className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : row.ata ? "Actualizar recepción" : "Recibir en stock"}</Button></div>{!row.chasis && <p className="mt-2 text-[10px] text-amber-700">Primero guardá el chasis de esta máquina.</p>}</section>}
+      {canEdit && <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">{row.ata ? "Arribo registrado" : "Registrar arribo"}</h3><p className="text-[10px] text-muted-foreground">Registrar el arribo no crea stock. La máquina ingresará y, si corresponde, quedará reservada solo cuando una importación del stock del sistema contenga una coincidencia única y exacta de este chasis.</p></div><div className="max-w-xs"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt({ fecha: event.target.value })} /></Field></div><div className="mt-3 flex justify-end"><Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackageCheck className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : row.ata ? "Actualizar arribo" : "Registrar arribo"}</Button></div>{!row.chasis && <p className="mt-2 text-[10px] text-amber-700">Primero guardá el chasis de esta máquina.</p>}</section>}
       {groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter>
