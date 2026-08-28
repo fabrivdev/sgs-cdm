@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Eye, FileCheck2, FileText, PackagePlus, Paperclip, PackageCheck, Pencil, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,6 +26,7 @@ import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { SUCURSALES } from "@/lib/constants";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -225,6 +226,7 @@ type ImportRow = {
   vinculo_manual: boolean; detalle_manual: boolean;
 };
 type DraftLine = {
+  id?: string;
   linea_numero: number; marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
   anio?: number | null; cabezal?: string;
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
@@ -243,11 +245,21 @@ type ImportAssignmentRow = {
   chasis: string | null; situacion_vinculo: string | null; vinculo_manual: boolean;
   invoice_supplier: string | null; factura_proveedor_fecha: string | null; costo_final: number | null;
 };
+type ImportDraft = {
+  marca: "CLAAS" | "HORSCH" | "OTROS"; proveedor: string; producto: string; modelo: string;
+  cantidad: number; estado_fuente: string; np_numero: string; oc: string; po: string; eta: string;
+  transporte: string; origen: string; destino: string; notas: string;
+};
 type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; docs: any[]; importation?: any };
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
   anio: null, cabezal: "", condicion: "NUEVA", abastecimiento: "DEFINIR", subgrupo: "OTRO", chasis: [],
+});
+const blankImport = (): ImportDraft => ({
+  marca: "CLAAS", proveedor: "", producto: "", modelo: "", cantidad: 1,
+  estado_fuente: "PLANIFICADA", np_numero: "", oc: "", po: "", eta: "",
+  transporte: "", origen: "", destino: "", notas: "",
 });
 
 function formatDate(value?: string | null) {
@@ -384,6 +396,9 @@ export default function MaquinariaOperaciones() {
   const [situacion, setSituacion] = useState("TODOS");
   const [entrega, setEntrega] = useState<EntregaState | "TODOS">("TODOS");
   const [newOpen, setNewOpen] = useState(false);
+  const [editingOperationId, setEditingOperationId] = useState<string | null>(null);
+  const [importFormOpen, setImportFormOpen] = useState(false);
+  const [editingImport, setEditingImport] = useState<ImportRow | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedImport, setSelectedImport] = useState<ImportRow | null>(null);
 
@@ -527,7 +542,9 @@ export default function MaquinariaOperaciones() {
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
       meta={importsView ? "Qué está planificado y qué ya llegó, con su situación comercial." : "Qué pedidos faltan facturar y cuáles ya se completaron."}
-      actions={!importsView ? <Button size="sm" onClick={() => setNewOpen(true)}><Plus className="mr-1.5 h-4 w-4" />Nuevo pedido</Button> : undefined}
+      actions={importsView
+        ? <Button size="sm" onClick={() => { setEditingImport(null); setImportFormOpen(true); }}><Plus className="mr-1.5 h-4 w-4" />Nueva importación</Button>
+        : <Button size="sm" onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="mr-1.5 h-4 w-4" />Nuevo pedido</Button>}
     />
     {importsView ? (
       <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
@@ -654,10 +671,17 @@ export default function MaquinariaOperaciones() {
         {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "pedidos"} con estos filtros.</div>}
       </>}
     </Panel>
-    <NewOperationDrawer open={newOpen} onOpenChange={setNewOpen} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
-    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); }} />
+    <NewOperationDrawer operationId={editingOperationId} open={newOpen} onOpenChange={(open) => { setNewOpen(open); if (!open) setEditingOperationId(null); }} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
+    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onEdit={(id) => { setSelected(null); setEditingOperationId(id); setNewOpen(true); }} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); }} />
+    <ImportFormDrawer
+      open={importFormOpen}
+      row={editingImport}
+      onOpenChange={(open) => { setImportFormOpen(open); if (!open) setEditingImport(null); }}
+      onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations", "imports"] })}
+    />
     <ImportDetailDrawer
       row={selectedImport}
+      onEditHeader={(importRow) => { setSelectedImport(null); setEditingImport(importRow); setImportFormOpen(true); }}
       onOpenChange={(open) => !open && setSelectedImport(null)}
       onSaved={() => {
         setSelectedImport(null);
@@ -767,21 +791,79 @@ function AttachDocumentButton({ operationId, onUploaded, disabledTitle }: { oper
   </>;
 }
 
-function ImportDetailDrawer({ row, onOpenChange, onSaved }: { row: ImportRow | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
+function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean; row: ImportRow | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
+  const [form, setForm] = useState<ImportDraft>(blankImport());
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setForm(row ? {
+      marca: safeMarca(row.marca), proveedor: row.proveedor ?? "", producto: row.producto ?? "",
+      modelo: row.modelo ?? "", cantidad: Math.max(1, Number(row.cantidad_lote) || 1),
+      estado_fuente: row.estado_fuente ?? "PLANIFICADA", np_numero: row.np_numero ?? "",
+      oc: row.oc ?? "", po: row.po ?? "", eta: row.eta ?? "", transporte: (row as any).transporte ?? "",
+      origen: (row as any).origen ?? "", destino: (row as any).destino ?? "", notas: (row as any).notas ?? "",
+    } : blankImport());
+  }, [open, row]);
+  const save = async () => {
+    if (!form.producto.trim() && !form.modelo.trim()) return toast.error("Ingresá el producto o modelo");
+    setSaving(true);
+    try {
+      const { error } = await db.rpc("maquinaria_guardar_importacion", {
+        p_importacion_id: row?.importacion_linea_id ?? null,
+        p_datos: form,
+      });
+      if (error) throw error;
+      toast.success(row ? "Importación actualizada" : "Importación creada y desglosada por unidad");
+      onSaved(); onOpenChange(false);
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo guardar la importación");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
+    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{row ? "Editar importación" : "Nueva importación"}</h2><p className="text-[11px] text-muted-foreground">La cantidad se desglosa automáticamente en máquinas físicas independientes.</p></ResponsiveDrawerHeader>
+    <ResponsiveDrawerBody className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Marca"><CompactSelect value={form.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(marca) => setForm((value) => ({ ...value, marca: marca as ImportDraft["marca"] }))} /></Field>
+        <Field label="Proveedor"><Input value={form.proveedor} onChange={(event) => setForm((value) => ({ ...value, proveedor: event.target.value }))} /></Field>
+        <Field label="Producto / tipo"><Input value={form.producto} onChange={(event) => setForm((value) => ({ ...value, producto: event.target.value }))} /></Field>
+        <Field label="Modelo"><Input value={form.modelo} onChange={(event) => setForm((value) => ({ ...value, modelo: event.target.value }))} /></Field>
+        <Field label="Cantidad"><Input type="number" min={1} max={500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.max(1, Number(event.target.value) || 1) }))} /></Field>
+        <Field label="Estado"><Input value={form.estado_fuente} onChange={(event) => setForm((value) => ({ ...value, estado_fuente: event.target.value }))} placeholder="PLANIFICADA / EN TRANSITO" /></Field>
+        <Field label="NP de referencia"><Input value={form.np_numero} onChange={(event) => setForm((value) => ({ ...value, np_numero: event.target.value }))} /></Field>
+        <Field label="OC"><Input value={form.oc} onChange={(event) => setForm((value) => ({ ...value, oc: event.target.value }))} /></Field>
+        <Field label="PO"><Input value={form.po} onChange={(event) => setForm((value) => ({ ...value, po: event.target.value }))} /></Field>
+        <Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field>
+        <Field label="Transporte"><Input value={form.transporte} onChange={(event) => setForm((value) => ({ ...value, transporte: event.target.value }))} /></Field>
+        <Field label="Origen"><Input value={form.origen} onChange={(event) => setForm((value) => ({ ...value, origen: event.target.value }))} /></Field>
+        <Field label="Destino"><Input value={form.destino} onChange={(event) => setForm((value) => ({ ...value, destino: event.target.value }))} /></Field>
+      </div>
+      <Field label="Notas"><Textarea rows={3} value={form.notas} onChange={(event) => setForm((value) => ({ ...value, notas: event.target.value }))} /></Field>
+      {row && <p className="rounded-lg bg-muted/50 p-3 text-[11px] text-muted-foreground">Los chasis, facturas, costos y fechas de arribo se editan por cada máquina física desde su detalle.</p>}
+    </ResponsiveDrawerBody>
+    <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving}>{saving ? "Guardando..." : row ? "Guardar cambios" : "Crear importación"}</Button></ResponsiveDrawerFooter>
+  </ResponsiveDrawer>;
+}
+
+function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row: ImportRow | null; onOpenChange: (open: boolean) => void; onEditHeader: (row: ImportRow) => void; onSaved: () => void }) {
   const { isAdmin, roles } = useAuth();
   const canEdit = isAdmin || roles.includes("jefatura");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ chasis: "", eta: "", ata: "", invoice_supplier: "", factura_proveedor_fecha: "", costo_final: "" });
+  const [receiving, setReceiving] = useState(false);
+  const [form, setForm] = useState({ chasis: "", eta: "", invoice_supplier: "", factura_proveedor_fecha: "", costo_final: "" });
+  const [receipt, setReceipt] = useState({ fecha: TODAY, sucursal: SUCURSALES[0], deposito: "" });
   useEffect(() => {
     setEditing(false);
     setForm({
-      chasis: row?.chasis ?? "", eta: row?.eta ?? "", ata: row?.ata ?? "",
+      chasis: row?.chasis ?? "", eta: row?.eta ?? "",
       invoice_supplier: row?.invoice_supplier ?? "",
       factura_proveedor_fecha: row?.factura_proveedor_fecha ?? "",
       costo_final: row?.costo_final == null ? "" : String(row.costo_final),
     });
-  }, [row?.id, row?.chasis, row?.eta, row?.ata, row?.invoice_supplier, row?.factura_proveedor_fecha, row?.costo_final]);
+    setReceipt({ fecha: row?.ata ?? TODAY, sucursal: (SUCURSALES.includes(row?.stock_sucursal as any) ? row?.stock_sucursal : SUCURSALES[0]) as typeof SUCURSALES[number], deposito: row?.stock_deposito ?? "" });
+  }, [row?.id, row?.chasis, row?.eta, row?.ata, row?.invoice_supplier, row?.factura_proveedor_fecha, row?.costo_final, row?.stock_sucursal, row?.stock_deposito]);
   if (!row) return null;
   const arrival = arrivalState(row);
   const saveUnit = async () => {
@@ -790,7 +872,6 @@ function ImportDetailDrawer({ row, onOpenChange, onSaved }: { row: ImportRow | n
       const { error } = await db.from("maquinaria_importacion_unidades").update({
         chasis: form.chasis.trim() || null,
         eta: form.eta || null,
-        ata: form.ata || null,
         invoice_supplier: form.invoice_supplier.trim() || null,
         factura_proveedor_fecha: form.factura_proveedor_fecha || null,
         costo_final: form.costo_final === "" ? null : Number(form.costo_final),
@@ -805,6 +886,24 @@ function ImportDetailDrawer({ row, onOpenChange, onSaved }: { row: ImportRow | n
       toast.error(error?.message ?? "No se pudo actualizar la máquina importada");
     } finally {
       setSaving(false);
+    }
+  };
+  const receiveUnit = async () => {
+    setReceiving(true);
+    try {
+      const { error } = await db.rpc("maquinaria_recibir_unidad_importacion", {
+        p_importacion_unidad_id: row.id,
+        p_fecha: receipt.fecha,
+        p_sucursal: receipt.sucursal,
+        p_deposito: receipt.deposito.trim() || null,
+      });
+      if (error) throw error;
+      toast.success(row.ata ? "Recepción actualizada y reserva conservada" : "Máquina recibida, ingresada al stock y reservada");
+      onSaved();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo registrar la recepción");
+    } finally {
+      setReceiving(false);
     }
   };
   const groups = [
@@ -825,10 +924,12 @@ function ImportDetailDrawer({ row, onOpenChange, onSaved }: { row: ImportRow | n
       </div>
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
-      {editing && <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">Datos propios de esta máquina</h3><p className="text-[10px] text-muted-foreground">Estos valores no se aplican a las demás unidades del lote.</p></div><div className="grid gap-2 sm:grid-cols-2"><Field label="Chasis"><Input value={form.chasis} onChange={(e) => setForm((v) => ({ ...v, chasis: e.target.value }))} /></Field><Field label="Factura proveedor"><Input value={form.invoice_supplier} onChange={(e) => setForm((v) => ({ ...v, invoice_supplier: e.target.value }))} /></Field><Field label="Fecha factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(e) => setForm((v) => ({ ...v, factura_proveedor_fecha: e.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(e) => setForm((v) => ({ ...v, costo_final: e.target.value }))} /></Field><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(e) => setForm((v) => ({ ...v, eta: e.target.value }))} /></Field><Field label="Arribo real"><Input type="date" value={form.ata} onChange={(e) => setForm((v) => ({ ...v, ata: e.target.value }))} /></Field></div><div className="mt-3 flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar unidad"}</Button></div></section>}
+      {editing && <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">Datos propios de esta máquina</h3><p className="text-[10px] text-muted-foreground">Estos valores no se aplican a las demás unidades del lote.</p></div><div className="grid gap-2 sm:grid-cols-2"><Field label="Chasis"><Input value={form.chasis} onChange={(e) => setForm((v) => ({ ...v, chasis: e.target.value }))} /></Field><Field label="Factura proveedor"><Input value={form.invoice_supplier} onChange={(e) => setForm((v) => ({ ...v, invoice_supplier: e.target.value }))} /></Field><Field label="Fecha factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(e) => setForm((v) => ({ ...v, factura_proveedor_fecha: e.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(e) => setForm((v) => ({ ...v, costo_final: e.target.value }))} /></Field><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(e) => setForm((v) => ({ ...v, eta: e.target.value }))} /></Field></div><div className="mt-3 flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar unidad"}</Button></div></section>}
+      {canEdit && <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">{row.ata ? "Recepción registrada" : "Registrar llegada al stock"}</h3><p className="text-[10px] text-muted-foreground">Al confirmar, esta máquina entra al stock físico. Si ya tiene pedido, queda reservada para ese pedido.</p></div><div className="grid gap-2 sm:grid-cols-3"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt((value) => ({ ...value, fecha: event.target.value }))} /></Field><Field label="Sucursal"><CompactSelect value={receipt.sucursal} values={SUCURSALES} onChange={(sucursal) => setReceipt((value) => ({ ...value, sucursal: sucursal as typeof SUCURSALES[number] }))} /></Field><Field label="Depósito"><Input value={receipt.deposito} onChange={(event) => setReceipt((value) => ({ ...value, deposito: event.target.value }))} /></Field></div><div className="mt-3 flex justify-end"><Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackagePlus className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : row.ata ? "Actualizar recepción" : "Recibir en stock"}</Button></div>{!row.chasis && <p className="mt-2 text-[10px] text-amber-700">Primero guardá el chasis de esta máquina.</p>}</section>}
       {groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter>
+      {canEdit && <Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button>}
       {canEdit && <Button variant="outline" size="sm" onClick={() => setEditing((value) => !value)}>{editing ? "Cerrar edición" : "Editar esta máquina"}</Button>}
       <AttachDocumentButton
         operationId={row.operacion_id}
@@ -839,7 +940,7 @@ function ImportDetailDrawer({ row, onOpenChange, onSaved }: { row: ImportRow | n
   </ResponsiveDrawer>;
 }
 
-function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
+function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { operationId: string | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -848,7 +949,46 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
   const [extracted, setExtracted] = useState<any>({});
   const [form, setForm] = useState({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" });
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
-  useEffect(() => { if (!open) return; setFile(null); setExtracted({}); setForm({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" }); setLines([blankLine()]); }, [open]);
+  const editQuery = useQuery({
+    queryKey: ["machine-operation-edit", operationId],
+    enabled: open && !!operationId,
+    queryFn: async () => {
+      const [operation, summary, existingLines] = await Promise.all([
+        db.from("maquinaria_operaciones").select("id,np_numero,np_fecha,cliente_id,cliente_nombre,comercial,observaciones").eq("id", operationId).single(),
+        db.from("maquinaria_operaciones_resumen").select("cliente_nombre").eq("id", operationId).single(),
+        db.from("maquinaria_operacion_lineas").select("*").eq("operacion_id", operationId).order("linea_numero"),
+      ]);
+      if (operation.error) throw operation.error;
+      if (existingLines.error) throw existingLines.error;
+      return { operation: { ...operation.data, cliente_nombre: summary.data?.cliente_nombre ?? operation.data.cliente_nombre }, lines: existingLines.data ?? [] };
+    },
+  });
+  useEffect(() => {
+    if (!open) return;
+    setFile(null); setExtracted({});
+    if (operationId) {
+      if (!editQuery.data) return;
+      const operation = editQuery.data.operation;
+      setForm({
+        np_numero: operation.np_numero ?? "", np_fecha: operation.np_fecha ?? "",
+        cliente_nombre: operation.cliente_nombre ?? "", comercial: operation.comercial ?? "",
+        observaciones: operation.observaciones ?? "",
+      });
+      setLines(editQuery.data.lines.map((line: any, index: number) => ({
+        id: line.id, linea_numero: index + 1, marca: safeMarca(line.marca),
+        producto: line.producto ?? "", modelo: line.modelo ?? "",
+        anio: line.datos_extraidos?.anio ?? null, cabezal: line.datos_extraidos?.cabezal ?? "",
+        cantidad: Math.max(1, Number(line.cantidad) || 1),
+        condicion: line.condicion === "USADA" ? "USADA" : "NUEVA",
+        abastecimiento: ["STOCK", "IMPORTAR"].includes(line.abastecimiento) ? line.abastecimiento : "DEFINIR",
+        subgrupo: safeSubgroup(line.subgrupo), chasis: [],
+        confianza: line.confianza_extraccion ?? {}, datos_extraidos: line.datos_extraidos ?? {},
+      })));
+      return;
+    }
+    setForm({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" });
+    setLines([blankLine()]);
+  }, [open, operationId, editQuery.data]);
   useEffect(() => {
     if (!file) { setPreviewUrl(null); return undefined; }
     const url = URL.createObjectURL(file);
@@ -883,23 +1023,25 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
     if (lines.some((l) => !l.producto.trim() && !l.modelo.trim())) return toast.error("Cada línea necesita producto o modelo");
     setSaving(true);
     try {
-      const operationId = crypto.randomUUID();
+      const targetOperationId = operationId ?? crypto.randomUUID();
       const linesForSave = lines.map((line) => ({
         ...line,
         datos_extraidos: { ...(line.datos_extraidos ?? {}), anio: line.anio ?? null, cabezal: line.cabezal || null },
       }));
-      const { data, error } = await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: operationId, ...form }, p_lineas: linesForSave });
+      const { data, error } = operationId
+        ? await db.rpc("maquinaria_actualizar_operacion", { p_operacion_id: operationId, p_operacion: form, p_lineas: linesForSave })
+        : await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: targetOperationId, ...form }, p_lineas: linesForSave });
       if (error) throw error;
       if (file) {
-        try { await uploadEvidence(file, data ?? operationId, "NP", extracted); }
+        try { await uploadEvidence(file, data ?? targetOperationId, "NP", extracted); }
         catch (uploadError) { console.error(uploadError); toast.warning("La operación se guardó, pero el archivo no pudo adjuntarse."); }
       }
-      toast.success("NP validada y operación creada"); onSaved(); onOpenChange(false);
+      toast.success(operationId ? "Pedido actualizado" : "NP validada y operación creada"); onSaved(); onOpenChange(false);
     } catch (error: any) { toast.error(error?.message ?? "No se pudo guardar la operación"); }
     finally { setSaving(false); }
   };
   return <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="xl">
-    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">Nuevo pedido</h2><p className="text-[11px] text-muted-foreground">Subí la foto de la NP, verificá lo leído y completá solamente lo faltante.</p></ResponsiveDrawerHeader>
+    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{operationId ? "Editar pedido" : "Nuevo pedido"}</h2><p className="text-[11px] text-muted-foreground">{operationId ? "Corregí los datos sin perder las unidades ni sus vínculos." : "Subí la foto de la NP, verificá lo leído y completá solamente lo faltante."}</p></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
       <div className="flex items-center gap-2 rounded-xl border border-dashed p-3">
@@ -914,11 +1056,11 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
       <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"], modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => v !== "SUELO")} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Producto / tipo"><Input value={line.producto} onChange={(e) => updateLine(i, { producto: e.target.value })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
     </ResponsiveDrawerBody>
-    <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading}>{saving ? "Guardando..." : "Validar y crear"}</Button></ResponsiveDrawerFooter>
+    <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>
   </ResponsiveDrawer>;
 }
 
-function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onChanged: () => void }) {
+function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const { isAdmin, roles } = useAuth();
   // Edicion de chasis (manual o via "Subir factura"): protegida tambien por
   // un trigger en la base (guard_chasis_edit_trigger) -- esto es solo la
@@ -1159,6 +1301,7 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
       </>}
     </ResponsiveDrawerBody>
     {detail && <ResponsiveDrawerFooter>
+      {canEditChasis && operationId && <Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button>}
       <AttachDocumentButton operationId={operationId} onUploaded={() => detailQuery.refetch()} />
     </ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
