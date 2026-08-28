@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Plus, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -636,7 +637,7 @@ export default function MaquinariaOperaciones() {
       </>}
     </Panel>
     <NewOperationDrawer open={newOpen} onOpenChange={setNewOpen} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
-    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onChanged={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
+    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); }} />
     <ImportDetailDrawer row={selectedImport} onOpenChange={(open) => !open && setSelectedImport(null)} />
   </main>;
 }
@@ -854,10 +855,17 @@ function NewOperationDrawer({ open, onOpenChange, onSaved }: { open: boolean; on
 }
 
 function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onChanged: () => void }) {
+  const { isAdmin, roles } = useAuth();
+  // Edicion de chasis (manual o via "Subir factura"): protegida tambien por
+  // un trigger en la base (guard_chasis_edit_trigger) -- esto es solo la
+  // capa de comodidad, no la proteccion real.
+  const canEditChasis = isAdmin || roles.includes("jefatura");
   const invoiceRef = useRef<HTMLInputElement>(null);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [invoiceData, setInvoiceData] = useState<any>(null);
   const [reading, setReading] = useState(false); const [saving, setSaving] = useState(false);
+  const [chasisEdits, setChasisEdits] = useState<Record<string, string>>({});
+  const [savingChasisId, setSavingChasisId] = useState<string | null>(null);
   const detailQuery = useQuery({
     queryKey: ["machine-operation-detail", operationId], enabled: !!operationId,
     queryFn: async (): Promise<OperationDetail> => {
@@ -881,6 +889,26 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
   const chooseInvoice = async (file?: File) => { if (!file) return; setInvoiceFile(file); setReading(true); try { setInvoiceData(await extractDocument(file, "FACTURA_IMPORTACION")); toast.success("Factura leída. Revisá chasis y valor antes de confirmar."); } catch (e: any) { toast.warning(e?.message ?? "No se pudo leer la factura"); setInvoiceData({ factura_fecha: TODAY, chasis: [] }); } finally { setReading(false); } };
+  const saveChasis = async (unitId: string, rawValue: string) => {
+    const value = rawValue.trim() || null;
+    setSavingChasisId(unitId);
+    try {
+      const { error } = await db.from("maquinaria_unidades_operacion").update({ chasis: value }).eq("id", unitId);
+      if (error) {
+        if (error.code === "23505") throw new Error("Este chasis ya está asignado a otra unidad");
+        if (error.code === "42501") throw new Error("No tenés permiso para editar el chasis");
+        throw error;
+      }
+      toast.success("Chasis actualizado");
+      setChasisEdits((prev) => { const next = { ...prev }; delete next[unitId]; return next; });
+      detailQuery.refetch();
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo actualizar el chasis");
+    } finally {
+      setSavingChasisId(null);
+    }
+  };
   const confirmInvoice = async () => {
     if (!operationId || !invoiceFile || !invoiceData) return;
     setSaving(true);
@@ -923,14 +951,37 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
               <div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`].filter(Boolean).join(" · ")}</div></div>
               <div className="flex shrink-0 items-center gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge><Badge variant="outline" className={cn("text-[10px]", supplyClass(line.abastecimiento))}>{SUPPLY_LABEL[line.abastecimiento] ?? line.abastecimiento}</Badge></div>
             </div>
-            {unidadesDeLinea.length > 0 && <div className="mt-2 space-y-1 border-t pt-2">{unidadesDeLinea.map((u: any) => <div key={u.id} className="flex items-center justify-between gap-2 text-[11px]">
-              <span className="font-mono text-muted-foreground">{u.chasis || "Sin chasis"}</span>
-              <span className="text-muted-foreground">{UNIT_STATE_LABEL[u.estado] ?? u.estado}</span>
-            </div>)}</div>}
+            {unidadesDeLinea.length > 0 && <div className="mt-2 space-y-1 border-t pt-2">{unidadesDeLinea.map((u: any) => {
+              const editingValue = chasisEdits[u.id];
+              const isEditing = editingValue !== undefined;
+              return <div key={u.id} className="flex items-center justify-between gap-2 text-[11px]">
+                {canEditChasis ? (
+                  <input
+                    className="w-32 rounded border border-transparent bg-transparent px-1.5 py-0.5 font-mono text-[11px] text-foreground hover:border-border focus:border-primary focus:bg-background focus:outline-none disabled:opacity-50"
+                    value={isEditing ? editingValue : (u.chasis ?? "")}
+                    placeholder="Sin chasis"
+                    disabled={savingChasisId === u.id}
+                    onChange={(e) => setChasisEdits((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                    onBlur={(e) => {
+                      const next = e.target.value;
+                      if (isEditing && next.trim() !== (u.chasis ?? "").trim()) saveChasis(u.id, next);
+                      else setChasisEdits((prev) => { const rest = { ...prev }; delete rest[u.id]; return rest; });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") setChasisEdits((prev) => { const rest = { ...prev }; delete rest[u.id]; return rest; });
+                    }}
+                  />
+                ) : (
+                  <span className="font-mono text-muted-foreground">{u.chasis || "Sin chasis"}</span>
+                )}
+                <span className="text-muted-foreground">{UNIT_STATE_LABEL[u.estado] ?? u.estado}</span>
+              </div>;
+            })}</div>}
           </div>;
         })}</div></div>
         <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
-        {(detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
+        {canEditChasis && (detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
           {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}
         </div>}
         {detail.observaciones && <div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div>}
