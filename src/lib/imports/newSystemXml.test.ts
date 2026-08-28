@@ -16,6 +16,7 @@ import {
   mapProductosSheet,
   mapSolicitudCompraSheet,
   mapStockSheet,
+  reconcileCanonicalClientes,
 } from "@/lib/imports";
 
 const sheet = {
@@ -871,6 +872,38 @@ describe("importacion XML de maestro de clientes", () => {
     });
 
     expect(result.rows).toHaveLength(0);
+  });
+
+  it("corrige el nombre de un cliente existente por RUC sin cambiar su id", () => {
+    const incoming = mapClienteSheet("clientes.xml", {
+      name: "Maestro de Clientes",
+      headers: [],
+      rows: [{ ...filaBase, Codigo: "1.080.577-0", RUC: "1.080.577-0", Nombre: "PEDRO POCHIÑEC FIRAK" }],
+    }).rows;
+
+    const result = reconcileCanonicalClientes(incoming, [{
+      id: "cliente-existente",
+      cod_entidad: "590",
+      nombre: "PEDRO POCHI?EC",
+      ruc: "1080577-0",
+      direccion: null,
+      localidad: null,
+      correo_principal: null,
+      telefono: null,
+      region: null,
+      sucursal: null,
+      activo: true,
+    }]);
+
+    expect(result.nuevos).toHaveLength(0);
+    expect(result.actualizaciones).toEqual([
+      expect.objectContaining({
+        id: "cliente-existente",
+        cod_entidad: "590",
+        ruc: "1.080.577-0",
+        nombre: "PEDRO POCHIÑEC FIRAK",
+      }),
+    ]);
   });
 });
 

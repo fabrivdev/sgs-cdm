@@ -15,7 +15,6 @@ import {
 import { FolderOpen, FileUp, Import, X } from "lucide-react";
 import { toast } from "sonner";
 import {
-  mapCanonicalClienteToRow,
   mapCanonicalPedidoCompraToRow,
   mapCanonicalMachineStockToRow,
   mapCanonicalProductToRow,
@@ -29,6 +28,7 @@ import {
   mapStockSheet,
   parseSpreadsheetXml,
   prepareNewSystemImportBundle,
+  reconcileCanonicalClientes,
   persistNewSystemBundle,
   type CanonicalClienteRow,
   type CanonicalPedidoCompraRow,
@@ -37,6 +37,8 @@ import {
   type CanonicalSolicitudCompraRow,
   type CanonicalStockRow,
   type ClienteInsert,
+  type ClienteActualizacionImport,
+  type ClienteExistenteImport,
 } from "@/lib/imports";
 import { cn } from "@/lib/utils";
 
@@ -86,7 +88,7 @@ interface Preview {
   solicitudes: CanonicalSolicitudCompraRow[];
   clientesTodos: CanonicalClienteRow[];
   clientesNuevos: ClienteInsert[];
-  clientesExistentes: number;
+  clientesActualizados: ClienteActualizacionImport[];
   bundleFiles: { facturacion: { fileName: string; xmlText: string }; ordenesServicio: { fileName: string; xmlText: string }; productos: { fileName: string; xmlText: string } } | null;
   faltaParaTrio: string[];
 }
@@ -210,7 +212,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           : null;
 
       let clientesNuevos: ClienteInsert[] = [];
-      let clientesExistentes = 0;
+      let clientesActualizados: ClienteActualizacionImport[] = [];
       if (clientesTodos.length > 0) {
         // El codigo de TOTVS (Codigo/cod_entidad) es el RUC. Los clientes
         // cargados por el sistema viejo suelen tener un cod_entidad interno
@@ -218,22 +220,12 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         // correcto guardado en su propio campo -- comparar solo contra
         // cod_entidad duplicaba a casi toda la base. Se compara contra
         // cod_entidad Y ruc de lo ya existente.
-        const existentes = await cargarTodo<{ cod_entidad: string | null; ruc: string | null }>(
-          supabase.from("clientes").select("cod_entidad, ruc"),
+        const existentes = await cargarTodo<ClienteExistenteImport>(
+          supabase.from("clientes").select("id,cod_entidad,nombre,ruc,direccion,localidad,correo_principal,telefono,region,sucursal,activo"),
         );
-        const codigosExistentes = new Set<string>();
-        for (const c of existentes) {
-          if (c.cod_entidad) codigosExistentes.add(c.cod_entidad.trim().toUpperCase());
-          if (c.ruc) codigosExistentes.add(c.ruc.trim().toUpperCase());
-        }
-        clientesNuevos = clientesTodos
-          .filter((row) => {
-            const codigo = row.codEntidad.trim().toUpperCase();
-            const ruc = row.ruc?.trim().toUpperCase();
-            return !codigosExistentes.has(codigo) && !(ruc && codigosExistentes.has(ruc));
-          })
-          .map(mapCanonicalClienteToRow);
-        clientesExistentes = clientesTodos.length - clientesNuevos.length;
+        const reconciliacion = reconcileCanonicalClientes(clientesTodos, existentes);
+        clientesNuevos = reconciliacion.nuevos;
+        clientesActualizados = reconciliacion.actualizaciones;
       }
 
       setPreview({
@@ -244,7 +236,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         solicitudes,
         clientesTodos,
         clientesNuevos,
-        clientesExistentes,
+        clientesActualizados,
         bundleFiles,
         faltaParaTrio,
       });
@@ -256,7 +248,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         stockMaquinas.length ? `${stockMaquinas.length} máquinas en stock` : null,
         pedidos.length ? `${pedidos.length} líneas de pedido` : null,
         solicitudes.length ? `${solicitudes.length} líneas de solicitud` : null,
-        clientesTodos.length ? `${clientesNuevos.length} clientes nuevos` : null,
+        clientesTodos.length ? `${clientesNuevos.length} clientes nuevos y ${clientesActualizados.length} actualizados` : null,
       ].filter(Boolean);
       toast.success(partes.length > 0 ? `Leído: ${partes.join(", ")}.` : "Nada para importar todavía.");
     } catch (e) {
@@ -274,6 +266,34 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     try {
       let facturacionLineas = 0;
       let ordenesServicio = 0;
+
+      // El maestro se aplica antes que facturacion/OS: asi las lineas del
+      // mismo lote ya resuelven contra el nombre y RUC corregidos.
+      for (let i = 0; i < preview.clientesNuevos.length; i += 500) {
+        const chunk = preview.clientesNuevos.slice(i, i + 500);
+        const { data, error } = await (supabase.from("clientes").insert(chunk as any).select("id, nombre, telefono, correo_principal") as any);
+        if (error) throw error;
+
+        const contactosNuevos = ((data ?? []) as any[])
+          .filter((c) => c.telefono || c.correo_principal)
+          .map((c) => ({
+            cliente_id: c.id,
+            nombre: c.nombre,
+            telefono: c.telefono,
+            correo: c.correo_principal,
+            es_principal: true,
+          }));
+        if (contactosNuevos.length > 0) {
+          const { error: contactoError } = await supabase.from("contactos_cliente").insert(contactosNuevos as any);
+          if (contactoError) throw contactoError;
+        }
+      }
+
+      for (let i = 0; i < preview.clientesActualizados.length; i += 500) {
+        const chunk = preview.clientesActualizados.slice(i, i + 500);
+        const { error } = await supabase.from("clientes").upsert(chunk as any, { onConflict: "id" });
+        if (error) throw error;
+      }
 
       if (preview.bundleFiles) {
         const bundle = prepareNewSystemImportBundle({
@@ -342,39 +362,15 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         if (error) throw error;
       }
 
-      for (let i = 0; i < preview.clientesNuevos.length; i += 500) {
-        const chunk = preview.clientesNuevos.slice(i, i + 500);
-        const { data, error } = await (supabase.from("clientes").insert(chunk as any).select("id, nombre, telefono, correo_principal") as any);
-        if (error) throw error;
-
-        // El resto de la app (listado del parque, ficha de cliente) muestra
-        // telefono/correo a traves de un contacto, no del campo propio del
-        // cliente -- se crea un contacto principal con esos datos para que
-        // aparezca en los mismos lugares, no solo en "Datos generales".
-        const contactosNuevos = ((data ?? []) as any[])
-          .filter((c) => c.telefono || c.correo_principal)
-          .map((c) => ({
-            cliente_id: c.id,
-            nombre: c.nombre,
-            telefono: c.telefono,
-            correo: c.correo_principal,
-            es_principal: true,
-          }));
-
-        if (contactosNuevos.length > 0) {
-          const { error: contactoError } = await supabase.from("contactos_cliente").insert(contactosNuevos as any);
-          if (contactoError) throw contactoError;
-        }
-      }
-
-      const totalOtros = productoRows.length + stockRows.length + pedidoRows.length + solicitudRows.length + preview.clientesNuevos.length;
+      const totalOtros = productoRows.length + stockRows.length + pedidoRows.length + solicitudRows.length
+        + preview.clientesNuevos.length + preview.clientesActualizados.length;
       if (totalOtros > 0) {
         await supabase.from("importaciones").insert({
           usuario_id: user.id,
           tipo: "repuestos" as any,
           total_filas: totalOtros,
           insertados: totalOtros,
-          duplicados: preview.clientesExistentes,
+          duplicados: 0,
           archivo_nombre: usableFiles
             .filter((d) => d.kind !== "os" && d.kind !== "facturacion" && d.kind !== "stock_maquinas")
             .map((d) => d.file.name)
@@ -402,6 +398,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         pedidoRows.length ? `${pedidoRows.length} líneas de pedido` : null,
         solicitudRows.length ? `${solicitudRows.length} líneas de solicitud` : null,
         preview.clientesNuevos.length ? `${preview.clientesNuevos.length} clientes nuevos` : null,
+        preview.clientesActualizados.length ? `${preview.clientesActualizados.length} clientes actualizados` : null,
       ].filter(Boolean);
       toast.success(`Importado: ${partes.join(", ")}.`);
 
@@ -536,13 +533,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               {preview.solicitudes.length > 0 && <Badge variant="secondary">{preview.solicitudes.length} líneas de solicitud</Badge>}
               {preview.clientesTodos.length > 0 && (
                 <Badge variant="secondary">
-                  {preview.clientesNuevos.length} clientes nuevos ({preview.clientesExistentes} ya existentes)
+                  {preview.clientesNuevos.length} nuevos · {preview.clientesActualizados.length} actualizados
                 </Badge>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
               El stock de repuestos y de máquinas reemplaza por completo lo importado antes (es una foto del momento). Productos, pedidos y
-              solicitudes se actualizan sin duplicar. Clientes solo agrega los que todavía no existen.
+              solicitudes se actualizan sin duplicar. Clientes agrega los nuevos y corrige los existentes por código/RUC sin cambiar su ID.
             </p>
             <Button type="button" size="sm" onClick={confirmar} disabled={busy}>
               Confirmar importación

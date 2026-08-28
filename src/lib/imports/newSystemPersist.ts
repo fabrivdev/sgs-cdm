@@ -44,8 +44,27 @@ export async function persistNewSystemBundle({
 
   const cliByCod = new Map<string, string>();
   const cliByNombre = new Map<string, string>();
+  const clientCodeKeys = (value: unknown) => {
+    const normalized = normCode(value);
+    const compact = normalized.replace(/[^a-z0-9]/g, "");
+    return normalized === compact ? [normalized] : [normalized, compact];
+  };
+  const indexClientCode = (value: unknown, id: string) => {
+    for (const key of clientCodeKeys(value)) if (key) cliByCod.set(key, id);
+  };
+  const resolveClientCode = (value: unknown) => {
+    for (const key of clientCodeKeys(value)) {
+      const id = cliByCod.get(key);
+      if (id) return id;
+    }
+    return undefined;
+  };
   for (const c of cliExistentes as any[]) {
-    if (c.cod_entidad) cliByCod.set(normCode(c.cod_entidad), c.id);
+    if (c.cod_entidad) indexClientCode(c.cod_entidad, c.id);
+    // En el maestro nuevo CLIENTE suele ser el RUC, mientras clientes
+    // migrados conservan un cod_entidad legado distinto. Ambos identifican
+    // al mismo registro y deben resolver al mismo id.
+    if (c.ruc) indexClientCode(c.ruc, c.id);
     if (c.nombre) cliByNombre.set(normText(c.nombre), c.id);
   }
 
@@ -62,7 +81,7 @@ export async function persistNewSystemBundle({
         sucursal: matchSucursalFromRegion(row.branch) ?? matchSucursal(row.branch),
         tipo: crosswalk?.inferredLineType === "Repuestos" ? "Repuesto" : "Servicio",
         cliente_id:
-          (row.clientCode && cliByCod.get(normCode(row.clientCode))) ?? cliByNombre.get(normText(row.clientName)) ?? null,
+          (row.clientCode && resolveClientCode(row.clientCode)) ?? cliByNombre.get(normText(row.clientName)) ?? null,
         entidad_nombre: row.clientName,
         cod_entidad: row.clientCode,
         total_venta: Number((row.totalValueWithIva || row.totalValueBase || 0).toFixed(2)),

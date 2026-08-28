@@ -47,6 +47,14 @@ const text = (row: Record<string, unknown>, candidates: string[]) => {
   return normalized || null;
 };
 
+// Los textos que se muestran al usuario deben conservar Ñ y tildes. La
+// normalizacion sin diacriticos se reserva para claves, filtros y matching.
+const displayText = (row: Record<string, unknown>, candidates: string[]) => {
+  const value = firstValue(row, candidates);
+  const preserved = String(value ?? "").normalize("NFC").trim();
+  return preserved || null;
+};
+
 const number = (row: Record<string, unknown>, candidates: string[]) => {
   return parseFlexibleNumber(firstValue(row, candidates));
 };
@@ -448,15 +456,15 @@ export function mapClienteSheet(
     if (vistos.has(key)) return;
     vistos.add(key);
 
-    const region = text(row, ["DISTRI"]);
-    const localidad = text(row, ["Municipio"]);
+    const region = displayText(row, ["DISTRI"]);
+    const localidad = displayText(row, ["Municipio"]);
 
     rows.push({
       rowId: buildRowId(codEntidad, String(index + 1)) || `cliente-row-${index + 1}`,
       codEntidad,
-      nombre: text(row, ["Nombre"]) || `Cliente ${index + 1}`,
+      nombre: displayText(row, ["Nombre"]) || `Cliente ${index + 1}`,
       ruc: text(row, ["RUC"]),
-      direccion: text(row, ["Direccion"]),
+      direccion: displayText(row, ["Direccion"]),
       localidad,
       correoPrincipal: text(row, ["E-Mail"]),
       telefono: text(row, ["Telefono"]),

@@ -195,6 +195,27 @@ export interface ClienteInsert {
   activo: boolean;
 }
 
+export interface ClienteExistenteImport {
+  id: string;
+  cod_entidad: string | null;
+  nombre: string;
+  ruc: string | null;
+  direccion: string | null;
+  localidad: string | null;
+  correo_principal: string | null;
+  telefono: string | null;
+  region: string | null;
+  sucursal: string | null;
+  activo: boolean;
+}
+
+export type ClienteActualizacionImport = ClienteInsert & { id: string };
+
+export interface ClienteReconciliacion {
+  nuevos: ClienteInsert[];
+  actualizaciones: ClienteActualizacionImport[];
+}
+
 export function mapCanonicalClienteToRow(row: CanonicalClienteRow): ClienteInsert {
   return {
     cod_entidad: row.codEntidad,
@@ -208,6 +229,69 @@ export function mapCanonicalClienteToRow(row: CanonicalClienteRow): ClienteInser
     sucursal: row.sucursal,
     activo: row.activo,
   };
+}
+
+function normalizeClienteIdentity(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+/**
+ * El maestro de TOTVS es autoritativo para el nombre y el estado, pero debe
+ * conservar el id local: facturas, maquinas, contactos y trabajos apuntan a él.
+ * Codigo y RUC se consideran la misma identidad aun con guiones o espacios.
+ */
+export function reconcileCanonicalClientes(
+  rows: CanonicalClienteRow[],
+  existentes: ClienteExistenteImport[],
+): ClienteReconciliacion {
+  const porIdentidad = new Map<string, ClienteExistenteImport>();
+  for (const existente of existentes) {
+    for (const value of [existente.cod_entidad, existente.ruc]) {
+      const key = normalizeClienteIdentity(value);
+      if (key && !porIdentidad.has(key)) porIdentidad.set(key, existente);
+    }
+  }
+
+  const nuevos: ClienteInsert[] = [];
+  const actualizaciones: ClienteActualizacionImport[] = [];
+  const idsActualizados = new Set<string>();
+
+  for (const canonical of rows) {
+    const incoming = mapCanonicalClienteToRow(canonical);
+    const identities = [canonical.codEntidad, canonical.ruc]
+      .map(normalizeClienteIdentity)
+      .filter(Boolean);
+    const existente = identities.map((key) => porIdentidad.get(key)).find(Boolean);
+
+    if (!existente) {
+      nuevos.push(incoming);
+      continue;
+    }
+    if (idsActualizados.has(existente.id)) continue;
+    idsActualizados.add(existente.id);
+
+    actualizaciones.push({
+      id: existente.id,
+      // El codigo legado puede ser una clave interna distinta del RUC. No se
+      // reemplaza; el RUC entrante se indexa aparte para las facturas nuevas.
+      cod_entidad: existente.cod_entidad || incoming.cod_entidad,
+      nombre: incoming.nombre,
+      ruc: incoming.ruc || existente.ruc,
+      direccion: incoming.direccion || existente.direccion,
+      localidad: incoming.localidad || existente.localidad,
+      correo_principal: incoming.correo_principal || existente.correo_principal,
+      telefono: incoming.telefono || existente.telefono,
+      region: incoming.region || existente.region,
+      sucursal: incoming.sucursal || existente.sucursal,
+      activo: incoming.activo,
+    });
+  }
+
+  return { nuevos, actualizaciones };
 }
 
 // productos/repuestos_stock todavia no existen en el Database generado
