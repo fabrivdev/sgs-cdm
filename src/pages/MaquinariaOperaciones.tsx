@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Plus, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -227,7 +227,12 @@ type DraftLine = {
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
   subgrupo: string; chasis: string[]; confianza?: Record<string, unknown>; datos_extraidos?: Record<string, unknown>;
 };
-type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; docs: any[]; importation?: any };
+type StockAssignmentRow = {
+  id: string; producto_codigo: string; marca: string | null; modelo: string | null; sucursal: string | null;
+  deposito: string | null; chasis: string | null; saldo_actual: number | null; estado_disponibilidad: string | null;
+  disponibilidad_detalle: string | null; unidad_operacion_id: string | null;
+};
+type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; stock: StockAssignmentRow[]; docs: any[]; importation?: any };
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
@@ -878,8 +883,15 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
       ]);
       if (summary.error) throw summary.error; if (lines.error) throw lines.error;
       const lineIds = (lines.data ?? []).map((l: any) => l.id);
-      const units = lineIds.length ? await db.from("maquinaria_unidades_operacion").select("*").in("linea_id", lineIds).order("numero_unidad") : { data: [] };
-      return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], importation: importation.data };
+      const [units, stock] = await Promise.all([
+        lineIds.length ? db.from("maquinaria_unidades_operacion").select("*").in("linea_id", lineIds).order("numero_unidad") : Promise.resolve({ data: [], error: null }),
+        db.from("maquinaria_stock_trazabilidad")
+          .select("id,producto_codigo,marca,modelo,sucursal,deposito,chasis,saldo_actual,estado_disponibilidad,disponibilidad_detalle,unidad_operacion_id")
+          .or("saldo_actual.gt.0,unidad_operacion_id.not.is.null")
+          .order("marca").order("modelo").limit(1000),
+      ]);
+      if (units.error) throw units.error; if (stock.error) throw stock.error;
+      return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], importation: importation.data };
     },
   });
   useEffect(() => { setInvoiceFile(null); setInvoiceData(null); }, [operationId]);
@@ -980,6 +992,7 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
             })}</div>}
           </div>;
         })}</div></div>
+        {canEditChasis && <div><div className="mb-2"><h3 className="text-[13px] font-semibold">Asignación de stock</h3><p className="text-[10px] text-muted-foreground">Elegí la unidad física que queda reservada para cada máquina del pedido.</p></div><div className="space-y-2">{detail.units.map((unit) => <UnitStockAssignment key={unit.id} unit={unit} line={detail.lines.find((line) => line.id === unit.linea_id)} stock={detail.stock} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div></div>}
         <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
         {canEditChasis && (detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Completa chasis y valor facturado; la propuesta siempre requiere confirmación.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
           {invoiceData && <div className="mt-3 space-y-3 border-t pt-3"><div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Valor facturado"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field></div><Field label="Chasis (uno por línea)"><Textarea rows={3} value={(invoiceData.chasis ?? []).join("\n")} onChange={(e) => setInvoiceData({ ...invoiceData, chasis: e.target.value.split("\n") })} /></Field><div className="flex justify-end"><Button size="sm" onClick={confirmInvoice} disabled={saving}>{saving ? "Guardando..." : "Confirmar factura"}</Button></div></div>}
@@ -991,6 +1004,62 @@ function OperationDrawer({ operationId, onOpenChange, onChanged }: { operationId
       <AttachDocumentButton operationId={operationId} onUploaded={() => detailQuery.refetch()} />
     </ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
+}
+
+function normalizeAssignmentText(value: unknown) {
+  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+}
+
+function UnitStockAssignment({ unit, line, stock, onSaved }: { unit: any; line: any; stock: StockAssignmentRow[]; onSaved: () => void }) {
+  const linked = stock.find((row) => row.unidad_operacion_id === unit.id);
+  const [stockId, setStockId] = useState(linked?.id ?? "NONE");
+  const [searchStock, setSearchStock] = useState("");
+  const [savingAssignment, setSavingAssignment] = useState(false);
+
+  useEffect(() => {
+    setStockId(linked?.id ?? "NONE");
+  }, [linked?.id]);
+
+  const expected = normalizeAssignmentText([line?.marca, line?.modelo, line?.producto].filter(Boolean).join(" "));
+  const query = normalizeAssignmentText(searchStock);
+  const candidates = stock
+    .filter((row) => !row.unidad_operacion_id || row.unidad_operacion_id === unit.id || row.estado_disponibilidad === "DISPONIBLE")
+    .filter((row) => !query || normalizeAssignmentText([row.producto_codigo, row.marca, row.modelo, row.sucursal, row.deposito, row.chasis].join(" ")).includes(query))
+    .sort((a, b) => {
+      const aMatch = expected && normalizeAssignmentText([a.marca, a.modelo].join(" ")).split(" ").some((part) => part.length > 2 && expected.includes(part)) ? 1 : 0;
+      const bMatch = expected && normalizeAssignmentText([b.marca, b.modelo].join(" ")).split(" ").some((part) => part.length > 2 && expected.includes(part)) ? 1 : 0;
+      return bMatch - aMatch || Number(b.saldo_actual ?? 0) - Number(a.saldo_actual ?? 0);
+    })
+    .slice(0, 60);
+  if (linked && !candidates.some((row) => row.id === linked.id)) candidates.unshift(linked);
+
+  const saveAssignment = async () => {
+    setSavingAssignment(true);
+    try {
+      const { error } = await db.rpc("maquinaria_asignar_stock", {
+        p_unidad_id: unit.id,
+        p_stock_id: stockId === "NONE" ? null : stockId,
+        p_chasis: String(unit.chasis ?? "").trim() || null,
+      });
+      if (error) throw error;
+      toast.success(stockId === "NONE" ? "Reserva de stock quitada" : "Stock reservado para la operación");
+      onSaved();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo guardar la asignación");
+    } finally {
+      setSavingAssignment(false);
+    }
+  };
+
+  const dirty = stockId !== (linked?.id ?? "NONE");
+  return <div className="rounded-xl border p-3">
+    <div className="mb-2 flex flex-wrap items-start justify-between gap-2"><div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">{[line?.marca, line?.abastecimiento].filter(Boolean).join(" · ")}</div></div>{linked && <Badge variant="outline" className={availabilityClass(linked.estado_disponibilidad)}>{AVAILABILITY_LABEL[linked.estado_disponibilidad ?? ""] ?? "Reservado"}</Badge>}</div>
+    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Unidad de stock</Label><Input className="h-8 text-[11px]" value={searchStock} onChange={(event) => setSearchStock(event.target.value)} placeholder="Buscar por modelo, código, sucursal o chasis" /><Select value={stockId} onValueChange={setStockId}><SelectTrigger className="h-9 text-[11px]"><SelectValue placeholder="Sin reserva" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin reserva de stock</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto_codigo, row.chasis && `Ch. ${row.chasis}`, row.sucursal, row.deposito, `Stock ${Number(row.saldo_actual ?? 0)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
+      <Button size="sm" onClick={saveAssignment} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button>
+    </div>
+    {linked?.disponibilidad_detalle && <p className="mt-2 text-[10px] text-muted-foreground">Reserva actual: {linked.disponibilidad_detalle}</p>}
+  </div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">{label}</Label>{children}</div>; }
