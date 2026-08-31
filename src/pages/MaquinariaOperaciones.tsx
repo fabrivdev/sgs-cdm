@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import {
@@ -1208,12 +1209,17 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   </ResponsiveDrawer>;
 }
 
+function DetailValue({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return <div className="min-w-0"><div className="text-[10px] text-muted-foreground">{label}</div><div className={cn("mt-0.5 truncate text-[12px] font-medium", mono && "font-mono")}>{value || "—"}</div></div>;
+}
+
 function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const { isAdmin, roles } = useAuth();
   // La edicion de chasis esta protegida tambien por un trigger en la base.
   const canEditChasis = isAdmin || roles.includes("jefatura");
   const [chasisEdits, setChasisEdits] = useState<Record<string, string>>({});
   const [savingChasisId, setSavingChasisId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("resumen");
   const detailQuery = useQuery({
     queryKey: ["machine-operation-detail", operationId], enabled: !!operationId,
     queryFn: async (): Promise<OperationDetail> => {
@@ -1281,70 +1287,85 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   };
   const detail = detailQuery.data;
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
+  useEffect(() => {
+    setActiveTab(simpleState === "COMPLETADO" ? "facturacion" : "resumen");
+  }, [operationId, simpleState]);
+  const invoices = useMemo(() => {
+    if (!detail) return [];
+    const found = new Map<string, { numero: string | null; fecha: string | null; valor: number | null }>();
+    detail.lines.forEach((line: any) => {
+      const historical = line.datos_extraidos?.historico_pedido ?? {};
+      const numero = historical.factura_numero || historical.factura_venta || detail.factura_venta || null;
+      const fecha = historical.factura_fecha || detail.factura_fecha || null;
+      const rawValue = historical.valor_factura ?? historical.valor_venta ?? detail.valor_venta ?? null;
+      const valor = rawValue == null || rawValue === "" ? null : Number(rawValue);
+      if (numero || fecha || valor != null) {
+        const key = `${numero ?? ""}|${fecha ?? ""}|${valor ?? ""}`;
+        found.set(key, { numero, fecha, valor: Number.isFinite(valor) ? valor : null });
+      }
+    });
+    if (!found.size && (detail.factura_venta || detail.factura_fecha || detail.valor_venta != null)) {
+      found.set("summary", { numero: detail.factura_venta, fecha: detail.factura_fecha, valor: detail.valor_venta });
+    }
+    return [...found.values()];
+  }, [detail]);
+  const lifecycleIndex = detail
+    ? detail.estado === "CERRADA" ? 3 : detail.estado === "FACTURADA" ? 2 : ["ABASTECIMIENTO", "EN_IMPORTACION", "DISPONIBLE"].includes(detail.estado) ? 1 : 0
+    : 0;
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-[16px] font-semibold">NP {detail?.np_numero ?? "—"}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
-        {detail && <div className="flex flex-col items-end gap-1">
-          <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge>
-          <span className="text-[10px] text-muted-foreground" title="Etapa real del pedido">{STATE_LABEL[detail.estado] ?? detail.estado}</span>
-        </div>}
+        {detail && <div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><span className="text-[10px] text-muted-foreground">{STATE_LABEL[detail.estado] ?? detail.estado}</span></div>}
       </div>
     </ResponsiveDrawerHeader>
-    <ResponsiveDrawerBody className="space-y-4">
-      {detail && <>
-        <KpiStrip className="grid-cols-3"><KpiItem label="Unidades" value={detail.unidades} /><KpiItem label="Documentos" value={detail.documentos} /><KpiItem label="Fecha NP" value={formatDate(detail.np_fecha)} /></KpiStrip>
-        <div><h3 className="mb-2 text-[13px] font-semibold">Detalle de máquinas</h3><div className="space-y-2">{detail.lines.map((line) => {
-          const extracted = line.datos_extraidos ?? {};
-          const model = line.modelo || extracted.modelo;
-          const product = line.producto || extracted.producto;
-          const year = line.anio ?? extracted.anio;
-          const head = line.cabezal || extracted.cabezal;
-          const unidadesDeLinea = detail.units.filter((u: any) => u.linea_id === line.id);
-          return <div key={line.id} className="rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal: ${head}`].filter(Boolean).join(" · ")}</div></div>
-              <div className="flex shrink-0 items-center gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge><Badge variant="outline" className={cn("text-[10px]", supplyClass(line.abastecimiento))}>{SUPPLY_LABEL[line.abastecimiento] ?? line.abastecimiento}</Badge></div>
-            </div>
-            {unidadesDeLinea.length > 0 && <div className="mt-2 space-y-1 border-t pt-2">{unidadesDeLinea.map((u: any) => {
-              const editingValue = chasisEdits[u.id];
-              const isEditing = editingValue !== undefined;
-              return <div key={u.id} className="flex items-center justify-between gap-2 text-[11px]">
-                {canEditChasis ? (
-                  <input
-                    className="w-32 rounded border border-transparent bg-transparent px-1.5 py-0.5 font-mono text-[11px] text-foreground hover:border-border focus:border-primary focus:bg-background focus:outline-none disabled:opacity-50"
-                    value={isEditing ? editingValue : (u.chasis ?? "")}
-                    placeholder="Sin chasis"
-                    disabled={savingChasisId === u.id}
-                    onChange={(e) => setChasisEdits((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                    onBlur={(e) => {
-                      const next = e.target.value;
-                      if (isEditing && next.trim() !== (u.chasis ?? "").trim()) saveChasis(u.id, next);
-                      else setChasisEdits((prev) => { const rest = { ...prev }; delete rest[u.id]; return rest; });
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                      if (e.key === "Escape") setChasisEdits((prev) => { const rest = { ...prev }; delete rest[u.id]; return rest; });
-                    }}
-                  />
-                ) : (
-                  <span className="font-mono text-muted-foreground">{u.chasis || "Sin chasis"}</span>
-                )}
-                <span className="text-muted-foreground">{UNIT_STATE_LABEL[u.estado] ?? u.estado}</span>
-              </div>;
-            })}</div>}
-          </div>;
-        })}</div></div>
-        {canEditChasis && <div><div className="mb-2"><h3 className="text-[13px] font-semibold">{simpleState === "COMPLETADO" ? "Trazabilidad de unidades" : "Asignación de unidades"}</h3><p className="text-[10px] text-muted-foreground">{simpleState === "COMPLETADO" ? "El pedido ya está facturado: no admite nuevas reservas. Solo podés conservar un vínculo previo o asociar una importación histórica con el mismo chasis exacto." : "Stock reserva una máquina disponible; Importar vincula la unidad en tránsito correspondiente. Las coincidencias por chasis siempre requieren confirmación y la reserva permanece hasta desvincular o cancelar."}</p></div><div className="space-y-2">{detail.units.map((unit) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div></div>}
-        <div><h3 className="mb-2 text-[13px] font-semibold">Documentos comerciales</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{MACHINE_DOCUMENT_LABELS[doc.tipo as MachineDocumentType] ?? doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay notas de pedido ni facturas al cliente adjuntas.</p>}</div>
-        {detail.observaciones && <div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div>}
-      </>}
+    <ResponsiveDrawerBody>
+      {detail && <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="grid grid-cols-4 overflow-hidden rounded-xl border bg-muted/20">
+          {["Pedido", "Origen", "Facturación", "Entrega"].map((label, index) => <div key={label} className={cn("border-r px-2 py-2 text-center text-[10px] last:border-r-0", index <= lifecycleIndex ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground")}><div className={cn("mx-auto mb-1 h-1.5 w-1.5 rounded-full", index <= lifecycleIndex ? "bg-primary" : "bg-border")} />{label}</div>)}
+        </div>
+        <TabsList className="grid h-auto w-full grid-cols-4">
+          <TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger>
+          <TabsTrigger value="origen" className="px-2 text-[11px]">Origen</TabsTrigger>
+          <TabsTrigger value="facturacion" className="px-2 text-[11px]">Facturación</TabsTrigger>
+          <TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="resumen" className="space-y-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border p-3 sm:grid-cols-4">
+            <DetailValue label="Fecha NP" value={formatDate(detail.np_fecha)} />
+            <DetailValue label="Comercial" value={detail.comercial} />
+            <DetailValue label="Unidades" value={detail.unidades} />
+            <DetailValue label="Valor" value={formatUsd(detail.valor_venta)} />
+          </div>
+          <div><h3 className="mb-2 text-[13px] font-semibold">Máquinas</h3><div className="space-y-2">{detail.lines.map((line: any) => {
+            const extracted = line.datos_extraidos ?? {};
+            const model = line.modelo || extracted.modelo;
+            const product = line.producto || extracted.producto;
+            const year = line.anio ?? extracted.anio;
+            const head = line.cabezal || extracted.cabezal;
+            const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
+            return <div key={line.id} className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 grid gap-2 border-t pt-3 sm:grid-cols-2">{lineUnits.map((unit: any) => <div key={unit.id} className="grid grid-cols-2 gap-2"><DetailValue label={`Unidad ${unit.numero_unidad}`} value={unit.chasis || "Sin chasis"} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></div>)}</div>}</div>;
+          })}</div></div>
+          {detail.observaciones && <div><h3 className="mb-2 text-[13px] font-semibold">Observaciones</h3><div className="rounded-xl border p-3 text-[11px]">{detail.observaciones}</div></div>}
+        </TabsContent>
+
+        <TabsContent value="origen" className="space-y-3">
+          {canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}
+        </TabsContent>
+
+        <TabsContent value="facturacion" className="space-y-4">
+          <div><h3 className="mb-2 text-[13px] font-semibold">Factura al cliente</h3>{invoices.length ? <div className="space-y-2">{invoices.map((invoice, index) => <div key={`${invoice.numero}-${invoice.fecha}-${index}`} className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border p-3 sm:grid-cols-3"><DetailValue label="Número" value={invoice.numero} mono /><DetailValue label="Fecha" value={formatDate(invoice.fecha)} /><DetailValue label="Valor" value={formatUsd(invoice.valor)} /></div>)}</div> : <div className="rounded-xl border border-dashed p-3 text-[11px] text-muted-foreground">No hay datos de facturación cargados.</div>}</div>
+          <div><h3 className="mb-2 text-[13px] font-semibold">Entrega</h3><div className="space-y-2">{detail.units.map((unit: any) => { const line = detail.lines.find((item: any) => item.id === unit.linea_id); return <div key={unit.id} className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border p-3 sm:grid-cols-3"><DetailValue label="Máquina" value={line?.modelo || line?.producto} /><DetailValue label="Chasis" value={unit.chasis} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></div>; })}</div></div>
+        </TabsContent>
+
+        <TabsContent value="documentos" className="space-y-4">
+          <div><h3 className="mb-2 text-[13px] font-semibold">Documentos comerciales</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc: any) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-[11px] hover:bg-muted/40"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="font-medium text-primary">Ver</span></button>)}</div> : <p className="text-[11px] text-muted-foreground">No hay documentos adjuntos.</p>}</div>
+          <div className="flex flex-wrap gap-2"><AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar nota de pedido" onUploaded={() => detailQuery.refetch()} /><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar factura al cliente" onUploaded={() => detailQuery.refetch()} /></div>
+        </TabsContent>
+      </Tabs>}
     </ResponsiveDrawerBody>
-    {detail && <ResponsiveDrawerFooter>
-      {canEditChasis && operationId && <Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button>}
-      <AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar nota de pedido" onUploaded={() => detailQuery.refetch()} />
-      <AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar factura al cliente" onUploaded={() => detailQuery.refetch()} />
-    </ResponsiveDrawerFooter>}
+    {detail && canEditChasis && operationId && <ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button></ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
 }
 
@@ -1381,6 +1402,7 @@ function UnitHistoricalAssignment({ unit, line, stock, imports, onSaved }: { uni
 
   const [importId, setImportId] = useState(linkedImport?.id ?? "NONE");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   useEffect(() => setImportId(linkedImport?.id ?? "NONE"), [linkedImport?.id]);
   const dirty = importId !== (linkedImport?.id ?? "NONE");
 
@@ -1393,6 +1415,7 @@ function UnitHistoricalAssignment({ unit, line, stock, imports, onSaved }: { uni
       });
       if (error) throw error;
       toast.success(importId === "NONE" ? "Vínculo histórico quitado" : "Importación histórica vinculada por chasis");
+      setEditing(false);
       onSaved();
     } catch (error: any) {
       toast.error(error?.message ?? "No se pudo guardar la trazabilidad histórica");
@@ -1401,17 +1424,18 @@ function UnitHistoricalAssignment({ unit, line, stock, imports, onSaved }: { uni
     }
   };
 
-  return <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
+  return <div className="rounded-xl border p-3">
     <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
       <div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">Ch. {unit.chasis || "sin registrar"} · Pedido facturado</div></div>
-      {linkedImport && <Badge variant="outline" className="border-violet-200 bg-violet-50 text-[10px] text-violet-700">Origen importado confirmado</Badge>}
+      {linkedImport && !editing && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3 w-3" />Cambiar</Button>}
     </div>
-    {linkedStock && <div className="mb-2 rounded-lg border bg-background p-2.5 text-[10px] text-muted-foreground"><span className="font-medium text-foreground">Vínculo previo de stock:</span> {[linkedStock.modelo || linkedStock.producto_codigo, linkedStock.sucursal, linkedStock.deposito, linkedStock.chasis && `Ch. ${linkedStock.chasis}`].filter(Boolean).join(" · ")}. Se conserva solo como lectura.</div>}
-    {!chassisKey ? <p className="rounded-lg border border-dashed p-3 text-[11px] text-amber-700">Primero registrá el chasis para buscar su importación histórica.</p> : candidates.length ? <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+    {linkedImport && !editing ? <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-3"><DetailValue label="Origen" value="Importación" /><DetailValue label="Proveedor" value={linkedImport.proveedor} /><DetailValue label="OC" value={linkedImport.oc} mono /><DetailValue label="Factura proveedor" value={linkedImport.invoice_supplier} mono /><DetailValue label="Fecha factura" value={formatDate(linkedImport.factura_proveedor_fecha)} /><DetailValue label="Arribo" value={formatDate(linkedImport.ata)} /></div> : <>
+    {linkedStock && <div className="mb-2 grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3"><DetailValue label="Origen anterior" value="Stock" /><DetailValue label="Ubicación" value={[linkedStock.sucursal, linkedStock.deposito].filter(Boolean).join(" · ")} /></div>}
+    {!chassisKey ? <p className="rounded-lg border border-dashed p-3 text-[11px] text-amber-700">Registrá el chasis para buscar la importación correspondiente.</p> : candidates.length ? <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Importación histórica con el mismo chasis</Label><Select value={importId} onValueChange={setImportId}><SelectTrigger className="h-9 text-[11px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin importación histórica vinculada</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto || "Importación", `Ch. ${row.chasis}`, row.oc && `OC ${row.oc}`, row.invoice_supplier && `Factura ${row.invoice_supplier}`, row.ata ? `Arribo ${formatDate(row.ata)}` : row.eta && `ETA ${formatDate(row.eta)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
-      <Button size="sm" onClick={save} disabled={!dirty || saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar trazabilidad"}</Button>
+      <div className="flex gap-2">{editing && <Button size="sm" variant="outline" onClick={() => { setImportId(linkedImport?.id ?? "NONE"); setEditing(false); }}>Cancelar</Button>}<Button size="sm" onClick={save} disabled={!dirty || saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar"}</Button></div>
     </div> : <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">No se encontró una importación histórica con el chasis exacto {unit.chasis}.</p>}
-    {linkedImport && <p className="mt-2 text-[10px] text-muted-foreground">{[linkedImport.proveedor, linkedImport.estado_fuente, linkedImport.oc && `OC ${linkedImport.oc}`, linkedImport.invoice_supplier && `Factura ${linkedImport.invoice_supplier}`].filter(Boolean).join(" · ")}</p>}
+    </>}
   </div>;
 }
 
@@ -1442,6 +1466,7 @@ function UnitStockAssignment({ unit, line, stock, suggestion, onSaved }: { unit:
   const [stockId, setStockId] = useState(linked?.id ?? "NONE");
   const [searchStock, setSearchStock] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     setStockId(linked?.id ?? "NONE");
@@ -1471,6 +1496,7 @@ function UnitStockAssignment({ unit, line, stock, suggestion, onSaved }: { unit:
       });
       if (error) throw error;
       toast.success(effectiveStockId === "NONE" ? "Reserva de stock quitada" : "Stock reservado para la operación");
+      setEditing(false);
       onSaved();
     } catch (error: any) {
       toast.error(error?.message ?? "No se pudo guardar la asignación");
@@ -1481,13 +1507,14 @@ function UnitStockAssignment({ unit, line, stock, suggestion, onSaved }: { unit:
 
   const dirty = stockId !== (linked?.id ?? "NONE");
   return <div className="rounded-xl border p-3">
-    <div className="mb-2 flex flex-wrap items-start justify-between gap-2"><div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">{[line?.marca, line?.abastecimiento].filter(Boolean).join(" · ")}</div></div>{linked && <Badge variant="outline" className={availabilityClass(linked.estado_disponibilidad)}>{AVAILABILITY_LABEL[linked.estado_disponibilidad ?? ""] ?? "Reservado"}</Badge>}</div>
+    <div className="mb-2 flex flex-wrap items-start justify-between gap-2"><div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">{line?.marca}</div></div>{linked && !editing && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3 w-3" />Cambiar</Button>}</div>
+    {linked && !editing ? <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-3"><DetailValue label="Origen" value="Stock" /><DetailValue label="Máquina" value={linked.modelo || linked.producto_codigo} /><DetailValue label="Chasis" value={linked.chasis} mono /><DetailValue label="Sucursal" value={linked.sucursal} /><DetailValue label="Depósito" value={linked.deposito} /><DetailValue label="Estado" value={AVAILABILITY_LABEL[linked.estado_disponibilidad ?? ""] ?? linked.estado_disponibilidad} /></div> : <>
     {!linked && suggestion && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/50 p-2.5"><div><p className="text-[11px] font-medium text-blue-800">Coincidencia exacta de chasis</p><p className="text-[10px] text-blue-700">{[suggestion.modelo, suggestion.ubicacion, suggestion.chasis].filter(Boolean).join(" · ")}</p></div><Button size="sm" variant="outline" onClick={() => saveAssignment(suggestion.recurso_id)} disabled={savingAssignment}>Confirmar sugerencia</Button></div>}
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Unidad de stock</Label><Input className="h-8 text-[11px]" value={searchStock} onChange={(event) => setSearchStock(event.target.value)} placeholder="Buscar por modelo, código, sucursal o chasis" /><Select value={stockId} onValueChange={setStockId}><SelectTrigger className="h-9 text-[11px]"><SelectValue placeholder="Sin reserva" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin reserva de stock</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto_codigo, row.chasis && `Ch. ${row.chasis}`, row.sucursal, row.deposito, `Stock ${Number(row.saldo_actual ?? 0)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
-      <Button size="sm" onClick={() => saveAssignment()} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button>
+      <div className="flex gap-2">{editing && <Button size="sm" variant="outline" onClick={() => { setStockId(linked?.id ?? "NONE"); setEditing(false); }}>Cancelar</Button>}<Button size="sm" onClick={() => saveAssignment()} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button></div>
     </div>
-    {linked?.disponibilidad_detalle && <p className="mt-2 text-[10px] text-muted-foreground">Reserva actual: {linked.disponibilidad_detalle}</p>}
+    </>}
   </div>;
 }
 
@@ -1496,6 +1523,7 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
   const [importId, setImportId] = useState(linked?.id ?? "NONE");
   const [searchImport, setSearchImport] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => setImportId(linked?.id ?? "NONE"), [linked?.id]);
 
@@ -1523,6 +1551,7 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
       });
       if (error) throw error;
       toast.success(effectiveImportId === "NONE" ? "Vínculo de importación quitado" : "Importación vinculada a la unidad");
+      setEditing(false);
       onSaved();
     } catch (error: any) {
       toast.error(error?.message ?? "No se pudo guardar la importación");
@@ -1533,13 +1562,14 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
 
   const dirty = importId !== (linked?.id ?? "NONE");
   return <div className="rounded-xl border p-3">
-    <div className="mb-2 flex flex-wrap items-start justify-between gap-2"><div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">{[line?.marca, "Importar", unit.chasis && `Ch. ${unit.chasis}`].filter(Boolean).join(" · ")}</div></div>{linked && <Badge variant="outline" className="border-violet-200 bg-violet-50 text-[10px] text-violet-700">{linked.vinculo_manual ? "Importación confirmada" : "Importación sugerida"}</Badge>}</div>
+    <div className="mb-2 flex flex-wrap items-start justify-between gap-2"><div><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div><div className="text-[10px] text-muted-foreground">{[line?.marca, unit.chasis && `Ch. ${unit.chasis}`].filter(Boolean).join(" · ")}</div></div>{linked && !editing && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3 w-3" />Cambiar</Button>}</div>
+    {linked && !editing ? <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-3"><DetailValue label="Origen" value="Importación" /><DetailValue label="Máquina" value={linked.modelo || linked.producto} /><DetailValue label="Chasis" value={linked.chasis || unit.chasis} mono /><DetailValue label="Proveedor" value={linked.proveedor} /><DetailValue label="OC" value={linked.oc} mono /><DetailValue label="Llegada" value={formatDate(linked.ata || linked.eta)} /></div> : <>
     {!linked && validSuggestion && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50/50 p-2.5"><div><p className="text-[11px] font-medium text-violet-800">Coincidencia exacta de chasis</p><p className="text-[10px] text-violet-700">{[validSuggestion.modelo, validSuggestion.ubicacion, validSuggestion.chasis].filter(Boolean).join(" · ")}</p></div><Button size="sm" variant="outline" onClick={() => saveAssignment(validSuggestion.recurso_id)} disabled={savingAssignment}>Confirmar sugerencia</Button></div>}
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Máquina importada</Label><Input className="h-8 text-[11px]" value={searchImport} onChange={(event) => setSearchImport(event.target.value)} placeholder="Buscar por modelo, NP, proveedor, OC, PO o chasis" /><Select value={importId} onValueChange={setImportId}><SelectTrigger className="h-9 text-[11px]"><SelectValue placeholder="Sin importación vinculada" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin importación vinculada</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto || "Importación", `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`, row.chasis && `Ch. ${row.chasis}`, row.np_numero && `NP ${row.np_numero}`, row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`, row.eta && `ETA ${formatDate(row.eta)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
-      <Button size="sm" onClick={() => saveAssignment()} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button>
+      <div className="flex gap-2">{editing && <Button size="sm" variant="outline" onClick={() => { setImportId(linked?.id ?? "NONE"); setEditing(false); }}>Cancelar</Button>}<Button size="sm" onClick={() => saveAssignment()} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button></div>
     </div>
-    {linked && <p className="mt-2 text-[10px] text-muted-foreground">{[linked.proveedor, linked.estado_fuente, linked.situacion_vinculo].filter(Boolean).join(" · ")}</p>}
+    </>}
   </div>;
 }
 
