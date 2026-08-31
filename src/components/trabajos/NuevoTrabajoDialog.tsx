@@ -15,8 +15,9 @@ import { PRIORIDADES, trabajoOsNumero, type Prioridad } from "@/lib/trabajos";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { canonicalClientId, canonicalClientOptions } from "@/lib/clientIdentity";
 
-interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
+interface Cliente { id: string; nombre: string; sucursal: Sucursal | null; ruc?: string | null; cod_entidad?: string | null }
 
 interface Props {
   open: boolean;
@@ -60,24 +61,16 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
   const [busy, setBusy] = useState(false);
 
   const clientesUnicos = useMemo(() => {
-    const porNombre = new Map<string, Cliente>();
-    for (const cliente of clientes) {
-      const key = clienteNombreKey(cliente.nombre);
-      if (!key) continue;
-      const actual = porNombre.get(key);
-      if (!actual || (cliente.sucursal === form.sucursal && actual.sucursal !== form.sucursal)) {
-        porNombre.set(key, cliente);
-      }
-    }
-    return Array.from(porNombre.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-  }, [clientes, form.sucursal]);
+    return canonicalClientOptions(clientes);
+  }, [clientes]);
 
   useEffect(() => {
     if (!open) return;
     if (trabajo) {
-      const cli = clientes.find(c => c.id === trabajo.cliente_id);
+      const clienteId = canonicalClientId(clientesUnicos, trabajo.cliente_id);
+      const cli = clientesUnicos.find(c => c.id === clienteId);
       setForm({
-        cliente_id: trabajo.cliente_id ?? "",
+        cliente_id: clienteId,
         cliente_text: cli?.nombre ?? "",
         os_numero: trabajoOsNumero(trabajo),
         marca: trabajo.marca,
@@ -93,7 +86,7 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         tipo_trabajo: "Visita de campo", descripcion_problema: "", prioridad: "media",
       });
     }
-  }, [open, trabajo]);
+  }, [open, trabajo, clientesUnicos, profile?.sucursal]);
 
   const guardar = async () => {
     if (!form.descripcion_problema.trim()) {

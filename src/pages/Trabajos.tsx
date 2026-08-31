@@ -20,7 +20,7 @@ import { PageHeader } from "@/components/layout/AppPrimitives";
 import { useAuth } from "@/hooks/useAuth";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
-interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
+interface Cliente { id: string; nombre: string; sucursal: Sucursal | null; ruc: string | null; cod_entidad: string | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 
 const PAGE = 1000;
@@ -83,7 +83,7 @@ export default function Trabajos() {
       const [t, sj, c, pr] = await Promise.all([
         cargarTodo<any>(supabase.from("trabajos").select("*").order("actualizado_en", { ascending: false })),
         cargarTodo<any>(supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, tecnico_responsable_id").order("fecha", { ascending: true })),
-        cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal").order("nombre")),
+        cargarTodo<Cliente>(supabase.from("clientes").select("id, nombre, sucursal, ruc, cod_entidad").order("nombre")),
         cargarTodo<Profile>(supabase.from("profiles").select("id, nombre, sucursal").order("nombre")),
       ]);
       setTrabajos(t);
