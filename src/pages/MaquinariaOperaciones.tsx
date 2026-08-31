@@ -1200,7 +1200,6 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       ]);
       if (summary.error) throw summary.error; if (lines.error) throw lines.error;
       const lineIds = (lines.data ?? []).map((l: any) => l.id);
-      const importColumns = "id,importacion_linea_id,numero_unidad,cantidad_lote,operacion_id,linea_id,unidad_id,np_numero,proveedor,producto,modelo,estado_fuente,oc,po,eta,ata,chasis,situacion_vinculo,vinculo_manual,invoice_supplier,factura_proveedor_fecha,costo_final";
       const [units, stock, linkedImports, availableImports, suggestions] = await Promise.all([
         lineIds.length ? db.from("maquinaria_unidades_operacion").select("*").in("linea_id", lineIds).order("numero_unidad") : Promise.resolve({ data: [], error: null }),
         db.from("maquinaria_stock_trazabilidad")
@@ -1208,10 +1207,10 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
           .or("saldo_actual.gt.0,unidad_operacion_id.not.is.null")
           .order("marca").order("modelo").limit(1000),
         db.from("maquinaria_importacion_unidades_operativas")
-          .select(importColumns).eq("operacion_id", operationId)
+          .select("*").eq("operacion_id", operationId)
           .order("eta", { ascending: true, nullsFirst: false }),
         db.from("maquinaria_importacion_unidades_asignables")
-          .select(importColumns).order("eta", { ascending: true, nullsFirst: false }).limit(500),
+          .select("*").order("eta", { ascending: true, nullsFirst: false }).limit(500),
         db.from("maquinaria_vinculos_sugeridos").select("*").eq("operacion_id", operationId),
       ]);
       if (units.error) throw units.error; if (stock.error) throw stock.error; if (linkedImports.error) throw linkedImports.error; if (availableImports.error) throw availableImports.error; if (suggestions.error) throw suggestions.error;
