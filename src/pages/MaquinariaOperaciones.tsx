@@ -423,7 +423,7 @@ async function uploadImportDocument(file: File, importLineId: string, type: "OC"
   if (docError) throw docError;
 }
 
-async function openMachineDocument(storagePath: string) {
+async function openMachineDocument(storagePath: string, fileName = "documento") {
   const viewer = window.open("about:blank", "_blank");
   if (viewer) {
     viewer.document.title = "Cargando documento...";
@@ -435,18 +435,43 @@ async function openMachineDocument(storagePath: string) {
     if (error || !data) throw error ?? new Error("El archivo no está disponible");
     const objectUrl = URL.createObjectURL(data);
     if (viewer) {
-      viewer.location.href = objectUrl;
-      window.setTimeout(() => {
-        try { viewer.opener = null; } catch { /* La navegación ya quedó iniciada. */ }
-      }, 1_000);
+      const documentViewer = viewer.document;
+      documentViewer.open();
+      documentViewer.write("<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Documento</title><style>html,body{margin:0;height:100%;background:#202124;color:#fff;font-family:system-ui}body{display:flex;flex-direction:column}.toolbar{height:52px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 16px;background:#2b2d30}.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.download{flex:none;border:1px solid #6b7280;border-radius:7px;padding:7px 12px;color:#fff;text-decoration:none;font-size:13px}.content{flex:1;min-height:0;display:grid;place-items:center;padding:12px}.content img{display:block;max-width:100%;max-height:100%;object-fit:contain}.content iframe{width:100%;height:100%;border:0;background:#fff}.message{max-width:520px;text-align:center;color:#d1d5db}</style></head><body><div class='toolbar'><span class='name'></span><a class='download'>Descargar</a></div><main class='content'></main></body></html>");
+      documentViewer.close();
+      documentViewer.title = fileName;
+      const name = documentViewer.querySelector<HTMLElement>(".name");
+      const download = documentViewer.querySelector<HTMLAnchorElement>(".download");
+      const content = documentViewer.querySelector<HTMLElement>(".content");
+      if (name) name.textContent = fileName;
+      if (download) { download.href = objectUrl; download.download = fileName; }
+      const normalizedName = fileName.toLowerCase();
+      const isImage = data.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp)$/.test(normalizedName);
+      const isPdf = data.type === "application/pdf" || normalizedName.endsWith(".pdf");
+      if (content && isImage) {
+        const image = documentViewer.createElement("img");
+        image.src = objectUrl;
+        image.alt = fileName;
+        content.appendChild(image);
+      } else if (content && isPdf) {
+        const frame = documentViewer.createElement("iframe");
+        frame.src = objectUrl;
+        frame.title = fileName;
+        content.appendChild(frame);
+      } else if (content) {
+        const message = documentViewer.createElement("p");
+        message.className = "message";
+        message.textContent = "Este formato no admite vista previa en el navegador. Usá Descargar para abrirlo en tu equipo.";
+        content.appendChild(message);
+      }
     } else {
       const link = document.createElement("a");
       link.href = objectUrl;
       link.target = "_blank";
-      link.rel = "noopener noreferrer";
+      link.download = fileName;
       link.click();
     }
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 300_000);
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 600_000);
   } catch (error) {
     viewer?.close();
     throw error;
@@ -967,7 +992,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
         <Field label="Fecha de pedido"><Input type="date" value={form.fecha_pedido} onChange={(event) => setForm((value) => ({ ...value, fecha_pedido: event.target.value }))} /></Field>
         <Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field>
       </div>
-      <section className="rounded-xl border p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Documento de OC</h3><p className="text-[10px] text-muted-foreground">PDF o imagen de la orden de compra.</p></div><><input ref={ocFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setOcFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" size="sm" onClick={() => ocFileRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocFile ? "Cambiar archivo" : "Subir OC"}</Button></></div>{ocFile && <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-[11px]"><span className="truncate">{ocFile.name}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOcFile(null)}>Quitar</Button></div>}{ocDocumentsQuery.data?.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="mt-2 flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</section>
+      <section className="rounded-xl border p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Documento de OC</h3><p className="text-[10px] text-muted-foreground">PDF o imagen de la orden de compra.</p></div><><input ref={ocFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setOcFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" size="sm" onClick={() => ocFileRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocFile ? "Cambiar archivo" : "Subir OC"}</Button></></div>{ocFile && <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-[11px]"><span className="truncate">{ocFile.name}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOcFile(null)}>Quitar</Button></div>}{ocDocumentsQuery.data?.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path, document.archivo_nombre).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="mt-2 flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</section>
       <Field label="Notas"><Textarea rows={3} value={form.notas} onChange={(event) => setForm((value) => ({ ...value, notas: event.target.value }))} /></Field>
       {row && <p className="rounded-lg bg-muted/50 p-3 text-[11px] text-muted-foreground">Los chasis, facturas, costos y fechas de arribo se editan por cada máquina física desde su detalle.</p>}
     </ResponsiveDrawerBody>
@@ -1080,8 +1105,8 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
           <input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} />
           <input ref={detailSupplierInvoiceRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadSupplierInvoice(event.target.files?.[0])} />
           <DetailSection title="Documentos de importación">
-            <div>{ocDocuments.length ? ocDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Orden de compra adicional" : "Orden de compra"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} />) : <DocumentRow label="Orden de compra" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}{ocDocuments.length > 0 && canEdit && <div className="flex justify-end"><Button variant="ghost" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar otra OC</Button></div>}</div>
-            <div>{supplierDocuments.length ? supplierDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura del proveedor"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la factura"))} />) : <DocumentRow label="Factura del proveedor" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}</div>
+            <div>{ocDocuments.length ? ocDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Orden de compra adicional" : "Orden de compra"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path, document.archivo_nombre).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} />) : <DocumentRow label="Orden de compra" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}{ocDocuments.length > 0 && canEdit && <div className="flex justify-end"><Button variant="ghost" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar otra OC</Button></div>}</div>
+            <div>{supplierDocuments.length ? supplierDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura del proveedor"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path, document.archivo_nombre).catch((error) => toast.error(error?.message ?? "No se pudo abrir la factura"))} />) : <DocumentRow label="Factura del proveedor" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}</div>
           </DetailSection>
           <DetailSection title="Datos de la factura" action={canEdit && !editingInvoice ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingInvoice(true)}><Pencil className="mr-1.5 h-3 w-3" />Editar</Button> : undefined}>
             {editingInvoice ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Número de factura"><Input value={form.invoice_supplier} onChange={(event) => setForm((value) => ({ ...value, invoice_supplier: event.target.value }))} /></Field><Field label="Fecha de factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(event) => setForm((value) => ({ ...value, factura_proveedor_fecha: event.target.value }))} /></Field><Field label="Valor facturado"><Input type="number" value={form.costo_final} onChange={(event) => setForm((value) => ({ ...value, costo_final: event.target.value }))} /></Field></div><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, invoice_supplier: row.invoice_supplier ?? "", factura_proveedor_fecha: row.factura_proveedor_fecha ?? "", costo_final: row.costo_final == null ? "" : String(row.costo_final) })); setEditingInvoice(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div></div> : <KeyValueGrid><KeyValueItem label="Número" value={row.invoice_supplier} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={formatDate(row.factura_proveedor_fecha)} empty="Pendiente" /><KeyValueItem label="Valor" value={row.costo_final != null ? formatUsd(row.costo_final) : null} empty="Pendiente" /></KeyValueGrid>}
@@ -1291,8 +1316,8 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: [...importsById.values()], suggestions: suggestions.data ?? [], importation: importation.data };
     },
   });
-  const openDocument = (storagePath: string) => {
-    openMachineDocument(storagePath).catch((error) => {
+  const openDocument = (storagePath: string, fileName: string) => {
+    openMachineDocument(storagePath, fileName).catch((error) => {
       console.error(error);
       toast.error("No se pudo abrir el documento");
     });
@@ -1377,7 +1402,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-4">
-          <DetailSection title="Documentos comerciales"><div>{npDocuments.length ? npDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Nota de pedido adicional" : "Nota de pedido"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path)} />) : <DocumentRow label="Nota de pedido" action={<AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{npDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div><div>{saleInvoiceDocuments.length ? saleInvoiceDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura al cliente"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path)} />) : <DocumentRow label="Factura al cliente" action={<AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{saleInvoiceDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div></DetailSection>
+          <DetailSection title="Documentos comerciales"><div>{npDocuments.length ? npDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Nota de pedido adicional" : "Nota de pedido"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} />) : <DocumentRow label="Nota de pedido" action={<AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{npDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div><div>{saleInvoiceDocuments.length ? saleInvoiceDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura al cliente"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} />) : <DocumentRow label="Factura al cliente" action={<AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{saleInvoiceDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div></DetailSection>
         </TabsContent>
       </Tabs>}
     </ResponsiveDrawerBody>
