@@ -127,6 +127,12 @@ const entregaClass = (state: EntregaState | null) =>
         : "border-amber-200 bg-amber-50 text-amber-700";
 
 const normalizarChasis = (value: string | null | undefined) => String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const formatNpCode = (value: string | null | undefined) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "Sin NP";
+  const code = raw.replace(/^(?:NP[\s._-]*)+/i, "").trim();
+  return code ? `NP${code}` : "NP";
+};
 
 // Sub-etapa A (diseno_flujo_maquinas.md): las marcas no admitidas a Parque
 // (OTROS) nunca van a generar una fila en parque_maquinas -- para ellas
@@ -692,7 +698,7 @@ export default function MaquinariaOperaciones() {
           const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet);
           return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
             <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-[12px] font-semibold">{row.np_numero ? `NP ${row.np_numero}` : "Sin NP"}</span>
+              <span className="font-mono text-[12px] font-semibold">{formatNpCode(row.np_numero)}</span>
               <div className="flex flex-col items-end gap-1">
                 <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state), state === "COMPLETADO" && entregaState !== "ENTREGADO" && "animate-pulse")}>{SIMPLE_STATE_LABEL[state]}</Badge>
                 {entregaState && <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge>}
@@ -932,7 +938,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
         <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo) => setForm((value) => ({ ...value, modelo }))} allowCustom={false} disabled={Boolean(selectedNp)} /></Field>
         <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
         <Field label="Estado"><Select value={form.estado_fuente} onValueChange={(estado_fuente) => setForm((value) => ({ ...value, estado_fuente }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PLANIFICADA">Planificada</SelectItem><SelectItem value="PEDIDA">Pedida</SelectItem><SelectItem value="EN_TRANSITO">En tránsito</SelectItem><SelectItem value="RECIBIDA">Recibida</SelectItem><SelectItem value="CANCELADA">Cancelada</SelectItem></SelectContent></Select></Field>
-        <Field label="NP de referencia"><Select value={form.linea_id || "NONE"} onValueChange={selectNp}><SelectTrigger><SelectValue placeholder={availableNpQuery.isLoading ? "Cargando NP..." : "Seleccionar NP disponible"} /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin NP asignada</SelectItem>{npOptions.map((option) => <SelectItem key={option.linea_id} value={option.linea_id}>NP {option.np_numero} · {option.modelo || option.producto} · {option.unidades_disponibles} libre{option.unidades_disponibles === 1 ? "" : "s"}</SelectItem>)}</SelectContent></Select></Field>
+        <Field label="NP de referencia"><Select value={form.linea_id || "NONE"} onValueChange={selectNp}><SelectTrigger><SelectValue placeholder={availableNpQuery.isLoading ? "Cargando NP..." : "Seleccionar NP disponible"} /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin NP asignada</SelectItem>{npOptions.map((option) => <SelectItem key={option.linea_id} value={option.linea_id}>{formatNpCode(option.np_numero)} · {option.modelo || option.producto} · {option.unidades_disponibles} libre{option.unidades_disponibles === 1 ? "" : "s"}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="OC"><Input value={form.oc} onChange={(event) => setForm((value) => ({ ...value, oc: event.target.value }))} /></Field>
         <Field label="Fecha de pedido"><Input type="date" value={form.fecha_pedido} onChange={(event) => setForm((value) => ({ ...value, fecha_pedido: event.target.value }))} /></Field>
         <Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field>
@@ -1042,7 +1048,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
 
         <TabsContent value="pedido" className="space-y-4">
           <DetailSection title="Pedido vinculado" action={canEdit ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3 w-3" />{row.np_numero ? "Cambiar" : "Vincular"}</Button> : undefined}>
-            {row.np_numero ? <EntityCard><div className="mb-3"><div className="text-[13px] font-semibold">NP {row.np_numero}</div><div className="text-[10px] text-muted-foreground">{row.cliente_nombre || "Cliente no informado"}</div></div><KeyValueGrid className="border-t pt-3"><KeyValueItem label="Comercial" value={row.comercial} /><KeyValueItem label="Fecha NP" value={formatDate(row.np_fecha)} /><KeyValueItem label="Estado del vínculo" value={row.situacion_vinculo} empty="Vinculado" /></KeyValueGrid></EntityCard> : <div className="py-4 text-[11px] text-muted-foreground">Esta máquina todavía no tiene un pedido vinculado.</div>}
+            {row.np_numero ? <EntityCard><div className="mb-3"><div className="text-[13px] font-semibold">{formatNpCode(row.np_numero)}</div><div className="text-[10px] text-muted-foreground">{row.cliente_nombre || "Cliente no informado"}</div></div><KeyValueGrid className="border-t pt-3"><KeyValueItem label="Comercial" value={row.comercial} /><KeyValueItem label="Fecha NP" value={formatDate(row.np_fecha)} /><KeyValueItem label="Estado del vínculo" value={row.situacion_vinculo} empty="Vinculado" /></KeyValueGrid></EntityCard> : <div className="py-4 text-[11px] text-muted-foreground">Esta máquina todavía no tiene un pedido vinculado.</div>}
           </DetailSection>
         </TabsContent>
 
@@ -1303,7 +1309,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
-        <div><h2 className="text-[16px] font-semibold">NP {detail?.np_numero ?? "—"}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
+        <div><h2 className="text-[16px] font-semibold">{detail ? formatNpCode(detail.np_numero) : "Cargando..."}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
         {detail && <div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState), simpleState === "COMPLETADO" && !deliveryComplete && "animate-pulse")}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><span className="text-[10px] text-muted-foreground">{STATE_LABEL[detail.estado] ?? detail.estado}</span></div>}
       </div>
     </ResponsiveDrawerHeader>
@@ -1551,7 +1557,7 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
     {linked && !editing ? <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-3"><DetailValue label="Origen" value="Importación" /><DetailValue label="Máquina" value={linked.modelo || linked.producto} /><DetailValue label="Chasis" value={linked.chasis || unit.chasis} mono /><DetailValue label="Proveedor" value={linked.proveedor} /><DetailValue label="OC" value={linked.oc} mono /><DetailValue label="Llegada" value={formatDate(linked.ata || linked.eta)} /></div> : <>
     {!linked && validSuggestion && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-200 bg-violet-50/50 p-2.5"><div><p className="text-[11px] font-medium text-violet-800">Coincidencia exacta de chasis</p><p className="text-[10px] text-violet-700">{[validSuggestion.modelo, validSuggestion.ubicacion, validSuggestion.chasis].filter(Boolean).join(" · ")}</p></div><Button size="sm" variant="outline" onClick={() => saveAssignment(validSuggestion.recurso_id)} disabled={savingAssignment}>Confirmar sugerencia</Button></div>}
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-      <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Máquina importada</Label><Input className="h-8 text-[11px]" value={searchImport} onChange={(event) => setSearchImport(event.target.value)} placeholder="Buscar por modelo, NP, proveedor, OC, PO o chasis" /><Select value={importId} onValueChange={setImportId}><SelectTrigger className="h-9 text-[11px]"><SelectValue placeholder="Sin importación vinculada" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin importación vinculada</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto || "Importación", `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`, row.chasis && `Ch. ${row.chasis}`, row.np_numero && `NP ${row.np_numero}`, row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`, row.eta && `ETA ${formatDate(row.eta)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
+      <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">Máquina importada</Label><Input className="h-8 text-[11px]" value={searchImport} onChange={(event) => setSearchImport(event.target.value)} placeholder="Buscar por modelo, NP, proveedor, OC, PO o chasis" /><Select value={importId} onValueChange={setImportId}><SelectTrigger className="h-9 text-[11px]"><SelectValue placeholder="Sin importación vinculada" /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin importación vinculada</SelectItem>{candidates.map((row) => <SelectItem key={row.id} value={row.id}>{[row.modelo || row.producto || "Importación", `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`, row.chasis && `Ch. ${row.chasis}`, row.np_numero && formatNpCode(row.np_numero), row.oc && `OC ${row.oc}`, row.po && `PO ${row.po}`, row.eta && `ETA ${formatDate(row.eta)}`].filter(Boolean).join(" · ")}</SelectItem>)}</SelectContent></Select></div>
       <div className="flex gap-2">{editing && <Button size="sm" variant="outline" onClick={() => { setImportId(linked?.id ?? "NONE"); setEditing(false); }}>Cancelar</Button>}<Button size="sm" onClick={() => saveAssignment()} disabled={!dirty || savingAssignment}><Save className="mr-1.5 h-3.5 w-3.5" />{savingAssignment ? "Guardando..." : "Guardar"}</Button></div>
     </div>
     </>}
