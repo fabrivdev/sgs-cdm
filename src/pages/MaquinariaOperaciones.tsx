@@ -460,18 +460,38 @@ async function openMachineDocument(storagePath: string, fileName = "documento") 
         content.style.display = "block";
         content.style.overflow = "auto";
         content.style.background = "#525659";
-        const pdf = await getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise;
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-          const page = await pdf.getPage(pageNumber);
-          const viewport = page.getViewport({ scale: 1.5 });
-          const canvas = documentViewer.createElement("canvas");
-          const context = canvas.getContext("2d");
-          if (!context) throw new Error("No se pudo preparar la vista del PDF");
-          canvas.width = Math.ceil(viewport.width);
-          canvas.height = Math.ceil(viewport.height);
-          canvas.style.cssText = "display:block;max-width:100%;height:auto;margin:0 auto 12px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)";
-          content.appendChild(canvas);
-          await page.render({ canvasContext: context, viewport }).promise;
+        content.style.padding = "12px";
+        const progress = documentViewer.createElement("p");
+        progress.className = "message";
+        progress.style.margin = "24px auto";
+        progress.textContent = "Preparando PDF...";
+        content.appendChild(progress);
+        try {
+          const pdf = await getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise;
+          for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+            progress.textContent = `Renderizando página ${pageNumber} de ${pdf.numPages}...`;
+            const page = await pdf.getPage(pageNumber);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d", { alpha: false });
+            if (!context) throw new Error("No se pudo preparar la vista del PDF");
+            canvas.width = Math.ceil(viewport.width);
+            canvas.height = Math.ceil(viewport.height);
+            await page.render({ canvasContext: context, viewport, background: "#ffffff" }).promise;
+            const renderedPage = documentViewer.createElement("img");
+            renderedPage.src = canvas.toDataURL("image/png");
+            renderedPage.alt = `Página ${pageNumber} de ${fileName}`;
+            renderedPage.style.cssText = "display:block;width:auto;max-width:100%;height:auto;margin:0 auto 12px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)";
+            content.appendChild(renderedPage);
+            canvas.width = 1;
+            canvas.height = 1;
+            page.cleanup();
+          }
+          progress.remove();
+          await pdf.destroy();
+        } catch (pdfError) {
+          console.error("No se pudo renderizar el PDF", pdfError);
+          progress.textContent = "No se pudo generar la vista previa. Usá Descargar para abrir el archivo en tu equipo.";
         }
       } else if (content) {
         const message = documentViewer.createElement("p");
