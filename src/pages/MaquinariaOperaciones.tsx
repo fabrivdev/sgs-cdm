@@ -425,13 +425,20 @@ async function uploadImportDocument(file: File, importLineId: string, type: "OC"
 
 async function openMachineDocument(storagePath: string) {
   const viewer = window.open("about:blank", "_blank");
+  if (viewer) {
+    viewer.document.title = "Cargando documento...";
+    viewer.document.body.style.cssText = "margin:0;display:grid;place-items:center;min-height:100vh;font-family:system-ui;color:#4b5563";
+    viewer.document.body.textContent = "Cargando documento...";
+  }
   try {
     const { data, error } = await supabase.storage.from("maquinaria-documentos").download(storagePath);
     if (error || !data) throw error ?? new Error("El archivo no está disponible");
     const objectUrl = URL.createObjectURL(data);
     if (viewer) {
-      viewer.opener = null;
-      viewer.location.replace(objectUrl);
+      viewer.location.href = objectUrl;
+      window.setTimeout(() => {
+        try { viewer.opener = null; } catch { /* La navegación ya quedó iniciada. */ }
+      }, 1_000);
     } else {
       const link = document.createElement("a");
       link.href = objectUrl;
@@ -439,7 +446,7 @@ async function openMachineDocument(storagePath: string) {
       link.rel = "noopener noreferrer";
       link.click();
     }
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 300_000);
   } catch (error) {
     viewer?.close();
     throw error;
