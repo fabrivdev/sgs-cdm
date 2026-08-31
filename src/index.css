@@ -4,6 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes process-step-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+.process-step-blink {
+  animation: process-step-blink 1s ease-in-out infinite;
+}
+
 @layer base {
   :root {
     --space-1: 4px;

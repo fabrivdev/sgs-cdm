@@ -1027,7 +1027,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival), arrival === "COMPLETADO" && !stockConfirmed && "animate-pulse")}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} />
+        <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} pulseCurrent={!stockConfirmed} />
         <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
@@ -1309,7 +1309,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       {detail && <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <ProcessStepper steps={["Pedido", "Origen", "Facturación", "Entrega"]} currentIndex={lifecycleIndex} />
+        <ProcessStepper steps={["Pedido", "Origen", "Facturación", "Entrega"]} currentIndex={lifecycleIndex} pulseCurrent={!deliveryComplete} />
         <TabsList className="grid h-auto w-full grid-cols-4">
           <TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger>
           <TabsTrigger value="origen" className="px-2 text-[11px]">Origen</TabsTrigger>

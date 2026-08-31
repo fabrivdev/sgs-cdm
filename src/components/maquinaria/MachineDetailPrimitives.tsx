@@ -3,14 +3,14 @@ import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function ProcessStepper({ steps, currentIndex }: { steps: string[]; currentIndex: number }) {
+export function ProcessStepper({ steps, currentIndex, pulseCurrent = false }: { steps: string[]; currentIndex: number; pulseCurrent?: boolean }) {
   return <div className="grid grid-cols-4 gap-2" aria-label="Avance del proceso">
     {steps.map((step, index) => {
       const complete = index < currentIndex;
       const current = index === currentIndex;
       return <div key={step} className="min-w-0">
-        <div className={cn("mb-1 h-1 rounded-full", complete || current ? "bg-primary" : "bg-border")} />
-        <div className={cn("truncate text-[10px]", current ? "font-semibold text-foreground" : complete ? "font-medium text-primary" : "text-muted-foreground")}>{step}</div>
+        <div className={cn("mb-1 h-1 rounded-full", complete || current ? "bg-primary" : "bg-border", current && pulseCurrent && "process-step-blink")} />
+        <div className={cn("truncate text-[10px]", current ? "font-semibold text-foreground" : complete ? "font-medium text-primary" : "text-muted-foreground", current && pulseCurrent && "process-step-blink")}>{step}</div>
       </div>;
     })}
   </div>;
