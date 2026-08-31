@@ -8,6 +8,7 @@ import type {
   CanonicalSolicitudCompraRow,
   CanonicalStockRow,
 } from "@/lib/imports/canonical";
+import { canonicalClientName } from "@/lib/clientIdentity";
 import {
   applyIva,
   extractShortInvoiceNumber,
@@ -462,7 +463,7 @@ export function mapClienteSheet(
     rows.push({
       rowId: buildRowId(codEntidad, String(index + 1)) || `cliente-row-${index + 1}`,
       codEntidad,
-      nombre: displayText(row, ["Nombre"]) || `Cliente ${index + 1}`,
+      nombre: canonicalClientName(displayText(row, ["Nombre"])) || `Cliente ${index + 1}`,
       ruc: text(row, ["RUC"]),
       direccion: displayText(row, ["Direccion"]),
       localidad,

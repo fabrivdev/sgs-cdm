@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
+import { canonicalClientId, canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
 
-type Cliente = { id: string; nombre: string };
+type Cliente = ClientIdentityRow & { sourceIds: string[] };
 
 interface Props {
   notification: AppNotification | null;
@@ -89,12 +90,12 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
     });
 
     void (async () => {
-      const rows: Cliente[] = [];
+      const rows: ClientIdentityRow[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
         const { data: page, error } = await supabase
           .from("clientes")
-          .select("id, nombre")
+          .select("id, nombre, ruc, cod_entidad")
           .eq("activo", true)
           .order("nombre")
           .range(from, from + pageSize - 1);
@@ -102,11 +103,13 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
           toast.error("No se pudo cargar el listado de clientes");
           break;
         }
-        const typedPage = (page ?? []) as Cliente[];
+        const typedPage = (page ?? []) as ClientIdentityRow[];
         rows.push(...typedPage);
         if (typedPage.length < pageSize) break;
       }
-      setClientes(rows);
+      const options = canonicalClientOptions(rows);
+      setClientes(options);
+      setForm((current) => ({ ...current, cliente_id: canonicalClientId(options, current.cliente_id) }));
     })();
   }, [data, notification, open]);
 

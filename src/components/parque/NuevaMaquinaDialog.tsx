@@ -21,8 +21,9 @@ import { toast } from "sonner";
 import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
+import { canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
 
-type Cliente = { id: string; nombre: string };
+type Cliente = ClientIdentityRow & { sourceIds: string[] };
 
 interface Props {
   open: boolean;
@@ -76,21 +77,21 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
       notas: "",
     }));
     (async () => {
-      const all: Cliente[] = [];
+      const all: ClientIdentityRow[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await supabase
           .from("clientes")
-          .select("id, nombre")
+          .select("id, nombre, ruc, cod_entidad")
           .eq("activo", true)
           .order("nombre")
           .range(from, from + pageSize - 1);
         if (error) break;
-        const rows = (data ?? []) as Cliente[];
+        const rows = (data ?? []) as ClientIdentityRow[];
         all.push(...rows);
         if (rows.length < pageSize) break;
       }
-      setClientes(all);
+      setClientes(canonicalClientOptions(all));
     })();
     (async () => {
       // La tabla estará disponible en los tipos generados después de aplicar la migración.

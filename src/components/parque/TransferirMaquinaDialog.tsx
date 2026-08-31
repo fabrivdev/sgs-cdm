@@ -17,8 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
+import { canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
 
-type ClienteSimple = { id: string; nombre: string };
+type ClienteSimple = ClientIdentityRow & { sourceIds: string[] };
 
 export type MaquinaParaTransferir = {
   id: string;
@@ -60,21 +61,21 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
     setNuevoClienteSucursal("");
     setMotivo("");
     (async () => {
-      const all: ClienteSimple[] = [];
+      const all: ClientIdentityRow[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await supabase
           .from("clientes")
-          .select("id, nombre")
+          .select("id, nombre, ruc, cod_entidad")
           .eq("activo", true)
           .order("nombre")
           .range(from, from + pageSize - 1);
         if (error) break;
-        const rows = (data ?? []) as ClienteSimple[];
+        const rows = (data ?? []) as ClientIdentityRow[];
         all.push(...rows);
         if (rows.length < pageSize) break;
       }
-      setClientes(all);
+      setClientes(canonicalClientOptions(all));
     })();
   }, [open]);
 
@@ -88,13 +89,13 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
     const { data, error } = await supabase
       .from("clientes")
       .insert({ nombre, sucursal: nuevoClienteSucursal || null })
-      .select("id, nombre")
+      .select("id, nombre, ruc, cod_entidad")
       .single();
     setCreating(false);
     if (error) return toast.error(error.message);
 
-    const creado = data as ClienteSimple;
-    setClientes((prev) => [...prev, creado].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    const creado = data as ClientIdentityRow;
+    setClientes((prev) => canonicalClientOptions([...prev, creado]));
     setNuevoClienteId(creado.id);
     setClienteSearch("");
     setNuevoClienteNombre("");

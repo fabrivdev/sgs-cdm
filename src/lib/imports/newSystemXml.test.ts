@@ -850,18 +850,18 @@ describe("importacion XML de maestro de clientes", () => {
     expect(result.rows[0].sucursal).toBe("Misiones");
   });
 
-  it("se queda con la primera fila cuando el mismo codigo aparece una vez por sucursal", () => {
+  it("unifica el nombre cuando el mismo cliente aparece una vez por sucursal", () => {
     const result = mapClienteSheet("clientes.xml", {
       name: "Maestro de Clientes",
       headers: [],
       rows: [
-        { ...filaBase, Codigo: "80056738-2", Nombre: "CDM - SANTA RITA", DISTRI: "SANTA RITA" },
-        { ...filaBase, Codigo: "80056738-2", Nombre: "CDM - KATUETE", DISTRI: "KATUETE" },
+        { ...filaBase, Codigo: "80056738-2", Nombre: "CAMPOS DEL MAÑANA S.A. - LOMA PLATA", DISTRI: "LOMA PLATA" },
+        { ...filaBase, Codigo: "80056738-2", Nombre: "CAMPOS DEL MAÑANA S.A. - KATUETE", DISTRI: "KATUETE" },
       ],
     });
 
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].nombre).toBe("CDM - SANTA RITA");
+    expect(result.rows[0].nombre).toBe("CAMPOS DEL MAÑANA S.A.");
   });
 
   it("descarta filas sin codigo", () => {
