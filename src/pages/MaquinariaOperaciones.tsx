@@ -4,6 +4,8 @@ import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Pencil, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 // Estado de una UNIDAD fisica (maquinaria_unidades_operacion.estado) --
 // distinto del estado de la operacion (STATE_LABEL, mas abajo).
@@ -454,10 +457,22 @@ async function openMachineDocument(storagePath: string, fileName = "documento") 
         image.alt = fileName;
         content.appendChild(image);
       } else if (content && isPdf) {
-        const frame = documentViewer.createElement("iframe");
-        frame.src = objectUrl;
-        frame.title = fileName;
-        content.appendChild(frame);
+        content.style.display = "block";
+        content.style.overflow = "auto";
+        content.style.background = "#525659";
+        const pdf = await getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise;
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = documentViewer.createElement("canvas");
+          const context = canvas.getContext("2d");
+          if (!context) throw new Error("No se pudo preparar la vista del PDF");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          canvas.style.cssText = "display:block;max-width:100%;height:auto;margin:0 auto 12px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)";
+          content.appendChild(canvas);
+          await page.render({ canvasContext: context, viewport }).promise;
+        }
       } else if (content) {
         const message = documentViewer.createElement("p");
         message.className = "message";
