@@ -424,9 +424,26 @@ async function uploadImportDocument(file: File, importLineId: string, type: "OC"
 }
 
 async function openMachineDocument(storagePath: string) {
-  const { data, error } = await supabase.storage.from("maquinaria-documentos").createSignedUrl(storagePath, 90);
-  if (error) throw error;
-  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  const viewer = window.open("about:blank", "_blank");
+  try {
+    const { data, error } = await supabase.storage.from("maquinaria-documentos").download(storagePath);
+    if (error || !data) throw error ?? new Error("El archivo no está disponible");
+    const objectUrl = URL.createObjectURL(data);
+    if (viewer) {
+      viewer.opener = null;
+      viewer.location.replace(objectUrl);
+    } else {
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+    }
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch (error) {
+    viewer?.close();
+    throw error;
+  }
 }
 
 export default function MaquinariaOperaciones() {
@@ -1267,10 +1284,11 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: [...importsById.values()], suggestions: suggestions.data ?? [], importation: importation.data };
     },
   });
-  const openDocument = async (storagePath: string) => {
-    const { data, error } = await supabase.storage.from("maquinaria-documentos").createSignedUrl(storagePath, 90);
-    if (error || !data?.signedUrl) return toast.error("No se pudo abrir el documento");
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  const openDocument = (storagePath: string) => {
+    openMachineDocument(storagePath).catch((error) => {
+      console.error(error);
+      toast.error("No se pudo abrir el documento");
+    });
   };
   const detail = detailQuery.data;
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
