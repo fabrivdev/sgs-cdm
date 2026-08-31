@@ -223,6 +223,8 @@
     color: #111 !important;
     background: white !important;
     font-size: 8px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body.printing-dashboard-matrix .dashboard-matrix-print-header {
@@ -236,6 +238,34 @@
   }
 
   body.printing-dashboard-matrix .dashboard-matrix-print-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    margin: 0 0 5px !important;
+    padding: 4px 6px !important;
+    border: 1px solid #d9d9d9 !important;
+    background: #fafafa !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-legend {
+    display: flex !important;
+    align-items: center !important;
+    gap: 3px 10px !important;
+    color: #222 !important;
+    font-size: 7px !important;
+    line-height: 1.1 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-legend > span {
+    white-space: nowrap !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-legend-note {
+    color: #555 !important;
+    font-style: italic !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-actions {
     display: none !important;
   }
 
@@ -392,6 +422,12 @@
     line-height: 1 !important;
   }
 
+  body.printing-dashboard-matrix .dashboard-matrix-day-header.dashboard-matrix-sunday {
+    background: #d4d4d4 !important;
+    color: #111 !important;
+    font-weight: 700 !important;
+  }
+
   body.printing-dashboard-matrix .dashboard-matrix-tech {
     height: 21px !important;
     padding: 2px 4px !important;
@@ -410,6 +446,10 @@
 
   body.printing-dashboard-matrix .dashboard-matrix-cell {
     padding: 1px !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-cell.dashboard-matrix-sunday {
+    background: #e2e2e2 !important;
   }
 
   body.printing-dashboard-matrix .dashboard-matrix-cell > *,

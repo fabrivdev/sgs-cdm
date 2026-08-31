@@ -1531,11 +1531,12 @@ function MatrizCellVisual({
 
   if (hasRealizadas && hasNoRealizadas) {
     return (
-      <div className={cn("relative flex h-9 items-center justify-center overflow-hidden rounded-md border border-border/60 text-[11px] font-semibold tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-muted/40")}>
+      <div className={cn("relative flex h-9 items-center justify-center gap-1 overflow-hidden rounded-md border border-border/60 px-1 text-[11px] font-semibold tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-muted/40")}>
         <div className="absolute inset-y-0 left-0 w-1/2 bg-emerald-500/18" />
         <div className="absolute inset-y-0 right-0 w-1/2 bg-amber-400/25" />
         {hasNoDisponibilidad ? <div className="absolute inset-x-1 bottom-1 h-1 rounded-full bg-violet-400/75" /> : null}
-        <span className="relative z-10 text-foreground">{labelValue || "●"}</span>
+        <span className="relative z-10 whitespace-nowrap text-[9px]"><span className="text-emerald-700">●</span><span className="text-amber-700">▲</span></span>
+        {labelValue ? <span className="relative z-10 text-foreground">{labelValue}</span> : null}
       </div>
     );
   }
@@ -1736,14 +1737,16 @@ export function MatrizTécnicosDías({
         </div>
 
         <div className="dashboard-matrix-print-toolbar flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><span className="text-emerald-600">●</span> Realizadas</span>
-            <span className="inline-flex items-center gap-1"><span className="text-amber-600">▲</span> No realizadas / vencidas</span>
-            <span className="inline-flex items-center gap-1"><span className="text-sky-700">○</span> Programadas</span>
-            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-400" /> No disponible</span>
+          <div className="dashboard-matrix-legend flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground" aria-label="Leyenda de la matriz">
+            <span className="inline-flex items-center gap-1"><span className="font-bold text-emerald-700">●</span> Trabajo realizado</span>
+            <span className="inline-flex items-center gap-1"><span className="font-bold text-amber-700">▲</span> No realizado o vencido</span>
+            <span className="inline-flex items-center gap-1"><span className="font-bold text-sky-700">○</span> Trabajo programado</span>
+            <span className="inline-flex items-center gap-1"><span className="font-bold text-violet-700">ND</span> No disponible</span>
+            <span className="inline-flex items-center gap-1"><span className="font-bold"><span className="text-emerald-700">●</span><span className="text-amber-700">▲</span></span> Estados combinados</span>
+            <span className="dashboard-matrix-legend-note">El número indica {metric === "horas" ? "horas" : "cantidad de trabajos"}.</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="dashboard-matrix-actions flex items-center gap-2">
             <div className="inline-flex overflow-hidden rounded-md border text-[11px]">
               <button type="button" onClick={() => onMetricChange("trabajos")} className={cn("px-2.5 py-1", metric === "trabajos" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Trabajos</button>
               <button type="button" onClick={() => onMetricChange("horas")} className={cn("border-l px-2.5 py-1", metric === "horas" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}>Horas</button>
@@ -1791,7 +1794,7 @@ export function MatrizTécnicosDías({
                       className={cn(
                         "dashboard-matrix-day-header flex h-11 items-center justify-center border-l px-1 text-center text-[11px] font-medium text-muted-foreground",
                         isCurrent && "bg-primary/5 text-foreground",
-                        isSunday && "bg-muted/50"
+                        isSunday && "dashboard-matrix-sunday bg-muted/70"
                       )}
                     >
                       {bucketLabels[bucket] ?? bucket}
@@ -1831,7 +1834,7 @@ export function MatrizTécnicosDías({
                         : "Sin actividad";
 
                     return (
-                      <div key={`${block.sucursal}-${row.id}-${bucket}`} className={cn("dashboard-matrix-cell border-l border-t p-1", isCurrent && "bg-primary/5", isSunday && "bg-muted/35")}>
+                      <div key={`${block.sucursal}-${row.id}-${bucket}`} className={cn("dashboard-matrix-cell border-l border-t p-1", isCurrent && "bg-primary/5", isSunday && "dashboard-matrix-sunday bg-muted/55")}>
                         {(cell?.refs?.length || cell?.noDisponibilidad?.length) ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
