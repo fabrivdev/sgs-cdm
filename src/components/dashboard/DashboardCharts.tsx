@@ -1943,7 +1943,7 @@ export function MatrizTécnicosDías({
           )}
 
           {printDetailRows.unavailable.length > 0 ? (
-            <>
+            <section className="dashboard-matrix-print-unavailability">
               <div className="dashboard-matrix-print-section-title dashboard-matrix-print-section-title-secondary">No disponibilidad</div>
               <table className="dashboard-matrix-print-table dashboard-matrix-print-table-compact">
                 <thead>
@@ -1965,7 +1965,7 @@ export function MatrizTécnicosDías({
                   ))}
                 </tbody>
               </table>
-            </>
+            </section>
           ) : null}
         </div>
       </div>

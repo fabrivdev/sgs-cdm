@@ -317,7 +317,14 @@
   }
 
   body.printing-dashboard-matrix .dashboard-matrix-print-section-title-secondary {
-    margin-top: 8px !important;
+    margin-top: 0 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-print-unavailability {
+    display: block !important;
+    break-before: page !important;
+    page-break-before: always !important;
+    margin-top: 0 !important;
   }
 
   body.printing-dashboard-matrix .dashboard-matrix-print-table {
