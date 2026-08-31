@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
+import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
@@ -943,7 +944,11 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
 function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row: ImportRow | null; onOpenChange: (open: boolean) => void; onEditHeader: (row: ImportRow) => void; onSaved: () => void }) {
   const { isAdmin, roles } = useAuth();
   const canEdit = isAdmin || roles.includes("jefatura");
-  const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState("resumen");
+  const [editingChassis, setEditingChassis] = useState(false);
+  const [editingImportData, setEditingImportData] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(false);
+  const [editingReceipt, setEditingReceipt] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [uploadingOc, setUploadingOc] = useState(false);
@@ -953,139 +958,112 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const [form, setForm] = useState({ chasis: "", eta: "", invoice_supplier: "", factura_proveedor_fecha: "", costo_final: "" });
   const [receipt, setReceipt] = useState({ fecha: TODAY });
   const detailOcQuery = useQuery({
-    queryKey: ["machine-import-oc-documents", row?.importacion_linea_id],
-    enabled: Boolean(row?.importacion_linea_id),
+    queryKey: ["machine-import-oc-documents", row?.importacion_linea_id], enabled: Boolean(row?.importacion_linea_id),
     queryFn: async () => {
-      const { data, error } = await db.from("maquinaria_documentos")
-        .select("id,archivo_nombre,storage_path,creado_en")
-        .eq("importacion_linea_id", row?.importacion_linea_id)
-        .eq("tipo", "OC")
-        .order("creado_en", { ascending: false });
+      const { data, error } = await db.from("maquinaria_documentos").select("id,archivo_nombre,storage_path,creado_en").eq("importacion_linea_id", row?.importacion_linea_id).eq("tipo", "OC").order("creado_en", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
   const detailSupplierInvoiceQuery = useQuery({
-    queryKey: ["machine-import-supplier-invoice-documents", row?.importacion_linea_id],
-    enabled: Boolean(row?.importacion_linea_id),
+    queryKey: ["machine-import-supplier-invoice-documents", row?.importacion_linea_id], enabled: Boolean(row?.importacion_linea_id),
     queryFn: async () => {
-      const { data, error } = await db.from("maquinaria_documentos")
-        .select("id,archivo_nombre,storage_path,creado_en")
-        .eq("importacion_linea_id", row?.importacion_linea_id)
-        .eq("tipo", "FACTURA_IMPORTACION")
-        .order("creado_en", { ascending: false });
+      const { data, error } = await db.from("maquinaria_documentos").select("id,archivo_nombre,storage_path,creado_en").eq("importacion_linea_id", row?.importacion_linea_id).eq("tipo", "FACTURA_IMPORTACION").order("creado_en", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
   useEffect(() => {
-    setEditing(false);
-    setForm({
-      chasis: row?.chasis ?? "", eta: row?.eta ?? "",
-      invoice_supplier: row?.invoice_supplier ?? "",
-      factura_proveedor_fecha: row?.factura_proveedor_fecha ?? "",
-      costo_final: row?.costo_final == null ? "" : String(row.costo_final),
-    });
+    setActiveTab("resumen");
+    setEditingChassis(false); setEditingImportData(false); setEditingInvoice(false); setEditingReceipt(false);
+    setForm({ chasis: row?.chasis ?? "", eta: row?.eta ?? "", invoice_supplier: row?.invoice_supplier ?? "", factura_proveedor_fecha: row?.factura_proveedor_fecha ?? "", costo_final: row?.costo_final == null ? "" : String(row.costo_final) });
     setReceipt({ fecha: row?.ata ?? TODAY });
   }, [row?.id, row?.chasis, row?.eta, row?.ata, row?.invoice_supplier, row?.factura_proveedor_fecha, row?.costo_final]);
   if (!row) return null;
   const arrival = arrivalState(row);
+  const stockConfirmed = Boolean(row.stock_sucursal || row.stock_deposito || ["DISPONIBLE", "RESERVADO", "VENDIDO_PENDIENTE_ENTREGA"].includes(row.estado_disponibilidad ?? ""));
+  const progressIndex = stockConfirmed ? 3 : row.ata || arrival === "COMPLETADO" ? 2 : arrival === "EN_TRANSITO" ? 1 : 0;
+  const closeEditors = () => { setEditingChassis(false); setEditingImportData(false); setEditingInvoice(false); };
   const uploadOc = async (file?: File) => {
     if (!file) return;
     setUploadingOc(true);
-    try {
-      await uploadImportDocument(file, row.importacion_linea_id, "OC", row.operacion_id);
-      await detailOcQuery.refetch();
-      toast.success("Documento de OC adjuntado");
-    } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo adjuntar la OC");
-    } finally {
-      setUploadingOc(false);
-      if (detailOcRef.current) detailOcRef.current.value = "";
-    }
+    try { await uploadImportDocument(file, row.importacion_linea_id, "OC", row.operacion_id); await detailOcQuery.refetch(); toast.success("Documento de OC adjuntado"); }
+    catch (error: any) { toast.error(error?.message ?? "No se pudo adjuntar la OC"); }
+    finally { setUploadingOc(false); if (detailOcRef.current) detailOcRef.current.value = ""; }
   };
   const uploadSupplierInvoice = async (file?: File) => {
     if (!file) return;
     setUploadingSupplierInvoice(true);
-    try {
-      await uploadImportDocument(file, row.importacion_linea_id, "FACTURA_IMPORTACION", row.operacion_id);
-      await detailSupplierInvoiceQuery.refetch();
-      toast.success("Factura del proveedor adjuntada");
-    } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo adjuntar la factura del proveedor");
-    } finally {
-      setUploadingSupplierInvoice(false);
-      if (detailSupplierInvoiceRef.current) detailSupplierInvoiceRef.current.value = "";
-    }
+    try { await uploadImportDocument(file, row.importacion_linea_id, "FACTURA_IMPORTACION", row.operacion_id); await detailSupplierInvoiceQuery.refetch(); toast.success("Factura del proveedor adjuntada"); }
+    catch (error: any) { toast.error(error?.message ?? "No se pudo adjuntar la factura del proveedor"); }
+    finally { setUploadingSupplierInvoice(false); if (detailSupplierInvoiceRef.current) detailSupplierInvoiceRef.current.value = ""; }
   };
   const saveUnit = async () => {
     setSaving(true);
     try {
-      const { error } = await db.from("maquinaria_importacion_unidades").update({
-        chasis: form.chasis.trim() || null,
-        eta: form.eta || null,
-        invoice_supplier: form.invoice_supplier.trim() || null,
-        factura_proveedor_fecha: form.factura_proveedor_fecha || null,
-        costo_final: form.costo_final === "" ? null : Number(form.costo_final),
-        detalle_manual: true,
-        actualizado_en: new Date().toISOString(),
-      }).eq("id", row.id);
+      const { error } = await db.from("maquinaria_importacion_unidades").update({ chasis: form.chasis.trim() || null, eta: form.eta || null, invoice_supplier: form.invoice_supplier.trim() || null, factura_proveedor_fecha: form.factura_proveedor_fecha || null, costo_final: form.costo_final === "" ? null : Number(form.costo_final), detalle_manual: true, actualizado_en: new Date().toISOString() }).eq("id", row.id);
       if (error) throw error;
-      toast.success("Datos de la máquina importada actualizados");
-      setEditing(false);
-      onSaved();
-    } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo actualizar la máquina importada");
-    } finally {
-      setSaving(false);
-    }
+      toast.success("Datos actualizados"); closeEditors(); onSaved();
+    } catch (error: any) { toast.error(error?.message ?? "No se pudo actualizar la máquina importada"); }
+    finally { setSaving(false); }
   };
   const receiveUnit = async () => {
     setReceiving(true);
     try {
-      const { data, error } = await db.rpc("maquinaria_recibir_unidad_importacion", {
-        p_importacion_unidad_id: row.id,
-        p_fecha: receipt.fecha,
-      });
+      const { data, error } = await db.rpc("maquinaria_recibir_unidad_importacion", { p_importacion_unidad_id: row.id, p_fecha: receipt.fecha });
       if (error) throw error;
-      toast.success(data?.stock_confirmado
-        ? "Arribo registrado; el chasis ya fue confirmado por el stock del sistema y quedó reservado."
-        : "Arribo registrado. Queda pendiente hasta que el chasis aparezca en el stock importado del sistema.");
-      onSaved();
-    } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo registrar la recepción");
-    } finally {
-      setReceiving(false);
-    }
+      toast.success(data?.stock_confirmado ? "Arribo registrado y chasis confirmado en stock" : "Arribo registrado; pendiente de confirmación en stock");
+      setEditingReceipt(false); onSaved();
+    } catch (error: any) { toast.error(error?.message ?? "No se pudo registrar la recepción"); }
+    finally { setReceiving(false); }
   };
-  const groups = [
-    { title: "Unidad importada", values: [["Llave interna", row.llave_interna], ["Máquina", row.producto], ["Modelo", row.modelo], ["Marca / proveedor", row.marca], ["Unidad del lote", `${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`], ["Chasis", row.chasis]] },
-    { title: "Pedido y logística", values: [["OC", row.oc], ["Fecha de pedido", formatDate(row.fecha_pedido)], ["Estado", row.estado_fuente], ["Embarque estimado", formatDate(row.eta)], ["Arribo", formatDate(row.ata)]] },
-    { title: "Pedido vinculado", values: [["NP", row.np_numero], ["Cliente", row.cliente_nombre], ["Comercial", row.comercial], ["Situación del vínculo", row.situacion_vinculo]] },
-    { title: "Documentación y valores", values: [["Valor de OC", row.precio_oc != null ? formatUsd(row.precio_oc) : null], ["Valor facturado por el proveedor", row.costo_final != null ? formatUsd(row.costo_final) : null], ["Factura del proveedor", row.invoice_supplier], ["Fecha factura proveedor", formatDate(row.factura_proveedor_fecha)], ["Venta facturada", row.venta_facturada], ["Valor de venta", row.valor_venta != null ? formatUsd(row.valor_venta) : null]] },
-    { title: "Stock vinculado", values: [["Sucursal", row.stock_sucursal], ["Depósito", row.stock_deposito], ["Saldo", row.stock_saldo], ["Detalle", row.disponibilidad_detalle]] },
-  ].map((group) => ({ ...group, values: group.values.filter(([, value]) => value !== null && value !== undefined && value !== "" && value !== "—") })).filter((group) => group.values.length);
+  const ocDocuments = detailOcQuery.data ?? [];
+  const supplierDocuments = detailSupplierInvoiceQuery.data ?? [];
   return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg">
-    <ResponsiveDrawerHeader>
-      <div className="flex items-start justify-between gap-3">
-        <div><h2 className="text-[16px] font-semibold">{row.producto || row.modelo || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{row.oc ? `OC ${row.oc}` : row.np_numero ? `NP ${row.np_numero}` : "Sin OC"}</p></div>
-        <div className="flex flex-col items-end gap-1">
-          <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>
-          {row.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge>}
-        </div>
-      </div>
-    </ResponsiveDrawerHeader>
-    <ResponsiveDrawerBody className="space-y-4">
-      {editing && <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">Datos propios de esta máquina</h3><p className="text-[10px] text-muted-foreground">Estos valores no se aplican a las demás unidades del lote.</p></div><div className="grid gap-2 sm:grid-cols-2"><Field label="Chasis"><Input value={form.chasis} onChange={(e) => setForm((v) => ({ ...v, chasis: e.target.value }))} /></Field><Field label="Factura proveedor"><Input value={form.invoice_supplier} onChange={(e) => setForm((v) => ({ ...v, invoice_supplier: e.target.value }))} /></Field><Field label="Fecha factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(e) => setForm((v) => ({ ...v, factura_proveedor_fecha: e.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(e) => setForm((v) => ({ ...v, costo_final: e.target.value }))} /></Field><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(e) => setForm((v) => ({ ...v, eta: e.target.value }))} /></Field></div><div className="mt-3 flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar unidad"}</Button></div></section>}
-      <section><div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Orden de compra</h3>{canEdit && <><input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} /><Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{uploadingOc ? "Subiendo..." : "Adjuntar OC"}</Button></>}</div>{detailOcQuery.data?.length ? <div className="space-y-1">{detailOcQuery.data.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</div> : <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">Todavía no hay un documento de OC adjunto.</p>}</section>
-      <section><div className="mb-2 flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Factura del proveedor</h3><p className="text-[10px] text-muted-foreground">Documento emitido por el proveedor para esta importación.</p></div>{canEdit && <><input ref={detailSupplierInvoiceRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadSupplierInvoice(event.target.files?.[0])} /><Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{uploadingSupplierInvoice ? "Subiendo..." : "Adjuntar factura"}</Button></>}</div>{detailSupplierInvoiceQuery.data?.length ? <div className="space-y-1">{detailSupplierInvoiceQuery.data.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la factura"))} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver factura</span></button>)}</div> : <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">Todavía no hay una factura del proveedor adjunta.</p>}</section>
-      {canEdit && <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">{row.ata ? "Arribo registrado" : "Registrar arribo"}</h3><p className="text-[10px] text-muted-foreground">Registrar el arribo no crea stock. La máquina ingresará y, si corresponde, quedará reservada solo cuando una importación del stock del sistema contenga una coincidencia única y exacta de este chasis.</p></div><div className="max-w-xs"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt({ fecha: event.target.value })} /></Field></div><div className="mt-3 flex justify-end"><Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackageCheck className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : row.ata ? "Actualizar arribo" : "Registrar arribo"}</Button></div>{!row.chasis && <p className="mt-2 text-[10px] text-amber-700">Primero guardá el chasis de esta máquina.</p>}</section>}
-      {groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}
+    <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
+    <ResponsiveDrawerBody>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} />
+        <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
+
+        <TabsContent value="resumen" className="space-y-4">
+          <DetailSection title="Máquina" action={canEdit && !editingChassis ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingChassis(true)}><Pencil className="mr-1.5 h-3 w-3" />{row.chasis ? "Cambiar chasis" : "Asignar chasis"}</Button> : undefined}>
+            <EntityCard><div className="mb-3"><div className="text-[13px] font-semibold">{row.modelo || row.producto || "Sin modelo"}</div><div className="text-[10px] text-muted-foreground">{[row.producto, row.marca].filter(Boolean).join(" · ")}</div></div>{editingChassis ? <div className="flex items-end gap-2 border-t pt-3"><Field label="Chasis"><Input autoFocus value={form.chasis} onChange={(event) => setForm((value) => ({ ...value, chasis: event.target.value }))} /></Field><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, chasis: row.chasis ?? "" })); setEditingChassis(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div> : <KeyValueGrid className="border-t pt-3"><KeyValueItem label="Llave interna" value={row.llave_interna} /><KeyValueItem label="Unidad del lote" value={`${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`} /><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /></KeyValueGrid>}</EntityCard>
+          </DetailSection>
+          <DetailSection title="Importación" action={canEdit && !editingImportData ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingImportData(true)}><Pencil className="mr-1.5 h-3 w-3" />Editar datos</Button> : undefined}>
+            {editingImportData ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(event) => setForm((value) => ({ ...value, costo_final: event.target.value }))} /></Field></div><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, eta: row.eta ?? "", costo_final: row.costo_final == null ? "" : String(row.costo_final) })); setEditingImportData(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div></div> : <KeyValueGrid><KeyValueItem label="OC" value={row.oc} empty="Sin asignar" mono /><KeyValueItem label="Estado" value={ARRIVAL_LABEL[arrival]} /><KeyValueItem label="Fecha de pedido" value={formatDate(row.fecha_pedido)} /><KeyValueItem label="Embarque estimado" value={formatDate(row.eta)} empty="Pendiente" /><KeyValueItem label="Valor OC" value={row.precio_oc != null ? formatUsd(row.precio_oc) : null} /><KeyValueItem label="Costo final" value={row.costo_final != null ? formatUsd(row.costo_final) : null} /><KeyValueItem label="Venta facturada" value={row.venta_facturada} empty="No" /><KeyValueItem label="Valor de venta" value={row.valor_venta != null ? formatUsd(row.valor_venta) : null} /></KeyValueGrid>}
+          </DetailSection>
+          {(row.stock_sucursal || row.stock_deposito || row.disponibilidad_detalle) && <DetailSection title="Stock vinculado"><KeyValueGrid><KeyValueItem label="Sucursal" value={row.stock_sucursal} /><KeyValueItem label="Depósito" value={row.stock_deposito} /><KeyValueItem label="Saldo" value={row.stock_saldo} /><KeyValueItem label="Estado" value={row.disponibilidad_detalle} /></KeyValueGrid></DetailSection>}
+        </TabsContent>
+
+        <TabsContent value="pedido" className="space-y-4">
+          <DetailSection title="Pedido vinculado" action={canEdit ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3 w-3" />{row.np_numero ? "Cambiar" : "Vincular"}</Button> : undefined}>
+            {row.np_numero ? <EntityCard><div className="mb-3"><div className="text-[13px] font-semibold">NP {row.np_numero}</div><div className="text-[10px] text-muted-foreground">{row.cliente_nombre || "Cliente no informado"}</div></div><KeyValueGrid className="border-t pt-3"><KeyValueItem label="Comercial" value={row.comercial} /><KeyValueItem label="Fecha NP" value={formatDate(row.np_fecha)} /><KeyValueItem label="Estado del vínculo" value={row.situacion_vinculo} empty="Vinculado" /></KeyValueGrid></EntityCard> : <div className="py-4 text-[11px] text-muted-foreground">Esta máquina todavía no tiene un pedido vinculado.</div>}
+          </DetailSection>
+        </TabsContent>
+
+        <TabsContent value="documentos" className="space-y-4">
+          <input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} />
+          <input ref={detailSupplierInvoiceRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadSupplierInvoice(event.target.files?.[0])} />
+          <DetailSection title="Documentos de importación">
+            <div>{ocDocuments.length ? ocDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Orden de compra adicional" : "Orden de compra"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} />) : <DocumentRow label="Orden de compra" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}{ocDocuments.length > 0 && canEdit && <div className="flex justify-end"><Button variant="ghost" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar otra OC</Button></div>}</div>
+            <div>{supplierDocuments.length ? supplierDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura del proveedor"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la factura"))} />) : <DocumentRow label="Factura del proveedor" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}</div>
+          </DetailSection>
+          <DetailSection title="Datos de la factura" action={canEdit && !editingInvoice ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingInvoice(true)}><Pencil className="mr-1.5 h-3 w-3" />Editar</Button> : undefined}>
+            {editingInvoice ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Número de factura"><Input value={form.invoice_supplier} onChange={(event) => setForm((value) => ({ ...value, invoice_supplier: event.target.value }))} /></Field><Field label="Fecha de factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(event) => setForm((value) => ({ ...value, factura_proveedor_fecha: event.target.value }))} /></Field><Field label="Valor facturado"><Input type="number" value={form.costo_final} onChange={(event) => setForm((value) => ({ ...value, costo_final: event.target.value }))} /></Field></div><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, invoice_supplier: row.invoice_supplier ?? "", factura_proveedor_fecha: row.factura_proveedor_fecha ?? "", costo_final: row.costo_final == null ? "" : String(row.costo_final) })); setEditingInvoice(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div></div> : <KeyValueGrid><KeyValueItem label="Número" value={row.invoice_supplier} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={formatDate(row.factura_proveedor_fecha)} empty="Pendiente" /><KeyValueItem label="Valor" value={row.costo_final != null ? formatUsd(row.costo_final) : null} empty="Pendiente" /></KeyValueGrid>}
+          </DetailSection>
+        </TabsContent>
+
+        <TabsContent value="recepcion" className="space-y-4">
+          <DetailSection title="Recepción">
+            <KeyValueGrid><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /><KeyValueItem label="Fecha de arribo" value={formatDate(row.ata)} empty="Pendiente" /><KeyValueItem label="Estado en stock" value={stockConfirmed ? (AVAILABILITY_LABEL[row.estado_disponibilidad ?? ""] ?? "Confirmado") : "Pendiente de confirmación"} /></KeyValueGrid>
+          </DetailSection>
+          {canEdit && (editingReceipt || !row.ata) ? <div className="space-y-3 border-t pt-4"><div className="max-w-xs"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt({ fecha: event.target.value })} /></Field></div>{!row.chasis && <p className="text-[10px] text-amber-700">Asigná el chasis antes de registrar el arribo.</p>}<div className="flex gap-2">{row.ata && <Button variant="outline" size="sm" onClick={() => { setReceipt({ fecha: row.ata ?? TODAY }); setEditingReceipt(false); }}>Cancelar</Button>}<Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackageCheck className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : "Registrar arribo"}</Button></div></div> : canEdit && <Button variant="outline" size="sm" onClick={() => setEditingReceipt(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Modificar arribo</Button>}
+          {row.ata && !stockConfirmed && <p className="text-[10px] text-muted-foreground">El arribo está registrado. La máquina ingresará al stock cuando el chasis coincida con el archivo importado del sistema.</p>}
+        </TabsContent>
+      </Tabs>
     </ResponsiveDrawerBody>
-    <ResponsiveDrawerFooter>
-      {canEdit && <Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button>}
-      {canEdit && <Button variant="outline" size="sm" onClick={() => setEditing((value) => !value)}>{editing ? "Cerrar edición" : "Editar esta máquina"}</Button>}
-    </ResponsiveDrawerFooter>
+    {canEdit && <ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button></ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
 }
 
@@ -1210,15 +1188,34 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
 }
 
 function DetailValue({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return <div className="min-w-0"><div className="text-[10px] text-muted-foreground">{label}</div><div className={cn("mt-0.5 truncate text-[12px] font-medium", mono && "font-mono")}>{value || "—"}</div></div>;
+  return <KeyValueItem label={label} value={value} mono={mono} />;
+}
+
+function OperationChassisValue({ unit, canEdit, onSaved }: { unit: any; canEdit: boolean; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(unit.chasis ?? "");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setValue(unit.chasis ?? ""), [unit.chasis]);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const { error } = await db.from("maquinaria_unidades_operacion").update({ chasis: value.trim() || null }).eq("id", unit.id);
+      if (error) {
+        if (error.code === "23505") throw new Error("Este chasis ya está asignado a otra unidad");
+        if (error.code === "42501") throw new Error("No tenés permiso para editar el chasis");
+        throw error;
+      }
+      toast.success("Chasis actualizado");
+      setEditing(false); onSaved();
+    } catch (error: any) { toast.error(error?.message ?? "No se pudo actualizar el chasis"); }
+    finally { setSaving(false); }
+  };
+  return editing ? <div className="flex items-end gap-2"><Field label={`Unidad ${unit.numero_unidad} · Chasis`}><Input autoFocus value={value} onChange={(event) => setValue(event.target.value)} /></Field><Button variant="outline" size="sm" onClick={() => { setValue(unit.chasis ?? ""); setEditing(false); }}>Cancelar</Button><Button size="sm" onClick={save} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div> : <div className="flex items-start justify-between gap-2"><KeyValueGrid className="min-w-0 flex-1 grid-cols-2 sm:grid-cols-2"><DetailValue label={`Unidad ${unit.numero_unidad}`} value={unit.chasis || "Sin asignar"} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></KeyValueGrid>{canEdit && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="h-3 w-3" /><span className="sr-only">Editar chasis</span></Button>}</div>;
 }
 
 function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const { isAdmin, roles } = useAuth();
-  // La edicion de chasis esta protegida tambien por un trigger en la base.
   const canEditChasis = isAdmin || roles.includes("jefatura");
-  const [chasisEdits, setChasisEdits] = useState<Record<string, string>>({});
-  const [savingChasisId, setSavingChasisId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("resumen");
   const detailQuery = useQuery({
     queryKey: ["machine-operation-detail", operationId], enabled: !!operationId,
@@ -1265,26 +1262,6 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     if (error || !data?.signedUrl) return toast.error("No se pudo abrir el documento");
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
-  const saveChasis = async (unitId: string, rawValue: string) => {
-    const value = rawValue.trim() || null;
-    setSavingChasisId(unitId);
-    try {
-      const { error } = await db.from("maquinaria_unidades_operacion").update({ chasis: value }).eq("id", unitId);
-      if (error) {
-        if (error.code === "23505") throw new Error("Este chasis ya está asignado a otra unidad");
-        if (error.code === "42501") throw new Error("No tenés permiso para editar el chasis");
-        throw error;
-      }
-      toast.success("Chasis actualizado");
-      setChasisEdits((prev) => { const next = { ...prev }; delete next[unitId]; return next; });
-      detailQuery.refetch();
-      onChanged();
-    } catch (e: any) {
-      toast.error(e?.message ?? "No se pudo actualizar el chasis");
-    } finally {
-      setSavingChasisId(null);
-    }
-  };
   const detail = detailQuery.data;
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   useEffect(() => {
@@ -1312,6 +1289,8 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const lifecycleIndex = detail
     ? detail.estado === "CERRADA" ? 3 : detail.estado === "FACTURADA" ? 2 : ["ABASTECIMIENTO", "EN_IMPORTACION", "DISPONIBLE"].includes(detail.estado) ? 1 : 0
     : 0;
+  const npDocuments = detail?.docs.filter((document: any) => document.tipo === "NP") ?? [];
+  const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
@@ -1321,9 +1300,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       {detail && <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="grid grid-cols-4 overflow-hidden rounded-xl border bg-muted/20">
-          {["Pedido", "Origen", "Facturación", "Entrega"].map((label, index) => <div key={label} className={cn("border-r px-2 py-2 text-center text-[10px] last:border-r-0", index <= lifecycleIndex ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground")}><div className={cn("mx-auto mb-1 h-1.5 w-1.5 rounded-full", index <= lifecycleIndex ? "bg-primary" : "bg-border")} />{label}</div>)}
-        </div>
+        <ProcessStepper steps={["Pedido", "Origen", "Facturación", "Entrega"]} currentIndex={lifecycleIndex} />
         <TabsList className="grid h-auto w-full grid-cols-4">
           <TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger>
           <TabsTrigger value="origen" className="px-2 text-[11px]">Origen</TabsTrigger>
@@ -1332,22 +1309,22 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border p-3 sm:grid-cols-4">
+          <KeyValueGrid className="sm:grid-cols-4">
             <DetailValue label="Fecha NP" value={formatDate(detail.np_fecha)} />
             <DetailValue label="Comercial" value={detail.comercial} />
             <DetailValue label="Unidades" value={detail.unidades} />
             <DetailValue label="Valor" value={formatUsd(detail.valor_venta)} />
-          </div>
-          <div><h3 className="mb-2 text-[13px] font-semibold">Máquinas</h3><div className="space-y-2">{detail.lines.map((line: any) => {
+          </KeyValueGrid>
+          <DetailSection title="Máquinas"><div className="space-y-2">{detail.lines.map((line: any) => {
             const extracted = line.datos_extraidos ?? {};
             const model = line.modelo || extracted.modelo;
             const product = line.producto || extracted.producto;
             const year = line.anio ?? extracted.anio;
             const head = line.cabezal || extracted.cabezal;
             const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
-            return <div key={line.id} className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 grid gap-2 border-t pt-3 sm:grid-cols-2">{lineUnits.map((unit: any) => <div key={unit.id} className="grid grid-cols-2 gap-2"><DetailValue label={`Unidad ${unit.numero_unidad}`} value={unit.chasis || "Sin chasis"} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></div>)}</div>}</div>;
-          })}</div></div>
-          {detail.observaciones && <div><h3 className="mb-2 text-[13px] font-semibold">Observaciones</h3><div className="rounded-xl border p-3 text-[11px]">{detail.observaciones}</div></div>}
+            return <EntityCard key={line.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 space-y-3 border-t pt-3">{lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div>}</EntityCard>;
+          })}</div></DetailSection>
+          {detail.observaciones && <DetailSection title="Observaciones"><div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div></DetailSection>}
         </TabsContent>
 
         <TabsContent value="origen" className="space-y-3">
@@ -1355,13 +1332,12 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsContent>
 
         <TabsContent value="facturacion" className="space-y-4">
-          <div><h3 className="mb-2 text-[13px] font-semibold">Factura al cliente</h3>{invoices.length ? <div className="space-y-2">{invoices.map((invoice, index) => <div key={`${invoice.numero}-${invoice.fecha}-${index}`} className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border p-3 sm:grid-cols-3"><DetailValue label="Número" value={invoice.numero} mono /><DetailValue label="Fecha" value={formatDate(invoice.fecha)} /><DetailValue label="Valor" value={formatUsd(invoice.valor)} /></div>)}</div> : <div className="rounded-xl border border-dashed p-3 text-[11px] text-muted-foreground">No hay datos de facturación cargados.</div>}</div>
-          <div><h3 className="mb-2 text-[13px] font-semibold">Entrega</h3><div className="space-y-2">{detail.units.map((unit: any) => { const line = detail.lines.find((item: any) => item.id === unit.linea_id); return <div key={unit.id} className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border p-3 sm:grid-cols-3"><DetailValue label="Máquina" value={line?.modelo || line?.producto} /><DetailValue label="Chasis" value={unit.chasis} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></div>; })}</div></div>
+          <DetailSection title="Facturación">{invoices.length ? <div className="divide-y">{invoices.map((invoice, index) => <KeyValueGrid key={`${invoice.numero}-${invoice.fecha}-${index}`} className="py-3 first:pt-0"><KeyValueItem label="Valor" value={formatUsd(invoice.valor)} empty="Pendiente" prominent /><KeyValueItem label="Número" value={invoice.numero} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={invoice.fecha ? formatDate(invoice.fecha) : null} empty="Pendiente" /></KeyValueGrid>)}</div> : <KeyValueGrid><KeyValueItem label="Valor" value={detail.valor_venta != null ? formatUsd(detail.valor_venta) : null} empty="Pendiente" prominent /><KeyValueItem label="Número" value={null} empty="Pendiente" /><KeyValueItem label="Fecha" value={null} empty="Pendiente" /></KeyValueGrid>}</DetailSection>
+          <DetailSection title="Entrega"><div className="space-y-2">{detail.units.map((unit: any) => { const line = detail.lines.find((item: any) => item.id === unit.linea_id); return <EntityCard key={unit.id}><div className="mb-3"><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Máquina"}</div><div className="text-[10px] text-muted-foreground">{unit.chasis ? `Ch. ${unit.chasis}` : "Sin chasis asignado"}</div></div><KeyValueGrid className="border-t pt-3"><DetailValue label="Unidad" value={unit.numero_unidad} /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></KeyValueGrid></EntityCard>; })}</div></DetailSection>
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-4">
-          <div><h3 className="mb-2 text-[13px] font-semibold">Documentos comerciales</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc: any) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-[11px] hover:bg-muted/40"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="font-medium text-primary">Ver</span></button>)}</div> : <p className="text-[11px] text-muted-foreground">No hay documentos adjuntos.</p>}</div>
-          <div className="flex flex-wrap gap-2"><AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar nota de pedido" onUploaded={() => detailQuery.refetch()} /><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar factura al cliente" onUploaded={() => detailQuery.refetch()} /></div>
+          <DetailSection title="Documentos comerciales"><div>{npDocuments.length ? npDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Nota de pedido adicional" : "Nota de pedido"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path)} />) : <DocumentRow label="Nota de pedido" action={<AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{npDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div><div>{saleInvoiceDocuments.length ? saleInvoiceDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura al cliente"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path)} />) : <DocumentRow label="Factura al cliente" action={<AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{saleInvoiceDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div></DetailSection>
         </TabsContent>
       </Tabs>}
     </ResponsiveDrawerBody>
