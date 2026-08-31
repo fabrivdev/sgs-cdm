@@ -1688,13 +1688,41 @@ export function MatrizTécnicosDías({
     };
   }, [blocks, buckets]);
 
+  const normalizePrintState = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const printStateCounts = printDetailRows.activity.reduce((counts, row) => {
+    const state = normalizePrintState(row.estado);
+    if (state.includes("NO REALIZ") || state.includes("VENCID")) counts.noRealizadas += 1;
+    else if (state.includes("REALIZ")) counts.realizadas += 1;
+    else if (state.includes("PROGRAM")) counts.programadas += 1;
+    return counts;
+  }, { realizadas: 0, noRealizadas: 0, programadas: 0 });
+  const closedJobs = printStateCounts.realizadas + printStateCounts.noRealizadas;
+  const completionRate = closedJobs > 0 ? Math.round((printStateCounts.realizadas / closedJobs) * 100) : null;
+  const fullPrintDate = (key: string) => /^\d{4}-\d{2}-\d{2}$/.test(key)
+    ? new Intl.DateTimeFormat("es-PY", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${key}T00:00:00Z`))
+    : bucketLabels[key] ?? key;
+  const reportRangeLabel = buckets.length
+    ? `${fullPrintDate(buckets[0])} - ${fullPrintDate(buckets[buckets.length - 1])}`
+    : "";
+  const reportGeneratedAt = new Intl.DateTimeFormat("es-PY", { dateStyle: "short", timeStyle: "short" }).format(new Date());
+
   const printMatrix = () => {
+    document.querySelectorAll(".dashboard-matrix-print-clone").forEach((node) => node.remove());
+    const source = document.querySelector<HTMLElement>(".dashboard-matrix-print-root");
+    if (!source) return;
+    const printClone = source.cloneNode(true) as HTMLElement;
+    printClone.classList.add("dashboard-matrix-print-clone");
+    printClone.setAttribute("aria-hidden", "true");
+    document.body.appendChild(printClone);
     document.body.classList.add("printing-dashboard-matrix");
     window.setTimeout(() => window.print(), 30);
   };
 
   useEffect(() => {
-    const cleanup = () => document.body.classList.remove("printing-dashboard-matrix");
+    const cleanup = () => {
+      document.body.classList.remove("printing-dashboard-matrix");
+      document.querySelectorAll(".dashboard-matrix-print-clone").forEach((node) => node.remove());
+    };
     window.addEventListener("afterprint", cleanup);
     return () => {
       window.removeEventListener("afterprint", cleanup);
@@ -1732,7 +1760,8 @@ export function MatrizTécnicosDías({
             </div>
           </div>
           <div className="text-right text-[10px] text-muted-foreground">
-            {buckets[0] ? bucketLabels[buckets[0]] ?? buckets[0] : ""} - {buckets[buckets.length - 1] ? bucketLabels[buckets[buckets.length - 1]] ?? buckets[buckets.length - 1] : ""}
+            <div>{reportRangeLabel}</div>
+            <div>Generado: {reportGeneratedAt}</div>
           </div>
         </div>
 
@@ -1760,6 +1789,15 @@ export function MatrizTécnicosDías({
               Imprimir
             </button>
           </div>
+        </div>
+
+        <div className="dashboard-matrix-print-summary hidden">
+          <div><span>Trabajos</span><strong>{printDetailRows.activity.length}</strong></div>
+          <div><span>Realizados</span><strong>{printStateCounts.realizadas}</strong></div>
+          <div><span>No realizados / vencidos</span><strong>{printStateCounts.noRealizadas}</strong></div>
+          <div><span>Programados</span><strong>{printStateCounts.programadas}</strong></div>
+          <div><span>Cumplimiento cerrado</span><strong>{completionRate == null ? "-" : `${completionRate}%`}</strong></div>
+          <div><span>No disponibilidad</span><strong>{printDetailRows.unavailable.length}</strong></div>
         </div>
 
         <div className="dashboard-matrix-scroll space-y-3 overflow-x-auto pb-1">
