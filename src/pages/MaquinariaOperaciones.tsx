@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
@@ -370,7 +369,17 @@ async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTA
   return data?.data ?? {};
 }
 
-async function uploadEvidence(file: File, operationId: string, type: string, extracted: unknown) {
+type MachineDocumentType = "NP" | "OC" | "FACTURA_IMPORTACION" | "FACTURA_VENTA" | "OTRO";
+
+const MACHINE_DOCUMENT_LABELS: Record<MachineDocumentType, string> = {
+  NP: "Nota de pedido",
+  OC: "Orden de compra",
+  FACTURA_IMPORTACION: "Factura del proveedor",
+  FACTURA_VENTA: "Factura al cliente",
+  OTRO: "Otro",
+};
+
+async function uploadEvidence(file: File, operationId: string, type: MachineDocumentType, extracted: unknown) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Sesión no válida");
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
@@ -386,15 +395,15 @@ async function uploadEvidence(file: File, operationId: string, type: string, ext
   return document;
 }
 
-async function uploadImportDocument(file: File, importLineId: string, operationId?: string | null) {
+async function uploadImportDocument(file: File, importLineId: string, type: "OC" | "FACTURA_IMPORTACION", operationId?: string | null) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Sesión no válida");
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
-  const path = `${auth.user.id}/importaciones/${importLineId}/${crypto.randomUUID()}-${safeName}`;
+  const path = `${auth.user.id}/importaciones/${importLineId}/${type.toLowerCase()}/${crypto.randomUUID()}-${safeName}`;
   const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
   if (storageError) throw storageError;
   const { error: docError } = await db.from("maquinaria_documentos").insert({
-    operacion_id: operationId || null, importacion_linea_id: importLineId, tipo: "OC",
+    operacion_id: operationId || null, importacion_linea_id: importLineId, tipo: type,
     archivo_nombre: file.name, storage_path: path, mime_type: file.type,
     tamano_bytes: file.size, estado_extraccion: "REVISADO", datos_extraidos: {},
     revisado_por: auth.user.id, revisado_en: new Date().toISOString(),
@@ -789,32 +798,31 @@ function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: I
   </Table>;
 }
 
-/** Adjuntar un documento suelto (sin lectura OCR) a una operacion ya creada. */
-function AttachDocumentButton({ operationId, onUploaded, disabledTitle }: { operationId: string | null; onUploaded: () => void; disabledTitle?: string }) {
+/** Adjunta un documento comercial con un tipo explicito a un pedido. */
+function AttachOrderDocumentButton({ operationId, type, label, onUploaded }: { operationId: string | null; type: "NP" | "FACTURA_VENTA"; label: string; onUploaded: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const choose = async (file?: File) => {
     if (!file || !operationId) return;
     setBusy(true);
     try {
-      await uploadEvidence(file, operationId, "OTRO", {});
-      toast.success("Documento adjuntado");
+      await uploadEvidence(file, operationId, type, {});
+      toast.success(`${label} adjuntada`);
       onUploaded();
     } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo adjuntar el documento");
+      toast.error(error?.message ?? `No se pudo adjuntar ${label.toLowerCase()}`);
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   };
   return <>
-    <input ref={fileRef} type="file" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
+    <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
     <Button
       variant="outline" size="sm" disabled={busy || !operationId}
-      title={!operationId ? disabledTitle : undefined}
       onClick={() => fileRef.current?.click()}
     >
-      <Paperclip className="mr-1.5 h-3.5 w-3.5" />{busy ? "Subiendo..." : "Adjuntar documento"}
+      <Paperclip className="mr-1.5 h-3.5 w-3.5" />{busy ? "Subiendo..." : label}
     </Button>
   </>;
 }
@@ -895,7 +903,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
       if (error) throw error;
       if (ocFile) {
         try {
-          await uploadImportDocument(ocFile, savedId, npOptions.find((option) => option.linea_id === form.linea_id)?.operacion_id ?? row?.operacion_id);
+          await uploadImportDocument(ocFile, savedId, "OC", npOptions.find((option) => option.linea_id === form.linea_id)?.operacion_id ?? row?.operacion_id);
         } catch (uploadError: any) {
           toast.warning(`La importación se guardó, pero la OC no pudo subirse: ${uploadError?.message ?? "error desconocido"}`);
         }
@@ -938,7 +946,9 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const [saving, setSaving] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [uploadingOc, setUploadingOc] = useState(false);
+  const [uploadingSupplierInvoice, setUploadingSupplierInvoice] = useState(false);
   const detailOcRef = useRef<HTMLInputElement>(null);
+  const detailSupplierInvoiceRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ chasis: "", eta: "", invoice_supplier: "", factura_proveedor_fecha: "", costo_final: "" });
   const [receipt, setReceipt] = useState({ fecha: TODAY });
   const detailOcQuery = useQuery({
@@ -949,6 +959,19 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
         .select("id,archivo_nombre,storage_path,creado_en")
         .eq("importacion_linea_id", row?.importacion_linea_id)
         .eq("tipo", "OC")
+        .order("creado_en", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const detailSupplierInvoiceQuery = useQuery({
+    queryKey: ["machine-import-supplier-invoice-documents", row?.importacion_linea_id],
+    enabled: Boolean(row?.importacion_linea_id),
+    queryFn: async () => {
+      const { data, error } = await db.from("maquinaria_documentos")
+        .select("id,archivo_nombre,storage_path,creado_en")
+        .eq("importacion_linea_id", row?.importacion_linea_id)
+        .eq("tipo", "FACTURA_IMPORTACION")
         .order("creado_en", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -970,7 +993,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     if (!file) return;
     setUploadingOc(true);
     try {
-      await uploadImportDocument(file, row.importacion_linea_id, row.operacion_id);
+      await uploadImportDocument(file, row.importacion_linea_id, "OC", row.operacion_id);
       await detailOcQuery.refetch();
       toast.success("Documento de OC adjuntado");
     } catch (error: any) {
@@ -978,6 +1001,20 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     } finally {
       setUploadingOc(false);
       if (detailOcRef.current) detailOcRef.current.value = "";
+    }
+  };
+  const uploadSupplierInvoice = async (file?: File) => {
+    if (!file) return;
+    setUploadingSupplierInvoice(true);
+    try {
+      await uploadImportDocument(file, row.importacion_linea_id, "FACTURA_IMPORTACION", row.operacion_id);
+      await detailSupplierInvoiceQuery.refetch();
+      toast.success("Factura del proveedor adjuntada");
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo adjuntar la factura del proveedor");
+    } finally {
+      setUploadingSupplierInvoice(false);
+      if (detailSupplierInvoiceRef.current) detailSupplierInvoiceRef.current.value = "";
     }
   };
   const saveUnit = async () => {
@@ -1040,17 +1077,13 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     <ResponsiveDrawerBody className="space-y-4">
       {editing && <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">Datos propios de esta máquina</h3><p className="text-[10px] text-muted-foreground">Estos valores no se aplican a las demás unidades del lote.</p></div><div className="grid gap-2 sm:grid-cols-2"><Field label="Chasis"><Input value={form.chasis} onChange={(e) => setForm((v) => ({ ...v, chasis: e.target.value }))} /></Field><Field label="Factura proveedor"><Input value={form.invoice_supplier} onChange={(e) => setForm((v) => ({ ...v, invoice_supplier: e.target.value }))} /></Field><Field label="Fecha factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(e) => setForm((v) => ({ ...v, factura_proveedor_fecha: e.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(e) => setForm((v) => ({ ...v, costo_final: e.target.value }))} /></Field><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(e) => setForm((v) => ({ ...v, eta: e.target.value }))} /></Field></div><div className="mt-3 flex justify-end gap-2"><Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />{saving ? "Guardando..." : "Guardar unidad"}</Button></div></section>}
       <section><div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Orden de compra</h3>{canEdit && <><input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} /><Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{uploadingOc ? "Subiendo..." : "Adjuntar OC"}</Button></>}</div>{detailOcQuery.data?.length ? <div className="space-y-1">{detailOcQuery.data.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</div> : <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">Todavía no hay un documento de OC adjunto.</p>}</section>
+      <section><div className="mb-2 flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Factura del proveedor</h3><p className="text-[10px] text-muted-foreground">Documento emitido por el proveedor para esta importación.</p></div>{canEdit && <><input ref={detailSupplierInvoiceRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadSupplierInvoice(event.target.files?.[0])} /><Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{uploadingSupplierInvoice ? "Subiendo..." : "Adjuntar factura"}</Button></>}</div>{detailSupplierInvoiceQuery.data?.length ? <div className="space-y-1">{detailSupplierInvoiceQuery.data.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path).catch((error) => toast.error(error?.message ?? "No se pudo abrir la factura"))} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver factura</span></button>)}</div> : <p className="rounded-lg border border-dashed p-3 text-[11px] text-muted-foreground">Todavía no hay una factura del proveedor adjunta.</p>}</section>
       {canEdit && <section className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-3"><div className="mb-3"><h3 className="text-[12px] font-semibold">{row.ata ? "Arribo registrado" : "Registrar arribo"}</h3><p className="text-[10px] text-muted-foreground">Registrar el arribo no crea stock. La máquina ingresará y, si corresponde, quedará reservada solo cuando una importación del stock del sistema contenga una coincidencia única y exacta de este chasis.</p></div><div className="max-w-xs"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt({ fecha: event.target.value })} /></Field></div><div className="mt-3 flex justify-end"><Button size="sm" onClick={receiveUnit} disabled={receiving || !row.chasis || !receipt.fecha}><PackageCheck className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : row.ata ? "Actualizar arribo" : "Registrar arribo"}</Button></div>{!row.chasis && <p className="mt-2 text-[10px] text-amber-700">Primero guardá el chasis de esta máquina.</p>}</section>}
       {groups.map((group) => <section key={group.title}><h3 className="mb-2 text-[12px] font-semibold">{group.title}</h3><dl className="grid gap-x-4 gap-y-2 rounded-lg border p-3 sm:grid-cols-2">{group.values.map(([label, value]) => <div key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="break-words text-[12px] font-medium">{String(value)}</dd></div>)}</dl></section>)}
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter>
       {canEdit && <Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button>}
       {canEdit && <Button variant="outline" size="sm" onClick={() => setEditing((value) => !value)}>{editing ? "Cerrar edición" : "Editar esta máquina"}</Button>}
-      <AttachDocumentButton
-        operationId={row.operacion_id}
-        disabledTitle="Esta importación todavía no está vinculada a un pedido; vinculala primero para poder adjuntar documentos."
-        onUploaded={() => undefined}
-      />
     </ResponsiveDrawerFooter>
   </ResponsiveDrawer>;
 }
@@ -1177,15 +1210,8 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
 
 function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const { isAdmin, roles } = useAuth();
-  // Edicion de chasis (manual o via "Subir factura"): protegida tambien por
-  // un trigger en la base (guard_chasis_edit_trigger) -- esto es solo la
-  // capa de comodidad, no la proteccion real.
+  // La edicion de chasis esta protegida tambien por un trigger en la base.
   const canEditChasis = isAdmin || roles.includes("jefatura");
-  const invoiceRef = useRef<HTMLInputElement>(null);
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [invoiceData, setInvoiceData] = useState<any>(null);
-  const [invoiceUnits, setInvoiceUnits] = useState<Record<string, { selected: boolean; chasis: string; costo: string }>>({});
-  const [reading, setReading] = useState(false); const [saving, setSaving] = useState(false);
   const [chasisEdits, setChasisEdits] = useState<Record<string, string>>({});
   const [savingChasisId, setSavingChasisId] = useState<string | null>(null);
   const detailQuery = useQuery({
@@ -1195,7 +1221,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         db.from("maquinaria_operaciones_resumen").select("*").eq("id", operationId).single(),
         db.from("maquinaria_operaciones").select("observaciones").eq("id", operationId).single(),
         db.from("maquinaria_operacion_lineas").select("*").eq("operacion_id", operationId).order("linea_numero"),
-        db.from("maquinaria_documentos").select("*").eq("operacion_id", operationId).order("creado_en"),
+        db.from("maquinaria_documentos").select("*").eq("operacion_id", operationId).in("tipo", ["NP", "FACTURA_VENTA"]).order("creado_en"),
         db.from("maquinaria_importaciones_operativas").select("*").eq("operacion_id", operationId).maybeSingle(),
       ]);
       if (summary.error) throw summary.error; if (lines.error) throw lines.error;
@@ -1220,52 +1246,10 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: [...importsById.values()], suggestions: suggestions.data ?? [], importation: importation.data };
     },
   });
-  useEffect(() => { setInvoiceFile(null); setInvoiceData(null); setInvoiceUnits({}); }, [operationId]);
   const openDocument = async (storagePath: string) => {
     const { data, error } = await supabase.storage.from("maquinaria-documentos").createSignedUrl(storagePath, 90);
     if (error || !data?.signedUrl) return toast.error("No se pudo abrir el documento");
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  };
-  const prepareInvoiceUnits = (extracted: any) => {
-    const candidates = (detailQuery.data?.imports ?? []).filter((row) => row.operacion_id === operationId && row.unidad_id && row.vinculo_manual);
-    const chassis = Array.isArray(extracted?.chasis)
-      ? extracted.chasis.map((value: unknown) => String(value).trim()).filter(Boolean)
-      : [];
-    const selectedTarget = chassis.length > 0 ? Math.min(chassis.length, candidates.length) : candidates.length === 1 ? 1 : 0;
-    const drafts: Record<string, { selected: boolean; chasis: string; costo: string }> = {};
-    candidates.forEach((row, index) => {
-      const selected = index < selectedTarget;
-      drafts[row.id] = {
-        selected,
-        chasis: row.chasis ?? chassis[index] ?? "",
-        costo: row.costo_final == null ? "" : String(row.costo_final),
-      };
-    });
-    if (selectedTarget === 1 && extracted?.valor_facturado != null) {
-      const selectedId = Object.keys(drafts).find((id) => drafts[id].selected);
-      if (selectedId) drafts[selectedId].costo = String(extracted.valor_facturado);
-    }
-    setInvoiceUnits(drafts);
-    return candidates.length;
-  };
-  const chooseInvoice = async (file?: File) => {
-    if (!file) return;
-    setInvoiceFile(file);
-    setReading(true);
-    try {
-      const extracted = await extractDocument(file, "FACTURA_IMPORTACION");
-      setInvoiceData(extracted);
-      const candidates = prepareInvoiceUnits(extracted);
-      if (!candidates) toast.warning("Primero vinculá una máquina importada a las unidades de este pedido.");
-      else toast.success("Factura leída. Confirmá exactamente qué máquinas incluye.");
-    } catch (e: any) {
-      toast.warning(e?.message ?? "No se pudo leer la factura");
-      const fallback = { factura_fecha: TODAY, chasis: [] };
-      setInvoiceData(fallback);
-      prepareInvoiceUnits(fallback);
-    } finally {
-      setReading(false);
-    }
   };
   const saveChasis = async (unitId: string, rawValue: string) => {
     const value = rawValue.trim() || null;
@@ -1287,67 +1271,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       setSavingChasisId(null);
     }
   };
-  const confirmInvoice = async () => {
-    if (!operationId || !invoiceFile || !invoiceData) return;
-    const selected = Object.entries(invoiceUnits).filter(([, value]) => value.selected);
-    if (!String(invoiceData.factura_numero ?? "").trim()) return toast.error("Completá el número de factura");
-    if (!selected.length) return toast.error("Seleccioná al menos una máquina incluida en esta factura");
-    setSaving(true);
-    try {
-      const unitsPayload = selected.map(([id, value]) => ({
-        importacion_unidad_id: id,
-        chasis: value.chasis.trim() || null,
-        costo_unidad: value.costo === "" ? null : Number(value.costo),
-      }));
-      if (unitsPayload.some((unit) => unit.costo_unidad != null && !Number.isFinite(unit.costo_unidad))) {
-        throw new Error("Revisá los costos unitarios ingresados");
-      }
-      const total = invoiceData.valor_facturado === "" || invoiceData.valor_facturado == null
-        ? null : Number(invoiceData.valor_facturado);
-      if (total != null && !Number.isFinite(total)) throw new Error("Revisá el valor total de la factura");
-
-      const { data: applied, error } = await db.rpc("maquinaria_aplicar_factura_importacion", {
-        p_operacion_id: operationId,
-        p_factura_numero: String(invoiceData.factura_numero).trim(),
-        p_factura_fecha: invoiceData.factura_fecha || null,
-        p_proveedor: invoiceData.proveedor || null,
-        p_moneda: invoiceData.moneda || null,
-        p_valor_total: total,
-        p_unidades: unitsPayload,
-      });
-      if (error) throw error;
-
-      try {
-        const document = await uploadEvidence(invoiceFile, operationId, "FACTURA_IMPORTACION", {
-          ...invoiceData,
-          unidades_confirmadas: unitsPayload,
-        });
-        if (document?.id && applied?.factura_id) {
-          const [invoiceUpdate, documentUpdate] = await Promise.all([
-            db.from("maquinaria_facturas_importacion").update({ documento_id: document.id }).eq("id", applied.factura_id),
-            applied.importacion_operativa_id
-              ? db.from("maquinaria_documentos").update({ importacion_id: applied.importacion_operativa_id }).eq("id", document.id)
-              : Promise.resolve({ error: null }),
-          ]);
-          if (invoiceUpdate.error) throw invoiceUpdate.error;
-          if (documentUpdate.error) throw documentUpdate.error;
-        }
-      } catch (documentError: any) {
-        toast.warning(`La factura se guardó, pero el archivo no quedó vinculado: ${documentError?.message ?? "error desconocido"}`);
-      }
-
-      toast.success(`Factura aplicada a ${selected.length} ${selected.length === 1 ? "máquina" : "máquinas"}`);
-      setInvoiceData(null); setInvoiceFile(null); setInvoiceUnits({}); detailQuery.refetch(); onChanged();
-    } catch (e: any) { toast.error(e?.message ?? "No se pudo guardar la factura"); } finally { setSaving(false); }
-  };
   const detail = detailQuery.data;
-  const invoiceCandidates = (detail?.imports ?? []).filter((row) => row.operacion_id === operationId && row.unidad_id && row.vinculo_manual);
-  const invoiceSelectedCount = Object.values(invoiceUnits).filter((value) => value.selected).length;
-  const invoiceAssignedCost = Object.values(invoiceUnits).reduce((sum, value) => {
-    if (!value.selected || value.costo === "") return sum;
-    const amount = Number(value.costo);
-    return Number.isFinite(amount) ? sum + amount : sum;
-  }, 0);
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
@@ -1404,26 +1328,14 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
           </div>;
         })}</div></div>
         {canEditChasis && <div><div className="mb-2"><h3 className="text-[13px] font-semibold">Asignación de unidades</h3><p className="text-[10px] text-muted-foreground">Stock reserva una máquina disponible; Importar vincula la unidad en tránsito correspondiente. Las coincidencias por chasis siempre requieren confirmación y la reserva permanece hasta desvincular o cancelar.</p></div><div className="space-y-2">{detail.units.map((unit) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion) => suggestion.unidad_id === unit.id)} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div></div>}
-        <div><h3 className="mb-2 text-[13px] font-semibold">Documentos</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay documentos adjuntos.</p>}</div>
-        {canEditChasis && (detail.requiere_importacion || detail.importation) && <div className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold">Factura de importación</h3><p className="text-[11px] text-muted-foreground">Elegí solo las máquinas incluidas. Las demás no se modifican.</p></div><Button variant="outline" size="sm" onClick={() => invoiceRef.current?.click()} disabled={reading}><Upload className="mr-1.5 h-3.5 w-3.5" />{reading ? "Leyendo..." : "Subir factura"}</Button></div><input ref={invoiceRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseInvoice(e.target.files?.[0])} />
-          {invoiceData && <div className="mt-3 space-y-3 border-t pt-3">
-            <div className="grid gap-2 sm:grid-cols-2"><Field label="Factura"><Input value={invoiceData.factura_numero ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={invoiceData.factura_fecha ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, factura_fecha: e.target.value })} /></Field><Field label="Proveedor"><Input value={invoiceData.proveedor ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, proveedor: e.target.value })} /></Field><Field label="Moneda"><Input value={invoiceData.moneda ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, moneda: e.target.value })} /></Field><Field label="Total de la factura"><Input type="number" value={invoiceData.valor_facturado ?? ""} onChange={(e) => setInvoiceData({ ...invoiceData, valor_facturado: e.target.value })} /></Field></div>
-            <div className="space-y-2"><div className="flex items-center justify-between"><div><h4 className="text-[12px] font-semibold">Máquinas incluidas</h4><p className="text-[10px] text-muted-foreground">El costo por máquina no se completa automáticamente cuando la factura incluye varias.</p></div><Badge variant="outline">{invoiceSelectedCount}/{invoiceCandidates.length} seleccionadas</Badge></div>
-              {!invoiceCandidates.length && <p className="rounded-lg bg-amber-50 p-3 text-[11px] text-amber-800">Este pedido todavía no tiene máquinas importadas vinculadas. Asignalas arriba antes de confirmar la factura.</p>}
-              {invoiceCandidates.map((row) => {
-                const draft = invoiceUnits[row.id] ?? { selected: false, chasis: row.chasis ?? "", costo: row.costo_final == null ? "" : String(row.costo_final) };
-                return <div key={row.id} className={cn("rounded-lg border p-3", draft.selected && "border-violet-200 bg-violet-50/40")}><div className="flex items-start gap-2"><Checkbox id={`invoice-unit-${row.id}`} checked={draft.selected} onCheckedChange={(checked) => setInvoiceUnits((current) => ({ ...current, [row.id]: { ...draft, selected: checked === true } }))} /><label htmlFor={`invoice-unit-${row.id}`} className="min-w-0 flex-1 cursor-pointer"><span className="block text-[11px] font-medium">{row.modelo || row.producto || "Máquina importada"} · Unidad {row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</span><span className="block truncate text-[10px] text-muted-foreground">{[row.oc && `OC ${row.oc}`, row.invoice_supplier && `Factura actual ${row.invoice_supplier}`].filter(Boolean).join(" · ") || "Sin factura asignada"}</span></label></div><div className="mt-2 grid gap-2 sm:grid-cols-2"><Field label="Chasis de esta máquina"><Input disabled={!draft.selected} value={draft.chasis} onChange={(e) => setInvoiceUnits((current) => ({ ...current, [row.id]: { ...draft, chasis: e.target.value } }))} /></Field><Field label="Costo de esta máquina"><Input disabled={!draft.selected} type="number" value={draft.costo} onChange={(e) => setInvoiceUnits((current) => ({ ...current, [row.id]: { ...draft, costo: e.target.value } }))} /></Field></div></div>;
-              })}
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3"><p className="text-[10px] text-muted-foreground">Costo distribuido: {formatUsd(invoiceAssignedCost)}{invoiceData.valor_facturado != null && invoiceData.valor_facturado !== "" ? ` · Total factura: ${formatUsd(invoiceData.valor_facturado)}` : ""}</p><Button size="sm" onClick={confirmInvoice} disabled={saving || !invoiceSelectedCount}>{saving ? "Guardando..." : `Confirmar para ${invoiceSelectedCount} ${invoiceSelectedCount === 1 ? "máquina" : "máquinas"}`}</Button></div>
-          </div>}
-        </div>}
+        <div><h3 className="mb-2 text-[13px] font-semibold">Documentos comerciales</h3>{detail.docs.length ? <div className="space-y-1">{detail.docs.map((doc) => <button type="button" key={doc.id} onClick={() => openDocument(doc.storage_path)} className="flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{doc.archivo_nombre}</span></span><span className="flex items-center gap-2"><Badge variant="outline">{MACHINE_DOCUMENT_LABELS[doc.tipo as MachineDocumentType] ?? doc.tipo}</Badge><span className="font-medium text-primary">Ver</span></span></button>)}</div> : <p className="text-[11px] text-muted-foreground">Aún no hay notas de pedido ni facturas al cliente adjuntas.</p>}</div>
         {detail.observaciones && <div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div>}
       </>}
     </ResponsiveDrawerBody>
     {detail && <ResponsiveDrawerFooter>
       {canEditChasis && operationId && <Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button>}
-      <AttachDocumentButton operationId={operationId} onUploaded={() => detailQuery.refetch()} />
+      <AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar nota de pedido" onUploaded={() => detailQuery.refetch()} />
+      <AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar factura al cliente" onUploaded={() => detailQuery.refetch()} />
     </ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
 }
