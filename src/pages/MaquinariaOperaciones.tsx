@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileCheck2, FileText, Paperclip, PackageCheck, Pencil, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Download, Eye, FileCheck2, FileText, LoaderCircle, Paperclip, PackageCheck, Pencil, Plus, Save, Ship, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import {
@@ -426,95 +427,115 @@ async function uploadImportDocument(file: File, importLineId: string, type: "OC"
   if (docError) throw docError;
 }
 
-async function openMachineDocument(storagePath: string, fileName = "documento") {
-  const viewer = window.open("about:blank", "_blank");
-  if (viewer) {
-    viewer.document.title = "Cargando documento...";
-    viewer.document.body.style.cssText = "margin:0;display:grid;place-items:center;min-height:100vh;font-family:system-ui;color:#4b5563";
-    viewer.document.body.textContent = "Cargando documento...";
-  }
-  try {
-    const { data, error } = await supabase.storage.from("maquinaria-documentos").download(storagePath);
-    if (error || !data) throw error ?? new Error("El archivo no está disponible");
-    const objectUrl = URL.createObjectURL(data);
-    if (viewer) {
-      const documentViewer = viewer.document;
-      documentViewer.open();
-      documentViewer.write("<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Documento</title><style>html,body{margin:0;height:100%;background:#202124;color:#fff;font-family:system-ui}body{display:flex;flex-direction:column}.toolbar{height:52px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 16px;background:#2b2d30}.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.download{flex:none;border:1px solid #6b7280;border-radius:7px;padding:7px 12px;color:#fff;text-decoration:none;font-size:13px}.content{flex:1;min-height:0;display:grid;place-items:center;padding:12px}.content img{display:block;max-width:100%;max-height:100%;object-fit:contain}.content iframe{width:100%;height:100%;border:0;background:#fff}.message{max-width:520px;text-align:center;color:#d1d5db}</style></head><body><div class='toolbar'><span class='name'></span><a class='download'>Descargar</a></div><main class='content'></main></body></html>");
-      documentViewer.close();
-      documentViewer.title = fileName;
-      const name = documentViewer.querySelector<HTMLElement>(".name");
-      const download = documentViewer.querySelector<HTMLAnchorElement>(".download");
-      const content = documentViewer.querySelector<HTMLElement>(".content");
-      if (name) name.textContent = fileName;
-      if (download) { download.href = objectUrl; download.download = fileName; }
-      const normalizedName = fileName.toLowerCase();
-      const isImage = data.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp)$/.test(normalizedName);
-      const isPdf = data.type === "application/pdf" || normalizedName.endsWith(".pdf");
-      if (content && isImage) {
-        const image = documentViewer.createElement("img");
-        image.src = objectUrl;
-        image.alt = fileName;
-        content.appendChild(image);
-      } else if (content && isPdf) {
-        content.style.display = "block";
-        content.style.overflow = "auto";
-        content.style.background = "#525659";
-        content.style.padding = "12px";
-        const progress = documentViewer.createElement("p");
-        progress.className = "message";
-        progress.style.margin = "24px auto";
-        progress.textContent = "Preparando PDF...";
-        content.appendChild(progress);
-        try {
-          const pdf = await getDocument({
-            data: new Uint8Array(await data.arrayBuffer()),
-            isImageDecoderSupported: false,
-            isOffscreenCanvasSupported: false,
-          }).promise;
-          for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-            progress.textContent = `Renderizando página ${pageNumber} de ${pdf.numPages}...`;
-            const page = await pdf.getPage(pageNumber);
-            const viewport = page.getViewport({ scale: 1.5 });
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d", { alpha: false });
-            if (!context) throw new Error("No se pudo preparar la vista del PDF");
-            canvas.width = Math.ceil(viewport.width);
-            canvas.height = Math.ceil(viewport.height);
-            await page.render({ canvasContext: context, viewport, background: "#ffffff" }).promise;
-            const renderedPage = documentViewer.createElement("img");
-            renderedPage.src = canvas.toDataURL("image/png");
-            renderedPage.alt = `Página ${pageNumber} de ${fileName}`;
-            renderedPage.style.cssText = "display:block;width:auto;max-width:100%;height:auto;margin:0 auto 12px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.35)";
-            content.appendChild(renderedPage);
-            canvas.width = 1;
-            canvas.height = 1;
-            page.cleanup();
-          }
-          progress.remove();
-          await pdf.destroy();
-        } catch (pdfError) {
-          console.error("No se pudo renderizar el PDF", pdfError);
-          progress.textContent = "No se pudo generar la vista previa. Usá Descargar para abrir el archivo en tu equipo.";
-        }
-      } else if (content) {
-        const message = documentViewer.createElement("p");
-        message.className = "message";
-        message.textContent = "Este formato no admite vista previa en el navegador. Usá Descargar para abrirlo en tu equipo.";
-        content.appendChild(message);
-      }
-    } else {
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.target = "_blank";
-      link.download = fileName;
-      link.click();
+const MACHINE_DOCUMENT_EVENT = "sig:open-machine-document";
+type MachineDocumentRequest = { storagePath: string; fileName: string };
+type RenderedMachineDocument = { objectUrl: string; kind: "IMAGE" | "PDF" | "OTHER"; pages: string[] };
+const machineDocumentCache = new Map<string, RenderedMachineDocument>();
+
+function openMachineDocument(storagePath: string, fileName = "documento") {
+  window.dispatchEvent(new CustomEvent<MachineDocumentRequest>(MACHINE_DOCUMENT_EVENT, { detail: { storagePath, fileName } }));
+  return Promise.resolve();
+}
+
+function MachineDocumentViewer() {
+  const [request, setRequest] = useState<MachineDocumentRequest | null>(null);
+  const [rendered, setRendered] = useState<RenderedMachineDocument | null>(null);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const listener = (event: Event) => setRequest((event as CustomEvent<MachineDocumentRequest>).detail);
+    window.addEventListener(MACHINE_DOCUMENT_EVENT, listener);
+    return () => window.removeEventListener(MACHINE_DOCUMENT_EVENT, listener);
+  }, []);
+
+  useEffect(() => {
+    if (!request) return;
+    const cacheKey = request.storagePath;
+    const cached = machineDocumentCache.get(cacheKey);
+    if (cached) {
+      setRendered(cached);
+      setProgress("");
+      setError("");
+      return;
     }
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 600_000);
-  } catch (error) {
-    viewer?.close();
-    throw error;
-  }
+    let cancelled = false;
+    setRendered(null);
+    setError("");
+    setProgress("Descargando documento...");
+    void (async () => {
+      try {
+        const { data, error: downloadError } = await supabase.storage.from("maquinaria-documentos").download(request.storagePath);
+        if (downloadError || !data) throw downloadError ?? new Error("El archivo no está disponible");
+        const objectUrl = URL.createObjectURL(data);
+        const normalizedName = request.fileName.toLowerCase();
+        const isImage = data.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp)$/.test(normalizedName);
+        const isPdf = data.type === "application/pdf" || normalizedName.endsWith(".pdf");
+        if (isImage) {
+          const result: RenderedMachineDocument = { objectUrl, kind: "IMAGE", pages: [objectUrl] };
+          machineDocumentCache.set(cacheKey, result);
+          if (!cancelled) { setRendered(result); setProgress(""); }
+          return;
+        }
+        if (!isPdf) {
+          const result: RenderedMachineDocument = { objectUrl, kind: "OTHER", pages: [] };
+          machineDocumentCache.set(cacheKey, result);
+          if (!cancelled) { setRendered(result); setProgress(""); }
+          return;
+        }
+        const pdf = await getDocument({
+          data: new Uint8Array(await data.arrayBuffer()),
+          isImageDecoderSupported: false,
+          isOffscreenCanvasSupported: false,
+        }).promise;
+        const pages: string[] = [];
+        const result: RenderedMachineDocument = { objectUrl, kind: "PDF", pages };
+        if (!cancelled) setRendered({ ...result, pages: [] });
+        const scale = Math.min(1.25, Math.max(1, window.devicePixelRatio || 1));
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          if (!cancelled) setProgress(`Renderizando página ${pageNumber} de ${pdf.numPages}...`);
+          const page = await pdf.getPage(pageNumber);
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d", { alpha: false });
+          if (!context) throw new Error("No se pudo preparar la vista del PDF");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          await page.render({ canvasContext: context, viewport, background: "#ffffff" }).promise;
+          pages.push(canvas.toDataURL("image/jpeg", 0.92));
+          canvas.width = 1;
+          canvas.height = 1;
+          page.cleanup();
+          if (!cancelled) setRendered({ ...result, pages: [...pages] });
+        }
+        await pdf.destroy();
+        machineDocumentCache.set(cacheKey, { ...result, pages: [...pages] });
+        if (!cancelled) setProgress("");
+      } catch (documentError) {
+        console.error("No se pudo preparar el documento", documentError);
+        if (!cancelled) { setProgress(""); setError("No se pudo generar la vista previa. Podés intentar nuevamente o descargar el archivo."); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [request]);
+
+  return <Dialog open={!!request} onOpenChange={(open) => !open && setRequest(null)}>
+    <DialogContent className="h-[92vh] w-[96vw] max-w-none gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogHeader className="border-b px-5 py-3 pr-24 text-left">
+        <DialogTitle className="truncate text-[14px]">{request?.fileName ?? "Documento"}</DialogTitle>
+        <DialogDescription className="sr-only">Vista previa del documento seleccionado</DialogDescription>
+      </DialogHeader>
+      {rendered?.objectUrl && <Button asChild variant="outline" size="sm" className="absolute right-12 top-2.5 h-8"><a href={rendered.objectUrl} download={request?.fileName}><Download className="mr-1.5 h-3.5 w-3.5" />Descargar</a></Button>}
+      <div className="min-h-0 overflow-auto bg-slate-600 p-3">
+        {progress && rendered?.pages.length ? <div className="sticky top-0 z-10 mx-auto mb-3 flex w-fit items-center gap-2 rounded-full bg-slate-900/90 px-3 py-1.5 text-[11px] text-white shadow"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />{progress}</div> : null}
+        {((!rendered || (progress && !rendered.pages.length)) && !error) && <div className="flex h-full min-h-[320px] items-center justify-center gap-2 text-[12px] text-white"><LoaderCircle className="h-4 w-4 animate-spin" />{progress || "Preparando documento..."}</div>}
+        {error && <div className="flex h-full min-h-[320px] items-center justify-center text-center text-[12px] text-white">{error}</div>}
+        {rendered?.kind === "IMAGE" && <img src={rendered.pages[0]} alt={request?.fileName} className="mx-auto max-h-full max-w-full bg-white object-contain shadow-xl" />}
+        {rendered?.kind === "PDF" && <div className="space-y-3">{rendered.pages.map((page, index) => <img key={index} src={page} alt={`Página ${index + 1} de ${request?.fileName}`} className="mx-auto h-auto max-w-full bg-white shadow-xl" />)}</div>}
+        {rendered?.kind === "OTHER" && <div className="flex h-full min-h-[320px] items-center justify-center text-center text-[12px] text-white">Este formato no admite vista previa. Usá Descargar para abrirlo en tu equipo.</div>}
+      </div>
+    </DialogContent>
+  </Dialog>;
 }
 
 export default function MaquinariaOperaciones() {
@@ -821,6 +842,7 @@ export default function MaquinariaOperaciones() {
         queryClient.invalidateQueries({ queryKey: ["machine-operations", "imports"] });
       }}
     />
+    <MachineDocumentViewer />
   </main>;
 }
 
