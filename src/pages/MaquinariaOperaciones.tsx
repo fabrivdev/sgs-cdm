@@ -467,7 +467,11 @@ async function openMachineDocument(storagePath: string, fileName = "documento") 
         progress.textContent = "Preparando PDF...";
         content.appendChild(progress);
         try {
-          const pdf = await getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise;
+          const pdf = await getDocument({
+            data: new Uint8Array(await data.arrayBuffer()),
+            isImageDecoderSupported: false,
+            isOffscreenCanvasSupported: false,
+          }).promise;
           for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
             progress.textContent = `Renderizando página ${pageNumber} de ${pdf.numPages}...`;
             const page = await pdf.getPage(pageNumber);
