@@ -789,7 +789,7 @@ export default function MaquinariaOperaciones() {
             return <button type="button" key={row.id} onClick={() => setSelectedImport(importRow)} className="w-full rounded-xl border bg-card p-3 text-left">
               <div className="flex items-start justify-between gap-2">
                 <span className="font-mono text-[12px] font-semibold">{importRow.llave_interna || (importRow.oc ? `OC ${importRow.oc}` : "Sin llave interna")}</span>
-                <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival), arrival === "COMPLETADO" && !importStockConfirmed(importRow) && "animate-pulse")}>{ARRIVAL_LABEL[arrival]}</Badge>
+                <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>
               </div>
               <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
               <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
@@ -809,7 +809,7 @@ export default function MaquinariaOperaciones() {
             <div className="flex items-start justify-between gap-2">
               <span className="font-mono text-[12px] font-semibold">{formatNpCode(row.np_numero)}</span>
               <div className="flex flex-col items-end gap-1">
-                <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state), state === "COMPLETADO" && entregaState !== "ENTREGADO" && "animate-pulse")}>{SIMPLE_STATE_LABEL[state]}</Badge>
+                <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge>
                 {entregaState && <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge>}
               </div>
             </div>
@@ -873,7 +873,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
         <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge></TableCell>
         <TableCell>{row.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(row.condicion))}>{CONDITION_LABEL[row.condicion] ?? row.condicion}</Badge>}</TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", supplyClass(row.abastecimiento))}>{SUPPLY_LABEL[row.abastecimiento ?? ""] ?? "Sin definir"}</Badge></TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state), state === "COMPLETADO" && entregaState !== "ENTREGADO" && "animate-pulse")}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
         <TableCell>{entregaState ? <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
         <TableCell className="text-right tabular-nums">{formatUsd(row.valor_venta)}</TableCell>
         <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
@@ -911,7 +911,7 @@ function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: I
         <TableCell className="whitespace-nowrap">{formatDate(row.fecha_pedido)}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.eta)}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.ata)}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival), arrival === "COMPLETADO" && !importStockConfirmed(row) && "animate-pulse")}>{ARRIVAL_LABEL[arrival]}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge></TableCell>
         <TableCell>{row.estado_disponibilidad ? <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
         <TableCell className="font-mono text-[11px]">{row.chasis || "Sin chasis"}</TableCell>
         <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
@@ -1140,7 +1140,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const ocDocuments = detailOcQuery.data ?? [];
   const supplierDocuments = detailSupplierInvoiceQuery.data ?? [];
   return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg">
-    <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival), arrival === "COMPLETADO" && !stockConfirmed && "animate-pulse")}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
+    <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} pulseCurrent={!stockConfirmed} />
@@ -1421,7 +1421,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-[16px] font-semibold">{detail ? formatNpCode(detail.np_numero) : "Cargando..."}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
-        {detail && <div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState), simpleState === "COMPLETADO" && !deliveryComplete && "animate-pulse")}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><span className="text-[10px] text-muted-foreground">{STATE_LABEL[detail.estado] ?? detail.estado}</span></div>}
+        {detail && <div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><span className="text-[10px] text-muted-foreground">{STATE_LABEL[detail.estado] ?? detail.estado}</span></div>}
       </div>
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
