@@ -25,7 +25,6 @@ import {
   STOCK_FILTROS_VACIOS,
   STOCK_PAGE_SIZE,
   useFamiliasStock,
-  useStockKpis,
   useStockMatriz,
   type StockFiltros,
   type StockMatrizRow,
@@ -85,7 +84,6 @@ export default function Repuestos() {
 
   const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
-  const kpisQuery = useStockKpis(filtros);
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
   const marcaSugerencia = seleccionado && (seleccionado.marca === "CLAAS" || seleccionado.marca === "HORSCH" || seleccionado.marca === "OTROS")
@@ -153,7 +151,7 @@ export default function Repuestos() {
   const count = matrizQuery.data?.count ?? 0;
   const totalPages = Math.max(Math.ceil(count / STOCK_PAGE_SIZE), 1);
 
-  const kpis = kpisQuery.data;
+  const kpis = matrizQuery.data?.kpis;
   const ultimaImportacionTexto = kpis?.ultimaImportacion
     ? new Date(kpis.ultimaImportacion).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })
     : "—";
@@ -163,9 +161,9 @@ export default function Repuestos() {
       <PageHeader title="Catálogo y Stock" />
 
       <KpiStrip className="sm:grid-cols-3">
-        <KpiItem label="Con stock" value={kpisQuery.isLoading ? "…" : (kpis?.conStock ?? 0).toLocaleString("es-PY")} detail={`${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")} productos`} icon={<Package className="h-4 w-4 text-primary" />} tone="positive" />
-        <KpiItem label="Sin stock" value={kpisQuery.isLoading ? "…" : (kpis?.enCero ?? 0).toLocaleString("es-PY")} icon={<AlertTriangle className="h-4 w-4 text-amber-600" />} tone="warning" />
-        <KpiItem label="Actualizado" value={kpisQuery.isLoading ? "…" : ultimaImportacionTexto} icon={<Clock className="h-4 w-4" />} />
+        <KpiItem label="Con stock" value={matrizQuery.isLoading ? "…" : (kpis?.conStock ?? 0).toLocaleString("es-PY")} detail={`${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")} productos`} icon={<Package className="h-4 w-4 text-primary" />} tone="positive" />
+        <KpiItem label="Sin stock" value={matrizQuery.isLoading ? "…" : (kpis?.enCero ?? 0).toLocaleString("es-PY")} icon={<AlertTriangle className="h-4 w-4 text-amber-600" />} tone="warning" />
+        <KpiItem label="Actualizado" value={matrizQuery.isLoading ? "…" : ultimaImportacionTexto} icon={<Clock className="h-4 w-4" />} />
       </KpiStrip>
 
       <FiltersBar
@@ -210,11 +208,18 @@ export default function Repuestos() {
 
           {matrizQuery.isLoading && <p className={cn(metaText, "p-3")}>Cargando matriz de stock…</p>}
 
-          {!matrizQuery.isLoading && rows.length === 0 && (
+          {matrizQuery.isError && (
+            <div className="flex items-center justify-between gap-3 p-4 text-[12px]">
+              <div className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /><span>No se pudo cargar el catálogo de stock.</span></div>
+              <Button type="button" variant="outline" size="sm" onClick={() => void matrizQuery.refetch()}>Reintentar</Button>
+            </div>
+          )}
+
+          {!matrizQuery.isLoading && !matrizQuery.isError && rows.length === 0 && (
             <p className={cn(metaText, "p-3")}>Sin productos para este filtro.</p>
           )}
 
-          {!matrizQuery.isLoading && rows.length > 0 && (
+          {!matrizQuery.isLoading && !matrizQuery.isError && rows.length > 0 && (
             <>
               <div className="overflow-x-auto">
                 <Table>

@@ -105,19 +105,33 @@ export function useStockMatriz(filtros: StockFiltros, page: number, sortKey: Sto
   return useQuery({
     queryKey: ["repuestos", "stock_matriz", filtros, page, sortKey, sortDir],
     staleTime: STALE_TIME,
+    retry: false,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous,
     queryFn: async () => {
-      const from = page * STOCK_PAGE_SIZE;
-      const to = from + STOCK_PAGE_SIZE - 1;
-
-      let query = (supabase.from("v_repuestos_stock_matriz" as any) as any)
-        .select(STOCK_MATRIZ_COLUMNS, { count: "exact" })
-        .order(sortKey, { ascending: sortDir === "asc" });
-      query = aplicarFiltrosStock(query, filtros);
-
-      const { data, error, count } = await query.range(from, to);
+      const { data, error } = await (supabase.rpc as any)("repuestos_catalogo_stock_paginado", {
+        p_busqueda: filtros.busqueda.trim() || null,
+        p_marcas: filtros.marcas,
+        p_familias: filtros.familias,
+        p_estados_stock: filtros.estadosStock,
+        p_orden: sortKey,
+        p_direccion: sortDir,
+        p_limite: STOCK_PAGE_SIZE,
+        p_offset: page * STOCK_PAGE_SIZE,
+      });
       if (error) throw error;
 
-      return { rows: (data ?? []) as StockMatrizRow[], count: count ?? 0 };
+      const result = data && typeof data === "object" ? data as Record<string, any> : {};
+      return {
+        rows: (Array.isArray(result.rows) ? result.rows : []) as StockMatrizRow[],
+        count: Number(result.count ?? 0),
+        kpis: {
+          totalCatalogo: Number(result.kpis?.totalCatalogo ?? 0),
+          conStock: Number(result.kpis?.conStock ?? 0),
+          enCero: Number(result.kpis?.enCero ?? 0),
+          ultimaImportacion: result.kpis?.ultimaImportacion ?? null,
+        } as StockKpis,
+      };
     },
   });
 }
@@ -168,47 +182,6 @@ export interface StockKpis {
   conStock: number;
   enCero: number;
   ultimaImportacion: string | null;
-}
-
-export function useStockKpis(filtros: StockFiltros) {
-  return useQuery({
-    queryKey: ["repuestos", "stock_kpis", filtros],
-    staleTime: STALE_TIME,
-    queryFn: async (): Promise<StockKpis> => {
-      const totalQuery = aplicarFiltrosStock(
-        (supabase.from("v_repuestos_stock_matriz" as any) as any)
-          .select("codigo_interno", { count: "exact", head: true }),
-        filtros,
-      );
-      const conStockQuery = aplicarFiltrosStock(
-        (supabase.from("v_repuestos_stock_matriz" as any) as any)
-          .select("codigo_interno", { count: "exact", head: true }),
-        filtros,
-      ).gt("total", 0);
-      const [totalRes, conStockRes, ultimaRes] = await Promise.all([
-        totalQuery,
-        conStockQuery,
-        (supabase.from("repuestos_stock" as any) as any)
-          .select("importado_en")
-          .order("importado_en", { ascending: false })
-          .limit(1),
-      ]);
-
-      if (totalRes.error) throw totalRes.error;
-      if (conStockRes.error) throw conStockRes.error;
-      if (ultimaRes.error) throw ultimaRes.error;
-
-      const totalCatalogo = totalRes.count ?? 0;
-      const conStock = conStockRes.count ?? 0;
-
-      return {
-        totalCatalogo,
-        conStock,
-        enCero: Math.max(totalCatalogo - conStock, 0),
-        ultimaImportacion: ultimaRes.data?.[0]?.importado_en ?? null,
-      };
-    },
-  });
 }
 
 export function useFamiliasStock() {
