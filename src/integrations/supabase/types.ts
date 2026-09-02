@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1064,8 +1064,9 @@ export type Database = {
           estado_extraccion: string
           id: string
           importacion_id: string | null
+          importacion_linea_id: string | null
           mime_type: string | null
-          operacion_id: string
+          operacion_id: string | null
           revisado_en: string | null
           revisado_por: string | null
           storage_path: string
@@ -1083,8 +1084,9 @@ export type Database = {
           estado_extraccion?: string
           id?: string
           importacion_id?: string | null
+          importacion_linea_id?: string | null
           mime_type?: string | null
-          operacion_id: string
+          operacion_id?: string | null
           revisado_en?: string | null
           revisado_por?: string | null
           storage_path: string
@@ -1102,8 +1104,9 @@ export type Database = {
           estado_extraccion?: string
           id?: string
           importacion_id?: string | null
+          importacion_linea_id?: string | null
           mime_type?: string | null
-          operacion_id?: string
+          operacion_id?: string | null
           revisado_en?: string | null
           revisado_por?: string | null
           storage_path?: string
@@ -1118,6 +1121,76 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_importaciones_operativas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_facturas_importacion_detalle"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_unidades_asignables"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_unidades_historicas"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_unidades_operativas"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importaciones_lineas_operativas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
           },
           {
             foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
@@ -1137,11 +1210,187 @@ export type Database = {
             foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_pedidos_lineas_operativas"
             referencedColumns: ["operacion_id"]
           },
           {
             foreignKeyName: "maquinaria_documentos_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+        ]
+      }
+      maquinaria_factura_importacion_unidades: {
+        Row: {
+          actualizado_en: string
+          chasis: string | null
+          costo_unidad: number | null
+          creado_en: string
+          factura_id: string
+          importacion_unidad_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          chasis?: string | null
+          costo_unidad?: number | null
+          creado_en?: string
+          factura_id: string
+          importacion_unidad_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          chasis?: string | null
+          costo_unidad?: number | null
+          creado_en?: string
+          factura_id?: string
+          importacion_unidad_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unida_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_facturas_importacion_detalle"
+            referencedColumns: ["importacion_unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unida_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unida_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades_asignables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unida_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades_historicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unida_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades_operativas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unidades_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_facturas_importacion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_factura_importacion_unidades_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_facturas_importacion_detalle"
+            referencedColumns: ["factura_id"]
+          },
+        ]
+      }
+      maquinaria_facturas_importacion: {
+        Row: {
+          actualizado_en: string
+          creado_en: string
+          creado_por: string | null
+          documento_id: string | null
+          factura_fecha: string | null
+          factura_numero: string
+          id: string
+          moneda: string | null
+          operacion_id: string
+          proveedor: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          actualizado_en?: string
+          creado_en?: string
+          creado_por?: string | null
+          documento_id?: string | null
+          factura_fecha?: string | null
+          factura_numero: string
+          id?: string
+          moneda?: string | null
+          operacion_id: string
+          proveedor?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          actualizado_en?: string
+          creado_en?: string
+          creado_por?: string | null
+          documento_id?: string | null
+          factura_fecha?: string | null
+          factura_numero?: string
+          id?: string
+          moneda?: string | null
+          operacion_id?: string
+          proveedor?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
@@ -1166,11 +1415,13 @@ export type Database = {
           estado_fuente: string | null
           eta: string | null
           factura_venta: string | null
+          fecha_pedido: string | null
           flete_seguro: number | null
           id: string
           invoice_supplier: string | null
           linea_id: string | null
           llave_interna: string | null
+          marca_importacion: Database["public"]["Enums"]["marca"] | null
           margen_porcentaje: number | null
           modelo: string | null
           notas: string | null
@@ -1214,11 +1465,13 @@ export type Database = {
           estado_fuente?: string | null
           eta?: string | null
           factura_venta?: string | null
+          fecha_pedido?: string | null
           flete_seguro?: number | null
           id?: string
           invoice_supplier?: string | null
           linea_id?: string | null
           llave_interna?: string | null
+          marca_importacion?: Database["public"]["Enums"]["marca"] | null
           margen_porcentaje?: number | null
           modelo?: string | null
           notas?: string | null
@@ -1262,11 +1515,13 @@ export type Database = {
           estado_fuente?: string | null
           eta?: string | null
           factura_venta?: string | null
+          fecha_pedido?: string | null
           flete_seguro?: number | null
           id?: string
           invoice_supplier?: string | null
           linea_id?: string | null
           llave_interna?: string | null
+          marca_importacion?: Database["public"]["Enums"]["marca"] | null
           margen_porcentaje?: number | null
           modelo?: string | null
           notas?: string | null
@@ -1299,8 +1554,22 @@ export type Database = {
             foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
             columns: ["linea_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operacion_lineas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
@@ -1320,6 +1589,13 @@ export type Database = {
             foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operaciones"
             referencedColumns: ["id"]
           },
@@ -1334,6 +1610,13 @@ export type Database = {
             foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_pedidos_lineas_operativas"
             referencedColumns: ["operacion_id"]
           },
@@ -1343,6 +1626,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
             referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
@@ -1406,6 +1696,247 @@ export type Database = {
         }
         Relationships: []
       }
+      maquinaria_importacion_unidades: {
+        Row: {
+          activa: boolean
+          actualizado_en: string
+          ata: string | null
+          chasis: string | null
+          costo_final: number | null
+          costo_final_sin_iva: number | null
+          creado_en: string
+          detalle_manual: boolean
+          estado_fuente: string | null
+          eta: string | null
+          factura_proveedor_fecha: string | null
+          factura_proveedor_moneda: string | null
+          id: string
+          importacion_linea_id: string
+          invoice_supplier: string | null
+          linea_id: string | null
+          numero_unidad: number
+          operacion_id: string | null
+          situacion_vinculo: string
+          unidad_id: string | null
+          vinculo_manual: boolean
+        }
+        Insert: {
+          activa?: boolean
+          actualizado_en?: string
+          ata?: string | null
+          chasis?: string | null
+          costo_final?: number | null
+          costo_final_sin_iva?: number | null
+          creado_en?: string
+          detalle_manual?: boolean
+          estado_fuente?: string | null
+          eta?: string | null
+          factura_proveedor_fecha?: string | null
+          factura_proveedor_moneda?: string | null
+          id?: string
+          importacion_linea_id: string
+          invoice_supplier?: string | null
+          linea_id?: string | null
+          numero_unidad: number
+          operacion_id?: string | null
+          situacion_vinculo?: string
+          unidad_id?: string | null
+          vinculo_manual?: boolean
+        }
+        Update: {
+          activa?: boolean
+          actualizado_en?: string
+          ata?: string | null
+          chasis?: string | null
+          costo_final?: number | null
+          costo_final_sin_iva?: number | null
+          creado_en?: string
+          detalle_manual?: boolean
+          estado_fuente?: string | null
+          eta?: string | null
+          factura_proveedor_fecha?: string | null
+          factura_proveedor_moneda?: string | null
+          id?: string
+          importacion_linea_id?: string
+          invoice_supplier?: string | null
+          linea_id?: string | null
+          numero_unidad?: number
+          operacion_id?: string | null
+          situacion_vinculo?: string
+          unidad_id?: string | null
+          vinculo_manual?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_facturas_importacion_detalle"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_unidades_asignables"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_unidades_historicas"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_unidades_operativas"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importaciones_lineas_operativas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_importacion_linea_id_fkey"
+            columns: ["importacion_linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["importacion_linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maquinaria_importaciones_operativas: {
         Row: {
           actualizado_en: string
@@ -1448,6 +1979,13 @@ export type Database = {
             foreignKeyName: "maquinaria_importaciones_operativas_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: true
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importaciones_operativas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: true
             referencedRelation: "maquinaria_operaciones"
             referencedColumns: ["id"]
           },
@@ -1457,6 +1995,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importaciones_operativas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
           },
           {
             foreignKeyName: "maquinaria_importaciones_operativas_operacion_id_fkey"
@@ -1558,6 +2103,13 @@ export type Database = {
             foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operaciones"
             referencedColumns: ["id"]
           },
@@ -1567,6 +2119,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
           },
           {
             foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
@@ -1689,8 +2248,22 @@ export type Database = {
             foreignKeyName: "maquinaria_unidades_operacion_linea_id_fkey"
             columns: ["linea_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_unidades_operacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operacion_lineas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_unidades_operacion_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
           },
           {
             foreignKeyName: "maquinaria_unidades_operacion_linea_id_fkey"
@@ -2007,6 +2580,13 @@ export type Database = {
             foreignKeyName: "parque_historial_propiedad_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "parque_historial_propiedad_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operaciones"
             referencedColumns: ["id"]
           },
@@ -2016,6 +2596,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_operaciones_resumen"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_historial_propiedad_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
           },
           {
             foreignKeyName: "parque_historial_propiedad_operacion_id_fkey"
@@ -2185,6 +2772,7 @@ export type Database = {
           importado_en: string
           marca: string | null
           modelo: string | null
+          parque_origen_id: string | null
           producto_codigo: string
           saldo_actual: number
           source_row: number | null
@@ -2204,6 +2792,7 @@ export type Database = {
           importado_en?: string
           marca?: string | null
           modelo?: string | null
+          parque_origen_id?: string | null
           producto_codigo: string
           saldo_actual?: number
           source_row?: number | null
@@ -2223,6 +2812,7 @@ export type Database = {
           importado_en?: string
           marca?: string | null
           modelo?: string | null
+          parque_origen_id?: string | null
           producto_codigo?: string
           saldo_actual?: number
           source_row?: number | null
@@ -2232,6 +2822,27 @@ export type Database = {
           unidad_operacion_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "parque_stock_maquinas_parque_origen_id_fkey"
+            columns: ["parque_origen_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["parque_maquina_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_parque_origen_id_fkey"
+            columns: ["parque_origen_id"]
+            isOneToOne: false
+            referencedRelation: "parque_maquinas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
           {
             foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
             columns: ["unidad_operacion_id"]
@@ -4010,6 +4621,643 @@ export type Database = {
       }
     }
     Views: {
+      maquinaria_facturas_importacion_detalle: {
+        Row: {
+          actualizado_en: string | null
+          cantidad_lote: number | null
+          chasis: string | null
+          costo_unidad: number | null
+          documento_id: string | null
+          factura_fecha: string | null
+          factura_id: string | null
+          factura_numero: string | null
+          importacion_linea_id: string | null
+          importacion_unidad_id: string | null
+          modelo: string | null
+          moneda: string | null
+          numero_unidad: number | null
+          operacion_id: string | null
+          pedido_unidad_id: string | null
+          producto: string | null
+          proveedor: string | null
+          valor_total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_importacion_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["pedido_unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["pedido_unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["pedido_unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["pedido_unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maquinaria_importacion_np_disponibles: {
+        Row: {
+          cliente_nombre: string | null
+          linea_id: string | null
+          marca: string | null
+          modelo: string | null
+          np_numero: string | null
+          operacion_id: string | null
+          producto: string | null
+          unidades_disponibles: number | null
+        }
+        Relationships: []
+      }
+      maquinaria_importacion_unidades_asignables: {
+        Row: {
+          activa: boolean | null
+          actualizado_en: string | null
+          ata: string | null
+          cantidad: number | null
+          cantidad_lote: number | null
+          chasis: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          costo_final: number | null
+          costo_final_sin_iva: number | null
+          creado_en: string | null
+          datos_fuente: Json | null
+          descuento_especial: number | null
+          descuentos: number | null
+          destino: string | null
+          detalle_manual: boolean | null
+          diferencia: number | null
+          disponibilidad_detalle: string | null
+          estado_disponibilidad: string | null
+          estado_fuente: string | null
+          eta: string | null
+          factura_proveedor_fecha: string | null
+          factura_proveedor_moneda: string | null
+          factura_venta: string | null
+          fecha_pedido: string | null
+          flete_seguro: number | null
+          id: string | null
+          importacion_linea_id: string | null
+          invoice_supplier: string | null
+          linea_id: string | null
+          llave_interna: string | null
+          marca: string | null
+          margen_porcentaje: number | null
+          modelo: string | null
+          notas: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          numero_unidad: number | null
+          oc: string | null
+          operacion_id: string | null
+          origen: string | null
+          po: string | null
+          precio_oc: number | null
+          precio_teorico_oc: number | null
+          prioridad: string | null
+          producto: string | null
+          producto_facturado: string | null
+          proveedor: string | null
+          proveedor_flete: string | null
+          situacion_vinculo: string | null
+          source_id: string | null
+          source_row: number | null
+          source_sheet: string | null
+          stock_deposito: string | null
+          stock_saldo: number | null
+          stock_sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo_cambio: number | null
+          transporte: string | null
+          unidad_id: string | null
+          utilidad: number | null
+          valor_venta: number | null
+          venta_facturada: string | null
+          vinculo_manual: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maquinaria_importacion_unidades_historicas: {
+        Row: {
+          activa: boolean | null
+          actualizado_en: string | null
+          ata: string | null
+          cantidad: number | null
+          cantidad_lote: number | null
+          chasis: string | null
+          chasis_normalizado: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          costo_final: number | null
+          costo_final_sin_iva: number | null
+          creado_en: string | null
+          datos_fuente: Json | null
+          descuento_especial: number | null
+          descuentos: number | null
+          destino: string | null
+          detalle_manual: boolean | null
+          diferencia: number | null
+          disponibilidad_detalle: string | null
+          estado_disponibilidad: string | null
+          estado_fuente: string | null
+          eta: string | null
+          factura_proveedor_fecha: string | null
+          factura_proveedor_moneda: string | null
+          factura_venta: string | null
+          fecha_pedido: string | null
+          flete_seguro: number | null
+          id: string | null
+          importacion_linea_id: string | null
+          invoice_supplier: string | null
+          linea_id: string | null
+          llave_interna: string | null
+          marca: string | null
+          margen_porcentaje: number | null
+          modelo: string | null
+          notas: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          numero_unidad: number | null
+          oc: string | null
+          operacion_id: string | null
+          origen: string | null
+          po: string | null
+          precio_oc: number | null
+          precio_teorico_oc: number | null
+          prioridad: string | null
+          producto: string | null
+          producto_facturado: string | null
+          proveedor: string | null
+          proveedor_flete: string | null
+          situacion_vinculo: string | null
+          source_id: string | null
+          source_row: number | null
+          source_sheet: string | null
+          stock_deposito: string | null
+          stock_saldo: number | null
+          stock_sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo_cambio: number | null
+          transporte: string | null
+          unidad_id: string | null
+          utilidad: number | null
+          valor_venta: number | null
+          venta_facturada: string | null
+          vinculo_manual: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maquinaria_importacion_unidades_operativas: {
+        Row: {
+          activa: boolean | null
+          actualizado_en: string | null
+          ata: string | null
+          cantidad: number | null
+          cantidad_lote: number | null
+          chasis: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          costo_final: number | null
+          costo_final_sin_iva: number | null
+          creado_en: string | null
+          datos_fuente: Json | null
+          descuento_especial: number | null
+          descuentos: number | null
+          destino: string | null
+          detalle_manual: boolean | null
+          diferencia: number | null
+          disponibilidad_detalle: string | null
+          estado_disponibilidad: string | null
+          estado_fuente: string | null
+          eta: string | null
+          factura_proveedor_fecha: string | null
+          factura_proveedor_moneda: string | null
+          factura_venta: string | null
+          fecha_pedido: string | null
+          flete_seguro: number | null
+          id: string | null
+          importacion_linea_id: string | null
+          invoice_supplier: string | null
+          linea_id: string | null
+          llave_interna: string | null
+          marca: string | null
+          margen_porcentaje: number | null
+          modelo: string | null
+          notas: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          numero_unidad: number | null
+          oc: string | null
+          operacion_id: string | null
+          origen: string | null
+          po: string | null
+          precio_oc: number | null
+          precio_teorico_oc: number | null
+          prioridad: string | null
+          producto: string | null
+          producto_facturado: string | null
+          proveedor: string | null
+          proveedor_flete: string | null
+          situacion_vinculo: string | null
+          source_id: string | null
+          source_row: number | null
+          source_sheet: string | null
+          stock_deposito: string | null
+          stock_saldo: number | null
+          stock_sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo_cambio: number | null
+          transporte: string | null
+          unidad_id: string | null
+          utilidad: number | null
+          valor_venta: number | null
+          venta_facturada: string | null
+          vinculo_manual: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operacion_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_operaciones_resumen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_unidades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maquinaria_importaciones_lineas_operativas: {
         Row: {
           actualizado_en: string | null
@@ -4072,8 +5320,22 @@ export type Database = {
             foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
             columns: ["linea_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operacion_lineas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["linea_id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
@@ -4093,6 +5355,13 @@ export type Database = {
             foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_importacion_np_disponibles"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_operaciones"
             referencedColumns: ["id"]
           },
@@ -4107,6 +5376,13 @@ export type Database = {
             foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
             columns: ["operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
+            columns: ["operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_pedidos_lineas_operativas"
             referencedColumns: ["operacion_id"]
           },
@@ -4116,6 +5392,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
             referencedColumns: ["operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_unidad_id_fkey"
@@ -4175,6 +5458,44 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      maquinaria_pedidos_lineas_estado_actual: {
+        Row: {
+          abastecimiento: string | null
+          actualizado_en: string | null
+          ata: string | null
+          cantidad: number | null
+          chasis: string | null
+          cliente_nombre: string | null
+          comercial: string | null
+          condicion: string | null
+          costo_producto: number | null
+          disponibilidad_detalle: string | null
+          estado_disponibilidad: string | null
+          estado_fuente: string | null
+          estado_importacion_fuente: string | null
+          estado_operacion: string | null
+          eta: string | null
+          factura_fecha: string | null
+          factura_venta: string | null
+          id: string | null
+          importacion_linea_id: string | null
+          linea_id: string | null
+          linea_numero: number | null
+          marca: string | null
+          modelo: string | null
+          moneda: string | null
+          np_fecha: string | null
+          np_numero: string | null
+          observaciones: string | null
+          operacion_id: string | null
+          producto: string | null
+          proveedor: string | null
+          unidad_id: string | null
+          valor_facturado: number | null
+          valor_venta: number | null
+        }
+        Relationships: []
       }
       maquinaria_pedidos_lineas_operativas: {
         Row: {
@@ -4305,6 +5626,13 @@ export type Database = {
             foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
             columns: ["unidad_operacion_id"]
             isOneToOne: false
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "parque_stock_maquinas_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: false
             referencedRelation: "maquinaria_pedidos_lineas_operativas"
             referencedColumns: ["unidad_id"]
           },
@@ -4323,6 +5651,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      maquinaria_vinculos_sugeridos: {
+        Row: {
+          chasis: string | null
+          linea_id: string | null
+          marca: string | null
+          modelo: string | null
+          motivo: string | null
+          operacion_id: string | null
+          recurso_id: string | null
+          tipo: string | null
+          ubicacion: string | null
+          unidad_id: string | null
+        }
+        Relationships: []
       }
       repuestos_ventas_duplicados_detectados: {
         Row: {
@@ -4624,6 +5967,26 @@ export type Database = {
         Args: { p_texto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
       }
+      maquinaria_actualizar_operacion: {
+        Args: { p_lineas: Json; p_operacion: Json; p_operacion_id: string }
+        Returns: string
+      }
+      maquinaria_anular_recepcion_importacion: {
+        Args: { p_importacion_unidad_id: string }
+        Returns: Json
+      }
+      maquinaria_aplicar_factura_importacion: {
+        Args: {
+          p_factura_fecha: string
+          p_factura_numero: string
+          p_moneda: string
+          p_operacion_id: string
+          p_proveedor: string
+          p_unidades: Json
+          p_valor_total: number
+        }
+        Returns: Json
+      }
       maquinaria_asignar_importacion: {
         Args: { p_importacion_id: string; p_unidad_id: string }
         Returns: Json
@@ -4631,6 +5994,14 @@ export type Database = {
       maquinaria_asignar_stock: {
         Args: { p_chasis?: string; p_stock_id: string; p_unidad_id: string }
         Returns: Json
+      }
+      maquinaria_cliente_es_stock_interno: {
+        Args: { p_nombre: string }
+        Returns: boolean
+      }
+      maquinaria_guardar_importacion: {
+        Args: { p_datos: Json; p_importacion_id: string }
+        Returns: string
       }
       maquinaria_importar_historico_pedidos: {
         Args: { p_filas: Json }
@@ -4644,9 +6015,18 @@ export type Database = {
         Args: { p_marca: Database["public"]["Enums"]["marca"] }
         Returns: boolean
       }
+      maquinaria_puede_gestionar_flujo: { Args: never; Returns: boolean }
+      maquinaria_recibir_unidad_importacion: {
+        Args: { p_fecha: string; p_importacion_unidad_id: string }
+        Returns: Json
+      }
       maquinaria_registrar_operacion: {
         Args: { p_lineas: Json; p_operacion: Json }
         Returns: string
+      }
+      maquinaria_vincular_importacion_historica: {
+        Args: { p_importacion_id: string; p_unidad_id: string }
+        Returns: Json
       }
       normalizar_chasis_notificacion: {
         Args: { p_valor: string }
@@ -4855,6 +6235,19 @@ export type Database = {
           p_producto_codigo: string
         }
         Returns: undefined
+      }
+      repuestos_catalogo_stock_paginado: {
+        Args: {
+          p_busqueda?: string
+          p_direccion?: string
+          p_estados_stock?: string[]
+          p_familias?: string[]
+          p_limite?: number
+          p_marcas?: string[]
+          p_offset?: number
+          p_orden?: string
+        }
+        Returns: Json
       }
       repuestos_crear_version_modelo: {
         Args: {
@@ -5097,12 +6490,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5126,11 +6519,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5151,11 +6544,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5176,11 +6569,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5193,11 +6586,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
