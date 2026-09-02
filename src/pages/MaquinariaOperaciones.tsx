@@ -59,7 +59,7 @@ const formatUsd = (value: unknown) => {
 };
 
 const brandClass = (marca: string | null) => {
-  const normalized = (marca ?? "").toUpperCase();
+  const normalized = (marca ?? "").trim().toUpperCase();
   if (normalized === "CLAAS") return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
   if (normalized === "HORSCH") return "border-marca-horsch/30 bg-marca-horsch-bg text-marca-horsch";
   return "border-border bg-muted text-muted-foreground";
@@ -198,7 +198,7 @@ function importStockConfirmed(row: Pick<ImportRow, "stock_sucursal" | "stock_dep
 // maquinaria_stock_trazabilidad, se reusa tal cual.
 const AVAILABILITY_LABEL: Record<string, string> = {
   DISPONIBLE: "Stock", RESERVADO: "Reservado", VENDIDO_PENDIENTE_ENTREGA: "Vendido · por entregar",
-  EN_PARQUE: "En parque", CONFLICTO: "Conflicto", SIN_CHASIS: "Sin chasis",
+  EN_PARQUE: "En parque", CONFLICTO: "Conflicto", SIN_CHASIS: "Sin chasis", SIN_CONCILIAR: "Sin conciliar",
 };
 const availabilityClass = (state?: string | null) => cn(
   "text-[10px]",
@@ -206,6 +206,7 @@ const availabilityClass = (state?: string | null) => cn(
   state === "RESERVADO" && "border-blue-200 bg-blue-50 text-blue-700",
   state === "VENDIDO_PENDIENTE_ENTREGA" && "border-violet-200 bg-violet-50 text-violet-700",
   state === "CONFLICTO" && "border-red-200 bg-red-50 text-red-700",
+  state === "SIN_CONCILIAR" && "border-amber-200 bg-amber-50 text-amber-700",
   (!state || state === "SIN_CHASIS" || state === "EN_PARQUE") && "border-slate-200 bg-slate-100 text-slate-600",
 );
 
@@ -796,7 +797,7 @@ export default function MaquinariaOperaciones() {
               <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
               <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className={cn("text-[10px]", brandClass(importRow.marca))}>{importRow.marca || importRow.proveedor || "OTROS"}</Badge>
+                <Badge variant="outline" className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{importRow.marca || importRow.proveedor || "OTROS"}</Badge>
                 <Badge variant="outline" className="text-[10px]">Unidad {importRow.numero_unidad}/{Math.max(1, Number(importRow.cantidad_lote) || 1)}</Badge>
                 {importRow.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(importRow.estado_disponibilidad)}>{AVAILABILITY_LABEL[importRow.estado_disponibilidad] ?? importRow.estado_disponibilidad}</Badge>}
               </div>
@@ -906,7 +907,7 @@ function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: I
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-semibold">{row.llave_interna || "—"}</TableCell>
         <TableCell className="font-mono font-medium">{row.oc || "—"}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca || row.proveedor || "OTROS"}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca || row.proveedor))}>{row.marca || row.proveedor || "OTROS"}</Badge></TableCell>
         <TableCell className="max-w-[200px] truncate">{row.producto || "—"}</TableCell>
         <TableCell className="max-w-[200px] truncate font-medium">{row.modelo || "—"}</TableCell>
         <TableCell className="whitespace-nowrap tabular-nums">{row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</TableCell>
