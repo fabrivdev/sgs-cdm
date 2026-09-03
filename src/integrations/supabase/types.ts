@@ -6015,6 +6015,10 @@ export type Database = {
         Args: { p_marca: Database["public"]["Enums"]["marca"] }
         Returns: boolean
       }
+      maquinaria_parsear_fecha_pedido_legacy: {
+        Args: { p_valor: string }
+        Returns: string
+      }
       maquinaria_puede_gestionar_flujo: { Args: never; Returns: boolean }
       maquinaria_recibir_unidad_importacion: {
         Args: { p_fecha: string; p_importacion_unidad_id: string }
