@@ -725,7 +725,8 @@ export default function MaquinariaOperaciones() {
       total: orderRows.length,
       pendientes: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE").length,
       facturados: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "COMPLETADO").length,
-      facturado: orderRows.reduce((sum, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "COMPLETADO"
+      valorPedidos: orderRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0), 0),
+      valorPendiente: orderRows.reduce((sum, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE"
         ? sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0)
         : sum, 0),
     };
@@ -760,7 +761,11 @@ export default function MaquinariaOperaciones() {
         <KpiItem label="Líneas de pedido" value={orderTotals.total} icon={<FileCheck2 />} tone="info" />
         <KpiItem label="Líneas pendientes" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
         <KpiItem label="Líneas facturadas" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
-        <KpiItem label="Facturación (USD)" value={formatUsd(orderTotals.facturado)} />
+        <KpiItem
+          label="Valor de pedidos (USD)"
+          value={formatUsd(orderTotals.valorPedidos)}
+          detail={`Pendiente: ${formatUsd(orderTotals.valorPendiente)}`}
+        />
       </KpiStrip>
     )}
     <FiltersBar
