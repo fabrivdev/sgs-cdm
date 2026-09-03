@@ -667,6 +667,46 @@ describe("importacion XML de ordenes de servicio", () => {
 });
 
 describe("importacion XML de facturacion", () => {
+  it("conserva el chasis y los datos finales de una venta de maquinaria", () => {
+    const result = mapFacturaVentasSheet("facturas.xml", {
+      name: "Facturas",
+      headers: [],
+      rows: [{
+        FILIAL: "01 - Santa Rita",
+        EMISION: "20260903",
+        CLIENTE: "3524005-9",
+        NOMBRE: "MARCOS LEANDRO WEIMANN WERLE",
+        MONORI: "Dolares",
+        ESPECIE: "NF",
+        SERIE: "FE1",
+        DOCUMENTO: "0010010005017",
+        MARCA: "MET - METASA",
+        GRUPO: "999 - OTROS",
+        CODIGO: "VEIC_000079",
+        PRODUCTO: "Tipo: SEMBRADORA - Marca: METASA - Modelo: PDM 9810 - Casis: 600302406",
+        CODFAB: "",
+        CANTIDAD: "1,00",
+        VUNITUSD: "14.090,91",
+        TOTALUSD: "14.090,91",
+        TIPOES: "501 - IVA 10% INCL C/STOCK",
+      }],
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      emissionDate: "2026-09-03",
+      invoiceLongNumber: "0010010005017",
+      clientCode: "3524005-9",
+      clientName: "MARCOS LEANDRO WEIMANN WERLE",
+      productCode: "VEIC_000079",
+      productName: "Tipo: SEMBRADORA - Marca: METASA - Modelo: PDM 9810 - Casis: 600302406",
+      quantity: 1,
+      currency: "USD",
+      lineType: "Maquinarias",
+      totalValueBase: 14090.91,
+      totalValueWithIva: 15500,
+    });
+  });
+
   it("resta notas de credito y no usa la factura original como numero propio", () => {
     const result = mapFacturaVentasSheet("facturas.xml", {
       name: "Facturas",
