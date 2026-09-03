@@ -314,6 +314,25 @@ function safeSubgroup(value: unknown) {
     ? normalized : "OTRO";
 }
 
+const MACHINE_CLASSIFICATION_LABEL: Record<string, string> = {
+  COSECHADORAS: "Cosechadora",
+  SEMBRADORAS: "Plantadora / Sembradora",
+  PICADORAS: "Picadora",
+  PLATAFORMAS: "Plataforma",
+  "PLATAFORMAS/CABEZALES": "Plataforma / Cabezal",
+  PULVERIZADORAS: "Pulverizadora",
+  TRACTORES: "Tractor",
+  SUELO: "Implemento de suelo",
+};
+
+function machineClassificationLabel(line: Record<string, any>, extracted: Record<string, any> = {}) {
+  const subgroup = String(line.subgrupo ?? extracted.subgrupo ?? "").trim().toUpperCase();
+  return MACHINE_CLASSIFICATION_LABEL[subgroup]
+    || safeExtractedText(line.producto)
+    || safeExtractedText(extracted.producto)
+    || "Sin clasificación";
+}
+
 function safeExtractedDate(value: unknown) {
   const normalized = String(value ?? "").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
@@ -1592,7 +1611,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
           <DetailSection title="Máquinas"><div className="space-y-2">{detail.lines.map((line: any) => {
             const extracted = line.datos_extraidos ?? {};
             const model = line.modelo || extracted.modelo;
-            const product = line.producto || extracted.producto;
+            const product = machineClassificationLabel(line, extracted);
             const year = line.anio ?? extracted.anio;
             const head = line.cabezal || extracted.cabezal;
             const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
