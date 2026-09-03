@@ -370,10 +370,38 @@ function fileToDataUrl(file: File) {
   });
 }
 
+async function prepareImageForExtraction(file: File) {
+  // Las fotos tomadas con celular suelen guardar los pixeles de costado y
+  // depender de EXIF para mostrarse derechas. Algunos proveedores de vision
+  // ignoran ese metadato. createImageBitmap aplica la orientacion y el canvas
+  // vuelve a codificar pixeles realmente verticales, sin depender de EXIF.
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  try {
+    const maxSide = 2560;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("No se pudo preparar la imagen para lectura");
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.92), mimeType: "image/jpeg" };
+  } finally {
+    bitmap.close();
+  }
+}
+
 async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTACION") {
   if (!file.type.startsWith("image/")) throw new Error("La lectura automática requiere una foto JPG, PNG o WEBP.");
+  let prepared: { dataUrl: string; mimeType: string };
+  try {
+    prepared = await prepareImageForExtraction(file);
+  } catch (error) {
+    console.error("No se pudo normalizar la orientación de la imagen", error);
+    prepared = { dataUrl: await fileToDataUrl(file), mimeType: file.type };
+  }
   const { data, error } = await supabase.functions.invoke("machine-document-extractor", {
-    body: { documentType, mimeType: file.type, dataUrl: await fileToDataUrl(file) },
+    body: { documentType, mimeType: prepared.mimeType, dataUrl: prepared.dataUrl },
   });
   if (error) {
     const raw = [error.message, (error as any).context?.status, (error as any).context?.statusText]

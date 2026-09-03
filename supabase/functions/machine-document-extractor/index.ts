@@ -178,18 +178,23 @@ Deno.serve(async (req) => {
       `Si un dato no aparece o no se puede leer con seguridad, devuelve null (no uses la fecha actual ni nombres supuestos). ` +
       `La respuesta se revisara manualmente.\n` +
       `Para una NP, usa exactamente estos campos: el numero junto a N°, la fecha escrita en FECHA/FECHA DE OPERACION, ` +
+      `lee los digitos uno por uno y no sustituyas un año visible por otro. ` +
       `cliente debe ser exclusivamente el texto escrito por el comprador junto a Apellido y Nombre/Razon Social. ` +
       `No uses el membrete CAMPOS DEL MANANA S.A., la empresa vendedora CDM, un nombre de firma, vendedor, operativo, ` +
       `domicilio ni destinatario como cliente. Conserva exactamente el nombre visible, incluidas las palabras S.A. ` +
       `Si el campo del comprador no se puede leer con seguridad, devuelve null y anotalo en campos_dudosos. ` +
-      `comercial solo si hay un nombre escrito junto a Vendedor, ` +
+      `comercial solo si hay un nombre escrito junto a Vendedor, Vendedores, ` +
       `Comercial u Operativo comercial. Nunca deduzcas el comercial a partir de una firma, sello o nombre del cliente. ` +
+      `Los logos CLAAS, HORSCH y CDM del membrete no son la marca de la maquina. La marca debe salir exclusivamente ` +
+      `de la descripcion manuscrita de esa linea; METASA y cualquier fabricante distinto de CLAAS/HORSCH es OTROS. ` +
       `En cada linea lee por separado Marca, Tipo, Modelo y Año: producto debe ser el tipo o descripcion ` +
       `(por ejemplo Cosechadora), modelo debe conservar el texto exacto del campo Modelo (por ejemplo Tucano 710), ` +
       `y anio solo el año visible. Si el campo Cabezal/Plataforma de la maquina vendida tiene contenido, crea una SEGUNDA ` +
       `linea independiente: producto Cabezal / plataforma, modelo con ese texto exacto, subgrupo PLATAFORMAS/CABEZALES, ` +
       `misma marca, cantidad, condicion y abastecimiento; deja cabezal en null en ambas lineas. No conviertas en linea un ` +
       `cabezal mencionado solamente dentro de una toma, permuta o maquina usada entregada como parte de pago. ` +
+      `Una linea fisica de la tabla puede continuar escrita en el renglon siguiente: conserva todo como UNA sola maquina. ` +
+      `No dividas palabras o fragmentos de una misma descripcion en varias lineas y no crees una linea por cada renglon manuscrito. ` +
       `No pongas el tipo dentro de modelo ` +
       `ni el modelo dentro de producto. Si el manuscrito es dudoso, deja ese campo en null y anotala en campos_dudosos. ` +
       `La condicion USADA solo se marca si la maquina de esa linea se describe explicitamente como usada. ` +
