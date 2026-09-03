@@ -252,8 +252,23 @@ type ImportAssignmentRow = {
   asignable?: boolean;
 };
 
-function orderBillingState(row: Pick<OrderRow, "estado_operacion" | "estado_fuente">): SimpleOrderState {
-  return simpleOrderState(row.estado_operacion || row.estado_fuente);
+function orderBillingState(
+  row: Pick<OrderRow, "estado_operacion" | "estado_fuente" | "factura_venta" | "factura_fecha">,
+  unitState?: string | null,
+): SimpleOrderState {
+  // La NP puede contener lineas facturadas y pendientes al mismo tiempo. La
+  // evidencia de cada linea/unidad siempre tiene prioridad sobre el estado
+  // agregado de la operacion.
+  if (unitState === "CANCELADA") return "CANCELADA";
+  if (
+    safeExtractedText(row.factura_venta)
+    || row.factura_fecha
+    || ["FACTURADA", "EN_PARQUE", "TRANSFERIDA"].includes(unitState ?? "")
+  ) return "COMPLETADO";
+
+  const lineState = simpleOrderState(row.estado_fuente);
+  if (lineState !== "PENDIENTE") return lineState;
+  return simpleOrderState(row.estado_operacion);
 }
 type ImportDraft = {
   marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
@@ -687,7 +702,7 @@ export default function MaquinariaOperaciones() {
       if (situacion !== "TODOS" && (importRow.estado_disponibilidad ?? "SIN_CHASIS") !== situacion) return false;
     } else {
       const orderRow = row as OrderRow;
-      if (orderState !== "TODOS" && orderBillingState(orderRow) !== orderState) return false;
+      if (orderState !== "TODOS" && orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado) !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
       const unit = entregaByUnitId?.get(orderRow.id);
       if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet) !== entrega) return false;
@@ -708,11 +723,13 @@ export default function MaquinariaOperaciones() {
     const orderRows = rows as OrderRow[];
     return {
       total: orderRows.length,
-      pendientes: orderRows.filter((row) => orderBillingState(row) === "PENDIENTE").length,
-      facturados: orderRows.filter((row) => orderBillingState(row) === "COMPLETADO").length,
-      facturado: orderRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0), 0),
+      pendientes: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE").length,
+      facturados: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "COMPLETADO").length,
+      facturado: orderRows.reduce((sum, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "COMPLETADO"
+        ? sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0)
+        : sum, 0),
     };
-  }, [rows]);
+  }, [rows, entregaByUnitId]);
   const importTotals = useMemo(() => {
     const importRows = rows as ImportRow[];
     return {
@@ -740,9 +757,9 @@ export default function MaquinariaOperaciones() {
       </KpiStrip>
     ) : (
       <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
-        <KpiItem label="Pedidos" value={orderTotals.total} icon={<FileCheck2 />} tone="info" />
-        <KpiItem label="Pendientes de facturar" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
-        <KpiItem label="Facturados" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
+        <KpiItem label="Líneas de pedido" value={orderTotals.total} icon={<FileCheck2 />} tone="info" />
+        <KpiItem label="Líneas pendientes" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
+        <KpiItem label="Líneas facturadas" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
         <KpiItem label="Facturación (USD)" value={formatUsd(orderTotals.facturado)} />
       </KpiStrip>
     )}
@@ -750,7 +767,7 @@ export default function MaquinariaOperaciones() {
       search={{ value: search, onChange: setSearch, placeholder: importsView ? "NP, proveedor, OC/PO..." : "NP, cliente o comercial...", label: "Buscar", width: "w-[240px]" }}
       activeCount={activeCount}
       onClear={clearFilters}
-      meta={`${rows.length} ${importsView ? "importaciones" : "pedidos"}`}
+      meta={`${rows.length} ${importsView ? "importaciones" : "líneas"}`}
     >
       {!importsView && (
         <FilterSelect
@@ -833,8 +850,8 @@ export default function MaquinariaOperaciones() {
             </button>;
           }
           const orderRow = row as OrderRow;
-          const state = orderBillingState(orderRow);
           const orderUnit = entregaByUnitId?.get(orderRow.id);
+          const state = orderBillingState(orderRow, orderUnit?.estado);
           const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet);
           return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
             <div className="flex items-start justify-between gap-2">
@@ -853,7 +870,7 @@ export default function MaquinariaOperaciones() {
             </div>
           </button>;
         })}</div>
-        {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "pedidos"} con estos filtros.</div>}
+        {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "líneas"} con estos filtros.</div>}
       </>}
     </Panel>
     <NewOperationDrawer operationId={editingOperationId} open={newOpen} onOpenChange={(open) => { setNewOpen(open); if (!open) setEditingOperationId(null); }} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
@@ -893,8 +910,8 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
       <TableHead className="w-[40px]" />
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {
-      const state = orderBillingState(row);
       const unit = entregaByUnitId?.get(row.id);
+      const state = orderBillingState(row, unit?.estado);
       const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet);
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell>
