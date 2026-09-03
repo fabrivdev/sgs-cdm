@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, FileCheck2, FileText, LoaderCircle, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Upload, X } from "lucide-react";
+import { Download, Eye, FileCheck2, FileText, LoaderCircle, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -432,6 +432,7 @@ async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTA
 }
 
 type MachineDocumentType = "NP" | "OC" | "FACTURA_IMPORTACION" | "FACTURA_VENTA" | "OTRO";
+type StoredMachineDocument = { id: string; archivo_nombre: string; storage_path: string; creado_en: string };
 
 const MACHINE_DOCUMENT_LABELS: Record<MachineDocumentType, string> = {
   NP: "Nota de pedido",
@@ -444,33 +445,88 @@ const MACHINE_DOCUMENT_LABELS: Record<MachineDocumentType, string> = {
 async function uploadEvidence(file: File, operationId: string, type: MachineDocumentType, extracted: unknown) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Sesión no válida");
+  const { data: existing, error: existingError } = await db.from("maquinaria_documentos")
+    .select("id,storage_path").eq("operacion_id", operationId).eq("tipo", type)
+    .order("creado_en", { ascending: false });
+  if (existingError) throw existingError;
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
   const path = `${auth.user.id}/${operationId}/${crypto.randomUUID()}-${safeName}`;
   const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
   if (storageError) throw storageError;
-  const { data: document, error: docError } = await db.from("maquinaria_documentos").insert({
+  const savedAt = new Date().toISOString();
+  const payload = {
     operacion_id: operationId, tipo: type, archivo_nombre: file.name, storage_path: path,
     mime_type: file.type, tamano_bytes: file.size, estado_extraccion: "REVISADO",
-    datos_extraidos: extracted ?? {}, revisado_por: auth.user.id, revisado_en: new Date().toISOString(),
-  }).select("id").single();
-  if (docError) throw docError;
+    datos_extraidos: extracted ?? {}, revisado_por: auth.user.id, revisado_en: savedAt,
+    creado_en: savedAt, actualizado_en: savedAt,
+  };
+  const current = existing?.[0];
+  const result = current
+    ? await db.from("maquinaria_documentos").update(payload).eq("id", current.id).select("id").single()
+    : await db.from("maquinaria_documentos").insert(payload).select("id").single();
+  if (result.error) {
+    await supabase.storage.from("maquinaria-documentos").remove([path]);
+    throw result.error;
+  }
+  const extras = (existing ?? []).slice(1);
+  if (extras.length) await db.from("maquinaria_documentos").delete().in("id", extras.map((document: any) => document.id));
+  const previousPaths = (existing ?? []).map((document: any) => document.storage_path).filter(Boolean);
+  if (previousPaths.length) await supabase.storage.from("maquinaria-documentos").remove(previousPaths);
+  previousPaths.forEach((previousPath: string) => machineDocumentCache.delete(previousPath));
+  const document = result.data;
   return document;
 }
 
 async function uploadImportDocument(file: File, importLineId: string, type: "OC" | "FACTURA_IMPORTACION", operationId?: string | null) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Sesión no válida");
+  const { data: existing, error: existingError } = await db.from("maquinaria_documentos")
+    .select("id,storage_path").eq("importacion_linea_id", importLineId).eq("tipo", type)
+    .order("creado_en", { ascending: false });
+  if (existingError) throw existingError;
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
   const path = `${auth.user.id}/importaciones/${importLineId}/${type.toLowerCase()}/${crypto.randomUUID()}-${safeName}`;
   const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
   if (storageError) throw storageError;
-  const { error: docError } = await db.from("maquinaria_documentos").insert({
+  const savedAt = new Date().toISOString();
+  const payload = {
     operacion_id: operationId || null, importacion_linea_id: importLineId, tipo: type,
     archivo_nombre: file.name, storage_path: path, mime_type: file.type,
     tamano_bytes: file.size, estado_extraccion: "REVISADO", datos_extraidos: {},
-    revisado_por: auth.user.id, revisado_en: new Date().toISOString(),
-  });
-  if (docError) throw docError;
+    revisado_por: auth.user.id, revisado_en: savedAt,
+    creado_en: savedAt, actualizado_en: savedAt,
+  };
+  const current = existing?.[0];
+  const result = current
+    ? await db.from("maquinaria_documentos").update(payload).eq("id", current.id)
+    : await db.from("maquinaria_documentos").insert(payload);
+  if (result.error) {
+    await supabase.storage.from("maquinaria-documentos").remove([path]);
+    throw result.error;
+  }
+  const extras = (existing ?? []).slice(1);
+  if (extras.length) await db.from("maquinaria_documentos").delete().in("id", extras.map((document: any) => document.id));
+  const previousPaths = (existing ?? []).map((document: any) => document.storage_path).filter(Boolean);
+  if (previousPaths.length) await supabase.storage.from("maquinaria-documentos").remove(previousPaths);
+  previousPaths.forEach((previousPath: string) => machineDocumentCache.delete(previousPath));
+}
+
+async function deleteMachineDocuments(filters: { operationId?: string; importLineId?: string; type: MachineDocumentType }) {
+  let query = db.from("maquinaria_documentos").select("id,storage_path").eq("tipo", filters.type);
+  query = filters.operationId ? query.eq("operacion_id", filters.operationId) : query.eq("importacion_linea_id", filters.importLineId);
+  const { data: documents, error: readError } = await query;
+  if (readError) throw readError;
+  const ids = (documents ?? []).map((document: any) => document.id);
+  if (ids.length) {
+    const { error: deleteError } = await db.from("maquinaria_documentos").delete().in("id", ids);
+    if (deleteError) throw deleteError;
+  }
+  const paths = (documents ?? []).map((document: any) => document.storage_path).filter(Boolean);
+  if (paths.length) {
+    const { error: storageError } = await supabase.storage.from("maquinaria-documentos").remove(paths);
+    if (storageError) console.warn("No se pudo limpiar el archivo eliminado del almacenamiento", storageError);
+  }
+  paths.forEach((path: string) => machineDocumentCache.delete(path));
 }
 
 const MACHINE_DOCUMENT_EVENT = "sig:open-machine-document";
@@ -982,7 +1038,7 @@ function AttachOrderDocumentButton({ operationId, type, label, onUploaded }: { o
     setBusy(true);
     try {
       await uploadEvidence(file, operationId, type, {});
-      toast.success(`${label} adjuntada`);
+      toast.success(`${MACHINE_DOCUMENT_LABELS[type]} guardada`);
       onUploaded();
     } catch (error: any) {
       toast.error(error?.message ?? `No se pudo adjuntar ${label.toLowerCase()}`);
@@ -1000,6 +1056,28 @@ function AttachOrderDocumentButton({ operationId, type, label, onUploaded }: { o
       <Paperclip className="mr-1.5 h-3.5 w-3.5" />{busy ? "Subiendo..." : label}
     </Button>
   </>;
+}
+
+function DeleteDocumentButton({ documentLabel, onDelete }: { documentLabel: string; onDelete: () => Promise<void> }) {
+  const [deleting, setDeleting] = useState(false);
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      await onDelete();
+      toast.success(`${documentLabel} eliminada`);
+    } catch (error: any) {
+      toast.error(error?.message ?? `No se pudo eliminar ${documentLabel.toLowerCase()}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+  return <AlertDialog>
+    <AlertDialogTrigger asChild><Button type="button" variant="ghost" size="sm" className="h-8 text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={deleting}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Eliminar</Button></AlertDialogTrigger>
+    <AlertDialogContent>
+      <AlertDialogHeader><AlertDialogTitle>Eliminar {documentLabel.toLowerCase()}</AlertDialogTitle><AlertDialogDescription>El archivo dejará de estar disponible en este registro. Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+      <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={remove}>Eliminar</AlertDialogAction></AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>;
 }
 
 function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean; row: ImportRow | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
@@ -1030,6 +1108,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
       return data ?? [];
     },
   });
+  const existingOc = (ocDocumentsQuery.data?.[0] ?? null) as StoredMachineDocument | null;
   const npOptions = useMemo(() => {
     const options = [...(availableNpQuery.data ?? [])];
     if (row?.linea_id && row.np_numero && !options.some((option) => option.linea_id === row.linea_id)) {
@@ -1106,7 +1185,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
         <Field label="Fecha de pedido"><Input type="date" value={form.fecha_pedido} onChange={(event) => setForm((value) => ({ ...value, fecha_pedido: event.target.value }))} /></Field>
         <Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field>
       </div>
-      <section className="rounded-xl border p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Documento de OC</h3><p className="text-[10px] text-muted-foreground">PDF o imagen de la orden de compra.</p></div><><input ref={ocFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setOcFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" size="sm" onClick={() => ocFileRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocFile ? "Cambiar archivo" : "Subir OC"}</Button></></div>{ocFile && <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-[11px]"><span className="truncate">{ocFile.name}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOcFile(null)}>Quitar</Button></div>}{ocDocumentsQuery.data?.map((document: any) => <button type="button" key={document.id} onClick={() => openMachineDocument(document.storage_path, document.archivo_nombre).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} className="mt-2 flex w-full items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-left text-[11px] hover:bg-muted"><span className="flex min-w-0 items-center gap-2"><Eye className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{document.archivo_nombre}</span></span><span className="font-medium text-primary">Ver OC</span></button>)}</section>
+      <section className="rounded-xl border p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-[12px] font-semibold">Documento de OC</h3><p className="text-[10px] text-muted-foreground">Se conserva una sola orden de compra por importación.</p></div><><input ref={ocFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setOcFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" size="sm" onClick={() => ocFileRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocFile || existingOc ? "Reemplazar" : "Subir OC"}</Button></></div>{ocFile && <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-[11px]"><span className="truncate">{ocFile.name}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOcFile(null)}>Quitar selección</Button></div>}{existingOc && !ocFile && <DocumentRow label="Orden de compra" fileName={existingOc.archivo_nombre} date={formatDate(existingOc.creado_en)} onOpen={() => openMachineDocument(existingOc.storage_path, existingOc.archivo_nombre)} action={<DeleteDocumentButton documentLabel="Orden de compra" onDelete={async () => { await deleteMachineDocuments({ importLineId: importLineId!, type: "OC" }); await ocDocumentsQuery.refetch(); }} />} />}</section>
       <Field label="Notas"><Textarea rows={3} value={form.notas} onChange={(event) => setForm((value) => ({ ...value, notas: event.target.value }))} /></Field>
       {row && <p className="rounded-lg bg-muted/50 p-3 text-[11px] text-muted-foreground">Los chasis, facturas, costos y fechas de arribo se editan por cada máquina física desde su detalle.</p>}
     </ResponsiveDrawerBody>
@@ -1203,6 +1282,8 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   };
   const ocDocuments = detailOcQuery.data ?? [];
   const supplierDocuments = detailSupplierInvoiceQuery.data ?? [];
+  const ocDocument = (ocDocuments[0] ?? null) as StoredMachineDocument | null;
+  const supplierDocument = (supplierDocuments[0] ?? null) as StoredMachineDocument | null;
   return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg">
     <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
@@ -1230,8 +1311,8 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
           <input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} />
           <input ref={detailSupplierInvoiceRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadSupplierInvoice(event.target.files?.[0])} />
           <DetailSection title="Documentos de importación">
-            <div>{ocDocuments.length ? ocDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Orden de compra adicional" : "Orden de compra"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path, document.archivo_nombre).catch((error) => toast.error(error?.message ?? "No se pudo abrir la OC"))} />) : <DocumentRow label="Orden de compra" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}{ocDocuments.length > 0 && canEdit && <div className="flex justify-end"><Button variant="ghost" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar otra OC</Button></div>}</div>
-            <div>{supplierDocuments.length ? supplierDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura del proveedor"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path, document.archivo_nombre).catch((error) => toast.error(error?.message ?? "No se pudo abrir la factura"))} />) : <DocumentRow label="Factura del proveedor" action={canEdit ? <Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />Adjuntar</Button> : undefined} />}</div>
+            <DocumentRow label="Orden de compra" fileName={ocDocument?.archivo_nombre} date={ocDocument ? formatDate(ocDocument.creado_en) : null} onOpen={ocDocument ? () => openMachineDocument(ocDocument.storage_path, ocDocument.archivo_nombre) : undefined} action={canEdit ? <><Button variant="outline" size="sm" disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocDocument ? "Reemplazar" : "Adjuntar"}</Button>{ocDocument && <DeleteDocumentButton documentLabel="Orden de compra" onDelete={async () => { await deleteMachineDocuments({ importLineId: row.importacion_linea_id, type: "OC" }); await detailOcQuery.refetch(); }} />}</> : undefined} />
+            <DocumentRow label="Factura del proveedor" fileName={supplierDocument?.archivo_nombre} date={supplierDocument ? formatDate(supplierDocument.creado_en) : null} onOpen={supplierDocument ? () => openMachineDocument(supplierDocument.storage_path, supplierDocument.archivo_nombre) : undefined} action={canEdit ? <><Button variant="outline" size="sm" disabled={uploadingSupplierInvoice} onClick={() => detailSupplierInvoiceRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{supplierDocument ? "Reemplazar" : "Adjuntar"}</Button>{supplierDocument && <DeleteDocumentButton documentLabel="Factura del proveedor" onDelete={async () => { await deleteMachineDocuments({ importLineId: row.importacion_linea_id, type: "FACTURA_IMPORTACION" }); await detailSupplierInvoiceQuery.refetch(); }} />}</> : undefined} />
           </DetailSection>
           <DetailSection title="Datos de la factura" action={canEdit && !editingInvoice ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingInvoice(true)}><Pencil className="mr-1.5 h-3 w-3" />Editar</Button> : undefined}>
             {editingInvoice ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Número de factura"><Input value={form.invoice_supplier} onChange={(event) => setForm((value) => ({ ...value, invoice_supplier: event.target.value }))} /></Field><Field label="Fecha de factura"><Input type="date" value={form.factura_proveedor_fecha} onChange={(event) => setForm((value) => ({ ...value, factura_proveedor_fecha: event.target.value }))} /></Field><Field label="Moneda"><CompactSelect value={form.factura_proveedor_moneda} values={["USD", "EUR", "PYG"]} onChange={(factura_proveedor_moneda) => setForm((value) => ({ ...value, factura_proveedor_moneda }))} /></Field><Field label="Valor sin IVA"><Input type="number" value={form.costo_final_sin_iva} onChange={(event) => setForm((value) => ({ ...value, costo_final_sin_iva: event.target.value }))} /></Field><Field label="Valor facturado"><Input type="number" value={form.costo_final} onChange={(event) => setForm((value) => ({ ...value, costo_final: event.target.value }))} /></Field></div><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, invoice_supplier: row.invoice_supplier ?? "", factura_proveedor_fecha: row.factura_proveedor_fecha ?? "", factura_proveedor_moneda: row.factura_proveedor_moneda ?? "USD", costo_final_sin_iva: row.costo_final_sin_iva == null ? "" : String(row.costo_final_sin_iva), costo_final: row.costo_final == null ? "" : String(row.costo_final) })); setEditingInvoice(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div></div> : <KeyValueGrid><KeyValueItem label="Número" value={row.invoice_supplier} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={formatDate(row.factura_proveedor_fecha)} empty="Pendiente" /><KeyValueItem label="Moneda" value={row.factura_proveedor_moneda} empty="Pendiente" /><KeyValueItem label="Valor sin IVA" value={row.costo_final_sin_iva != null ? formatUsd(row.costo_final_sin_iva) : null} empty="Pendiente" /><KeyValueItem label="Valor" value={row.costo_final != null ? formatUsd(row.costo_final) : null} empty="Pendiente" /></KeyValueGrid>}
@@ -1409,7 +1490,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         db.from("maquinaria_operaciones_resumen").select("*").eq("id", operationId).single(),
         db.from("maquinaria_operaciones").select("observaciones").eq("id", operationId).single(),
         db.from("maquinaria_operacion_lineas").select("*").eq("operacion_id", operationId).order("linea_numero"),
-        db.from("maquinaria_documentos").select("*").eq("operacion_id", operationId).in("tipo", ["NP", "FACTURA_VENTA"]).order("creado_en"),
+        db.from("maquinaria_documentos").select("*").eq("operacion_id", operationId).in("tipo", ["NP", "FACTURA_VENTA"]).order("creado_en", { ascending: false }),
         db.from("maquinaria_importaciones_operativas").select("*").eq("operacion_id", operationId).maybeSingle(),
       ]);
       if (summary.error) throw summary.error; if (lines.error) throw lines.error;
@@ -1482,6 +1563,8 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     : 0;
   const npDocuments = detail?.docs.filter((document: any) => document.tipo === "NP") ?? [];
   const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
+  const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
+  const saleInvoiceDocument = (saleInvoiceDocuments[0] ?? null) as StoredMachineDocument | null;
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
@@ -1528,7 +1611,10 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-4">
-          <DetailSection title="Documentos comerciales"><div>{npDocuments.length ? npDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Nota de pedido adicional" : "Nota de pedido"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} />) : <DocumentRow label="Nota de pedido" action={<AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{npDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="NP" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div><div>{saleInvoiceDocuments.length ? saleInvoiceDocuments.map((document: any, index: number) => <DocumentRow key={document.id} label={index ? "Factura adicional" : "Factura al cliente"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} />) : <DocumentRow label="Factura al cliente" action={<AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar" onUploaded={() => detailQuery.refetch()} />} />}{saleInvoiceDocuments.length > 0 && <div className="flex justify-end"><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label="Adjuntar otra" onUploaded={() => detailQuery.refetch()} /></div>}</div></DetailSection>
+          <DetailSection title="Documentos comerciales">
+            <DocumentRow label="Nota de pedido" fileName={npDocument?.archivo_nombre} date={npDocument ? formatDate(npDocument.creado_en) : null} onOpen={npDocument ? () => openDocument(npDocument.storage_path, npDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton operationId={operationId} type="NP" label={npDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{npDocument && <DeleteDocumentButton documentLabel="Nota de pedido" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "NP" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
+            <DocumentRow label="Factura al cliente" fileName={saleInvoiceDocument?.archivo_nombre} date={saleInvoiceDocument ? formatDate(saleInvoiceDocument.creado_en) : null} onOpen={saleInvoiceDocument ? () => openDocument(saleInvoiceDocument.storage_path, saleInvoiceDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label={saleInvoiceDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{saleInvoiceDocument && <DeleteDocumentButton documentLabel="Factura al cliente" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "FACTURA_VENTA" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
+          </DetailSection>
         </TabsContent>
       </Tabs>}
     </ResponsiveDrawerBody>
