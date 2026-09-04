@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
-import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
+import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
@@ -56,6 +56,16 @@ const usdFormatter = new Intl.NumberFormat("es-PY", { style: "currency", currenc
 const formatUsd = (value: unknown) => {
   const number = Number(value);
   return value == null || value === "" || !Number.isFinite(number) ? "—" : usdFormatter.format(number);
+};
+
+const formatMoney = (value: unknown, currency = "USD") => {
+  const number = Number(value);
+  if (value == null || value === "" || !Number.isFinite(number)) return "—";
+  try {
+    return new Intl.NumberFormat("es-PY", { style: "currency", currency, maximumFractionDigits: currency === "PYG" ? 0 : 2 }).format(number);
+  } catch {
+    return `${currency} ${number.toLocaleString("es-PY")}`;
+  }
 };
 
 const brandClass = (marca: string | null) => {
@@ -286,7 +296,7 @@ type LinkSuggestionRow = {
   recurso_id: string; chasis: string; modelo: string | null; marca: string | null;
   ubicacion: string | null; motivo: string;
 };
-type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; suggestions: LinkSuggestionRow[]; docs: any[]; importation?: any };
+type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; valor_acordado?: number | null; valor_facturado?: number | null; moneda_valor?: string | null; unidades_facturadas?: number; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; suggestions: LinkSuggestionRow[]; docs: any[]; importation?: any };
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
@@ -1496,6 +1506,68 @@ function OperationChassisValue({ unit, canEdit, onSaved }: { unit: any; canEdit:
   return editing ? <div className="flex items-end gap-2"><Field label={`Unidad ${unit.numero_unidad} · Chasis`}><Input autoFocus value={value} onChange={(event) => setValue(event.target.value)} /></Field><Button variant="outline" size="sm" onClick={() => { setValue(unit.chasis ?? ""); setEditing(false); }}>Cancelar</Button><Button size="sm" onClick={save} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div> : <div className="flex items-start justify-between gap-2"><KeyValueGrid className="min-w-0 flex-1 grid-cols-2 sm:grid-cols-2"><DetailValue label={`Unidad ${unit.numero_unidad}`} value={unit.chasis || "Sin asignar"} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></KeyValueGrid>{canEdit && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="h-3 w-3" /><span className="sr-only">Editar chasis</span></Button>}</div>;
 }
 
+function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; units: any[]; canEdit: boolean; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(line.valor_acordado_unitario == null ? "" : String(line.valor_acordado_unitario));
+  const [currency, setCurrency] = useState(line.moneda_acordada || "USD");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setValue(line.valor_acordado_unitario == null ? "" : String(line.valor_acordado_unitario));
+    setCurrency(line.moneda_acordada || "USD");
+  }, [line.valor_acordado_unitario, line.moneda_acordada]);
+
+  const billedUnits = units.filter((unit) => unit.valor_facturado != null && Number.isFinite(Number(unit.valor_facturado)));
+  const billedTotal = billedUnits.reduce((sum, unit) => sum + Number(unit.valor_facturado), 0);
+  const quantity = Number(line.cantidad) || units.length || 1;
+  const agreedUnitValue = line.valor_acordado_unitario == null ? null : Number(line.valor_acordado_unitario);
+  const remainingUnits = Math.max(quantity - billedUnits.length, 0);
+  const effectiveTotal = billedUnits.length > 0
+    ? billedTotal + (agreedUnitValue == null ? 0 : agreedUnitValue * remainingUnits)
+    : agreedUnitValue == null ? null : agreedUnitValue * quantity;
+  const fullyBilled = units.length > 0 && billedUnits.length === units.length;
+  const displayCurrency = billedUnits.find((unit) => unit.moneda)?.moneda || currency;
+  const valueLabel = fullyBilled ? "Valor facturado" : billedUnits.length ? "Valor vigente" : "Valor acordado";
+
+  const save = async () => {
+    const parsed = value === "" ? null : Number(value);
+    if (parsed != null && (!Number.isFinite(parsed) || parsed < 0)) {
+      toast.error("Ingresá un valor válido");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await db.from("maquinaria_operacion_lineas").update({
+        valor_acordado_unitario: parsed,
+        moneda_acordada: currency,
+        actualizado_en: new Date().toISOString(),
+      }).eq("id", line.id);
+      if (error) throw error;
+      toast.success(parsed == null ? "Valor acordado quitado" : "Valor acordado actualizado");
+      setEditing(false);
+      onSaved();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo guardar el valor acordado");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return <div className="mt-3 space-y-2 border-t pt-3">
+      <div className="grid grid-cols-[1fr_92px] gap-2">
+        <Field label="Valor acordado por unidad"><Input autoFocus type="number" min="0" step="0.01" value={value} onChange={(event) => setValue(event.target.value)} placeholder="Sin cargar" /></Field>
+        <Field label="Moneda"><CompactSelect value={currency} values={["USD", "EUR", "PYG"]} onChange={setCurrency} /></Field>
+      </div>
+      <div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setValue(line.valor_acordado_unitario == null ? "" : String(line.valor_acordado_unitario)); setCurrency(line.moneda_acordada || "USD"); setEditing(false); }}>Cancelar</Button><Button size="sm" onClick={save} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div>
+    </div>;
+  }
+
+  return <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+    <div className="min-w-0"><div className="text-[10px] text-muted-foreground">{valueLabel}</div><div className="text-[13px] font-semibold tabular-nums">{effectiveTotal == null ? "Sin cargar" : formatMoney(effectiveTotal, displayCurrency)}</div>{quantity > 1 && agreedUnitValue != null && !fullyBilled && <div className="text-[10px] text-muted-foreground">{formatMoney(agreedUnitValue, currency)} por unidad{billedUnits.length ? ` · ${billedUnits.length}/${quantity} facturadas` : ""}</div>}</div>
+    {canEdit && !fullyBilled && <Button variant="ghost" size="sm" className="h-8 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar valor</Button>}
+  </div>;
+}
+
 function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const { isAdmin, roles } = useAuth();
   const canEditChasis = isAdmin || roles.includes("jefatura");
@@ -1549,24 +1621,27 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const detail = detailQuery.data;
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   useEffect(() => {
-    setActiveTab(simpleState === "COMPLETADO" ? "facturacion" : "resumen");
-  }, [operationId, simpleState]);
+    setActiveTab("resumen");
+  }, [operationId]);
   const invoices = useMemo(() => {
     if (!detail) return [];
-    const found = new Map<string, { numero: string | null; fecha: string | null; valor: number | null }>();
+    const found = new Map<string, { numero: string | null; fecha: string | null; valor: number | null; moneda: string }>();
     detail.lines.forEach((line: any) => {
       const historical = line.datos_extraidos?.historico_pedido ?? {};
       const numero = historical.factura_numero || historical.factura_venta || detail.factura_venta || null;
       const fecha = historical.factura_fecha || detail.factura_fecha || null;
-      const rawValue = historical.valor_factura ?? historical.valor_venta ?? detail.valor_venta ?? null;
+      const billedUnits = detail.units.filter((unit: any) => unit.linea_id === line.id && unit.valor_facturado != null);
+      const billedValue = billedUnits.length ? billedUnits.reduce((sum: number, unit: any) => sum + Number(unit.valor_facturado), 0) : null;
+      const rawValue = billedValue ?? historical.valor_factura ?? historical.valor_venta ?? null;
       const valor = rawValue == null || rawValue === "" ? null : Number(rawValue);
+      const moneda = billedUnits.find((unit: any) => unit.moneda)?.moneda || historical.moneda || line.moneda_acordada || "USD";
       if (numero || fecha || valor != null) {
         const key = `${numero ?? ""}|${fecha ?? ""}|${valor ?? ""}`;
-        found.set(key, { numero, fecha, valor: Number.isFinite(valor) ? valor : null });
+        found.set(key, { numero, fecha, valor: Number.isFinite(valor) ? valor : null, moneda });
       }
     });
     if (!found.size && (detail.factura_venta || detail.factura_fecha || detail.valor_venta != null)) {
-      found.set("summary", { numero: detail.factura_venta, fecha: detail.factura_fecha, valor: detail.valor_venta });
+      found.set("summary", { numero: detail.factura_venta, fecha: detail.factura_fecha, valor: detail.valor_venta, moneda: detail.moneda_valor || "USD" });
     }
     return [...found.values()];
   }, [detail]);
@@ -1575,9 +1650,11 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     const line = detail!.lines.find((candidate: any) => candidate.id === unit.linea_id);
     return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail!.estado, detailStockChassis) === "ENTREGADO";
   });
-  const lifecycleIndex = detail
-    ? deliveryComplete ? 3 : ["FACTURADA", "CERRADA"].includes(detail.estado) ? 2 : ["ABASTECIMIENTO", "EN_IMPORTACION", "DISPONIBLE"].includes(detail.estado) ? 1 : 0
-    : 0;
+  const deliveryLabel = deliveryComplete ? "Entregado" : "Entrega pendiente";
+  const billedUnitsCount = Number(detail?.unidades_facturadas ?? 0);
+  const valueSummaryLabel = billedUnitsCount > 0 && billedUnitsCount >= Number(detail?.unidades ?? 0)
+    ? "Valor facturado"
+    : billedUnitsCount > 0 ? "Valor vigente" : "Valor acordado";
   const npDocuments = detail?.docs.filter((document: any) => document.tipo === "NP") ?? [];
   const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
   const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
@@ -1586,16 +1663,14 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-[16px] font-semibold">{detail ? formatNpCode(detail.np_numero) : "Cargando..."}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
-        {detail && <div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><span className="text-[10px] text-muted-foreground">{STATE_LABEL[detail.estado] ?? detail.estado}</span></div>}
+        {detail && <div className="flex flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><Badge variant="outline" className={cn("text-[10px]", deliveryComplete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600")}>{deliveryLabel}</Badge></div>}
       </div>
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       {detail && <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <ProcessStepper steps={["Pedido", "Origen", "Facturación", "Entrega"]} currentIndex={lifecycleIndex} pulseCurrent={!deliveryComplete} />
-        <TabsList className="grid h-auto w-full grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-3">
           <TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger>
-          <TabsTrigger value="origen" className="px-2 text-[11px]">Origen</TabsTrigger>
-          <TabsTrigger value="facturacion" className="px-2 text-[11px]">Facturación</TabsTrigger>
+          <TabsTrigger value="trazabilidad" className="px-2 text-[11px]">Trazabilidad</TabsTrigger>
           <TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger>
         </TabsList>
 
@@ -1604,7 +1679,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
             <DetailValue label="Fecha NP" value={formatDate(detail.np_fecha)} />
             <DetailValue label="Comercial" value={detail.comercial} />
             <DetailValue label="Unidades" value={detail.unidades} />
-            <DetailValue label="Valor" value={formatUsd(detail.valor_venta)} />
+            <DetailValue label={valueSummaryLabel} value={detail.valor_venta == null ? "Sin cargar" : formatMoney(detail.valor_venta, detail.moneda_valor || "USD")} />
           </KeyValueGrid>
           <DetailSection title="Máquinas"><div className="space-y-2">{detail.lines.map((line: any) => {
             const extracted = line.datos_extraidos ?? {};
@@ -1613,18 +1688,16 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
             const year = line.anio ?? extracted.anio;
             const head = line.cabezal || extracted.cabezal;
             const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
-            return <EntityCard key={line.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 space-y-3 border-t pt-3">{lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div>}</EntityCard>;
+            return <EntityCard key={line.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 space-y-3 border-t pt-3">{lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div>}<OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && simpleState !== "CANCELADA"} onSaved={() => { detailQuery.refetch(); onChanged(); }} /></EntityCard>;
           })}</div></DetailSection>
           {detail.observaciones && <DetailSection title="Observaciones"><div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div></DetailSection>}
         </TabsContent>
 
-        <TabsContent value="origen" className="space-y-3">
-          {canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}
-        </TabsContent>
-
-        <TabsContent value="facturacion" className="space-y-4">
-          <DetailSection title="Facturación">{invoices.length ? <div className="divide-y">{invoices.map((invoice, index) => <KeyValueGrid key={`${invoice.numero}-${invoice.fecha}-${index}`} className="py-3 first:pt-0"><KeyValueItem label="Valor" value={formatUsd(invoice.valor)} empty="Pendiente" prominent /><KeyValueItem label="Número" value={invoice.numero} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={invoice.fecha ? formatDate(invoice.fecha) : null} empty="Pendiente" /></KeyValueGrid>)}</div> : <KeyValueGrid><KeyValueItem label="Valor" value={detail.valor_venta != null ? formatUsd(detail.valor_venta) : null} empty="Pendiente" prominent /><KeyValueItem label="Número" value={null} empty="Pendiente" /><KeyValueItem label="Fecha" value={null} empty="Pendiente" /></KeyValueGrid>}</DetailSection>
-          <DetailSection title="Entrega"><div className="space-y-2">{detail.units.map((unit: any) => { const line = detail.lines.find((item: any) => item.id === unit.linea_id); return <EntityCard key={unit.id}><div className="mb-3"><div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Máquina"}</div><div className="text-[10px] text-muted-foreground">{unit.chasis ? `Ch. ${unit.chasis}` : "Sin chasis asignado"}</div></div><KeyValueGrid className="border-t pt-3"><DetailValue label="Unidad" value={unit.numero_unidad} /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></KeyValueGrid></EntityCard>; })}</div></DetailSection>
+        <TabsContent value="trazabilidad" className="space-y-5">
+          <DetailSection title="Facturación">{invoices.length ? <div className="divide-y">{invoices.map((invoice, index) => <KeyValueGrid key={`${invoice.numero}-${invoice.fecha}-${index}`} className="py-3 first:pt-0"><KeyValueItem label="Valor facturado" value={formatMoney(invoice.valor, invoice.moneda)} empty="Pendiente" prominent /><KeyValueItem label="Número" value={invoice.numero} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={invoice.fecha ? formatDate(invoice.fecha) : null} empty="Pendiente" /></KeyValueGrid>)}</div> : <KeyValueGrid><KeyValueItem label="Valor acordado" value={detail.valor_venta != null ? formatMoney(detail.valor_venta, detail.moneda_valor || "USD") : null} empty="Pendiente" prominent /><KeyValueItem label="Número" value={null} empty="Pendiente" /><KeyValueItem label="Fecha" value={null} empty="Pendiente" /></KeyValueGrid>}</DetailSection>
+          <DetailSection title="Origen de las máquinas" className="border-t pt-4">
+            <div className="space-y-3">{canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}</div>
+          </DetailSection>
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-4">
