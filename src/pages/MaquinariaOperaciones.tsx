@@ -1665,7 +1665,7 @@ function UnitAssignment({ unit, line, stock, imports, suggestions, historical, o
 function UnitHistoricalAssignment({ unit, line, stock, imports, onSaved }: { unit: any; line: any; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; onSaved: () => void }) {
   const chassisKey = normalizeChassisKey(unit.chasis);
   const linkedStock = stock.find((row) => row.unidad_operacion_id === unit.id);
-  const linkedImport = imports.find((row) => row.unidad_id === unit.id && row.vinculo_manual);
+  const linkedImport = imports.find((row) => row.unidad_id === unit.id);
   const candidates = imports
     .filter((row) => normalizeChassisKey(row.chasis) === chassisKey)
     .filter((row) => !row.unidad_id || row.unidad_id === unit.id)
@@ -1791,7 +1791,7 @@ function UnitStockAssignment({ unit, line, stock, suggestion, onSaved }: { unit:
 }
 
 function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { unit: any; line: any; imports: ImportAssignmentRow[]; suggestion?: LinkSuggestionRow; onSaved: () => void }) {
-  const linked = imports.find((row) => row.unidad_id === unit.id && row.vinculo_manual);
+  const linked = imports.find((row) => row.unidad_id === unit.id);
   const [importId, setImportId] = useState(linked?.id ?? "NONE");
   const [searchImport, setSearchImport] = useState("");
   const [savingAssignment, setSavingAssignment] = useState(false);
