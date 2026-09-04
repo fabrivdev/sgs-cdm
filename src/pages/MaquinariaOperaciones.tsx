@@ -191,7 +191,7 @@ function arrivalState(row: Pick<ImportRow, "eta" | "ata" | "estado_fuente">): Ar
 }
 
 function importStockConfirmed(row: Pick<ImportRow, "stock_sucursal" | "stock_deposito" | "estado_disponibilidad">) {
-  return Boolean(row.stock_sucursal || row.stock_deposito || ["DISPONIBLE", "RESERVADO", "VENDIDO_PENDIENTE_ENTREGA"].includes(row.estado_disponibilidad ?? ""));
+  return Boolean(row.stock_sucursal || row.stock_deposito || ["DISPONIBLE", "RESERVADO", "VENDIDO_PENDIENTE_ENTREGA", "EN_PARQUE"].includes(row.estado_disponibilidad ?? ""));
 }
 
 // Situacion comercial (Reservado/Vendido/Stock) -- ya se calcula sola desde
