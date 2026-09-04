@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
-import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem } from "@/components/maquinaria/MachineDetailPrimitives";
+import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
@@ -1315,7 +1315,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} pulseCurrent={!stockConfirmed} />
+        <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} />
         <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
@@ -1630,7 +1630,10 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       const historical = line.datos_extraidos?.historico_pedido ?? {};
       const numero = historical.factura_numero || historical.factura_venta || detail.factura_venta || null;
       const fecha = historical.factura_fecha || detail.factura_fecha || null;
-      const billedUnits = detail.units.filter((unit: any) => unit.linea_id === line.id && unit.valor_facturado != null);
+      const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
+      const billedUnits = lineUnits.filter((unit: any) => unit.valor_facturado != null);
+      const hasBillingEvidence = Boolean(numero || fecha || billedUnits.length || lineUnits.some((unit: any) => ["FACTURADA", "EN_PARQUE", "TRANSFERIDA"].includes(unit.estado)));
+      if (!hasBillingEvidence) return;
       const billedValue = billedUnits.length ? billedUnits.reduce((sum: number, unit: any) => sum + Number(unit.valor_facturado), 0) : null;
       const rawValue = billedValue ?? historical.valor_factura ?? historical.valor_venta ?? null;
       const valor = rawValue == null || rawValue === "" ? null : Number(rawValue);
@@ -1640,7 +1643,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         found.set(key, { numero, fecha, valor: Number.isFinite(valor) ? valor : null, moneda });
       }
     });
-    if (!found.size && (detail.factura_venta || detail.factura_fecha || detail.valor_venta != null)) {
+    if (!found.size && (detail.factura_venta || detail.factura_fecha || detail.valor_facturado != null)) {
       found.set("summary", { numero: detail.factura_venta, fecha: detail.factura_fecha, valor: detail.valor_venta, moneda: detail.moneda_valor || "USD" });
     }
     return [...found.values()];
@@ -1650,11 +1653,37 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     const line = detail!.lines.find((candidate: any) => candidate.id === unit.linea_id);
     return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail!.estado, detailStockChassis) === "ENTREGADO";
   });
+  const deliveredUnitsCount = detail?.units.filter((unit: any) => {
+    const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
+    return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail.estado, detailStockChassis) === "ENTREGADO";
+  }).length ?? 0;
   const deliveryLabel = deliveryComplete ? "Entregado" : "Entrega pendiente";
   const billedUnitsCount = Number(detail?.unidades_facturadas ?? 0);
   const valueSummaryLabel = billedUnitsCount > 0 && billedUnitsCount >= Number(detail?.unidades ?? 0)
     ? "Valor facturado"
     : billedUnitsCount > 0 ? "Valor vigente" : "Valor acordado";
+  const unitBillingCount = detail?.units.filter((unit: any) => unit.valor_facturado != null || ["FACTURADA", "EN_PARQUE", "TRANSFERIDA"].includes(unit.estado)).length ?? 0;
+  const missingOriginCount = detail?.units.filter((unit: any) => {
+    const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
+    if (line?.abastecimiento === "IMPORTAR") return !detail.imports.some((item: ImportAssignmentRow) => item.unidad_id === unit.id);
+    if (line?.abastecimiento === "STOCK") return !detail.stock.some((item: StockAssignmentRow) => item.unidad_operacion_id === unit.id);
+    return true;
+  }).length ?? 0;
+  const missingAgreedValueCount = detail?.lines.filter((line: any) => {
+    const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
+    return line.valor_acordado_unitario == null && !lineUnits.every((unit: any) => unit.valor_facturado != null);
+  }).length ?? 0;
+  const nextAction = simpleState === "CANCELADA"
+    ? { title: "Pedido cancelado", detail: "No requiere ninguna acción." }
+    : simpleState === "COMPLETADO" && deliveryComplete
+      ? { title: "Proceso completo", detail: "La facturación y la entrega ya están confirmadas." }
+      : simpleState === "COMPLETADO"
+        ? { title: "Falta confirmar la entrega", detail: `${Math.max(Number(detail?.unidades ?? 0) - deliveredUnitsCount, 1)} unidad(es) todavía no figuran como entregadas.` }
+        : missingOriginCount > 0
+          ? { title: "Falta definir el origen", detail: `${missingOriginCount} unidad(es) todavía no están vinculadas a stock o importación.` }
+          : missingAgreedValueCount > 0
+            ? { title: "Falta cargar el valor acordado", detail: `${missingAgreedValueCount} línea(s) no tienen valor mientras esperan la factura.` }
+            : { title: "Pendiente de facturación", detail: `${unitBillingCount}/${Number(detail?.unidades ?? 0)} unidad(es) tienen facturación confirmada.` };
   const npDocuments = detail?.docs.filter((document: any) => document.tipo === "NP") ?? [];
   const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
   const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
@@ -1675,11 +1704,15 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
-          <KeyValueGrid className="sm:grid-cols-4">
+          <div className={cn("rounded-lg border px-3 py-2.5", simpleState === "COMPLETADO" && deliveryComplete ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60")}>
+            <div className="text-[11px] font-semibold">{nextAction.title}</div>
+            <div className="mt-0.5 text-[10px] text-muted-foreground">{nextAction.detail}</div>
+          </div>
+          <KeyValueGrid className={cn(detail.lines.length > 1 ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
             <DetailValue label="Fecha NP" value={formatDate(detail.np_fecha)} />
             <DetailValue label="Comercial" value={detail.comercial} />
             <DetailValue label="Unidades" value={detail.unidades} />
-            <DetailValue label={valueSummaryLabel} value={detail.valor_venta == null ? "Sin cargar" : formatMoney(detail.valor_venta, detail.moneda_valor || "USD")} />
+            {detail.lines.length > 1 && <DetailValue label={valueSummaryLabel} value={detail.valor_venta == null ? "Sin cargar" : formatMoney(detail.valor_venta, detail.moneda_valor || "USD")} />}
           </KeyValueGrid>
           <DetailSection title="Máquinas"><div className="space-y-2">{detail.lines.map((line: any) => {
             const extracted = line.datos_extraidos ?? {};
@@ -1694,7 +1727,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsContent>
 
         <TabsContent value="trazabilidad" className="space-y-5">
-          <DetailSection title="Facturación">{invoices.length ? <div className="divide-y">{invoices.map((invoice, index) => <KeyValueGrid key={`${invoice.numero}-${invoice.fecha}-${index}`} className="py-3 first:pt-0"><KeyValueItem label="Valor facturado" value={formatMoney(invoice.valor, invoice.moneda)} empty="Pendiente" prominent /><KeyValueItem label="Número" value={invoice.numero} empty="Pendiente" mono /><KeyValueItem label="Fecha" value={invoice.fecha ? formatDate(invoice.fecha) : null} empty="Pendiente" /></KeyValueGrid>)}</div> : <KeyValueGrid><KeyValueItem label="Valor acordado" value={detail.valor_venta != null ? formatMoney(detail.valor_venta, detail.moneda_valor || "USD") : null} empty="Pendiente" prominent /><KeyValueItem label="Número" value={null} empty="Pendiente" /><KeyValueItem label="Fecha" value={null} empty="Pendiente" /></KeyValueGrid>}</DetailSection>
+          <DetailSection title="Facturación">{invoices.length ? <div className="divide-y">{invoices.map((invoice, index) => <KeyValueGrid key={`${invoice.numero}-${invoice.fecha}-${index}`} className="py-3 first:pt-0"><KeyValueItem label="Valor facturado" value={formatMoney(invoice.valor, invoice.moneda)} empty="No informado" /><KeyValueItem label="Número" value={invoice.numero} empty="No informado" mono /><KeyValueItem label="Fecha" value={invoice.fecha ? formatDate(invoice.fecha) : null} empty="No informada" /></KeyValueGrid>)}</div> : <div className="rounded-lg bg-muted/40 px-3 py-3 text-[11px] text-muted-foreground">Todavía no hay una factura confirmada para este pedido.</div>}</DetailSection>
           <DetailSection title="Origen de las máquinas" className="border-t pt-4">
             <div className="space-y-3">{canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}</div>
           </DetailSection>
