@@ -1441,6 +1441,7 @@ export type Database = {
           source_id: string
           source_row: number | null
           source_sheet: string
+          subgrupo: Database["public"]["Enums"]["subgrupo_maquina"] | null
           tipo_cambio: number | null
           transporte: string | null
           unidad_id: string | null
@@ -1491,6 +1492,7 @@ export type Database = {
           source_id: string
           source_row?: number | null
           source_sheet?: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"] | null
           tipo_cambio?: number | null
           transporte?: string | null
           unidad_id?: string | null
@@ -1541,6 +1543,7 @@ export type Database = {
           source_id?: string
           source_row?: number | null
           source_sheet?: string
+          subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"] | null
           tipo_cambio?: number | null
           transporte?: string | null
           unidad_id?: string | null
