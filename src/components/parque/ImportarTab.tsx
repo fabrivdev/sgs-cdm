@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +19,7 @@ import {
   normCode,
   normText,
   persistNewSystemBundle,
+  actualizarVentasRepuestosPeriodo,
   prepareNewSystemImportBundle,
   type NewSystemImportBundle,
 } from "@/lib/imports";
@@ -324,6 +326,7 @@ const applyOrdenServicioHeader = (target: OrdenServicioRow, source: Record<strin
 
 export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [parqueRows, setParqueRows] = useState<ParqueRow[] | null>(null);
   const [parqueFile, setParqueFile] = useState<string>("");
   const [factRows, setFactRows] = useState<FactRow[] | null>(null);
@@ -719,7 +722,10 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       toast.success(
         `Nuevo sistema importado: ${resultado.facturacionLineas} líneas de facturación y ${resultado.ordenesServicio} líneas de OS.`,
       );
+      if (resultado.historialRepuestosError) toast.warning(resultado.historialRepuestosError);
       resetNewSystemImport();
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "ventas_unificadas"] });
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       await cargarHistorial();
       onChanged();
     } catch (e) {
@@ -1353,10 +1359,19 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         .eq("id", imp?.id);
       if (updError) throw updError;
 
+      const fechasGrid = payload.map((row) => row.fecha_factura).filter((value): value is string => Boolean(value)).sort();
+      const historialGrid = await actualizarVentasRepuestosPeriodo(
+        fechasGrid[0] ?? null,
+        fechasGrid.length ? fechasGrid[fechasGrid.length - 1] : null,
+      );
+
       toast.success(`Importadas ${insertadosReal} lineas GRID`);
+      if (historialGrid.error) toast.warning(historialGrid.error);
       setGridRows(null);
       setGridFile("");
       setGridDiag(null);
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "ventas_unificadas"] });
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       await cargarHistorial();
       onChanged();
     } catch (e) {

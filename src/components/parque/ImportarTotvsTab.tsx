@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cargarTodo } from "@/hooks/useCatalogos";
@@ -30,6 +31,7 @@ import {
   prepareNewSystemImportBundle,
   reconcileCanonicalClientes,
   persistNewSystemBundle,
+  actualizarVentasRepuestosPeriodo,
   type CanonicalClienteRow,
   type CanonicalPedidoCompraRow,
   type CanonicalMachineStockRow,
@@ -95,6 +97,7 @@ interface Preview {
 
 export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [detected, setDetected] = useState<DetectedFile[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -266,6 +269,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     try {
       let facturacionLineas = 0;
       let ordenesServicio = 0;
+      let facturacionDesde: string | null = null;
+      let facturacionHasta: string | null = null;
+      let historialRepuestosError: string | null = null;
 
       // El maestro se aplica antes que facturacion/OS: asi las lineas del
       // mismo lote ya resuelven contra el nombre y RUC corregidos.
@@ -313,6 +319,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         });
         facturacionLineas = resultado.facturacionLineas;
         ordenesServicio = resultado.ordenesServicio;
+        facturacionDesde = resultado.facturacionDesde;
+        facturacionHasta = resultado.facturacionHasta;
+        historialRepuestosError = resultado.historialRepuestosError;
       }
 
       const productoRows = preview.productos.map(mapCanonicalProductToRow).filter((r): r is NonNullable<typeof r> => r !== null);
@@ -346,6 +355,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           p_filas: machineStockRows,
         });
         if (error) throw error;
+      }
+
+      // Se repite después del maestro porque el lote puede incorporar SKU
+      // nuevos que todavía no existían cuando se guardó la facturación.
+      if (facturacionDesde && facturacionHasta) {
+        const historial = await actualizarVentasRepuestosPeriodo(facturacionDesde, facturacionHasta);
+        historialRepuestosError = historial.error;
       }
 
       for (let i = 0; i < pedidoRows.length; i += 500) {
@@ -401,9 +417,12 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         preview.clientesActualizados.length ? `${preview.clientesActualizados.length} clientes actualizados` : null,
       ].filter(Boolean);
       toast.success(`Importado: ${partes.join(", ")}.`);
+      if (historialRepuestosError) toast.warning(historialRepuestosError);
 
       setDetected([]);
       setPreview(null);
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "ventas_unificadas"] });
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       onChanged();
     } catch (e) {
       toast.error("Error importando: " + (e as Error).message);

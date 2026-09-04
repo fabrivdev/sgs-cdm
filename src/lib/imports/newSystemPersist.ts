@@ -33,6 +33,30 @@ export interface PersistNewSystemBundleArgs {
 export interface PersistNewSystemBundleResult {
   facturacionLineas: number;
   ordenesServicio: number;
+  facturacionDesde: string | null;
+  facturacionHasta: string | null;
+  historialRepuestosActualizado: boolean;
+  historialRepuestosError: string | null;
+}
+
+const missingPartsHistoryRefresh = (error: any) =>
+  error?.code === "PGRST202"
+  || error?.code === "42883"
+  || String(error?.message ?? "").includes("repuestos_actualizar_ventas_periodo");
+
+export async function actualizarVentasRepuestosPeriodo(desde: string | null, hasta: string | null) {
+  if (!desde || !hasta) return { actualizado: false, error: null as string | null };
+
+  const { error } = await (supabase.rpc as any)("repuestos_actualizar_ventas_periodo", {
+    p_desde: desde,
+    p_hasta: hasta,
+  });
+  if (!error) return { actualizado: true, error: null as string | null };
+
+  const message = missingPartsHistoryRefresh(error)
+    ? "Falta aplicar la migración que actualiza las ventas de repuestos después de importar."
+    : [error.message, error.details, error.hint].filter(Boolean).join(" | ") || "No se pudo actualizar el historial de repuestos.";
+  return { actualizado: false, error: message };
 }
 
 export async function persistNewSystemBundle({
@@ -206,6 +230,9 @@ export async function persistNewSystemBundle({
   if (osImpError) throw osImpError;
 
   const billingWindow = bundle.diagnostics.replacement.facturacion;
+  const billingDates = facturacionLineas.map((row) => row.fecha_factura).filter((value): value is string => Boolean(value));
+  const facturacionDesde = billingWindow.from ?? (billingDates.length ? [...billingDates].sort()[0] : null);
+  const facturacionHasta = billingWindow.to ?? (billingDates.length ? [...billingDates].sort().at(-1)! : null);
   if (billingWindow.shouldReplace && billingWindow.from && billingWindow.to) {
     const { error: deleteFactSummaryError } = await supabase
       .from("facturacion")
@@ -310,8 +337,14 @@ export async function persistNewSystemBundle({
     console.error("No se pudo reconciliar la ultima actividad del Parque", refreshParkError);
   }
 
+  const historialRepuestos = await actualizarVentasRepuestosPeriodo(facturacionDesde, facturacionHasta);
+
   return {
     facturacionLineas: facturacionLineas.length,
     ordenesServicio: ordenesServicioPayload.length,
+    facturacionDesde,
+    facturacionHasta,
+    historialRepuestosActualizado: historialRepuestos.actualizado,
+    historialRepuestosError: historialRepuestos.error,
   };
 }
