@@ -207,7 +207,8 @@ const availabilityClass = (state?: string | null) => cn(
   state === "VENDIDO_PENDIENTE_ENTREGA" && "border-violet-200 bg-violet-50 text-violet-700",
   state === "CONFLICTO" && "border-red-200 bg-red-50 text-red-700",
   state === "SIN_CONCILIAR" && "border-amber-200 bg-amber-50 text-amber-700",
-  (!state || state === "SIN_CHASIS" || state === "EN_PARQUE") && "border-slate-200 bg-slate-100 text-slate-600",
+  state === "EN_PARQUE" && "border-teal-200 bg-teal-50 text-teal-700",
+  (!state || state === "SIN_CHASIS") && "border-slate-200 bg-slate-100 text-slate-600",
 );
 
 type OrderRow = {
