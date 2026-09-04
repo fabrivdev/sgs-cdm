@@ -113,14 +113,14 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
     if (!form.cliente_id) return toast.error("Seleccioná un cliente");
     if (!form.serie.trim()) return toast.error("Número de serie requerido");
     if (form.subgrupo === "OTRO" && !form.subgrupo_personalizado.trim()) return toast.error("Escribí el nuevo subgrupo");
-    if (!form.modelo_tipo.trim()) return toast.error("Seleccioná o escribí el modelo");
+    if (!form.modelo_tipo.trim()) return toast.error("Seleccioná un modelo o escribí uno nuevo");
     setSaving(true);
     const { error } = await supabase.from("parque_maquinas").insert({
       cliente_id: form.cliente_id,
       marca: form.marca,
       subgrupo: form.subgrupo as never,
       subgrupo_personalizado: form.subgrupo === "OTRO" ? form.subgrupo_personalizado.trim() : null,
-      modelo_tipo: form.modelo_tipo || null,
+      modelo_tipo: form.modelo_tipo.trim() || null,
       serie: form.serie.trim(),
       anio: form.anio ? Number(form.anio) : null,
       sucursal: (form.sucursal || null) as Sucursal | null,
@@ -131,7 +131,12 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
       activo: true,
     });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      if (error.code === "23505" && String(error.message).toLowerCase().includes("serie")) {
+        return toast.error(`Ya existe una máquina con la serie ${form.serie.trim()}`);
+      }
+      return toast.error(error.message);
+    }
     await queryClient.invalidateQueries({ queryKey: ["parque-modelos-catalogo"] });
     toast.success("Máquina creada");
     onOpenChange(false);

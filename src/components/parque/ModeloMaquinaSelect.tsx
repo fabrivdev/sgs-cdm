@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Marca } from "@/lib/constants";
 import { normalizeMachineModelKey } from "@/lib/machineModels";
@@ -75,7 +76,39 @@ export function ModeloMaquinaSelect({
     );
   }
 
-  const selectValue = customMode || esModeloNuevo ? "__OTHER__" : value || undefined;
+  if (customMode || esModeloNuevo) {
+    return (
+      <div className="space-y-1.5">
+        <div className="flex gap-2">
+          <Input
+            value={value ?? ""}
+            onChange={(event) => onValueChange(event.target.value)}
+            placeholder="Escribí el nombre del nuevo modelo"
+            className={className}
+            disabled={disabled}
+            autoFocus
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0"
+            disabled={disabled}
+            onClick={() => {
+              onValueChange("");
+              setCustomMode(false);
+            }}
+          >
+            Ver catálogo
+          </Button>
+        </div>
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          Modelo nuevo: escribí el nombre exacto antes de crear la máquina.
+        </p>
+      </div>
+    );
+  }
+
+  const selectValue = value || undefined;
 
   return (
     <div className="space-y-1.5">
@@ -100,21 +133,7 @@ export function ModeloMaquinaSelect({
           <SelectItem value="__OTHER__">OTRO / NUEVO MODELO</SelectItem>
         </SelectContent>
       </Select>
-      {(customMode || esModeloNuevo) && (
-        <Input
-          value={value ?? ""}
-          onChange={(event) => onValueChange(event.target.value)}
-          placeholder="Escribir nuevo modelo"
-          className={className}
-          disabled={disabled}
-          autoFocus={!value}
-        />
-      )}
-      <p className={esModeloNuevo ? "text-[11px] text-amber-700 dark:text-amber-400" : "text-[11px] text-muted-foreground"}>
-        {esModeloNuevo
-          ? "Modelo nuevo: verificá el texto antes de continuar."
-          : "Seleccioná un modelo o elegí otro para crear uno nuevo."}
-      </p>
+      <p className="text-[11px] text-muted-foreground">Seleccioná un modelo o elegí otro para crear uno nuevo.</p>
     </div>
   );
 }
