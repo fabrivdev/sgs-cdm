@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { AppNotification } from "@/lib/notifications";
 import { machineSaleNotificationData } from "@/lib/notifications";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
-import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
+import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
 import { canonicalClientId, canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
 
 type Cliente = ClientIdentityRow & { sourceIds: string[] };
@@ -35,6 +36,7 @@ type FormState = {
   cliente_id: string;
   marca: Marca;
   subgrupo: string;
+  subgrupo_personalizado: string;
   modelo_tipo: string;
   serie: string;
   anio: string;
@@ -48,6 +50,7 @@ const emptyForm: FormState = {
   cliente_id: "",
   marca: "CLAAS",
   subgrupo: "OTRO",
+  subgrupo_personalizado: "",
   modelo_tipo: "",
   serie: "",
   anio: "",
@@ -75,13 +78,16 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
 
   useEffect(() => {
     if (!open || !notification) return;
+    const subgrupo = canonicalMachineSubgroup(data.subgrupo);
+    const subgrupoDetectado = String(data.subgrupo ?? "").trim();
     setForm({
       ...emptyForm,
       cliente_id: data.cliente_id ?? "",
       marca: data.marca === "HORSCH" ? "HORSCH" : "CLAAS",
-      subgrupo: MACHINE_SUBGROUPS.includes(data.subgrupo as (typeof MACHINE_SUBGROUPS)[number])
-        ? String(data.subgrupo)
-        : "OTRO",
+      subgrupo,
+      subgrupo_personalizado: subgrupo === "OTRO" && subgrupoDetectado.toLocaleUpperCase("es") !== "OTRO"
+        ? subgrupoDetectado
+        : "",
       modelo_tipo: data.modelo_tipo ?? "",
       serie: data.chasis ?? "",
       anio: "",
@@ -121,12 +127,15 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
     if (!notification) return;
     if (!form.cliente_id) return toast.error("Seleccioná el cliente de la máquina");
     if (!form.serie.trim()) return toast.error("Verificá el chasis antes de confirmar");
+    if (form.subgrupo === "OTRO" && !form.subgrupo_personalizado.trim()) return toast.error("Escribí el nuevo subgrupo");
+    if (!form.modelo_tipo.trim()) return toast.error("Seleccioná o escribí el modelo");
     setSaving(true);
     const { error } = await supabase.rpc("confirmar_notificacion_alta_maquina", {
       p_notificacion_id: notification.id,
       p_cliente_id: form.cliente_id,
       p_marca: form.marca,
       p_subgrupo: form.subgrupo as (typeof MACHINE_SUBGROUPS)[number],
+      p_subgrupo_personalizado: form.subgrupo === "OTRO" ? form.subgrupo_personalizado.trim() : null,
       p_modelo_tipo: form.modelo_tipo || null,
       p_serie: form.serie.trim(),
       p_anio: form.anio ? Number(form.anio) : null,
@@ -235,12 +244,16 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-[12px]">Subgrupo</Label>
-                <Select value={form.subgrupo} onValueChange={(subgrupo) => setForm((current) => ({ ...current, subgrupo, modelo_tipo: "" }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MACHINE_SUBGROUPS.map((subgroup) => <SelectItem key={subgroup} value={subgroup}>{subgroup}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SubgrupoMaquinaSelect
+                  value={form.subgrupo}
+                  customValue={form.subgrupo_personalizado}
+                  onValueChange={(subgrupo, subgrupo_personalizado) => setForm((current) => ({
+                    ...current,
+                    subgrupo,
+                    subgrupo_personalizado,
+                    modelo_tipo: "",
+                  }))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

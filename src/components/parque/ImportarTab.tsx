@@ -32,47 +32,13 @@ import {
 } from "@/lib/facturacionReglas";
 import { cn } from "@/lib/utils";
 import { importedServiceOrderParticipants } from "@/lib/technicianMatching";
-
-const SUBGRUPOS_VALIDOS = new Set([
-  "COSECHADORAS",
-  "SEMBRADORAS",
-  "PICADORAS",
-  "PLATAFORMAS",
-  "PLATAFORMAS/CABEZALES",
-  "PULVERIZADORAS",
-  "TRACTORES",
-  "SUELO",
-  "OTRO",
-]);
-
-const normalizarSubgrupoParque = (value: unknown): string => {
-  const raw = norm(value).toUpperCase().replace(/\s+/g, " ");
-
-  if (!raw) return "OTRO";
-
-  if (raw.includes("COSECH")) return "COSECHADORAS";
-  if (raw.includes("SEMBR")) return "SEMBRADORAS";
-  if (raw.includes("PICAD")) return "PICADORAS";
-  if (raw.includes("PULVER")) return "PULVERIZADORAS";
-  if (raw.includes("TRACT")) return "TRACTORES";
-  if (raw.includes("SUELO")) return "SUELO";
-
-  if (
-    raw.includes("PLATAFORMA") ||
-    raw.includes("CABEZAL") ||
-    raw.includes("CABEZALES") ||
-    raw.includes("HEADER")
-  ) {
-    return "PLATAFORMAS/CABEZALES";
-  }
-
-  return SUBGRUPOS_VALIDOS.has(raw) ? raw : "OTRO";
-};
+import { canonicalMachineSubgroup } from "@/lib/machineModels";
 
 interface ParqueRow {
   anio: number | null;
   sucursal: Sucursal | null;
   subgrupo: string;
+  subgrupo_personalizado: string | null;
   modelo_tipo: string | null;
   serie: string;
   cliente_nombre: string;
@@ -761,7 +727,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (!serie) continue;
 
         const marca = matchMarca(r["MARCA"] ?? r["marca"]) ?? "CLAAS";
-        const subgrupo = normalizarSubgrupoParque(r["SUBGRUPO"] ?? r["subgrupo"]);
+        const subgrupoFuente = norm(r["SUBGRUPO"] ?? r["subgrupo"]);
+        const subgrupo = canonicalMachineSubgroup(subgrupoFuente);
         const anioVal = r["AÑO"] ?? r["ANO"] ?? r["ANIO"] ?? r["año"];
         const anio = anioVal ? Number(anioVal) || null : null;
 
@@ -769,6 +736,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           anio,
           sucursal: matchSucursal(r["SUCURSAL"] ?? r["sucursal"]),
           subgrupo,
+          subgrupo_personalizado: subgrupo === "OTRO" ? subgrupoFuente || "SIN CLASIFICAR" : null,
           modelo_tipo: norm(r["MODELO_TIPO"] ?? r["MODELO"] ?? r["modelo_tipo"]) || null,
           serie,
           cliente_nombre: norm(r["CLIENTE"] ?? r["cliente"]),
@@ -822,6 +790,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         sucursal: r.sucursal,
         localidad: r.localidad,
         subgrupo: r.subgrupo as never,
+        subgrupo_personalizado: r.subgrupo_personalizado,
         modelo_tipo: r.modelo_tipo,
         serie: r.serie,
         vendedor: r.vendedor,

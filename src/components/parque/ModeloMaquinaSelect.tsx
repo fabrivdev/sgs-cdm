@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ export function ModeloMaquinaSelect({
   allowCustom?: boolean;
   disabled?: boolean;
 }) {
-  const listId = useId();
+  const [customMode, setCustomMode] = useState(false);
   const { data = [], isLoading } = useQuery({
     queryKey: ["parque-modelos-catalogo", marca, subgrupo],
     queryFn: async () => {
@@ -59,6 +59,13 @@ export function ModeloMaquinaSelect({
     !data.some((modelo) => normalizeMachineModelKey(modelo.nombre) === normalizeMachineModelKey(value)),
   );
 
+  useEffect(() => {
+    if (!value?.trim()) return;
+    setCustomMode(!data.some((modelo) => normalizeMachineModelKey(modelo.nombre) === normalizeMachineModelKey(value)));
+  }, [data, value]);
+
+  useEffect(() => setCustomMode(false), [marca, subgrupo]);
+
   if (!allowCustom) {
     return (
       <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled || isLoading || !subgrupo}>
@@ -68,25 +75,45 @@ export function ModeloMaquinaSelect({
     );
   }
 
+  const selectValue = customMode || esModeloNuevo ? "__OTHER__" : value || undefined;
+
   return (
-    <div className="space-y-1">
-      <Input
-        list={listId}
-        value={value ?? ""}
-        onChange={(event) => onValueChange(event.target.value)}
-        placeholder={isLoading ? "Cargando modelos..." : "Seleccionar o escribir modelo"}
-        className={className}
-        disabled={disabled}
-      />
-      <datalist id={listId}>
-        {opciones.map((modelo) => (
-          <option key={normalizeMachineModelKey(modelo)} value={modelo} />
-        ))}
-      </datalist>
+    <div className="space-y-1.5">
+      <Select
+        value={selectValue}
+        onValueChange={(next) => {
+          if (next === "__OTHER__") {
+            setCustomMode(true);
+            onValueChange("");
+          } else {
+            setCustomMode(false);
+            onValueChange(next);
+          }
+        }}
+        disabled={disabled || isLoading || !subgrupo}
+      >
+        <SelectTrigger className={className}><SelectValue placeholder={isLoading ? "Cargando modelos..." : "Seleccionar modelo"} /></SelectTrigger>
+        <SelectContent>
+          {opciones.filter((modelo) => !esModeloNuevo || normalizeMachineModelKey(modelo) !== normalizeMachineModelKey(value)).map((modelo) => (
+            <SelectItem key={normalizeMachineModelKey(modelo)} value={modelo}>{modelo}</SelectItem>
+          ))}
+          <SelectItem value="__OTHER__">OTRO / NUEVO MODELO</SelectItem>
+        </SelectContent>
+      </Select>
+      {(customMode || esModeloNuevo) && (
+        <Input
+          value={value ?? ""}
+          onChange={(event) => onValueChange(event.target.value)}
+          placeholder="Escribir nuevo modelo"
+          className={className}
+          disabled={disabled}
+          autoFocus={!value}
+        />
+      )}
       <p className={esModeloNuevo ? "text-[11px] text-amber-700 dark:text-amber-400" : "text-[11px] text-muted-foreground"}>
         {esModeloNuevo
           ? "Modelo nuevo: verificá el texto antes de continuar."
-          : "Seleccioná una opción o escribí un modelo nuevo."}
+          : "Seleccioná un modelo o elegí otro para crear uno nuevo."}
       </p>
     </div>
   );

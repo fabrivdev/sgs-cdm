@@ -19,8 +19,8 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
-import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
+import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
 import { canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
 
 type Cliente = ClientIdentityRow & { sourceIds: string[] };
@@ -41,6 +41,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
     cliente_id: string;
     marca: Marca;
     subgrupo: string;
+    subgrupo_personalizado: string;
     modelo_tipo: string;
     serie: string;
     anio: string;
@@ -52,6 +53,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
     cliente_id: "",
     marca: "CLAAS",
     subgrupo: "OTRO",
+    subgrupo_personalizado: "",
     modelo_tipo: "",
     serie: "",
     anio: "",
@@ -68,6 +70,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
       cliente_id: "",
       marca: "CLAAS",
       subgrupo: "OTRO",
+      subgrupo_personalizado: "",
       modelo_tipo: "",
       serie: "",
       anio: "",
@@ -109,11 +112,14 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
   const guardar = async () => {
     if (!form.cliente_id) return toast.error("Seleccioná un cliente");
     if (!form.serie.trim()) return toast.error("Número de serie requerido");
+    if (form.subgrupo === "OTRO" && !form.subgrupo_personalizado.trim()) return toast.error("Escribí el nuevo subgrupo");
+    if (!form.modelo_tipo.trim()) return toast.error("Seleccioná o escribí el modelo");
     setSaving(true);
     const { error } = await supabase.from("parque_maquinas").insert({
       cliente_id: form.cliente_id,
       marca: form.marca,
       subgrupo: form.subgrupo as never,
+      subgrupo_personalizado: form.subgrupo === "OTRO" ? form.subgrupo_personalizado.trim() : null,
       modelo_tipo: form.modelo_tipo || null,
       serie: form.serie.trim(),
       anio: form.anio ? Number(form.anio) : null,
@@ -194,12 +200,11 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-[12px]">Subgrupo</Label>
-                <Select value={form.subgrupo} onValueChange={(v) => setForm({ ...form, subgrupo: v, modelo_tipo: "" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MACHINE_SUBGROUPS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SubgrupoMaquinaSelect
+                  value={form.subgrupo}
+                  customValue={form.subgrupo_personalizado}
+                  onValueChange={(subgrupo, subgrupo_personalizado) => setForm({ ...form, subgrupo, subgrupo_personalizado, modelo_tipo: "" })}
+                />
               </div>
             </div>
           </section>

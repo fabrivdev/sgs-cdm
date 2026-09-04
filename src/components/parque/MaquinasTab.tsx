@@ -11,7 +11,7 @@ import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/Fil
 import { cn } from "@/lib/utils";
 import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
-import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { MACHINE_SUBGROUPS, machineSubgroupLabel } from "@/lib/machineModels";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -28,6 +28,7 @@ type Maquina = {
   anio: number | null;
   marca: Marca;
   subgrupo: string;
+  subgrupo_personalizado: string | null;
   modelo_tipo: string | null;
   serie: string;
   vendedor: string | null;
@@ -125,7 +126,7 @@ export function MaquinasTab({
         cargarTodo<Maquina>(
           supabase
             .from("parque_maquinas")
-            .select("id, cliente_id, anio, marca, subgrupo, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
+            .select("id, cliente_id, anio, marca, subgrupo, subgrupo_personalizado, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
         ),
         cargarTodo<Cliente>(
           supabase
@@ -182,6 +183,16 @@ export function MaquinasTab({
     return clientes;
   }, [maquinas, fEstado]);
 
+  const subgrupoOptions = useMemo(() => {
+    const values = new Set<string>(MACHINE_SUBGROUPS.filter((subgrupo) => subgrupo !== "OTRO"));
+    for (const maquina of maquinas) {
+      values.add(machineSubgroupLabel(maquina.subgrupo, maquina.subgrupo_personalizado));
+    }
+    return Array.from(values)
+      .sort((a, b) => a.localeCompare(b, "es"))
+      .map((value) => ({ value, label: value === "OTRO" ? "OTRO (SIN ESPECIFICAR)" : value }));
+  }, [maquinas]);
+
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
     const ad = añoDesde ? Number(añoDesde) : null;
@@ -196,7 +207,7 @@ export function MaquinasTab({
       if (fMarca === MARCA_AMBAS) {
         if (!m.cliente_id || !clientesConAmbasMarcas.has(m.cliente_id)) return false;
       } else if (fMarca !== "all" && m.marca !== fMarca) return false;
-      if (fSubgrupo !== "all" && m.subgrupo !== fSubgrupo) return false;
+      if (fSubgrupo !== "all" && machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado) !== fSubgrupo) return false;
       if (ad != null && (m.anio == null || m.anio < ad)) return false;
       if (ah != null && (m.anio == null || m.anio > ah)) return false;
 
@@ -227,7 +238,8 @@ export function MaquinasTab({
         case "marca":
           return a.marca.localeCompare(b.marca) * dir;
         case "subgrupo":
-          return (a.subgrupo ?? "").localeCompare(b.subgrupo ?? "") * dir;
+          return machineSubgroupLabel(a.subgrupo, a.subgrupo_personalizado)
+            .localeCompare(machineSubgroupLabel(b.subgrupo, b.subgrupo_personalizado), "es") * dir;
         case "año":
           return ((a.anio ?? 0) - (b.anio ?? 0)) * dir;
         case "serie":
@@ -272,7 +284,7 @@ export function MaquinasTab({
         Sucursal: m.sucursal ?? "",
         Localidad: m.localidad ?? "",
         Marca: m.marca,
-        Subgrupo: m.subgrupo,
+        Subgrupo: machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado),
         Modelo: m.modelo_tipo ?? "",
         Año: m.anio ?? "",
         "Antig.": m.anio ? hoy - m.anio : "",
@@ -355,7 +367,7 @@ export function MaquinasTab({
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[145px]"
-          options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
+          options={[{ value: "all", label: "Todos" }, ...subgrupoOptions]}
         />
       </FiltersBar>
 
@@ -424,7 +436,7 @@ export function MaquinasTab({
                     <TableCell>
                       <MarcaBadge marca={m.marca} className="text-[10px]" />
                     </TableCell>
-                    <TableCell className="text-[12px]">{m.subgrupo}</TableCell>
+                    <TableCell className="text-[12px]">{machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado)}</TableCell>
                     <TableCell className="text-[12px]">{m.modelo_tipo ?? "—"}</TableCell>
                     <TableCell className="text-center tabular-nums">{m.anio ?? "—"}</TableCell>
                     <TableCell className="text-center tabular-nums text-[12px]">{antig != null ? `${antig}a` : "—"}</TableCell>
@@ -453,6 +465,7 @@ export function MaquinasTab({
                               serie: m.serie,
                               anio: m.anio,
                               subgrupo: m.subgrupo,
+                              subgrupo_personalizado: m.subgrupo_personalizado,
                               notas: m.notas ?? null,
                             });
                           }}

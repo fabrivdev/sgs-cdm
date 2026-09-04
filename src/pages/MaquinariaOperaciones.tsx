@@ -30,7 +30,7 @@ import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
 import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
-import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -310,16 +310,13 @@ function safeMarca(value: unknown): DraftLine["marca"] {
 }
 
 function safeSubgroup(value: unknown) {
-  const normalized = String(value ?? "").toUpperCase();
-  return (MACHINE_SUBGROUPS as readonly string[]).includes(normalized) && normalized !== "SUELO"
-    ? normalized : "OTRO";
+  return canonicalMachineSubgroup(value);
 }
 
 const MACHINE_CLASSIFICATION_LABEL: Record<string, string> = {
   COSECHADORAS: "Cosechadora",
   SEMBRADORAS: "Plantadora / Sembradora",
   PICADORAS: "Picadora",
-  PLATAFORMAS: "Plataforma",
   "PLATAFORMAS/CABEZALES": "Plataforma / Cabezal",
   PULVERIZADORAS: "Pulverizadora",
   TRACTORES: "Tractor",
@@ -327,7 +324,7 @@ const MACHINE_CLASSIFICATION_LABEL: Record<string, string> = {
 };
 
 function machineClassificationLabel(line: Record<string, any>, extracted: Record<string, any> = {}) {
-  const subgroup = String(line.subgrupo ?? extracted.subgrupo ?? "").trim().toUpperCase();
+  const subgroup = canonicalMachineSubgroup(line.subgrupo ?? extracted.subgrupo ?? line.producto ?? extracted.producto);
   return MACHINE_CLASSIFICATION_LABEL[subgroup]
     || safeExtractedText(line.producto)
     || safeExtractedText(extracted.producto)
@@ -1196,7 +1193,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Llave interna *"><Input autoFocus value={form.llave_interna} onChange={(event) => setForm((value) => ({ ...value, llave_interna: event.target.value }))} placeholder="Ej. 26.61L2" /></Field>
         <Field label="Marca / proveedor"><CompactSelect value={form.marca} values={["CLAAS", "HORSCH", "OTROS"]} disabled={Boolean(selectedNp)} onChange={(marca) => setForm((value) => ({ ...value, marca: marca as ImportDraft["marca"], modelo: "" }))} /></Field>
-        <Field label="Producto / tipo"><CompactSelect value={form.producto} values={(MACHINE_SUBGROUPS as readonly string[]).filter((value) => value !== "SUELO")} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
+        <Field label="Producto / tipo"><CompactSelect value={form.producto} values={MACHINE_SUBGROUPS as readonly string[]} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
         <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo) => setForm((value) => ({ ...value, modelo }))} allowCustom={false} disabled={Boolean(selectedNp)} /></Field>
         <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
         <Field label="Estado"><Select value={form.estado_fuente} onValueChange={(estado_fuente) => setForm((value) => ({ ...value, estado_fuente }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PLANIFICADA">Planificada</SelectItem><SelectItem value="PEDIDA">Pedida</SelectItem><SelectItem value="EN_TRANSITO">En tránsito</SelectItem><SelectItem value="RECIBIDA">Recibida</SelectItem><SelectItem value="CANCELADA">Cancelada</SelectItem></SelectContent></Select></Field>

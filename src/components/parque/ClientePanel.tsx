@@ -49,8 +49,9 @@ import { toast } from "sonner";
 import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
 import { cn, formatGuaranies } from "@/lib/utils";
 import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
-import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { machineSubgroupLabel } from "@/lib/machineModels";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
+import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
 
 const RESULTADOS = [
   "Contactado",
@@ -89,6 +90,7 @@ type Maquina = {
   sucursal: Sucursal | null;
   localidad: string | null;
   subgrupo: string;
+  subgrupo_personalizado: string | null;
   modelo_tipo: string | null;
   serie: string;
   vendedor: string | null;
@@ -318,6 +320,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const guardarMaquina = async () => {
     if (!cliente) return;
     if (!maquinaForm.serie?.trim()) return toast.error("Número de serie requerido");
+    if ((maquinaForm.subgrupo ?? "OTRO") === "OTRO" && !maquinaForm.subgrupo_personalizado?.trim()) return toast.error("Escribí el nuevo subgrupo");
+    if (!maquinaForm.modelo_tipo?.trim()) return toast.error("Seleccioná o escribí el modelo");
     if (editMaquina) {
       const { error } = await supabase
         .from("parque_maquinas")
@@ -325,6 +329,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
           anio: maquinaForm.anio ?? null,
           marca: (maquinaForm.marca ?? "CLAAS") as Marca,
           subgrupo: (maquinaForm.subgrupo ?? "OTRO") as never,
+          subgrupo_personalizado: maquinaForm.subgrupo === "OTRO" ? maquinaForm.subgrupo_personalizado?.trim() || null : null,
           modelo_tipo: maquinaForm.modelo_tipo ?? null,
           serie: maquinaForm.serie!,
           sucursal: (maquinaForm.sucursal ?? null) as Sucursal | null,
@@ -340,6 +345,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         anio: maquinaForm.anio ?? null,
         marca: (maquinaForm.marca ?? "CLAAS") as Marca,
         subgrupo: (maquinaForm.subgrupo ?? "OTRO") as never,
+        subgrupo_personalizado: maquinaForm.subgrupo === "OTRO" ? maquinaForm.subgrupo_personalizado?.trim() || null : null,
         modelo_tipo: maquinaForm.modelo_tipo ?? null,
         serie: maquinaForm.serie!,
         sucursal: (maquinaForm.sucursal ?? cliente.sucursal ?? null) as Sucursal | null,
@@ -691,7 +697,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                 {m.marca}
                               </Badge>
                               <span className="text-[13px] font-medium">{m.anio ?? "—"}</span>
-                              <Badge variant="outline" className="text-[10px]">{m.subgrupo}</Badge>
+                              <Badge variant="outline" className="text-[10px]">{machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado)}</Badge>
                               {m.agregado_manualmente && <Badge variant="secondary" className="text-[9px]">Manual</Badge>}
                               {!m.activo && <Badge variant="destructive" className="text-[9px]">Inactiva</Badge>}
                             </div>
@@ -986,10 +992,11 @@ function MaquinaForm({
         </div>
         <div>
           <Label className="text-[11px]">Subgrupo</Label>
-          <Select value={form.subgrupo ?? "OTRO"} onValueChange={(v) => setForm({ ...form, subgrupo: v, modelo_tipo: null })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{MACHINE_SUBGROUPS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-          </Select>
+          <SubgrupoMaquinaSelect
+            value={form.subgrupo ?? "OTRO"}
+            customValue={form.subgrupo_personalizado}
+            onValueChange={(subgrupo, subgrupo_personalizado) => setForm({ ...form, subgrupo, subgrupo_personalizado, modelo_tipo: null })}
+          />
         </div>
         <div>
           <Label className="text-[11px]">Modelo</Label>

@@ -2635,6 +2635,7 @@ export type Database = {
           notas: string | null
           serie: string
           subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+          subgrupo_personalizado: string | null
           sucursal: Database["public"]["Enums"]["sucursal"] | null
           vendedor: string | null
         }
@@ -2652,6 +2653,7 @@ export type Database = {
           notas?: string | null
           serie: string
           subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          subgrupo_personalizado?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           vendedor?: string | null
         }
@@ -2669,6 +2671,7 @@ export type Database = {
           notas?: string | null
           serie?: string
           subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          subgrupo_personalizado?: string | null
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
           vendedor?: string | null
         }
@@ -5915,6 +5918,7 @@ export type Database = {
           p_notificacion_id: string
           p_serie: string
           p_subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+          p_subgrupo_personalizado?: string
           p_sucursal?: Database["public"]["Enums"]["sucursal"]
           p_vendedor?: string
         }

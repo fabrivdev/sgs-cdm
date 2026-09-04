@@ -31,7 +31,7 @@ import {
   calcularKpis,
   buildClientesConTrabajoAbierto,
 } from "@/lib/contacto-utils";
-import { MACHINE_SUBGROUPS } from "@/lib/machineModels";
+import { MACHINE_SUBGROUPS, machineSubgroupLabel } from "@/lib/machineModels";
 import { useAuth } from "@/hooks/useAuth";
 
 const MARCA_AMBAS = "ambas";
@@ -70,6 +70,7 @@ type Maquina = {
   anio: number | null;
   marca: Marca;
   subgrupo: string;
+  subgrupo_personalizado: string | null;
   activo: boolean;
   sucursal: Sucursal | null;
 };
@@ -243,7 +244,7 @@ export function ParqueTab({
     try {
       const { data: maquinasData, error: maquinasError } = await supabase
         .from("parque_maquinas")
-        .select("id, cliente_id, anio, marca, subgrupo, activo, sucursal")
+        .select("id, cliente_id, anio, marca, subgrupo, subgrupo_personalizado, activo, sucursal")
         .eq("activo", true);
 
       if (maquinasError) throw maquinasError;
@@ -472,6 +473,16 @@ export function ParqueTab({
     };
   }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro, factReloadKey]);
 
+  const subgrupoOptions = useMemo(() => {
+    const values = new Set<string>(MACHINE_SUBGROUPS.filter((subgrupo) => subgrupo !== "OTRO"));
+    for (const maquina of maquinas) {
+      values.add(machineSubgroupLabel(maquina.subgrupo, maquina.subgrupo_personalizado));
+    }
+    return Array.from(values)
+      .sort((a, b) => a.localeCompare(b, "es"))
+      .map((value) => ({ value, label: value === "OTRO" ? "OTRO (SIN ESPECIFICAR)" : value }));
+  }, [maquinas]);
+
   const rows: Row[] = useMemo(() => {
     const hoy = new Date();
 
@@ -485,8 +496,9 @@ export function ParqueTab({
     const maquinasByCliente = new Map<string, Maquina[]>();
     for (const mq of maquinas) {
       if (!mq.cliente_id) continue;
-      if (!incluirPlataformas && esPlataformaOCabezal(mq.subgrupo)) continue;
-      if (fSubgrupo !== "all" && mq.subgrupo !== fSubgrupo) continue;
+      const subgrupo = machineSubgroupLabel(mq.subgrupo, mq.subgrupo_personalizado);
+      if (!incluirPlataformas && esPlataformaOCabezal(subgrupo)) continue;
+      if (fSubgrupo !== "all" && subgrupo !== fSubgrupo) continue;
       const arr = maquinasByCliente.get(mq.cliente_id) ?? [];
       arr.push(mq);
       maquinasByCliente.set(mq.cliente_id, arr);
@@ -504,7 +516,7 @@ export function ParqueTab({
       const mqs = maquinasByCliente.get(cli.id) ?? [];
       const cantClaas = mqs.filter((m) => m.marca === "CLAAS").length;
       const cantHorsch = mqs.filter((m) => m.marca === "HORSCH").length;
-      const subgs = Array.from(new Set(mqs.map((m) => m.subgrupo))).sort();
+      const subgs = Array.from(new Set(mqs.map((m) => machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado)))).sort();
       const sucursales = Array.from(
         new Set(mqs.map((m) => m.sucursal).filter((s): s is Sucursal => !!s)),
       ).sort();
@@ -675,7 +687,7 @@ export function ParqueTab({
             />
             <FilterSelect
               label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-full"
-              options={[{ value: "all", label: "Todos" }, ...MACHINE_SUBGROUPS.map(s => ({ value: s, label: s }))]}
+              options={[{ value: "all", label: "Todos" }, ...subgrupoOptions]}
             />
             {rango === "custom" && (
               <>

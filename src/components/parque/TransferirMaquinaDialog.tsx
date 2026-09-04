@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
+import { machineSubgroupLabel } from "@/lib/machineModels";
 
 type ClienteSimple = ClientIdentityRow & { sourceIds: string[] };
 
@@ -29,6 +30,7 @@ export type MaquinaParaTransferir = {
   serie: string;
   anio: number | null;
   subgrupo: string;
+  subgrupo_personalizado: string | null;
   notas: string | null;
 };
 
@@ -137,7 +139,7 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Máquina</div>
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
                 <Badge className="text-[10px]">{maquina.marca}</Badge>
-                <Badge variant="outline" className="text-[10px]">{maquina.subgrupo}</Badge>
+                <Badge variant="outline" className="text-[10px]">{machineSubgroupLabel(maquina.subgrupo, maquina.subgrupo_personalizado)}</Badge>
                 {maquina.anio && <span className="text-[12px] text-muted-foreground">{maquina.anio}</span>}
               </div>
               <div className="text-[13px] font-medium">{maquina.modelo_tipo ?? "—"}</div>
