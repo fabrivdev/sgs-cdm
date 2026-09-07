@@ -1712,6 +1712,7 @@ export type Database = {
           costo_final_sin_iva: number | null
           creado_en: string
           detalle_manual: boolean
+          eliminada_manualmente: boolean
           estado_fuente: string | null
           eta: string | null
           factura_proveedor_fecha: string | null
@@ -1735,6 +1736,7 @@ export type Database = {
           costo_final_sin_iva?: number | null
           creado_en?: string
           detalle_manual?: boolean
+          eliminada_manualmente?: boolean
           estado_fuente?: string | null
           eta?: string | null
           factura_proveedor_fecha?: string | null
@@ -1758,6 +1760,7 @@ export type Database = {
           costo_final_sin_iva?: number | null
           creado_en?: string
           detalle_manual?: boolean
+          eliminada_manualmente?: boolean
           estado_fuente?: string | null
           eta?: string | null
           factura_proveedor_fecha?: string | null
@@ -5527,6 +5530,7 @@ export type Database = {
           condicion: string | null
           costo_producto: number | null
           disponibilidad_detalle: string | null
+          es_historico: boolean | null
           estado_disponibilidad: string | null
           estado_fuente: string | null
           estado_importacion_fuente: string | null
@@ -5541,6 +5545,7 @@ export type Database = {
           marca: string | null
           modelo: string | null
           moneda: string | null
+          moneda_valor: string | null
           np_fecha: string | null
           np_numero: string | null
           observaciones: string | null
@@ -5565,6 +5570,7 @@ export type Database = {
           condicion: string | null
           costo_producto: number | null
           disponibilidad_detalle: string | null
+          es_historico: boolean | null
           estado_disponibilidad: string | null
           estado_fuente: string | null
           estado_importacion_fuente: string | null
@@ -5578,6 +5584,7 @@ export type Database = {
           marca: string | null
           modelo: string | null
           moneda: string | null
+          moneda_valor: string | null
           np_fecha: string | null
           np_numero: string | null
           observaciones: string | null
