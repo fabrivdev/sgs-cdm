@@ -2,9 +2,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const DEFAULT_VISION_MODELS = ["qwen/qwen3.6-27b", "qwen/qwen3.8-27b"];
+type ExtractionIssueCode = "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT" | "INVALID_INPUT" | "CONFIG";
 
 class ExtractionError extends Error {
-  constructor(message: string, readonly status: number, readonly code: "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT") {
+  constructor(message: string, readonly status: number, readonly code: Exclude<ExtractionIssueCode, "INVALID_INPUT" | "CONFIG">) {
     super(message);
   }
 }
@@ -13,6 +14,14 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   status,
   headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
+
+// Provider availability and extraction quality are expected outcomes of this
+// optional helper, not application crashes. Returning them as a successful
+// function invocation lets the form show the message without Lovable's runtime
+// error overlay. Authentication and authorization failures above remain HTTP
+// errors because they represent an invalid caller.
+const extractionIssue = (error: string, code: ExtractionIssueCode, retryable: boolean) =>
+  json({ error, code, retryable });
 
 const NP_SCHEMA = `{
   "np_numero": "texto o null",
@@ -176,12 +185,12 @@ Deno.serve(async (req) => {
     const dataUrl = String(body?.dataUrl ?? "");
     const mimeType = String(body?.mimeType ?? "");
     if (!/^image\/(jpeg|png|webp)$/.test(mimeType) || !dataUrl.startsWith(`data:${mimeType};base64,`)) {
-      return json({ error: "Para la lectura automatica usa una foto JPG, PNG o WEBP nitida." }, 400);
+      return extractionIssue("Para la lectura automatica usa una foto JPG, PNG o WEBP nitida.", "INVALID_INPUT", false);
     }
-    if (dataUrl.length > 16_500_000) return json({ error: "La imagen supera el limite de 12 MB." }, 413);
+    if (dataUrl.length > 16_500_000) return extractionIssue("La imagen supera el limite de 12 MB.", "INVALID_INPUT", false);
 
     const apiKey = Deno.env.get("GROQ_API_KEY");
-    if (!apiKey) return json({ error: "La lectura automatica no esta configurada." }, 503);
+    if (!apiKey) return extractionIssue("La lectura automatica no esta configurada.", "CONFIG", false);
     const schema = documentType === "NP" ? NP_SCHEMA : INVOICE_SCHEMA;
     const purpose = documentType === "NP"
       ? "una nota de pedido (NP) de maquinaria agricola"
@@ -225,15 +234,15 @@ Deno.serve(async (req) => {
     console.error("[machine-document-extractor]", error);
     if (error instanceof ExtractionError) {
       if (error.code === "RATE_LIMIT") {
-        return json({ error: "La lectura automatica esta ocupada. Espera unos segundos e intenta de nuevo." }, 429);
+        return extractionIssue("Se alcanzo el limite temporal de lecturas. Espera unos segundos e intenta de nuevo.", error.code, true);
       }
       if (error.code === "AUTH") {
-        return json({ error: "El servicio de lectura no pudo autenticarse. Un administrador debe revisar la configuracion de GROQ_API_KEY en Supabase." }, error.status);
+        return extractionIssue("El servicio de lectura no pudo autenticarse. Un administrador debe revisar la configuracion de GROQ_API_KEY en Supabase.", error.code, false);
       }
       if (error.code === "PROVIDER") {
-        return json({ error: "El servicio de lectura no esta disponible en este momento. Reintenta en unos segundos o completa los campos manualmente." }, error.status);
+        return extractionIssue("El servicio de lectura no esta disponible en este momento. Reintenta en unos segundos o completa los campos manualmente.", error.code, true);
       }
-      return json({ error: "La imagen fue recibida, pero el lector no pudo estructurar los datos. Reintenta o completa los campos manualmente." }, error.status);
+      return extractionIssue("La imagen fue recibida, pero el lector no pudo estructurar los datos. Reintenta o completa los campos manualmente.", error.code, true);
     }
     return json({ error: "No se pudo procesar el documento. Podes continuar con carga manual." }, 500);
   }
