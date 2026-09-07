@@ -2063,9 +2063,11 @@ export type Database = {
           linea_numero: number
           marca: Database["public"]["Enums"]["marca"]
           modelo: string | null
+          moneda_acordada: string
           operacion_id: string
           producto: string | null
           subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+          valor_acordado_unitario: number | null
         }
         Insert: {
           abastecimiento?: string
@@ -2080,9 +2082,11 @@ export type Database = {
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
           modelo?: string | null
+          moneda_acordada?: string
           operacion_id: string
           producto?: string | null
           subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          valor_acordado_unitario?: number | null
         }
         Update: {
           abastecimiento?: string
@@ -2097,9 +2101,11 @@ export type Database = {
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
           modelo?: string | null
+          moneda_acordada?: string
           operacion_id?: string
           producto?: string | null
           subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
+          valor_acordado_unitario?: number | null
         }
         Relationships: [
           {
@@ -5442,11 +5448,16 @@ export type Database = {
           incluye_marca_admitida: boolean | null
           lineas: number | null
           marcas: string | null
+          moneda_valor: string | null
           np_fecha: string | null
           np_numero: string | null
           observaciones: string | null
           requiere_importacion: boolean | null
           unidades: number | null
+          unidades_facturadas: number | null
+          valor_acordado: number | null
+          valor_facturado: number | null
+          valor_venta: number | null
         }
         Relationships: [
           {
@@ -6006,6 +6017,10 @@ export type Database = {
         Args: { p_nombre: string }
         Returns: boolean
       }
+      maquinaria_conciliar_factura_venta: {
+        Args: { p_facturacion_linea_id: string }
+        Returns: string
+      }
       maquinaria_guardar_importacion: {
         Args: { p_datos: Json; p_importacion_id: string }
         Returns: string
@@ -6017,6 +6032,10 @@ export type Database = {
       maquinaria_importar_maestro_importaciones: {
         Args: { p_filas: Json }
         Returns: Json
+      }
+      maquinaria_intentar_autovinculo_historico: {
+        Args: { p_chasis: string }
+        Returns: boolean
       }
       maquinaria_marca_admitida: {
         Args: { p_marca: Database["public"]["Enums"]["marca"] }
@@ -6034,6 +6053,10 @@ export type Database = {
       maquinaria_registrar_operacion: {
         Args: { p_lineas: Json; p_operacion: Json }
         Returns: string
+      }
+      maquinaria_subgrupo_desde_producto: {
+        Args: { p_producto: string }
+        Returns: Database["public"]["Enums"]["subgrupo_maquina"]
       }
       maquinaria_vincular_importacion_historica: {
         Args: { p_importacion_id: string; p_unidad_id: string }
@@ -6232,6 +6255,10 @@ export type Database = {
       repuesto_hermanos: { Args: { p_producto_codigo: string }; Returns: Json }
       repuesto_ventas_historial: {
         Args: { p_producto_codigo: string }
+        Returns: Json
+      }
+      repuestos_actualizar_ventas_periodo: {
+        Args: { p_desde: string; p_hasta: string }
         Returns: Json
       }
       repuestos_aplicar_conversiones_unidad_historica: {

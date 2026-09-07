@@ -722,6 +722,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                     serie: m.serie,
                                     anio: m.anio,
                                     subgrupo: m.subgrupo,
+                                    subgrupo_personalizado: m.subgrupo_personalizado,
                                     notas: m.notas,
                                   })}
                                 >
