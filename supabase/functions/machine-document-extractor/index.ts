@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const DEFAULT_GEMINI_VISION_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const DEFAULT_GEMINI_VISION_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
 type ExtractionIssueCode = "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT" | "INVALID_INPUT" | "CONFIG";
 
 class ExtractionError extends Error {
@@ -101,71 +101,78 @@ async function requestDocumentExtraction(
   let invalidOutput = false;
 
   for (const model of models) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{
-          role: "user",
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType, data: base64Data } },
-          ],
-        }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          maxOutputTokens: 4096,
+    for (const jsonMode of [true, false]) {
+      const generationConfig: Record<string, unknown> = { maxOutputTokens: 4096 };
+      if (jsonMode) generationConfig.responseMimeType = "application/json";
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType, data: base64Data } },
+              ],
+            }],
+            generationConfig,
+          }),
         },
-      }),
-      },
-    );
-
-    if (!response.ok) {
-      const failureBody = await response.text();
-      lastFailure = { status: response.status, body: failureBody };
-      console.error(
-        "[machine-document-extractor] Gemini",
-        response.status,
-        model,
-        response.headers.get("retry-after"),
-        failureBody,
       );
-      if (response.status === 401 || response.status === 403) break;
-      continue;
-    }
 
-    const completion = await response.json();
-    const raw = completion?.candidates?.[0]?.content?.parts
-      ?.map((part: { text?: unknown }) => typeof part?.text === "string" ? part.text : "")
-      .join("")
-      .trim();
-    if (!raw) {
-      invalidOutput = true;
-      console.error(
-        "[machine-document-extractor] Empty Gemini response",
-        model,
-        completion?.candidates?.[0]?.finishReason,
-        completion?.promptFeedback,
-      );
-      continue;
-    }
+      if (!response.ok) {
+        const failureBody = await response.text();
+        lastFailure = { status: response.status, body: failureBody };
+        console.error(
+          "[machine-document-extractor] Gemini",
+          response.status,
+          model,
+          jsonMode ? "json" : "plain",
+          response.headers.get("retry-after"),
+          failureBody,
+        );
+        if (response.status === 401 || response.status === 403) break;
+        // A 400 can mean this model does not accept JSON mode. Retry the same
+        // request without that option; the prompt still requires valid JSON.
+        if (response.status === 400 && jsonMode) continue;
+        break;
+      }
 
-    try {
-      return { data: extractJson(raw), model };
-    } catch (parseError) {
-      invalidOutput = true;
-      console.error(
-        "[machine-document-extractor] Invalid Gemini JSON",
-        model,
-        completion?.candidates?.[0]?.finishReason,
-        parseError,
-      );
+      const completion = await response.json();
+      const raw = completion?.candidates?.[0]?.content?.parts
+        ?.map((part: { text?: unknown }) => typeof part?.text === "string" ? part.text : "")
+        .join("")
+        .trim();
+      if (!raw) {
+        invalidOutput = true;
+        console.error(
+          "[machine-document-extractor] Empty Gemini response",
+          model,
+          completion?.candidates?.[0]?.finishReason,
+          completion?.promptFeedback,
+        );
+        break;
+      }
+
+      try {
+        return { data: extractJson(raw), model };
+      } catch (parseError) {
+        invalidOutput = true;
+        console.error(
+          "[machine-document-extractor] Invalid Gemini JSON",
+          model,
+          completion?.candidates?.[0]?.finishReason,
+          parseError,
+        );
+        break;
+      }
     }
+    if (lastFailure?.status === 401 || lastFailure?.status === 403) break;
   }
 
   if (lastFailure?.status === 429) {
@@ -263,7 +270,9 @@ Deno.serve(async (req) => {
         return extractionIssue("El servicio de lectura no pudo autenticarse. Un administrador debe revisar la configuracion de GEMINI_API_KEY en Supabase.", error.code, false);
       }
       if (error.code === "PROVIDER") {
-        return extractionIssue("El servicio de lectura no esta disponible en este momento. Reintenta en unos segundos o completa los campos manualmente.", error.code, true);
+        const providerStatus = error.message.match(/\((\d{3})\)/)?.[1];
+        const diagnostic = providerStatus ? ` (Gemini respondio ${providerStatus})` : "";
+        return extractionIssue(`El servicio de lectura no esta disponible${diagnostic}. Reintenta o completa los campos manualmente.`, error.code, true);
       }
       return extractionIssue("La imagen fue recibida, pero el lector no pudo estructurar los datos. Reintenta o completa los campos manualmente.", error.code, true);
     }
