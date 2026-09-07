@@ -32,7 +32,7 @@ import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, Pro
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
-import { legacyMachineBrand, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
+import { legacyMachineBrand, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -946,7 +946,7 @@ export default function MaquinariaOperaciones() {
               <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
               <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{visibleMachineBrand(importRow.marca || importRow.proveedor)}</Badge>
+                <Badge variant="outline" style={machineBrandStyle(importRow.marca || importRow.proveedor)} className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{visibleMachineBrand(importRow.marca || importRow.proveedor)}</Badge>
                 <Badge variant="outline" className="text-[10px]">Unidad {importRow.numero_unidad}/{Math.max(1, Number(importRow.cantidad_lote) || 1)}</Badge>
                 {importRow.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(importRow.estado_disponibilidad)}>{AVAILABILITY_LABEL[importRow.estado_disponibilidad] ?? importRow.estado_disponibilidad}</Badge>}
               </div>
@@ -968,7 +968,7 @@ export default function MaquinariaOperaciones() {
             <div className="mt-2 text-[13px] font-medium">{row.modelo || row.producto || "Sin descripción"}</div>
             <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{orderRow.cliente_nombre || "Sin cliente"}</div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>
+              <Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>
               {orderRow.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(orderRow.condicion))}>{CONDITION_LABEL[orderRow.condicion] ?? orderRow.condicion}</Badge>}
               <span className="ml-auto text-[11px] font-medium tabular-nums">{formatUsd(orderRow.valor_venta)}</span>
             </div>
@@ -1022,7 +1022,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
         <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
         <TableCell className="max-w-[220px] truncate">{row.cliente_nombre}</TableCell>
         <TableCell className="max-w-[220px] truncate">{row.modelo || row.producto || "—"}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge></TableCell>
+        <TableCell><Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge></TableCell>
         <TableCell>{row.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(row.condicion))}>{CONDITION_LABEL[row.condicion] ?? row.condicion}</Badge>}</TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", supplyClass(row.abastecimiento))}>{SUPPLY_LABEL[row.abastecimiento ?? ""] ?? "Sin definir"}</Badge></TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
@@ -1056,7 +1056,7 @@ function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: I
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-semibold">{row.llave_interna || "—"}</TableCell>
         <TableCell className="font-mono font-medium">{row.oc || "—"}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca || row.proveedor))}>{visibleMachineBrand(row.marca || row.proveedor)}</Badge></TableCell>
+        <TableCell><Badge variant="outline" style={machineBrandStyle(row.marca || row.proveedor)} className={cn("text-[10px]", brandClass(row.marca || row.proveedor))}>{visibleMachineBrand(row.marca || row.proveedor)}</Badge></TableCell>
         <TableCell className="max-w-[200px] truncate">{row.producto || "—"}</TableCell>
         <TableCell className="max-w-[200px] truncate font-medium">{row.modelo || "—"}</TableCell>
         <TableCell className="whitespace-nowrap tabular-nums">{row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</TableCell>
@@ -1751,7 +1751,28 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
             const head = line.cabezal || extracted.cabezal;
             const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
             const brand = line.marca_nombre ?? line.marca;
-            return <EntityCard key={line.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(brand))}>{visibleMachineBrand(brand)}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 space-y-3 border-t pt-3">{lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div>}<OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && simpleState !== "CANCELADA"} onSaved={() => { detailQuery.refetch(); onChanged(); }} /></EntityCard>;
+            return (
+              <EntityCard key={line.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                    <Badge variant="outline" style={machineBrandStyle(brand)} className={cn("text-[10px]", brandClass(brand))}>{visibleMachineBrand(brand)}</Badge>
+                    <Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge>
+                  </div>
+                </div>
+                {lineUnits.length > 0 && (
+                  <div className="mt-3 space-y-3 border-t pt-3">
+                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
+                  </div>
+                )}
+                <OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && simpleState !== "CANCELADA"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />
+              </EntityCard>
+            );
           })}</div></DetailSection>
           {detail.observaciones && <DetailSection title="Observaciones"><div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div></DetailSection>}
         </TabsContent>

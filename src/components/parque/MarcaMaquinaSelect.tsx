@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -39,11 +39,6 @@ export function MarcaMaquinaSelect({
     if (normalizedValue && normalizedValue !== "OTROS") values.add(normalizedValue);
     return [...values].sort((a, b) => a.localeCompare(b, "es"));
   }, [data, normalizedValue]);
-
-  useEffect(() => {
-    if (!normalizedValue || normalizedValue === "OTROS") return;
-    setCustomMode(!brands.includes(normalizedValue));
-  }, [brands, normalizedValue]);
 
   if (customMode) {
     return (

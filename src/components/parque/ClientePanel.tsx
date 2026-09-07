@@ -53,7 +53,7 @@ import { machineSubgroupLabel } from "@/lib/machineModels";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
 import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
 import { MarcaMaquinaSelect } from "./MarcaMaquinaSelect";
-import { legacyMachineBrand, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
+import { legacyMachineBrand, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
 
 const RESULTADOS = [
   "Contactado",
@@ -700,7 +700,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge className={cn("text-[10px]", (m.marca_nombre || m.marca) === "CLAAS" ? "bg-emerald-600 text-white" : (m.marca_nombre || m.marca) === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
+                              <Badge style={machineBrandStyle(m.marca_nombre || m.marca)} className={cn("text-[10px]", (m.marca_nombre || m.marca) === "CLAAS" ? "bg-emerald-600 text-white" : (m.marca_nombre || m.marca) === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
                                 {visibleMachineBrand(m.marca_nombre || m.marca)}
                               </Badge>
                               <span className="text-[13px] font-medium">{m.anio ?? "—"}</span>

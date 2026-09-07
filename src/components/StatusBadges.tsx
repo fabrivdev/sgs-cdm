@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ESTADO_LABELS, type Estado } from "@/lib/constants";
-import { visibleMachineBrand } from "@/lib/machineBrands";
+import { machineBrandStyle, visibleMachineBrand } from "@/lib/machineBrands";
 import { ESTADOS_TRABAJO, type EstadoTrabajo } from "@/lib/trabajos";
 
 export function EstadoBadge({ estado, className }: { estado: Estado; className?: string }) {
@@ -19,7 +19,7 @@ export function MarcaBadge({ marca, className }: { marca: string; className?: st
     : marca === "HORSCH"
       ? "bg-marca-horsch-bg text-marca-horsch border-marca-horsch/30"
       : "bg-muted text-muted-foreground border-border";
-  return <Badge variant="outline" className={cn("font-medium tracking-wide", style, className)}>{visibleMachineBrand(marca)}</Badge>;
+  return <Badge variant="outline" style={machineBrandStyle(marca)} className={cn("font-medium tracking-wide", style, className)}>{visibleMachineBrand(marca)}</Badge>;
 }
 
 const TRABAJO_ESTADO_STYLES: Record<EstadoTrabajo, string> = {
