@@ -572,6 +572,14 @@ async function deleteMachineDocuments(filters: { operationId?: string; importLin
   paths.forEach((path: string) => machineDocumentCache.delete(path));
 }
 
+async function deleteStoredMachineFiles(paths: Array<string | null | undefined>) {
+  const uniquePaths = [...new Set(paths.filter((path): path is string => Boolean(path)))];
+  if (!uniquePaths.length) return;
+  const { error } = await supabase.storage.from("maquinaria-documentos").remove(uniquePaths);
+  if (error) console.warn("No se pudieron limpiar los archivos eliminados del almacenamiento", error);
+  uniquePaths.forEach((path) => machineDocumentCache.delete(path));
+}
+
 const MACHINE_DOCUMENT_EVENT = "sig:open-machine-document";
 type MachineDocumentRequest = { storagePath: string; fileName: string };
 type RenderedMachineDocument = { objectUrl: string; kind: "IMAGE" | "PDF" | "OTHER"; pages: string[] };
@@ -1253,6 +1261,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const [saving, setSaving] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [reversingReceipt, setReversingReceipt] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [uploadingOc, setUploadingOc] = useState(false);
   const [uploadingSupplierInvoice, setUploadingSupplierInvoice] = useState(false);
   const detailOcRef = useRef<HTMLInputElement>(null);
@@ -1333,6 +1342,23 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const supplierDocuments = detailSupplierInvoiceQuery.data ?? [];
   const ocDocument = (ocDocuments[0] ?? null) as StoredMachineDocument | null;
   const supplierDocument = (supplierDocuments[0] ?? null) as StoredMachineDocument | null;
+  const deleteImportUnit = async () => {
+    setDeleting(true);
+    try {
+      const { data, error } = await db.rpc("maquinaria_eliminar_unidad_importacion", { p_importacion_unidad_id: row.id });
+      if (error) throw error;
+      if (data?.linea_eliminada) {
+        await deleteStoredMachineFiles([ocDocument?.storage_path, supplierDocument?.storage_path]);
+      }
+      toast.success(data?.linea_eliminada ? "Línea de importación eliminada" : "Unidad de importación eliminada");
+      onOpenChange(false);
+      onSaved();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo eliminar la línea de importación");
+    } finally {
+      setDeleting(false);
+    }
+  };
   return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg">
     <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><p className="text-[11px] text-muted-foreground">{[row.producto, row.marca, `Unidad ${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`].filter(Boolean).join(" · ")}</p></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
@@ -1378,7 +1404,16 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
         </TabsContent>
       </Tabs>
     </ResponsiveDrawerBody>
-    {canEdit && <ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button></ResponsiveDrawerFooter>}
+    {canEdit && <ResponsiveDrawerFooter className="justify-between">
+      <AlertDialog>
+        <AlertDialogTrigger asChild><Button variant="destructive" size="sm" disabled={deleting}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Eliminar {Number(row.cantidad_lote) > 1 ? "unidad" : "línea"}</Button></AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>¿Eliminar esta {Number(row.cantidad_lote) > 1 ? "unidad" : "línea de importación"}?</AlertDialogTitle><AlertDialogDescription>{Number(row.cantidad_lote) > 1 ? `Se eliminará solamente la unidad ${row.numero_unidad} de ${row.cantidad_lote}; las demás seguirán en la importación.` : "Se eliminará la línea completa y sus documentos. Esta acción solo se permite si todavía no tiene factura, recepción, stock ni parque vinculados."}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={deleteImportUnit} disabled={deleting}>{deleting ? "Eliminando..." : "Eliminar"}</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button>
+    </ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
 }
 
@@ -1601,6 +1636,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const { isAdmin, roles } = useAuth();
   const canEditChasis = isAdmin || roles.includes("jefatura");
   const [activeTab, setActiveTab] = useState("resumen");
+  const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
   const detailQuery = useQuery({
     queryKey: ["machine-operation-detail", operationId], enabled: !!operationId,
     queryFn: async (): Promise<OperationDetail> => {
@@ -1717,6 +1753,27 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
   const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
   const saleInvoiceDocument = (saleInvoiceDocuments[0] ?? null) as StoredMachineDocument | null;
+  const deleteOrderLine = async (lineId: string) => {
+    setDeletingLineId(lineId);
+    try {
+      const documentPaths = detail?.docs.map((document: any) => document.storage_path) ?? [];
+      const { data, error } = await db.rpc("maquinaria_eliminar_linea_pedido", { p_linea_id: lineId });
+      if (error) throw error;
+      if (data?.pedido_eliminado) {
+        await deleteStoredMachineFiles(documentPaths);
+        toast.success("Pedido eliminado");
+        onOpenChange(false);
+      } else {
+        toast.success("Línea de pedido eliminada");
+        await detailQuery.refetch();
+      }
+      onChanged();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo eliminar la línea de pedido");
+    } finally {
+      setDeletingLineId(null);
+    }
+  };
   return <ResponsiveDrawer open={!!operationId} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
@@ -1763,6 +1820,13 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
                   <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                     <Badge variant="outline" style={machineBrandStyle(brand)} className={cn("text-[10px]", brandClass(brand))}>{visibleMachineBrand(brand)}</Badge>
                     <Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge>
+                    {canEditChasis && simpleState !== "CANCELADA" && <AlertDialog>
+                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" aria-label="Eliminar línea" disabled={deletingLineId === line.id}><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar {model || product || "esta línea"}?</AlertDialogTitle><AlertDialogDescription>{detail.lines.length === 1 ? "Es la única línea: también se eliminará el pedido completo y sus documentos. Solo se permite si todavía no tiene facturación, recepción, stock ni parque vinculados." : "Se eliminará esta línea y sus unidades. Las demás líneas del pedido se conservarán. Solo se permite si todavía no tiene trazabilidad confirmada."}</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteOrderLine(line.id)} disabled={deletingLineId === line.id}>{deletingLineId === line.id ? "Eliminando..." : "Eliminar"}</AlertDialogAction></AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>}
                   </div>
                 </div>
                 {lineUnits.length > 0 && (
