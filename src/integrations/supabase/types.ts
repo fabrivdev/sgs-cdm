@@ -6060,6 +6060,14 @@ export type Database = {
         Args: { p_facturacion_linea_id: string }
         Returns: string
       }
+      maquinaria_eliminar_linea_pedido: {
+        Args: { p_linea_id: string }
+        Returns: Json
+      }
+      maquinaria_eliminar_unidad_importacion: {
+        Args: { p_importacion_unidad_id: string }
+        Returns: Json
+      }
       maquinaria_guardar_importacion: {
         Args: { p_datos: Json; p_importacion_id: string }
         Returns: string
@@ -6080,6 +6088,10 @@ export type Database = {
         Args: { p_marca: Database["public"]["Enums"]["marca"] }
         Returns: boolean
       }
+      maquinaria_normalizar_marca: {
+        Args: { p_marca: string }
+        Returns: string
+      }
       maquinaria_parsear_fecha_pedido_legacy: {
         Args: { p_valor: string }
         Returns: string
@@ -6088,6 +6100,10 @@ export type Database = {
       maquinaria_recibir_unidad_importacion: {
         Args: { p_fecha: string; p_importacion_unidad_id: string }
         Returns: Json
+      }
+      maquinaria_registrar_marca_catalogo: {
+        Args: { p_marca: string }
+        Returns: string
       }
       maquinaria_registrar_operacion: {
         Args: { p_lineas: Json; p_operacion: Json }
