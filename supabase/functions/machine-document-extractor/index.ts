@@ -96,7 +96,7 @@ function geminiModelScore(model: string) {
   return score;
 }
 
-async function listAvailableGeminiModels(apiKey: string) {
+async function listAvailableGeminiModels(apiKey: string): Promise<string[]> {
   if (cachedGeminiModels?.length) return cachedGeminiModels;
   const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
     headers: { "x-goog-api-key": apiKey },
@@ -127,7 +127,7 @@ async function listAvailableGeminiModels(apiKey: string) {
     .sort((left: string, right: string) => geminiModelScore(right) - geminiModelScore(left))
     .slice(0, 4);
 
-  if (!cachedGeminiModels.length) {
+  if (!cachedGeminiModels?.length) {
     throw new ExtractionError("Gemini has no compatible generateContent model", 503, "PROVIDER");
   }
   console.info("[machine-document-extractor] Available Gemini models", cachedGeminiModels);
