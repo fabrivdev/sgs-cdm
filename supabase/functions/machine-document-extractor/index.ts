@@ -37,7 +37,7 @@ const NP_SCHEMA = `{
     "cantidad": 1,
     "condicion": "NUEVA | USADA",
     "abastecimiento": "DEFINIR | STOCK | IMPORTAR",
-    "subgrupo": "TRACTORES | COSECHADORAS | PICADORAS | SEMBRADORAS | PLATAFORMAS | PLATAFORMAS/CABEZALES | PULVERIZADORAS | OTRO",
+    "subgrupo": "TRACTORES | COSECHADORAS | PICADORAS | SEMBRADORAS | PLATAFORMAS/CABEZALES | PULVERIZADORAS | SUELO | OTRO",
     "chasis": []
   }],
   "confianza": {"global": 0.0, "campos_dudosos": []},
@@ -86,6 +86,46 @@ function extractJson(raw: string) {
   throw new Error("Model response contained incomplete JSON");
 }
 
+async function timedFetch(input: string, init: RequestInit = {}) {
+  try {
+    return await fetch(input, { ...init, signal: AbortSignal.timeout(25_000) });
+  } catch (error) {
+    if (error instanceof DOMException && ["TimeoutError", "AbortError"].includes(error.name)) {
+      throw new ExtractionError("Gemini request timed out", 503, "PROVIDER");
+    }
+    throw error;
+  }
+}
+
+function validateExtraction(data: unknown, documentType: "NP" | "FACTURA_IMPORTACION") {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new ExtractionError("Gemini returned an invalid object", 422, "INVALID_OUTPUT");
+  }
+  const value = data as Record<string, unknown>;
+  if (documentType === "NP") {
+    if (!Array.isArray(value.lineas)) {
+      throw new ExtractionError("Gemini response has no order lines", 422, "INVALID_OUTPUT");
+    }
+    const lines = value.lineas.filter((line) => {
+      if (!line || typeof line !== "object" || Array.isArray(line)) return false;
+      const item = line as Record<string, unknown>;
+      return [item.marca, item.producto, item.modelo].some((field) => typeof field === "string" && field.trim());
+    });
+    if (!lines.length) {
+      throw new ExtractionError("Gemini response has no usable order lines", 422, "INVALID_OUTPUT");
+    }
+    return { ...value, lineas: lines };
+  }
+  const hasInvoiceData = [value.factura_numero, value.np_numero, value.modelo]
+    .some((field) => typeof field === "string" && field.trim())
+    || (Array.isArray(value.chasis) && value.chasis.length > 0)
+    || (typeof value.valor_facturado === "number" && Number.isFinite(value.valor_facturado));
+  if (!hasInvoiceData) {
+    throw new ExtractionError("Gemini response has no usable invoice data", 422, "INVALID_OUTPUT");
+  }
+  return value;
+}
+
 function geminiModelScore(model: string) {
   let score = 0;
   if (/^gemini-\d+(?:\.\d+)?-flash$/.test(model)) score += 100;
@@ -98,7 +138,7 @@ function geminiModelScore(model: string) {
 
 async function listAvailableGeminiModels(apiKey: string): Promise<string[]> {
   if (cachedGeminiModels?.length) return cachedGeminiModels;
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+  const response = await timedFetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
     headers: { "x-goog-api-key": apiKey },
   });
   if (!response.ok) {
@@ -140,9 +180,9 @@ async function requestDocumentExtraction(
   dataUrl: string,
   mimeType: string,
 ) {
-  const configuredModel = Deno.env.get("GEMINI_VISION_MODEL")?.trim();
+  const configuredModel = Deno.env.get("GEMINI_VISION_MODEL")?.trim().replace(/^models\//, "");
   const availableModels = await listAvailableGeminiModels(apiKey);
-  const models = configuredModel && availableModels.includes(configuredModel)
+  const models = configuredModel
     ? [configuredModel, ...availableModels.filter((model) => model !== configuredModel)]
     : availableModels;
   const base64Data = dataUrl.slice(dataUrl.indexOf(",") + 1);
@@ -153,7 +193,7 @@ async function requestDocumentExtraction(
     for (const jsonMode of [true, false]) {
       const generationConfig: Record<string, unknown> = { maxOutputTokens: 4096 };
       if (jsonMode) generationConfig.responseMimeType = "application/json";
-      const response = await fetch(
+      const response = await timedFetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         {
           method: "POST",
@@ -302,14 +342,16 @@ Deno.serve(async (req) => {
       `La condicion USADA solo se marca si la maquina de esa linea se describe explicitamente como usada. ` +
       `No marques como USADA la maquina ofertada por una mencion separada de toma, permuta o entrega de otra maquina usada; ` +
       `si la condicion de la maquina listada no aparece, usa NUEVA para que quede pendiente de revision manual. ` +
-      `El abastecimiento solo es STOCK o IMPORTAR cuando hay evidencia explicita; en caso contrario usa DEFINIR.\n` +
+      `El abastecimiento solo es STOCK o IMPORTAR cuando hay evidencia explicita; en caso contrario usa DEFINIR. ` +
+      `Clasifica C - Picadora como PLATAFORMAS/CABEZALES, M - Picadora como PICADORAS y Direct Disc como PLATAFORMAS/CABEZALES.\n` +
       `Las marcas no estan limitadas a un listado cerrado.\n` +
       `En facturas busca especialmente chasis, numero de factura y valor total facturado. ` +
-      `Se conciso: observaciones maximo 120 caracteres y no agregues explicaciones.\n` +
+      `En observaciones conserva condiciones comerciales, cuotas, fechas, anticipos, permutas y garantias visibles; no agregues explicaciones.\n` +
       `Responde exclusivamente JSON valido con esta forma:\n${schema}`;
 
     const extraction = await requestDocumentExtraction(apiKey, prompt, dataUrl, mimeType);
-    return json({ data: extraction.data, documentType, model: extraction.model });
+    const validated = validateExtraction(extraction.data, documentType);
+    return json({ data: validated, documentType, model: extraction.model });
   } catch (error) {
     console.error("[machine-document-extractor]", error);
     if (error instanceof ExtractionError) {

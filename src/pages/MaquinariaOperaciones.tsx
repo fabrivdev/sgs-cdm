@@ -70,6 +70,20 @@ const formatMoney = (value: unknown, currency = "USD") => {
   }
 };
 
+type MoneyTotals = Record<string, number>;
+const addMoney = (totals: MoneyTotals, value: unknown, currency?: string | null) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return totals;
+  const key = String(currency || "USD").trim().toUpperCase() || "USD";
+  totals[key] = (totals[key] ?? 0) + number;
+  return totals;
+};
+const formatMoneyTotals = (totals: MoneyTotals) => {
+  const entries = Object.entries(totals).filter(([, value]) => value !== 0);
+  if (!entries.length) return "Sin valores";
+  return entries.map(([currency, value]) => formatMoney(value, currency)).join(" · ");
+};
+
 const brandClass = (marca: string | null) => {
   const normalized = (marca ?? "").trim().toUpperCase();
   if (normalized === "CLAAS") return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
@@ -163,9 +177,11 @@ function entregaStateFromUnit(
   marca: string | null | undefined,
   operacionEstado: string | null | undefined,
   stockChasisSet: Set<string> | undefined,
+  esHistorico = false,
 ): EntregaState {
   if (unitEstado === "EN_PARQUE" || unitEstado === "TRANSFERIDA") return "ENTREGADO";
   if (unitEstado === "CANCELADA") return "CANCELADA";
+  if (operacionEstado === "CERRADA" || (operacionEstado === "FACTURADA" && esHistorico)) return "ENTREGADO";
   const esParqueEligible = Boolean(normalizeMachineBrand(marca) && normalizeMachineBrand(marca) !== "OTROS");
   if (!esParqueEligible && (operacionEstado === "FACTURADA" || operacionEstado === "CERRADA")) return "ENTREGADO";
   const normalizado = normalizarChasis(unitChasis);
@@ -228,7 +244,8 @@ type OrderRow = {
   condicion: string | null; abastecimiento: string | null; estado_fuente: string | null; estado_operacion: string | null; chasis: string | null;
   estado_disponibilidad: string | null; disponibilidad_detalle: string | null; estado_importacion_fuente: string | null;
   eta: string | null; ata: string | null; proveedor: string | null; factura_venta: string | null; factura_fecha: string | null;
-  costo_producto: number | null; valor_venta: number | null; observaciones: string | null; actualizado_en: string;
+  costo_producto: number | null; valor_venta: number | null; moneda_valor: string | null; observaciones: string | null; actualizado_en: string;
+  es_historico: boolean;
 };
 type ImportRow = {
   id: string; importacion_linea_id: string; numero_unidad: number; cantidad_lote: number | null;
@@ -572,6 +589,43 @@ async function deleteMachineDocuments(filters: { operationId?: string; importLin
   paths.forEach((path: string) => machineDocumentCache.delete(path));
 }
 
+function mergeExtractedLines(existing: DraftLine[], proposed: DraftLine[]) {
+  const used = new Set<number>();
+  const key = (value: unknown) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+  const merged = proposed.map((line, index) => {
+    let existingIndex = -1;
+    if (proposed.length === existing.length && existing[index]) {
+      existingIndex = index;
+    } else {
+      let bestScore = 0;
+      existing.forEach((candidate, candidateIndex) => {
+        if (used.has(candidateIndex)) return;
+        const modelMatch = key(line.modelo) && key(line.modelo) === key(candidate.modelo);
+        const productMatch = key(line.producto) && key(line.producto) === key(candidate.producto);
+        const score = (modelMatch ? 100 : 0) + (productMatch ? 30 : 0)
+          + (key(line.marca) === key(candidate.marca) ? 10 : 0)
+          + (key(line.subgrupo) === key(candidate.subgrupo) ? 10 : 0);
+        if (score > bestScore) { bestScore = score; existingIndex = candidateIndex; }
+      });
+      if (bestScore < 40) existingIndex = -1;
+    }
+    const current = existingIndex >= 0 ? existing[existingIndex] : undefined;
+    if (!current) return line;
+    used.add(existingIndex);
+    return {
+      ...line,
+      id: current.id,
+      marca: line.marca || current.marca,
+      producto: line.producto || current.producto,
+      modelo: line.modelo || current.modelo,
+      anio: line.anio ?? current.anio,
+      subgrupo: line.subgrupo === "OTRO" && current.subgrupo !== "OTRO" ? current.subgrupo : line.subgrupo,
+      chasis: current.chasis,
+    };
+  });
+  return [...merged, ...existing.filter((_, index) => !used.has(index))].map((line, index) => ({ ...line, linea_numero: index + 1 }));
+}
+
 async function deleteStoredMachineFiles(paths: Array<string | null | undefined>) {
   const uniquePaths = [...new Set(paths.filter((path): path is string => Boolean(path)))];
   if (!uniquePaths.length) return;
@@ -718,9 +772,14 @@ export default function MaquinariaOperaciones() {
     queryFn: async () => {
       const table = importsView ? "maquinaria_importacion_unidades_operativas" : "maquinaria_pedidos_lineas_estado_actual";
       const orderColumn = importsView ? "eta" : "np_fecha";
-      const { data, error } = await db.from(table).select("*").order(orderColumn, { ascending: false, nullsFirst: false }).limit(1000);
-      if (error) throw error;
-      return (data ?? []) as (OrderRow | ImportRow)[];
+      const all: (OrderRow | ImportRow)[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await db.from(table).select("*").order(orderColumn, { ascending: false, nullsFirst: false }).range(from, from + 999);
+        if (error) throw error;
+        all.push(...((data ?? []) as (OrderRow | ImportRow)[]));
+        if (!data || data.length < 1000) break;
+      }
+      return all;
     },
   });
 
@@ -812,7 +871,7 @@ export default function MaquinariaOperaciones() {
       if (orderState !== "TODOS" && orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado) !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
       const unit = entregaByUnitId?.get(orderRow.id);
-      if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet) !== entrega) return false;
+      if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet, orderRow.es_historico) !== entrega) return false;
     }
     if (marca !== "TODOS" && row.marca !== marca) return false;
     const q = search.trim().toUpperCase();
@@ -832,10 +891,10 @@ export default function MaquinariaOperaciones() {
       total: orderRows.length,
       pendientes: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE").length,
       facturados: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "COMPLETADO").length,
-      valorPedidos: orderRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0), 0),
-      valorPendiente: orderRows.reduce((sum, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE"
-        ? sum + (Number.isFinite(Number(row.valor_venta)) ? Number(row.valor_venta) : 0)
-        : sum, 0),
+      valorPedidos: orderRows.reduce((totals, row) => addMoney(totals, row.valor_venta, row.moneda_valor), {} as MoneyTotals),
+      valorPendiente: orderRows.reduce((totals, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE"
+        ? addMoney(totals, row.valor_venta, row.moneda_valor)
+        : totals, {} as MoneyTotals),
     };
   }, [rows, entregaByUnitId]);
   const importTotals = useMemo(() => {
@@ -869,9 +928,9 @@ export default function MaquinariaOperaciones() {
         <KpiItem label="Líneas pendientes" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
         <KpiItem label="Líneas facturadas" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
         <KpiItem
-          label="Valor de pedidos (USD)"
-          value={formatUsd(orderTotals.valorPedidos)}
-          detail={`Pendiente: ${formatUsd(orderTotals.valorPendiente)}`}
+          label="Valor de pedidos"
+          value={formatMoneyTotals(orderTotals.valorPedidos)}
+          detail={`Pendiente: ${formatMoneyTotals(orderTotals.valorPendiente)}`}
         />
       </KpiStrip>
     )}
@@ -964,7 +1023,7 @@ export default function MaquinariaOperaciones() {
           const orderRow = row as OrderRow;
           const orderUnit = entregaByUnitId?.get(orderRow.id);
           const state = orderBillingState(orderRow, orderUnit?.estado);
-          const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet);
+          const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet, orderRow.es_historico);
           return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
             <div className="flex items-start justify-between gap-2">
               <span className="font-mono text-[12px] font-semibold">{formatNpCode(row.np_numero)}</span>
@@ -978,7 +1037,7 @@ export default function MaquinariaOperaciones() {
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>
               {orderRow.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(orderRow.condicion))}>{CONDITION_LABEL[orderRow.condicion] ?? orderRow.condicion}</Badge>}
-              <span className="ml-auto text-[11px] font-medium tabular-nums">{formatUsd(orderRow.valor_venta)}</span>
+              <span className="ml-auto text-[11px] font-medium tabular-nums">{formatMoney(orderRow.valor_venta, orderRow.moneda_valor || "USD")}</span>
             </div>
           </button>;
         })}</div>
@@ -1018,13 +1077,13 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
       <TableHead>Origen</TableHead>
       <TableHead>Facturación</TableHead>
       <TableHead>Entrega</TableHead>
-      <TableHead className="text-right">Valor (USD)</TableHead>
+      <TableHead className="text-right">Valor</TableHead>
       <TableHead className="w-[40px]" />
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {
       const unit = entregaByUnitId?.get(row.id);
       const state = orderBillingState(row, unit?.estado);
-      const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet);
+      const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet, row.es_historico);
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
@@ -1035,7 +1094,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
         <TableCell><Badge variant="outline" className={cn("text-[10px]", supplyClass(row.abastecimiento))}>{SUPPLY_LABEL[row.abastecimiento ?? ""] ?? "Sin definir"}</Badge></TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
         <TableCell>{entregaState ? <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
-        <TableCell className="text-right tabular-nums">{formatUsd(row.valor_venta)}</TableCell>
+        <TableCell className="text-right tabular-nums">{formatMoney(row.valor_venta, row.moneda_valor || "USD")}</TableCell>
         <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
       </TableRow>;
     })}</TableBody>
@@ -1488,7 +1547,8 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         observaciones: safeExtractedText(data.observaciones) || old.observaciones,
       }));
       if (Array.isArray(data.lineas) && data.lineas.length) {
-        setLines(extractedLinesToDraft(data.lineas, data.confianza ?? {}));
+        const proposedLines = extractedLinesToDraft(data.lineas, data.confianza ?? {});
+        setLines((current) => operationId ? mergeExtractedLines(current, proposedLines) : proposedLines);
       }
       toast.success("Lectura terminada. Revisá los datos antes de guardar.");
     } catch (error: any) {
@@ -1536,8 +1596,9 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         {previewUrl && <Button type="button" variant="outline" size="sm" onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><Eye className="mr-1.5 h-3.5 w-3.5" />Ver documento</Button>}
       </div>
       {extractionError && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div className="min-w-0 flex-1"><p>{extractionError}</p><p className="mt-0.5 text-amber-700">La foto sigue seleccionada. Podés reintentar o completar los campos manualmente.</p></div>{file && <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-amber-300 bg-white px-2 text-[11px]" disabled={reading} onClick={() => chooseFile(file)}><RotateCcw className="mr-1 h-3 w-3" />Reintentar</Button>}</div>}
+      {!extractionError && Array.isArray(extracted?.confianza?.campos_dudosos) && extracted.confianza.campos_dudosos.length > 0 && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div><p className="font-medium">Revisá estos datos antes de guardar</p><p className="mt-0.5">{extracted.confianza.campos_dudosos.map(String).join(" · ")}</p></div></div>}
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
-      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca, modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => v !== "SUELO")} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div></div>)}</div>
+      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca, modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div></div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>
@@ -1714,19 +1775,39 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     return [...found.values()];
   }, [detail]);
   const detailStockChassis = new Set<string>((detail?.stock ?? []).map((stockRow: StockAssignmentRow) => normalizarChasis(stockRow.chasis)).filter(Boolean));
+  const isConcludedHistorical = Boolean(detail && (
+    detail.estado === "CERRADA"
+    || (detail.estado === "FACTURADA" && detail.lines.length > 0 && detail.lines.every((line: any) => Boolean(line.datos_extraidos?.historico_pedido)))
+  ));
   const deliveryComplete = Boolean(detail?.units.length) && detail!.units.every((unit: any) => {
     const line = detail!.lines.find((candidate: any) => candidate.id === unit.linea_id);
-    return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail!.estado, detailStockChassis) === "ENTREGADO";
+    return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail!.estado, detailStockChassis, isConcludedHistorical) === "ENTREGADO";
   });
   const deliveredUnitsCount = detail?.units.filter((unit: any) => {
     const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
-    return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail.estado, detailStockChassis) === "ENTREGADO";
+    return entregaStateFromUnit(unit.estado, unit.chasis, line?.marca, detail.estado, detailStockChassis, isConcludedHistorical) === "ENTREGADO";
   }).length ?? 0;
   const deliveryLabel = deliveryComplete ? "Entregado" : "Entrega pendiente";
   const billedUnitsCount = Number(detail?.unidades_facturadas ?? 0);
   const valueSummaryLabel = billedUnitsCount > 0 && billedUnitsCount >= Number(detail?.unidades ?? 0)
     ? "Valor facturado"
     : billedUnitsCount > 0 ? "Valor vigente" : "Valor acordado";
+  const detailValueTotals = useMemo(() => {
+    if (!detail) return {} as MoneyTotals;
+    return detail.lines.reduce((totals: MoneyTotals, line: any) => {
+      const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
+      const billed = lineUnits.filter((unit: any) => unit.valor_facturado != null);
+      billed.forEach((unit: any) => addMoney(totals, unit.valor_facturado, unit.moneda || line.moneda_acordada));
+      const remaining = Math.max((Number(line.cantidad) || lineUnits.length || 1) - billed.length, 0);
+      if (remaining > 0 && line.valor_acordado_unitario != null) {
+        addMoney(totals, Number(line.valor_acordado_unitario) * remaining, line.moneda_acordada);
+      } else if (!billed.length) {
+        const historical = line.datos_extraidos?.historico_pedido ?? {};
+        addMoney(totals, historical.valor_factura ?? historical.valor_venta, historical.moneda);
+      }
+      return totals;
+    }, {} as MoneyTotals);
+  }, [detail]);
   const unitBillingCount = detail?.units.filter((unit: any) => unit.valor_facturado != null || ["FACTURADA", "EN_PARQUE", "TRANSFERIDA"].includes(unit.estado)).length ?? 0;
   const missingOriginCount = detail?.units.filter((unit: any) => {
     const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
@@ -1798,7 +1879,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
             <DetailValue label="Fecha NP" value={formatDate(detail.np_fecha)} />
             <DetailValue label="Comercial" value={detail.comercial} />
             <DetailValue label="Unidades" value={detail.unidades} />
-            {detail.lines.length > 1 && <DetailValue label={valueSummaryLabel} value={detail.valor_venta == null ? "Sin cargar" : formatMoney(detail.valor_venta, detail.moneda_valor || "USD")} />}
+            {detail.lines.length > 1 && <DetailValue label={valueSummaryLabel} value={formatMoneyTotals(detailValueTotals)} />}
           </KeyValueGrid>
           <DetailSection title="Máquinas"><div className="space-y-2">{detail.lines.map((line: any) => {
             const extracted = line.datos_extraidos ?? {};
@@ -1820,7 +1901,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
                   <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                     <Badge variant="outline" style={machineBrandStyle(brand)} className={cn("text-[10px]", brandClass(brand))}>{visibleMachineBrand(brand)}</Badge>
                     <Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge>
-                    {canEditChasis && simpleState !== "CANCELADA" && <AlertDialog>
+                    {canEditChasis && !["CANCELADA", "CERRADA"].includes(detail.estado) && !isConcludedHistorical && <AlertDialog>
                       <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" aria-label="Eliminar línea" disabled={deletingLineId === line.id}><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader><AlertDialogTitle>¿Eliminar {model || product || "esta línea"}?</AlertDialogTitle><AlertDialogDescription>{detail.lines.length === 1 ? "Es la única línea: también se eliminará el pedido completo y sus documentos. Solo se permite si todavía no tiene facturación, recepción, stock ni parque vinculados." : "Se eliminará esta línea y sus unidades. Las demás líneas del pedido se conservarán. Solo se permite si todavía no tiene trazabilidad confirmada."}</AlertDialogDescription></AlertDialogHeader>
@@ -1831,10 +1912,10 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
                 </div>
                 {lineUnits.length > 0 && (
                   <div className="mt-3 space-y-3 border-t pt-3">
-                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
+                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
                   </div>
                 )}
-                <OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && simpleState !== "CANCELADA"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />
+                <OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && !["CANCELADA", "CERRADA"].includes(detail.estado) && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />
               </EntityCard>
             );
           })}</div></DetailSection>
@@ -1844,7 +1925,9 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         <TabsContent value="trazabilidad" className="space-y-5">
           <DetailSection title="Facturación">{invoices.length ? <div className="divide-y">{invoices.map((invoice, index) => <KeyValueGrid key={`${invoice.numero}-${invoice.fecha}-${index}`} className="py-3 first:pt-0"><KeyValueItem label="Valor facturado" value={formatMoney(invoice.valor, invoice.moneda)} empty="No informado" /><KeyValueItem label="Número" value={invoice.numero} empty="No informado" mono /><KeyValueItem label="Fecha" value={invoice.fecha ? formatDate(invoice.fecha) : null} empty="No informada" /></KeyValueGrid>)}</div> : <div className="rounded-lg bg-muted/40 px-3 py-3 text-[11px] text-muted-foreground">Todavía no hay una factura confirmada para este pedido.</div>}</DetailSection>
           <DetailSection title="Origen de las máquinas" className="border-t pt-4">
-            <div className="space-y-3">{canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}</div>
+            <div className="space-y-3">{isConcludedHistorical
+              ? detail.units.map((unit: any) => <ClosedHistoricalOrigin key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} />)
+              : canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}</div>
           </DetailSection>
         </TabsContent>
 
@@ -1856,7 +1939,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsContent>
       </Tabs>}
     </ResponsiveDrawerBody>
-    {detail && canEditChasis && operationId && <ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button></ResponsiveDrawerFooter>}
+    {detail && canEditChasis && operationId && !isConcludedHistorical && detail.estado !== "CANCELADA" && <ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button></ResponsiveDrawerFooter>}
   </ResponsiveDrawer>;
 }
 
@@ -1879,6 +1962,18 @@ function UnitAssignment({ unit, line, stock, imports, suggestions, historical, o
     return <UnitStockAssignment unit={unit} line={line} stock={stock} suggestion={suggestions.find((item) => item.tipo === "STOCK")} onSaved={onSaved} />;
   }
   return <UnitSupplyDefinition unit={unit} line={line} onSaved={onSaved} />;
+}
+
+function ClosedHistoricalOrigin({ unit, line, stock, imports }: { unit: any; line: any; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[] }) {
+  const linkedStock = stock.find((row) => row.unidad_operacion_id === unit.id);
+  const linkedImport = imports.find((row) => row.unidad_id === unit.id);
+  return <div className="rounded-xl border p-3">
+    <div className="text-[12px] font-medium">{line?.modelo || line?.producto || "Unidad"} · #{unit.numero_unidad}</div>
+    <div className="mt-0.5 text-[10px] text-muted-foreground">Ch. {unit.chasis || "sin registrar"} · Pedido concluido</div>
+    {linkedImport ? <KeyValueGrid className="mt-3 border-t pt-3"><DetailValue label="Origen histórico" value="Importación" /><DetailValue label="Proveedor" value={linkedImport.proveedor} /><DetailValue label="OC" value={linkedImport.oc} mono /><DetailValue label="Arribo" value={formatDate(linkedImport.ata)} /></KeyValueGrid>
+      : linkedStock ? <KeyValueGrid className="mt-3 border-t pt-3"><DetailValue label="Origen histórico" value="Stock" /><DetailValue label="Ubicación" value={[linkedStock.sucursal, linkedStock.deposito].filter(Boolean).join(" · ")} /><DetailValue label="Chasis" value={linkedStock.chasis} mono /></KeyValueGrid>
+        : <div className="mt-3 rounded-lg bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">Origen no registrado en el histórico · Sin acciones pendientes</div>}
+  </div>;
 }
 
 function UnitHistoricalAssignment({ unit, line, stock, imports, onSaved }: { unit: any; line: any; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; onSaved: () => void }) {
