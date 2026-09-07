@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const DEFAULT_GEMINI_VISION_MODEL = "gemini-3.7-flash";
+const DEFAULT_GEMINI_VISION_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 type ExtractionIssueCode = "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT" | "INVALID_INPUT" | "CONFIG";
 
 class ExtractionError extends Error {
@@ -92,11 +92,18 @@ async function requestDocumentExtraction(
   dataUrl: string,
   mimeType: string,
 ) {
-  const model = Deno.env.get("GEMINI_VISION_MODEL")?.trim() || DEFAULT_GEMINI_VISION_MODEL;
+  const configuredModel = Deno.env.get("GEMINI_VISION_MODEL")?.trim();
+  const models = configuredModel
+    ? [configuredModel, ...DEFAULT_GEMINI_VISION_MODELS.filter((model) => model !== configuredModel)]
+    : DEFAULT_GEMINI_VISION_MODELS;
   const base64Data = dataUrl.slice(dataUrl.indexOf(",") + 1);
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
+  let lastFailure: { status: number; body: string } | undefined;
+  let invalidOutput = false;
+
+  for (const model of models) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -113,56 +120,67 @@ async function requestDocumentExtraction(
         generationConfig: {
           responseMimeType: "application/json",
           maxOutputTokens: 4096,
-          thinkingConfig: { thinkingLevel: "low" },
         },
       }),
-    },
-  );
-
-  if (!response.ok) {
-    const failureBody = await response.text();
-    console.error(
-      "[machine-document-extractor] Gemini",
-      response.status,
-      model,
-      response.headers.get("retry-after"),
-      failureBody,
+      },
     );
-    if (response.status === 429) {
-      throw new ExtractionError("Gemini rate limit", 429, "RATE_LIMIT");
+
+    if (!response.ok) {
+      const failureBody = await response.text();
+      lastFailure = { status: response.status, body: failureBody };
+      console.error(
+        "[machine-document-extractor] Gemini",
+        response.status,
+        model,
+        response.headers.get("retry-after"),
+        failureBody,
+      );
+      if (response.status === 401 || response.status === 403) break;
+      continue;
     }
-    if (response.status === 401 || response.status === 403) {
-      throw new ExtractionError("Gemini authentication failed", 503, "AUTH");
+
+    const completion = await response.json();
+    const raw = completion?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: unknown }) => typeof part?.text === "string" ? part.text : "")
+      .join("")
+      .trim();
+    if (!raw) {
+      invalidOutput = true;
+      console.error(
+        "[machine-document-extractor] Empty Gemini response",
+        model,
+        completion?.candidates?.[0]?.finishReason,
+        completion?.promptFeedback,
+      );
+      continue;
     }
-    throw new ExtractionError(`Gemini request failed (${response.status})`, 503, "PROVIDER");
+
+    try {
+      return { data: extractJson(raw), model };
+    } catch (parseError) {
+      invalidOutput = true;
+      console.error(
+        "[machine-document-extractor] Invalid Gemini JSON",
+        model,
+        completion?.candidates?.[0]?.finishReason,
+        parseError,
+      );
+    }
   }
 
-  const completion = await response.json();
-  const raw = completion?.candidates?.[0]?.content?.parts
-    ?.map((part: { text?: unknown }) => typeof part?.text === "string" ? part.text : "")
-    .join("")
-    .trim();
-  if (!raw) {
-    console.error(
-      "[machine-document-extractor] Empty Gemini response",
-      model,
-      completion?.candidates?.[0]?.finishReason,
-      completion?.promptFeedback,
-    );
-    throw new ExtractionError("Gemini returned an empty response", 422, "INVALID_OUTPUT");
+  if (lastFailure?.status === 429) {
+    throw new ExtractionError("Gemini rate limit", 429, "RATE_LIMIT");
   }
-
-  try {
-    return { data: extractJson(raw), model };
-  } catch (parseError) {
-    console.error(
-      "[machine-document-extractor] Invalid Gemini JSON",
-      model,
-      completion?.candidates?.[0]?.finishReason,
-      parseError,
-    );
+  if (lastFailure?.status === 401 || lastFailure?.status === 403) {
+    throw new ExtractionError("Gemini authentication failed", 503, "AUTH");
+  }
+  if (lastFailure) {
+    throw new ExtractionError(`Gemini request failed (${lastFailure.status})`, 503, "PROVIDER");
+  }
+  if (invalidOutput) {
     throw new ExtractionError("Gemini returned invalid structured output", 422, "INVALID_OUTPUT");
   }
+  throw new ExtractionError("Gemini document extraction failed", 503, "PROVIDER");
 }
 
 Deno.serve(async (req) => {
