@@ -28,6 +28,10 @@ import {
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
 import { MarcaMaquinaSelect } from "@/components/parque/MarcaMaquinaSelect";
+import { MachineCatalogLineReview } from "@/components/parque/MachineCatalogLineReview";
+import { useMachineCatalog } from "@/hooks/useMachineCatalog";
+import { cargarTodo } from "@/hooks/useCatalogos";
+import { catalogLineKey, exactCatalogName, normalizeNpCode, reconcileCatalogLine, reviewCatalogLine, upperMachineText, validMachineDate } from "@/lib/machineOrderValidation";
 import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
@@ -161,8 +165,7 @@ const normalizarChasis = (value: string | null | undefined) => String(value ?? "
 const formatNpCode = (value: string | null | undefined) => {
   const raw = String(value ?? "").trim();
   if (!raw) return "Sin NP";
-  const code = raw.replace(/^(?:NP[\s._-]*)+/i, "").trim();
-  return code ? `NP${code}` : "NP";
+  return normalizeNpCode(raw) ?? raw.toUpperCase();
 };
 
 // Las líneas históricas que todavía no tienen una marca identificada no
@@ -261,6 +264,7 @@ type ImportRow = {
 };
 type DraftLine = {
   id?: string;
+  catalogConfirmed?: string;
   linea_numero: number; marca: string; producto: string; modelo: string;
   anio?: number | null; cabezal?: string;
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
@@ -317,7 +321,7 @@ type LinkSuggestionRow = {
 type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; valor_acordado?: number | null; valor_facturado?: number | null; moneda_valor?: string | null; unidades_facturadas?: number; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; suggestions: LinkSuggestionRow[]; docs: any[]; importation?: any };
 
 const blankLine = (n = 1): DraftLine => ({
-  linea_numero: n, marca: "CLAAS", producto: "", modelo: "", cantidad: 1,
+  linea_numero: n, marca: "", producto: "", modelo: "", cantidad: 1,
   anio: null, cabezal: "", condicion: "NUEVA", abastecimiento: "DEFINIR", subgrupo: "OTRO", chasis: [],
 });
 const blankImport = (): ImportDraft => ({
@@ -365,15 +369,15 @@ function safeExtractedDate(value: unknown) {
 }
 
 function safeExtractedText(value: unknown) {
-  const normalized = String(value ?? "").trim();
-  return normalized && normalized.toLowerCase() !== "null" ? normalized : "";
+  const normalized = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+  return normalized && normalized.toLowerCase() !== "null" ? upperMachineText(normalized) : "";
 }
 
 function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, unknown> = {}) {
   const result: DraftLine[] = [];
   rawLines.forEach((raw) => {
     const line = (raw ?? {}) as Record<string, any>;
-    const quantity = Math.max(1, Number(line.cantidad) || 1);
+    const quantity = line.cantidad == null ? 1 : Number(line.cantidad);
     const condition: DraftLine["condicion"] = line.condicion === "USADA" ? "USADA" : "NUEVA";
     const supply: DraftLine["abastecimiento"] = line.abastecimiento === "STOCK" || line.abastecimiento === "IMPORTAR"
       ? line.abastecimiento
@@ -392,7 +396,7 @@ function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, u
       condicion: condition,
       abastecimiento: supply,
       subgrupo: safeSubgroup(line.subgrupo),
-      chasis: Array.isArray(line.chasis) ? line.chasis.map(String) : [],
+      chasis: Array.isArray(line.chasis) ? line.chasis.map(chasis => upperMachineText(String(chasis))) : [],
       confianza: confidence,
       datos_extraidos: line,
     });
@@ -876,7 +880,7 @@ export default function MaquinariaOperaciones() {
     if (marca !== "TODOS" && row.marca !== marca) return false;
     const q = search.trim().toUpperCase();
     if (!q) return true;
-    const common = [row.np_numero, row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
+    const common = [row.np_numero, formatNpCode(row.np_numero), row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
   }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
@@ -1085,7 +1089,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
       const state = orderBillingState(row, unit?.estado);
       const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet, row.es_historico);
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
-        <TableCell className="font-mono font-medium">{row.np_numero || "Sin NP"}</TableCell>
+        <TableCell className="font-mono font-medium">{formatNpCode(row.np_numero)}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
         <TableCell className="max-w-[220px] truncate">{row.cliente_nombre}</TableCell>
         <TableCell className="max-w-[220px] truncate">{row.modelo || row.producto || "—"}</TableCell>
@@ -1478,6 +1482,19 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
 
 function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { operationId: string | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const catalog = useMachineCatalog(open);
+  const queryClient = useQueryClient();
+  const [namesConfirmed, setNamesConfirmed] = useState("");
+  const references = useQuery({
+    queryKey: ["machine-order-reference-names"], enabled: open, staleTime: 60_000,
+    queryFn: async () => {
+      const [clients, orders] = await Promise.all([
+        cargarTodo<{ id: string; nombre: string }>(db.from("clientes").select("id,nombre").eq("activo", true).order("id")),
+        cargarTodo<{ comercial: string | null }>(db.from("maquinaria_operaciones").select("id,comercial").not("comercial", "is", null).order("id")),
+      ]);
+      return { clients, commercials: [...new Set(orders.map(o => upperMachineText(o.comercial).trim()).filter(Boolean))] };
+    },
+  });
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
@@ -1502,18 +1519,18 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   });
   useEffect(() => {
     if (!open) return;
-    setFile(null); setExtracted({}); setExtractionError(null);
+    setFile(null); setExtracted({}); setExtractionError(null); setNamesConfirmed("");
     if (operationId) {
       if (!editQuery.data) return;
       const operation = editQuery.data.operation;
       setForm({
-        np_numero: operation.np_numero ?? "", np_fecha: operation.np_fecha ?? "",
-        cliente_nombre: operation.cliente_nombre ?? "", comercial: operation.comercial ?? "",
-        observaciones: operation.observaciones ?? "",
+        np_numero: normalizeNpCode(operation.np_numero) ?? upperMachineText(operation.np_numero), np_fecha: operation.np_fecha ?? "",
+        cliente_nombre: upperMachineText(operation.cliente_nombre), comercial: upperMachineText(operation.comercial),
+        observaciones: upperMachineText(operation.observaciones),
       });
       setLines(editQuery.data.lines.map((line: any, index: number) => ({
         id: line.id, linea_numero: index + 1, marca: safeMarca(line.marca_nombre ?? line.marca),
-        producto: line.producto ?? "", modelo: line.modelo ?? "",
+        producto: upperMachineText(line.producto), modelo: upperMachineText(line.modelo),
         anio: line.datos_extraidos?.anio ?? null, cabezal: line.datos_extraidos?.cabezal ?? "",
         cantidad: Math.max(1, Number(line.cantidad) || 1),
         condicion: line.condicion === "USADA" ? "USADA" : "NUEVA",
@@ -1534,20 +1551,22 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   }, [file]);
 
   const chooseFile = async (picked?: File) => {
-    if (!picked) return;
+    if (!picked || reading) return;
     setFile(picked); setReading(true); setExtractionError(null);
     try {
       const data = await extractDocument(picked, "NP"); setExtracted(data);
       setForm((old) => ({
         ...old,
-        np_numero: safeExtractedText(data.np_numero) || old.np_numero,
+        np_numero: normalizeNpCode(data.np_numero) ?? (safeExtractedText(data.np_numero) || old.np_numero),
         np_fecha: safeExtractedDate(data.np_fecha) || old.np_fecha,
-        cliente_nombre: safeExtractedText(data.cliente_nombre) || old.cliente_nombre,
-        comercial: safeExtractedText(data.comercial) || old.comercial,
+        cliente_nombre: exactCatalogName(safeExtractedText(data.cliente_nombre), references.data?.clients.map(c => c.nombre) ?? []) || safeExtractedText(data.cliente_nombre) || old.cliente_nombre,
+        comercial: exactCatalogName(safeExtractedText(data.comercial), references.data?.commercials ?? []) || safeExtractedText(data.comercial) || old.comercial,
         observaciones: safeExtractedText(data.observaciones) || old.observaciones,
       }));
       if (Array.isArray(data.lineas) && data.lineas.length) {
-        const proposedLines = extractedLinesToDraft(data.lineas, data.confianza ?? {});
+        const checkedCatalog = await catalog.refetch();
+        const proposedLines = extractedLinesToDraft(data.lineas, data.confianza ?? {})
+          .map(line => checkedCatalog.data ? reconcileCatalogLine(line, checkedCatalog.data) : line);
         setLines((current) => operationId ? mergeExtractedLines(current, proposedLines) : proposedLines);
       }
       toast.success("Lectura terminada. Revisá los datos antes de guardar.");
@@ -1558,27 +1577,54 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
     finally { setReading(false); }
   };
   const updateLine = (index: number, patch: Partial<DraftLine>) => setLines((all) => all.map((line, i) => i === index ? { ...line, ...patch } : line));
+  const isPreservedLine = (line: DraftLine) => {
+    const original = editQuery.data?.lines.find((candidate: any) => candidate.id === line.id);
+    return !!original && catalogLineKey(line) === catalogLineKey({ marca: original.marca_nombre ?? original.marca, modelo: original.modelo ?? "", subgrupo: original.subgrupo });
+  };
+  const unknownNames = [
+    form.cliente_nombre.trim() && !exactCatalogName(form.cliente_nombre, references.data?.clients.map(c => c.nombre) ?? []) ? "CLIENTE" : "",
+    form.comercial.trim() && !exactCatalogName(form.comercial, references.data?.commercials ?? []) ? "OPERATIVO COMERCIAL" : "",
+  ].filter(Boolean);
+  const namesKey = JSON.stringify([form.cliente_nombre, form.comercial]);
   const save = async () => {
-    if (!form.np_numero.trim()) return toast.error("Ingresá el número de NP");
+    const np = normalizeNpCode(form.np_numero);
+    if (!np) return toast.error("La NP debe tener cuatro números, por ejemplo NP0002");
+    if (!validMachineDate(form.np_fecha)) return toast.error("Ingresá una fecha válida para la NP");
     if (!form.cliente_nombre.trim()) return toast.error("Ingresá el cliente");
     if (lines.some((l) => !normalizeMachineBrand(l.marca))) return toast.error("Cada línea necesita una marca correcta");
-    if (lines.some((l) => !l.producto.trim() && !l.modelo.trim())) return toast.error("Cada línea necesita producto o modelo");
+    if (lines.some(l => !l.modelo.trim())) return toast.error("Cada línea necesita un modelo");
+    if (lines.some(l => !Number.isInteger(l.cantidad) || l.cantidad < 1 || l.cantidad > 500)) return toast.error("La cantidad debe ser un entero entre 1 y 500");
+    if (lines.some(l => l.anio != null && (!Number.isInteger(l.anio) || l.anio < 1900 || l.anio > 2200))) return toast.error("Revisá el año de la máquina");
+    if (!references.data || references.isError) return toast.error("Primero cargá los datos de referencia para validar cliente y operativo");
+    if (unknownNames.length && namesConfirmed !== namesKey) return toast.error("Confirmá los nombres que no coinciden con los datos registrados");
     setSaving(true);
     try {
+      const checkedCatalog = await catalog.refetch();
+      if (checkedCatalog.error || !checkedCatalog.data) throw new Error("No se pudo verificar el catálogo. Reintentá antes de guardar.");
+      const checkedLines = lines.map(line => reconcileCatalogLine(line, checkedCatalog.data!));
+      for (const line of checkedLines) {
+        const review = reviewCatalogLine(line, checkedCatalog.data);
+        if (isPreservedLine(line)) continue;
+        if (review.archived) throw new Error("La marca o el modelo fue eliminado del listado. Seleccioná otro o restauralo.");
+        if (review.needsConfirmation && line.catalogConfirmed !== catalogLineKey(line)) throw new Error("Seleccioná un modelo del catálogo o confirmá el dato nuevo de cada línea.");
+      }
+      const normalizedForm = { ...form, np_numero: np, cliente_nombre: upperMachineText(form.cliente_nombre).trim(), comercial: upperMachineText(form.comercial).trim(), observaciones: upperMachineText(form.observaciones).trim() };
+      setForm(normalizedForm); setLines(checkedLines);
       const targetOperationId = operationId ?? crypto.randomUUID();
-      const linesForSave = lines.map((line) => ({
+      const linesForSave = checkedLines.map((line) => ({
         ...line,
-        marca: legacyMachineBrand(line.marca),
+        marca: legacyMachineBrand(line.marca), producto: upperMachineText(line.producto || line.subgrupo), modelo: upperMachineText(line.modelo), chasis: line.chasis.map(upperMachineText),
         datos_extraidos: { ...(line.datos_extraidos ?? {}), marca_real: normalizeMachineBrand(line.marca), anio: line.anio ?? null, cabezal: line.cabezal || null },
       }));
       const { data, error } = operationId
-        ? await db.rpc("maquinaria_actualizar_operacion", { p_operacion_id: operationId, p_operacion: form, p_lineas: linesForSave })
-        : await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: targetOperationId, ...form }, p_lineas: linesForSave });
+        ? await db.rpc("maquinaria_actualizar_operacion", { p_operacion_id: operationId, p_operacion: normalizedForm, p_lineas: linesForSave })
+        : await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: targetOperationId, ...normalizedForm }, p_lineas: linesForSave });
       if (error) throw error;
       if (file) {
         try { await uploadEvidence(file, data ?? targetOperationId, "NP", extracted); }
         catch (uploadError) { console.error(uploadError); toast.warning("La operación se guardó, pero el archivo no pudo adjuntarse."); }
       }
+      await Promise.all(["machine-catalog-review", "maquinaria-marcas-catalogo", "parque-modelos-catalogo", "machine-order-reference-names"].map(key => queryClient.invalidateQueries({ queryKey: [key] })));
       toast.success(operationId ? "Pedido actualizado" : "NP validada y operación creada"); onSaved(); onOpenChange(false);
     } catch (error: any) { toast.error(error?.message ?? "No se pudo guardar la operación"); }
     finally { setSaving(false); }
@@ -1588,7 +1634,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
     <ResponsiveDrawerBody className="space-y-4">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
       <div className="flex items-center gap-2 rounded-xl border border-dashed p-3">
-        <button type="button" onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <button type="button" disabled={reading} onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Upload className="h-4 w-4" /></span>
           <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{reading ? "Leyendo la NP..." : file?.name ?? "Subir foto nítida de la NP"}</span><span className="block text-[11px] text-muted-foreground">La lectura propone datos; nada se confirma automáticamente.</span></span>
           {reading && <Sparkles className="h-4 w-4 animate-pulse text-primary" />}
@@ -1597,11 +1643,13 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
       </div>
       {extractionError && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div className="min-w-0 flex-1"><p>{extractionError}</p><p className="mt-0.5 text-amber-700">La foto sigue seleccionada. Podés reintentar o completar los campos manualmente.</p></div>{file && <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-amber-300 bg-white px-2 text-[11px]" disabled={reading} onClick={() => chooseFile(file)}><RotateCcw className="mr-1 h-3 w-3" />Reintentar</Button>}</div>}
       {!extractionError && Array.isArray(extracted?.confianza?.campos_dudosos) && extracted.confianza.campos_dudosos.length > 0 && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div><p className="font-medium">Revisá estos datos antes de guardar</p><p className="mt-0.5">{extracted.confianza.campos_dudosos.map(String).join(" · ")}</p></div></div>}
-      <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
-      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca, modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div></div>)}</div>
-      <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
+      <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input placeholder="NP0002" value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: upperMachineText(e.target.value) })} onBlur={() => setForm(v => ({ ...v, np_numero: normalizeNpCode(v.np_numero) ?? v.np_numero }))} />{form.np_numero && !normalizeNpCode(form.np_numero) && <p className="text-xs text-destructive">Usá NP y cuatro números. No se recortan números de más.</p>}</Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input list="np-clientes" value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: upperMachineText(e.target.value) })} /><datalist id="np-clientes">{references.data?.clients.map(c => <option key={c.id} value={upperMachineText(c.nombre)} />)}</datalist></Field><Field label="Operativo comercial"><Input list="np-comerciales" value={form.comercial} onChange={(e) => setForm({ ...form, comercial: upperMachineText(e.target.value) })} /><datalist id="np-comerciales">{references.data?.commercials.map(c => <option key={c} value={c} />)}</datalist></Field></div>
+      {(catalog.isError || references.isError) && <div className="rounded-md border border-amber-200 p-2 text-xs">No se pudo validar contra los datos registrados. <Button size="sm" variant="outline" onClick={() => { catalog.refetch(); references.refetch(); }}>Reintentar validación</Button></div>}
+      {references.data && unknownNames.length > 0 && <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"><input type="checkbox" checked={namesConfirmed === namesKey} onChange={e => setNamesConfirmed(e.target.checked ? namesKey : "")} /><span>{unknownNames.join(" Y ")} sin coincidencia exacta. Revisé la NP y confirmo los nombres escritos.</span></label>}
+      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca: upperMachineText(marca), modelo: "", catalogConfirmed: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo: upperMachineText(modelo), catalogConfirmed: "" })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{catalog.data && <MachineCatalogLineReview line={line} catalog={catalog.data} confirmed={line.catalogConfirmed} preserved={isPreservedLine(line)} onConfirm={key => updateLine(i, { catalogConfirmed: key })} onSelect={selection => updateLine(i, { ...selection, catalogConfirmed: "" })} />}</div>)}</div>
+      <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: upperMachineText(e.target.value) })} /></Field>
     </ResponsiveDrawerBody>
-    <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>
+    <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading || catalog.isLoading || references.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>
   </ResponsiveDrawer>;
 }
 

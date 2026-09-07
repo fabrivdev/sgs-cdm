@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DEFAULT_MACHINE_BRANDS, normalizeMachineBrand } from "@/lib/machineBrands";
+import { upperMachineText } from "@/lib/machineOrderValidation";
+import { MachineCatalogManager } from "./MachineCatalogManager";
 
 export function MarcaMaquinaSelect({
   value,
@@ -19,10 +21,10 @@ export function MarcaMaquinaSelect({
 }) {
   const [customMode, setCustomMode] = useState(false);
   const normalizedValue = normalizeMachineBrand(value);
-  const { data = [], isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["maquinaria-marcas-catalogo"],
     queryFn: async () => {
-      const { data: rows, error } = await (supabase as any)
+      const { data: rows, error } = await supabase
         .from("maquinaria_marcas_catalogo")
         .select("nombre")
         .eq("activa", true)
@@ -35,7 +37,7 @@ export function MarcaMaquinaSelect({
   });
 
   const brands = useMemo(() => {
-    const values = new Set<string>([...DEFAULT_MACHINE_BRANDS, ...data]);
+      const values = new Set<string>(data ?? DEFAULT_MACHINE_BRANDS);
     if (normalizedValue && normalizedValue !== "OTROS") values.add(normalizedValue);
     return [...values].sort((a, b) => a.localeCompare(b, "es"));
   }, [data, normalizedValue]);
@@ -46,7 +48,7 @@ export function MarcaMaquinaSelect({
         <div className="flex gap-2">
           <Input
             value={normalizedValue === "OTROS" ? "" : value ?? ""}
-            onChange={(event) => onValueChange(event.target.value)}
+            onChange={(event) => onValueChange(upperMachineText(event.target.value))}
             onBlur={(event) => onValueChange(normalizeMachineBrand(event.target.value))}
             placeholder="Escribí la nueva marca"
             className={className}
@@ -58,12 +60,13 @@ export function MarcaMaquinaSelect({
           </Button>
         </div>
         <p className="text-[11px] text-amber-700 dark:text-amber-400">La nueva marca se agregará al catálogo al guardar.</p>
+        <MachineCatalogManager kind="marca" disabled={disabled} />
       </div>
     );
   }
 
   return (
-    <Select
+    <div className="space-y-1"><Select
       value={normalizedValue && normalizedValue !== "OTROS" ? normalizedValue : undefined}
       onValueChange={(next) => {
         if (next === "__NEW__") { onValueChange(""); setCustomMode(true); }
@@ -76,6 +79,6 @@ export function MarcaMaquinaSelect({
         {brands.map((brand) => <SelectItem key={brand} value={brand}>{brand}</SelectItem>)}
         <SelectItem value="__NEW__">+ AGREGAR NUEVA MARCA</SelectItem>
       </SelectContent>
-    </Select>
+    </Select>{isError && <p className="text-[11px] text-amber-700">No se pudo verificar el listado de marcas.</p>}<MachineCatalogManager kind="marca" disabled={disabled} /></div>
   );
 }

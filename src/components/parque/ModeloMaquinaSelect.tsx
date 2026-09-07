@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
+import { normalizeMachineBrand } from "@/lib/machineBrands";
 import { normalizeMachineModelKey } from "@/lib/machineModels";
+import { upperMachineText } from "@/lib/machineOrderValidation";
+import { MachineCatalogManager } from "./MachineCatalogManager";
 
 type ModeloCatalogo = {
   id: string;
@@ -30,10 +32,10 @@ export function ModeloMaquinaSelect({
   disabled?: boolean;
 }) {
   const [customMode, setCustomMode] = useState(false);
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["parque-modelos-catalogo", marca, subgrupo],
     queryFn: async () => {
-      const { data: rows, error } = await (supabase as any)
+      const { data: rows, error } = await supabase
         .from("parque_modelos_catalogo")
         .select("id, nombre")
         .eq("marca_nombre", normalizeMachineBrand(marca))
@@ -41,17 +43,7 @@ export function ModeloMaquinaSelect({
         .eq("activo", true)
         .order("nombre");
 
-      if (error) {
-        const fallback = await supabase
-          .from("parque_modelos_catalogo")
-          .select("id, nombre")
-          .eq("marca", legacyMachineBrand(marca))
-          .eq("subgrupo", subgrupo as never)
-          .eq("activo", true)
-          .order("nombre");
-        if (fallback.error) throw fallback.error;
-        return (fallback.data ?? []) as ModeloCatalogo[];
-      }
+      if (error) throw error;
       return (rows ?? []) as ModeloCatalogo[];
     },
     staleTime: 5 * 60 * 1000,
@@ -70,11 +62,6 @@ export function ModeloMaquinaSelect({
     !data.some((modelo) => normalizeMachineModelKey(modelo.nombre) === normalizeMachineModelKey(value)),
   );
 
-  useEffect(() => {
-    if (!value?.trim()) return;
-    setCustomMode(!data.some((modelo) => normalizeMachineModelKey(modelo.nombre) === normalizeMachineModelKey(value)));
-  }, [data, value]);
-
   useEffect(() => setCustomMode(false), [marca, subgrupo]);
 
   if (!allowCustom) {
@@ -92,7 +79,7 @@ export function ModeloMaquinaSelect({
         <div className="flex gap-2">
           <Input
             value={value ?? ""}
-            onChange={(event) => onValueChange(event.target.value)}
+            onChange={(event) => { setCustomMode(true); onValueChange(upperMachineText(event.target.value)); }}
             placeholder="Escribí el nombre del nuevo modelo"
             className={className}
             disabled={disabled}
@@ -112,13 +99,14 @@ export function ModeloMaquinaSelect({
           </Button>
         </div>
         <p className="text-[11px] text-amber-700 dark:text-amber-400">
-          Modelo nuevo: escribí el nombre exacto antes de crear la máquina.
+          {isError ? "No se pudo verificar el catálogo de modelos." : "Modelo fuera del listado: verificá el nombre o seleccioná uno del catálogo."}
         </p>
+        <MachineCatalogManager kind="modelo" disabled={disabled} />
       </div>
     );
   }
 
-  const selectValue = value || undefined;
+  const selectValue = data.find(model => normalizeMachineModelKey(model.nombre) === normalizeMachineModelKey(value))?.nombre || value || undefined;
 
   return (
     <div className="space-y-1.5">
@@ -144,6 +132,7 @@ export function ModeloMaquinaSelect({
         </SelectContent>
       </Select>
       <p className="text-[11px] text-muted-foreground">Seleccioná un modelo o elegí otro para crear uno nuevo.</p>
+      <MachineCatalogManager kind="modelo" disabled={disabled} />
     </div>
   );
 }
