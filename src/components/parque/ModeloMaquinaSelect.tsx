@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Marca } from "@/lib/constants";
+import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
 import { normalizeMachineModelKey } from "@/lib/machineModels";
 
 type ModeloCatalogo = {
@@ -21,7 +21,7 @@ export function ModeloMaquinaSelect({
   allowCustom = true,
   disabled = false,
 }: {
-  marca: Marca;
+  marca: string;
   subgrupo: string;
   value?: string | null;
   onValueChange: (value: string) => void;
@@ -33,15 +33,25 @@ export function ModeloMaquinaSelect({
   const { data = [], isLoading } = useQuery({
     queryKey: ["parque-modelos-catalogo", marca, subgrupo],
     queryFn: async () => {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await (supabase as any)
         .from("parque_modelos_catalogo")
         .select("id, nombre")
-        .eq("marca", marca)
+        .eq("marca_nombre", normalizeMachineBrand(marca))
         .eq("subgrupo", subgrupo as never)
         .eq("activo", true)
         .order("nombre");
 
-      if (error) throw error;
+      if (error) {
+        const fallback = await supabase
+          .from("parque_modelos_catalogo")
+          .select("id, nombre")
+          .eq("marca", legacyMachineBrand(marca))
+          .eq("subgrupo", subgrupo as never)
+          .eq("activo", true)
+          .order("nombre");
+        if (fallback.error) throw fallback.error;
+        return (fallback.data ?? []) as ModeloCatalogo[];
+      }
       return (rows ?? []) as ModeloCatalogo[];
     },
     staleTime: 5 * 60 * 1000,

@@ -29,7 +29,7 @@ const NP_SCHEMA = `{
   "cliente_nombre": "texto o null",
   "comercial": "texto o null",
   "lineas": [{
-    "marca": "CLAAS | HORSCH | OTROS",
+    "marca": "fabricante exacto visible o null",
     "producto": "tipo o descripcion de la maquina tal como aparece, por ejemplo Cosechadora",
     "modelo": "modelo exacto tal como aparece en el campo Modelo, por ejemplo Tucano 710",
     "anio": "numero o null",
@@ -51,7 +51,7 @@ const INVOICE_SCHEMA = `{
   "moneda": "USD | EUR | PYG | otra o null",
   "valor_facturado": 0,
   "np_numero": "texto o null",
-  "marca": "CLAAS | HORSCH | OTROS",
+  "marca": "fabricante exacto visible o null",
   "modelo": "texto o null",
   "chasis": ["texto"],
   "confianza": {"global": 0.0, "campos_dudosos": []},
@@ -287,7 +287,8 @@ Deno.serve(async (req) => {
       `comercial solo si hay un nombre escrito junto a Vendedor, Vendedores, ` +
       `Comercial u Operativo comercial. Nunca deduzcas el comercial a partir de una firma, sello o nombre del cliente. ` +
       `Los logos CLAAS, HORSCH y CDM del membrete no son la marca de la maquina. La marca debe salir exclusivamente ` +
-      `de la descripcion manuscrita de esa linea; METASA y cualquier fabricante distinto de CLAAS/HORSCH es OTROS. ` +
+      `de la descripcion manuscrita de esa linea. Devuelve el fabricante exacto visible (por ejemplo METASA, JOHN DEERE, ` +
+      `NEW HOLLAND, CLAAS o HORSCH); nunca reemplaces una marca legible por OTROS. Si no es legible, devuelve null. ` +
       `En cada linea lee por separado Marca, Tipo, Modelo y Año: producto debe ser el tipo o descripcion ` +
       `(por ejemplo Cosechadora), modelo debe conservar el texto exacto del campo Modelo (por ejemplo Tucano 710), ` +
       `y anio solo el año visible. Si el campo Cabezal/Plataforma de la maquina vendida tiene contenido, crea una SEGUNDA ` +
@@ -302,7 +303,7 @@ Deno.serve(async (req) => {
       `No marques como USADA la maquina ofertada por una mencion separada de toma, permuta o entrega de otra maquina usada; ` +
       `si la condicion de la maquina listada no aparece, usa NUEVA para que quede pendiente de revision manual. ` +
       `El abastecimiento solo es STOCK o IMPORTAR cuando hay evidencia explicita; en caso contrario usa DEFINIR.\n` +
-      `CLAAS y HORSCH son las unicas marcas representadas inicialmente; cualquier otra es OTROS.\n` +
+      `Las marcas no estan limitadas a un listado cerrado.\n` +
       `En facturas busca especialmente chasis, numero de factura y valor total facturado. ` +
       `Se conciso: observaciones maximo 120 caracteres y no agregues explicaciones.\n` +
       `Responde exclusivamente JSON valido con esta forma:\n${schema}`;

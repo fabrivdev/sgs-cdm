@@ -1422,6 +1422,7 @@ export type Database = {
           linea_id: string | null
           llave_interna: string | null
           marca_importacion: Database["public"]["Enums"]["marca"] | null
+          marca_nombre: string | null
           margen_porcentaje: number | null
           modelo: string | null
           notas: string | null
@@ -1473,6 +1474,7 @@ export type Database = {
           linea_id?: string | null
           llave_interna?: string | null
           marca_importacion?: Database["public"]["Enums"]["marca"] | null
+          marca_nombre?: string | null
           margen_porcentaje?: number | null
           modelo?: string | null
           notas?: string | null
@@ -1524,6 +1526,7 @@ export type Database = {
           linea_id?: string | null
           llave_interna?: string | null
           marca_importacion?: Database["public"]["Enums"]["marca"] | null
+          marca_nombre?: string | null
           margen_porcentaje?: number | null
           modelo?: string | null
           notas?: string | null
@@ -2049,6 +2052,33 @@ export type Database = {
         }
         Relationships: []
       }
+      maquinaria_marcas_catalogo: {
+        Row: {
+          activa: boolean
+          actualizado_en: string
+          admitida_parque: boolean
+          creado_en: string
+          creado_por: string | null
+          nombre: string
+        }
+        Insert: {
+          activa?: boolean
+          actualizado_en?: string
+          admitida_parque?: boolean
+          creado_en?: string
+          creado_por?: string | null
+          nombre: string
+        }
+        Update: {
+          activa?: boolean
+          actualizado_en?: string
+          admitida_parque?: boolean
+          creado_en?: string
+          creado_por?: string | null
+          nombre?: string
+        }
+        Relationships: []
+      }
       maquinaria_operacion_lineas: {
         Row: {
           abastecimiento: string
@@ -2062,6 +2092,7 @@ export type Database = {
           id: string
           linea_numero: number
           marca: Database["public"]["Enums"]["marca"]
+          marca_nombre: string | null
           modelo: string | null
           moneda_acordada: string
           operacion_id: string
@@ -2081,6 +2112,7 @@ export type Database = {
           id?: string
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
+          marca_nombre?: string | null
           modelo?: string | null
           moneda_acordada?: string
           operacion_id: string
@@ -2100,6 +2132,7 @@ export type Database = {
           id?: string
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
+          marca_nombre?: string | null
           modelo?: string | null
           moneda_acordada?: string
           operacion_id?: string
@@ -2640,6 +2673,7 @@ export type Database = {
           id: string
           localidad: string | null
           marca: Database["public"]["Enums"]["marca"]
+          marca_nombre: string | null
           modelo_tipo: string | null
           notas: string | null
           serie: string
@@ -2658,6 +2692,7 @@ export type Database = {
           id?: string
           localidad?: string | null
           marca: Database["public"]["Enums"]["marca"]
+          marca_nombre?: string | null
           modelo_tipo?: string | null
           notas?: string | null
           serie: string
@@ -2676,6 +2711,7 @@ export type Database = {
           id?: string
           localidad?: string | null
           marca?: Database["public"]["Enums"]["marca"]
+          marca_nombre?: string | null
           modelo_tipo?: string | null
           notas?: string | null
           serie?: string
@@ -2747,6 +2783,7 @@ export type Database = {
           creado_en: string
           id: string
           marca: Database["public"]["Enums"]["marca"]
+          marca_nombre: string | null
           nombre: string
           subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
         }
@@ -2757,6 +2794,7 @@ export type Database = {
           creado_en?: string
           id?: string
           marca: Database["public"]["Enums"]["marca"]
+          marca_nombre?: string | null
           nombre: string
           subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
         }
@@ -2767,6 +2805,7 @@ export type Database = {
           creado_en?: string
           id?: string
           marca?: Database["public"]["Enums"]["marca"]
+          marca_nombre?: string | null
           nombre?: string
           subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
         }

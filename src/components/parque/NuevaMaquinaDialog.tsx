@@ -18,8 +18,10 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
+import { SUCURSALES, type Sucursal } from "@/lib/constants";
+import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
+import { MarcaMaquinaSelect } from "./MarcaMaquinaSelect";
 import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
 import { canonicalClientOptions, type ClientIdentityRow } from "@/lib/clientIdentity";
 
@@ -36,10 +38,9 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [marcasAdmitidas, setMarcasAdmitidas] = useState<Marca[]>(["CLAAS", "HORSCH"]);
   const [form, setForm] = useState<{
     cliente_id: string;
-    marca: Marca;
+    marca: string;
     subgrupo: string;
     subgrupo_personalizado: string;
     modelo_tipo: string;
@@ -96,28 +97,19 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
       }
       setClientes(canonicalClientOptions(all));
     })();
-    (async () => {
-      // La tabla estará disponible en los tipos generados después de aplicar la migración.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from("maquinaria_marcas_admitidas")
-        .select("marca")
-        .eq("activa", true)
-        .eq("admitida_parque", true)
-        .order("marca");
-      if (!error && data?.length) setMarcasAdmitidas(data.map((row: { marca: Marca }) => row.marca));
-    })();
   }, [open]);
 
   const guardar = async () => {
     if (!form.cliente_id) return toast.error("Seleccioná un cliente");
+    if (!normalizeMachineBrand(form.marca) || normalizeMachineBrand(form.marca) === "OTROS") return toast.error("Seleccioná o escribí la marca correcta");
     if (!form.serie.trim()) return toast.error("Número de serie requerido");
     if (form.subgrupo === "OTRO" && !form.subgrupo_personalizado.trim()) return toast.error("Escribí el nuevo subgrupo");
     if (!form.modelo_tipo.trim()) return toast.error("Seleccioná un modelo o escribí uno nuevo");
     setSaving(true);
     const { error } = await supabase.from("parque_maquinas").insert({
       cliente_id: form.cliente_id,
-      marca: form.marca,
+      marca: legacyMachineBrand(form.marca),
+      marca_nombre: normalizeMachineBrand(form.marca),
       subgrupo: form.subgrupo as never,
       subgrupo_personalizado: form.subgrupo === "OTRO" ? form.subgrupo_personalizado.trim() : null,
       modelo_tipo: form.modelo_tipo.trim() || null,
@@ -196,12 +188,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label className="text-[12px]">Marca *</Label>
-                <Select value={form.marca} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: "" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {marcasAdmitidas.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MarcaMaquinaSelect value={form.marca} onValueChange={(marca) => setForm({ ...form, marca, modelo_tipo: "" })} />
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-[12px]">Subgrupo</Label>

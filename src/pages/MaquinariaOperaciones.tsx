@@ -27,10 +27,12 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
+import { MarcaMaquinaSelect } from "@/components/parque/MarcaMaquinaSelect";
 import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
+import { legacyMachineBrand, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -149,13 +151,12 @@ const formatNpCode = (value: string | null | undefined) => {
   return code ? `NP${code}` : "NP";
 };
 
-// Sub-etapa A (diseno_flujo_maquinas.md): las marcas no admitidas a Parque
-// (OTROS) nunca van a generar una fila en parque_maquinas -- para ellas
+// Las líneas históricas que todavía no tienen una marca identificada no
+// pueden generar una fila en parque_maquinas -- para ellas
 // "EN_PARQUE"/"TRANSFERIDA" nunca va a llegar, aunque la venta este 100%
-// cerrada. Confirmado con datos reales: 3 pedidos OTROS con la operacion
-// en FACTURADA/CERRADA quedaban "En stock" para siempre. Para esas marcas,
-// la operacion cerrada/facturada YA es la señal de entrega real. CLAAS y
-// HORSCH no cambian: siguen dependiendo solo de entrar al Parque.
+// cerrada. En ese caso la operación cerrada/facturada es la señal de entrega.
+// Las marcas reales nuevas sí son elegibles mediante el catálogo y dependen
+// de entrar al Parque, igual que CLAAS y HORSCH.
 function entregaStateFromUnit(
   unitEstado: string | null | undefined,
   unitChasis: string | null | undefined,
@@ -165,7 +166,7 @@ function entregaStateFromUnit(
 ): EntregaState {
   if (unitEstado === "EN_PARQUE" || unitEstado === "TRANSFERIDA") return "ENTREGADO";
   if (unitEstado === "CANCELADA") return "CANCELADA";
-  const esParqueEligible = marca === "CLAAS" || marca === "HORSCH";
+  const esParqueEligible = Boolean(normalizeMachineBrand(marca) && normalizeMachineBrand(marca) !== "OTROS");
   if (!esParqueEligible && (operacionEstado === "FACTURADA" || operacionEstado === "CERRADA")) return "ENTREGADO";
   const normalizado = normalizarChasis(unitChasis);
   if (normalizado && stockChasisSet?.has(normalizado)) return "EN_STOCK";
@@ -243,7 +244,7 @@ type ImportRow = {
 };
 type DraftLine = {
   id?: string;
-  linea_numero: number; marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
+  linea_numero: number; marca: string; producto: string; modelo: string;
   anio?: number | null; cabezal?: string;
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
   subgrupo: string; chasis: string[]; confianza?: Record<string, unknown>; datos_extraidos?: Record<string, unknown>;
@@ -282,13 +283,13 @@ function orderBillingState(
   return simpleOrderState(row.estado_operacion);
 }
 type ImportDraft = {
-  marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string; modelo: string;
+  marca: string; producto: string; modelo: string;
   cantidad: number; estado_fuente: string; linea_id: string; np_numero: string; llave_interna: string;
   oc: string; fecha_pedido: string; eta: string; notas: string;
 };
 type AvailableImportNp = {
   operacion_id: string; linea_id: string; np_numero: string; cliente_nombre: string | null;
-  marca: "CLAAS" | "HORSCH" | "OTROS"; producto: string | null; modelo: string | null;
+  marca: string; producto: string | null; modelo: string | null;
   unidades_disponibles: number;
 };
 type LinkSuggestionRow = {
@@ -315,8 +316,8 @@ function formatDate(value?: string | null) {
 }
 
 function safeMarca(value: unknown): DraftLine["marca"] {
-  const normalized = String(value ?? "").toUpperCase();
-  return normalized === "CLAAS" || normalized === "HORSCH" ? normalized : "OTROS";
+  const normalized = normalizeMachineBrand(value);
+  return normalized === "OTROS" ? "" : normalized;
 }
 
 function safeSubgroup(value: unknown) {
@@ -763,7 +764,7 @@ export default function MaquinariaOperaciones() {
     },
   });
 
-  // Sub-etapa A: para marcas OTROS, "entrega" tambien depende del estado
+  // Para líneas históricas sin marca, "entrega" también depende del estado
   // real de la OPERACION (FACTURADA/CERRADA) -- se busca aparte por
   // operacion_id, igual patron que entregaQuery, sin tocar la base.
   const operacionIds = useMemo(
@@ -945,7 +946,7 @@ export default function MaquinariaOperaciones() {
               <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
               <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{importRow.marca || importRow.proveedor || "OTROS"}</Badge>
+                <Badge variant="outline" className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{visibleMachineBrand(importRow.marca || importRow.proveedor)}</Badge>
                 <Badge variant="outline" className="text-[10px]">Unidad {importRow.numero_unidad}/{Math.max(1, Number(importRow.cantidad_lote) || 1)}</Badge>
                 {importRow.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(importRow.estado_disponibilidad)}>{AVAILABILITY_LABEL[importRow.estado_disponibilidad] ?? importRow.estado_disponibilidad}</Badge>}
               </div>
@@ -967,7 +968,7 @@ export default function MaquinariaOperaciones() {
             <div className="mt-2 text-[13px] font-medium">{row.modelo || row.producto || "Sin descripción"}</div>
             <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{orderRow.cliente_nombre || "Sin cliente"}</div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge>
+              <Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>
               {orderRow.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(orderRow.condicion))}>{CONDITION_LABEL[orderRow.condicion] ?? orderRow.condicion}</Badge>}
               <span className="ml-auto text-[11px] font-medium tabular-nums">{formatUsd(orderRow.valor_venta)}</span>
             </div>
@@ -1021,7 +1022,7 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
         <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
         <TableCell className="max-w-[220px] truncate">{row.cliente_nombre}</TableCell>
         <TableCell className="max-w-[220px] truncate">{row.modelo || row.producto || "—"}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge></TableCell>
         <TableCell>{row.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(row.condicion))}>{CONDITION_LABEL[row.condicion] ?? row.condicion}</Badge>}</TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", supplyClass(row.abastecimiento))}>{SUPPLY_LABEL[row.abastecimiento ?? ""] ?? "Sin definir"}</Badge></TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
@@ -1055,7 +1056,7 @@ function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: I
       return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
         <TableCell className="font-mono font-semibold">{row.llave_interna || "—"}</TableCell>
         <TableCell className="font-mono font-medium">{row.oc || "—"}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca || row.proveedor))}>{row.marca || row.proveedor || "OTROS"}</Badge></TableCell>
+        <TableCell><Badge variant="outline" className={cn("text-[10px]", brandClass(row.marca || row.proveedor))}>{visibleMachineBrand(row.marca || row.proveedor)}</Badge></TableCell>
         <TableCell className="max-w-[200px] truncate">{row.producto || "—"}</TableCell>
         <TableCell className="max-w-[200px] truncate font-medium">{row.modelo || "—"}</TableCell>
         <TableCell className="whitespace-nowrap tabular-nums">{row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</TableCell>
@@ -1189,14 +1190,20 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
   };
   const save = async () => {
     if (!form.llave_interna.trim()) return toast.error("Ingresá la llave interna");
+    if (!normalizeMachineBrand(form.marca)) return toast.error("Seleccioná o escribí la marca correcta");
     if (!form.producto || !form.modelo) return toast.error("Seleccioná el producto y el modelo");
     setSaving(true);
     try {
+      const marcaNombre = normalizeMachineBrand(form.marca);
       const { data: savedId, error } = await db.rpc("maquinaria_guardar_importacion", {
         p_importacion_id: row?.importacion_linea_id ?? null,
-        p_datos: form,
+        p_datos: { ...form, marca: legacyMachineBrand(marcaNombre) },
       });
       if (error) throw error;
+      const { error: brandError } = await db.from("maquinaria_importacion_lineas")
+        .update({ marca_nombre: marcaNombre, proveedor: marcaNombre })
+        .eq("id", savedId);
+      if (brandError) throw brandError;
       if (ocFile) {
         try {
           await uploadImportDocument(ocFile, savedId, "OC", npOptions.find((option) => option.linea_id === form.linea_id)?.operacion_id ?? row?.operacion_id);
@@ -1217,9 +1224,9 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
     <ResponsiveDrawerBody className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Llave interna *"><Input autoFocus value={form.llave_interna} onChange={(event) => setForm((value) => ({ ...value, llave_interna: event.target.value }))} placeholder="Ej. 26.61L2" /></Field>
-        <Field label="Marca / proveedor"><CompactSelect value={form.marca} values={["CLAAS", "HORSCH", "OTROS"]} disabled={Boolean(selectedNp)} onChange={(marca) => setForm((value) => ({ ...value, marca: marca as ImportDraft["marca"], modelo: "" }))} /></Field>
+        <Field label="Marca / proveedor"><MarcaMaquinaSelect value={form.marca} disabled={Boolean(selectedNp)} onValueChange={(marca) => setForm((value) => ({ ...value, marca, modelo: "" }))} /></Field>
         <Field label="Producto / tipo"><CompactSelect value={form.producto} values={MACHINE_SUBGROUPS as readonly string[]} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
-        <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo) => setForm((value) => ({ ...value, modelo }))} allowCustom={false} disabled={Boolean(selectedNp)} /></Field>
+        <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo) => setForm((value) => ({ ...value, modelo }))} disabled={Boolean(selectedNp)} /></Field>
         <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
         <Field label="Estado"><Select value={form.estado_fuente} onValueChange={(estado_fuente) => setForm((value) => ({ ...value, estado_fuente }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PLANIFICADA">Planificada</SelectItem><SelectItem value="PEDIDA">Pedida</SelectItem><SelectItem value="EN_TRANSITO">En tránsito</SelectItem><SelectItem value="RECIBIDA">Recibida</SelectItem><SelectItem value="CANCELADA">Cancelada</SelectItem></SelectContent></Select></Field>
         <Field label="NP de referencia"><Select value={form.linea_id || "NONE"} onValueChange={selectNp}><SelectTrigger><SelectValue placeholder={availableNpQuery.isLoading ? "Cargando NP..." : "Seleccionar NP disponible"} /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin NP asignada</SelectItem>{npOptions.map((option) => <SelectItem key={option.linea_id} value={option.linea_id}>{formatNpCode(option.np_numero)} · {option.modelo || option.producto} · {option.unidades_disponibles} libre{option.unidades_disponibles === 1 ? "" : "s"}</SelectItem>)}</SelectContent></Select></Field>
@@ -1411,7 +1418,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         observaciones: operation.observaciones ?? "",
       });
       setLines(editQuery.data.lines.map((line: any, index: number) => ({
-        id: line.id, linea_numero: index + 1, marca: safeMarca(line.marca),
+        id: line.id, linea_numero: index + 1, marca: safeMarca(line.marca_nombre ?? line.marca),
         producto: line.producto ?? "", modelo: line.modelo ?? "",
         anio: line.datos_extraidos?.anio ?? null, cabezal: line.datos_extraidos?.cabezal ?? "",
         cantidad: Math.max(1, Number(line.cantidad) || 1),
@@ -1459,13 +1466,15 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   const save = async () => {
     if (!form.np_numero.trim()) return toast.error("Ingresá el número de NP");
     if (!form.cliente_nombre.trim()) return toast.error("Ingresá el cliente");
+    if (lines.some((l) => !normalizeMachineBrand(l.marca))) return toast.error("Cada línea necesita una marca correcta");
     if (lines.some((l) => !l.producto.trim() && !l.modelo.trim())) return toast.error("Cada línea necesita producto o modelo");
     setSaving(true);
     try {
       const targetOperationId = operationId ?? crypto.randomUUID();
       const linesForSave = lines.map((line) => ({
         ...line,
-        datos_extraidos: { ...(line.datos_extraidos ?? {}), anio: line.anio ?? null, cabezal: line.cabezal || null },
+        marca: legacyMachineBrand(line.marca),
+        datos_extraidos: { ...(line.datos_extraidos ?? {}), marca_real: normalizeMachineBrand(line.marca), anio: line.anio ?? null, cabezal: line.cabezal || null },
       }));
       const { data, error } = operationId
         ? await db.rpc("maquinaria_actualizar_operacion", { p_operacion_id: operationId, p_operacion: form, p_lineas: linesForSave })
@@ -1493,7 +1502,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
       </div>
       {extractionError && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div className="min-w-0 flex-1"><p>{extractionError}</p><p className="mt-0.5 text-amber-700">La foto sigue seleccionada. Podés reintentar o completar los campos manualmente.</p></div>{file && <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-amber-300 bg-white px-2 text-[11px]" disabled={reading} onClick={() => chooseFile(file)}><RotateCcw className="mr-1 h-3 w-3" />Reintentar</Button>}</div>}
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
-      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"], modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => v !== "SUELO")} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
+      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca, modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => v !== "SUELO")} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div></div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>
@@ -1741,7 +1750,8 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
             const year = line.anio ?? extracted.anio;
             const head = line.cabezal || extracted.cabezal;
             const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
-            return <EntityCard key={line.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(line.marca))}>{line.marca ?? "OTROS"}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 space-y-3 border-t pt-3">{lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div>}<OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && simpleState !== "CANCELADA"} onSaved={() => { detailQuery.refetch(); onChanged(); }} /></EntityCard>;
+            const brand = line.marca_nombre ?? line.marca;
+            return <EntityCard key={line.id}><div className="flex items-start justify-between gap-3"><div><div className="text-[12px] font-medium">{model || product || "Sin descripción"}</div><div className="text-[10px] text-muted-foreground">{[product && product !== model ? product : null, year && `Año ${year}`, head && `Cabezal ${head}`].filter(Boolean).join(" · ")}</div></div><div className="flex shrink-0 flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", brandClass(brand))}>{visibleMachineBrand(brand)}</Badge><Badge variant="outline" className={cn("text-[10px]", conditionClass(line.condicion))}>{CONDITION_LABEL[line.condicion] ?? line.condicion}</Badge></div></div>{lineUnits.length > 0 && <div className="mt-3 space-y-3 border-t pt-3">{lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}</div>}<OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && simpleState !== "CANCELADA"} onSaved={() => { detailQuery.refetch(); onChanged(); }} /></EntityCard>;
           })}</div></DetailSection>
           {detail.observaciones && <DetailSection title="Observaciones"><div className="rounded-lg bg-muted/40 p-3 text-[11px]">{detail.observaciones}</div></DetailSection>}
         </TabsContent>

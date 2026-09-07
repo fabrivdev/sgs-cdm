@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Download, Plus } from "lucide-react";
 import { MarcaBadge } from "@/components/StatusBadges";
-import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
+import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
@@ -16,17 +16,12 @@ import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 
 const MARCA_AMBAS = "ambas";
-const MARCA_OPTIONS = [
-  { value: "all", label: "Todos" },
-  { value: MARCA_AMBAS, label: "C/Ambas" },
-  ...MARCAS.map((m) => ({ value: m, label: m })),
-];
-
 type Maquina = {
   id: string;
   cliente_id: string | null;
   anio: number | null;
-  marca: Marca;
+  marca: string;
+  marca_nombre: string | null;
   subgrupo: string;
   subgrupo_personalizado: string | null;
   modelo_tipo: string | null;
@@ -126,7 +121,7 @@ export function MaquinasTab({
         cargarTodo<Maquina>(
           supabase
             .from("parque_maquinas")
-            .select("id, cliente_id, anio, marca, subgrupo, subgrupo_personalizado, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
+            .select("id, cliente_id, anio, marca, marca_nombre, subgrupo, subgrupo_personalizado, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
         ),
         cargarTodo<Cliente>(
           supabase
@@ -136,9 +131,10 @@ export function MaquinasTab({
         ),
       ]);
 
-      setMaquinas(m);
+      const normalized = m.map((machine) => ({ ...machine, marca: machine.marca_nombre || (machine.marca === "OTROS" ? "Sin marca" : machine.marca) }));
+      setMaquinas(normalized);
       setClientes(c);
-      const activas = m.filter((maquina) => maquina.activo !== false);
+      const activas = normalized.filter((maquina) => maquina.activo !== false);
       onResumenChange?.({
         totalMaquinas: activas.length,
         totalClientes: new Set(activas.map((maquina) => maquina.cliente_id).filter(Boolean)).size,
@@ -163,7 +159,7 @@ export function MaquinasTab({
   }, [clientes]);
 
   const clientesConAmbasMarcas = useMemo(() => {
-    const marcasByCliente = new Map<string, Set<Marca>>();
+    const marcasByCliente = new Map<string, Set<string>>();
 
     for (const m of maquinas) {
       if (!m.cliente_id) continue;
@@ -171,7 +167,7 @@ export function MaquinasTab({
       if (fEstado === "activa" && !activa) continue;
       if (fEstado === "inactiva" && activa) continue;
 
-      const marcas = marcasByCliente.get(m.cliente_id) ?? new Set<Marca>();
+      const marcas = marcasByCliente.get(m.cliente_id) ?? new Set<string>();
       marcas.add(m.marca);
       marcasByCliente.set(m.cliente_id, marcas);
     }
@@ -192,6 +188,12 @@ export function MaquinasTab({
       .sort((a, b) => a.localeCompare(b, "es"))
       .map((value) => ({ value, label: value === "OTRO" ? "OTRO (SIN ESPECIFICAR)" : value }));
   }, [maquinas]);
+
+  const marcaOptions = useMemo(() => [
+    { value: "all", label: "Todos" },
+    { value: MARCA_AMBAS, label: "C/Ambas" },
+    ...Array.from(new Set(maquinas.map((machine) => machine.marca))).sort((a, b) => a.localeCompare(b, "es")).map((brand) => ({ value: brand, label: brand })),
+  ], [maquinas]);
 
   const filtradas = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -363,7 +365,7 @@ export function MaquinasTab({
         />
         <FilterSelect
           label="Marca" value={fMarca} onChange={setFMarca} placeholder="Marca" width="w-[110px]"
-          options={MARCA_OPTIONS}
+          options={marcaOptions}
         />
         <FilterSelect
           label="Subgrupo" value={fSubgrupo} onChange={setFSubgrupo} placeholder="Subgrupo" width="w-[145px]"

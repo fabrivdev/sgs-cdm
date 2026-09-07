@@ -46,12 +46,14 @@ import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./Transferi
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { SUCURSALES, MARCAS, type Sucursal, type Marca } from "@/lib/constants";
+import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { cn, formatGuaranies } from "@/lib/utils";
 import { normalizarEstadoTrabajo, trabajoReferencia } from "@/lib/trabajos";
 import { machineSubgroupLabel } from "@/lib/machineModels";
 import { ModeloMaquinaSelect } from "./ModeloMaquinaSelect";
 import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
+import { MarcaMaquinaSelect } from "./MarcaMaquinaSelect";
+import { legacyMachineBrand, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
 
 const RESULTADOS = [
   "Contactado",
@@ -94,7 +96,8 @@ type Maquina = {
   modelo_tipo: string | null;
   serie: string;
   vendedor: string | null;
-  marca: Marca;
+  marca: string;
+  marca_nombre: string | null;
   agregado_manualmente: boolean;
   activo: boolean;
   notas: string | null;
@@ -320,6 +323,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const guardarMaquina = async () => {
     if (!cliente) return;
     if (!maquinaForm.serie?.trim()) return toast.error("Número de serie requerido");
+    const marcaNombre = normalizeMachineBrand(maquinaForm.marca_nombre || maquinaForm.marca);
+    if (!marcaNombre || marcaNombre === "OTROS") return toast.error("Seleccioná o escribí la marca correcta");
     if ((maquinaForm.subgrupo ?? "OTRO") === "OTRO" && !maquinaForm.subgrupo_personalizado?.trim()) return toast.error("Escribí el nuevo subgrupo");
     if (!maquinaForm.modelo_tipo?.trim()) return toast.error("Seleccioná o escribí el modelo");
     if (editMaquina) {
@@ -327,7 +332,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         .from("parque_maquinas")
         .update({
           anio: maquinaForm.anio ?? null,
-          marca: (maquinaForm.marca ?? "CLAAS") as Marca,
+          marca: legacyMachineBrand(marcaNombre),
+          marca_nombre: marcaNombre,
           subgrupo: (maquinaForm.subgrupo ?? "OTRO") as never,
           subgrupo_personalizado: maquinaForm.subgrupo === "OTRO" ? maquinaForm.subgrupo_personalizado?.trim() || null : null,
           modelo_tipo: maquinaForm.modelo_tipo ?? null,
@@ -343,7 +349,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       const { error } = await supabase.from("parque_maquinas").insert({
         cliente_id: cliente.id,
         anio: maquinaForm.anio ?? null,
-        marca: (maquinaForm.marca ?? "CLAAS") as Marca,
+        marca: legacyMachineBrand(marcaNombre),
+        marca_nombre: marcaNombre,
         subgrupo: (maquinaForm.subgrupo ?? "OTRO") as never,
         subgrupo_personalizado: maquinaForm.subgrupo === "OTRO" ? maquinaForm.subgrupo_personalizado?.trim() || null : null,
         modelo_tipo: maquinaForm.modelo_tipo ?? null,
@@ -693,8 +700,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge className={cn("text-[10px]", m.marca === "CLAAS" ? "bg-emerald-600 text-white" : m.marca === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
-                                {m.marca}
+                              <Badge className={cn("text-[10px]", (m.marca_nombre || m.marca) === "CLAAS" ? "bg-emerald-600 text-white" : (m.marca_nombre || m.marca) === "HORSCH" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground border")}>
+                                {visibleMachineBrand(m.marca_nombre || m.marca)}
                               </Badge>
                               <span className="text-[13px] font-medium">{m.anio ?? "—"}</span>
                               <Badge variant="outline" className="text-[10px]">{machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado)}</Badge>
@@ -717,7 +724,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                                   onClick={() => setTransferMaquina({
                                     id: m.id,
                                     clienteIdActual: m.cliente_id,
-                                    marca: m.marca,
+                                    marca: m.marca_nombre || m.marca,
                                     modelo_tipo: m.modelo_tipo,
                                     serie: m.serie,
                                     anio: m.anio,
@@ -986,10 +993,7 @@ function MaquinaForm({
         </div>
         <div>
           <Label className="text-[11px]">Marca</Label>
-          <Select value={form.marca ?? "CLAAS"} onValueChange={(v) => setForm({ ...form, marca: v as Marca, modelo_tipo: null })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{MARCAS.filter((m) => m !== "OTROS" || form.marca === "OTROS").map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-          </Select>
+          <MarcaMaquinaSelect value={form.marca_nombre || form.marca || "CLAAS"} onValueChange={(marca_nombre) => setForm({ ...form, marca_nombre, modelo_tipo: null })} />
         </div>
         <div>
           <Label className="text-[11px]">Subgrupo</Label>
@@ -1002,7 +1006,7 @@ function MaquinaForm({
         <div>
           <Label className="text-[11px]">Modelo</Label>
           <ModeloMaquinaSelect
-            marca={form.marca ?? "CLAAS"}
+            marca={form.marca_nombre || form.marca || "CLAAS"}
             subgrupo={form.subgrupo ?? "OTRO"}
             value={form.modelo_tipo}
             onValueChange={(modelo_tipo) => setForm({ ...form, modelo_tipo })}
