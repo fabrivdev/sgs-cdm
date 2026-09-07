@@ -101,7 +101,7 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_completion_tokens: 2200,
+        max_completion_tokens: 1200,
         reasoning_effort: "none",
         response_format: { type: "json_object" },
         messages: [{
@@ -140,9 +140,9 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
     lastFailure = { status: response.status, body: failureBody };
     console.error("[machine-document-extractor] Groq", response.status, model, failureBody);
 
-    // Authentication and rate limits are shared across models. Retrying them
-    // immediately only increases pressure on the same account quota.
-    if (response.status === 401 || response.status === 403 || response.status === 429) break;
+    // Authentication failures affect every model. Rate limits can be
+    // model-specific, so a 429 must still allow the second vision model.
+    if (response.status === 401 || response.status === 403) break;
   }
 
   if (lastFailure?.status === 429) {
@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
     }
     if (dataUrl.length > 16_500_000) return extractionIssue("La imagen supera el limite de 12 MB.", "INVALID_INPUT", false);
 
-    const apiKey = Deno.env.get("GROQ_API_KEY");
+    const apiKey = Deno.env.get("GROQ_API_KEY")?.trim();
     if (!apiKey) return extractionIssue("La lectura automatica no esta configurada.", "CONFIG", false);
     const schema = documentType === "NP" ? NP_SCHEMA : INVOICE_SCHEMA;
     const purpose = documentType === "NP"
