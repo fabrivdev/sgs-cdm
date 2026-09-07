@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const DEFAULT_GEMINI_VISION_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
+let cachedGeminiModels: string[] | undefined;
 type ExtractionIssueCode = "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT" | "INVALID_INPUT" | "CONFIG";
 
 class ExtractionError extends Error {
@@ -86,6 +86,54 @@ function extractJson(raw: string) {
   throw new Error("Model response contained incomplete JSON");
 }
 
+function geminiModelScore(model: string) {
+  let score = 0;
+  if (/^gemini-\d+(?:\.\d+)?-flash$/.test(model)) score += 100;
+  if (model.includes("flash")) score += 50;
+  if (model.includes("latest")) score += 20;
+  if (model.includes("lite")) score -= 10;
+  if (/preview|experimental|exp/.test(model)) score -= 20;
+  return score;
+}
+
+async function listAvailableGeminiModels(apiKey: string) {
+  if (cachedGeminiModels?.length) return cachedGeminiModels;
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", {
+    headers: { "x-goog-api-key": apiKey },
+  });
+  if (!response.ok) {
+    const failureBody = await response.text();
+    console.error("[machine-document-extractor] Gemini models.list", response.status, failureBody);
+    if (response.status === 429) throw new ExtractionError("Gemini rate limit", 429, "RATE_LIMIT");
+    if (response.status === 401 || response.status === 403) {
+      throw new ExtractionError("Gemini authentication failed", 503, "AUTH");
+    }
+    throw new ExtractionError(`Gemini models.list failed (${response.status})`, 503, "PROVIDER");
+  }
+
+  const payload = await response.json();
+  const models = Array.isArray(payload?.models) ? payload.models : [];
+  cachedGeminiModels = models
+    .filter((model: { supportedGenerationMethods?: unknown }) =>
+      Array.isArray(model?.supportedGenerationMethods) &&
+      model.supportedGenerationMethods.includes("generateContent")
+    )
+    .map((model: { name?: unknown }) => typeof model?.name === "string" ? model.name.replace(/^models\//, "") : "")
+    .filter((model: string) =>
+      model.includes("gemini") &&
+      model.includes("flash") &&
+      !/(?:image|live|tts|transcribe|embedding)/.test(model)
+    )
+    .sort((left: string, right: string) => geminiModelScore(right) - geminiModelScore(left))
+    .slice(0, 4);
+
+  if (!cachedGeminiModels.length) {
+    throw new ExtractionError("Gemini has no compatible generateContent model", 503, "PROVIDER");
+  }
+  console.info("[machine-document-extractor] Available Gemini models", cachedGeminiModels);
+  return cachedGeminiModels;
+}
+
 async function requestDocumentExtraction(
   apiKey: string,
   prompt: string,
@@ -93,9 +141,10 @@ async function requestDocumentExtraction(
   mimeType: string,
 ) {
   const configuredModel = Deno.env.get("GEMINI_VISION_MODEL")?.trim();
-  const models = configuredModel
-    ? [configuredModel, ...DEFAULT_GEMINI_VISION_MODELS.filter((model) => model !== configuredModel)]
-    : DEFAULT_GEMINI_VISION_MODELS;
+  const availableModels = await listAvailableGeminiModels(apiKey);
+  const models = configuredModel && availableModels.includes(configuredModel)
+    ? [configuredModel, ...availableModels.filter((model) => model !== configuredModel)]
+    : availableModels;
   const base64Data = dataUrl.slice(dataUrl.indexOf(",") + 1);
   let lastFailure: { status: number; body: string } | undefined;
   let invalidOutput = false;
