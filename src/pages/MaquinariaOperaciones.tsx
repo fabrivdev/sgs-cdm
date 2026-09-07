@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, FileCheck2, FileText, LoaderCircle, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, Download, Eye, FileCheck2, FileText, LoaderCircle, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -446,13 +446,28 @@ async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTA
     body: { documentType, mimeType: prepared.mimeType, dataUrl: prepared.dataUrl },
   });
   if (error) {
-    const raw = [error.message, (error as any).context?.status, (error as any).context?.statusText]
+    const context = (error as any).context;
+    let functionMessage = "";
+    if (context && typeof context.clone === "function") {
+      try {
+        const payload = await context.clone().json();
+        functionMessage = typeof payload?.error === "string" ? payload.error : "";
+      } catch {
+        try {
+          const responseText = (await context.clone().text()).trim();
+          if (responseText && !responseText.startsWith("<")) functionMessage = responseText;
+        } catch {
+          // The generic SDK error below remains available as a fallback.
+        }
+      }
+    }
+    const raw = [functionMessage, error.message, context?.status, context?.statusText]
       .filter(Boolean)
       .join(" ");
     if (/404|not[_ ]found|function.*not.*found|failed to send/i.test(raw)) {
       throw new Error("El lector automático todavía no está desplegado en Supabase. Podés completar los datos manualmente o publicar la función machine-document-extractor.");
     }
-    throw error;
+    throw new Error(functionMessage || "No se pudo leer la imagen. Reintentá; si continúa, podés completar los datos manualmente.");
   }
   if (data?.error) throw new Error(data.error);
   return data?.data ?? {};
@@ -1365,6 +1380,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [extracted, setExtracted] = useState<any>({});
   const [form, setForm] = useState({ np_numero: "", np_fecha: "", cliente_nombre: "", comercial: "", observaciones: "" });
@@ -1385,7 +1401,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   });
   useEffect(() => {
     if (!open) return;
-    setFile(null); setExtracted({});
+    setFile(null); setExtracted({}); setExtractionError(null);
     if (operationId) {
       if (!editQuery.data) return;
       const operation = editQuery.data.operation;
@@ -1418,7 +1434,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
 
   const chooseFile = async (picked?: File) => {
     if (!picked) return;
-    setFile(picked); setReading(true);
+    setFile(picked); setReading(true); setExtractionError(null);
     try {
       const data = await extractDocument(picked, "NP"); setExtracted(data);
       setForm((old) => ({
@@ -1433,7 +1449,11 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         setLines(extractedLinesToDraft(data.lineas, data.confianza ?? {}));
       }
       toast.success("Lectura terminada. Revisá los datos antes de guardar.");
-    } catch (error: any) { toast.warning(error?.message ?? "No se pudo leer; completá los datos manualmente."); }
+    } catch (error: any) {
+      const message = error?.message ?? "No se pudo leer; completá los datos manualmente.";
+      setExtractionError(message);
+      toast.warning(message);
+    }
     finally { setReading(false); }
   };
   const updateLine = (index: number, patch: Partial<DraftLine>) => setLines((all) => all.map((line, i) => i === index ? { ...line, ...patch } : line));
@@ -1472,6 +1492,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         </button>
         {previewUrl && <Button type="button" variant="outline" size="sm" onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><Eye className="mr-1.5 h-3.5 w-3.5" />Ver documento</Button>}
       </div>
+      {extractionError && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div className="min-w-0 flex-1"><p>{extractionError}</p><p className="mt-0.5 text-amber-700">El documento quedó adjunto y podés completar los campos manualmente.</p></div>{file && <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-amber-300 bg-white px-2 text-[11px]" disabled={reading} onClick={() => chooseFile(file)}><RotateCcw className="mr-1 h-3 w-3" />Reintentar</Button>}</div>}
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: e.target.value })} /></Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} /></Field><Field label="Operativo comercial"><Input value={form.comercial} onChange={(e) => setForm({ ...form, comercial: e.target.value })} /></Field></div>
       <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={i} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><CompactSelect value={line.marca} values={["CLAAS", "HORSCH", "OTROS"]} onChange={(v) => updateLine(i, { marca: v as DraftLine["marca"], modelo: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={(MACHINE_SUBGROUPS as readonly string[]).filter((v) => v !== "SUELO")} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{line.marca === "OTROS" && <p className="mt-2 text-[11px] text-amber-700">Se seguirá en la operación, pero no podrá ingresar al Parque mientras la marca no esté admitida.</p>}</div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>

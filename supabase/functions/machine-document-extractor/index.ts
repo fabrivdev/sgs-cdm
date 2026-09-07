@@ -4,7 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const DEFAULT_VISION_MODELS = ["qwen/qwen3.6-27b", "qwen/qwen3.8-27b"];
 
 class ExtractionError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly code: "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT") {
     super(message);
   }
 }
@@ -83,6 +83,7 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
     ? [configuredModel, ...DEFAULT_VISION_MODELS.filter((model) => model !== configuredModel)]
     : DEFAULT_VISION_MODELS;
   let lastFailure: { status: number; body: string } | undefined;
+  let invalidOutput = false;
 
   for (const model of models) {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -93,6 +94,7 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
         temperature: 0,
         max_completion_tokens: 2200,
         reasoning_effort: "none",
+        response_format: { type: "json_object" },
         messages: [{
           role: "user",
           content: [
@@ -110,6 +112,7 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
         try {
           return { data: extractJson(raw), model: completion?.model ?? model };
         } catch (parseError) {
+          invalidOutput = true;
           console.error(
             "[machine-document-extractor] Invalid model JSON",
             model,
@@ -119,6 +122,7 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
           continue;
         }
       }
+      invalidOutput = true;
       console.error("[machine-document-extractor] Empty model response", model);
       continue;
     }
@@ -132,10 +136,19 @@ async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl
     if (response.status === 401 || response.status === 403 || response.status === 429) break;
   }
 
-  throw new ExtractionError(
-    `Groq request failed (${lastFailure?.status ?? "unknown"})`,
-    lastFailure?.status === 429 ? 429 : 422,
-  );
+  if (lastFailure?.status === 429) {
+    throw new ExtractionError("Groq rate limit", 429, "RATE_LIMIT");
+  }
+  if (lastFailure?.status === 401 || lastFailure?.status === 403) {
+    throw new ExtractionError("Groq authentication failed", 503, "AUTH");
+  }
+  if (lastFailure) {
+    throw new ExtractionError(`Groq request failed (${lastFailure.status})`, 503, "PROVIDER");
+  }
+  if (invalidOutput) {
+    throw new ExtractionError("Model returned invalid structured output", 422, "INVALID_OUTPUT");
+  }
+  throw new ExtractionError("Document extraction failed", 503, "PROVIDER");
 }
 
 Deno.serve(async (req) => {
@@ -211,10 +224,16 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("[machine-document-extractor]", error);
     if (error instanceof ExtractionError) {
-      if (error.status === 429) {
+      if (error.code === "RATE_LIMIT") {
         return json({ error: "La lectura automatica esta ocupada. Espera unos segundos e intenta de nuevo." }, 429);
       }
-      return json({ error: "No se encontraron datos legibles. Proba con una imagen mas nitida o completa los campos manualmente." }, 422);
+      if (error.code === "AUTH") {
+        return json({ error: "El servicio de lectura no pudo autenticarse. Un administrador debe revisar la configuracion de GROQ_API_KEY en Supabase." }, error.status);
+      }
+      if (error.code === "PROVIDER") {
+        return json({ error: "El servicio de lectura no esta disponible en este momento. Reintenta en unos segundos o completa los campos manualmente." }, error.status);
+      }
+      return json({ error: "La imagen fue recibida, pero el lector no pudo estructurar los datos. Reintenta o completa los campos manualmente." }, error.status);
     }
     return json({ error: "No se pudo procesar el documento. Podes continuar con carga manual." }, 500);
   }
