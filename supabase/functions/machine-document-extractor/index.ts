@@ -1,7 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const DEFAULT_VISION_MODELS = ["qwen/qwen3.6-27b", "qwen/qwen3.8-27b"];
+const DEFAULT_GEMINI_VISION_MODEL = "gemini-3.7-flash";
 type ExtractionIssueCode = "RATE_LIMIT" | "AUTH" | "PROVIDER" | "INVALID_OUTPUT" | "INVALID_INPUT" | "CONFIG";
 
 class ExtractionError extends Error {
@@ -86,78 +86,83 @@ function extractJson(raw: string) {
   throw new Error("Model response contained incomplete JSON");
 }
 
-async function requestDocumentExtraction(apiKey: string, prompt: string, dataUrl: string) {
-  const configuredModel = Deno.env.get("GROQ_VISION_MODEL")?.trim();
-  const models = configuredModel
-    ? [configuredModel, ...DEFAULT_VISION_MODELS.filter((model) => model !== configuredModel)]
-    : DEFAULT_VISION_MODELS;
-  let lastFailure: { status: number; body: string } | undefined;
-  let invalidOutput = false;
-
-  for (const model of models) {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+async function requestDocumentExtraction(
+  apiKey: string,
+  prompt: string,
+  dataUrl: string,
+  mimeType: string,
+) {
+  const model = Deno.env.get("GEMINI_VISION_MODEL")?.trim() || DEFAULT_GEMINI_VISION_MODEL;
+  const base64Data = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
       method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify({
-        model,
-        temperature: 0,
-        max_completion_tokens: 1200,
-        reasoning_effort: "none",
-        response_format: { type: "json_object" },
-        messages: [{
+        contents: [{
           role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: dataUrl } },
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: base64Data } },
           ],
         }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 4096,
+          thinkingConfig: { thinkingLevel: "low" },
+        },
       }),
-    });
+    },
+  );
 
-    if (response.ok) {
-      const completion = await response.json();
-      const raw = completion?.choices?.[0]?.message?.content;
-      if (typeof raw === "string" && raw.trim()) {
-        try {
-          return { data: extractJson(raw), model: completion?.model ?? model };
-        } catch (parseError) {
-          invalidOutput = true;
-          console.error(
-            "[machine-document-extractor] Invalid model JSON",
-            model,
-            completion?.choices?.[0]?.finish_reason,
-            parseError,
-          );
-          continue;
-        }
-      }
-      invalidOutput = true;
-      console.error("[machine-document-extractor] Empty model response", model);
-      continue;
-    }
-
+  if (!response.ok) {
     const failureBody = await response.text();
-    lastFailure = { status: response.status, body: failureBody };
-    console.error("[machine-document-extractor] Groq", response.status, model, failureBody);
-
-    // Authentication failures affect every model. Rate limits can be
-    // model-specific, so a 429 must still allow the second vision model.
-    if (response.status === 401 || response.status === 403) break;
+    console.error(
+      "[machine-document-extractor] Gemini",
+      response.status,
+      model,
+      response.headers.get("retry-after"),
+      failureBody,
+    );
+    if (response.status === 429) {
+      throw new ExtractionError("Gemini rate limit", 429, "RATE_LIMIT");
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new ExtractionError("Gemini authentication failed", 503, "AUTH");
+    }
+    throw new ExtractionError(`Gemini request failed (${response.status})`, 503, "PROVIDER");
   }
 
-  if (lastFailure?.status === 429) {
-    throw new ExtractionError("Groq rate limit", 429, "RATE_LIMIT");
+  const completion = await response.json();
+  const raw = completion?.candidates?.[0]?.content?.parts
+    ?.map((part: { text?: unknown }) => typeof part?.text === "string" ? part.text : "")
+    .join("")
+    .trim();
+  if (!raw) {
+    console.error(
+      "[machine-document-extractor] Empty Gemini response",
+      model,
+      completion?.candidates?.[0]?.finishReason,
+      completion?.promptFeedback,
+    );
+    throw new ExtractionError("Gemini returned an empty response", 422, "INVALID_OUTPUT");
   }
-  if (lastFailure?.status === 401 || lastFailure?.status === 403) {
-    throw new ExtractionError("Groq authentication failed", 503, "AUTH");
+
+  try {
+    return { data: extractJson(raw), model };
+  } catch (parseError) {
+    console.error(
+      "[machine-document-extractor] Invalid Gemini JSON",
+      model,
+      completion?.candidates?.[0]?.finishReason,
+      parseError,
+    );
+    throw new ExtractionError("Gemini returned invalid structured output", 422, "INVALID_OUTPUT");
   }
-  if (lastFailure) {
-    throw new ExtractionError(`Groq request failed (${lastFailure.status})`, 503, "PROVIDER");
-  }
-  if (invalidOutput) {
-    throw new ExtractionError("Model returned invalid structured output", 422, "INVALID_OUTPUT");
-  }
-  throw new ExtractionError("Document extraction failed", 503, "PROVIDER");
 }
 
 Deno.serve(async (req) => {
@@ -189,7 +194,7 @@ Deno.serve(async (req) => {
     }
     if (dataUrl.length > 16_500_000) return extractionIssue("La imagen supera el limite de 12 MB.", "INVALID_INPUT", false);
 
-    const apiKey = Deno.env.get("GROQ_API_KEY")?.trim();
+    const apiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
     if (!apiKey) return extractionIssue("La lectura automatica no esta configurada.", "CONFIG", false);
     const schema = documentType === "NP" ? NP_SCHEMA : INVOICE_SCHEMA;
     const purpose = documentType === "NP"
@@ -228,7 +233,7 @@ Deno.serve(async (req) => {
       `Se conciso: observaciones maximo 120 caracteres y no agregues explicaciones.\n` +
       `Responde exclusivamente JSON valido con esta forma:\n${schema}`;
 
-    const extraction = await requestDocumentExtraction(apiKey, prompt, dataUrl);
+    const extraction = await requestDocumentExtraction(apiKey, prompt, dataUrl, mimeType);
     return json({ data: extraction.data, documentType, model: extraction.model });
   } catch (error) {
     console.error("[machine-document-extractor]", error);
@@ -237,7 +242,7 @@ Deno.serve(async (req) => {
         return extractionIssue("Se alcanzo el limite temporal de lecturas. Espera unos segundos e intenta de nuevo.", error.code, true);
       }
       if (error.code === "AUTH") {
-        return extractionIssue("El servicio de lectura no pudo autenticarse. Un administrador debe revisar la configuracion de GROQ_API_KEY en Supabase.", error.code, false);
+        return extractionIssue("El servicio de lectura no pudo autenticarse. Un administrador debe revisar la configuracion de GEMINI_API_KEY en Supabase.", error.code, false);
       }
       if (error.code === "PROVIDER") {
         return extractionIssue("El servicio de lectura no esta disponible en este momento. Reintenta en unos segundos o completa los campos manualmente.", error.code, true);
