@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Download, Eye, FileCheck2, FileText, LoaderCircle, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, Download, Eye, FileCheck2, FileText, LoaderCircle, MoreVertical, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import {
@@ -32,11 +33,12 @@ import { MachineCatalogLineReview } from "@/components/parque/MachineCatalogLine
 import { useMachineCatalog } from "@/hooks/useMachineCatalog";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import { catalogLineKey, exactCatalogName, normalizeNpCode, reconcileCatalogLine, reviewCatalogLine, upperMachineText, validMachineDate } from "@/lib/machineOrderValidation";
-import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem, ProcessStepper } from "@/components/maquinaria/MachineDetailPrimitives";
+import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem } from "@/components/maquinaria/MachineDetailPrimitives";
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 import { legacyMachineBrand, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
+import { isImportSaleInvoiced } from "@/lib/machineImportStatus";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -1319,6 +1321,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const [receiving, setReceiving] = useState(false);
   const [reversingReceipt, setReversingReceipt] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [uploadingOc, setUploadingOc] = useState(false);
   const [uploadingSupplierInvoice, setUploadingSupplierInvoice] = useState(false);
   const detailOcRef = useRef<HTMLInputElement>(null);
@@ -1350,7 +1353,8 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   if (!row) return null;
   const arrival = arrivalState(row);
   const stockConfirmed = importStockConfirmed(row);
-  const progressIndex = stockConfirmed ? 3 : row.ata || arrival === "COMPLETADO" ? 2 : arrival === "EN_TRANSITO" ? 1 : 0;
+  const showAvailabilityStatus = Boolean(row.estado_disponibilidad && row.estado_disponibilidad !== "SIN_CHASIS");
+  const headerStatus = showAvailabilityStatus ? (AVAILABILITY_LABEL[row.estado_disponibilidad!] ?? row.estado_disponibilidad) : ARRIVAL_LABEL[arrival];
   const closeEditors = () => { setEditingChassis(false); setEditingImportData(false); setEditingInvoice(false); };
   const uploadOc = async (file?: File) => {
     if (!file) return;
@@ -1400,7 +1404,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   const ocDocument = (ocDocuments[0] ?? null) as StoredMachineDocument | null;
   const supplierDocument = (supplierDocuments[0] ?? null) as StoredMachineDocument | null;
   const hasSupplierInvoiceData = Boolean(row.invoice_supplier || row.factura_proveedor_fecha || row.costo_final_sin_iva != null || row.costo_final != null);
-  const saleInvoiced = ["TRUE", "SI", "SÍ", "1"].includes(String(row.venta_facturada ?? "").trim().toUpperCase());
+  const saleInvoiced = isImportSaleInvoiced(row);
   const deleteImportUnit = async () => {
     setDeleting(true);
     try {
@@ -1419,10 +1423,9 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
     }
   };
   return <ResponsiveDrawer open onOpenChange={onOpenChange} size="lg">
-    <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><div className="mt-1 flex flex-wrap items-center gap-1.5"><Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>{row.producto && row.producto !== row.modelo && <span className="text-[10px] text-muted-foreground">{row.producto}</span>}</div></div><div className="flex flex-col items-end gap-1"><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>{row.estado_disponibilidad && <span className="text-[10px] text-muted-foreground">{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</span>}</div></div></ResponsiveDrawerHeader>
+    <ResponsiveDrawerHeader><div className="flex items-start justify-between gap-3"><div><h2 className="text-[16px] font-semibold">{row.modelo || row.producto || "Importación"}</h2><div className="mt-1 flex flex-wrap items-center gap-1.5"><Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>{row.producto && row.producto !== row.modelo && <span className="text-[10px] text-muted-foreground">{row.producto}</span>}</div></div><div className="flex items-start gap-2"><Badge variant="outline" className={cn("text-[10px]", showAvailabilityStatus ? availabilityClass(row.estado_disponibilidad) : arrivalClass(arrival))}>{headerStatus}</Badge>{canEdit && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 shrink-0" aria-label="Acciones de la importación"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48"><DropdownMenuItem onClick={() => onEditHeader(row)}><Pencil className="mr-2 h-4 w-4" />Editar importación</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => setDeleteDialogOpen(true)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar {Number(row.cantidad_lote) > 1 ? "unidad" : "línea"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</div></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <ProcessStepper steps={["Planificada", "En tránsito", "Recibida", "Stock"]} currentIndex={progressIndex} />
         <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
@@ -1430,9 +1433,9 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
             {editingChassis ? <div className="flex items-end gap-2"><Field label="Chasis"><Input autoFocus value={form.chasis} onChange={(event) => setForm((value) => ({ ...value, chasis: event.target.value }))} /></Field><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, chasis: row.chasis ?? "" })); setEditingChassis(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div> : <KeyValueGrid><KeyValueItem label="Llave interna" value={row.llave_interna} empty="—" /><KeyValueItem label="Unidad del lote" value={`${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`} /><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /></KeyValueGrid>}
           </DetailSection>
           <DetailSection title="Importación" action={canEdit && !editingImportData ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditingImportData(true)}><Pencil className="mr-1.5 h-3 w-3" />Editar datos</Button> : undefined}>
-            {editingImportData ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field><Field label="Costo sin IVA"><Input type="number" value={form.costo_final_sin_iva} onChange={(event) => setForm((value) => ({ ...value, costo_final_sin_iva: event.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(event) => setForm((value) => ({ ...value, costo_final: event.target.value }))} /></Field></div><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, eta: row.eta ?? "", costo_final_sin_iva: row.costo_final_sin_iva == null ? "" : String(row.costo_final_sin_iva), costo_final: row.costo_final == null ? "" : String(row.costo_final) })); setEditingImportData(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div></div> : <KeyValueGrid><KeyValueItem label="OC" value={row.oc} empty="—" mono /><KeyValueItem label="Fecha de pedido" value={formatDate(row.fecha_pedido)} empty="—" /><KeyValueItem label="Embarque estimado" value={formatDate(row.eta)} empty="—" /><KeyValueItem label="Valor OC" value={row.precio_oc != null ? formatUsd(row.precio_oc) : null} empty="—" /><KeyValueItem label="Costo sin IVA" value={row.costo_final_sin_iva != null ? formatUsd(row.costo_final_sin_iva) : null} empty="—" /><KeyValueItem label="Costo final" value={row.costo_final != null ? formatUsd(row.costo_final) : null} empty="—" /><KeyValueItem label="Venta facturada" value={saleInvoiced ? "Sí" : "No"} /><KeyValueItem label="Valor de venta" value={row.valor_venta != null ? formatUsd(row.valor_venta) : null} empty="—" /></KeyValueGrid>}
+            {editingImportData ? <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field><Field label="Costo sin IVA"><Input type="number" value={form.costo_final_sin_iva} onChange={(event) => setForm((value) => ({ ...value, costo_final_sin_iva: event.target.value }))} /></Field><Field label="Costo final"><Input type="number" value={form.costo_final} onChange={(event) => setForm((value) => ({ ...value, costo_final: event.target.value }))} /></Field></div><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setForm((value) => ({ ...value, eta: row.eta ?? "", costo_final_sin_iva: row.costo_final_sin_iva == null ? "" : String(row.costo_final_sin_iva), costo_final: row.costo_final == null ? "" : String(row.costo_final) })); setEditingImportData(false); }}>Cancelar</Button><Button size="sm" onClick={saveUnit} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div></div> : <KeyValueGrid><KeyValueItem label="OC" value={row.oc} empty="—" mono /><KeyValueItem label="Estado de importación" value={ARRIVAL_LABEL[arrival]} /><KeyValueItem label="Fecha de pedido" value={formatDate(row.fecha_pedido)} empty="—" /><KeyValueItem label="Embarque estimado" value={formatDate(row.eta)} empty="—" /><KeyValueItem label="Valor OC" value={row.precio_oc != null ? formatUsd(row.precio_oc) : null} empty="—" /><KeyValueItem label="Costo sin IVA" value={row.costo_final_sin_iva != null ? formatUsd(row.costo_final_sin_iva) : null} empty="—" /><KeyValueItem label="Costo final" value={row.costo_final != null ? formatUsd(row.costo_final) : null} empty="—" /><KeyValueItem label="Venta" value={saleInvoiced ? "Facturada" : row.np_numero ? "Pendiente de facturación" : "Sin pedido vinculado"} /><KeyValueItem label="Valor de venta" value={row.valor_venta != null ? formatUsd(row.valor_venta) : null} empty="—" /></KeyValueGrid>}
           </DetailSection>
-          {(row.stock_sucursal || row.stock_deposito || row.disponibilidad_detalle) && <DetailSection title="Stock vinculado"><KeyValueGrid><KeyValueItem label="Sucursal" value={row.stock_sucursal} /><KeyValueItem label="Depósito" value={row.stock_deposito} /><KeyValueItem label="Saldo" value={row.stock_saldo} /><KeyValueItem label="Estado" value={row.disponibilidad_detalle} /></KeyValueGrid></DetailSection>}
+          {(row.stock_sucursal || row.stock_deposito || row.stock_saldo != null || (row.disponibilidad_detalle && row.estado_disponibilidad !== "EN_PARQUE")) && <DetailSection title="Stock vinculado"><KeyValueGrid>{row.stock_sucursal && <KeyValueItem label="Sucursal" value={row.stock_sucursal} />}{row.stock_deposito && <KeyValueItem label="Depósito" value={row.stock_deposito} />}{row.stock_saldo != null && <KeyValueItem label="Saldo" value={row.stock_saldo} />}<KeyValueItem label="Estado" value={row.disponibilidad_detalle || AVAILABILITY_LABEL[row.estado_disponibilidad ?? ""]} empty="—" /></KeyValueGrid></DetailSection>}
         </TabsContent>
 
         <TabsContent value="pedido" className="space-y-4">
@@ -1464,16 +1467,12 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
         </TabsContent>
       </Tabs>
     </ResponsiveDrawerBody>
-    {canEdit && <ResponsiveDrawerFooter className="justify-between">
-      <AlertDialog>
-        <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={deleting}><Trash2 className="mr-1.5 h-3.5 w-3.5" />Eliminar {Number(row.cantidad_lote) > 1 ? "unidad" : "línea"}</Button></AlertDialogTrigger>
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>¿Eliminar esta {Number(row.cantidad_lote) > 1 ? "unidad" : "línea de importación"}?</AlertDialogTitle><AlertDialogDescription>{Number(row.cantidad_lote) > 1 ? `Se eliminará solamente la unidad ${row.numero_unidad} de ${row.cantidad_lote}; las demás seguirán en la importación.` : "Se eliminará la línea completa y sus documentos. Esta acción solo se permite si todavía no tiene factura, recepción, stock ni parque vinculados."}</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={deleteImportUnit} disabled={deleting}>{deleting ? "Eliminando..." : "Eliminar"}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
-      <Button variant="outline" size="sm" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar importación</Button>
-    </ResponsiveDrawerFooter>}
+    </AlertDialog>
   </ResponsiveDrawer>;
 }
 
