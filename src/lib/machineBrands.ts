@@ -4,10 +4,11 @@ import type { CSSProperties } from "react";
 export const DEFAULT_MACHINE_BRANDS = ["CLAAS", "HORSCH"] as const;
 
 export function normalizeMachineBrand(value: unknown): string {
-  return String(value ?? "")
+  const normalized = String(value ?? "")
     .trim()
     .replace(/\s+/g, " ")
     .toLocaleUpperCase("es");
+  return normalized === "NB MAQUINAS" ? "NB" : normalized;
 }
 
 export function legacyMachineBrand(value: unknown): Marca {

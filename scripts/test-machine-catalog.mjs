@@ -53,16 +53,23 @@ try {
   await db.exec(`
     SELECT set_config('test.role','admin',false);
     SELECT public.maquinaria_gestionar_catalogo('marca','HORSCH','restaurar');
+    SELECT public.maquinaria_registrar_marca_catalogo('CLAAS');
+    INSERT INTO public.maquinaria_marcas_catalogo(nombre,activa) VALUES('NB',true),('NB MAQUINAS',false);
     CREATE TABLE public.parque_maquinas(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),marca public.marca,marca_nombre text,subgrupo public.subgrupo_maquina,modelo_tipo text);
     CREATE TABLE public.maquinaria_importacion_lineas(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),marca_importacion public.marca,marca_nombre text,proveedor text,linea_id uuid,producto text,subgrupo public.subgrupo_maquina,modelo text);
-    CREATE TABLE public.parque_modelos_alias(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),marca public.marca,subgrupo public.subgrupo_maquina,alias text,clave_alias text,modelo_catalogo_id uuid REFERENCES public.parque_modelos_catalogo(id));
+    CREATE TABLE public.parque_modelos_alias(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),marca public.marca,subgrupo public.subgrupo_maquina,alias text,clave_alias text,modelo_catalogo_id uuid REFERENCES public.parque_modelos_catalogo(id),UNIQUE(marca,subgrupo,clave_alias));
     CREATE TRIGGER trg_sincronizar_modelo_maquina_catalogo BEFORE INSERT OR UPDATE OF marca,marca_nombre,subgrupo,modelo_tipo ON public.parque_maquinas FOR EACH ROW EXECUTE FUNCTION public.sincronizar_modelo_maquina_catalogo();
     SELECT public.maquinaria_registrar_modelo_catalogo('HORSCH','SEMBRADORAS','MAESTRO CF 18.50');
     SELECT public.maquinaria_registrar_modelo_catalogo('HORSCH','SEMBRADORAS','MAESTRO 18 CF E50');
+    SELECT public.maquinaria_registrar_modelo_catalogo('HORSCH','PULVERIZADORAS','LEEB 5280 VL');
+    SELECT public.maquinaria_registrar_modelo_catalogo('HORSCH','SUELO','DAKAR 8 CF');
+    SELECT public.maquinaria_registrar_modelo_catalogo('HORSCH','SUELO','JOKER 7 RT');
+    INSERT INTO public.parque_modelos_catalogo(marca,marca_nombre,subgrupo,nombre,clave_normalizada,activo)
+      VALUES('HORSCH','HORSCH','SEMBRADORAS','DAKAR 8 CF','DAKAR8CF',false);
     INSERT INTO public.parque_modelos_alias(marca,subgrupo,alias,clave_alias,modelo_catalogo_id)
       SELECT 'HORSCH','SEMBRADORAS','MAESTRO 18 CF E50','MAESTRO18CFE50',id FROM public.parque_modelos_catalogo WHERE nombre='MAESTRO CF 18.50';
     INSERT INTO public.parque_modelos_alias(marca,subgrupo,alias,clave_alias,modelo_catalogo_id)
-      SELECT 'HORSCH','PULVERIZADORAS','LEEB 5250','LEEB5250',id FROM public.parque_modelos_catalogo WHERE nombre='LEEB 6.280';
+      SELECT 'HORSCH','PULVERIZADORAS','LEEB 5250','LEEB5250',id FROM public.parque_modelos_catalogo WHERE nombre='LEEB 5280 VL';
   `);
   // Insert Parque fixture before its sync trigger to exercise reconciliation of missing catalog entries.
   await db.exec(`
@@ -72,9 +79,35 @@ try {
       ('CLAAS','CLAAS','COSECHADORAS','TRION 720'),
       ('HORSCH','HORSCH','SEMBRADORAS','MAESTRO 18 CF E50'),
       ('HORSCH','HORSCH','PULVERIZADORAS','LEEB 5.280');
+    INSERT INTO public.maquinaria_importacion_lineas(marca_importacion,marca_nombre,proveedor,subgrupo,modelo) VALUES
+      ('CLAAS','CLAAS','CLAAS','TRACTORES','AXION 870'),
+      ('HORSCH','HORSCH','HORSCH','PULVERIZADORAS','LEEB 5.280 - 36 M'),
+      ('HORSCH','HORSCH','HORSCH','SEMBRADORAS','DAKAR 8 CF'),
+      ('HORSCH','HORSCH','HORSCH','SUELO','JOKER 7 RT +'),
+      ('OTROS','NB MAQUINAS','NB MAQUINAS','PLATAFORMAS/CABEZALES','CABEZAL MAICERO 20L X 45CM');
     ALTER TABLE public.parque_maquinas ENABLE TRIGGER trg_sincronizar_modelo_maquina_catalogo;
   `);
   await db.exec(await readFile(new URL("../supabase/migrations/20260908120000_shared_machine_model_identity.sql", import.meta.url), "utf8"));
+  const importCatalogMigration = await readFile(new URL("../supabase/migrations/20260908140000_reconcile_import_machine_model_variants.sql", import.meta.url), "utf8");
+  await db.exec(importCatalogMigration);
+  await db.exec(importCatalogMigration);
+  assert.ok((await first("SELECT id FROM public.parque_modelos_catalogo WHERE nombre='AXION 870' AND marca_nombre='CLAAS' AND activo"))?.id, "Import-only model was added to the shared catalog");
+  assert.ok((await first("SELECT id FROM public.parque_modelos_catalogo WHERE nombre='LEEB 6.280 VL' AND marca_nombre='HORSCH' AND activo"))?.id, "LEEB 6.280 VL remains a distinct catalog option");
+  assert.equal((await first("SELECT nombre FROM public.parque_modelos_catalogo WHERE clave_normalizada='LEEB5280VL' AND marca_nombre='HORSCH' AND activo")).nombre, "LEEB 5.280 VL");
+  assert.equal((await first("SELECT count(*)::int AS n FROM public.parque_modelos_catalogo WHERE marca_nombre='HORSCH' AND nombre='LEEB 5.280 - 36 M'")).n, 0, "The 36 m wording is an alias, not another selectable model");
+  const leebWidthImport = await first("SELECT modelo,modelo_catalogo_id FROM public.maquinaria_importacion_lineas WHERE modelo='LEEB 5.280 - 36 M'");
+  assert.equal(leebWidthImport.modelo, "LEEB 5.280 - 36 M");
+  assert.equal(leebWidthImport.modelo_catalogo_id, (await first("SELECT id FROM public.parque_modelos_catalogo WHERE nombre='LEEB 5.280 VL'")).id);
+  assert.equal((await first("SELECT activo FROM public.parque_modelos_catalogo WHERE marca_nombre='HORSCH' AND nombre='DAKAR 8 CF' AND subgrupo='SEMBRADORAS'")).activo, true);
+  assert.equal((await first("SELECT activo FROM public.parque_modelos_catalogo WHERE marca_nombre='HORSCH' AND nombre='DAKAR 8 CF' AND subgrupo='SUELO'")).activo, false);
+  assert.equal((await first("SELECT subgrupo FROM public.maquinaria_importacion_lineas WHERE modelo='DAKAR 8 CF'")).subgrupo, "SEMBRADORAS");
+  assert.ok((await first("SELECT id FROM public.parque_modelos_catalogo WHERE marca_nombre='HORSCH' AND nombre='JOKER 7 RT +' AND activo"))?.id, "JOKER 7 RT + is a distinct selectable model");
+  assert.equal((await first("SELECT count(*)::int AS n FROM public.parque_modelos_catalogo WHERE marca_nombre='HORSCH' AND nombre IN ('JOKER 7 RT','JOKER 7 RT +') AND activo")).n, 2);
+  assert.equal((await first("SELECT public.maquinaria_normalizar_marca('NB MAQUINAS') AS marca")).marca, "NB");
+  assert.ok((await first("SELECT id FROM public.parque_modelos_catalogo WHERE marca_nombre='NB' AND nombre='CABEZAL MAICERO 20L X 45CM' AND activo"))?.id, "NB MAQUINAS import was cataloged under NB");
+  const nbImport = await first("SELECT marca_nombre,proveedor,modelo_catalogo_id FROM public.maquinaria_importacion_lineas WHERE modelo='CABEZAL MAICERO 20L X 45CM'");
+  assert.equal(nbImport.marca_nombre, "NB"); assert.equal(nbImport.proveedor, "NB MAQUINAS"); assert.ok(nbImport.modelo_catalogo_id);
+  assert.equal((await first("SELECT count(*)::int AS n FROM public.maquinaria_importacion_lineas WHERE modelo_catalogo_id IS NULL")).n, 0, "Import-only exact variants were linked");
   const leeb = await first("SELECT * FROM public.parque_modelos_catalogo WHERE nombre='LEEB 6.280 VL' AND marca_nombre='HORSCH'");
   assert.ok(leeb?.id, "Missing Parque model was imported into shared catalog");
   assert.equal((await first("SELECT activo FROM public.parque_modelos_catalogo WHERE nombre='LEEB 5.280' AND marca_nombre='HORSCH'")).activo, false, "Retired model stays retired");
@@ -88,7 +121,8 @@ try {
   assert.equal(imported.modelo_catalogo_id,leeb.id); assert.equal(imported.subgrupo,'PULVERIZADORAS');
   const aliasOrder = await first(`INSERT INTO public.maquinaria_operacion_lineas(marca,marca_nombre,subgrupo,modelo) VALUES('HORSCH','HORSCH','OTRO','MAESTRO 18 CF E50') RETURNING *`);
   assert.equal(aliasOrder.modelo,'MAESTRO CF 18.50'); assert.equal(aliasOrder.subgrupo,'SEMBRADORAS');
-  assert.equal((await first("SELECT public.maquinaria_resolver_modelo_catalogo('HORSCH','OTRO','LEEB 5250') AS id")).id,null);
+  const reviewedLeebAlias = await first("SELECT public.maquinaria_resolver_modelo_catalogo('HORSCH','OTRO','LEEB 5250') AS id");
+  assert.equal(reviewedLeebAlias.id, (await first("SELECT id FROM public.parque_modelos_catalogo WHERE nombre='LEEB 5.280 VL'")).id);
   assert.equal((await first("SELECT public.maquinaria_resolver_modelo_catalogo('CLAAS','OTRO','LEEB 6.280 VL') AS id")).id,null);
   const otherBrand = await first(`INSERT INTO public.maquinaria_operacion_lineas(marca,subgrupo,modelo,datos_extraidos)
     VALUES('OTROS','PULVERIZADORAS','STAR 2500','{"marca_real":"JACTO"}') RETURNING *`);

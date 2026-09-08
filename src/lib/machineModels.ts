@@ -49,5 +49,6 @@ export function normalizeMachineModelKey(value: unknown) {
     .toLocaleUpperCase("es")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\+/g, " PLUS ")
     .replace(/[^A-Z0-9]+/g, "");
 }

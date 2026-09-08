@@ -9,6 +9,11 @@ describe("normalizeMachineModelKey", () => {
   it("unifica caracteres acentuados sin mezclar números", () => {
     expect(normalizeMachineModelKey("Jagüar 960")).toBe("JAGUAR960");
   });
+
+  it("conserva PLUS como parte de la identidad del modelo", () => {
+    expect(normalizeMachineModelKey("JOKER 7 RT +")).toBe("JOKER7RTPLUS");
+    expect(normalizeMachineModelKey("JOKER 7 RT +")).not.toBe(normalizeMachineModelKey("JOKER 7 RT"));
+  });
 });
 
 describe("canonicalMachineSubgroup", () => {
