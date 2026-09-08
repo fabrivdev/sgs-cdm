@@ -50,16 +50,47 @@ it("offers LEEB from OTRO and updates type with the catalog selection", async ()
       onValueChange={(modelo, model) => setLine({ modelo, subgrupo: model?.subgrupo ?? line.subgrupo })} /></>;
   }
   wrapper(<Form />);
-  await screen.findByRole("option", { name: "LEEB · PULVERIZADORAS" });
+  await screen.findByRole("option", { name: "LEEB" });
   expect(screen.queryByRole("option", { name: /STAR/ })).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
   expect(screen.getByRole("status")).toHaveTextContent("PULVERIZADORAS");
+  expect(screen.getByRole("option", { selected: true })).toHaveTextContent(/^LEEB$/);
 });
 it("still offers other brands' models in orders", async () => {
   const onChange = vi.fn<(name: string, model?: MachineCatalogModel) => void>();
   wrapper(<ModeloMaquinaSelect marca="JACTO" subgrupo="OTRO" onValueChange={onChange} />);
-  await screen.findByRole("option", { name: "STAR 2500 · PULVERIZADORAS" });
+  await screen.findByRole("option", { name: "STAR 2500" });
   expect(screen.queryByRole("option", { name: /LEEB/ })).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "3" } });
   expect(onChange).toHaveBeenCalledWith("STAR 2500", expect.objectContaining({ id: "3", marca_nombre: "JACTO", subgrupo: "PULVERIZADORAS" }));
+});
+
+it("filters HORSCH models by PULVERIZADORAS without adding the type to their names", async () => {
+  wrapper(<ModeloMaquinaSelect marca="HORSCH" subgrupo="PULVERIZADORAS" onValueChange={vi.fn()} />);
+  await screen.findByRole("option", { name: "LEEB" });
+  expect(screen.queryByRole("option", { name: /MAESTRO|STAR|PULVERIZADORAS/ })).not.toBeInTheDocument();
+});
+
+it("returns from custom input to the filtered list when changing the type", async () => {
+  function Form() {
+    const [line, setLine] = useState({ modelo: "", subgrupo: "OTRO" });
+    return <><button onClick={() => setLine({ modelo: "", subgrupo: "PULVERIZADORAS" })}>Filtrar pulverizadoras</button>
+      <ModeloMaquinaSelect marca="HORSCH" subgrupo={line.subgrupo} value={line.modelo}
+        onValueChange={modelo => setLine(current => ({ ...current, modelo }))} /></>;
+  }
+  wrapper(<Form />);
+  await screen.findByRole("option", { name: "LEEB" });
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "__OTHER__" } });
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "MODELO NUEVO" } });
+  fireEvent.click(screen.getByRole("button", { name: "Filtrar pulverizadoras" }));
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "LEEB" })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "MAESTRO" })).not.toBeInTheDocument();
+});
+
+it("explains an empty type without showing unrelated models", async () => {
+  wrapper(<ModeloMaquinaSelect marca="HORSCH" subgrupo="TRACTORES" onValueChange={vi.fn()} />);
+  await screen.findByText("No hay modelos activos para esta marca y tipo. Podés agregar uno nuevo.");
+  expect(screen.queryByRole("option", { name: /LEEB|MAESTRO|STAR/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "OTRO / NUEVO MODELO" })).toBeInTheDocument();
 });

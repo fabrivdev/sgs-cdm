@@ -5,7 +5,7 @@
 - Parque, Pedidos e Importaciones consultan `parque_modelos_catalogo`.
 - CLAAS y HORSCH se reconcilian con los modelos ya registrados en `parque_maquinas`.
 - Pedidos conserva las demás marcas y permite agregar nuevas marcas/modelos al catálogo común. Registrar una opción del catálogo no crea una máquina física en Parque.
-- Elegir una marca muestra todos sus modelos activos, independientemente del tipo seleccionado anteriormente. Elegir modelo completa el tipo en la misma actualización.
+- Con tipo OTRO (sin clasificación definida), elegir una marca muestra todos sus modelos activos. Al elegir un tipo concreto, el listado se filtra por marca y tipo. Modelo muestra solamente el nombre, sin repetir el tipo. Elegir modelo completa el tipo en la misma actualización.
 - La lectura de NP usa ese catálogo y sus equivalencias. Una similitud aproximada solo es una sugerencia: no se sustituye una variante numérica sin confirmación.
 - Las equivalencias históricas se aceptan automáticamente únicamente si preservan la numeración y no son ambiguas. Por ejemplo, `LEEB 5250` no se convierte en `LEEB 5280 VL`.
 
