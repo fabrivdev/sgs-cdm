@@ -1,5 +1,23 @@
 -- One model identity for Parque, Pedidos (including other brands) and Importaciones.
 -- Historical text is retained during backfill. No machine, order or invoice is deleted.
+
+-- Excepcion explicita y auditable al guardrail de digitos de mas abajo: estos
+-- 3 alias ya estaban cargados en parque_modelos_alias y ya fueron verificados
+-- a mano por el usuario -- son el mismo modelo fisico, solo que con una
+-- grafia distinta en digitos (LEEB / LEEB 5250 -> LEEB 5280 VL; DAKAR 10 VF
+-- 60 17 -> DAKAR 10 CF). El guardrail sigue estricto para cualquier otro
+-- alias, presente o futuro (revisado_manual default false). No hace falta
+-- tocar el paso de retiro de duplicados mas abajo: estas 3 grafias ya estan
+-- activo=false en el catalogo.
+ALTER TABLE public.parque_modelos_alias
+  ADD COLUMN IF NOT EXISTS revisado_manual boolean NOT NULL DEFAULT false;
+
+UPDATE public.parque_modelos_alias
+SET revisado_manual = true
+WHERE (marca = 'HORSCH' AND clave_alias = public.parque_modelo_clave('LEEB'))
+   OR (marca = 'HORSCH' AND clave_alias = public.parque_modelo_clave('LEEB 5250'))
+   OR (marca = 'HORSCH' AND clave_alias = public.parque_modelo_clave('DAKAR 10 VF 60 17'));
+
 CREATE OR REPLACE FUNCTION public.maquinaria_resolver_modelo_catalogo(
   p_marca text, p_subgrupo public.subgrupo_maquina, p_nombre text
 ) RETURNS uuid LANGUAGE sql STABLE SET search_path = public, pg_temp AS $$
@@ -19,9 +37,13 @@ CREATE OR REPLACE FUNCTION public.maquinaria_resolver_modelo_catalogo(
       AND c.marca_nombre = public.maquinaria_normalizar_marca(p_marca) AND c.activo
       AND a.clave_alias = public.parque_modelo_clave(p_nombre)
       AND public.parque_modelo_clave(p_nombre) <> ''
-      -- Do not convert LEEB, LEEB 5250 or LEEB 6.280 into a 5280.
-      AND regexp_replace(public.parque_modelo_clave(a.alias), '[^0-9]', '', 'g')
-        = regexp_replace(c.clave_normalizada, '[^0-9]', '', 'g')
+      -- Do not convert LEEB, LEEB 5250 or LEEB 6.280 into a 5280 --
+      -- salvo alias revisados a mano explicitamente (revisado_manual).
+      AND (
+        regexp_replace(public.parque_modelo_clave(a.alias), '[^0-9]', '', 'g')
+          = regexp_replace(c.clave_normalizada, '[^0-9]', '', 'g')
+        OR a.revisado_manual
+      )
   ), preferidos AS (
     SELECT * FROM candidatos WHERE subgrupo = p_subgrupo
   )
@@ -160,3 +182,6 @@ REVOKE ALL ON FUNCTION public.maquinaria_sincronizar_identidad_modelo() FROM PUB
 REVOKE ALL ON FUNCTION public.maquinaria_resolver_modelo_catalogo(text,public.subgrupo_maquina,text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.maquinaria_resolver_modelo_catalogo(text,public.subgrupo_maquina,text) TO authenticated;
 NOTIFY pgrst,'reload schema';
+
+-- Verificacion: debe dar 3 (LEEB, LEEB 5250, DAKAR 10 VF 60 17)
+select count(*) as alias_revisados_manualmente from public.parque_modelos_alias where revisado_manual;
