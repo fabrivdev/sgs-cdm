@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronsUpDown, FileText, Tractor } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,7 @@ function formatDate(value?: string | null) {
 }
 
 export function MachineSaleNotificationDialog({ notification, open, onOpenChange, onResolved }: Props) {
+  const queryClient = useQueryClient();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clienteOpen, setClienteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -147,6 +149,7 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Máquina incorporada al parque");
+    await queryClient.invalidateQueries({ queryKey: ["machine-catalog-review"] });
     onResolved();
     onOpenChange(false);
   };
@@ -272,7 +275,7 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
                 marca={form.marca}
                 subgrupo={form.subgrupo}
                 value={form.modelo_tipo}
-                onValueChange={(modelo_tipo) => setForm((current) => ({ ...current, modelo_tipo }))}
+                onValueChange={(modelo_tipo, model) => setForm((current) => ({ ...current, modelo_tipo, subgrupo: model?.subgrupo ?? current.subgrupo, subgrupo_personalizado: model ? "" : current.subgrupo_personalizado }))}
               />
             </div>
           </section>

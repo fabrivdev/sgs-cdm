@@ -1424,6 +1424,7 @@ export type Database = {
           marca_importacion: Database["public"]["Enums"]["marca"] | null
           marca_nombre: string | null
           margen_porcentaje: number | null
+          modelo_catalogo_id: string | null
           modelo: string | null
           notas: string | null
           np_numero: string | null
@@ -1476,6 +1477,7 @@ export type Database = {
           marca_importacion?: Database["public"]["Enums"]["marca"] | null
           marca_nombre?: string | null
           margen_porcentaje?: number | null
+          modelo_catalogo_id?: string | null
           modelo?: string | null
           notas?: string | null
           np_numero?: string | null
@@ -1528,6 +1530,7 @@ export type Database = {
           marca_importacion?: Database["public"]["Enums"]["marca"] | null
           marca_nombre?: string | null
           margen_porcentaje?: number | null
+          modelo_catalogo_id?: string | null
           modelo?: string | null
           notas?: string | null
           np_numero?: string | null
@@ -1556,6 +1559,13 @@ export type Database = {
           vinculo_manual?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_modelo_catalogo_id_fkey"
+            columns: ["modelo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "parque_modelos_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
             columns: ["linea_id"]
@@ -2096,6 +2106,7 @@ export type Database = {
           linea_numero: number
           marca: Database["public"]["Enums"]["marca"]
           marca_nombre: string | null
+          modelo_catalogo_id: string | null
           modelo: string | null
           moneda_acordada: string
           operacion_id: string
@@ -2116,6 +2127,7 @@ export type Database = {
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
           marca_nombre?: string | null
+          modelo_catalogo_id?: string | null
           modelo?: string | null
           moneda_acordada?: string
           operacion_id: string
@@ -2136,6 +2148,7 @@ export type Database = {
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
           marca_nombre?: string | null
+          modelo_catalogo_id?: string | null
           modelo?: string | null
           moneda_acordada?: string
           operacion_id?: string
@@ -2144,6 +2157,13 @@ export type Database = {
           valor_acordado_unitario?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "maquinaria_operacion_lineas_modelo_catalogo_id_fkey"
+            columns: ["modelo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "parque_modelos_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "maquinaria_operacion_lineas_operacion_id_fkey"
             columns: ["operacion_id"]
@@ -2677,6 +2697,7 @@ export type Database = {
           localidad: string | null
           marca: Database["public"]["Enums"]["marca"]
           marca_nombre: string | null
+          modelo_catalogo_id: string | null
           modelo_tipo: string | null
           notas: string | null
           serie: string
@@ -2696,6 +2717,7 @@ export type Database = {
           localidad?: string | null
           marca: Database["public"]["Enums"]["marca"]
           marca_nombre?: string | null
+          modelo_catalogo_id?: string | null
           modelo_tipo?: string | null
           notas?: string | null
           serie: string
@@ -2715,6 +2737,7 @@ export type Database = {
           localidad?: string | null
           marca?: Database["public"]["Enums"]["marca"]
           marca_nombre?: string | null
+          modelo_catalogo_id?: string | null
           modelo_tipo?: string | null
           notas?: string | null
           serie?: string
@@ -2724,6 +2747,13 @@ export type Database = {
           vendedor?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "parque_maquinas_modelo_catalogo_id_fkey"
+            columns: ["modelo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "parque_modelos_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "parque_maquinas_cliente_id_fkey"
             columns: ["cliente_id"]

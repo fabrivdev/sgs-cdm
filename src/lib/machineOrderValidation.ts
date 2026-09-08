@@ -12,9 +12,21 @@ export function normalizeNpCode(value: unknown): string | null {
 
 export type MachineCatalogBrand = { nombre: string; activa: boolean };
 export type MachineCatalogModel = { id: string; nombre: string; marca_nombre: string; subgrupo: string; activo: boolean };
-export type MachineCatalog = { brands: MachineCatalogBrand[]; models: MachineCatalogModel[] };
+export type MachineCatalogAlias = { marca: string; alias: string; modelo_catalogo_id: string };
+export type MachineCatalog = { brands: MachineCatalogBrand[]; models: MachineCatalogModel[]; aliases?: MachineCatalogAlias[] };
 export type CatalogLine = { marca: string; modelo: string; subgrupo: string };
 export const catalogLineKey = (line: CatalogLine) => JSON.stringify([normalizeMachineBrand(line.marca), canonicalMachineSubgroup(line.subgrupo), normalizeMachineModelKey(line.modelo)]);
+
+// Aliases that change/add model numbers need human review, not automatic substitution.
+export const safeMachineModelAlias = (alias: string, name: string) =>
+  normalizeMachineModelKey(alias).replace(/[^0-9]/g, "") === normalizeMachineModelKey(name).replace(/[^0-9]/g, "");
+
+export function catalogModelsForBrand(catalog: MachineCatalog, brand: string) {
+  const normalized = normalizeMachineBrand(brand);
+  if (catalog.brands.some(b => normalizeMachineBrand(b.nombre) === normalized && !b.activa)) return [];
+  return catalog.models.filter(m => m.activo && normalizeMachineBrand(m.marca_nombre) === normalized)
+    .sort((a, b) => a.subgrupo.localeCompare(b.subgrupo) || a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
+}
 
 function distance(a: string, b: string) {
   let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -32,11 +44,13 @@ export function reviewCatalogLine(line: CatalogLine, catalog: MachineCatalog) {
   const subgroup = canonicalMachineSubgroup(line.subgrupo);
   const brandEntry = catalog.brands.find(b => normalizeMachineBrand(b.nombre) === brand);
   const scoped = catalog.models.filter(m => normalizeMachineBrand(m.marca_nombre) === brand);
-  const exact = scoped.filter(m => m.activo && normalizeMachineModelKey(m.nombre) === key && key);
+  const exactNames = scoped.filter(m => m.activo && normalizeMachineModelKey(m.nombre) === key && key);
+  const aliasIds = new Set((catalog.aliases ?? []).filter(a => normalizeMachineBrand(a.marca) === brand && key && normalizeMachineModelKey(a.alias) === key).map(a => a.modelo_catalogo_id));
+  const exact = exactNames.length ? exactNames : scoped.filter(m => m.activo && aliasIds.has(m.id) && safeMachineModelAlias(line.modelo, m.nombre));
   const withinSubgroup = exact.filter(m => m.subgrupo === subgroup);
   const match = withinSubgroup.length === 1 ? withinSubgroup[0] : exact.length === 1 ? exact[0] : undefined;
-  const archived = brandEntry?.activa === false || (!match && scoped.some(m => !m.activo && m.subgrupo === subgroup && normalizeMachineModelKey(m.nombre) === key));
-  const suggestions = key ? scoped.filter(m => m.activo).map(model => {
+  const archived = brandEntry?.activa === false || (!match && scoped.some(m => !m.activo && normalizeMachineModelKey(m.nombre) === key));
+  const suggestions = key && !match ? scoped.filter(m => m.activo).map(model => {
     const modelKey = normalizeMachineModelKey(model.nombre);
     return { model, score: 1 - distance(key, modelKey) / Math.max(key.length, modelKey.length, 1) };
   }).filter(s => s.score >= 0.55).sort((a, b) => b.score - a.score).slice(0, 3).map(s => s.model) : [];

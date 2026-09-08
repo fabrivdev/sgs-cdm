@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogLineKey, exactCatalogName, normalizeNpCode, reconcileCatalogLine, reviewCatalogLine, upperMachineText, validMachineDate, type MachineCatalog } from "./machineOrderValidation";
+import { catalogLineKey, catalogModelsForBrand, exactCatalogName, normalizeNpCode, reconcileCatalogLine, reviewCatalogLine, upperMachineText, validMachineDate, type MachineCatalog } from "./machineOrderValidation";
 
 const catalog: MachineCatalog = { brands: [{ nombre: "HORSCH", activa: true }, { nombre: "ANTIGUA", activa: false }], models: [
   { id: "1", marca_nombre: "HORSCH", subgrupo: "PULVERIZADORAS", nombre: "LEEB 5.280", activo: true },
@@ -14,6 +14,29 @@ describe("NP format", () => {
 });
 
 describe("catalog validation", () => {
+  it("lists every active type for a brand, including LEEB, without mixing brands", () => {
+    const expanded = { ...catalog, brands: [...catalog.brands, { nombre: "JACTO", activa: true }], models: [...catalog.models,
+      { id: "j", marca_nombre: "JACTO", nombre: "STAR 2500", subgrupo: "PULVERIZADORAS", activo: true }] };
+    expect(catalogModelsForBrand(expanded, "horsch").map(m => m.nombre)).toEqual(["LEEB 5.280", "MAESTRO 18 CF"]);
+    expect(catalogModelsForBrand(expanded, "JACTO").map(m => m.nombre)).toEqual(["STAR 2500"]);
+    expect(reconcileCatalogLine({ marca: "JACTO", modelo: "star 2500", subgrupo: "OTRO" }, expanded).subgrupo).toBe("PULVERIZADORAS");
+  });
+  it("resolves a reviewed alias and type, but never changes the model numbers", () => {
+    const withAliases = { ...catalog, aliases: [
+      { marca: "HORSCH", alias: "MAESTRO CF 18", modelo_catalogo_id: "2" },
+      { marca: "HORSCH", alias: "LEEB 5250", modelo_catalogo_id: "1" },
+      { marca: "HORSCH", alias: "LEEB", modelo_catalogo_id: "1" },
+    ] };
+    expect(reconcileCatalogLine({ marca: "HORSCH", modelo: "MAESTRO CF 18", subgrupo: "OTRO" }, withAliases)).toEqual({ marca: "HORSCH", modelo: "MAESTRO 18 CF", subgrupo: "SEMBRADORAS" });
+    for (const modelo of ["LEEB", "LEEB 5250", "LEEB 6.280"]) {
+      expect(reviewCatalogLine({ marca: "HORSCH", modelo, subgrupo: "OTRO" }, withAliases).match).toBeUndefined();
+    }
+  });
+  it("does not resolve aliases into retired models or another brand", () => {
+    const c = { ...catalog, aliases: [{ marca: "CLAAS", alias: "MAESTRO CF 18", modelo_catalogo_id: "2" }, { marca: "HORSCH", alias: "VIEJO", modelo_catalogo_id: "3" }] };
+    expect(reviewCatalogLine({ marca: "CLAAS", modelo: "MAESTRO CF 18", subgrupo: "OTRO" }, c).match).toBeUndefined();
+    expect(reviewCatalogLine({ marca: "HORSCH", modelo: "VIEJO", subgrupo: "OTRO" }, c).match).toBeUndefined();
+  });
   it("maps formatting differences to the exact catalog name and correct type", () => {
     expect(reconcileCatalogLine({ marca: "horsch", modelo: "leeb 5 280", subgrupo: "OTRO" }, catalog)).toEqual({ marca: "HORSCH", modelo: "LEEB 5.280", subgrupo: "PULVERIZADORAS" });
   });
@@ -31,6 +54,7 @@ describe("catalog validation", () => {
     expect(reviewCatalogLine({ marca: "ANTIGUA", modelo: "X", subgrupo: "OTRO" }, catalog).archived).toBe(true);
     const review = reviewCatalogLine({ marca: "HORSCH", modelo: "retirado", subgrupo: "SUELO" }, catalog);
     expect(review.archived).toBe(true); expect(review.match).toBeUndefined(); expect(review.suggestions).toHaveLength(0);
+    expect(reviewCatalogLine({ marca: "HORSCH", modelo: "RETIRADO", subgrupo: "OTRO" }, catalog).archived).toBe(true);
   });
   it("invalidates confirmation after a model or brand is changed", () => {
     const line = { marca: "HORSCH", modelo: "NUEVO 123", subgrupo: "OTRO" };

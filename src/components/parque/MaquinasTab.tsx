@@ -14,6 +14,8 @@ import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
 import { MACHINE_SUBGROUPS, machineSubgroupLabel } from "@/lib/machineModels";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
+import { useMachineCatalog } from "@/hooks/useMachineCatalog";
+import { reviewCatalogLine } from "@/lib/machineOrderValidation";
 
 const MARCA_AMBAS = "ambas";
 type Maquina = {
@@ -97,7 +99,12 @@ export function MaquinasTab({
   const canManagePark = can("parque:gestionar");
   const canExport = can("datos:exportar");
   const [loading, setLoading] = useState(true);
-  const [maquinas, setMaquinas] = useState<Maquina[]>([]);
+  const [rawMaquinas, setMaquinas] = useState<Maquina[]>([]);
+  const catalog = useMachineCatalog();
+  const maquinas = useMemo(() => rawMaquinas.map(machine => {
+    const match = catalog.data ? reviewCatalogLine({ marca: machine.marca, modelo: machine.modelo_tipo ?? "", subgrupo: machine.subgrupo }, catalog.data).match : undefined;
+    return match ? { ...machine, modelo_tipo: match.nombre, subgrupo: match.subgrupo } : machine;
+  }), [rawMaquinas, catalog.data]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [transferMaquina, setTransferMaquina] = useState<MaquinaParaTransferir | null>(null);
   const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);

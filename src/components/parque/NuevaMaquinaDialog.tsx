@@ -130,6 +130,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
       return toast.error(error.message);
     }
     await queryClient.invalidateQueries({ queryKey: ["parque-modelos-catalogo"] });
+    await queryClient.invalidateQueries({ queryKey: ["machine-catalog-review"] });
     toast.success("Máquina creada");
     onOpenChange(false);
     onCreated?.();
@@ -219,7 +220,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
                 marca={form.marca}
                 subgrupo={form.subgrupo}
                 value={form.modelo_tipo}
-                onValueChange={(modelo_tipo) => setForm({ ...form, modelo_tipo })}
+                onValueChange={(modelo_tipo, model) => setForm({ ...form, modelo_tipo, subgrupo: model?.subgrupo ?? form.subgrupo, subgrupo_personalizado: model ? "" : form.subgrupo_personalizado })}
               />
             </div>
           </section>

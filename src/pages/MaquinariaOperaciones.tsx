@@ -345,19 +345,9 @@ function safeSubgroup(value: unknown) {
   return canonicalMachineSubgroup(value);
 }
 
-const MACHINE_CLASSIFICATION_LABEL: Record<string, string> = {
-  COSECHADORAS: "Cosechadora",
-  SEMBRADORAS: "Plantadora / Sembradora",
-  PICADORAS: "Picadora",
-  "PLATAFORMAS/CABEZALES": "Plataforma / Cabezal",
-  PULVERIZADORAS: "Pulverizadora",
-  TRACTORES: "Tractor",
-  SUELO: "Implemento de suelo",
-};
-
 function machineClassificationLabel(line: Record<string, any>, extracted: Record<string, any> = {}) {
   const subgroup = canonicalMachineSubgroup(line.subgrupo ?? extracted.subgrupo ?? line.producto ?? extracted.producto);
-  return MACHINE_CLASSIFICATION_LABEL[subgroup]
+  return (subgroup !== "OTRO" ? subgroup : "")
     || safeExtractedText(line.producto)
     || safeExtractedText(extracted.producto)
     || "Sin clasificación";
@@ -750,6 +740,7 @@ function MachineDocumentViewer() {
 }
 
 export default function MaquinariaOperaciones() {
+  const modelCatalog = useMachineCatalog();
   const location = useLocation();
   const queryClient = useQueryClient();
   const importsView = location.pathname === "/parque-importaciones";
@@ -865,7 +856,10 @@ export default function MaquinariaOperaciones() {
   const entregaByUnitId = entregaQuery.data;
   const estadoByOperacionId = operacionEstadoQuery.data;
   const stockChasisSet = stockChasisQuery.data;
-  const rows = useMemo(() => (operationsQuery.data ?? []).filter((row) => {
+  const rows = useMemo(() => (operationsQuery.data ?? []).map(row => {
+    const match = modelCatalog.data ? reviewCatalogLine({ marca: row.marca ?? "", modelo: row.modelo ?? "", subgrupo: row.producto ?? "OTRO" }, modelCatalog.data).match : undefined;
+    return { ...row, modelo_original: row.modelo, ...(match ? { modelo: match.nombre, producto: match.subgrupo } : {}) };
+  }).filter((row) => {
     if (importsView) {
       const importRow = row as ImportRow;
       if (llegada !== "TODOS" && arrivalState(importRow) !== llegada) return false;
@@ -880,10 +874,10 @@ export default function MaquinariaOperaciones() {
     if (marca !== "TODOS" && row.marca !== marca) return false;
     const q = search.trim().toUpperCase();
     if (!q) return true;
-    const common = [row.np_numero, formatNpCode(row.np_numero), row.cliente_nombre, row.marca, row.producto, row.modelo, row.chasis];
+    const common = [row.np_numero, formatNpCode(row.np_numero), row.cliente_nombre, row.marca, row.producto, row.modelo, row.modelo_original, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [operationsQuery.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
+  }), [operationsQuery.data, modelCatalog.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
 
   const activeCount = (marca !== "TODOS" ? 1 : 0)
     + (importsView ? (llegada !== "TODOS" ? 1 : 0) + (situacion !== "TODOS" ? 1 : 0) : (condicion !== "TODOS" ? 1 : 0) + (entrega !== "TODOS" ? 1 : 0));
@@ -1195,6 +1189,7 @@ function DeleteDocumentButton({ documentLabel, onDelete }: { documentLabel: stri
 }
 
 function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean; row: ImportRow | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<ImportDraft>(blankImport());
   const [saving, setSaving] = useState(false);
   const [ocFile, setOcFile] = useState<File | null>(null);
@@ -1283,6 +1278,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
         }
       }
       toast.success(row ? "Importación actualizada" : "Importación creada y desglosada por unidad");
+      await queryClient.invalidateQueries({ queryKey: ["machine-catalog-review"] });
       onSaved(); onOpenChange(false);
     } catch (error: any) {
       toast.error(error?.message ?? "No se pudo guardar la importación");
@@ -1297,7 +1293,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
         <Field label="Llave interna *"><Input autoFocus value={form.llave_interna} onChange={(event) => setForm((value) => ({ ...value, llave_interna: event.target.value }))} placeholder="Ej. 26.61L2" /></Field>
         <Field label="Marca / proveedor"><MarcaMaquinaSelect value={form.marca} disabled={Boolean(selectedNp)} onValueChange={(marca) => setForm((value) => ({ ...value, marca, modelo: "" }))} /></Field>
         <Field label="Producto / tipo"><CompactSelect value={form.producto} values={MACHINE_SUBGROUPS as readonly string[]} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
-        <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo) => setForm((value) => ({ ...value, modelo }))} disabled={Boolean(selectedNp)} /></Field>
+        <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo, model) => setForm((value) => ({ ...value, modelo, producto: model?.subgrupo ?? value.producto }))} disabled={Boolean(selectedNp)} /></Field>
         <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
         <Field label="Estado"><Select value={form.estado_fuente} onValueChange={(estado_fuente) => setForm((value) => ({ ...value, estado_fuente }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PLANIFICADA">Planificada</SelectItem><SelectItem value="PEDIDA">Pedida</SelectItem><SelectItem value="EN_TRANSITO">En tránsito</SelectItem><SelectItem value="RECIBIDA">Recibida</SelectItem><SelectItem value="CANCELADA">Cancelada</SelectItem></SelectContent></Select></Field>
         <Field label="NP de referencia"><Select value={form.linea_id || "NONE"} onValueChange={selectNp}><SelectTrigger><SelectValue placeholder={availableNpQuery.isLoading ? "Cargando NP..." : "Seleccionar NP disponible"} /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin NP asignada</SelectItem>{npOptions.map((option) => <SelectItem key={option.linea_id} value={option.linea_id}>{formatNpCode(option.np_numero)} · {option.modelo || option.producto} · {option.unidades_disponibles} libre{option.unidades_disponibles === 1 ? "" : "s"}</SelectItem>)}</SelectContent></Select></Field>
@@ -1649,7 +1645,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input placeholder="NP0002" value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: upperMachineText(e.target.value) })} onBlur={() => setForm(v => ({ ...v, np_numero: normalizeNpCode(v.np_numero) ?? v.np_numero }))} />{form.np_numero && !normalizeNpCode(form.np_numero) && <p className="text-xs text-destructive">Usá NP y cuatro números. No se recortan números de más.</p>}</Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input list="np-clientes" value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: upperMachineText(e.target.value) })} /><datalist id="np-clientes">{references.data?.clients.map(c => <option key={c.id} value={upperMachineText(c.nombre)} />)}</datalist></Field><Field label="Operativo comercial"><Input list="np-comerciales" value={form.comercial} onChange={(e) => setForm({ ...form, comercial: upperMachineText(e.target.value) })} /><datalist id="np-comerciales">{references.data?.commercials.map(c => <option key={c} value={c} />)}</datalist></Field></div>
       {(catalog.isError || references.isError) && <div className="rounded-md border border-amber-200 p-2 text-xs">No se pudo validar contra los datos registrados. <Button size="sm" variant="outline" onClick={() => { catalog.refetch(); references.refetch(); }}>Reintentar validación</Button></div>}
       {references.data && unknownNames.length > 0 && <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"><input type="checkbox" checked={namesConfirmed === namesKey} onChange={e => setNamesConfirmed(e.target.checked ? namesKey : "")} /><span>{unknownNames.join(" Y ")} sin coincidencia exacta. Revisé la NP y confirmo los nombres escritos.</span></label>}
-      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca: upperMachineText(marca), modelo: "", catalogConfirmed: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo) => updateLine(i, { modelo: upperMachineText(modelo), catalogConfirmed: "" })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{catalog.data && <MachineCatalogLineReview line={line} catalog={catalog.data} confirmed={line.catalogConfirmed} preserved={isPreservedLine(line)} onConfirm={key => updateLine(i, { catalogConfirmed: key })} onSelect={selection => updateLine(i, { ...selection, catalogConfirmed: "" })} />}</div>)}</div>
+      <div className="space-y-2"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><p className="text-[10px] text-muted-foreground">La máquina y el cabezal se registran como líneas independientes.</p></div><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca: upperMachineText(marca), modelo: "", catalogConfirmed: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo, model) => updateLine(i, { modelo: upperMachineText(modelo), subgrupo: model?.subgrupo ?? line.subgrupo, catalogConfirmed: "" })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{catalog.data && <MachineCatalogLineReview line={line} catalog={catalog.data} confirmed={line.catalogConfirmed} preserved={isPreservedLine(line)} onConfirm={key => updateLine(i, { catalogConfirmed: key })} onSelect={selection => updateLine(i, { ...selection, catalogConfirmed: "" })} />}</div>)}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: upperMachineText(e.target.value) })} /></Field>
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading || catalog.isLoading || references.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>
@@ -1745,6 +1741,7 @@ function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; unit
 }
 
 function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
+  const modelCatalog = useMachineCatalog(!!operationId);
   const { isAdmin, roles } = useAuth();
   const canEditChasis = isAdmin || roles.includes("jefatura");
   const [activeTab, setActiveTab] = useState("resumen");
@@ -1795,7 +1792,13 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       toast.error("No se pudo abrir el documento");
     });
   };
-  const detail = detailQuery.data;
+  const detail = useMemo(() => {
+    if (!detailQuery.data || !modelCatalog.data) return detailQuery.data;
+    return { ...detailQuery.data, lines: detailQuery.data.lines.map(line => {
+      const match = reviewCatalogLine({ marca: line.marca_nombre ?? line.marca, modelo: line.modelo ?? "", subgrupo: line.subgrupo ?? line.producto ?? "OTRO" }, modelCatalog.data).match;
+      return match ? { ...line, modelo: match.nombre, subgrupo: match.subgrupo, producto: match.subgrupo } : line;
+    }) };
+  }, [detailQuery.data, modelCatalog.data]);
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   useEffect(() => {
     setActiveTab("resumen");

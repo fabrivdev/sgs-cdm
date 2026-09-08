@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useMachineCatalog } from "@/hooks/useMachineCatalog";
+import { reviewCatalogLine } from "@/lib/machineOrderValidation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -174,7 +176,12 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [loading, setLoading] = useState(false);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [contactos, setContactos] = useState<Contacto[]>([]);
-  const [maquinas, setMaquinas] = useState<Maquina[]>([]);
+  const [rawMaquinas, setMaquinas] = useState<Maquina[]>([]);
+  const modelCatalog = useMachineCatalog();
+  const maquinas = useMemo(() => rawMaquinas.map(machine => {
+    const match = modelCatalog.data ? reviewCatalogLine({ marca: machine.marca_nombre || machine.marca, modelo: machine.modelo_tipo ?? "", subgrupo: machine.subgrupo }, modelCatalog.data).match : undefined;
+    return match ? { ...machine, modelo_tipo: match.nombre, subgrupo: match.subgrupo } : machine;
+  }), [rawMaquinas, modelCatalog.data]);
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [trabajos, setTrabajos] = useState<TrabajoCliente[]>([]);
@@ -364,6 +371,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       if (error) return toast.error(error.message);
     }
     await queryClient.invalidateQueries({ queryKey: ["parque-modelos-catalogo"] });
+    await queryClient.invalidateQueries({ queryKey: ["machine-catalog-review"] });
     toast.success("Máquina guardada");
     setEditMaquina(null);
     setNewMaquina(false);
@@ -1009,7 +1017,7 @@ function MaquinaForm({
             marca={form.marca_nombre || form.marca || "CLAAS"}
             subgrupo={form.subgrupo ?? "OTRO"}
             value={form.modelo_tipo}
-            onValueChange={(modelo_tipo) => setForm({ ...form, modelo_tipo })}
+            onValueChange={(modelo_tipo, model) => setForm({ ...form, modelo_tipo, subgrupo: model?.subgrupo ?? form.subgrupo, subgrupo_personalizado: model ? null : form.subgrupo_personalizado })}
           />
         </div>
         <div>
