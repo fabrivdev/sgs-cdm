@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Administración consulta tablas nuevas antes de regenerar database.types. */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ImportarTotvsTab } from "@/components/parque/ImportarTotvsTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
+import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 import { FiltersBar } from "@/components/filters/FiltersBar";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface Profile {
   id: string;
@@ -123,6 +124,7 @@ export default function Admin() {
   const [nuSucursal, setNuSucursal] = useState<Sucursal>(SUCURSALES[0]);
   const [nuRol, setNuRol] = useState<AssignableRole>("operativo");
   const [busy, setBusy] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const [credUser, setCredUser] = useState<Profile | null>(null);
   const [credEmail, setCredEmail] = useState("");
@@ -140,7 +142,6 @@ export default function Admin() {
   const [tableSearch, setTableSearch] = useState("");
   const availableAdminTabs = useMemo(() => [
     hasSectionAccess("admin.usuarios") ? "equipo" : null,
-    hasSectionAccess("admin.usuarios") ? "accesos" : null,
     hasSectionAccess("admin.importaciones") ? "importar" : null,
     hasSectionAccess("admin.parametros") ? "parametros" : null,
   ].filter(Boolean) as string[], [hasSectionAccess]);
@@ -173,10 +174,10 @@ export default function Admin() {
 
   const hasLinkedSchema = profiles.some((profile) => typeof profile.auth_user_id !== "undefined");
 
-  const emailByProfile = (profile: Profile) => {
+  const emailByProfile = useCallback((profile: Profile) => {
     const linkedUserId = profile.auth_user_id || profile.id;
     return emails[linkedUserId] ?? "";
-  };
+  }, [emails]);
 
   const permissionOwnerId = (profile: Profile) => profile.auth_user_id || profile.id;
   const rolesForProfile = (profile: Profile) => Array.from(new Set([
@@ -201,17 +202,12 @@ export default function Admin() {
 
   const profilesConAcceso = useMemo(
     () => profiles.filter((profile) => Boolean(emailByProfile(profile))),
-    [profiles, emails],
+    [profiles, emailByProfile],
   );
   const profilesSinAcceso = useMemo(
     () => profiles.filter((profile) => !emailByProfile(profile)),
-    [profiles, emails],
+    [profiles, emailByProfile],
   );
-  const perfilesActivos = useMemo(
-    () => profiles.filter((profile) => profile.activo).length,
-    [profiles],
-  );
-
   const normalizedTableSearch = normalizeAdminSearch(tableSearch);
   const profileMatchesSearch = (profile: Profile) => {
     if (!normalizedTableSearch) return true;
@@ -353,6 +349,7 @@ export default function Admin() {
     setEmail("");
     setPassword("");
     setNombre("");
+    setCreateOpen(false);
     load();
   };
 
@@ -463,7 +460,10 @@ export default function Admin() {
     }
     const { error } = await supabase.from("profiles").update({ sucursal }).eq("id", id);
     if (error) toast.error(error.message);
-    else load();
+    else {
+      setSectionUser((current) => current?.id === id ? { ...current, sucursal } : current);
+      load();
+    }
   };
 
   const openCred = (profile: Profile) => {
@@ -549,41 +549,45 @@ export default function Admin() {
 
   return (
     <PageShell>
-      <PageHeader title="Administración" />
+      <PageHeader
+        title="Administración"
+        actions={adminTab === "equipo" && canManageAdmin ? (
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Nuevo usuario
+          </Button>
+        ) : undefined}
+      />
 
       <Tabs value={adminTab} onValueChange={(value) => { setAdminTab(value); setTableSearch(""); }}>
         <TabsList>
           {hasSectionAccess("admin.usuarios") && <TabsTrigger value="equipo">
             <Users className="mr-2 h-4 w-4" />
-            Equipo
-          </TabsTrigger>}
-          {hasSectionAccess("admin.usuarios") && <TabsTrigger value="accesos">
-            <KeyRound className="mr-2 h-4 w-4" />
-            Accesos
+            Equipo y accesos
           </TabsTrigger>}
           {hasSectionAccess("admin.importaciones") && <TabsTrigger value="importar">
             <Database className="mr-2 h-4 w-4" />
-            Importar datos
+            Datos
           </TabsTrigger>}
           {hasSectionAccess("admin.parametros") && <TabsTrigger value="parametros">
             <Settings2 className="mr-2 h-4 w-4" />
-            Parámetros
+            Configuración
           </TabsTrigger>}
         </TabsList>
 
-        {(adminTab === "equipo" || adminTab === "accesos") && (
+        {adminTab === "equipo" && (
           <FiltersBar
             search={{
               value: tableSearch,
               onChange: setTableSearch,
               label: "Buscar",
-              placeholder: adminTab === "equipo" ? "Nombre, sucursal o nivel…" : "Persona, email, rol o módulo…",
+              placeholder: "Nombre, email, sucursal o nivel…",
               width: "w-[min(420px,34vw)]",
             }}
             activeCount={normalizedTableSearch ? 1 : 0}
             onClear={() => setTableSearch("")}
-            meta={`${adminTab === "equipo" ? filteredProfiles.length : filteredProfilesConAcceso.length} registro${(adminTab === "equipo" ? filteredProfiles.length : filteredProfilesConAcceso.length) === 1 ? "" : "s"}`}
-            actions={<TableExportButton options={adminTab === "equipo" ? [exportOptions[0]] : [exportOptions[1]]} />}
+            meta={`${filteredProfiles.length} persona${filteredProfiles.length === 1 ? "" : "s"}`}
+            actions={<TableExportButton options={[exportOptions[0]]} />}
           />
         )}
 
@@ -600,22 +604,17 @@ export default function Admin() {
             </Card>
           )}
 
-          <KpiStrip className="sm:grid-cols-3">
-            <KpiItem label="Perfiles operativos" value={profiles.length} detail={`${perfilesActivos} activos`} />
-            <KpiItem label="Con acceso" value={profilesConAcceso.length} detail="Pueden iniciar sesión" tone="positive" />
-            <KpiItem label="Sin acceso" value={profilesSinAcceso.length} detail="Solo equipo operativo" tone="warning" />
-          </KpiStrip>
-
-          <Card className="hidden md:block">
+          <Card className="hidden overflow-hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Técnico</TableHead>
-                  <TableHead>Acceso</TableHead>
+                  <TableHead>Persona</TableHead>
+                  <TableHead>Cuenta</TableHead>
                   <TableHead>Sucursal</TableHead>
                   <TableHead>Nivel</TableHead>
-                  <TableHead>Activo</TableHead>
-                  {canManageAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
+                  <TableHead>Áreas</TableHead>
+                  <TableHead>Perfil</TableHead>
+                  <TableHead className="w-[120px]"><span className="sr-only">Acciones</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -625,46 +624,26 @@ export default function Admin() {
                     <TableCell className="text-[12px] text-muted-foreground">
                       {emailByProfile(profile) || "Sin acceso"}
                     </TableCell>
-                    <TableCell>
-                      {canManageAdmin && !isProtectedProfile(profile) ? (
-                        <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
-                          <SelectTrigger className="h-8 w-40"><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-[12px]">{profile.sucursal ?? "—"}</span>
-                      )}
-                    </TableCell>
+                    <TableCell className="text-[12px]">{profile.sucursal ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</Badge>
                     </TableCell>
-                    <TableCell>
-                      {canManageAdmin && !isProtectedProfile(profile) ? (
-                        <Button variant={profile.activo ? "default" : "outline"} size="sm" onClick={() => toggleActivo(profile)}>
-                          {profile.activo ? "Activo" : "Inactivo"}
-                        </Button>
-                      ) : (
-                        <Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge>
-                      )}
+                    <TableCell className="max-w-[260px] text-[12px] text-muted-foreground">
+                      {modulesForProfile(profile).length
+                        ? modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(" · ")
+                        : "Sin áreas"}
                     </TableCell>
-                    {canManageAdmin && (
-                      <TableCell>
-                        {isProtectedProfile(profile) ? (
-                          <Badge variant="outline">Protegido</Badge>
-                        ) : (
-                          <div className="flex gap-1">
-                            <Button variant="outline" size="sm" onClick={() => openCred(profile)} title="Credenciales">
-                              <KeyRound className="h-3.5 w-3.5" />
-                            </Button>
-                            {emailByProfile(profile) && (
-                              <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} title="Quitar acceso" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      <span className="inline-flex items-center gap-2 text-[12px]">
+                        <span className={cn("h-2 w-2 rounded-full", profile.activo ? "bg-emerald-500" : "bg-muted-foreground/35")} />
+                        {profile.activo ? "Activo" : "Inactivo"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" className="h-8" onClick={() => setSectionUser(profile)}>
+                        {canManageAdmin && !isProtectedProfile(profile) ? "Configurar" : "Ver"}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -673,7 +652,7 @@ export default function Admin() {
 
           <div className="space-y-2 md:hidden">
             {filteredProfiles.map((profile) => (
-              <Card key={profile.id} className="space-y-2 p-3">
+              <Card key={profile.id} className="space-y-3 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold">{profile.nombre}</div>
@@ -681,50 +660,25 @@ export default function Admin() {
                       {emailByProfile(profile) || "Sin acceso"}
                     </div>
                   </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    {canManageAdmin && !isProtectedProfile(profile) && (
-                      <>
-                        <Button variant="outline" size="sm" onClick={() => openCred(profile)} className="h-9 w-9 px-0">
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        {emailByProfile(profile) && (
-                          <Button variant="outline" size="sm" onClick={() => setDelUser(profile)} className="h-9 w-9 px-0 text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant={profile.activo ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleActivo(profile)}
-                          className="h-9 px-3 text-[12px]"
-                        >
-                          {profile.activo ? "Activo" : "Inactivo"}
-                        </Button>
-                      </>
-                    )}
-                    {(!canManageAdmin || isProtectedProfile(profile)) && (
-                      <Badge variant={profile.activo ? "default" : "outline"} className="text-[10px]">
-                        {profile.activo ? "Activo" : "Inactivo"}
-                      </Badge>
-                    )}
-                  </div>
+                  <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setSectionUser(profile)}>
+                    {canManageAdmin && !isProtectedProfile(profile) ? "Configurar" : "Ver"}
+                  </Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3 text-[12px]">
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
-                    {canManageAdmin && !isProtectedProfile(profile) ? (
-                      <Select value={profile.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(profile.id, value as Sucursal)}>
-                        <SelectTrigger className="h-8 text-[12px]"><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>{SUCURSALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="py-1.5 text-[12px]">{profile.sucursal ?? "—"}</div>
-                    )}
+                    <div className="mt-1">{profile.sucursal ?? "—"}</div>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">Nivel</Label>
-                    <div className="py-1.5 text-[12px]">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</div>
+                    <div className="mt-1">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-[10px] text-muted-foreground">Áreas</Label>
+                    <div className="mt-1 text-muted-foreground">
+                      {modulesForProfile(profile).length ? modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(" · ") : "Sin áreas"}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -939,6 +893,51 @@ export default function Admin() {
         </TabsContent>
       </Tabs>
 
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nuevo usuario</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-[12px]">Nombre y apellido</Label>
+              <Input value={nombre} onChange={(event) => setNombre(event.target.value)} autoFocus />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-[12px]">Email</Label>
+              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-[12px]">Contraseña inicial</Label>
+              <div className="relative">
+                <Input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} className="pr-9" />
+                <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[12px]">Sucursal</Label>
+              <Select value={nuSucursal} onValueChange={(value) => setNuSucursal(value as Sucursal)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{SUCURSALES.map((sucursal) => <SelectItem key={sucursal} value={sucursal}>{sucursal}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[12px]">Nivel</Label>
+              <Select value={nuRol} onValueChange={(value) => setNuRol(value as AssignableRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={crearUsuario} disabled={busy}>{busy ? "Creando…" : "Crear usuario"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!credUser} onOpenChange={(open) => !open && setCredUser(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -983,25 +982,89 @@ export default function Admin() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!sectionUser} onOpenChange={(open) => !open && setSectionUser(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Secciones habilitadas — {sectionUser?.nombre}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {!isSuperAdmin && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Solo el superadministrador puede modificar los accesos por sección.</div>}
+      <Sheet open={!!sectionUser} onOpenChange={(open) => !open && setSectionUser(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader className="border-b pb-4 text-left">
+            <SheetTitle>{sectionUser?.nombre}</SheetTitle>
+            <SheetDescription>{sectionUser && (emailByProfile(sectionUser) || "Sin cuenta de acceso")}</SheetDescription>
+          </SheetHeader>
+          {sectionUser && (
+            <div className="grid gap-3 border-b py-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">Sucursal</Label>
+                {canManageAdmin && !isProtectedProfile(sectionUser) ? (
+                  <Select value={sectionUser.sucursal ?? ""} onValueChange={(value) => cambiarSucursal(sectionUser.id, value as Sucursal)}>
+                    <SelectTrigger><SelectValue placeholder="Sin definir" /></SelectTrigger>
+                    <SelectContent>{SUCURSALES.map((sucursal) => <SelectItem key={sucursal} value={sucursal}>{sucursal}</SelectItem>)}</SelectContent>
+                  </Select>
+                ) : <div className="py-2 text-[13px]">{sectionUser.sucursal ?? "Sin definir"}</div>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] text-muted-foreground">Estado del perfil</Label>
+                {canManageAdmin && !isProtectedProfile(sectionUser) ? (
+                  <Button variant="outline" className="w-full justify-start" onClick={() => { setSectionUser(null); toggleActivo(sectionUser); }}>
+                    <span className={cn("mr-2 h-2 w-2 rounded-full", sectionUser.activo ? "bg-emerald-500" : "bg-muted-foreground/35")} />
+                    {sectionUser.activo ? "Activo" : "Inactivo"}
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2 py-2 text-[13px]"><span className={cn("h-2 w-2 rounded-full", sectionUser.activo ? "bg-emerald-500" : "bg-muted-foreground/35")} />{sectionUser.activo ? "Activo" : "Inactivo"}</div>
+                )}
+              </div>
+            </div>
+          )}
+          {sectionUser && (
+            <section className="space-y-3 border-b py-4">
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Cuenta y nivel</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3">
+                <div>
+                  <div className="text-[13px] font-medium">{emailByProfile(sectionUser) || "Sin acceso al sistema"}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">{emailByProfile(sectionUser) ? nivelLabel(primaryRoleForProfile(sectionUser), modulesForProfile(sectionUser)) : "Solo equipo operativo"}</div>
+                </div>
+                {canManageAdmin && !isProtectedProfile(sectionUser) && (
+                  <Button variant="outline" size="sm" onClick={() => { const profile = sectionUser; setSectionUser(null); openCred(profile); }}>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    {emailByProfile(sectionUser) ? "Credenciales" : "Crear acceso"}
+                  </Button>
+                )}
+                {emailByProfile(sectionUser) && canManageAdmin && !isProtectedProfile(sectionUser) && (
+                  <div className="w-full border-t pt-3">
+                    <Label className="text-[11px] text-muted-foreground">Nivel</Label>
+                    <Select value={primaryRoleForProfile(sectionUser) ?? ""} onValueChange={(value) => cambiarRol(permissionOwnerId(sectionUser), value as AssignableRole)}>
+                      <SelectTrigger className="mt-1.5"><SelectValue placeholder="Sin definir" /></SelectTrigger>
+                      <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          <div className="space-y-3 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Secciones habilitadas</h3>
+              {sectionUser && sections.length > 0 && <span className="text-[11px] text-muted-foreground">{sectionsForProfile(sectionUser).length} de {sections.length}</span>}
+            </div>
+            {sectionUser && !emailByProfile(sectionUser) && <p className="text-[12px] text-muted-foreground">Crea el acceso al sistema antes de asignar secciones.</p>}
+            {!sections.length && sectionUser && (
+              <div className="rounded-xl border p-3">
+                <ModuloChips
+                  activos={modulesForProfile(sectionUser)}
+                  editable={canManageAdmin && !isProtectedProfile(sectionUser)}
+                  onToggle={(modulo, activo) => cambiarModuloAcceso(permissionOwnerId(sectionUser), modulo, activo)}
+                />
+              </div>
+            )}
             {Array.from(new Set(sections.map((section) => section.modulo_id))).map((moduleId) => (
-              <section key={moduleId} className="overflow-hidden rounded-xl border">
-                <div className="border-b bg-muted/30 px-3 py-2 text-[12px] font-semibold">{moduleId === "admin" ? "Administración" : MODULO_LABELS[moduleId as Modulo] ?? moduleId}</div>
-                <div className="grid gap-2 p-3 sm:grid-cols-2">
+              <section key={moduleId} className="rounded-xl border p-3">
+                <div className="mb-2 text-[12px] font-semibold">{moduleId === "admin" ? "Administración" : MODULO_LABELS[moduleId as Modulo] ?? moduleId}</div>
+                <div className="grid gap-2 sm:grid-cols-2">
                   {sections.filter((section) => section.modulo_id === moduleId).map((section) => {
                     const active = sectionUser ? sectionsForProfile(sectionUser).includes(section.id) : false;
                     return <button
                       key={section.id}
                       type="button"
-                      disabled={!isSuperAdmin || !sectionUser || isProtectedProfile(sectionUser) || sectionBusy === section.id}
+                      disabled={!isSuperAdmin || !sectionUser || !emailByProfile(sectionUser) || isProtectedProfile(sectionUser) || sectionBusy === section.id}
                       onClick={() => sectionUser && cambiarSeccionAcceso(sectionUser, section, !active)}
-                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!isSuperAdmin || (sectionUser && isProtectedProfile(sectionUser))) && "cursor-default")}
+                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!isSuperAdmin || (sectionUser && (!emailByProfile(sectionUser) || isProtectedProfile(sectionUser)))) && "cursor-default")}
                     >
                       <span>{section.nombre}</span>
                       <span className={cn("h-2.5 w-2.5 rounded-full border", active ? "border-primary bg-primary" : "border-muted-foreground/30")} />
@@ -1010,10 +1073,15 @@ export default function Admin() {
                 </div>
               </section>
             ))}
+            {sectionUser && canManageAdmin && !isProtectedProfile(sectionUser) && emailByProfile(sectionUser) && (
+              <button type="button" className="pt-2 text-[12px] text-destructive hover:underline" onClick={() => { const profile = sectionUser; setSectionUser(null); setDelUser(profile); }}>
+                Quitar acceso al sistema
+              </button>
+            )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setSectionUser(null)}>Cerrar</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <SheetFooter className="border-t pt-4"><Button variant="outline" onClick={() => setSectionUser(null)}>Cerrar</Button></SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={!!toggleActivoPending} onOpenChange={(open) => !open && setToggleActivoPending(null)}>
         <AlertDialogContent>
