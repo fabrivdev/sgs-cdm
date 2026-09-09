@@ -17,7 +17,6 @@ const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Comisiones = lazy(() => import("./pages/Comisiones"));
-const Historial = lazy(() => import("./pages/Historial"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
 const MaquinariaOperaciones = lazy(() => import("./pages/MaquinariaOperaciones"));
 const Trabajos = lazy(() => import("./pages/Trabajos"));
@@ -76,7 +75,6 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/historial" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.historial"><Historial /></ProtectedRoute>} />
                 <Route
                   path="/parque-clientes"
                   element={

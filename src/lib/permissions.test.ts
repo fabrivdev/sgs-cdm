@@ -12,8 +12,9 @@ describe("matriz de permisos", () => {
     expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.importaciones"])).toBe("/parque-importaciones");
   });
 
-  it("no publica Agenda como una sección funcional", () => {
+  it("no publica las vistas retiradas como secciones funcionales", () => {
     expect(SECTION_ROUTES.some((section) => section.id === "servicios.agenda")).toBe(false);
+    expect(SECTION_ROUTES.some((section) => section.id === "servicios.historial")).toBe(false);
   });
 
   it("reserva el acceso global para el superadministrador", () => {
