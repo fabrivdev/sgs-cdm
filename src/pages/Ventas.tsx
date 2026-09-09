@@ -17,11 +17,17 @@ type SalesLine = {
   id: string; fecha: string; factura: string; cliente: string; sucursal: string | null;
   concepto: string; metodologia: "historico" | "actual"; total_venta: number; cantidad: number;
   os_numero: string | null; codigo: string | null; codigo_fabricante: string | null;
-  descripcion: string | null; marca: string | null; modelo: string | null; chasis: string | null;
+  descripcion: string | null; marca: string | null; modelo: string | null; chasis: string | null; es_nota_credito: boolean;
 };
 type SalesResponse = {
   total: number; facturas: number; clientes: number; promedio: number;
   historico: number; actual: number; cruza_corte: boolean; lineas: SalesLine[];
+  clientes_detalle: Array<{ nombre: string; importe: number; facturas: number }>;
+  pendientes_vinculacion: { facturas: number; importe: number };
+};
+type AnalysisResponse = {
+  columns: Array<{ key: string; label: string }>;
+  rows: Array<{ key: string; values: Record<string, number>; total: number }>;
 };
 
 const AREA_COPY = {
@@ -39,7 +45,7 @@ function cleanModel(value: string | null) {
   return (value ?? "").replace(/\s*[-·]?\s*(?:chasis|casis)\s*:?\s*[\w-]+.*$/i, "").trim() || "Modelo no informado";
 }
 function lineIdentity(area: VentasArea, row: SalesLine) {
-  if (area === "servicios") return row.os_numero || (row.metodologia === "historico" ? "OS no disponible" : "Sin OS vinculada");
+  if (area === "servicios") return row.os_numero || (row.es_nota_credito ? "Nota de crédito sin OS" : "OS no disponible");
   if (area === "repuestos") {
     const code = row.codigo_fabricante || row.codigo;
     const description = row.descripcion && row.descripcion.toUpperCase() !== "REPUESTOS" ? row.descripcion : null;
@@ -49,34 +55,21 @@ function lineIdentity(area: VentasArea, row: SalesLine) {
   const model = cleanModel(row.modelo || row.descripcion);
   return row.chasis ? `${model} · ${row.chasis}` : model;
 }
-function rowDimension(area: VentasArea, row: SalesLine, dimension: PivotRow) {
-  if (dimension === "cliente") return row.cliente || "Sin cliente";
-  if (dimension === "sucursal") return row.sucursal || "Sin sucursal";
-  if (dimension === "factura") return row.factura || "Sin factura";
-  return lineIdentity(area, row);
-}
-function columnDimension(row: SalesLine, dimension: PivotColumn) {
-  if (dimension === "none") return { key: "total", label: "Total" };
-  if (dimension === "sucursal") { const label = row.sucursal || "Sin sucursal"; return { key: label, label }; }
-  const key = row.fecha.slice(0, 7);
-  const [year, month] = key.split("-");
-  return { key, label: `${month}/${year}` };
-}
-function metricValue(value: { usd: number; facturas: Set<string>; cantidad: number }, metric: PivotMetric) {
-  return metric === "usd" ? value.usd : metric === "facturas" ? value.facturas.size : value.cantidad;
-}
 function formatMetric(value: number, metric: PivotMetric) {
   if (metric === "usd") return usd.format(value);
   return metric === "facturas" ? Math.round(value).toLocaleString("es-PY") : quantity.format(value);
 }
 
-function SalesExplorer({ area, data, loading }: { area: VentasArea; data: SalesResponse | null; loading: boolean }) {
+function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string }) {
   const copy = AREA_COPY[area];
   const [view, setView] = useState<ExplorerView>("facturas");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pivotRows, setPivotRows] = useState<PivotRow>(copy.primaryValue);
   const [pivotColumns, setPivotColumns] = useState<PivotColumn>("mes");
   const [pivotMetric, setPivotMetric] = useState<PivotMetric>("usd");
+  const [analysis, setAnalysis] = useState<AnalysisResponse>({ columns: [], rows: [] });
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const lines = useMemo(() => data?.lineas ?? [], [data?.lineas]);
 
   useEffect(() => { setView("facturas"); setExpanded(null); setPivotRows(copy.primaryValue); }, [area, copy.primaryValue]);
@@ -91,32 +84,31 @@ function SalesExplorer({ area, data, loading }: { area: VentasArea; data: SalesR
     return [...map.values()].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.total - a.total);
   }, [lines]);
 
-  const clients = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; invoices: Set<string>; rows: SalesLine[] }>();
-    lines.forEach((row) => {
-      const name = row.cliente || "Sin cliente";
-      const current = map.get(name) ?? { name, total: 0, invoices: new Set<string>(), rows: [] };
-      current.total += Number(row.total_venta || 0); current.invoices.add(`${row.factura}__${row.fecha}`); current.rows.push(row); map.set(name, current);
-    });
-    return [...map.values()].sort((a, b) => b.total - a.total);
+  const clientLines = useMemo(() => {
+    const map = new Map<string, SalesLine[]>();
+    lines.forEach((row) => { const name = row.cliente || "Sin cliente"; map.set(name, [...(map.get(name) ?? []), row]); });
+    return map;
   }, [lines]);
+  const clients = useMemo(() => (data?.clientes_detalle ?? []).map((client) => ({
+    name: client.nombre, total: Number(client.importe || 0), invoiceCount: client.facturas, rows: clientLines.get(client.nombre) ?? [],
+  })), [clientLines, data?.clientes_detalle]);
 
-  const pivot = useMemo(() => {
-    type Cell = { usd: number; facturas: Set<string>; cantidad: number };
-    type Row = Cell & { key: string; cells: Map<string, Cell> };
-    const columns = new Map<string, string>(); const rows = new Map<string, Row>();
-    lines.forEach((line) => {
-      const rowKey = rowDimension(area, line, pivotRows); const column = columnDimension(line, pivotColumns);
-      columns.set(column.key, column.label);
-      const current = rows.get(rowKey) ?? { key: rowKey, usd: 0, facturas: new Set<string>(), cantidad: 0, cells: new Map<string, Cell>() };
-      const cell = current.cells.get(column.key) ?? { usd: 0, facturas: new Set<string>(), cantidad: 0 };
-      const invoiceKey = `${line.factura}__${line.fecha}`;
-      current.usd += Number(line.total_venta || 0); current.facturas.add(invoiceKey); current.cantidad += Number(line.cantidad || 0);
-      cell.usd += Number(line.total_venta || 0); cell.facturas.add(invoiceKey); cell.cantidad += Number(line.cantidad || 0);
-      current.cells.set(column.key, cell); rows.set(rowKey, current);
+  useEffect(() => {
+    if (view !== "analisis") return;
+    let alive = true;
+    setAnalysisLoading(true); setAnalysisError(null);
+    void (supabase as any).rpc("ventas_area_analisis", {
+      p_area: area, p_desde: desde, p_hasta: hasta,
+      p_sucursal: sucursal === "TODAS" ? null : sucursal,
+      p_buscar: buscar.trim() || null, p_filas: pivotRows, p_columnas: pivotColumns, p_medida: pivotMetric,
+    }).then(({ data: response, error }: { data: unknown; error: { message?: string } | null }) => {
+      if (!alive) return;
+      if (error) { setAnalysisError(error.message ?? "No se pudo calcular el análisis."); setAnalysis({ columns: [], rows: [] }); }
+      else setAnalysis(response as AnalysisResponse);
+      setAnalysisLoading(false);
     });
-    return { columns: [...columns].map(([key, label]) => ({ key, label })).sort((a, b) => a.key.localeCompare(b.key)), rows: [...rows.values()].sort((a, b) => metricValue(b, pivotMetric) - metricValue(a, pivotMetric)) };
-  }, [area, lines, pivotColumns, pivotMetric, pivotRows]);
+    return () => { alive = false; };
+  }, [area, buscar, desde, hasta, pivotColumns, pivotMetric, pivotRows, sucursal, view]);
 
   const rowOptions = [{ value: copy.primaryValue, label: copy.primary }, { value: "cliente" as const, label: "Cliente" }, { value: "sucursal" as const, label: "Sucursal" }, { value: "factura" as const, label: "Factura" }];
   const partial = Boolean(data && data.facturas > invoices.length);
@@ -146,7 +138,7 @@ function SalesExplorer({ area, data, loading }: { area: VentasArea; data: SalesR
       ) : view === "clientes" ? (
         <div className="mt-3 overflow-hidden rounded-md border">
           <div className="grid grid-cols-[minmax(260px,1fr)_100px_130px_140px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"><div>Cliente</div><div className="text-right">Facturas</div><div className="text-right">Ticket promedio</div><div className="text-right">Facturación</div></div>
-          <div className="max-h-[480px] overflow-y-auto">{!clients.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">{copy.empty}</div> : clients.map((client) => <div key={client.name} className="border-t"><button type="button" onClick={() => setExpanded((current) => current === client.name ? null : client.name)} className="grid w-full grid-cols-[minmax(260px,1fr)_100px_130px_140px] items-center px-3 py-2 text-left text-[12px] hover:bg-accent"><div className="truncate font-medium">{client.name}</div><div className="text-right tabular-nums">{client.invoices.size}</div><div className="text-right tabular-nums">{usd.format(client.total / Math.max(client.invoices.size, 1))}</div><div className="text-right font-semibold tabular-nums">{usd.format(client.total)}</div></button>{expanded === client.name && <div className="bg-muted/20 px-3 py-2 text-[11px]">{client.rows.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map((row) => <div key={row.id} className="grid grid-cols-[130px_110px_minmax(240px,1fr)_130px] gap-3 border-t border-border/50 py-1.5"><div className="font-mono text-muted-foreground">{row.factura}</div><div>{shortDate.format(new Date(`${row.fecha}T00:00:00`))}</div><div className="truncate text-muted-foreground">{lineIdentity(area, row)}</div><div className="text-right font-medium tabular-nums">{usd.format(row.total_venta)}</div></div>)}</div>}</div>)}</div>
+          <div className="max-h-[480px] overflow-y-auto">{!clients.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">{copy.empty}</div> : clients.map((client) => <div key={client.name} className="border-t"><button type="button" onClick={() => setExpanded((current) => current === client.name ? null : client.name)} className="grid w-full grid-cols-[minmax(260px,1fr)_100px_130px_140px] items-center px-3 py-2 text-left text-[12px] hover:bg-accent"><div className="truncate font-medium">{client.name}</div><div className="text-right tabular-nums">{client.invoiceCount}</div><div className="text-right tabular-nums">{usd.format(client.total / Math.max(client.invoiceCount, 1))}</div><div className="text-right font-semibold tabular-nums">{usd.format(client.total)}</div></button>{expanded === client.name && <div className="bg-muted/20 px-3 py-2 text-[11px]">{client.rows.length ? client.rows.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map((row) => <div key={row.id} className="grid grid-cols-[130px_110px_minmax(240px,1fr)_130px] gap-3 border-t border-border/50 py-1.5"><div className="font-mono text-muted-foreground">{row.factura}</div><div>{shortDate.format(new Date(`${row.fecha}T00:00:00`))}</div><div className="truncate text-muted-foreground">{lineIdentity(area, row)}</div><div className="text-right font-medium tabular-nums">{usd.format(row.total_venta)}</div></div>) : <div className="py-2 text-muted-foreground">El detalle no está dentro de las últimas líneas visibles.</div>}</div>}</div>)}</div>
         </div>
       ) : (
         <div className="mt-3 space-y-3">
@@ -156,7 +148,7 @@ function SalesExplorer({ area, data, loading }: { area: VentasArea; data: SalesR
             <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Medida</span><select value={pivotMetric} onChange={(event) => setPivotMetric(event.target.value as PivotMetric)} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]"><option value="usd">USD</option><option value="facturas">Facturas</option><option value="cantidad">Cantidad</option></select></label>
           </div>
           {area === "repuestos" && data?.historico !== 0 && <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-[10px] text-muted-foreground"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />El código y la descripción del repuesto no existen en el histórico anterior al 01/07/2026; para ese tramo conviene analizar por cliente, sucursal o factura.</div>}
-          <div className="overflow-x-auto rounded-md border"><div className="min-w-max"><div className="grid items-center border-b bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground" style={{ gridTemplateColumns: `260px repeat(${Math.max(pivot.columns.length, 1)}, minmax(130px, 1fr)) 140px` }}><div>{rowOptions.find((option) => option.value === pivotRows)?.label}</div>{pivot.columns.map((column) => <div key={column.key} className="text-right">{column.label}</div>)}<div className="text-right">Total</div></div><div className="max-h-[440px] overflow-y-auto">{!pivot.rows.length ? <div className="w-[700px] py-12 text-center text-[12px] text-muted-foreground">No hay datos para esta combinación.</div> : pivot.rows.map((row) => <div key={row.key} className="grid items-center border-b px-3 py-2 text-[12px] last:border-0" style={{ gridTemplateColumns: `260px repeat(${Math.max(pivot.columns.length, 1)}, minmax(130px, 1fr)) 140px` }}><div className="truncate font-medium" title={row.key}>{row.key}</div>{pivot.columns.map((column) => <div key={column.key} className="text-right tabular-nums text-muted-foreground">{row.cells.get(column.key) ? formatMetric(metricValue(row.cells.get(column.key)!, pivotMetric), pivotMetric) : "—"}</div>)}<div className="text-right font-semibold tabular-nums">{formatMetric(metricValue(row, pivotMetric), pivotMetric)}</div></div>)}</div></div></div>
+          <div className="overflow-x-auto rounded-md border">{analysisLoading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Calculando todo el período…</div> : analysisError ? <div className="py-12 text-center text-[12px] text-destructive">{analysisError}</div> : <div className="min-w-max"><div className="grid items-center border-b bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground" style={{ gridTemplateColumns: `260px repeat(${Math.max(analysis.columns.length, 1)}, minmax(130px, 1fr)) 140px` }}><div>{rowOptions.find((option) => option.value === pivotRows)?.label}</div>{analysis.columns.map((column) => <div key={column.key} className="text-right">{column.label}</div>)}<div className="text-right">Total</div></div><div className="max-h-[440px] overflow-y-auto">{!analysis.rows.length ? <div className="w-[700px] py-12 text-center text-[12px] text-muted-foreground">No hay datos para esta combinación.</div> : analysis.rows.map((row) => <div key={row.key} className="grid items-center border-b px-3 py-2 text-[12px] last:border-0" style={{ gridTemplateColumns: `260px repeat(${Math.max(analysis.columns.length, 1)}, minmax(130px, 1fr)) 140px` }}><div className="truncate font-medium" title={row.key}>{row.key}</div>{analysis.columns.map((column) => <div key={column.key} className="text-right tabular-nums text-muted-foreground">{row.values[column.key] == null ? "—" : formatMetric(Number(row.values[column.key]), pivotMetric)}</div>)}<div className="text-right font-semibold tabular-nums">{formatMetric(Number(row.total), pivotMetric)}</div></div>)}</div></div>}</div>
         </div>
       )}
     </Panel>
@@ -183,8 +175,9 @@ export default function Ventas({ area }: { area: VentasArea }) {
       <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); }} meta={data ? `${data.facturas.toLocaleString("es-PY")} facturas` : undefined}><FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} /><FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} /></FiltersBar>
       {error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         <KpiStrip><KpiItem label="Facturado" value={loading ? "—" : usd.format(data?.total ?? 0)} icon={<Receipt />} /><KpiItem label="Facturas" value={loading ? "—" : (data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label="Clientes" value={loading ? "—" : (data?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label="Promedio por factura" value={loading ? "—" : usd.format(data?.promedio ?? 0)} /></KpiStrip>
+        {area === "servicios" && Boolean(data?.pendientes_vinculacion?.facturas) && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-900"><AlertTriangle className="h-3.5 w-3.5 shrink-0" /><span>{data!.pendientes_vinculacion.facturas.toLocaleString("es-PY")} factura(s) con conceptos de servicio quedaron fuera por no tener OS vinculada. Importe a revisar: {usd.format(data!.pendientes_vinculacion.importe)}.</span></div>}
         {showHistoricalLimit && <details className="rounded-md border bg-background px-3 py-2 text-[10px] text-muted-foreground"><summary className="flex cursor-pointer list-none items-center gap-2"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /><span>Alcance del histórico</span><ChevronDown className="ml-auto h-3.5 w-3.5" /></summary><p className="mt-2 pl-5">Antes del 01/07/2026 no existe una vinculación confiable entre factura y OS ni detalle por código de repuesto. Los totales se conservan por rubro contable.</p></details>}
-        <SalesExplorer area={area} data={data} loading={loading} />
+        <SalesExplorer area={area} data={data} loading={loading} desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} />
       </>}
     </PageShell>
   );
