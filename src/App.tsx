@@ -20,7 +20,6 @@ const Comisiones = lazy(() => import("./pages/Comisiones"));
 const Historial = lazy(() => import("./pages/Historial"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
 const MaquinariaOperaciones = lazy(() => import("./pages/MaquinariaOperaciones"));
-const Agenda = lazy(() => import("./pages/Agenda"));
 const Trabajos = lazy(() => import("./pages/Trabajos"));
 const Repuestos = lazy(() => import("./pages/Repuestos"));
 const RepuestosCompras = lazy(() => import("./pages/RepuestosCompras"));
@@ -115,14 +114,6 @@ const App = () => (
                   element={
                     <ProtectedRoute requireModulo="parque" requireSection="parque.importaciones">
                       <MaquinariaOperaciones />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/agenda"
-                  element={
-                    <ProtectedRoute requireRoles={["admin"]} requireSection="servicios.agenda">
-                      <Agenda />
                     </ProtectedRoute>
                   }
                 />

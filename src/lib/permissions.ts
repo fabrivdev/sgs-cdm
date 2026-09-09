@@ -7,7 +7,6 @@ export const SECTION_ROUTES = [
   { id: "servicios.dashboard", module: "servicios", route: "/dashboard" },
   { id: "servicios.comisiones", module: "servicios", route: "/comisiones" },
   { id: "servicios.historial", module: "servicios", route: "/historial" },
-  { id: "servicios.agenda", module: "servicios", route: "/agenda" },
   { id: "parque.clientes", module: "parque", route: "/parque-clientes" },
   { id: "parque.maquinas", module: "parque", route: "/parque-maquinas" },
   { id: "parque.stock", module: "parque", route: "/parque-stock" },

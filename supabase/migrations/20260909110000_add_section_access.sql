@@ -21,7 +21,6 @@ insert into public.app_secciones (id, modulo_id, nombre, orden, activo) values
   ('servicios.dashboard', 'servicios', 'Dashboard', 40, true),
   ('servicios.comisiones', 'servicios', 'Comisiones', 50, true),
   ('servicios.historial', 'servicios', 'Historial', 60, true),
-  ('servicios.agenda', 'servicios', 'Agenda', 70, true),
   ('parque.clientes', 'parque', 'Clientes', 10, true),
   ('parque.maquinas', 'parque', 'Máquinas', 20, true),
   ('parque.stock', 'parque', 'Stock', 30, true),

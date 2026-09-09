@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstAccessibleRoute, roleHasCapability } from "@/lib/permissions";
+import { firstAccessibleRoute, roleHasCapability, SECTION_ROUTES } from "@/lib/permissions";
 
 describe("matriz de permisos", () => {
   it("no concede modulos por ser administrador", () => {
@@ -10,6 +10,10 @@ describe("matriz de permisos", () => {
   it("respeta la primera sección habilitada dentro de un módulo", () => {
     expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.stock"])).toBe("/parque-stock");
     expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.importaciones"])).toBe("/parque-importaciones");
+  });
+
+  it("no publica Agenda como una sección funcional", () => {
+    expect(SECTION_ROUTES.some((section) => section.id === "servicios.agenda")).toBe(false);
   });
 
   it("reserva el acceso global para el superadministrador", () => {
