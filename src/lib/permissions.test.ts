@@ -3,7 +3,7 @@ import { firstAccessibleRoute, roleHasCapability, SECTION_ROUTES } from "@/lib/p
 
 describe("matriz de permisos", () => {
   it("no concede modulos por ser administrador", () => {
-    expect(firstAccessibleRoute(["parque"], ["admin"], false)).toBe("/parque-clientes");
+    expect(firstAccessibleRoute(["parque"], ["admin"], false)).toBe("/parque-ventas");
     expect(firstAccessibleRoute([], ["admin"], false)).toBe("/admin");
   });
 

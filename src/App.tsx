@@ -16,6 +16,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Ventas = lazy(() => import("./pages/Ventas"));
 const Comisiones = lazy(() => import("./pages/Comisiones"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
 const MaquinariaOperaciones = lazy(() => import("./pages/MaquinariaOperaciones"));
@@ -59,6 +60,7 @@ const App = () => (
                 <Route path="/" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.planificador"><Planificador /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
+                <Route path="/servicios/ventas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.ventas"><Ventas area="servicios" /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={
@@ -72,6 +74,14 @@ const App = () => (
                   element={
                     <ProtectedRoute requireRoles={["admin"]} requireModulo="servicios" requireSection="servicios.comisiones">
                       <Comisiones />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/parque-ventas"
+                  element={
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.ventas">
+                      <Ventas area="maquinas" />
                     </ProtectedRoute>
                   }
                 />
@@ -112,6 +122,14 @@ const App = () => (
                   element={
                     <ProtectedRoute requireModulo="parque" requireSection="parque.importaciones">
                       <MaquinariaOperaciones />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/repuestos/ventas"
+                  element={
+                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.ventas">
+                      <Ventas area="repuestos" />
                     </ProtectedRoute>
                   }
                 />

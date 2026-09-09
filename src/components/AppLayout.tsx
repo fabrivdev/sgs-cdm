@@ -18,6 +18,7 @@ import {
   HandCoins,
   ClipboardList,
   Ship,
+  BadgeDollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +72,7 @@ const navGroups: NavGroup[] = [
     label: "Servicios",
     icon: BriefcaseBusiness,
     items: [
+      { to: "/servicios/ventas", label: "Ventas", icon: BadgeDollarSign, section: "servicios.ventas", end: true },
       { to: "/", label: "Planificador", icon: ListChecks, section: "servicios.planificador", end: true },
       { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
       { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },
@@ -83,6 +85,7 @@ const navGroups: NavGroup[] = [
     label: "Parque",
     icon: Tractor,
     items: [
+      { to: "/parque-ventas", label: "Ventas", icon: BadgeDollarSign, section: "parque.ventas", end: true },
       { to: "/parque-clientes", label: "Clientes", icon: Users, section: "parque.clientes", end: true },
       { to: "/parque-maquinas", label: "Máquinas", icon: Tractor, section: "parque.maquinas", end: true },
       { to: "/parque-stock", label: "Stock", icon: Package, section: "parque.stock", end: true },
@@ -95,6 +98,7 @@ const navGroups: NavGroup[] = [
     label: "Repuestos",
     icon: Package,
     items: [
+      { to: "/repuestos/ventas", label: "Ventas", icon: BadgeDollarSign, section: "repuestos.ventas", end: true },
       { to: "/repuestos", label: "Catálogo y Stock", icon: Package, section: "repuestos.stock", end: true },
       { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, section: "repuestos.compras", end: true },
       { to: "/repuestos/sugerencias", label: "Sugerencia de compra", icon: Sparkles, section: "repuestos.sugerencias", end: true },

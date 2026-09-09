@@ -1,16 +1,19 @@
 import type { Role } from "@/lib/constants";
 
 export const SECTION_ROUTES = [
+  { id: "servicios.ventas", module: "servicios", route: "/servicios/ventas" },
   { id: "servicios.planificador", module: "servicios", route: "/" },
   { id: "servicios.trabajos", module: "servicios", route: "/trabajos" },
   { id: "servicios.calendario", module: "servicios", route: "/calendario" },
   { id: "servicios.dashboard", module: "servicios", route: "/dashboard" },
   { id: "servicios.comisiones", module: "servicios", route: "/comisiones" },
+  { id: "parque.ventas", module: "parque", route: "/parque-ventas" },
   { id: "parque.clientes", module: "parque", route: "/parque-clientes" },
   { id: "parque.maquinas", module: "parque", route: "/parque-maquinas" },
   { id: "parque.stock", module: "parque", route: "/parque-stock" },
   { id: "parque.operaciones", module: "parque", route: "/parque-operaciones" },
   { id: "parque.importaciones", module: "parque", route: "/parque-importaciones" },
+  { id: "repuestos.ventas", module: "repuestos", route: "/repuestos/ventas" },
   { id: "repuestos.stock", module: "repuestos", route: "/repuestos" },
   { id: "repuestos.compras", module: "repuestos", route: "/repuestos/compras" },
   { id: "repuestos.sugerencias", module: "repuestos", route: "/repuestos/sugerencias" },
