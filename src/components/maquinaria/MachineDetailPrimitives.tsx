@@ -16,9 +16,21 @@ export function ProcessStepper({ steps, currentIndex, pulseCurrent = false }: { 
   </div>;
 }
 
-export function DetailSection({ title, action, children, className }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
+export function DetailSection({ title, icon, action, children, className, card = false }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; card?: boolean }) {
+  if (card) {
+    return <section className={cn("overflow-hidden rounded-xl border bg-card", className)}>
+      <div className="flex min-h-11 items-center justify-between gap-3 border-b bg-muted/20 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {icon && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>}
+          <h3 className="truncate text-[12px] font-semibold">{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div className="p-3">{children}</div>
+    </section>;
+  }
   return <section className={cn("space-y-2", className)}>
-    <div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">{title}</h3>{action}</div>
+    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2">{icon}<h3 className="text-[12px] font-semibold">{title}</h3></div>{action}</div>
     {children}
   </section>;
 }
