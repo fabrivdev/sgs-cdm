@@ -1,220 +1,190 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, FileText, Receipt, Users } from "lucide-react";
+import { AlertTriangle, ChevronDown, FileText, Receipt, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "@/components/layout/AppPrimitives";
+import { PageHeader, PageShell, KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { FilterDate, FilterSelect, FiltersBar } from "@/components/filters/FiltersBar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ErrorState } from "@/components/ErrorState";
-import { TableSkeletonRows } from "@/components/LoadingSkeletons";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { SUCURSALES } from "@/lib/constants";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
-type Breakdown = { concepto: string; importe: number };
-type BranchBreakdown = { sucursal: string; importe: number; facturas: number };
-type SalesGroup = {
-  clave: string;
-  nombre: string;
-  referencia: string | null;
-  marca: string | null;
-  cantidad: number;
-  facturas: number;
-  clientes: number;
-  importe: number;
-};
+type ExplorerView = "facturas" | "clientes" | "analisis";
+type PivotColumn = "none" | "mes" | "sucursal";
+type PivotMetric = "usd" | "facturas" | "cantidad";
+type PivotRow = "cliente" | "sucursal" | "factura" | "os" | "repuesto" | "maquina";
 type SalesLine = {
-  id: string;
-  fecha: string;
-  factura: string;
-  cliente: string;
-  sucursal: string | null;
-  concepto: string;
-  metodologia: "historico" | "actual";
-  total_venta: number;
-  cantidad: number;
-  os_numero: string | null;
-  codigo: string | null;
-  codigo_fabricante: string | null;
-  descripcion: string | null;
-  marca: string | null;
-  modelo: string | null;
-  chasis: string | null;
+  id: string; fecha: string; factura: string; cliente: string; sucursal: string | null;
+  concepto: string; metodologia: "historico" | "actual"; total_venta: number; cantidad: number;
+  os_numero: string | null; codigo: string | null; codigo_fabricante: string | null;
+  descripcion: string | null; marca: string | null; modelo: string | null; chasis: string | null;
 };
 type SalesResponse = {
-  total: number;
-  facturas: number;
-  clientes: number;
-  promedio: number;
-  historico: number;
-  actual: number;
-  cruza_corte: boolean;
-  desglose: Breakdown[];
-  sucursales: BranchBreakdown[];
-  grupos: SalesGroup[];
-  lineas: SalesLine[];
+  total: number; facturas: number; clientes: number; promedio: number;
+  historico: number; actual: number; cruza_corte: boolean; lineas: SalesLine[];
 };
 
-const AREA_COPY: Record<VentasArea, { title: string; detailTab: string; empty: string; search: string }> = {
-  servicios: { title: "Ventas de Servicios", detailTab: "Por OS", empty: "No hay ventas de Servicios en el período.", search: "OS, factura o cliente…" },
-  repuestos: { title: "Ventas de Repuestos", detailTab: "Por repuesto", empty: "No hay ventas de Repuestos en el período.", search: "Código, repuesto, factura o cliente…" },
-  maquinas: { title: "Ventas de Máquinas", detailTab: "Por máquina", empty: "No hay ventas de Máquinas en el período.", search: "Modelo, chasis, factura o cliente…" },
+const AREA_COPY = {
+  servicios: { title: "Ventas de Servicios", search: "OS, factura o cliente…", primary: "OS", primaryValue: "os" as const, empty: "No hay ventas de Servicios en el período." },
+  repuestos: { title: "Ventas de Repuestos", search: "Código, repuesto, factura o cliente…", primary: "Repuesto", primaryValue: "repuesto" as const, empty: "No hay ventas de Repuestos en el período." },
+  maquinas: { title: "Ventas de Máquinas", search: "Modelo, chasis, factura o cliente…", primary: "Máquina", primaryValue: "maquina" as const, empty: "No hay ventas de Máquinas en el período." },
 };
 
 const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
+const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
+const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
-function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+function isoDate(date: Date) { return date.toISOString().slice(0, 10); }
+function cleanModel(value: string | null) {
+  return (value ?? "").replace(/\s*[-·]?\s*(?:chasis|casis)\s*:?\s*[\w-]+.*$/i, "").trim() || "Modelo no informado";
+}
+function lineIdentity(area: VentasArea, row: SalesLine) {
+  if (area === "servicios") return row.os_numero || (row.metodologia === "historico" ? "OS no disponible" : "Sin OS vinculada");
+  if (area === "repuestos") {
+    const code = row.codigo_fabricante || row.codigo;
+    const description = row.descripcion && row.descripcion.toUpperCase() !== "REPUESTOS" ? row.descripcion : null;
+    if (code && description) return `${code} · ${description}`;
+    return code || description || (row.metodologia === "historico" ? "Detalle no disponible en histórico" : "Repuesto sin identificar");
+  }
+  const model = cleanModel(row.modelo || row.descripcion);
+  return row.chasis ? `${model} · ${row.chasis}` : model;
+}
+function rowDimension(area: VentasArea, row: SalesLine, dimension: PivotRow) {
+  if (dimension === "cliente") return row.cliente || "Sin cliente";
+  if (dimension === "sucursal") return row.sucursal || "Sin sucursal";
+  if (dimension === "factura") return row.factura || "Sin factura";
+  return lineIdentity(area, row);
+}
+function columnDimension(row: SalesLine, dimension: PivotColumn) {
+  if (dimension === "none") return { key: "total", label: "Total" };
+  if (dimension === "sucursal") { const label = row.sucursal || "Sin sucursal"; return { key: label, label }; }
+  const key = row.fecha.slice(0, 7);
+  const [year, month] = key.split("-");
+  return { key, label: `${month}/${year}` };
+}
+function metricValue(value: { usd: number; facturas: Set<string>; cantidad: number }, metric: PivotMetric) {
+  return metric === "usd" ? value.usd : metric === "facturas" ? value.facturas.size : value.cantidad;
+}
+function formatMetric(value: number, metric: PivotMetric) {
+  if (metric === "usd") return usd.format(value);
+  return metric === "facturas" ? Math.round(value).toLocaleString("es-PY") : quantity.format(value);
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-PY").format(new Date(`${value}T00:00:00`));
-}
+function SalesExplorer({ area, data, loading }: { area: VentasArea; data: SalesResponse | null; loading: boolean }) {
+  const copy = AREA_COPY[area];
+  const [view, setView] = useState<ExplorerView>("facturas");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [pivotRows, setPivotRows] = useState<PivotRow>(copy.primaryValue);
+  const [pivotColumns, setPivotColumns] = useState<PivotColumn>("mes");
+  const [pivotMetric, setPivotMetric] = useState<PivotMetric>("usd");
+  const lines = useMemo(() => data?.lineas ?? [], [data?.lineas]);
 
-function EmptyRow({ columns, text }: { columns: number; text: string }) {
-  return <TableRow><TableCell colSpan={columns} className="h-28 text-center text-muted-foreground">{text}</TableCell></TableRow>;
-}
+  useEffect(() => { setView("facturas"); setExpanded(null); setPivotRows(copy.primaryValue); }, [area, copy.primaryValue]);
 
-function SummaryTable({ data, total, loading }: { data: Breakdown[]; total: number; loading: boolean }) {
+  const invoices = useMemo(() => {
+    const map = new Map<string, { key: string; factura: string; cliente: string; fecha: string; total: number; rows: SalesLine[] }>();
+    lines.forEach((row) => {
+      const key = `${row.factura}__${row.cliente}__${row.fecha}`;
+      const current = map.get(key) ?? { key, factura: row.factura || "Sin factura", cliente: row.cliente || "Sin cliente", fecha: row.fecha, total: 0, rows: [] };
+      current.total += Number(row.total_venta || 0); current.rows.push(row); map.set(key, current);
+    });
+    return [...map.values()].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.total - a.total);
+  }, [lines]);
+
+  const clients = useMemo(() => {
+    const map = new Map<string, { name: string; total: number; invoices: Set<string>; rows: SalesLine[] }>();
+    lines.forEach((row) => {
+      const name = row.cliente || "Sin cliente";
+      const current = map.get(name) ?? { name, total: 0, invoices: new Set<string>(), rows: [] };
+      current.total += Number(row.total_venta || 0); current.invoices.add(`${row.factura}__${row.fecha}`); current.rows.push(row); map.set(name, current);
+    });
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }, [lines]);
+
+  const pivot = useMemo(() => {
+    type Cell = { usd: number; facturas: Set<string>; cantidad: number };
+    type Row = Cell & { key: string; cells: Map<string, Cell> };
+    const columns = new Map<string, string>(); const rows = new Map<string, Row>();
+    lines.forEach((line) => {
+      const rowKey = rowDimension(area, line, pivotRows); const column = columnDimension(line, pivotColumns);
+      columns.set(column.key, column.label);
+      const current = rows.get(rowKey) ?? { key: rowKey, usd: 0, facturas: new Set<string>(), cantidad: 0, cells: new Map<string, Cell>() };
+      const cell = current.cells.get(column.key) ?? { usd: 0, facturas: new Set<string>(), cantidad: 0 };
+      const invoiceKey = `${line.factura}__${line.fecha}`;
+      current.usd += Number(line.total_venta || 0); current.facturas.add(invoiceKey); current.cantidad += Number(line.cantidad || 0);
+      cell.usd += Number(line.total_venta || 0); cell.facturas.add(invoiceKey); cell.cantidad += Number(line.cantidad || 0);
+      current.cells.set(column.key, cell); rows.set(rowKey, current);
+    });
+    return { columns: [...columns].map(([key, label]) => ({ key, label })).sort((a, b) => a.key.localeCompare(b.key)), rows: [...rows.values()].sort((a, b) => metricValue(b, pivotMetric) - metricValue(a, pivotMetric)) };
+  }, [area, lines, pivotColumns, pivotMetric, pivotRows]);
+
+  const rowOptions = [{ value: copy.primaryValue, label: copy.primary }, { value: "cliente" as const, label: "Cliente" }, { value: "sucursal" as const, label: "Sucursal" }, { value: "factura" as const, label: "Factura" }];
+  const partial = Boolean(data && data.facturas > invoices.length);
+
   return (
-    <Table>
-      <TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead className="text-right">Participación</TableHead><TableHead className="text-right">Facturado</TableHead></TableRow></TableHeader>
-      <TableBody>
-        {loading ? <TableSkeletonRows columns={3} rows={4} /> : data.length ? data.map((row) => (
-          <TableRow key={row.concepto}>
-            <TableCell className="font-medium">{row.concepto}</TableCell>
-            <TableCell className="text-right tabular-nums">{total ? `${((row.importe / total) * 100).toFixed(1)}%` : "—"}</TableCell>
-            <TableCell className="text-right font-medium tabular-nums">{usd.format(row.importe)}</TableCell>
-          </TableRow>
-        )) : <EmptyRow columns={3} text="Sin datos" />}
-      </TableBody>
-    </Table>
-  );
-}
+    <Panel className="p-3">
+      <div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
+        <div><h2 className="text-[13px] font-semibold">Detalle de facturación</h2><p className="text-[11px] text-muted-foreground">Consultá documentos, clientes o armá tu propio desglose.</p></div>
+        <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
+          {([['facturas', 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
+        </div>
+      </div>
 
-function GroupTable({ area, rows, loading, empty }: { area: VentasArea; rows: SalesGroup[]; loading: boolean; empty: string }) {
-  const columns = area === "servicios" ? 5 : 6;
-  return (
-    <Table>
-      <TableHeader>
-        {area === "servicios" ? (
-          <TableRow><TableHead>OS</TableHead><TableHead>Composición</TableHead><TableHead className="text-right">Facturas</TableHead><TableHead className="text-right">Clientes</TableHead><TableHead className="text-right">Facturado</TableHead></TableRow>
-        ) : area === "repuestos" ? (
-          <TableRow><TableHead>Código</TableHead><TableHead>Cód. fabricante</TableHead><TableHead>Repuesto</TableHead><TableHead className="text-right">Cantidad</TableHead><TableHead className="text-right">Facturas</TableHead><TableHead className="text-right">Facturado</TableHead></TableRow>
-        ) : (
-          <TableRow><TableHead>Modelo</TableHead><TableHead>Chasis</TableHead><TableHead>Marca</TableHead><TableHead className="text-right">Cantidad</TableHead><TableHead className="text-right">Facturas</TableHead><TableHead className="text-right">Facturado</TableHead></TableRow>
-        )}
-      </TableHeader>
-      <TableBody>
-        {loading ? <TableSkeletonRows columns={columns} rows={7} /> : rows.length ? rows.map((row) => (
-          <TableRow key={row.clave}>
-            {area === "servicios" ? <>
-              <TableCell className="font-medium">{row.nombre}</TableCell><TableCell>{row.referencia || "—"}</TableCell><TableCell className="text-right tabular-nums">{row.facturas}</TableCell><TableCell className="text-right tabular-nums">{row.clientes}</TableCell>
-            </> : area === "repuestos" ? <>
-              <TableCell className="font-medium">{row.clave}</TableCell><TableCell>{row.referencia || "—"}</TableCell><TableCell className="max-w-[340px] truncate" title={row.nombre}>{row.nombre}</TableCell><TableCell className="text-right tabular-nums">{number.format(row.cantidad)}</TableCell><TableCell className="text-right tabular-nums">{row.facturas}</TableCell>
-            </> : <>
-              <TableCell className="font-medium">{row.nombre}</TableCell><TableCell className="font-mono text-[12px]">{row.referencia || "—"}</TableCell><TableCell>{row.marca || "—"}</TableCell><TableCell className="text-right tabular-nums">{number.format(row.cantidad)}</TableCell><TableCell className="text-right tabular-nums">{row.facturas}</TableCell>
-            </>}
-            <TableCell className="text-right font-medium tabular-nums">{usd.format(row.importe)}</TableCell>
-          </TableRow>
-        )) : <EmptyRow columns={columns} text={empty} />}
-      </TableBody>
-    </Table>
-  );
-}
-
-function InvoiceTable({ area, rows, loading, empty }: { area: VentasArea; rows: SalesLine[]; loading: boolean; empty: string }) {
-  const identityLabel = area === "servicios" ? "OS" : area === "repuestos" ? "Código" : "Modelo / chasis";
-  return (
-    <Table>
-      <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Factura</TableHead><TableHead>Cliente</TableHead><TableHead>{identityLabel}</TableHead><TableHead>Sucursal</TableHead><TableHead className="text-right">Facturado</TableHead></TableRow></TableHeader>
-      <TableBody>
-        {loading ? <TableSkeletonRows columns={6} rows={7} /> : rows.length ? rows.map((row) => {
-          const identity = area === "servicios"
-            ? (row.os_numero || (row.metodologia === "historico" ? "No disponible" : "Sin OS"))
-            : area === "repuestos"
-              ? (row.codigo || row.codigo_fabricante || "Sin código")
-              : `${row.modelo || row.descripcion || "Modelo no informado"} · ${row.chasis || "Sin chasis"}`;
-          return (
-            <TableRow key={row.id}>
-              <TableCell className="whitespace-nowrap">{formatDate(row.fecha)}</TableCell>
-              <TableCell className="font-medium">{row.factura}</TableCell>
-              <TableCell className="max-w-[280px] truncate" title={row.cliente}>{row.cliente || "—"}</TableCell>
-              <TableCell className="max-w-[300px] truncate" title={identity}>{identity}</TableCell>
-              <TableCell>{row.sucursal || "—"}</TableCell>
-              <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">{usd.format(row.total_venta)}</TableCell>
-            </TableRow>
-          );
-        }) : <EmptyRow columns={6} text={empty} />}
-      </TableBody>
-    </Table>
+      {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div> : view === "facturas" ? (
+        <div className="mt-3 overflow-hidden rounded-md border">
+          <div className="grid grid-cols-[130px_minmax(220px,1fr)_180px_110px_80px_130px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"><div>Factura</div><div>Cliente</div><div>{copy.primary}</div><div>Fecha</div><div className="text-right">Líneas</div><div className="text-right">Importe</div></div>
+          <div className="max-h-[480px] overflow-y-auto">
+            {!invoices.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">{copy.empty}</div> : invoices.map((invoice) => (
+              <div key={invoice.key} className="border-t">
+                <button type="button" onClick={() => setExpanded((current) => current === invoice.key ? null : invoice.key)} className="grid w-full grid-cols-[130px_minmax(220px,1fr)_180px_110px_80px_130px] items-center px-3 py-2 text-left text-[12px] hover:bg-accent"><div className="truncate font-mono font-semibold">{invoice.factura}</div><div className="truncate font-medium">{invoice.cliente}</div><div className="truncate text-muted-foreground" title={lineIdentity(area, invoice.rows[0])}>{lineIdentity(area, invoice.rows[0])}</div><div>{shortDate.format(new Date(`${invoice.fecha}T00:00:00`))}</div><div className="text-right tabular-nums">{invoice.rows.length}</div><div className="text-right font-semibold tabular-nums">{usd.format(invoice.total)}</div></button>
+                {expanded === invoice.key && <div className="bg-muted/20 px-3 py-2"><div className="grid grid-cols-[minmax(260px,1fr)_150px_90px_130px] gap-3 text-[10px] font-medium text-muted-foreground"><div>{copy.primary} / detalle</div><div>Rubro</div><div className="text-right">Cantidad</div><div className="text-right">Importe</div></div>{invoice.rows.map((row) => <div key={row.id} className="grid grid-cols-[minmax(260px,1fr)_150px_90px_130px] gap-3 border-t border-border/50 py-1.5 text-[11px]"><div className="truncate" title={lineIdentity(area, row)}>{lineIdentity(area, row)}</div><div className="truncate text-muted-foreground">{row.concepto}</div><div className="text-right tabular-nums">{quantity.format(row.cantidad)}</div><div className="text-right font-medium tabular-nums">{usd.format(row.total_venta)}</div></div>)}</div>}
+              </div>
+            ))}
+          </div>
+          {partial && <div className="border-t px-3 py-2 text-[10px] text-muted-foreground">Se muestran las líneas más recientes; los indicadores superiores consideran el total completo.</div>}
+        </div>
+      ) : view === "clientes" ? (
+        <div className="mt-3 overflow-hidden rounded-md border">
+          <div className="grid grid-cols-[minmax(260px,1fr)_100px_130px_140px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"><div>Cliente</div><div className="text-right">Facturas</div><div className="text-right">Ticket promedio</div><div className="text-right">Facturación</div></div>
+          <div className="max-h-[480px] overflow-y-auto">{!clients.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">{copy.empty}</div> : clients.map((client) => <div key={client.name} className="border-t"><button type="button" onClick={() => setExpanded((current) => current === client.name ? null : client.name)} className="grid w-full grid-cols-[minmax(260px,1fr)_100px_130px_140px] items-center px-3 py-2 text-left text-[12px] hover:bg-accent"><div className="truncate font-medium">{client.name}</div><div className="text-right tabular-nums">{client.invoices.size}</div><div className="text-right tabular-nums">{usd.format(client.total / Math.max(client.invoices.size, 1))}</div><div className="text-right font-semibold tabular-nums">{usd.format(client.total)}</div></button>{expanded === client.name && <div className="bg-muted/20 px-3 py-2 text-[11px]">{client.rows.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map((row) => <div key={row.id} className="grid grid-cols-[130px_110px_minmax(240px,1fr)_130px] gap-3 border-t border-border/50 py-1.5"><div className="font-mono text-muted-foreground">{row.factura}</div><div>{shortDate.format(new Date(`${row.fecha}T00:00:00`))}</div><div className="truncate text-muted-foreground">{lineIdentity(area, row)}</div><div className="text-right font-medium tabular-nums">{usd.format(row.total_venta)}</div></div>)}</div>}</div>)}</div>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-2 rounded-md border p-3 md:grid-cols-3">
+            <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Filas</span><select value={pivotRows} onChange={(event) => setPivotRows(event.target.value as PivotRow)} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]">{rowOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Columnas</span><select value={pivotColumns} onChange={(event) => setPivotColumns(event.target.value as PivotColumn)} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]"><option value="mes">Mes</option><option value="sucursal">Sucursal</option><option value="none">Sin columnas</option></select></label>
+            <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Medida</span><select value={pivotMetric} onChange={(event) => setPivotMetric(event.target.value as PivotMetric)} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]"><option value="usd">USD</option><option value="facturas">Facturas</option><option value="cantidad">Cantidad</option></select></label>
+          </div>
+          {area === "repuestos" && data?.historico !== 0 && <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-[10px] text-muted-foreground"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />El código y la descripción del repuesto no existen en el histórico anterior al 01/07/2026; para ese tramo conviene analizar por cliente, sucursal o factura.</div>}
+          <div className="overflow-x-auto rounded-md border"><div className="min-w-max"><div className="grid items-center border-b bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground" style={{ gridTemplateColumns: `260px repeat(${Math.max(pivot.columns.length, 1)}, minmax(130px, 1fr)) 140px` }}><div>{rowOptions.find((option) => option.value === pivotRows)?.label}</div>{pivot.columns.map((column) => <div key={column.key} className="text-right">{column.label}</div>)}<div className="text-right">Total</div></div><div className="max-h-[440px] overflow-y-auto">{!pivot.rows.length ? <div className="w-[700px] py-12 text-center text-[12px] text-muted-foreground">No hay datos para esta combinación.</div> : pivot.rows.map((row) => <div key={row.key} className="grid items-center border-b px-3 py-2 text-[12px] last:border-0" style={{ gridTemplateColumns: `260px repeat(${Math.max(pivot.columns.length, 1)}, minmax(130px, 1fr)) 140px` }}><div className="truncate font-medium" title={row.key}>{row.key}</div>{pivot.columns.map((column) => <div key={column.key} className="text-right tabular-nums text-muted-foreground">{row.cells.get(column.key) ? formatMetric(metricValue(row.cells.get(column.key)!, pivotMetric), pivotMetric) : "—"}</div>)}<div className="text-right font-semibold tabular-nums">{formatMetric(metricValue(row, pivotMetric), pivotMetric)}</div></div>)}</div></div></div>
+        </div>
+      )}
+    </Panel>
   );
 }
 
 export default function Ventas({ area }: { area: VentasArea }) {
   const now = useMemo(() => new Date(), []);
-  const [desde, setDesde] = useState(`${now.getFullYear()}-01-01`);
-  const [hasta, setHasta] = useState(isoDate(now));
-  const [sucursal, setSucursal] = useState("TODAS");
-  const [buscar, setBuscar] = useState("");
-  const [data, setData] = useState<SalesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [desde, setDesde] = useState(`${now.getFullYear()}-01-01`); const [hasta, setHasta] = useState(isoDate(now));
+  const [sucursal, setSucursal] = useState("TODAS"); const [buscar, setBuscar] = useState("");
+  const [data, setData] = useState<SalesResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    if (!desde || !hasta || desde > hasta) {
-      setError("Seleccioná un rango de fechas válido.");
-      setData(null);
-      setLoading(false);
-      return;
-    }
-    const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_area_resumen", {
-      p_area: area, p_desde: desde, p_hasta: hasta,
-      p_sucursal: sucursal === "TODAS" ? null : sucursal,
-      p_buscar: buscar.trim() || null, p_limite: 500,
-    });
-    if (rpcError) {
-      setError(rpcError.message ?? "No se pudo cargar Ventas.");
-      setData(null);
-    } else setData(response as SalesResponse);
+    setLoading(true); setError(null);
+    if (!desde || !hasta || desde > hasta) { setError("Seleccioná un rango de fechas válido."); setData(null); setLoading(false); return; }
+    const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_area_resumen", { p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal, p_buscar: buscar.trim() || null, p_limite: 500 });
+    if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas."); setData(null); } else setData(response as SalesResponse);
     setLoading(false);
   }, [area, buscar, desde, hasta, sucursal]);
-
   useEffect(() => { void load(); }, [load]);
-
-  const copy = AREA_COPY[area];
-  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar));
-  const onlyHistorical = Boolean(data && data.historico !== 0 && data.actual === 0);
-
+  const copy = AREA_COPY[area]; const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)); const showHistoricalLimit = Boolean(data?.historico && area !== "maquinas");
   return (
     <PageShell>
       <PageHeader title={copy.title} />
-      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); }} meta={data ? `${data.facturas.toLocaleString("es-PY")} facturas` : undefined}>
-        <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} />
-        <FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
-        <FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} />
-      </FiltersBar>
-
+      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); }} meta={data ? `${data.facturas.toLocaleString("es-PY")} facturas` : undefined}><FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} /><FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} /></FiltersBar>
       {error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
-        <KpiStrip>
-          <KpiItem label="Facturado" value={loading ? "—" : usd.format(data?.total ?? 0)} icon={<Receipt />} />
-          <KpiItem label="Facturas" value={loading ? "—" : (data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} />
-          <KpiItem label="Clientes" value={loading ? "—" : (data?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} />
-          <KpiItem label="Promedio por factura" value={loading ? "—" : usd.format(data?.promedio ?? 0)} />
-        </KpiStrip>
-
-        {(data?.cruza_corte || onlyHistorical) && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span>{data.cruza_corte ? `El período combina histórico (${usd.format(data.historico)}) y sistema actual (${usd.format(data.actual)}). La separación OS/mostrador comienza el 01/07/2026.` : "En el histórico se conserva el rubro contable; el número de OS o el canal no está disponible de forma confiable."}</span></div>}
-
-        <Tabs defaultValue="resumen">
-          <TabsList className="w-full justify-start overflow-x-auto"><TabsTrigger value="resumen">Resumen</TabsTrigger><TabsTrigger value="detalle">{copy.detailTab}</TabsTrigger><TabsTrigger value="facturas">Facturas</TabsTrigger><TabsTrigger value="sucursales">Por sucursal</TabsTrigger></TabsList>
-          <TabsContent value="resumen"><Panel className="overflow-hidden p-0"><div className="px-3.5 pt-3"><SectionHeader title="Composición de ventas" /></div><SummaryTable data={data?.desglose ?? []} total={data?.total ?? 0} loading={loading} /></Panel></TabsContent>
-          <TabsContent value="detalle"><Panel className="overflow-hidden p-0"><div className="px-3.5 pt-3"><SectionHeader title={copy.detailTab} meta={data ? `${data.grupos.length.toLocaleString("es-PY")} registros` : undefined} /></div><GroupTable area={area} rows={data?.grupos ?? []} loading={loading} empty={copy.empty} /></Panel></TabsContent>
-          <TabsContent value="facturas"><Panel className="overflow-hidden p-0"><div className="px-3.5 pt-3"><SectionHeader title="Detalle facturado" meta={data && data.lineas.length === 500 ? "Últimas 500 líneas" : undefined} /></div><InvoiceTable area={area} rows={data?.lineas ?? []} loading={loading} empty={copy.empty} /></Panel></TabsContent>
-          <TabsContent value="sucursales"><Panel className="overflow-hidden p-0"><div className="px-3.5 pt-3"><SectionHeader title="Ventas por sucursal" /></div><Table><TableHeader><TableRow><TableHead>Sucursal</TableHead><TableHead className="text-right">Facturas</TableHead><TableHead className="text-right">Facturado</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableSkeletonRows columns={3} rows={4} /> : data?.sucursales.length ? data.sucursales.map((row) => <TableRow key={row.sucursal}><TableCell className="font-medium">{row.sucursal}</TableCell><TableCell className="text-right tabular-nums">{row.facturas}</TableCell><TableCell className="text-right font-medium tabular-nums">{usd.format(row.importe)}</TableCell></TableRow>) : <EmptyRow columns={3} text="Sin datos" />}</TableBody></Table></Panel></TabsContent>
-        </Tabs>
+        <KpiStrip><KpiItem label="Facturado" value={loading ? "—" : usd.format(data?.total ?? 0)} icon={<Receipt />} /><KpiItem label="Facturas" value={loading ? "—" : (data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label="Clientes" value={loading ? "—" : (data?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label="Promedio por factura" value={loading ? "—" : usd.format(data?.promedio ?? 0)} /></KpiStrip>
+        {showHistoricalLimit && <details className="rounded-md border bg-background px-3 py-2 text-[10px] text-muted-foreground"><summary className="flex cursor-pointer list-none items-center gap-2"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /><span>Alcance del histórico</span><ChevronDown className="ml-auto h-3.5 w-3.5" /></summary><p className="mt-2 pl-5">Antes del 01/07/2026 no existe una vinculación confiable entre factura y OS ni detalle por código de repuesto. Los totales se conservan por rubro contable.</p></details>}
+        <SalesExplorer area={area} data={data} loading={loading} />
       </>}
     </PageShell>
   );
