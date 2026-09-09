@@ -58,13 +58,13 @@ const App = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route path="/" element={<ProtectedRoute requireModulo="servicios"><Planificador /></ProtectedRoute>} />
-                <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios"><Trabajos /></ProtectedRoute>} />
-                <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios"><Calendario /></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.planificador"><Planificador /></ProtectedRoute>} />
+                <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
+                <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
                 <Route
                   path="/dashboard"
                   element={
-                    <ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios">
+                    <ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios" requireSection="servicios.dashboard">
                       <Dashboard />
                     </ProtectedRoute>
                   }
@@ -72,16 +72,16 @@ const App = () => (
                 <Route
                   path="/comisiones"
                   element={
-                    <ProtectedRoute requireRoles={["admin"]} requireModulo="servicios">
+                    <ProtectedRoute requireRoles={["admin"]} requireModulo="servicios" requireSection="servicios.comisiones">
                       <Comisiones />
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/historial" element={<ProtectedRoute requireModulo="servicios"><Historial /></ProtectedRoute>} />
+                <Route path="/historial" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.historial"><Historial /></ProtectedRoute>} />
                 <Route
                   path="/parque-clientes"
                   element={
-                    <ProtectedRoute requireModulo="parque">
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.clientes">
                       <ParqueClientes />
                     </ProtectedRoute>
                   }
@@ -89,7 +89,7 @@ const App = () => (
                 <Route
                   path="/parque-maquinas"
                   element={
-                    <ProtectedRoute requireModulo="parque">
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.maquinas">
                       <ParqueClientes />
                     </ProtectedRoute>
                   }
@@ -97,7 +97,7 @@ const App = () => (
                 <Route
                   path="/parque-stock"
                   element={
-                    <ProtectedRoute requireModulo="parque">
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.stock">
                       <ParqueClientes />
                     </ProtectedRoute>
                   }
@@ -105,7 +105,7 @@ const App = () => (
                 <Route
                   path="/parque-operaciones"
                   element={
-                    <ProtectedRoute requireModulo="parque">
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.operaciones">
                       <MaquinariaOperaciones />
                     </ProtectedRoute>
                   }
@@ -113,7 +113,7 @@ const App = () => (
                 <Route
                   path="/parque-importaciones"
                   element={
-                    <ProtectedRoute requireModulo="parque">
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.importaciones">
                       <MaquinariaOperaciones />
                     </ProtectedRoute>
                   }
@@ -121,7 +121,7 @@ const App = () => (
                 <Route
                   path="/agenda"
                   element={
-                    <ProtectedRoute requireRoles={["admin"]}>
+                    <ProtectedRoute requireRoles={["admin"]} requireSection="servicios.agenda">
                       <Agenda />
                     </ProtectedRoute>
                   }
@@ -129,7 +129,7 @@ const App = () => (
                 <Route
                   path="/repuestos"
                   element={
-                    <ProtectedRoute requireModulo="repuestos">
+                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.stock">
                       <Repuestos />
                     </ProtectedRoute>
                   }
@@ -137,7 +137,7 @@ const App = () => (
                 <Route
                   path="/repuestos/compras"
                   element={
-                    <ProtectedRoute requireModulo="repuestos">
+                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.compras">
                       <RepuestosCompras />
                     </ProtectedRoute>
                   }
@@ -145,7 +145,7 @@ const App = () => (
                 <Route
                   path="/admin"
                   element={
-                    <ProtectedRoute requireRoles={["admin"]}>
+                    <ProtectedRoute requireRoles={["admin"]} requireAnySections={["admin.usuarios", "admin.importaciones", "admin.parametros"]}>
                       <Admin />
                     </ProtectedRoute>
                   }
@@ -153,7 +153,7 @@ const App = () => (
                 <Route
                   path="/repuestos/sugerencias"
                   element={
-                    <ProtectedRoute requireModulo="repuestos">
+                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.sugerencias">
                       <RepuestosSugerencias />
                     </ProtectedRoute>
                   }

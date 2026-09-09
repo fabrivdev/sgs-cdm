@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Las tablas de permisos se tipan al regenerar database.types tras aplicar la migración. */
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role, Sucursal } from "@/lib/constants";
-import { firstAccessibleRoute, roleHasCapability, type Capability } from "@/lib/permissions";
+import { firstAccessibleRoute, roleHasCapability, sectionsFromLegacyModules, type Capability, type SectionKey } from "@/lib/permissions";
 
 interface Profile {
   id: string;
@@ -18,6 +19,7 @@ interface AuthCtx {
   profile: Profile | null;
   roles: Role[];
   moduloAccess: string[];
+  sectionAccess: string[];
   loading: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
@@ -29,6 +31,7 @@ interface AuthCtx {
   /** @deprecated alias de isOperativo, valido solo dentro del contexto de Servicios */
   isTecnico: boolean;
   hasModuloAccess: (moduloId: string) => boolean;
+  hasSectionAccess: (sectionId: SectionKey | string) => boolean;
   can: (capability: Capability) => boolean;
   defaultRoute: string;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [moduloAccess, setModuloAccess] = useState<string[]>([]);
+  const [sectionAccess, setSectionAccess] = useState<string[]>([]);
   /** Rol tecnico de emergencia, otorgado solo via user_roles (nunca asignable desde el UI de Admin). */
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setRoles([]);
     setModuloAccess([]);
+    setSectionAccess([]);
     setIsSuperAdmin(false);
     loadedUserRef.current = null;
     loadingUserRef.current = null;
@@ -127,17 +132,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const roleOwnerId = loadedProfile?.id ?? uid;
       const permissionOwnerIds = Array.from(new Set([uid, roleOwnerId]));
-      const [{ data: roleRows }, { data: moduloRows }] = await Promise.all([
+      const [roleResult, moduloResult, sectionResult] = await Promise.all([
         supabase.from("user_roles").select("role").in("user_id", permissionOwnerIds),
         (supabase as any).from("user_modulo_acceso").select("modulo_id").in("user_id", permissionOwnerIds),
+        (supabase as any).from("user_seccion_acceso").select("seccion_id").in("user_id", permissionOwnerIds),
       ]);
 
       const loadedRoles = Array.from(
-        new Set((roleRows ?? []).map((row: { role: Role }) => row.role)),
+        new Set((roleResult.data ?? []).map((row: { role: Role }) => row.role)),
       );
+      const loadedModules = ((moduloResult.data ?? []) as { modulo_id: string }[]).map((row) => row.modulo_id);
+      const loadedSections = sectionResult.error
+        ? sectionsFromLegacyModules(loadedModules, loadedRoles)
+        : ((sectionResult.data ?? []) as { seccion_id: string }[]).map((row) => row.seccion_id);
       setProfile(loadedProfile);
       setRoles(loadedRoles);
-      setModuloAccess(((moduloRows ?? []) as { modulo_id: string }[]).map((row) => row.modulo_id));
+      setModuloAccess(loadedModules);
+      setSectionAccess(loadedSections);
       setIsSuperAdmin(loadedRoles.includes("superadmin"));
       loadedUserRef.current = uid;
     })();
@@ -199,6 +210,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, () => {
         void loadUserData(user.id, true);
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_seccion_acceso" }, () => {
+        void loadUserData(user.id, true);
+      })
       .subscribe();
 
     return () => {
@@ -234,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isJefatura = roles.includes("jefatura");
   const isOperativo = roles.includes("operativo");
-  const defaultRoute = firstAccessibleRoute(moduloAccess, roles, isSuperAdmin);
+  const defaultRoute = firstAccessibleRoute(moduloAccess, roles, isSuperAdmin, sectionAccess);
 
   return (
     <Ctx.Provider
@@ -244,6 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         roles,
         moduloAccess,
+        sectionAccess,
         loading,
         isAdmin: isSuperAdmin || roles.includes("admin"),
         isSuperAdmin,
@@ -255,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Solo la cuenta tecnica de emergencia tiene acceso global. El resto,
         // incluso administradores, respeta los modulos asignados.
         hasModuloAccess: (moduloId: string) => isSuperAdmin || moduloAccess.includes(moduloId),
+        hasSectionAccess: (sectionId: SectionKey | string) => isSuperAdmin || sectionAccess.includes(sectionId),
         can: (capability: Capability) => isSuperAdmin || roleHasCapability(roles, capability),
         defaultRoute,
         signIn,

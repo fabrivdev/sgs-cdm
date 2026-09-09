@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Administración consulta tablas nuevas antes de regenerar database.types. */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -50,6 +51,18 @@ interface UserModuloAcceso {
   modulo_id: Modulo;
 }
 
+interface AppSection {
+  id: string;
+  modulo_id: string;
+  nombre: string;
+  orden: number;
+}
+
+interface UserSectionAccess {
+  user_id: string;
+  seccion_id: string;
+}
+
 const normalizeAdminSearch = (value: string) => value
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -93,11 +106,15 @@ function ModuloChips({
 }
 
 export default function Admin() {
-  const { can } = useAuth();
+  const { can, isSuperAdmin, hasSectionAccess } = useAuth();
   const canManageAdmin = can("administracion:gestionar");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [moduloAcceso, setModuloAcceso] = useState<UserModuloAcceso[]>([]);
+  const [sections, setSections] = useState<AppSection[]>([]);
+  const [sectionAccess, setSectionAccess] = useState<UserSectionAccess[]>([]);
+  const [sectionUser, setSectionUser] = useState<Profile | null>(null);
+  const [sectionBusy, setSectionBusy] = useState<string | null>(null);
   const [emails, setEmails] = useState<Record<string, string>>({});
 
   const [email, setEmail] = useState("");
@@ -121,6 +138,12 @@ export default function Admin() {
   const [savingParameters, setSavingParameters] = useState(false);
   const [adminTab, setAdminTab] = useState("equipo");
   const [tableSearch, setTableSearch] = useState("");
+  const availableAdminTabs = useMemo(() => [
+    hasSectionAccess("admin.usuarios") ? "equipo" : null,
+    hasSectionAccess("admin.usuarios") ? "accesos" : null,
+    hasSectionAccess("admin.importaciones") ? "importar" : null,
+    hasSectionAccess("admin.parametros") ? "parametros" : null,
+  ].filter(Boolean) as string[], [hasSectionAccess]);
 
   const rolesByUser = useMemo(
     () =>
@@ -138,6 +161,14 @@ export default function Admin() {
         return acc;
       }, {}),
     [moduloAcceso],
+  );
+
+  const sectionAccessByUser = useMemo(
+    () => sectionAccess.reduce<Record<string, string[]>>((acc, item) => {
+      (acc[item.user_id] ??= []).push(item.seccion_id);
+      return acc;
+    }, {}),
+    [sectionAccess],
   );
 
   const hasLinkedSchema = profiles.some((profile) => typeof profile.auth_user_id !== "undefined");
@@ -162,6 +193,10 @@ export default function Admin() {
   const modulesForProfile = (profile: Profile) => Array.from(new Set([
     ...(moduloAccesoByUser[permissionOwnerId(profile)] ?? []),
     ...(moduloAccesoByUser[profile.id] ?? []),
+  ]));
+  const sectionsForProfile = (profile: Profile) => Array.from(new Set([
+    ...(sectionAccessByUser[permissionOwnerId(profile)] ?? []),
+    ...(sectionAccessByUser[profile.id] ?? []),
   ]));
 
   const profilesConAcceso = useMemo(
@@ -206,6 +241,7 @@ export default function Admin() {
         Sucursal: profile.sucursal ?? "",
         Nivel: nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile)),
         Módulos: modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(", "),
+        Secciones: sectionsForProfile(profile).map((id) => sections.find((section) => section.id === id)?.nombre ?? id).join(", "),
         Estado: profile.activo ? "Activo" : "Inactivo",
       })),
     },
@@ -226,10 +262,12 @@ export default function Admin() {
   ];
 
   const load = async () => {
-    const [profileResult, roleResult, moduloAccesoResult] = await Promise.all([
+    const [profileResult, roleResult, moduloAccesoResult, sectionsResult, sectionAccessResult] = await Promise.all([
       (supabase as any).from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
       supabase.from("user_roles").select("user_id, role"),
       (supabase as any).from("user_modulo_acceso").select("user_id, modulo_id"),
+      (supabase as any).from("app_secciones").select("id, modulo_id, nombre, orden").eq("activo", true).order("modulo_id").order("orden"),
+      (supabase as any).from("user_seccion_acceso").select("user_id, seccion_id"),
     ]);
 
     let loadedProfiles = (profileResult.data ?? []) as Profile[];
@@ -256,6 +294,8 @@ export default function Admin() {
     setProfiles(loadedProfiles);
     setRoles((roleResult.data ?? []) as UserRole[]);
     setModuloAcceso((moduloAccesoResult.data ?? []) as UserModuloAcceso[]);
+    setSections((sectionsResult.data ?? []) as AppSection[]);
+    setSectionAccess((sectionAccessResult.data ?? []) as UserSectionAccess[]);
 
     const { data: emailData, error: emailErr } = await supabase.functions.invoke("admin-list-users");
     if (!emailErr && emailData?.users) {
@@ -271,6 +311,10 @@ export default function Admin() {
     load();
     loadMonthlyProductivityGoal().then(setMonthlyProductivityGoal);
   }, []);
+
+  useEffect(() => {
+    if (availableAdminTabs.length && !availableAdminTabs.includes(adminTab)) setAdminTab(availableAdminTabs[0]);
+  }, [adminTab, availableAdminTabs]);
 
   const saveParameters = async () => {
     if (!Number.isFinite(monthlyProductivityGoal) || monthlyProductivityGoal <= 0) {
@@ -382,6 +426,35 @@ export default function Admin() {
     else load();
   };
 
+  const cambiarSeccionAcceso = async (profile: Profile, section: AppSection, activo: boolean) => {
+    if (!isSuperAdmin || isProtectedProfile(profile)) return;
+    const userId = permissionOwnerId(profile);
+    setSectionBusy(section.id);
+    try {
+      const sectionQuery = activo
+        ? (supabase as any).from("user_seccion_acceso").insert({ user_id: userId, seccion_id: section.id })
+        : (supabase as any).from("user_seccion_acceso").delete().eq("user_id", userId).eq("seccion_id", section.id);
+      const { error } = await sectionQuery;
+      if (error) throw error;
+
+      if (["servicios", "parque", "repuestos"].includes(section.modulo_id)) {
+        const current = sectionsForProfile(profile);
+        const projected = activo ? Array.from(new Set([...current, section.id])) : current.filter((id) => id !== section.id);
+        const moduleStillUsed = sections.some((candidate) => candidate.modulo_id === section.modulo_id && projected.includes(candidate.id));
+        const moduleQuery = moduleStillUsed
+          ? (supabase as any).from("user_modulo_acceso").upsert({ user_id: userId, modulo_id: section.modulo_id }, { onConflict: "user_id,modulo_id" })
+          : (supabase as any).from("user_modulo_acceso").delete().eq("user_id", userId).eq("modulo_id", section.modulo_id);
+        const { error: moduleError } = await moduleQuery;
+        if (moduleError) throw moduleError;
+      }
+      await load();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo actualizar la sección");
+    } finally {
+      setSectionBusy(null);
+    }
+  };
+
   const cambiarSucursal = async (id: string, sucursal: Sucursal) => {
     const target = profiles.find((profile) => profile.id === id);
     if (target && isProtectedProfile(target)) {
@@ -480,22 +553,22 @@ export default function Admin() {
 
       <Tabs value={adminTab} onValueChange={(value) => { setAdminTab(value); setTableSearch(""); }}>
         <TabsList>
-          <TabsTrigger value="equipo">
+          {hasSectionAccess("admin.usuarios") && <TabsTrigger value="equipo">
             <Users className="mr-2 h-4 w-4" />
             Equipo
-          </TabsTrigger>
-          <TabsTrigger value="accesos">
+          </TabsTrigger>}
+          {hasSectionAccess("admin.usuarios") && <TabsTrigger value="accesos">
             <KeyRound className="mr-2 h-4 w-4" />
             Accesos
-          </TabsTrigger>
-          <TabsTrigger value="importar">
+          </TabsTrigger>}
+          {hasSectionAccess("admin.importaciones") && <TabsTrigger value="importar">
             <Database className="mr-2 h-4 w-4" />
             Importar datos
-          </TabsTrigger>
-          <TabsTrigger value="parametros">
+          </TabsTrigger>}
+          {hasSectionAccess("admin.parametros") && <TabsTrigger value="parametros">
             <Settings2 className="mr-2 h-4 w-4" />
             Parámetros
-          </TabsTrigger>
+          </TabsTrigger>}
         </TabsList>
 
         {(adminTab === "equipo" || adminTab === "accesos") && (
@@ -720,7 +793,7 @@ export default function Admin() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-[13px] font-semibold">Accesos activos</div>
-                <div className="text-[12px] text-muted-foreground">Personas con email asociado para iniciar sesion.</div>
+                <div className="text-[12px] text-muted-foreground">El acceso a cada módulo se calcula desde sus secciones habilitadas.</div>
               </div>
               <Badge variant="outline">{profilesConAcceso.length} accesos</Badge>
             </div>
@@ -732,6 +805,7 @@ export default function Admin() {
                     <TableHead>Email</TableHead>
                     <TableHead>Nivel</TableHead>
                     <TableHead>Módulos</TableHead>
+                    <TableHead>Secciones</TableHead>
                     <TableHead>Sucursal</TableHead>
                     <TableHead>Estado</TableHead>
                     {canManageAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
@@ -755,9 +829,14 @@ export default function Admin() {
                       <TableCell>
                         <ModuloChips
                           activos={modulesForProfile(profile)}
-                          editable={canManageAdmin && !isProtectedProfile(profile)}
+                          editable={canManageAdmin && !isProtectedProfile(profile) && !sections.length}
                           onToggle={(modulo, activo) => cambiarModuloAcceso(permissionOwnerId(profile), modulo, activo)}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm" className="h-8 whitespace-nowrap" onClick={() => setSectionUser(profile)} disabled={!sections.length}>
+                          {sections.length ? `${sectionsForProfile(profile).length} habilitadas` : "Aplicar SQL"}
+                        </Button>
                       </TableCell>
                       <TableCell className="text-[12px]">{profile.sucursal ?? "-"}</TableCell>
                       <TableCell><Badge variant={profile.activo ? "default" : "outline"}>{profile.activo ? "Activo" : "Inactivo"}</Badge></TableCell>
@@ -901,6 +980,38 @@ export default function Admin() {
             <Button variant="outline" onClick={() => setCredUser(null)}>Cancelar</Button>
             <Button onClick={guardarCred} disabled={credBusy}>{credBusy ? "Guardando..." : "Guardar"}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!sectionUser} onOpenChange={(open) => !open && setSectionUser(null)}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Secciones habilitadas — {sectionUser?.nombre}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {!isSuperAdmin && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Solo el superadministrador puede modificar los accesos por sección.</div>}
+            {Array.from(new Set(sections.map((section) => section.modulo_id))).map((moduleId) => (
+              <section key={moduleId} className="overflow-hidden rounded-xl border">
+                <div className="border-b bg-muted/30 px-3 py-2 text-[12px] font-semibold">{moduleId === "admin" ? "Administración" : MODULO_LABELS[moduleId as Modulo] ?? moduleId}</div>
+                <div className="grid gap-2 p-3 sm:grid-cols-2">
+                  {sections.filter((section) => section.modulo_id === moduleId).map((section) => {
+                    const active = sectionUser ? sectionsForProfile(sectionUser).includes(section.id) : false;
+                    return <button
+                      key={section.id}
+                      type="button"
+                      disabled={!isSuperAdmin || !sectionUser || isProtectedProfile(sectionUser) || sectionBusy === section.id}
+                      onClick={() => sectionUser && cambiarSeccionAcceso(sectionUser, section, !active)}
+                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!isSuperAdmin || (sectionUser && isProtectedProfile(sectionUser))) && "cursor-default")}
+                    >
+                      <span>{section.nombre}</span>
+                      <span className={cn("h-2.5 w-2.5 rounded-full border", active ? "border-primary bg-primary" : "border-muted-foreground/30")} />
+                    </button>;
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setSectionUser(null)}>Cerrar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -7,6 +7,11 @@ describe("matriz de permisos", () => {
     expect(firstAccessibleRoute([], ["admin"], false)).toBe("/admin");
   });
 
+  it("respeta la primera sección habilitada dentro de un módulo", () => {
+    expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.stock"])).toBe("/parque-stock");
+    expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.importaciones"])).toBe("/parque-importaciones");
+  });
+
   it("reserva el acceso global para el superadministrador", () => {
     expect(firstAccessibleRoute([], ["admin"], true)).toBe("/");
     expect(firstAccessibleRoute([], ["superadmin"], false)).toBe("/");

@@ -57,8 +57,9 @@ import { AIAssistant } from "@/components/assistant/AIAssistant";
 import { nivelLabel } from "@/lib/constants";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 import { HelpDrawer } from "@/components/layout/HelpDrawer";
+import type { SectionKey } from "@/lib/permissions";
 
-type NavItem = { to: string; label: string; icon: typeof ListChecks; end?: boolean; managementOnly?: boolean; adminOnly?: boolean };
+type NavItem = { to: string; label: string; icon: typeof ListChecks; section: SectionKey; end?: boolean; managementOnly?: boolean; adminOnly?: boolean };
 type NavGroup = { modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
 
 // Temporary kill switch: preserves the assistant configuration and history for a future re-enable.
@@ -70,11 +71,11 @@ const navGroups: NavGroup[] = [
     label: "Servicios",
     icon: BriefcaseBusiness,
     items: [
-      { to: "/", label: "Planificador", icon: ListChecks, end: true },
-      { to: "/trabajos", label: "Trabajos", icon: Wrench },
-      { to: "/calendario", label: "Calendario", icon: CalendarDays },
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, managementOnly: true },
-      { to: "/comisiones", label: "Comisiones", icon: HandCoins, adminOnly: true },
+      { to: "/", label: "Planificador", icon: ListChecks, section: "servicios.planificador", end: true },
+      { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
+      { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "servicios.dashboard", managementOnly: true },
+      { to: "/comisiones", label: "Comisiones", icon: HandCoins, section: "servicios.comisiones", adminOnly: true },
     ],
   },
   {
@@ -82,11 +83,11 @@ const navGroups: NavGroup[] = [
     label: "Parque",
     icon: Tractor,
     items: [
-      { to: "/parque-clientes", label: "Clientes", icon: Users, end: true },
-      { to: "/parque-maquinas", label: "Máquinas", icon: Tractor, end: true },
-      { to: "/parque-stock", label: "Stock", icon: Package, end: true },
-      { to: "/parque-operaciones", label: "Operaciones", icon: ClipboardList, end: true },
-      { to: "/parque-importaciones", label: "Importaciones", icon: Ship, end: true },
+      { to: "/parque-clientes", label: "Clientes", icon: Users, section: "parque.clientes", end: true },
+      { to: "/parque-maquinas", label: "Máquinas", icon: Tractor, section: "parque.maquinas", end: true },
+      { to: "/parque-stock", label: "Stock", icon: Package, section: "parque.stock", end: true },
+      { to: "/parque-operaciones", label: "Operaciones", icon: ClipboardList, section: "parque.operaciones", end: true },
+      { to: "/parque-importaciones", label: "Importaciones", icon: Ship, section: "parque.importaciones", end: true },
     ],
   },
   {
@@ -94,9 +95,9 @@ const navGroups: NavGroup[] = [
     label: "Repuestos",
     icon: Package,
     items: [
-      { to: "/repuestos", label: "Catálogo y Stock", icon: Package, end: true },
-      { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, end: true },
-      { to: "/repuestos/sugerencias", label: "Sugerencia de compra", icon: Sparkles, end: true },
+      { to: "/repuestos", label: "Catálogo y Stock", icon: Package, section: "repuestos.stock", end: true },
+      { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, section: "repuestos.compras", end: true },
+      { to: "/repuestos/sugerencias", label: "Sugerencia de compra", icon: Sparkles, section: "repuestos.sugerencias", end: true },
     ],
   },
 ];
@@ -176,7 +177,7 @@ function ModuloNavGroup({
 }
 
 export function AppLayout({ children }: { children?: React.ReactNode }) {
-  const { profile, isAdmin, hasModuloAccess, can, signOut, roles, moduloAccess } = useAuth();
+  const { profile, isAdmin, hasModuloAccess, hasSectionAccess, can, signOut, roles, moduloAccess } = useAuth();
   const unseen = useUnseen();
   const location = useLocation();
   const navigate = useNavigate();
@@ -187,7 +188,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
     .filter((group) => hasModuloAccess(group.modulo))
     .map((group) => ({
       ...group,
-      items: group.items.filter((it) => !(it.managementOnly && !can("dashboard:ver")) && !(it.adminOnly && !isAdmin)),
+      items: group.items.filter((it) => hasSectionAccess(it.section) && !(it.managementOnly && !can("dashboard:ver")) && !(it.adminOnly && !isAdmin)),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -321,7 +322,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {isAdmin && (
+                {isAdmin && ["admin.usuarios", "admin.importaciones", "admin.parametros"].some(hasSectionAccess) && (
                   <DropdownMenuItem onClick={() => navigate("/admin")}>
                     <Users className="mr-2 h-4 w-4" />
                     Administración
