@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, FileText, Receipt, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
@@ -33,8 +33,15 @@ type AnalysisResponse = {
 type SalesDocument = {
   id: string; fecha: string; factura: string; cliente: string; sucursal: string | null;
   metodologia: "historico" | "actual"; total_venta: number; cantidad_lineas: number; lineas: SalesLine[];
+  os_numero?: string; tipo?: string; facturas?: number; mano_obra?: number; kilometraje?: number; repuestos?: number; otros?: number;
 };
 type DocumentsResponse = { total: number; pagina: number; por_pagina: number; paginas: number; documentos: SalesDocument[] };
+
+type ClientComparison = {
+  nombre: string; importe: number; importe_anterior: number | null; facturas: number;
+  ordenes: number; ultima: string | null; sucursales: string | null;
+};
+type ClientResponse = { clientes: ClientComparison[]; comparable: boolean; desde_anterior: string; hasta_anterior: string };
 
 const AREA_COPY = {
   servicios: { title: "Ventas de Servicios", search: "OS, factura o cliente…", primary: "OS", primaryValue: "concepto" as const, empty: "No hay ventas de Servicios en el período." },
@@ -43,6 +50,7 @@ const AREA_COPY = {
 };
 
 const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const money = new Intl.NumberFormat("es-PY", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
@@ -50,20 +58,24 @@ function isoDate(date: Date) { return date.toISOString().slice(0, 10); }
 function cleanModel(value: string | null) {
   return (value ?? "").replace(/\s*[-·]?\s*(?:chasis|casis)\s*:?\s*[\w-]+.*$/i, "").trim() || "Modelo no informado";
 }
-function lineIdentity(area: VentasArea, row: SalesLine) {
-  if (area === "servicios") return row.os_numero || (row.es_nota_credito ? "Nota de crédito" : "OS no disponible");
-  if (area === "repuestos") {
-    const code = row.codigo_fabricante || row.codigo;
-    const description = row.descripcion && row.descripcion.toUpperCase() !== "REPUESTOS" ? row.descripcion : null;
-    if (code && description) return `${code} · ${description}`;
-    return code || description || (row.metodologia === "historico" ? "Detalle no disponible en histórico" : "Repuesto sin identificar");
-  }
-  const model = cleanModel(row.modelo || row.descripcion);
-  return row.chasis ? `${model} · ${row.chasis}` : model;
-}
 function formatMetric(value: number, metric: PivotMetric) {
   if (metric === "usd") return usd.format(value);
   return metric === "facturas" ? Math.round(value).toLocaleString("es-PY") : quantity.format(value);
+}
+
+function SalesLines({area,lines}:{area:VentasArea;lines:SalesLine[]}) {
+  return <div className="border-b bg-muted/15 px-5 py-2">
+    <table className="w-full table-fixed text-[11px] [&_th]:py-2 [&_th]:pr-3 [&_th]:font-medium [&_td]:py-2 [&_td]:pr-3 [&_td]:align-top">
+      <thead className="text-left text-muted-foreground"><tr>
+        {area === "servicios" && <><th className="w-[150px]">Factura</th><th className="w-[90px]">Fecha</th><th className="w-[110px]">Componente</th></>}
+        <th className="w-[135px]">{area === "maquinas" ? "Modelo" : "Cód. repuesto"}</th><th className="w-[145px]">{area === "maquinas" ? "Chasis" : "Cód. fabricante"}</th><th>Descripción</th><th className="w-[80px] text-right">Cantidad</th><th className="w-[120px] text-right">Importe USD</th>
+      </tr></thead>
+      <tbody>{lines.map(line=><tr key={line.id} className="border-t border-border/50">
+        {area === "servicios" && <><td className="font-mono">{line.factura}</td><td>{shortDate.format(new Date(line.fecha+"T00:00:00"))}</td><td>{line.concepto==="Servicio"?"Mano de obra":line.concepto}</td></>}
+        <td className="break-all font-mono text-foreground">{area === "maquinas" ? cleanModel(line.modelo) : line.codigo || "—"}</td><td className="break-all font-mono text-foreground">{area === "maquinas" ? line.chasis || "—" : line.codigo_fabricante || "—"}</td><td className="break-words">{line.descripcion || (line.metodologia==="historico"?"Histórico sin detalle de artículo":"—")}{line.es_nota_credito && <span className="ml-2 text-muted-foreground">Nota de crédito</span>}</td><td className="text-right tabular-nums">{quantity.format(Number(line.cantidad))}</td><td className="text-right tabular-nums">{money.format(Number(line.total_venta))}</td>
+      </tr>)}</tbody>
+    </table>
+  </div>;
 }
 
 function Pager({ page, pages, total, onChange }: { page: number; pages: number; total: number; onChange: (page: number) => void }) {
@@ -71,7 +83,7 @@ function Pager({ page, pages, total, onChange }: { page: number; pages: number; 
   return <div className="flex items-center justify-between border-t px-3 py-2 text-[10px] text-muted-foreground"><span>{total.toLocaleString("es-PY")} registros</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Anterior</button><span>{page} de {pages}</span><button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Siguiente</button></div></div>;
 }
 
-function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string }) {
+export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string }) {
   const copy = AREA_COPY[area];
   const [view, setView] = useState<ExplorerView>("facturas");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -86,7 +98,26 @@ function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: 
   const [analysis, setAnalysis] = useState<AnalysisResponse>({ columns: [], rows: [], total: 0, pagina: 1, por_pagina: 50, paginas: 1 });
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const clients = useMemo(() => data?.clientes_detalle ?? [], [data?.clientes_detalle]);
+  const [clientData, setClientData] = useState<ClientResponse | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [clientLoading, setClientLoading] = useState(false);
+  const [clientPage, setClientPage] = useState(1);
+  const [clientSort, setClientSort] = useState<"importe" | "nombre" | "facturas">("importe");
+  const clients = useMemo(() => [...(clientData?.clientes ?? [])].sort((a,b) => clientSort === "nombre" ? a.nombre.localeCompare(b.nombre) : Number(b[clientSort])-Number(a[clientSort])), [clientData,clientSort]);
+  useEffect(() => { setClientPage(1); }, [area,buscar,desde,hasta,sucursal,clientSort]);
+  useEffect(() => {
+    if(view !== "clientes") return;
+    let alive = true;
+    setClientLoading(true); setClientError(null);
+    void (supabase as any).rpc("ventas_clientes_comparacion", {
+      p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
+      p_buscar: buscar.trim() || null
+    }).then(({data: response,error}: {data: ClientResponse; error: {message:string} | null}) => {
+      if(!alive) return;
+      setClientData(error ? null : response); setClientError(error?.message ?? null); setClientLoading(false);
+    });
+    return () => { alive = false; };
+  }, [area,buscar,desde,hasta,sucursal,view]);
 
   useEffect(() => { setView("facturas"); setExpanded(null); setDocumentPage(1); setAnalysisPage(1); setPivotRows(copy.primaryValue); setPivotMetric("usd"); }, [area, copy.primaryValue]);
   useEffect(() => { setDocumentPage(1); setAnalysisPage(1); }, [buscar, desde, hasta, sucursal]);
@@ -95,9 +126,9 @@ function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: 
     if (view !== "facturas") return;
     let alive = true;
     setDocumentsLoading(true); setDocumentsError(null);
-    void (supabase as any).rpc("ventas_area_documentos", {
+    void (supabase as any).rpc(area === "servicios" ? "ventas_servicios_os" : "ventas_area_documentos", {
       p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
-      p_buscar: buscar.trim() || null, p_pagina: documentPage, p_por_pagina: 50,
+      p_buscar: buscar.trim() || null, p_pagina: documentPage, p_por_pagina: 20,
     }).then(({ data: response, error }: { data: unknown; error: { message?: string } | null }) => {
       if (!alive) return;
       if (error) { setDocumentsError(error.message ?? "No se pudieron cargar las facturas."); setDocuments({ total: 0, pagina: 1, por_pagina: 50, paginas: 1, documentos: [] }); }
@@ -130,40 +161,80 @@ function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: 
       ? [{ value: "subgrupo" as const, label: "Tipo de máquina" }, { value: "modelo" as const, label: "Modelo normalizado" }, { value: "cliente" as const, label: "Cliente" }, { value: "sucursal" as const, label: "Sucursal" }]
       : [{ value: "repuesto" as const, label: "Código y repuesto" }, { value: "cliente" as const, label: "Cliente" }, { value: "sucursal" as const, label: "Sucursal" }];
 
-  function documentIdentity(document: SalesDocument) {
-    const first = document.lineas[0];
-    if (area === "servicios") return first?.os_numero || (first?.es_nota_credito ? "Nota de crédito" : "OS no disponible");
-    return first ? lineIdentity(area, first) : "—";
-  }
-  function serviceComposition(document: SalesDocument) {
-    return [...new Set(document.lineas.map((line) => line.concepto === "Servicio" ? "Mano de obra" : line.concepto))].join(" · ");
-  }
 
   return (
     <Panel className="p-3">
       <div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-[13px] font-semibold">Detalle de facturación</h2>
+        <h2 className="text-[13px] font-semibold">{area === "servicios" ? "Órdenes de servicio facturadas" : "Ventas"}</h2>
         <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
-          {([['facturas', 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
+          {([['facturas', 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{value === "facturas" && area === "servicios" ? "Por OS" : label}</button>)}
         </div>
       </div>
 
       {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div> : view === "facturas" ? (
-        <div className="mt-3 overflow-hidden rounded-md border">
-          <div className={cn("grid bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground", area === "servicios" ? "grid-cols-[130px_minmax(210px,1fr)_150px_220px_100px_125px]" : area === "maquinas" ? "grid-cols-[130px_minmax(210px,1fr)_210px_130px_100px_125px]" : "grid-cols-[130px_minmax(210px,1fr)_minmax(260px,1fr)_100px_70px_125px]")}><div>Factura</div><div>Cliente</div><div>{area === "maquinas" ? "Modelo" : copy.primary}</div>{area === "servicios" ? <div>Composición</div> : area === "maquinas" ? <div>Chasis</div> : <div>Fecha</div>}<div>{area === "repuestos" ? "Líneas" : "Fecha"}</div><div className="text-right">Importe</div></div>
-          <div className="max-h-[480px] overflow-y-auto">
-            {documentsLoading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando facturas…</div> : documentsError ? <div className="py-12 text-center text-[12px] text-destructive">{documentsError}</div> : !documents.documentos.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">{copy.empty}</div> : documents.documentos.map((document) => (
-              <div key={`${document.id}_${document.factura}`} className="border-t">
-                <button type="button" onClick={() => setExpanded((current) => current === document.id ? null : document.id)} className={cn("grid w-full items-center px-3 py-2 text-left text-[12px] hover:bg-accent", area === "servicios" ? "grid-cols-[130px_minmax(210px,1fr)_150px_220px_100px_125px]" : area === "maquinas" ? "grid-cols-[130px_minmax(210px,1fr)_210px_130px_100px_125px]" : "grid-cols-[130px_minmax(210px,1fr)_minmax(260px,1fr)_100px_70px_125px]")}><div className="truncate font-mono font-semibold">{document.factura}</div><div className="truncate font-medium">{document.cliente}</div><div className="truncate text-muted-foreground" title={documentIdentity(document)}>{area === "maquinas" ? cleanModel(document.lineas[0]?.modelo || document.lineas[0]?.descripcion) : documentIdentity(document)}</div>{area === "servicios" ? <div className="truncate text-muted-foreground" title={serviceComposition(document)}>{serviceComposition(document)}</div> : area === "maquinas" ? <div className="truncate font-mono text-muted-foreground">{document.lineas[0]?.chasis || "—"}</div> : <div>{shortDate.format(new Date(`${document.fecha}T00:00:00`))}</div>}<div>{area === "repuestos" ? <span className="block text-right tabular-nums">{document.cantidad_lineas}</span> : shortDate.format(new Date(`${document.fecha}T00:00:00`))}</div><div className="text-right font-semibold tabular-nums">{usd.format(document.total_venta)}</div></button>
-                {expanded === document.id && <div className="bg-muted/20 px-3 py-2"><div className="grid grid-cols-[minmax(300px,1fr)_150px_90px_130px] gap-3 text-[10px] font-medium text-muted-foreground"><div>{copy.primary} / detalle</div><div>Componente</div><div className="text-right">Cantidad</div><div className="text-right">Importe</div></div>{document.lineas.map((row) => <div key={row.id} className="grid grid-cols-[minmax(300px,1fr)_150px_90px_130px] gap-3 border-t border-border/50 py-1.5 text-[11px]"><div className="truncate" title={lineIdentity(area, row)}>{lineIdentity(area, row)}</div><div className="truncate text-muted-foreground">{row.concepto === "Servicio" ? "Mano de obra" : row.concepto}</div><div className="text-right tabular-nums">{quantity.format(row.cantidad)}</div><div className="text-right font-medium tabular-nums">{usd.format(row.total_venta)}</div></div>)}</div>}
-              </div>
-            ))}
-          </div>
-          <Pager page={documents.pagina} pages={documents.paginas} total={documents.total} onChange={(page) => { setDocumentPage(page); setExpanded(null); }} />
+        <div className="mt-3">
+          {documentsLoading ? <div className="py-12 text-center text-sm text-muted-foreground">Cargando…</div> : documentsError ? <div role="alert" className="py-8 text-destructive">{documentsError}</div> : !documents.documentos.length ? <div className="py-12 text-center text-sm text-muted-foreground">{copy.empty}</div> : (
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[1000px] text-xs [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-3 [&_th]:font-medium [&_td]:px-3 [&_td]:py-3 [&_td]:align-top">
+                <thead className="border-b bg-muted/50 text-left text-muted-foreground">
+                  <tr><th>{area === "servicios" ? "OS / documento" : "Factura"}</th><th className="w-[24%]">Cliente</th><th>Sucursal</th>
+                    {area === "servicios" ? <><th className="text-right">Facturas</th><th className="text-right">Mano de obra</th><th className="text-right">Km</th><th className="text-right">Repuestos</th><th className="text-right">Otros</th></> :
+                      area === "maquinas" ? <><th>Modelo</th><th>Chasis</th></> : <th className="text-right">Líneas</th>}
+                    <th>{area === "servicios" ? "Última factura" : "Fecha"}</th><th className="text-right">Total USD</th>
+                  </tr>
+                </thead>
+                <tbody>{documents.documentos.map(document => {
+                  const isOpen = expanded === document.id;
+                  const count = area === "servicios" ? 10 : area === "maquinas" ? 7 : 6;
+                  return <Fragment key={document.id}>
+                    <tr className={cn("border-b",isOpen && "bg-primary/5")}>
+                      <td>{area === "repuestos" ? <span className="font-mono font-semibold">{document.factura}</span> : <button type="button" aria-expanded={isOpen} onClick={() => setExpanded(isOpen ? null : document.id)} className="flex items-center gap-2 text-left font-mono font-semibold text-primary">
+                        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 transition-transform",!isOpen && "-rotate-90")}/>
+                        {area === "servicios" ? document.os_numero || document.factura : document.factura}
+                      </button>}{area === "servicios" && !document.os_numero && <span className="mt-1 block text-[11px] text-muted-foreground">{document.tipo}</span>}</td>
+                      <td className="font-medium break-words">{document.cliente}</td><td className="text-muted-foreground">{document.sucursal || "—"}</td>
+                      {area === "servicios" ? <>
+                        <td className="text-right tabular-nums">{document.facturas}</td>
+                        {[document.mano_obra,document.kilometraje,document.repuestos,document.otros].map((amount,i) => <td key={i} className="text-right tabular-nums">{amount == null ? "—" : money.format(Number(amount))}</td>)}
+                      </> : area === "maquinas" ? <>
+                        <td className="max-w-[250px]">{document.lineas.map(l => <div key={l.id}>{cleanModel(l.modelo || l.descripcion)}</div>)}</td>
+                        <td className="font-mono">{document.lineas.map(l => <div key={l.id}>{l.chasis || "—"}</div>)}</td>
+                      </> : <td className="text-right tabular-nums">{document.cantidad_lineas}</td>}
+                      <td className="whitespace-nowrap text-muted-foreground">{shortDate.format(new Date(document.fecha+"T00:00:00"))}</td>
+                      <td className="text-right font-semibold tabular-nums whitespace-nowrap">{money.format(Number(document.total_venta))}</td>
+                    </tr>
+                    {(isOpen || area === "repuestos") && <tr><td colSpan={count} className="!p-0"><SalesLines area={area} lines={document.lineas}/></td></tr>}
+                  </Fragment>;
+                })}</tbody>
+              </table>
+            </div>
+          )}
+          {!documentsLoading && !documentsError && <Pager page={documents.pagina} pages={documents.paginas} total={documents.total} onChange={(page) => { setDocumentPage(page); setExpanded(null); }}/>}
         </div>
       ) : view === "clientes" ? (
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {!clients.length ? <div className="col-span-full py-12 text-center text-[12px] text-muted-foreground">{copy.empty}</div> : clients.map((client) => <div key={client.nombre} className="rounded-md border px-3 py-2.5"><div className="truncate text-[12px] font-medium" title={client.nombre}>{client.nombre}</div><div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground"><div><span className="block">Facturas</span><strong className="text-[12px] font-medium text-foreground tabular-nums">{client.facturas}</strong></div><div><span className="block">Promedio</span><strong className="text-[12px] font-medium text-foreground tabular-nums">{usd.format(Number(client.importe) / Math.max(client.facturas, 1))}</strong></div><div className="text-right"><span className="block">Facturación</span><strong className="text-[12px] font-semibold text-foreground tabular-nums">{usd.format(Number(client.importe))}</strong></div></div></div>)}
+        <div className="mt-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <span className="text-muted-foreground">Comparación: mismo período del año anterior{clientData && !clientData.comparable ? " · Histórico con distinto alcance" : ""}</span>
+            <label className="flex items-center gap-2">Ordenar por <select className="rounded-md border bg-background px-2 py-1.5" value={clientSort} onChange={e=>setClientSort(e.target.value as typeof clientSort)}><option value="importe">Facturación</option><option value="facturas">Facturas</option><option value="nombre">Cliente</option></select></label>
+          </div>
+          {clientLoading ? <div className="py-10 text-center text-muted-foreground">Cargando clientes…</div> : clientError ? <div role="alert" className="py-8 text-destructive">{clientError}</div> : (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full min-w-[1050px] text-xs [&_th]:px-3 [&_th]:py-3 [&_th]:font-medium [&_td]:px-3 [&_td]:py-3">
+              <thead className="border-b bg-muted/50 text-left text-muted-foreground"><tr><th>#</th><th className="w-[24%]">Cliente</th><th>Sucursal</th><th>Última compra</th>{area === "servicios" && <th className="text-right">OS identificadas</th>}<th className="text-right">Facturas</th><th className="text-right">Promedio / factura</th><th className="text-right">Año anterior</th><th className="text-right">Variación</th><th className="text-right">Actual USD</th><th className="w-[130px]">Participación</th></tr></thead>
+              <tbody>{clients.slice((clientPage-1)*25,clientPage*25).map((client,i)=>{
+                const share = (data?.total ?? 0)>0 ? Number(client.importe)/Number(data!.total)*100 : null;
+                const change = clientData?.comparable && client.importe_anterior != null && Number(client.importe_anterior)>0 ? (Number(client.importe)/Number(client.importe_anterior)-1)*100 : null;
+                return <tr key={client.nombre} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="text-muted-foreground">{(clientPage-1)*25+i+1}</td><td className="font-medium">{client.nombre}</td><td className="text-muted-foreground">{client.sucursales || "—"}</td><td className="whitespace-nowrap">{client.ultima ? shortDate.format(new Date(client.ultima+"T00:00:00")) : "—"}</td>
+                  {area === "servicios" && <td className="text-right tabular-nums">{client.ordenes}</td>}<td className="text-right tabular-nums">{client.facturas}</td><td className="text-right tabular-nums">{client.facturas ? money.format(Number(client.importe)/client.facturas) : "—"}</td>
+                  <td className="text-right tabular-nums">{client.importe_anterior == null ? "—" : money.format(Number(client.importe_anterior))}</td>
+                  <td className={cn("text-right tabular-nums whitespace-nowrap",change != null && (change<0 ? "text-red-700" : "text-green-700"))} title={!clientData?.comparable ? "La clasificación histórica no permite comparar el porcentaje de forma homogénea." : undefined}>{change == null ? "—" : (change>0 ? "+" : "")+change.toFixed(1)+"%"}</td>
+                  <td className="text-right font-semibold tabular-nums">{money.format(Number(client.importe))}</td><td><span className="block text-right tabular-nums">{share == null ? "—" : share.toFixed(1)+"%"}</span><div className="mt-1 h-1 rounded bg-muted"><div className="h-1 rounded bg-primary/60" style={{width:Math.min(100,Math.max(0,share??0))+"%"}}/></div></td>
+                </tr>;
+              })}</tbody>
+            </table>{!clients.length && <div className="py-10 text-center text-muted-foreground">{copy.empty}</div>}
+            <Pager page={clientPage} pages={Math.max(1,Math.ceil(clients.length/25))} total={clients.length} onChange={setClientPage}/>
+          </div>)}
         </div>
       ) : (
         <div className="mt-3 space-y-3">
