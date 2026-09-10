@@ -1,22 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Info } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { endOfDay, endOfISOWeek, endOfMonth, endOfYear } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/layout/AppPrimitives";
-import { pct } from "@/components/dashboard/utils";
+import { money, pct } from "@/components/dashboard/utils";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
 
 export type ServiciosSummary = { total: number; facturas: number; clientes: number; ordenes: number; promedio: number };
 type PeriodoPanorama = {
   periodo: string; total: number; mo: number; km: number; repuestos_os: number;
-  otros_facturados: number; horas: number; km_cantidad: number; terceros_os: number;
+  horas: number; km_cantidad: number; terceros_os: number;
   facturas: number; clientes: number; metodologia: "historico" | "actual" | "mixto";
 };
 type PanoramaResponse = { desde: string; hasta: string; agrupacion: PeriodMode; resumen: ServiciosSummary; periodos: PeriodoPanorama[] };
 
-const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 
 function periodEnd(iso: string, mode: PeriodMode) {
@@ -75,14 +74,14 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
       : error ? <div className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !rows.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay datos para este rango.</div>
-      : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1080px]">
-        <div className="grid grid-cols-[105px_135px_repeat(3,125px)_120px_125px_105px_120px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-          <div>Período</div><div className="text-right">Facturado</div><div className="text-right">Mano de obra</div><div className="text-right">Kilometraje</div><div className="text-right">Repuestos OS</div><div className="text-right">Otros fact.</div><div className="flex items-center justify-end gap-1" title="Valor de terceros registrado en la OS. No se suma nuevamente al facturado si no tiene línea propia."><Info className="h-3 w-3" />Terceros OS</div><div className="text-right">Cli. / Fact.</div><div className="text-right">Variación</div>
+      : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[930px]">
+        <div className="grid grid-cols-[105px_repeat(5,minmax(105px,1fr))_105px_120px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+          <div>Período</div><div className="text-right">Facturado</div><div className="text-right">Mano de obra</div><div className="text-right">Kilometraje</div><div className="text-right">Repuestos</div><div className="text-right">Terceros</div><div className="text-right">Cli. / Fact.</div><div className="text-right">vs. anterior</div>
         </div>
-        {rows.map((row) => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)} className={cn("grid w-full grid-cols-[105px_135px_repeat(3,125px)_120px_125px_105px_120px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent", row.periodo === selectedPeriod && "bg-primary/5 outline outline-1 outline-primary/20")}>
-          <div className="font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div><div className="text-right font-semibold tabular-nums">{usd.format(row.total)}</div>
-          <div className="text-right tabular-nums"><div>{usd.format(row.mo)}</div><div className="text-[10px] text-muted-foreground">{decimal.format(row.horas)} h</div></div><div className="text-right tabular-nums"><div>{usd.format(row.km)}</div><div className="text-[10px] text-muted-foreground">{decimal.format(row.km_cantidad)} km</div></div>
-          <div className="text-right tabular-nums text-muted-foreground">{usd.format(row.repuestos_os)}</div><div className="text-right tabular-nums text-muted-foreground">{usd.format(row.otros_facturados)}</div><div className="text-right tabular-nums text-muted-foreground">{usd.format(row.terceros_os)}</div><div className="text-right tabular-nums text-muted-foreground">{row.clientes} / {row.facturas}</div><div className={cn("text-right tabular-nums", row.variation != null && row.variation < 0 && "text-destructive")}>{row.variation == null ? "—" : `${row.variation > 0 ? "+" : ""}${row.variation}%`}</div>
+        {rows.map((row) => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)} className={cn("grid w-full grid-cols-[105px_repeat(5,minmax(105px,1fr))_105px_120px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent", row.periodo === selectedPeriod && "bg-primary/5 outline outline-1 outline-primary/20")}>
+          <div className="font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
+          <div className="text-right tabular-nums"><div>{money(row.mo)}</div><div className="text-[10px] text-muted-foreground">{decimal.format(row.horas)} h</div></div><div className="text-right tabular-nums"><div>{money(row.km)}</div><div className="text-[10px] text-muted-foreground">{decimal.format(row.km_cantidad)} km</div></div>
+          <div className="text-right tabular-nums text-muted-foreground">{money(row.repuestos_os)}</div><div className="text-right tabular-nums text-muted-foreground">{money(row.terceros_os)}</div><div className="text-right tabular-nums text-muted-foreground">{row.clientes} / {row.facturas}</div><div className={cn("text-right tabular-nums", row.variation != null && row.variation < 0 && "text-destructive")}>{row.variation == null ? "—" : `${row.variation > 0 ? "+" : ""}${row.variation}%`}</div>
         </button>)}
       </div></div>)}
   </Panel>;

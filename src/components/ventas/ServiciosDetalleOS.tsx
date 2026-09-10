@@ -1,15 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Info } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { money } from "@/components/dashboard/utils";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
   cliente: string; sucursal: string | null; tipo_tiempo: string; facturas: number;
   horas: number; km_cantidad: number; mo: number; km: number; repuestos: number;
-  otros_facturados: number; terceros_os: number; total: number;
+  terceros_os: number; total: number;
 };
 type HistoryRow = {
   os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null;
@@ -19,7 +20,6 @@ type HistoryRow = {
   terceros_valor: number | null; situacion_os: string | null;
 };
 
-const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const dateFormatter = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -48,7 +48,7 @@ function MachineHistory({ chassis, open, onOpenChange }: { chassis: string | nul
         {loading ? <p className="py-10 text-center text-[12px] text-muted-foreground">Cargando historial…</p>
           : !rows.length ? <p className="py-10 text-center text-[12px] text-muted-foreground">No se encontraron órdenes de servicio para este chasis.</p>
           : rows.map((row) => {
-            const total = Number(row.servicios_valor || 0) + Number(row.kilometro_valor || 0) + Number(row.repuesto_valor || 0);
+            const total = Number(row.servicios_valor || 0) + Number(row.kilometro_valor || 0) + Number(row.repuesto_valor || 0) + Number(row.terceros_valor || 0);
             const rowDate = row.fecha_cierre_os || row.fecha_emision_factura || row.fecha_abierta_os;
             return <div key={row.os_numero} className="rounded-md border p-3">
               <div className="flex items-start justify-between gap-3">
@@ -59,8 +59,8 @@ function MachineHistory({ chassis, open, onOpenChange }: { chassis: string | nul
               <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-2 text-[11px] sm:grid-cols-4">
                 <div><span className="text-muted-foreground">Horas</span><div className="font-medium">{decimal.format(Number(row.servicios_cantidad || 0))}</div></div>
                 <div><span className="text-muted-foreground">Km</span><div className="font-medium">{decimal.format(Number(row.km_cantidad || 0))}</div></div>
-                <div><span className="text-muted-foreground">Valor OS</span><div className="font-medium">{usd.format(total)}</div></div>
-                <div><span className="text-muted-foreground">Terceros OS</span><div className="font-medium">{usd.format(Number(row.terceros_valor || 0))}</div></div>
+                <div><span className="text-muted-foreground">Valor OS</span><div className="font-medium">{money(total)}</div></div>
+                <div><span className="text-muted-foreground">Terceros</span><div className="font-medium">{money(Number(row.terceros_valor || 0))}</div></div>
               </div>
             </div>;
           })}
@@ -92,13 +92,13 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo 
   }, [desde, hasta, sucursal, buscar, tipoTiempo]);
 
   const total = useMemo(() => rows.reduce((acc, row) => acc + Number(row.total || 0), 0), [rows]);
-  const columns = "grid-cols-[130px_115px_minmax(190px,1fr)_100px_65px_75px_minmax(300px,1fr)_135px]";
+  const columns = "grid-cols-[125px_110px_minmax(190px,1fr)_95px_55px_60px_repeat(4,100px)_125px]";
 
   return <>
     <div className="mt-3 overflow-hidden rounded-md border">
-      <div className="overflow-x-auto"><div className="min-w-[1120px]">
+      <div className="overflow-x-auto"><div className="min-w-[1250px]">
         <div className={`grid ${columns} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
-          <div>OS</div><div>Chasis</div><div>Cliente</div><div>Tipo tiempo</div><div className="text-right">Fact.</div><div className="text-right">Horas</div><div>Composición facturada / referencia OS</div><div className="text-right">Facturado período</div>
+          <div>OS</div><div>Chasis</div><div>Cliente / sucursal</div><div>Tipo</div><div className="text-right">Fact.</div><div className="text-right">Horas</div><div className="text-right">Mano de obra</div><div className="text-right">Km</div><div className="text-right">Repuestos</div><div className="text-right">Terceros</div><div className="text-right">Facturado</div>
         </div>
         <div className="max-h-[480px] overflow-y-auto">
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
@@ -107,13 +107,13 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo 
               <div className="truncate font-mono font-semibold">{row.os}</div>
               <div>{row.chasis ? <button type="button" className="flex max-w-full items-center gap-1 truncate font-mono text-primary hover:underline" onClick={() => setHistoryChassis(row.chasis)} title="Ver historial de esta máquina"><span className="truncate">{row.chasis}</span><ExternalLink className="h-3 w-3 shrink-0" /></button> : "—"}</div>
               <div className="min-w-0"><div className="truncate font-medium">{row.cliente}</div><div className="truncate text-[10px] text-muted-foreground">{row.sucursal || "Sin sucursal"}</div></div><div><Badge variant="outline" className="text-[10px]">{row.tipo_tiempo}</Badge></div><div className="text-right tabular-nums">{row.facturas}</div><div className="text-right tabular-nums">{decimal.format(row.horas)}</div>
-              <div className="min-w-0 text-[11px]"><div className="flex flex-wrap gap-x-3"><span>MO <b>{usd.format(row.mo)}</b></span><span>Km <b>{usd.format(row.km)}</b></span><span>Rep. <b>{usd.format(row.repuestos)}</b></span></div><div className="mt-0.5 flex flex-wrap gap-x-3 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1" title="Líneas facturadas fuera de MO, Km y Repuestos"><Info className="h-3 w-3" />Otros fact. {usd.format(row.otros_facturados)}</span><span className="inline-flex items-center gap-1" title="Referencia operativa de la OS; no se suma otra vez"><Info className="h-3 w-3" />Terceros OS {usd.format(row.terceros_os)}</span>{row.km_cantidad > 0 && <span>{decimal.format(row.km_cantidad)} km</span>}</div></div>
-              <div className="text-right font-semibold tabular-nums">{usd.format(row.total)}</div>
+              <div className="text-right tabular-nums">{money(row.mo)}</div><div className="text-right tabular-nums"><div>{money(row.km)}</div>{row.km_cantidad > 0 && <div className="text-[10px] text-muted-foreground">{decimal.format(row.km_cantidad)} km</div>}</div><div className="text-right tabular-nums">{money(row.repuestos)}</div><div className="text-right tabular-nums">{money(row.terceros_os)}</div>
+              <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
             </div>)}
         </div>
       </div></div>
       {error && <div className="border-t px-3 py-2 text-[11px] text-destructive">{error}</div>}
-      {!error && !loading && rows.length > 0 && <div className="border-t px-3 py-2 text-right text-[11px] font-medium text-muted-foreground">Total facturado en el período: <span className="text-foreground">{usd.format(total)}</span></div>}
+      {!error && !loading && rows.length > 0 && <div className="border-t px-3 py-2 text-right text-[11px] font-medium text-muted-foreground">Total del período: <span className="text-foreground">{money(total)}</span></div>}
     </div>
     <MachineHistory chassis={historyChassis} open={Boolean(historyChassis)} onOpenChange={(open) => { if (!open) setHistoryChassis(null); }} />
   </>;

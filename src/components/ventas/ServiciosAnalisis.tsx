@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { money } from "@/components/dashboard/utils";
 
 type LineaAnalisis = {
   id: string;
@@ -19,7 +20,7 @@ type Dimension = "mes" | "sucursal" | "cliente" | "componente" | "tipo_tiempo";
 type Metric = "usd" | "facturas" | "cantidad";
 
 const DIMENSION_LABEL: Record<Dimension, string> = { mes: "Mes", sucursal: "Sucursal", cliente: "Cliente", componente: "Componente", tipo_tiempo: "Tipo de tiempo" };
-const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const usd = { format: (value: number) => money(value) };
 const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 
 function dimensionValue(line: LineaAnalisis, dimension: Dimension) {
@@ -121,7 +122,7 @@ export function ServiciosAnalisis({ desde, hasta, sucursal, buscar, tipoTiempo }
         <label className="space-y-1">
           <span className="text-[10px] font-medium text-muted-foreground">Medida</span>
           <select value={metric} onChange={(event) => setMetric(event.target.value as Metric)} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]">
-            <option value="usd">USD facturados</option><option value="facturas">Facturas</option><option value="cantidad">Cantidad operativa</option>
+            <option value="usd">Facturación ($)</option><option value="facturas">Facturas</option><option value="cantidad">Cantidad operativa</option>
           </select>
         </label>
       </div>

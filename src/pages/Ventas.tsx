@@ -14,6 +14,7 @@ import { ServiciosPanorama, type ServiciosSummary } from "@/components/ventas/Se
 import { ServiciosDetalleOS } from "@/components/ventas/ServiciosDetalleOS";
 import { ServiciosAnalisis } from "@/components/ventas/ServiciosAnalisis";
 import { ServiciosClientes } from "@/components/ventas/ServiciosClientes";
+import { money as formatMoney } from "@/components/dashboard/utils";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
 type ExplorerView = "facturas" | "clientes" | "analisis";
@@ -56,7 +57,7 @@ const AREA_COPY = {
   maquinas: { title: "Ventas de Máquinas", search: "Modelo, chasis, factura o cliente…", primary: "Máquina", primaryValue: "subgrupo" as const, empty: "No hay ventas de Máquinas en el período." },
 };
 
-const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const usd = { format: (value: number) => formatMoney(value) };
 const money = new Intl.NumberFormat("es-PY", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -75,7 +76,7 @@ function SalesLines({area,lines}:{area:VentasArea;lines:SalesLine[]}) {
     <table className="w-full table-fixed text-[11px] [&_th]:py-2 [&_th]:pr-3 [&_th]:font-medium [&_td]:py-2 [&_td]:pr-3 [&_td]:align-top">
       <thead className="text-left text-muted-foreground"><tr>
         {area === "servicios" && <><th className="w-[150px]">Factura</th><th className="w-[90px]">Fecha</th><th className="w-[110px]">Componente</th></>}
-        <th className="w-[135px]">{area === "maquinas" ? "Modelo" : "Cód. repuesto"}</th><th className="w-[145px]">{area === "maquinas" ? "Chasis" : "Cód. fabricante"}</th><th>Descripción</th><th className="w-[80px] text-right">Cantidad</th><th className="w-[120px] text-right">Importe USD</th>
+        <th className="w-[135px]">{area === "maquinas" ? "Modelo" : "Cód. repuesto"}</th><th className="w-[145px]">{area === "maquinas" ? "Chasis" : "Cód. fabricante"}</th><th>Descripción</th><th className="w-[80px] text-right">Cantidad</th><th className="w-[120px] text-right">Importe</th>
       </tr></thead>
       <tbody>{lines.map(line=><tr key={line.id} className="border-t border-border/50">
         {area === "servicios" && <><td className="font-mono">{line.factura}</td><td>{shortDate.format(new Date(line.fecha+"T00:00:00"))}</td><td>{line.concepto==="Servicio"?"Mano de obra":line.concepto}</td></>}
@@ -194,7 +195,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
                   <tr><th>{area === "servicios" ? "OS / documento" : "Factura"}</th><th className="w-[24%]">Cliente</th><th>Sucursal</th>
                     {area === "servicios" ? <><th className="text-right">Facturas</th><th className="text-right">Mano de obra</th><th className="text-right">Km</th><th className="text-right">Repuestos</th><th className="text-right">Otros</th></> :
                       area === "maquinas" ? <><th>Modelo</th><th>Chasis</th></> : <th className="text-right">Líneas</th>}
-                    <th>{area === "servicios" ? "Última factura" : "Fecha"}</th><th className="text-right">Total USD</th>
+                    <th>{area === "servicios" ? "Última factura" : "Fecha"}</th><th className="text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody>{documents.documentos.map(document => {
@@ -234,7 +235,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
           {clientLoading ? <div className="py-10 text-center text-muted-foreground">Cargando clientes…</div> : clientError ? <div role="alert" className="py-8 text-destructive">{clientError}</div> : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[1050px] text-xs [&_th]:px-3 [&_th]:py-3 [&_th]:font-medium [&_td]:px-3 [&_td]:py-3">
-              <thead className="border-b bg-muted/50 text-left text-muted-foreground"><tr><th>#</th><th className="w-[24%]">Cliente</th><th>Sucursal</th><th>Última compra</th>{area === "servicios" && <th className="text-right">OS identificadas</th>}<th className="text-right">Facturas</th><th className="text-right">Promedio / factura</th><th className="text-right">Año anterior</th><th className="text-right">Variación</th><th className="text-right">Actual USD</th><th className="w-[130px]">Participación</th></tr></thead>
+              <thead className="border-b bg-muted/50 text-left text-muted-foreground"><tr><th>#</th><th className="w-[24%]">Cliente</th><th>Sucursal</th><th>Última compra</th>{area === "servicios" && <th className="text-right">OS identificadas</th>}<th className="text-right">Facturas</th><th className="text-right">Promedio / factura</th><th className="text-right">Año anterior</th><th className="text-right">Variación</th><th className="text-right">Actual</th><th className="w-[130px]">Participación</th></tr></thead>
               <tbody>{clients.slice((clientPage-1)*25,clientPage*25).map((client,i)=>{
                 const share = (data?.total ?? 0)>0 ? Number(client.importe)/Number(data!.total)*100 : null;
                 const change = clientData?.comparable && client.importe_anterior != null && Number(client.importe_anterior)>0 ? (Number(client.importe)/Number(client.importe_anterior)-1)*100 : null;
@@ -255,7 +256,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
           <div className="grid gap-2 rounded-md border p-3 md:grid-cols-3">
             <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Analizar por</span><select value={pivotRows} onChange={(event) => { const next = event.target.value as PivotRow; setPivotRows(next); if (next === "concepto" && pivotMetric === "facturas") setPivotMetric("usd"); setAnalysisPage(1); }} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]">{rowOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Desagregar en</span><select value={pivotColumns} onChange={(event) => { setPivotColumns(event.target.value as PivotColumn); setAnalysisPage(1); }} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]"><option value="mes">Mes</option><option value="sucursal">Sucursal</option><option value="none">Sin desglose</option></select></label>
-            <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Mostrar</span><select value={pivotMetric} onChange={(event) => { setPivotMetric(event.target.value as PivotMetric); setAnalysisPage(1); }} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]"><option value="usd">Facturación USD</option><option value="cantidad">{area === "maquinas" ? "Unidades" : "Cantidad"}</option>{pivotRows !== "concepto" && <option value="facturas">Facturas</option>}</select></label>
+            <label className="space-y-1"><span className="text-[10px] font-medium text-muted-foreground">Mostrar</span><select value={pivotMetric} onChange={(event) => { setPivotMetric(event.target.value as PivotMetric); setAnalysisPage(1); }} className="h-9 w-full rounded-md border bg-background px-3 text-[12px]"><option value="usd">Facturación ($)</option><option value="cantidad">{area === "maquinas" ? "Unidades" : "Cantidad"}</option>{pivotRows !== "concepto" && <option value="facturas">Facturas</option>}</select></label>
           </div>
           {area === "repuestos" && data?.historico !== 0 && <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-[10px] text-muted-foreground"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />Antes del 01/07/2026 no existe detalle por código; ese importe aparece agrupado como histórico sin detalle.</div>}
           <div className="overflow-x-auto rounded-md border">{analysisLoading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Calculando todo el período…</div> : analysisError ? <div className="py-12 text-center text-[12px] text-destructive">{analysisError}</div> : <div className="min-w-max"><div className="grid items-center border-b bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground" style={{ gridTemplateColumns: `minmax(280px,1fr) ${analysis.columns.length ? `repeat(${analysis.columns.length}, minmax(130px, 1fr))` : ""} 140px` }}><div>{rowOptions.find((option) => option.value === pivotRows)?.label}</div>{analysis.columns.map((column) => <div key={column.key} className="text-right">{column.label}</div>)}<div className="text-right">Total</div></div><div className="max-h-[440px] overflow-y-auto">{!analysis.rows.length ? <div className="w-[700px] py-12 text-center text-[12px] text-muted-foreground">No hay datos para esta combinación.</div> : analysis.rows.map((row) => <div key={row.key} className="grid items-center border-b px-3 py-2 text-[12px] last:border-0" style={{ gridTemplateColumns: `minmax(280px,1fr) ${analysis.columns.length ? `repeat(${analysis.columns.length}, minmax(130px, 1fr))` : ""} 140px` }}><div className="truncate font-medium" title={row.key}>{row.key}</div>{analysis.columns.map((column) => <div key={column.key} className="text-right tabular-nums text-muted-foreground">{row.values[column.key] == null ? "—" : formatMetric(Number(row.values[column.key]), pivotMetric)}</div>)}<div className="text-right font-semibold tabular-nums">{formatMetric(Number(row.total), pivotMetric)}</div></div>)}</div><Pager page={analysis.pagina} pages={analysis.paginas} total={analysis.total} onChange={setAnalysisPage} /></div>}</div>
