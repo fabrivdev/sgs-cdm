@@ -1,12 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, FileText, Receipt, Users } from "lucide-react";
+import { differenceInCalendarDays, endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, startOfMonth, startOfWeek, startOfYear, subMonths, subWeeks } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
-import { FilterDate, FilterSelect, FiltersBar } from "@/components/filters/FiltersBar";
+import { FilterCustom, FilterDate, FilterSelect, FiltersBar } from "@/components/filters/FiltersBar";
+import { PeriodSelector } from "@/components/dashboard/DashboardPanels";
+import type { PeriodMode } from "@/components/dashboard/types";
 import { ErrorState } from "@/components/ErrorState";
 import { cn } from "@/lib/utils";
 import { SUCURSALES } from "@/lib/constants";
+import { ServiciosPanorama, type ServiciosSummary } from "@/components/ventas/ServiciosPanorama";
+import { ServiciosDetalleOS } from "@/components/ventas/ServiciosDetalleOS";
+import { ServiciosAnalisis } from "@/components/ventas/ServiciosAnalisis";
+import { ServiciosClientes } from "@/components/ventas/ServiciosClientes";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
 type ExplorerView = "facturas" | "clientes" | "analisis";
@@ -83,7 +90,7 @@ function Pager({ page, pages, total, onChange }: { page: number; pages: number; 
   return <div className="flex items-center justify-between border-t px-3 py-2 text-[10px] text-muted-foreground"><span>{total.toLocaleString("es-PY")} registros</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Anterior</button><span>{page} de {pages}</span><button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Siguiente</button></div></div>;
 }
 
-export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string }) {
+export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar, tipoTiempo }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string }) {
   const copy = AREA_COPY[area];
   const [view, setView] = useState<ExplorerView>("facturas");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -167,11 +174,18 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
       <div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
         <h2 className="text-[13px] font-semibold">{area === "servicios" ? "Órdenes de servicio facturadas" : "Ventas"}</h2>
         <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
-          {([['facturas', 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{value === "facturas" && area === "servicios" ? "Por OS" : label}</button>)}
+          {([['facturas', area === "servicios" ? 'Detalle' : 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
         </div>
       </div>
 
-      {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div> : view === "facturas" ? (
+      {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
+      : area === "servicios" && view === "facturas" ? (
+        <ServiciosDetalleOS desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+      ) : area === "servicios" && view === "analisis" ? (
+        <ServiciosAnalisis desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+      ) : area === "servicios" && view === "clientes" ? (
+        <ServiciosClientes desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+      ) : view === "facturas" ? (
         <div className="mt-3">
           {documentsLoading ? <div className="py-12 text-center text-sm text-muted-foreground">Cargando…</div> : documentsError ? <div role="alert" className="py-8 text-destructive">{documentsError}</div> : !documents.documentos.length ? <div className="py-12 text-center text-sm text-muted-foreground">{copy.empty}</div> : (
             <div className="overflow-x-auto rounded-md border">
@@ -255,6 +269,10 @@ export default function Ventas({ area }: { area: VentasArea }) {
   const now = useMemo(() => new Date(), []);
   const [desde, setDesde] = useState(`${now.getFullYear()}-01-01`); const [hasta, setHasta] = useState(isoDate(now));
   const [sucursal, setSucursal] = useState("TODAS"); const [buscar, setBuscar] = useState("");
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
+  const [tipoTiempo, setTipoTiempo] = useState("TODOS");
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const [serviciosSummary, setServiciosSummary] = useState<ServiciosSummary | null>(null);
   const [data, setData] = useState<SalesResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -264,16 +282,60 @@ export default function Ventas({ area }: { area: VentasArea }) {
     setLoading(false);
   }, [area, buscar, desde, hasta, sucursal]);
   useEffect(() => { void load(); }, [load]);
-  const copy = AREA_COPY[area]; const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)); const showHistoricalLimit = Boolean(data?.historico && area !== "maquinas");
+  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo]);
+
+  const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);
+  const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
+  const datePresets = useMemo(() => [
+    { key: "current-week", label: "Semana actual", from: weekStart, to: endOfISOWeek(weekStart), mode: "dia" as PeriodMode },
+    { key: "previous-week", label: "Semana anterior", from: previousWeekStart, to: endOfISOWeek(previousWeekStart), mode: "dia" as PeriodMode },
+    { key: "previous-current-week", label: "Semana anterior + actual", from: previousWeekStart, to: endOfISOWeek(weekStart), mode: "dia" as PeriodMode },
+    { key: "current-month", label: "Este mes", from: startOfMonth(now), to: endOfMonth(now), mode: "semana" as PeriodMode },
+    { key: "last-6-months", label: "Últimos 6 meses", from: startOfMonth(subMonths(now, 5)), to: now, mode: "mes" as PeriodMode },
+    { key: "last-12-months", label: "Últimos 12 meses", from: startOfMonth(subMonths(now, 11)), to: now, mode: "mes" as PeriodMode },
+    { key: "current-year", label: "Este año", from: startOfYear(now), to: endOfYear(now), mode: "mes" as PeriodMode },
+  ], [now, previousWeekStart, weekStart]);
+  const activeDatePreset = useMemo(() => datePresets.find((preset) => desde === format(preset.from, "yyyy-MM-dd") && hasta === format(preset.to, "yyyy-MM-dd") && periodMode === preset.mode)?.key ?? "", [datePresets, desde, hasta, periodMode]);
+  const applyDatePreset = (key: string) => {
+    const preset = datePresets.find((item) => item.key === key); if (!preset) return;
+    setDesde(format(preset.from, "yyyy-MM-dd")); setHasta(format(preset.to, "yyyy-MM-dd")); setPeriodMode(preset.mode);
+  };
+  const rangeDays = useMemo(() => differenceInCalendarDays(new Date(`${hasta}T00:00:00`), new Date(`${desde}T00:00:00`)), [desde, hasta]);
+  const disabledGranularities = useMemo(() => { const disabled = new Set<PeriodMode>(); if (rangeDays > 31) disabled.add("dia"); if (rangeDays > 364) disabled.add("semana"); return disabled; }, [rangeDays]);
+  useEffect(() => {
+    if (periodMode === "dia" && rangeDays > 31) setPeriodMode(rangeDays <= 364 ? "semana" : "mes");
+    else if (periodMode === "semana" && rangeDays > 364) setPeriodMode("mes");
+  }, [periodMode, rangeDays]);
+
+  const explorerRange = useMemo(() => {
+    if (!selectedPeriod) return { desde, hasta };
+    const start = new Date(`${selectedPeriod}T00:00:00`);
+    const end = periodMode === "dia" ? endOfDay(start) : periodMode === "semana" ? endOfISOWeek(start) : periodMode === "anio" ? endOfYear(start) : endOfMonth(start);
+    const periodEndIso = isoDate(end);
+    return { desde: selectedPeriod > desde ? selectedPeriod : desde, hasta: periodEndIso < hasta ? periodEndIso : hasta };
+  }, [selectedPeriod, desde, hasta, periodMode]);
+  const copy = AREA_COPY[area];
+  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS");
+  const showHistoricalLimit = Boolean(data?.historico && area !== "maquinas");
+  const summary = area === "servicios" && serviciosSummary ? serviciosSummary : data;
+  const summaryCount = area === "servicios" ? serviciosSummary?.ordenes ?? data?.facturas : data?.facturas;
   return (
     <PageShell>
       <PageHeader title={copy.title} />
-      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); }} meta={data ? `${data.facturas.toLocaleString("es-PY")} facturas` : undefined}><FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} /><FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} /></FiltersBar>
+      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); }} meta={summaryCount != null ? `${summaryCount.toLocaleString("es-PY")} ${area === "servicios" ? "OS" : "facturas"}` : undefined}>
+        <FilterCustom label="Período rápido" width="w-[190px]"><select value={activeDatePreset} onChange={(event) => applyDatePreset(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px]"><option value="">Personalizado</option>{datePresets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></FilterCustom>
+        <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
+        <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
+        <FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} />
+        {area === "servicios" && <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />}
+      </FiltersBar>
       {error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
-        <KpiStrip><KpiItem label="Facturado" value={loading ? "—" : usd.format(data?.total ?? 0)} icon={<Receipt />} /><KpiItem label="Facturas" value={loading ? "—" : (data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label="Clientes" value={loading ? "—" : (data?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label="Promedio por factura" value={loading ? "—" : usd.format(data?.promedio ?? 0)} /></KpiStrip>
-        {area === "servicios" && Boolean(data?.pendientes_vinculacion?.facturas) && <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-900"><AlertTriangle className="h-3.5 w-3.5 shrink-0" /><span>{data!.pendientes_vinculacion.facturas.toLocaleString("es-PY")} factura(s) con conceptos de servicio quedaron fuera por no tener OS vinculada. Importe a revisar: {usd.format(data!.pendientes_vinculacion.importe)}.</span></div>}
+        <KpiStrip><KpiItem label="Facturado" value={loading ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : "Facturas"} value={loading ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? data?.facturas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label="Clientes" value={loading ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : "Promedio por factura"} value={loading ? "—" : usd.format(summary?.promedio ?? 0)} /></KpiStrip>
         {showHistoricalLimit && <details className="rounded-md border bg-background px-3 py-2 text-[10px] text-muted-foreground"><summary className="flex cursor-pointer list-none items-center gap-2"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /><span>Alcance del histórico</span><ChevronDown className="ml-auto h-3.5 w-3.5" /></summary><p className="mt-2 pl-5">Antes del 01/07/2026 no existe una vinculación confiable entre factura y OS ni detalle por código de repuesto. Los totales se conservan por rubro contable.</p></details>}
-        <SalesExplorer area={area} data={data} loading={loading} desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} />
+        {area === "servicios" && (
+          <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
+        )}
+        <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
       </>}
     </PageShell>
   );
