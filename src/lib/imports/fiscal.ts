@@ -18,15 +18,6 @@ export function parseFlexibleNumber(value: unknown): number {
   const raw = String(value).trim();
   if (!raw) return 0;
 
-  const hourMatch = raw.match(/(\d+):(\d{1,2})/);
-  if (hourMatch) {
-    const hours = Number(hourMatch[1]);
-    const minutes = Number(hourMatch[2]);
-    if (Number.isFinite(hours) && Number.isFinite(minutes)) {
-      return hours + minutes / 60;
-    }
-  }
-
   const cleaned = raw
     .replace(/[^\d,.-]/g, "")
     .replace(/^[^\d-]+/, "")
@@ -50,6 +41,28 @@ export function parseFlexibleNumber(value: unknown): number {
   }
 
   return Number(cleaned) || 0;
+}
+
+// Para columnas de CANTIDAD que representan horas trabajadas, la planilla de
+// origen a veces exporta "H:MM Hs." (ej. "7:00 Hs." = 7 horas) en vez de un
+// decimal. Este atajo NUNCA debe usarse para columnas de dinero (TOTAL,
+// VUNIT*, TOTALUSD, etc.) -- un importe que por casualidad tenga dos puntos
+// no es una hora, y confundirlo con una convierte, por ejemplo, "42" en 1.25
+// si la celda vino mal formateada como hora. Por eso es una funcion aparte,
+// de uso explicito, en vez de un atajo dentro de parseFlexibleNumber.
+export function parseFlexibleQuantity(value: unknown): number {
+  if (typeof value !== "number") {
+    const raw = String(value ?? "").trim();
+    const hourMatch = raw.match(/^(\d+):(\d{1,2})/);
+    if (hourMatch) {
+      const hours = Number(hourMatch[1]);
+      const minutes = Number(hourMatch[2]);
+      if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+        return hours + minutes / 60;
+      }
+    }
+  }
+  return parseFlexibleNumber(value);
 }
 
 export function roundMoney(value: number) {

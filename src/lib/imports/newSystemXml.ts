@@ -18,6 +18,7 @@ import {
   normalizeText,
   normalizeUpper,
   parseFlexibleNumber,
+  parseFlexibleQuantity,
   resolveCurrency,
 } from "@/lib/imports/fiscal";
 import {
@@ -58,6 +59,13 @@ const displayText = (row: Record<string, unknown>, candidates: string[]) => {
 
 const number = (row: Record<string, unknown>, candidates: string[]) => {
   return parseFlexibleNumber(firstValue(row, candidates));
+};
+
+// Solo para columnas de CANTIDAD que representan horas (ej. CANTIDAD de una
+// linea de mano de obra en la planilla de ordenes de servicio) -- ver
+// parseFlexibleQuantity en fiscal.ts. Nunca usar para columnas de dinero.
+const quantityNumber = (row: Record<string, unknown>, candidates: string[]) => {
+  return parseFlexibleQuantity(firstValue(row, candidates));
 };
 
 function buildRowId(...parts: Array<string | null | undefined>) {
@@ -223,7 +231,7 @@ export function mapOrdenesServicioSheet(
       manufacturerCode,
       description: productName,
     });
-    const quantity = number(row, ["CANTIDAD", "CNTFAC"]);
+    const quantity = quantityNumber(row, ["CANTIDAD", "CNTFAC"]);
     const lineTotal = number(row, ["TOTAL"]);
     const canonicalStartDate = normalizeDateLike(firstValue(row, ["Fch. Inicial"]));
     const canonicalStartTime = text(row, ["Hora Inicial"]);
