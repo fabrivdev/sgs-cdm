@@ -8,6 +8,13 @@
       "when": 1789155809030,
       "tag": "0000_ventas_servicios_historial_os_valores",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789156881453,
+      "tag": "0001_ventas_servicios_indicadores_postventa",
+      "breakpoints": true
     }
   ]
 }

@@ -6816,6 +6816,18 @@ export type Database = {
         Args: { p_chasis: string; p_vista?: string }
         Returns: Json
       }
+      ventas_servicios_indicadores_v1: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
       ventas_servicios_lineas: {
         Args: {
           p_desde: string
@@ -6862,6 +6874,18 @@ export type Database = {
       ventas_servicios_panorama_v2: {
         Args: {
           p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_tecnicos_v1: {
+        Args: {
           p_buscar?: string
           p_desde: string
           p_hasta: string
