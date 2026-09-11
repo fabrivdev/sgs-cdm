@@ -1,47 +1,51 @@
-# Design QA — armonización del menú lateral
+# Design QA — historial de máquina y detalle de OS
 
-## Resultado
+- Source visual truth: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-f880f7ff-a3f6-404b-a129-a843107a6e73.png`
+- Implementation evidence: Chrome CUA inline captures produced during this task (Resumen, Servicios expanded, Repuestos expanded). The browser surface does not expose a filesystem screenshot path.
+- Source pixels: 1672 × 941.
+- Implementation viewport: 1536 × 678 CSS px at devicePixelRatio 1.25.
+- State: right-side drawer open; Resumen, Servicios, expanded OS, Repuestos, and expanded parts table tested.
+- Density normalization: comparison used the complete right drawer in both captures; browser chrome and the intentionally different background page were excluded from the judgment.
 
-**final result: passed**
+## Full-view comparison evidence
 
-## Evidencia
+The implementation preserves the selected reference's wide right drawer, strong header, three-tab hierarchy, compact KPI strip, chronological OS cards, inline expansion, muted borders, and app green as the only navigation accent. The adapted implementation intentionally removes the reference's export button, filter chips, per-row view buttons, and redundant show/hide actions, in accordance with the request for fewer buttons.
 
-- Fuente visual: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-d38a3792-75ac-4b19-afdb-d9c9ed6f8fe6.png`
-- Captura expandida: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-corrected-expanded-final.jpg`
-- Captura contraída: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-corrected-collapsed.jpg`
-- Comparación conjunta: `C:\Users\Usuario\Documents\Codex\2026-08-11\r\sidebar-comparison-corrected.jpg`
-- Viewport principal: 1898 × 831 CSS px; fuente 1895 × 831 px normalizada e implementación 1896 × 831 px; densidad 1.
-- Estado: Planificador activo, Servicios expandido, escritorio.
+## Focused-region comparison evidence
 
-## Comparación completa y enfocada
+- Header/tabs: same hierarchy and proportion, with a denser title block aligned to the existing app typography.
+- Service history: an entire OS row is the disclosure control; expanded content shows work, financial composition, technician, billing state, and related invoices.
+- Parts history: expanded table visibly includes both required identifiers (`Cód. repuesto` and `Cód. fabricante`), description, quantity, unit price, total, and invoice.
+- Values use `$`, consistent with the rest of the app.
 
-- La cabecera del sidebar y la barra superior terminan exactamente en `y = 56 px`; la separación anterior entre tarjeta flotante y encabezado fue eliminada.
-- Solo hay un logo visible en escritorio y el pie institucional no contiene imágenes.
-- El rail contraído mide 63,2 px efectivos (64 px nominales). Los botones de módulo miden 44 px y conservan 9,6 px de margen a cada lado.
-- El control para restaurar el menú queda por encima de la barra superior y es clicable en todo su rectángulo de 32 × 32 px.
-- Tipografía: se conserva Inter, los pesos y tamaños del sistema SIG; no se alteró la jerarquía del contenido.
-- Espaciado: cabeceras, borde horizontal, rail e iconos forman una estructura continua y sin overflow.
-- Colores: se mantienen los tokens oliva, blancos y grises existentes.
-- Imágenes e iconos: se reutilizan el logo oficial y Lucide; no hay aproximaciones ni placeholders.
-- Contenido: módulos, rutas y etiquetas reales permanecen sin cambios.
+## Required fidelity surfaces
 
-## Interacciones y responsive
+- Fonts and typography: existing application font stack and weight scale retained; headings, metadata, badges, tabular values, and monospaced identifiers form a clear hierarchy without wrapping regressions.
+- Spacing and layout rhythm: 900 px maximum drawer width, 5 px-equivalent content rhythm through existing Tailwind tokens, compact 8 px controls, and consistent bordered groups. No clipped persistent controls at the tested viewport.
+- Colors and visual tokens: existing background, border, muted, primary, and semantic badge tokens used. No new palette or decorative gradient introduced.
+- Image quality and asset fidelity: the reference contains no app-specific raster imagery required by this detail. Existing Lucide icon system is reused consistently; no placeholder or handmade graphic substitutes.
+- Copy and content: labels follow the business vocabulary: OS, tipo de tiempo, mano de obra, kilometraje, repuestos, terceros, técnico, facturación, and facturas relacionadas.
 
-- Colapso y restauración del sidebar comprobados.
-- Acordeón exclusivo comprobado: al abrir Parque, Servicios y Repuestos quedan cerrados.
-- En 390 × 844 el sidebar no se renderiza, la navegación inferior sigue visible y el overflow horizontal es 0.
-- No se detectaron errores de renderizado en el estado final del harness aislado; la autenticación real no fue modificada.
+## Findings
 
-## Historial de comparación
+No actionable P0, P1, or P2 mismatch remains. The reduced button count and simplified toolbar are intentional product adaptations requested by the user, not fidelity defects.
 
-1. Captura inicial del usuario: logo repetido en cabecera y pie, encabezados visualmente separados y rail contraído sin respiración lateral.
-2. Primera corrección: sidebar integrado, cabeceras de 56 px, logo inferior eliminado y rail ampliado a 64 px.
-3. Hallazgo P2: el botón de expansión quedaba visualmente cubierto por el `z-index` de la barra superior.
-4. Corrección final: sidebar elevado en la pila visual; el botón quedó visible y clicable. La comparación final no presenta hallazgos P0/P1/P2.
+## Interaction and console checks
 
-## Hallazgos
+- Tabs Resumen / Servicios / Repuestos: passed.
+- Expand/collapse an OS by clicking the row: passed.
+- Navigate from latest intervention to its service detail: passed.
+- Parts table with internal and manufacturer codes: passed.
+- Console: no application errors. Only pre-existing React Router v7 future-flag warnings were observed.
 
-- P0: ninguno.
-- P1: ninguno.
-- P2: ninguno.
-- P3: ninguno dentro del alcance solicitado.
+## Comparison history
+
+- Initial P2: a state reset prevented the OS body from remaining expanded in the visual harness.
+- Fix: the data-loading effect now depends on stable target identifiers (`chassis` and `os`) instead of object identity.
+- Post-fix evidence: the OS remains expanded and exposes work, composition, technician, billing, invoices, and the complete parts table.
+
+## Follow-up polish
+
+- P3: validate very long model/client combinations against production data; current header truncation and wrapping are acceptable at the tested viewport.
+
+final result: passed
