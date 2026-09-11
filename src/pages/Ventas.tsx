@@ -135,7 +135,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
     if (area === "servicios" || view !== "facturas") return;
     let alive = true;
     setDocumentsLoading(true); setDocumentsError(null);
-    void (supabase as any).rpc(area === "servicios" ? "ventas_servicios_os" : "ventas_area_documentos", {
+    void (supabase as any).rpc("ventas_area_documentos", {
       p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
       p_buscar: buscar.trim() || null, p_pagina: documentPage, p_por_pagina: 20,
     }).then(({ data: response, error }: { data: unknown; error: { message?: string } | null }) => {
@@ -345,8 +345,8 @@ export default function Ventas({ area }: { area: VentasArea }) {
         <FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} />
         {area === "servicios" && <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />}
         {area === "servicios" && <>
-          <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} options={[{value:"TODAS",label:"Todas"}, ...[...new Set(machineOptions.map(m => m.marca))].sort().map(value=>({value,label:value}))]} />
-          <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} options={[{value:"TODOS",label:"Todos"}, ...[...new Set(machineOptions.map(m => m.tipo_maquina))].sort().map(value=>({value,label:value}))]} />
+          <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" options={[{value:"TODAS",label:"Todas"}, ...[...new Set(machineOptions.map(m => m.marca))].sort().map(value=>({value,label:value}))]} />
+          <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"}, ...[...new Set(machineOptions.map(m => m.tipo_maquina))].sort().map(value=>({value,label:value}))]} />
         </>}
       </FiltersBar>
       {area === "servicios" && machineOptionsError && <p role="alert" className="text-xs text-destructive">{machineOptionsError}</p>}
