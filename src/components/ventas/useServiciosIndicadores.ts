@@ -20,8 +20,13 @@ export type IndicadorMaquina = {
   marca: string; tipo_maquina: string; maquinas: number; ordenes: number; horas: number;
   mo: number; km: number; repuestos: number; terceros: number; neto: number;
 };
+export type IndicadorMarcaTipo = {
+  marca: string; tipo_tiempo: string; horas: number;
+  mo: number; km: number; repuestos: number; terceros: number; neto: number;
+};
 export type IndicadoresResponse = {
   totales: IndicadoresTotales; por_tipo: IndicadorTipo[]; por_maquina: IndicadorMaquina[];
+  por_marca_tipo: IndicadorMarcaTipo[];
 };
 
 export function useServiciosIndicadores({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: IndicadoresFiltros) {
