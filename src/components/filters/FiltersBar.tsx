@@ -66,7 +66,6 @@ export function FiltersBar({
   children,
   activeCount = 0,
   onClear,
-  meta,
   actions,
   expanded,
   className,
@@ -81,7 +80,6 @@ export function FiltersBar({
   children?: ReactNode;
   activeCount?: number;
   onClear?: () => void;
-  meta?: ReactNode;
   actions?: ReactNode;
   expanded?: ReactNode;
   className?: string;
