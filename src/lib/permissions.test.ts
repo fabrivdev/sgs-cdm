@@ -13,8 +13,9 @@ describe("matriz de permisos", () => {
   });
 
   it("no publica las vistas retiradas como secciones funcionales", () => {
-    expect(SECTION_ROUTES.some((section) => section.id === "servicios.agenda")).toBe(false);
-    expect(SECTION_ROUTES.some((section) => section.id === "servicios.historial")).toBe(false);
+    const sectionIds = SECTION_ROUTES.map((section) => section.id);
+    expect(sectionIds).not.toContain("servicios.agenda");
+    expect(sectionIds).not.toContain("servicios.historial");
   });
 
   it("reserva el acceso global para el superadministrador", () => {

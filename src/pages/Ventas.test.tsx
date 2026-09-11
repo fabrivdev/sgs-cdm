@@ -28,7 +28,7 @@ function setup(area:"servicios"|"repuestos"="servicios"){
   if(table==="facturacion_lineas_importadas") return query({data:[{id:"l1",factura:"001000000082",codigo_interno_factura:null,fecha_factura:"2026-09-08",grupo_normalizado:"Servicio",subgrupo_original:"Mano de obra",cod_mercaderia:null,codigo_fabricante:null,mercaderia:"Servicio técnico",observacion:null,cantidad:8,valor_unitario:60,total_venta:480,raw_data:{linked_service_order:"01-00000104"}},{id:"l2",factura:"001001005035",codigo_interno_factura:null,fecha_factura:"2026-09-08",grupo_normalizado:"Repuestos",subgrupo_original:"Repuestos",cod_mercaderia:"REP000087",codigo_fabricante:"1395950",mercaderia:"Tapa de cierre",observacion:null,cantidad:1,valor_unitario:39,total_venta:39,raw_data:{linked_service_order:"01-00000104"}}],error:null});
   return query({data:{modelo_tipo:"AXION 870",marca:"CLAAS",sucursal:"Santa Rita",clientes:{nombre:"Campos del Mañana S.A."}},error:null});
  });
- return render(<SalesExplorer area={area} data={null} loading={false} desde="2026-07-01" hasta="2026-09-10" sucursal="TODAS" buscar=""/>);
+ return render(<SalesExplorer area={area} data={null} loading={false} desde="2026-07-01" hasta="2026-09-10" sucursal="TODAS" buscar="" tipoTiempo="TODOS"/>);
 }
 describe("Ventas por negocio",()=>{
  it("presenta una OS con dos facturas y permite consultar ambas",async()=>{
