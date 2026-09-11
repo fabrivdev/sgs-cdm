@@ -6,6 +6,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Input } from "@/components/ui/input";
 import { money } from "@/components/dashboard/utils";
 import { serviceTypes } from "@/lib/serviceHistory";
+import { displayImportedTechnicianName, importedServiceOrderParticipants, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
+import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 
 type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null };
 type Part = { id: string; fecha_factura: string; factura: string; cod_mercaderia: string; codigo_fabricante: string; mercaderia: string; observacion: string; cantidad: number; total_venta: number; grupo_normalizado: string; subgrupo_original: string; raw_data: Record<string, unknown> };
@@ -26,6 +28,16 @@ function hoursByType(row: Row): Record<string, number> {
   const types = serviceTypes(row);
   // A mixed legacy total cannot be allocated to a type without a breakdown.
   return { [types.length === 1 ? types[0] : "Sin desglose"]: Number(row.servicios_cantidad ?? 0) };
+}
+// Unified crew naming, same rule as Dashboard / Servicios: all participants, canonical name when the technician exists.
+function crewNames(row: Row, profiles: TechnicianProfileReference[]): string[] {
+  const sources = importedServiceOrderParticipants(row.raw_data, row.responsable);
+  const unique = new Map<string, string>();
+  for (const source of sources) {
+    const name = matchTechnicianProfile(source, profiles)?.nombre ?? displayImportedTechnicianName(source);
+    if (name) unique.set(name.toLowerCase(), name);
+  }
+  return unique.size ? [...unique.values()] : ["Sin técnico asignado"];
 }
 async function history(chassis: string, view: string) {
   const {data,error} = await (supabase as any).rpc("ventas_servicios_historial", {p_chasis:chassis,p_vista:view});
@@ -68,16 +80,20 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
       .finally(() => { if (alive) setPartsLoading(false); });
     return () => { alive = false; };
   }, [tab, chassis, loading]);
+  const { data: tecnicos } = useServicioTecnicos();
+  const profiles = useMemo<TechnicianProfileReference[]>(() => (tecnicos ?? []).map(t => ({ id: t.id, nombre: t.nombre })), [tecnicos]);
+  const crewByOs = useMemo(() => new Map(rows.map(row => [row.os_numero, crewNames(row, profiles)])), [rows, profiles]);
   const term = search.trim().toLowerCase();
   const inRange = (value: string | null) => (!from || (value ?? "") >= from) && (!to || (value ?? "").slice(0,10) <= to);
-  const filtered = rows.filter(row => inRange(row.fecha_abierta_os) && [row.os_numero,row.responsable].join(" ").toLowerCase().includes(term));
+  const matchesText = (row: Row) => [row.os_numero, ...(crewByOs.get(row.os_numero) ?? [])].join(" ").toLowerCase().includes(term);
+  const filtered = rows.filter(row => inRange(row.fecha_abierta_os) && matchesText(row));
   const participation = useMemo(() => {
     const result: Record<string, number> = { Cliente: 0, Garantia: 0, Interno: 0 };
-    for (const row of rows.filter(row => (!from || (row.fecha_abierta_os ?? "") >= from) && (!to || (row.fecha_abierta_os ?? "").slice(0,10) <= to) && [row.os_numero,row.responsable].join(" ").toLowerCase().includes(term))) {
+    for (const row of rows.filter(row => (!from || (row.fecha_abierta_os ?? "") >= from) && (!to || (row.fecha_abierta_os ?? "").slice(0,10) <= to) && [row.os_numero, ...(crewByOs.get(row.os_numero) ?? [])].join(" ").toLowerCase().includes(term))) {
       for (const [type,hours] of Object.entries(hoursByType(row))) result[type] = (result[type] ?? 0) + hours;
     }
     return result;
-  }, [rows,from,to,term]);
+  }, [rows,from,to,term,crewByOs]);
   const totalHours = Object.values(participation).reduce((a,b) => a+b,0);
   const visibleParts = parts.filter(part => inRange(part.fecha_factura) && [part.cod_mercaderia,part.codigo_fabricante,part.mercaderia,part.factura,part.raw_data?.linked_service_order].join(" ").toLowerCase().includes(term));
   const tableClass = "w-full text-xs [&_th]:p-2 [&_th]:font-medium [&_td]:p-2 [&_td]:align-top";
@@ -88,8 +104,15 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
       <div className="grid gap-2 sm:grid-cols-[1fr_150px_150px]"><Input aria-label="Buscar en historial" value={search} onChange={e=>setSearch(e.target.value)} placeholder={tab === "os" ? "Buscar OS o técnico…" : "Buscar código, fabricante, repuesto u OS…"}/><Input aria-label="Desde" type="date" value={from} onChange={e=>setFrom(e.target.value)}/><Input aria-label="Hasta" type="date" value={to} onChange={e=>setTo(e.target.value)}/></div>
       {machineError && <p role="alert" className="text-xs text-destructive">{machineError}</p>}
       {loading ? <p>Cargando historial…</p> : error ? <p role="alert" className="text-destructive">{error}</p> : tab === "os" ? <>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 border-y py-3 text-xs"><span className="font-semibold">{filtered.length} OS · {decimal.format(totalHours)} h OS</span>{Object.entries(participation).map(([type,hours]) => <span key={type}>{typeLabel(type)}: <strong>{decimal.format(hours)} h</strong> · {totalHours > 0 ? decimal.format(hours/totalHours*100)+"%" : "—"}</span>)}</div>
-        <div className="overflow-x-auto rounded-md border"><table className={tableClass+" min-w-[760px]"}><thead className="bg-muted/50 text-left"><tr>{["Apertura","OS","Estado","Técnicos","Tipo de tiempo · horas OS","Km OS","Factura registrada"].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{filtered.map(row=><tr key={row.os_numero} className="border-t"><td className="whitespace-nowrap">{date(row.fecha_abierta_os)}</td><td className="font-mono whitespace-nowrap">{row.os_numero}</td><td>{row.situacion_os ?? "No informado"}</td><td>{row.responsable ?? "No informado"}</td><td>{Object.entries(hoursByType(row)).map(([type,hours])=><div key={type} className="whitespace-nowrap">{typeLabel(type)} · {decimal.format(hours)} h</div>)}</td><td className="text-right">{row.km_cantidad == null ? "—" : decimal.format(row.km_cantidad)}</td><td className="font-mono">{row.factura || "Sin dato de facturación"}</td></tr>)}</tbody></table>{!filtered.length && <p className="p-6 text-center text-sm">No hay OS para estos filtros.</p>}</div>
+        <div className="grid gap-2 sm:grid-cols-[minmax(150px,1fr)_repeat(3,minmax(0,1fr))]">
+          <div className="rounded-md border bg-muted/40 p-2.5"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Órdenes de servicio</div><div className="text-[15px] font-semibold leading-5">{filtered.length} OS</div><div className="text-[11px] text-muted-foreground">{decimal.format(totalHours)} h OS en total</div></div>
+          {Object.entries(participation).map(([type,hours]) => <div key={type} className="rounded-md border p-2.5">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><span className={"h-1.5 w-1.5 rounded-full " + (type === "Cliente" ? "bg-primary" : type === "Garantia" ? "bg-blue-500" : "bg-amber-500")} />{typeLabel(type)}</div>
+            <div className="text-[15px] font-semibold leading-5">{decimal.format(hours)} h</div>
+            <div className="text-[11px] text-muted-foreground">{totalHours > 0 ? decimal.format(hours/totalHours*100)+"% del total" : "Sin horas en el período"}</div>
+          </div>)}
+        </div>
+        <div className="overflow-x-auto rounded-md border"><table className={tableClass+" min-w-[820px]"}><thead className="bg-muted/50 text-left"><tr>{["Apertura","OS","Estado","Técnicos","Tipo de tiempo","Horas OS","Km OS","Factura registrada"].map(h=><th key={h} className={h === "Horas OS" || h === "Km OS" ? "text-right" : undefined}>{h}</th>)}</tr></thead><tbody>{filtered.map(row=>{const breakdown=Object.entries(hoursByType(row));return <tr key={row.os_numero} className="border-t"><td className="whitespace-nowrap">{date(row.fecha_abierta_os)}</td><td className="font-mono whitespace-nowrap">{row.os_numero}</td><td>{row.situacion_os ?? "No informado"}</td><td>{(crewByOs.get(row.os_numero) ?? ["Sin técnico asignado"]).map(name=><div key={name}>{name}</div>)}</td><td>{breakdown.map(([type])=><div key={type} className="whitespace-nowrap">{typeLabel(type)}</div>)}</td><td className="text-right">{breakdown.map(([type,hours])=><div key={type} className="whitespace-nowrap">{decimal.format(hours)} h</div>)}</td><td className="text-right">{row.km_cantidad == null ? "—" : decimal.format(row.km_cantidad)}</td><td className="font-mono">{row.factura || "Sin dato de facturación"}</td></tr>;})}</tbody></table>{!filtered.length && <p className="p-6 text-center text-sm">No hay OS para estos filtros.</p>}</div>
       </> : partsLoading ? <p>Cargando repuestos…</p> : partsError ? <p role="alert" className="text-destructive">No se pudieron consultar los repuestos. {partsError} No se muestran resultados parciales.</p> : <div className="overflow-x-auto rounded-md border"><table className={tableClass+" min-w-[850px]"}><thead className="bg-muted/50 text-left"><tr>{["Fecha","OS","Cód. repuesto","Cód. fabricante","Descripción","Cantidad","Facturado"].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{visibleParts.map(part=><tr key={part.id} className="border-t"><td>{date(part.fecha_factura)}</td><td className="font-mono">{String(part.raw_data?.linked_service_order ?? "—")}</td><td className="font-mono">{part.cod_mercaderia || "—"}</td><td className="font-mono">{part.codigo_fabricante || "—"}</td><td>{part.mercaderia || part.observacion}</td><td className="text-right">{decimal.format(part.cantidad)}</td><td className="text-right whitespace-nowrap">{money(part.total_venta)}</td></tr>)}</tbody></table>{!visibleParts.length && <p className="p-6 text-sm">Sin líneas de repuestos facturados disponibles para estos filtros. No implica ausencia de consumos en la OS.</p>}</div>}
     </div>
   </SheetContent></Sheet>;
