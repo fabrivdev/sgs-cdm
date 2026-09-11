@@ -1860,7 +1860,11 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       return totals;
     }, {} as MoneyTotals);
   }, [detail]);
-  const unitBillingCount = detail?.units.filter((unit: any) => unit.valor_facturado != null || ["FACTURADA", "EN_PARQUE", "TRANSFERIDA"].includes(unit.estado)).length ?? 0;
+  // Mismo criterio que el badge de la lista (orderBillingState): exige evidencia real de
+  // factura (factura_venta/factura_fecha) o que la unidad ya haya llegado (FACTURADA/EN_PARQUE/
+  // TRANSFERIDA). unit.valor_facturado NO es evidencia de factura -- es el valor acordado de
+  // venta, se carga aunque no exista ninguna factura, y no debe contarse como "facturada".
+  const unitBillingCount = detail?.units.filter((unit: any) => orderBillingState(detail, unit.estado) === "COMPLETADO").length ?? 0;
   const totalUnits = Number(detail?.unidades ?? 0);
   const billingComplete = totalUnits > 0 && unitBillingCount >= totalUnits;
   const missingOriginCount = detail?.units.filter((unit: any) => {
