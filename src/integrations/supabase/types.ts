@@ -176,6 +176,41 @@ export type Database = {
           },
         ]
       }
+      app_secciones: {
+        Row: {
+          activo: boolean
+          creado_en: string
+          id: string
+          modulo_id: string
+          nombre: string
+          orden: number
+        }
+        Insert: {
+          activo?: boolean
+          creado_en?: string
+          id: string
+          modulo_id: string
+          nombre: string
+          orden?: number
+        }
+        Update: {
+          activo?: boolean
+          creado_en?: string
+          id?: string
+          modulo_id?: string
+          nombre?: string
+          orden?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_secciones_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           activo: boolean
@@ -1424,8 +1459,8 @@ export type Database = {
           marca_importacion: Database["public"]["Enums"]["marca"] | null
           marca_nombre: string | null
           margen_porcentaje: number | null
-          modelo_catalogo_id: string | null
           modelo: string | null
+          modelo_catalogo_id: string | null
           notas: string | null
           np_numero: string | null
           oc: string | null
@@ -1477,8 +1512,8 @@ export type Database = {
           marca_importacion?: Database["public"]["Enums"]["marca"] | null
           marca_nombre?: string | null
           margen_porcentaje?: number | null
-          modelo_catalogo_id?: string | null
           modelo?: string | null
+          modelo_catalogo_id?: string | null
           notas?: string | null
           np_numero?: string | null
           oc?: string | null
@@ -1530,8 +1565,8 @@ export type Database = {
           marca_importacion?: Database["public"]["Enums"]["marca"] | null
           marca_nombre?: string | null
           margen_porcentaje?: number | null
-          modelo_catalogo_id?: string | null
           modelo?: string | null
+          modelo_catalogo_id?: string | null
           notas?: string | null
           np_numero?: string | null
           oc?: string | null
@@ -1559,13 +1594,6 @@ export type Database = {
           vinculo_manual?: boolean
         }
         Relationships: [
-          {
-            foreignKeyName: "maquinaria_importacion_lineas_modelo_catalogo_id_fkey"
-            columns: ["modelo_catalogo_id"]
-            isOneToOne: false
-            referencedRelation: "parque_modelos_catalogo"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "maquinaria_importacion_lineas_linea_id_fkey"
             columns: ["linea_id"]
@@ -1600,6 +1628,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
             referencedColumns: ["linea_operacion_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_importacion_lineas_modelo_catalogo_id_fkey"
+            columns: ["modelo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "parque_modelos_catalogo"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "maquinaria_importacion_lineas_operacion_id_fkey"
@@ -2106,8 +2141,8 @@ export type Database = {
           linea_numero: number
           marca: Database["public"]["Enums"]["marca"]
           marca_nombre: string | null
-          modelo_catalogo_id: string | null
           modelo: string | null
+          modelo_catalogo_id: string | null
           moneda_acordada: string
           operacion_id: string
           producto: string | null
@@ -2127,8 +2162,8 @@ export type Database = {
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
           marca_nombre?: string | null
-          modelo_catalogo_id?: string | null
           modelo?: string | null
+          modelo_catalogo_id?: string | null
           moneda_acordada?: string
           operacion_id: string
           producto?: string | null
@@ -2148,8 +2183,8 @@ export type Database = {
           linea_numero?: number
           marca?: Database["public"]["Enums"]["marca"]
           marca_nombre?: string | null
-          modelo_catalogo_id?: string | null
           modelo?: string | null
+          modelo_catalogo_id?: string | null
           moneda_acordada?: string
           operacion_id?: string
           producto?: string | null
@@ -2748,13 +2783,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "parque_maquinas_modelo_catalogo_id_fkey"
-            columns: ["modelo_catalogo_id"]
-            isOneToOne: false
-            referencedRelation: "parque_modelos_catalogo"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "parque_maquinas_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -2768,6 +2796,13 @@ export type Database = {
             referencedRelation: "v_clientes_resumen"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "parque_maquinas_modelo_catalogo_id_fkey"
+            columns: ["modelo_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "parque_modelos_catalogo"
+            referencedColumns: ["id"]
+          },
         ]
       }
       parque_modelos_alias: {
@@ -2778,6 +2813,7 @@ export type Database = {
           id: string
           marca: Database["public"]["Enums"]["marca"]
           modelo_catalogo_id: string
+          revisado_manual: boolean
           subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
         }
         Insert: {
@@ -2787,6 +2823,7 @@ export type Database = {
           id?: string
           marca: Database["public"]["Enums"]["marca"]
           modelo_catalogo_id: string
+          revisado_manual?: boolean
           subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
         }
         Update: {
@@ -2796,6 +2833,7 @@ export type Database = {
           id?: string
           marca?: Database["public"]["Enums"]["marca"]
           modelo_catalogo_id?: string
+          revisado_manual?: boolean
           subgrupo?: Database["public"]["Enums"]["subgrupo_maquina"]
         }
         Relationships: [
@@ -4703,6 +4741,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_seccion_acceso: {
+        Row: {
+          otorgado_en: string
+          otorgado_por: string | null
+          seccion_id: string
+          user_id: string
+        }
+        Insert: {
+          otorgado_en?: string
+          otorgado_por?: string | null
+          seccion_id: string
+          user_id: string
+        }
+        Update: {
+          otorgado_en?: string
+          otorgado_por?: string | null
+          seccion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_seccion_acceso_seccion_id_fkey"
+            columns: ["seccion_id"]
+            isOneToOne: false
+            referencedRelation: "app_secciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       maquinaria_facturas_importacion_detalle: {
@@ -6057,6 +6124,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_section_access: {
+        Args: { _seccion_id: string; _user_id: string }
+        Returns: boolean
+      }
       inferir_subgrupo_maquina_notificacion: {
         Args: { p_texto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
@@ -6105,6 +6176,16 @@ export type Database = {
         Args: { p_importacion_unidad_id: string }
         Returns: Json
       }
+      maquinaria_gestionar_catalogo: {
+        Args: {
+          p_accion: string
+          p_id: string
+          p_nombre?: string
+          p_subgrupo?: string
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       maquinaria_guardar_importacion: {
         Args: { p_datos: Json; p_importacion_id: string }
         Returns: string
@@ -6129,6 +6210,7 @@ export type Database = {
         Args: { p_marca: string }
         Returns: string
       }
+      maquinaria_np_canonica: { Args: { p_numero: string }; Returns: string }
       maquinaria_parsear_fecha_pedido_legacy: {
         Args: { p_valor: string }
         Returns: string
@@ -6142,8 +6224,24 @@ export type Database = {
         Args: { p_marca: string }
         Returns: string
       }
+      maquinaria_registrar_modelo_catalogo: {
+        Args: {
+          p_marca: string
+          p_nombre: string
+          p_subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
+        Returns: string
+      }
       maquinaria_registrar_operacion: {
         Args: { p_lineas: Json; p_operacion: Json }
+        Returns: string
+      }
+      maquinaria_resolver_modelo_catalogo: {
+        Args: {
+          p_marca: string
+          p_nombre: string
+          p_subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
+        }
         Returns: string
       }
       maquinaria_subgrupo_desde_producto: {
@@ -6541,6 +6639,154 @@ export type Database = {
       }
       valor_json_insensible: {
         Args: { p_claves: string[]; p_datos: Json }
+        Returns: string
+      }
+      ventas_area_analisis: {
+        Args: {
+          p_area: string
+          p_buscar?: string
+          p_columnas?: string
+          p_desde: string
+          p_filas?: string
+          p_hasta: string
+          p_medida?: string
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_area_analisis_negocio: {
+        Args: {
+          p_area: string
+          p_buscar?: string
+          p_columnas?: string
+          p_desde: string
+          p_filas?: string
+          p_hasta: string
+          p_medida?: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_area_documentos: {
+        Args: {
+          p_area: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_area_movimientos_base: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+        }
+        Returns: {
+          area_calculada: string
+          cantidad: number
+          chasis: string
+          cliente: string
+          codigo: string
+          codigo_fabricante: string
+          concepto: string
+          descripcion: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          linea_id: string
+          marca: string
+          metodologia: string
+          modelo: string
+          os_numero: string
+          sucursal: string
+          total_venta: number
+          vinculada_os: boolean
+        }[]
+      }
+      ventas_area_resumen: {
+        Args: {
+          p_area: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_limite?: number
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_clientes_comparacion: {
+        Args: {
+          p_area: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_detalle_os: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_lineas: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_os: {
+        Args: {
+          p_area: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_panorama: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_terceros_auditoria: {
+        Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
+        Returns: {
+          cliente: string
+          diagnostico: string
+          os_numero: string
+          otros_facturados: number
+          sucursal: string
+          terceros_registrados_os: number
+          total_facturado_os: number
+        }[]
+      }
+      ventas_tipo_tiempo_normalizado: {
+        Args: { p_valor: string }
         Returns: string
       }
     }
