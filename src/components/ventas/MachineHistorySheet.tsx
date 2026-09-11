@@ -29,6 +29,16 @@ function hoursByType(row: Row): Record<string, number> {
   // A mixed legacy total cannot be allocated to a type without a breakdown.
   return { [types.length === 1 ? types[0] : "Sin desglose"]: Number(row.servicios_cantidad ?? 0) };
 }
+// Unified crew naming, same rule as Dashboard / Servicios: all participants, canonical name when the technician exists.
+function crewNames(row: Row, profiles: TechnicianProfileReference[]): string[] {
+  const sources = importedServiceOrderParticipants(row.raw_data, row.responsable);
+  const unique = new Map<string, string>();
+  for (const source of sources) {
+    const name = matchTechnicianProfile(source, profiles)?.nombre ?? displayImportedTechnicianName(source);
+    if (name) unique.set(name.toLowerCase(), name);
+  }
+  return unique.size ? [...unique.values()] : ["Sin técnico asignado"];
+}
 async function history(chassis: string, view: string) {
   const {data,error} = await (supabase as any).rpc("ventas_servicios_historial", {p_chasis:chassis,p_vista:view});
   if (error) throw new Error(serviceSalesError(error));
