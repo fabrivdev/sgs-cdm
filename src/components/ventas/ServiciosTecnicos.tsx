@@ -69,13 +69,13 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
 
   return (
     <div className="mt-3 space-y-2">
-      <p className="text-[11px] text-muted-foreground">Horas de las jornadas cargadas. La mano de obra de cada OS se reparte en partes iguales entre los técnicos que participaron: es una atribución, no facturación propia del técnico.</p>
+      
       <div className="overflow-x-auto rounded-md border">
         <div className="min-w-[1080px]">
           <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
             <div>Técnico</div>
             {["Hs cliente", "Hs garantía", "Hs interno", "Total hs"].map((label) => <div key={label} className="text-right">{label}</div>)}
-            {["MO cliente", "MO garantía", "MO interno", "MO total"].map((label) => <div key={label} className="text-right">{label}</div>)}
+            {["MO cliente", "MO garantía", "MO interno", "MO total"].map((label) => <div key={label} className="text-right" title="Mano de obra de cada OS repartida en partes iguales entre los técnicos que participaron. Es una atribución, no facturación propia del técnico.">{label}</div>)}
             <div className="text-right">Part. horas</div>
           </div>
           {!unified.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay jornadas cargadas para las OS del período.</div>
