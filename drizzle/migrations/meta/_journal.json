@@ -15,6 +15,13 @@
       "when": 1789156881453,
       "tag": "0001_ventas_servicios_indicadores_postventa",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789156911469,
+      "tag": "0002_ventas_servicios_lineas_nota_credito",
+      "breakpoints": true
     }
   ]
 }
