@@ -6,7 +6,7 @@ const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const target = { chassis: '24491414', os: null };
-const row = { os_numero: '01-00000057', fecha_abierta_os: '2026-08-01', tipo_tiempo: 'Cliente / Garantia', servicios_cantidad: 8, responsable: '12 - juan gómez', raw_data: { 'Mec Aux 1': 'JUAN GOMEZ', 'Mec Aux 2': 'Pedro Ruiz', totales_por_tipo: { Cliente: { horas: 5 }, Garantia: { horas: 3 } } } };
+const row = { os_numero: '01-00000057', fecha_abierta_os: '2026-08-01', tipo_tiempo: 'Cliente / Garantia', servicios_cantidad: 8, responsable: '12 - juan gómez', situacion_os: 'CERRADA', factura: '0010001005021; 0010000000077', servicios_valor: 100, repuesto_valor: 50, kilometro_valor: null, terceros_valor: null, raw_data: { 'Mec Aux 1': 'JUAN GOMEZ', 'Mec Aux 2': 'Pedro Ruiz', totales_por_tipo: { Cliente: { horas: 5 }, Garantia: { horas: 3 } } } };
 function renderSheet() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><MachineHistorySheet target={target} onOpenChange={()=>{}} /></QueryClientProvider>);
