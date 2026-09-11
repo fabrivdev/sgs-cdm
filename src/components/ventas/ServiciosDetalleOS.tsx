@@ -45,6 +45,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo 
         </div>
         <div className="max-h-[480px] overflow-y-auto">
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
+            : error ? <div role="alert" className="px-3 py-12 text-center text-[12px] text-destructive">No se pudo cargar el detalle. {error}</div>
             : !rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay OS con facturación en el período.</div>
             : rows.map((row) => <div key={row.id} role={row.os_numero ? "button" : undefined} aria-label={row.os_numero ?? undefined} tabIndex={row.os_numero ? 0 : undefined} onClick={() => row.os_numero && setDetailTarget({ chassis: row.chasis, os: row.os_numero })} onKeyDown={(event) => { if (row.os_numero && (event.key === "Enter" || event.key === " ")) setDetailTarget({ chassis: row.chasis, os: row.os_numero }); }} className={`grid ${columns} items-center gap-x-3 border-t px-3 py-2 text-[12px] ${row.os_numero ? "cursor-pointer hover:bg-muted/30" : ""}`}>
               <div className="whitespace-nowrap text-muted-foreground">{row.fecha ? shortDate.format(new Date(`${row.fecha}T00:00:00`)) : "—"}</div>
@@ -58,7 +59,6 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo 
             </div>)}
         </div>
       </div></div>
-      {error && <div className="border-t px-3 py-2 text-[11px] text-destructive">{error}</div>}
       {!error && !loading && rows.length > 0 && <div className="border-t px-3 py-2 text-right text-[11px] font-medium text-muted-foreground">Total facturado en el período: <span className="text-foreground">{money(total)}</span></div>}
     </div>
     <MachineHistorySheet target={detailTarget} onOpenChange={(open) => { if (!open) setDetailTarget(null); }} />

@@ -43,7 +43,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
   useEffect(() => {
     let alive = true;
     if (!desde || !hasta || desde > hasta) return;
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); onSummary?.(null);
     (supabase as any).rpc("ventas_servicios_panorama", {
       p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
       p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo, p_agrupacion: periodMode, p_buscar: buscar.trim() || null,
