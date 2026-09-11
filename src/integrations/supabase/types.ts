@@ -6731,6 +6731,10 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_linea_tipo_tiempo: {
+        Args: { p_id: string; p_metodologia: string; p_os_tipo: string }
+        Returns: string
+      }
       ventas_servicios_detalle_os: {
         Args: {
           p_buscar?: string
