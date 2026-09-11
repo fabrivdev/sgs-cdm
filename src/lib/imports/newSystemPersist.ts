@@ -33,6 +33,9 @@ export interface PersistNewSystemBundleArgs {
 export interface PersistNewSystemBundleResult {
   facturacionLineas: number;
   ordenesServicio: number;
+  ordenesServicioArchivadas: number;
+  ordenesServicioBloqueadas: number;
+  jornadasDesactivadas: number;
   facturacionDesde: string | null;
   facturacionHasta: string | null;
   historialRepuestosActualizado: boolean;
@@ -43,6 +46,11 @@ const missingPartsHistoryRefresh = (error: any) =>
   error?.code === "PGRST202"
   || error?.code === "42883"
   || String(error?.message ?? "").includes("repuestos_actualizar_ventas_periodo");
+
+const missingServiceOrderReconciliation = (error: any) =>
+  error?.code === "PGRST202"
+  || error?.code === "42883"
+  || /ordenes_servicio_(reconciliar_snapshot|importadas_archivo)/.test(String(error?.message ?? ""));
 
 export async function actualizarVentasRepuestosPeriodo(desde: string | null, hasta: string | null) {
   if (!desde || !hasta) return { actualizado: false, error: null as string | null };
@@ -64,6 +72,25 @@ export async function persistNewSystemBundle({
   userId,
   fileNames,
 }: PersistNewSystemBundleArgs): Promise<PersistNewSystemBundleResult> {
+  const osWindow = bundle.diagnostics.replacement.ordenesServicio;
+  if (osWindow.shouldReplace) {
+    // La reconciliacion debe existir antes de cualquier escritura. Sin este
+    // preflight, publicar el frontend antes de aplicar la migracion podria
+    // dejar una importacion parcial tras reemplazar la facturacion.
+    const { error: reconciliationSchemaError } = await (supabase
+      .from("ordenes_servicio_importadas_archivo" as any)
+      .select("id")
+      .limit(1) as any);
+    if (reconciliationSchemaError) {
+      if (missingServiceOrderReconciliation(reconciliationSchemaError)) {
+        throw new Error(
+          "Falta aplicar la migración de reconciliación de órdenes de servicio antes de importar el XML.",
+        );
+      }
+      throw reconciliationSchemaError;
+    }
+  }
+
   const cliExistentes = await cargarTodo<any>(supabase.from("clientes").select("*"));
 
   const cliByCod = new Map<string, string>();
@@ -249,22 +276,7 @@ export async function persistNewSystemBundle({
     if (deleteFactLinesError) throw deleteFactLinesError;
   }
 
-  const osNumeros = Array.from(
-    new Set(
-      [
-        ...ordenesServicioPayload.map((row) => row.os_numero),
-        ...bundle.ordenesServicio.rows.map((row) => row.sourceServiceOrderNumber),
-      ].filter(Boolean),
-    ),
-  );
-  for (let i = 0; i < osNumeros.length; i += 500) {
-    const chunk = osNumeros.slice(i, i + 500);
-    const { error: deleteOsByNumberError } = await (supabase
-      .from("ordenes_servicio_importadas" as any)
-      .delete()
-      .in("os_numero", chunk) as any);
-    if (deleteOsByNumberError) throw deleteOsByNumberError;
-  }
+  const osNumeros = Array.from(new Set(ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean)));
 
   for (let i = 0; i < facturacionResumen.length; i += 500) {
     const chunk = facturacionResumen.slice(i, i + 500);
@@ -292,7 +304,10 @@ export async function persistNewSystemBundle({
   }
 
   for (let i = 0; i < ordenesServicioPayload.length; i += 500) {
-    const chunk = ordenesServicioPayload.slice(i, i + 500);
+    const chunk = ordenesServicioPayload.slice(i, i + 500).map((row) => ({
+      ...row,
+      actualizado_en: new Date().toISOString(),
+    }));
     const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
       onConflict: "os_numero",
     }) as any);
@@ -313,6 +328,31 @@ export async function persistNewSystemBundle({
     importId: osImp.id,
     strict: false,
   });
+
+  let ordenesServicioArchivadas = 0;
+  let ordenesServicioBloqueadas = 0;
+  let jornadasDesactivadas = 0;
+  if (osWindow.shouldReplace && osWindow.from && osWindow.to) {
+    const { data, error } = await (supabase.rpc as any)("ordenes_servicio_reconciliar_snapshot", {
+      p_importacion_id: osImp.id,
+      p_desde: osWindow.from,
+      p_hasta: osWindow.to,
+      p_os_numeros: osNumeros,
+    });
+    if (error) {
+      if (missingServiceOrderReconciliation(error)) {
+        throw new Error(
+          "Falta aplicar la migración de reconciliación de órdenes de servicio antes de volver a importar el XML.",
+        );
+      }
+      throw error;
+    }
+
+    const reconciliation = (data ?? {}) as Record<string, unknown>;
+    ordenesServicioArchivadas = Number(reconciliation.archivadas ?? 0);
+    jornadasDesactivadas = Number(reconciliation.jornadas_desactivadas ?? 0);
+    ordenesServicioBloqueadas = Number(reconciliation.bloqueadas ?? 0);
+  }
 
   const { error: updateFactImpError } = await supabase
     .from("importaciones")
@@ -342,6 +382,9 @@ export async function persistNewSystemBundle({
   return {
     facturacionLineas: facturacionLineas.length,
     ordenesServicio: ordenesServicioPayload.length,
+    ordenesServicioArchivadas,
+    ordenesServicioBloqueadas,
+    jornadasDesactivadas,
     facturacionDesde,
     facturacionHasta,
     historialRepuestosActualizado: historialRepuestos.actualizado,

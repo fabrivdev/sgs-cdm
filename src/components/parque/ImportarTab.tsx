@@ -686,8 +686,17 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
       });
 
       toast.success(
-        `Nuevo sistema importado: ${resultado.facturacionLineas} líneas de facturación y ${resultado.ordenesServicio} líneas de OS.`,
+        `Nuevo sistema importado: ${resultado.facturacionLineas} líneas de facturación y ${resultado.ordenesServicio} OS vigentes${
+          resultado.ordenesServicioArchivadas
+            ? `; ${resultado.ordenesServicioArchivadas} OS ausentes archivadas`
+            : ""
+        }.`,
       );
+      if (resultado.ordenesServicioBloqueadas) {
+        toast.warning(
+          `${resultado.ordenesServicioBloqueadas} OS ausentes conservaron su estado porque tienen factura, trabajo o comisión liquidada.`,
+        );
+      }
       if (resultado.historialRepuestosError) toast.warning(resultado.historialRepuestosError);
       resetNewSystemImport();
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "ventas_unificadas"] });

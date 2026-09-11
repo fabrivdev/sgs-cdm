@@ -269,6 +269,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     try {
       let facturacionLineas = 0;
       let ordenesServicio = 0;
+      let ordenesServicioArchivadas = 0;
+      let ordenesServicioBloqueadas = 0;
       let facturacionDesde: string | null = null;
       let facturacionHasta: string | null = null;
       let historialRepuestosError: string | null = null;
@@ -319,6 +321,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         });
         facturacionLineas = resultado.facturacionLineas;
         ordenesServicio = resultado.ordenesServicio;
+        ordenesServicioArchivadas = resultado.ordenesServicioArchivadas;
+        ordenesServicioBloqueadas = resultado.ordenesServicioBloqueadas;
         facturacionDesde = resultado.facturacionDesde;
         facturacionHasta = resultado.facturacionHasta;
         historialRepuestosError = resultado.historialRepuestosError;
@@ -407,7 +411,11 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       }
 
       const partes = [
-        preview.bundleFiles ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} de OS` : null,
+        preview.bundleFiles
+          ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS vigentes${
+              ordenesServicioArchivadas ? `; ${ordenesServicioArchivadas} OS ausentes archivadas` : ""
+            }`
+          : null,
         productoRows.length ? `${productoRows.length} productos` : null,
         stockRows.length ? `${stockRows.length} filas de stock` : null,
         machineStockRows.length ? `${machineStockRows.length} máquinas en stock` : null,
@@ -417,6 +425,11 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         preview.clientesActualizados.length ? `${preview.clientesActualizados.length} clientes actualizados` : null,
       ].filter(Boolean);
       toast.success(`Importado: ${partes.join(", ")}.`);
+      if (ordenesServicioBloqueadas) {
+        toast.warning(
+          `${ordenesServicioBloqueadas} OS ausentes conservaron su estado porque tienen factura, trabajo o comisión liquidada.`,
+        );
+      }
       if (historialRepuestosError) toast.warning(historialRepuestosError);
 
       setDetected([]);
