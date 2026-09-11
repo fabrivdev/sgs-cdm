@@ -10,7 +10,7 @@ await db.exec(`
   create role anon;
   create role authenticated;
   create schema auth;
-  create type public.app_role as enum ('admin', 'superadmin', 'cabecilla');
+  create type public.app_role as enum ('admin', 'superadmin', 'jefatura');
   create function auth.uid() returns uuid language sql as
     $$ select '00000000-0000-0000-0000-000000000001'::uuid $$;
   create function public.has_role(uuid, public.app_role) returns boolean language sql as

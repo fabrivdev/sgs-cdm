@@ -34,7 +34,7 @@ CREATE POLICY "Administracion consulta archivo OS"
   USING (
     public.has_role(auth.uid(), 'admin'::public.app_role)
     OR public.has_role(auth.uid(), 'superadmin'::public.app_role)
-    OR public.has_role(auth.uid(), 'cabecilla'::public.app_role)
+    OR public.has_role(auth.uid(), 'jefatura'::public.app_role)
   );
 
 DROP POLICY IF EXISTS "Administracion archiva OS"
@@ -45,7 +45,7 @@ CREATE POLICY "Administracion archiva OS"
   WITH CHECK (
     public.has_role(auth.uid(), 'admin'::public.app_role)
     OR public.has_role(auth.uid(), 'superadmin'::public.app_role)
-    OR public.has_role(auth.uid(), 'cabecilla'::public.app_role)
+    OR public.has_role(auth.uid(), 'jefatura'::public.app_role)
   );
 
 CREATE OR REPLACE FUNCTION public.ordenes_servicio_reconciliar_snapshot(
@@ -74,7 +74,7 @@ BEGIN
      AND NOT (
        public.has_role(auth.uid(), 'admin'::public.app_role)
        OR public.has_role(auth.uid(), 'superadmin'::public.app_role)
-       OR public.has_role(auth.uid(), 'cabecilla'::public.app_role)
+       OR public.has_role(auth.uid(), 'jefatura'::public.app_role)
      ) THEN
     RAISE EXCEPTION 'Acceso denegado' USING ERRCODE = '42501';
   END IF;
