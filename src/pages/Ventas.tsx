@@ -12,13 +12,15 @@ import { cn } from "@/lib/utils";
 import { SUCURSALES } from "@/lib/constants";
 import { ServiciosPanorama, type ServiciosSummary } from "@/components/ventas/ServiciosPanorama";
 import { ServiciosDetalleOS } from "@/components/ventas/ServiciosDetalleOS";
-import { ServiciosAnalisis } from "@/components/ventas/ServiciosAnalisis";
 import { ServiciosClientes } from "@/components/ventas/ServiciosClientes";
+import { ServiciosResumen } from "@/components/ventas/ServiciosResumen";
+import { ServiciosTecnicos } from "@/components/ventas/ServiciosTecnicos";
+import { ServiciosMaquinas } from "@/components/ventas/ServiciosMaquinas";
 import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
-type ExplorerView = "facturas" | "clientes" | "analisis";
+type ExplorerView = "facturas" | "clientes" | "analisis" | "resumen" | "tecnicos" | "maquinas";
 type PivotColumn = "none" | "mes" | "sucursal";
 type PivotMetric = "usd" | "facturas" | "cantidad";
 type PivotRow = "concepto" | "cliente" | "sucursal" | "repuesto" | "subgrupo" | "modelo";
