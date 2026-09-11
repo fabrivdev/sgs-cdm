@@ -14,7 +14,8 @@ type Fila = {
 };
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
-const COLUMNS = "grid-cols-[minmax(210px,1.45fr)_repeat(11,minmax(118px,1fr))]";
+const COLUMNS = "grid-cols-[minmax(210px,1.5fr)_repeat(8,minmax(105px,1fr))]";
+const unknown = (value: string) => /sin (tecnico|técnico|identificar|informar|atribuir)/i.test(value);
 
 export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: IndicadoresFiltros) {
   const [rows, setRows] = useState<Fila[]>([]);
@@ -63,37 +64,28 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
         mo_total: current.mo_total + row.mo_total,
       });
     });
-    return [...map.values()].sort((a, b) => b.total_horas - a.total_horas || a.tecnico.localeCompare(b.tecnico, "es"));
+    return [...map.values()].sort((a, b) => Number(unknown(a.tecnico)) - Number(unknown(b.tecnico)) || b.total_horas - a.total_horas || a.tecnico.localeCompare(b.tecnico, "es"));
   }, [rows, tecnicos]);
 
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando técnicos…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
 
-  const totalMo = unified.reduce((sum, item) => sum + item.mo_total, 0);
-
   return (
-    <div className="mt-3 space-y-3">
-      <div>
-        <h3 className="text-[13px] font-semibold">Facturación atribuida por técnico</h3>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">La mano de obra facturada se distribuye por horas computables dentro de cada OS y tipo de tiempo: validadas o calculadas, excluyendo jornadas inválidas. Se respetan las correcciones manuales de Comisiones.</p>
-      </div>
+    <div className="mt-3">
       <div className="overflow-x-auto rounded-md border">
-        <div className="min-w-[1560px]">
+        <div className="min-w-[1120px]">
           <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
-            <div className="text-center">Técnico</div>
-            {["Horas cliente", "Horas garantía", "Horas interno", "Horas sin clasificar", "Horas totales"].map((label) => <div key={label} className="text-center">{label}</div>)}
-            {["MO atribuida · Cliente", "MO atribuida · Garantía", "MO atribuida · Interno", "MO sin clasificar", "MO atribuida total"].map((label) => <div key={label} className="text-center" title="Importe de mano de obra asignado según la participación horaria válida en cada OS y tipo de tiempo.">{label}</div>)}
-            <div className="text-center">Participación MO</div>
+            <div>Técnico</div>
+            {["Horas Cliente", "Horas Garantía", "Horas Interno", "Total horas", "MO Cliente asociada", "MO Garantía asociada", "MO Interno asociada", "MO total asociada"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
           </div>
           {!unified.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay jornadas cargadas para las OS del período.</div>
             : unified.map((row) => (
                 <div key={row.tecnico} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
                   <div className="truncate font-medium" title={row.tecnico}>{row.tecnico}</div>
-                  {[row.horas_cliente, row.horas_garantia, row.horas_interno, row.horas_otros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{decimal.format(value)}</div>)}
+                  {[row.horas_cliente, row.horas_garantia, row.horas_interno].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{decimal.format(value)}</div>)}
                   <div className="text-right font-semibold tabular-nums">{decimal.format(row.total_horas)}</div>
-                  {[row.mo_cliente, row.mo_garantia, row.mo_interno, row.mo_otros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
+                  {[row.mo_cliente, row.mo_garantia, row.mo_interno].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
                   <div className="text-right font-semibold tabular-nums">{money(row.mo_total)}</div>
-                  <div className="text-right tabular-nums text-muted-foreground">{totalMo ? `${Math.round((row.mo_total / totalMo) * 100)}%` : "—"}</div>
                 </div>
               ))}
         </div>
