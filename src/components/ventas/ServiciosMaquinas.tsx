@@ -11,7 +11,7 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando máquinas…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
 
-  const rows = [...(data?.por_maquina ?? [])].sort((a, b) => Number(/sin (identificar|informar|máquina|maquina)/i.test(`${a.marca} ${a.tipo_maquina}`)) - Number(/sin (identificar|informar|máquina|maquina)/i.test(`${b.marca} ${b.tipo_maquina}`)) || b.neto - a.neto);
+  const rows = [...(data?.por_maquina ?? [])].sort((a, b) => Number(/(?:sin|no) (?:identificar|identificado|informar|informado|máquina|maquina)/i.test(`${a.marca} ${a.tipo_maquina}`)) - Number(/(?:sin|no) (?:identificar|identificado|informar|informado|máquina|maquina)/i.test(`${b.marca} ${b.tipo_maquina}`)) || b.neto - a.neto);
 
   return (
     <div className="mt-3 overflow-x-auto rounded-md border">

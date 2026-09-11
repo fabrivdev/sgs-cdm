@@ -33,7 +33,7 @@ export function ServiciosClientes({ desde, hasta, sucursal, buscar, tipoTiempo, 
     return [...map.values()]
       .filter((row) => row.facturas.size > 0 || row.os.size > 0 || row.total !== 0)
       .filter((row) => !term || row.cliente.toLowerCase().includes(term))
-      .sort((a, b) => Number(/^sin (cliente|identificar|informar)/i.test(a.cliente)) - Number(/^sin (cliente|identificar|informar)/i.test(b.cliente)) || b.total - a.total);
+      .sort((a, b) => Number(/^(?:sin|no) (?:cliente|identificar|identificado|informar|informado)/i.test(a.cliente)) - Number(/^(?:sin|no) (?:cliente|identificar|identificado|informar|informado)/i.test(b.cliente)) || b.total - a.total);
   }, [buscar, current, perspective]);
 
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Comparando clientes…</div>;

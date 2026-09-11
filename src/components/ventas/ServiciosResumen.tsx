@@ -5,7 +5,7 @@ const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const typeLabel = (value: string) => (value === "Garantia" ? "Garantía" : value);
 const COLUMNS = "grid-cols-[minmax(135px,1fr)_repeat(5,minmax(100px,1fr))_85px_85px_75px]";
 const BRAND_COLUMNS = "grid-cols-[minmax(120px,1fr)_minmax(110px,1fr)_repeat(5,minmax(100px,1fr))_85px_75px]";
-const unknown = (value: string) => /sin (identificar|informar|clasificar)/i.test(value);
+const unknown = (value: string) => /(?:sin|no) (?:identificar|identificado|informar|informado|clasificar|clasificado)/i.test(value);
 
 export function ServiciosResumen(props: IndicadoresFiltros) {
   const { data, loading, error } = useServiciosIndicadores(props);
@@ -16,7 +16,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
 
   const { totales } = data;
   const porTipo = [...data.por_tipo].sort((a, b) => Number(unknown(a.tipo_tiempo)) - Number(unknown(b.tipo_tiempo)) || b.neto - a.neto);
-  const porMarcaTipo = [...(data.por_marca_tipo ?? [])].sort((a, b) => Number(unknown(a.marca)) - Number(unknown(b.marca)) || a.marca.localeCompare(b.marca, "es") || b.neto - a.neto);
+  const porMarcaTipo = [...(data.por_marca_tipo ?? [])].sort((a, b) => Number(unknown(`${a.marca} ${a.tipo_tiempo}`)) - Number(unknown(`${b.marca} ${b.tipo_tiempo}`)) || a.marca.localeCompare(b.marca, "es") || b.neto - a.neto);
   const cards: Array<[string, string]> = [
     ["Neto", money(totales.neto)],
     ["Mano de obra", money(totales.mo)],
