@@ -6,7 +6,7 @@ const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const target = { chassis: '24491414', os: null };
-const row = { os_numero: '01-00000057', fecha_abierta_os: '2026-08-01', tipo_tiempo: 'Cliente / Garantia', servicios_cantidad: 8, responsable: '12 - juan gómez', raw_data: { 'Mec Aux 1': 'JUAN GOMEZ', 'Mec Aux 2': 'Pedro Ruiz', totales_por_tipo: { Cliente: { horas: 5 }, Garantia: { horas: 3 } } } };
+const row = { os_numero: '01-00000057', fecha_abierta_os: '2026-08-01', tipo_tiempo: 'Cliente / Garantia', servicios_cantidad: 8, responsable: '12 - juan gómez', situacion_os: 'CERRADA', factura: '0010001005021; 0010000000077', servicios_valor: 100, repuesto_valor: 50, kilometro_valor: null, terceros_valor: null, raw_data: { 'Mec Aux 1': 'JUAN GOMEZ', 'Mec Aux 2': 'Pedro Ruiz', totales_por_tipo: { Cliente: { horas: 5 }, Garantia: { horas: 3 } } } };
 function renderSheet() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><MachineHistorySheet target={target} onOpenChange={()=>{}} /></QueryClientProvider>);
@@ -24,18 +24,24 @@ describe('simple machine history', () => {
     setup(); renderSheet();
     expect(await screen.findByText(row.os_numero)).toBeInTheDocument();
     expect(screen.getByText(/Dueño actual/)).toBeInTheDocument();
-    expect(screen.getAllByText('Cliente').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Garantía').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('5 h').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('3 h').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Cliente/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Garantía/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/5 h/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/3 h/).length > 0).toBe(true);
     expect(rpc).not.toHaveBeenCalledWith(expect.anything(),expect.objectContaining({p_vista:'repuestos'}));
     expect(screen.queryByText('Resumen')).not.toBeInTheDocument();
   });
-  it('unifies crew names and lists every participant once', async () => {
+  it('unifies crew names, normalizes estado and shows compact invoice and total', async () => {
     setup(); renderSheet();
     await screen.findByText(row.os_numero);
-    expect(screen.getAllByText('JUAN GOMEZ')).toHaveLength(1);
-    expect(screen.getByText('PEDRO RUIZ')).toBeInTheDocument();
+    const techCell = screen.getByText(/JUAN GOMEZ, PEDRO RUIZ/);
+    expect(techCell).toBeInTheDocument();
+    expect(screen.getByText('Cerrada')).toBeInTheDocument();
+    expect(screen.getByText(/0010001005021/)).toBeInTheDocument();
+    expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(screen.queryByText('Sin dato de facturación')).not.toBeInTheDocument();
+    // 100 + 50, nulls treated as missing values.
+    expect(screen.getByText(/150/)).toBeInTheDocument();
   });
   it('shows and searches individual manufacturer and part codes', async () => {
     setup(); renderSheet();
