@@ -47,7 +47,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
           </div>
           {!porTipo.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin facturación en el período.</div>
             : porTipo.map((row) => (
-              <div key={row.tipo_tiempo} className={`grid ${SERVICE_SALES_GRID} items-center border-t px-3 py-2 text-[12px]`}>
+              <div key={row.tipo_tiempo} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
                 <div className="truncate font-medium">{typeLabel(row.tipo_tiempo)}</div>
                 {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
                 <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
