@@ -1,11 +1,10 @@
 import { money } from "@/components/dashboard/utils";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
+import { SERVICE_SALES_GRID, SERVICE_SALES_HEADERS, SERVICE_SALES_MIN_WIDTH } from "@/components/ventas/serviceSalesTable";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const typeLabel = (value: string) => (value === "Garantia" ? "Garantía" : value);
-
-const COLUMNS = "grid-cols-[minmax(120px,1fr)_repeat(5,minmax(100px,1fr))_80px_90px_90px]";
 
 export function ServiciosResumen(props: IndicadoresFiltros) {
   const { data, loading, error } = useServiciosIndicadores(props);
@@ -37,21 +36,25 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
         ))}
       </div>
 
+      <div>
+        <h3 className="text-[13px] font-semibold">Facturación por tipo de tiempo</h3>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">La misma composición del período, abierta por Cliente, Garantía e Interno.</p>
+      </div>
+
       <div className="overflow-x-auto rounded-md border">
-        <div className="min-w-[860px]">
-          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
-            <div>Tipo de tiempo</div>
-            {["MO", "Km", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className="text-right">{label}</div>)}
-            <div className="text-right">OS</div><div className="text-right">Horas OS</div><div className="text-right">Part.</div>
+        <div className={SERVICE_SALES_MIN_WIDTH}>
+          <div className={`grid ${SERVICE_SALES_GRID} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+            <div className="text-center">Tipo de tiempo</div>
+            {SERVICE_SALES_HEADERS.map((label) => <div key={label} className="text-center">{label}</div>)}
           </div>
           {!por_tipo.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin facturación en el período.</div>
             : por_tipo.map((row) => (
-              <div key={row.tipo_tiempo} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
+              <div key={row.tipo_tiempo} className={`grid ${SERVICE_SALES_GRID} items-center border-t px-3 py-2 text-[12px]`}>
                 <div className="truncate font-medium">{typeLabel(row.tipo_tiempo)}</div>
-                {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
                 <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
-                <div className="text-right tabular-nums">{integer.format(row.ordenes)}</div>
-                <div className="text-right tabular-nums">{decimal.format(row.horas)}</div>
+                {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
+                <div className="text-right tabular-nums">{integer.format(row.clientes ?? 0)}</div>
+                <div className="text-right tabular-nums">{integer.format(row.facturas ?? 0)}</div>
                 <div className="text-right tabular-nums">{totales.neto ? `${Math.round((row.neto / totales.neto) * 100)}%` : "—"}</div>
               </div>
             ))}

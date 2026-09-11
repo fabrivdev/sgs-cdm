@@ -65,7 +65,7 @@ const money = new Intl.NumberFormat("es-PY", {minimumFractionDigits: 2, maximumF
 const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
-function isoDate(date: Date) { return date.toISOString().slice(0, 10); }
+function isoDate(date: Date) { return format(date, "yyyy-MM-dd"); }
 function cleanModel(value: string | null) {
   return (value ?? "").replace(/\s*[-·]?\s*(?:chasis|casis)\s*:?\s*[\w-]+.*$/i, "").trim() || "Modelo no informado";
 }

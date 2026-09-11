@@ -14,7 +14,7 @@ export type IndicadoresTotales = {
 };
 export type IndicadorTipo = {
   tipo_tiempo: string; mo: number; km: number; repuestos: number; terceros: number;
-  neto: number; ordenes: number; horas: number;
+  neto: number; ordenes: number; horas: number; clientes: number; facturas: number;
 };
 export type IndicadorMaquina = {
   marca: string; tipo_maquina: string; maquinas: number; ordenes: number; horas: number;

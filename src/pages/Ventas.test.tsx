@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- builder mínimo para simular consultas Supabase. */
 import {afterEach,describe,it,expect,vi} from "vitest";
 import {render,screen,fireEvent,cleanup,within} from "@testing-library/react";
+import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {SalesExplorer} from "./Ventas";
 import {documentsFixture,clientsFixture} from "@/test/sales-fixtures";
 const {rpc,from}=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn()}));
@@ -17,6 +18,7 @@ function setup(area:"servicios"|"repuestos"="servicios"){
   {id:"p2",factura:"000101",os:"01-00000011",propietario:"Dueño B",cliente:"Ganadera El Fogón S.A.",componente:"Mano de obra",total_venta:500},
  ];
  rpc.mockImplementation(async(name:string,params:Record<string,string>)=>{
+  if(name==="ventas_servicios_indicadores_v1") return {data:{totales:{neto:769,mo:730,km:0,repuestos:39,terceros:0,ordenes:2,documentos:3,horas:16},por_tipo:[],por_maquina:[]},error:null};
   if(name==="ventas_servicios_detalle_os_v2") return {data:[{id:"01-00000104",fecha:"2026-09-08",os:"01-00000104",os_numero:"01-00000104",chasis:"24491421",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",sucursal:"Santa Rita",tipo_tiempo:"Garantía",facturas:2,mo:480,km:0,repuestos:39,terceros:0,total:519}],error:null};
   if(name==="ventas_servicios_lineas_v2") return {data:String(params?.p_desde||"").startsWith("2025")?previousLines:currentLines,error:null};
   if(name==="ventas_clientes_comparacion") return {data:clientsFixture,error:null};
@@ -28,11 +30,13 @@ function setup(area:"servicios"|"repuestos"="servicios"){
   if(table==="facturacion_lineas_importadas") return query({data:[{id:"l1",factura:"001000000082",codigo_interno_factura:null,fecha_factura:"2026-09-08",grupo_normalizado:"Servicio",subgrupo_original:"Mano de obra",cod_mercaderia:null,codigo_fabricante:null,mercaderia:"Servicio técnico",observacion:null,cantidad:8,valor_unitario:60,total_venta:480,raw_data:{linked_service_order:"01-00000104"}},{id:"l2",factura:"001001005035",codigo_interno_factura:null,fecha_factura:"2026-09-08",grupo_normalizado:"Repuestos",subgrupo_original:"Repuestos",cod_mercaderia:"REP000087",codigo_fabricante:"1395950",mercaderia:"Tapa de cierre",observacion:null,cantidad:1,valor_unitario:39,total_venta:39,raw_data:{linked_service_order:"01-00000104"}}],error:null});
   return query({data:{modelo_tipo:"AXION 870",marca:"CLAAS",sucursal:"Santa Rita",clientes:{nombre:"Campos del Mañana S.A."}},error:null});
  });
- return render(<SalesExplorer area={area} data={null} loading={false} desde="2026-07-01" hasta="2026-09-10" sucursal="TODAS" buscar="" tipoTiempo="TODOS"/>);
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ return render(<QueryClientProvider client={client}><SalesExplorer area={area} data={null} loading={false} desde="2026-07-01" hasta="2026-09-10" sucursal="TODAS" buscar="" tipoTiempo="TODOS"/></QueryClientProvider>);
 }
 describe("Ventas por negocio",()=>{
  it("agrupa dos facturas por OS sin abrir un detalle duplicado",async()=>{
   setup();
+  fireEvent.click(screen.getByRole("button",{name:"Detalle"}));
   expect(await screen.findByText("01-00000104")).toBeInTheDocument();
   expect(rpc).toHaveBeenCalledWith("ventas_servicios_detalle_os_v2",expect.objectContaining({p_marca:null,p_tipo_maquina:null}));
   expect(screen.getByText("Dueño A")).toBeInTheDocument();
