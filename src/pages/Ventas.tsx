@@ -317,7 +317,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
   }, [selectedPeriod, desde, hasta, periodMode]);
   const copy = AREA_COPY[area];
   const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS");
-  const showHistoricalLimit = Boolean(data?.historico && area !== "maquinas");
+  
   const summary = area === "servicios" ? serviciosSummary : data;
   const summaryCount = area === "servicios" ? serviciosSummary?.ordenes : data?.facturas;
   return (
@@ -332,7 +332,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
       </FiltersBar>
       {error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label="Clientes" value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(summary?.promedio ?? 0)} /></KpiStrip>
-        {showHistoricalLimit && <details className="rounded-md border bg-background px-3 py-2 text-[10px] text-muted-foreground"><summary className="flex cursor-pointer list-none items-center gap-2"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /><span>Alcance del histórico</span><ChevronDown className="ml-auto h-3.5 w-3.5" /></summary><p className="mt-2 pl-5">Antes del 01/07/2026 no existe una vinculación confiable entre factura y OS ni detalle por código de repuesto. Los totales se conservan por rubro contable.</p></details>}
+        
         {area === "servicios" && (
           <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
         )}
