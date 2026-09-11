@@ -9,12 +9,24 @@ import { serviceTypes } from "@/lib/serviceHistory";
 import { displayImportedTechnicianName, importedServiceOrderParticipants, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 
-type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null };
+type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null; servicios_valor: number | null; repuesto_valor: number | null; kilometro_valor: number | null; terceros_valor: number | null };
 type Part = { id: string; fecha_factura: string; factura: string; cod_mercaderia: string; codigo_fabricante: string; mercaderia: string; observacion: string; cantidad: number; total_venta: number; grupo_normalizado: string; subgrupo_original: string; raw_data: Record<string, unknown> };
 type Machine = { modelo_tipo: string; clientes: { nombre: string } | null };
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const date = (value: string | null) => value ? value.slice(0,10).split("-").reverse().join("/") : "—";
 const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
+// Sentence-case so imported rows in ALL CAPS and mixed case render the same way.
+const estadoLabel = (value: string | null) => {
+  if (!value?.trim()) return "—";
+  const lower = value.trim().toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+};
+const facturaList = (value: string | null) => (value ?? "").split(/[;,]/).map(v => v.trim()).filter(Boolean);
+// Same total as TrabajosOSTab: servicios + repuestos + kilometraje + terceros.
+function osTotal(row: Row): number | null {
+  const values = [row.servicios_valor, row.repuesto_valor, row.kilometro_valor, row.terceros_valor];
+  return values.every(v => v == null) ? null : values.reduce((sum, v) => sum + (v ?? 0), 0);
+}
 function hoursByType(row: Row): Record<string, number> {
   const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number }> | undefined;
   const result: Record<string, number> = {};
