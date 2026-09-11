@@ -7,7 +7,7 @@ import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
-  cliente: string; sucursal: string | null; tipo_tiempo: string; facturas: number;
+  cliente: string; propietario?: string; sucursal: string | null; tipo_tiempo: string; facturas: number;
   mo: number; km: number; repuestos: number; terceros: number; total: number;
 };
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -41,7 +41,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo 
     <div className="mt-3 overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><div className="min-w-[1040px]">
         <div className={`grid ${columns} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
-          <div>Fecha</div><div>OS</div><div>Chasis</div><div>Cliente</div><div>Sucursal</div><div>Tipo</div><div className="text-right">Fact.</div><div className="text-right">Facturado</div>
+          <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div><div className="text-right">Facturado</div>
         </div>
         <div className="max-h-[480px] overflow-y-auto">
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
@@ -50,9 +50,9 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo 
               <div className="whitespace-nowrap text-muted-foreground">{row.fecha ? shortDate.format(new Date(`${row.fecha}T00:00:00`)) : "—"}</div>
               <div className="truncate font-mono font-semibold text-primary">{row.os}</div>
               <div>{row.chasis ? <button type="button" className="max-w-full truncate font-mono text-primary hover:underline" onClick={(event) => { event.stopPropagation(); setDetailTarget({ chassis: row.chasis, os: null }); }} title="Ver historial de esta máquina">{row.chasis}</button> : "—"}</div>
-              <div className="truncate font-medium">{row.cliente}</div>
+              <div className="truncate font-medium">{row.propietario || 'Propietario no disponible'}</div>
               <div className="truncate text-muted-foreground">{row.sucursal || "Sin sucursal"}</div>
-              <div><Badge variant="outline" className="text-[10px]">{row.tipo_tiempo}</Badge></div>
+              <div className="flex flex-wrap gap-1">{row.tipo_tiempo.split(' / ').map(type => <Badge key={type} variant="outline" className="text-[10px]">{type === 'Garantia' ? 'Garantía' : type}</Badge>)}</div>
               <div className="text-right tabular-nums">{row.facturas}</div>
               <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
             </div>)}
