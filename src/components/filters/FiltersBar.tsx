@@ -66,6 +66,7 @@ export function FiltersBar({
   children,
   activeCount = 0,
   onClear,
+  meta,
   actions,
   expanded,
   className,
@@ -80,6 +81,8 @@ export function FiltersBar({
   children?: ReactNode;
   activeCount?: number;
   onClear?: () => void;
+  /** @deprecated El contador/meta ya no se renderiza junto al botón Filtros. */
+  meta?: ReactNode;
   actions?: ReactNode;
   expanded?: ReactNode;
   className?: string;
