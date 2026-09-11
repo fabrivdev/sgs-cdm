@@ -7,7 +7,6 @@ import { money } from "@/components/dashboard/utils";
 type Line = { id: string; factura: string; os: string | null; cliente: string; propietario: string; componente: string; total_venta: number; es_nota_credito?: boolean };
 const usd = { format: (value: number) => money(value) };
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
-const iso = (value: Date) => value.toISOString().slice(0, 10);
 
 export function ServiciosClientes({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: { desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string }) {
   const [perspective, setPerspective] = useState<"propietario" | "cliente">("propietario");
@@ -18,7 +17,7 @@ export function ServiciosClientes({ desde, hasta, sucursal, buscar, tipoTiempo, 
     (supabase as any).rpc("ventas_servicios_lineas_v2", params(desde, hasta)).then((nowResult: any) => {
       if (!alive) return;
       const rpcError = nowResult.error;
-      if (rpcError) { setError(serviceSalesError(rpcError)); setCurrent([]); setPrevious([]); }
+      if (rpcError) { setError(serviceSalesError(rpcError)); setCurrent([]); }
       else setCurrent(nowResult.data ?? []);
       setLoading(false);
     });
