@@ -9,6 +9,11 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const props = { desde: '2026-01-01', hasta: '2026-09-11', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
 
 describe('service detail loading states', () => {
+  it('passes both machine filters to the same detail query', async () => {
+    rpc.mockResolvedValue({data:[],error:null});
+    render(<ServiciosDetalleOS {...props} marca="HORSCH" tipoMaquina="SEMBRADORAS" />);
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_detalle_os_v2',expect.objectContaining({p_marca:'HORSCH',p_tipo_maquina:'SEMBRADORAS'})));
+  });
   it('shows timeout as an error, never as an empty result', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'canceling statement due to statement timeout' } });
     render(<ServiciosDetalleOS {...props} />);

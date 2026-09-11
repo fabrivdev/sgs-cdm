@@ -8,17 +8,17 @@ vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc,from}}));
 afterEach(()=>{cleanup();rpc.mockReset();from.mockReset();});
 function setup(area:"servicios"|"repuestos"="servicios"){
  const currentLines=[
-  {id:"l1",factura:"001000000082",os:"01-00000104",cliente:"Campos del Mañana S.A.",componente:"Mano de obra",total_venta:480},
-  {id:"l2",factura:"001001005035",os:"01-00000104",cliente:"Campos del Mañana S.A.",componente:"Repuestos",total_venta:39},
-  {id:"l3",factura:"001000000090",os:"01-00000105",cliente:"Ganadera El Fogón S.A.",componente:"Mano de obra",total_venta:250},
+  {id:"l1",factura:"001000000082",os:"01-00000104",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Mano de obra",total_venta:480},
+  {id:"l2",factura:"001001005035",os:"01-00000104",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Repuestos",total_venta:39},
+  {id:"l3",factura:"001000000090",os:"01-00000105",propietario:"Dueño B",cliente:"Ganadera El Fogón S.A.",componente:"Mano de obra",total_venta:250},
  ];
  const previousLines=[
-  {id:"p1",factura:"000100",os:"01-00000010",cliente:"Campos del Mañana S.A.",componente:"Mano de obra",total_venta:400},
-  {id:"p2",factura:"000101",os:"01-00000011",cliente:"Ganadera El Fogón S.A.",componente:"Mano de obra",total_venta:500},
+  {id:"p1",factura:"000100",os:"01-00000010",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Mano de obra",total_venta:400},
+  {id:"p2",factura:"000101",os:"01-00000011",propietario:"Dueño B",cliente:"Ganadera El Fogón S.A.",componente:"Mano de obra",total_venta:500},
  ];
  rpc.mockImplementation(async(name:string,params:Record<string,string>)=>{
-  if(name==="ventas_servicios_detalle_os") return {data:[{id:"01-00000104",fecha:"2026-09-08",os:"01-00000104",os_numero:"01-00000104",chasis:"24491421",cliente:"Campos del Mañana S.A.",sucursal:"Santa Rita",tipo_tiempo:"Garantía",facturas:2,mo:480,km:0,repuestos:39,terceros:0,total:519}],error:null};
-  if(name==="ventas_servicios_lineas") return {data:String(params?.p_desde||"").startsWith("2025")?previousLines:currentLines,error:null};
+  if(name==="ventas_servicios_detalle_os_v2") return {data:[{id:"01-00000104",fecha:"2026-09-08",os:"01-00000104",os_numero:"01-00000104",chasis:"24491421",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",sucursal:"Santa Rita",tipo_tiempo:"Garantía",facturas:2,mo:480,km:0,repuestos:39,terceros:0,total:519}],error:null};
+  if(name==="ventas_servicios_lineas_v2") return {data:String(params?.p_desde||"").startsWith("2025")?previousLines:currentLines,error:null};
   if(name==="ventas_clientes_comparacion") return {data:clientsFixture,error:null};
   return {data:documentsFixture,error:null};
  });
@@ -31,14 +31,13 @@ function setup(area:"servicios"|"repuestos"="servicios"){
  return render(<SalesExplorer area={area} data={null} loading={false} desde="2026-07-01" hasta="2026-09-10" sucursal="TODAS" buscar="" tipoTiempo="TODOS"/>);
 }
 describe("Ventas por negocio",()=>{
- it("presenta una OS con dos facturas y permite consultar ambas",async()=>{
+ it("agrupa dos facturas por OS sin abrir un detalle duplicado",async()=>{
   setup();
-  const order=await screen.findByRole("button",{name:"01-00000104"});
-  expect(rpc).toHaveBeenCalledWith("ventas_servicios_os",expect.objectContaining({p_area:"servicios"}));
-  expect(screen.getAllByText("Campos del Mañana S.A.")).toHaveLength(1);
-  fireEvent.click(order);
-  expect(await screen.findByText(/001000000082 · 001001005035/)).toBeInTheDocument();
-  expect(screen.getByText("Mano de obra")).toBeInTheDocument();
+  expect(await screen.findByText("01-00000104")).toBeInTheDocument();
+  expect(rpc).toHaveBeenCalledWith("ventas_servicios_detalle_os_v2",expect.objectContaining({p_marca:null,p_tipo_maquina:null}));
+  expect(screen.getByText("Dueño A")).toBeInTheDocument();
+  expect(screen.queryByRole("button",{name:"01-00000104"})).not.toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"24491421"})).toBeInTheDocument();
  });
  it("muestra ambos códigos del repuesto sin abrir la factura",async()=>{
   setup("repuestos");
@@ -50,6 +49,8 @@ describe("Ventas por negocio",()=>{
  it("presenta clientes en lista y no inventa variaciones entre metodologías",async()=>{
   setup();
   fireEvent.click(screen.getByRole("button",{name:"Clientes"}));
+  expect(await screen.findByText("Dueño B")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("combobox",{name:"Agrupar clientes por"}),{target:{value:"cliente"}});
   const name=await screen.findByText("Ganadera El Fogón S.A.");
   const row=name.parentElement;
   expect(row).not.toBeNull();

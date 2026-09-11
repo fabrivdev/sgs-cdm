@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { useEffect, useMemo, useState } from "react";
+import { serviceSalesError } from "@/lib/serviceSalesError";
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/components/dashboard/utils";
 
@@ -13,13 +14,13 @@ type LineaAnalisis = {
   tipo_tiempo: string;
   componente: string;
   total_venta: number;
-  cantidad: number;
+  cantidad: number; propietario: string; marca: string; tipo_maquina: string;
 };
 
-type Dimension = "mes" | "sucursal" | "cliente" | "componente" | "tipo_tiempo";
+type Dimension = "mes" | "sucursal" | "cliente" | "componente" | "tipo_tiempo" | "propietario" | "marca" | "tipo_maquina";
 type Metric = "usd" | "facturas" | "cantidad";
 
-const DIMENSION_LABEL: Record<Dimension, string> = { mes: "Mes", sucursal: "Sucursal", cliente: "Cliente", componente: "Componente", tipo_tiempo: "Tipo de tiempo" };
+const DIMENSION_LABEL: Record<Dimension, string> = { mes: "Mes", sucursal: "Sucursal", cliente: "Cliente", componente: "Componente", propietario: "Propietario actual", marca: "Marca", tipo_maquina: "Tipo de máquina", tipo_tiempo: "Tipo de tiempo" };
 const usd = { format: (value: number) => money(value) };
 const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 
@@ -29,6 +30,7 @@ function dimensionValue(line: LineaAnalisis, dimension: Dimension) {
     const [year, month] = key.split("-");
     return { key, label: `${month}/${year}` };
   }
+  if (["propietario","marca","tipo_maquina"].includes(dimension)) { const value = String(line[dimension as "marca"] || "Sin identificar"); return { key: value, label: value }; }
   if (dimension === "sucursal") return { key: line.sucursal, label: line.sucursal };
   if (dimension === "cliente") return { key: line.cliente, label: line.cliente };
   if (dimension === "tipo_tiempo") return { key: line.tipo_tiempo, label: line.tipo_tiempo };
@@ -43,7 +45,7 @@ function formatMetric(value: number, metric: Metric) {
   return metric === "facturas" ? Math.round(value).toLocaleString("es-PY") : quantity.format(value);
 }
 
-export function ServiciosAnalisis({ desde, hasta, sucursal, buscar, tipoTiempo }: { desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string }) {
+export function ServiciosAnalisis({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: { desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string }) {
   const [lines, setLines] = useState<LineaAnalisis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,15 +58,15 @@ export function ServiciosAnalisis({ desde, hasta, sucursal, buscar, tipoTiempo }
     if (!desde || !hasta || desde > hasta) return;
     setLoading(true); setError(null);
     (supabase as any)
-      .rpc("ventas_servicios_lineas", { p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal, p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo })
+      .rpc("ventas_servicios_lineas_v2", { p_marca: marca || null, p_tipo_maquina: tipoMaquina || null, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal, p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo })
       .then(({ data, error: rpcError }: any) => {
         if (!alive) return;
-        if (rpcError) { setError(rpcError.message ?? "No se pudo cargar el análisis."); setLines([]); }
+        if (rpcError) { setError(serviceSalesError(rpcError)); setLines([]); }
         else setLines((data as LineaAnalisis[]) ?? []);
         setLoading(false);
       });
     return () => { alive = false; };
-  }, [desde, hasta, sucursal, tipoTiempo]);
+  }, [desde, hasta, sucursal, tipoTiempo, marca, tipoMaquina]);
 
   const filteredLines = useMemo(() => {
     const term = buscar.trim().toLowerCase();
@@ -94,7 +96,7 @@ export function ServiciosAnalisis({ desde, hasta, sucursal, buscar, tipoTiempo }
     };
   }, [filteredLines, rowDim, colDim, metric]);
 
-  const dimensionOptions: Dimension[] = ["mes", "sucursal", "cliente", "componente", "tipo_tiempo"];
+  const dimensionOptions: Dimension[] = ["mes", "sucursal", "cliente", "componente", "tipo_tiempo", "propietario", "marca", "tipo_maquina"];
 
   return (
     <div className="mt-3 space-y-3">

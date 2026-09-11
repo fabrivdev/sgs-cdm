@@ -14,6 +14,7 @@ import { ServiciosPanorama, type ServiciosSummary } from "@/components/ventas/Se
 import { ServiciosDetalleOS } from "@/components/ventas/ServiciosDetalleOS";
 import { ServiciosAnalisis } from "@/components/ventas/ServiciosAnalisis";
 import { ServiciosClientes } from "@/components/ventas/ServiciosClientes";
+import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
@@ -91,7 +92,7 @@ function Pager({ page, pages, total, onChange }: { page: number; pages: number; 
   return <div className="flex items-center justify-between border-t px-3 py-2 text-[10px] text-muted-foreground"><span>{total.toLocaleString("es-PY")} registros</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Anterior</button><span>{page} de {pages}</span><button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Siguiente</button></div></div>;
 }
 
-export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar, tipoTiempo }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string }) {
+export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string }) {
   const copy = AREA_COPY[area];
   const [view, setView] = useState<ExplorerView>("facturas");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -114,7 +115,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
   const clients = useMemo(() => [...(clientData?.clientes ?? [])].sort((a,b) => clientSort === "nombre" ? a.nombre.localeCompare(b.nombre) : Number(b[clientSort])-Number(a[clientSort])), [clientData,clientSort]);
   useEffect(() => { setClientPage(1); }, [area,buscar,desde,hasta,sucursal,clientSort]);
   useEffect(() => {
-    if(view !== "clientes") return;
+    if(area === "servicios" || view !== "clientes") return;
     let alive = true;
     setClientLoading(true); setClientError(null);
     void (supabase as any).rpc("ventas_clientes_comparacion", {
@@ -131,7 +132,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
   useEffect(() => { setDocumentPage(1); setAnalysisPage(1); }, [buscar, desde, hasta, sucursal]);
 
   useEffect(() => {
-    if (view !== "facturas") return;
+    if (area === "servicios" || view !== "facturas") return;
     let alive = true;
     setDocumentsLoading(true); setDocumentsError(null);
     void (supabase as any).rpc(area === "servicios" ? "ventas_servicios_os" : "ventas_area_documentos", {
@@ -147,7 +148,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
   }, [area, buscar, desde, documentPage, hasta, sucursal, view]);
 
   useEffect(() => {
-    if (view !== "analisis") return;
+    if (area === "servicios" || view !== "analisis") return;
     let alive = true;
     setAnalysisLoading(true); setAnalysisError(null);
     void (supabase as any).rpc("ventas_area_analisis_negocio", {
@@ -181,11 +182,11 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
 
       {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : area === "servicios" && view === "facturas" ? (
-        <ServiciosDetalleOS desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+        <ServiciosDetalleOS desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
       ) : area === "servicios" && view === "analisis" ? (
-        <ServiciosAnalisis desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+        <ServiciosAnalisis desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
       ) : area === "servicios" && view === "clientes" ? (
-        <ServiciosClientes desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+        <ServiciosClientes desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
       ) : view === "facturas" ? (
         <div className="mt-3">
           {documentsLoading ? <div className="py-12 text-center text-sm text-muted-foreground">Cargando…</div> : documentsError ? <div role="alert" className="py-8 text-destructive">{documentsError}</div> : !documents.documentos.length ? <div className="py-12 text-center text-sm text-muted-foreground">{copy.empty}</div> : (
@@ -271,19 +272,33 @@ export default function Ventas({ area }: { area: VentasArea }) {
   const [desde, setDesde] = useState(`${now.getFullYear()}-01-01`); const [hasta, setHasta] = useState(isoDate(now));
   const [sucursal, setSucursal] = useState("TODAS"); const [buscar, setBuscar] = useState("");
   const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
+  const [marca, setMarca] = useState("");
+  const [tipoMaquina, setTipoMaquina] = useState("");
+  const [machineOptions, setMachineOptions] = useState<{marca: string; tipo_maquina: string}[]>([]);
+  const [machineOptionsError, setMachineOptionsError] = useState("");
+  useEffect(() => {
+    if (area !== "servicios") return;
+    let alive = true;
+    setMachineOptionsError("");
+    (supabase as any).rpc("ventas_servicios_dimensiones").then(({data,error}: any) => {
+      if (alive) { setMachineOptions(Array.isArray(data) ? data : []); if (error) setMachineOptionsError(serviceSalesError(error)); }
+    });
+    return () => { alive = false; };
+  }, [area]);
   const [tipoTiempo, setTipoTiempo] = useState("TODOS");
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [serviciosSummary, setServiciosSummary] = useState<ServiciosSummary | null>(null);
   const [data, setData] = useState<SalesResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true); setError(null);
+    if (area === "servicios") { setData(null); setLoading(false); return; }
     if (!desde || !hasta || desde > hasta) { setError("Seleccioná un rango de fechas válido."); setData(null); setLoading(false); return; }
     const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_area_resumen", { p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal, p_buscar: buscar.trim() || null, p_limite: 500 });
     if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas."); setData(null); } else setData(response as SalesResponse);
     setLoading(false);
   }, [area, buscar, desde, hasta, sucursal]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo]);
+  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina]);
 
   const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);
   const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
@@ -316,27 +331,32 @@ export default function Ventas({ area }: { area: VentasArea }) {
     return { desde: selectedPeriod > desde ? selectedPeriod : desde, hasta: periodEndIso < hasta ? periodEndIso : hasta };
   }, [selectedPeriod, desde, hasta, periodMode]);
   const copy = AREA_COPY[area];
-  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS");
+  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number(Boolean(marca)) + Number(Boolean(tipoMaquina));
   
   const summary = area === "servicios" ? serviciosSummary : data;
   const summaryCount = area === "servicios" ? serviciosSummary?.ordenes : data?.facturas;
   return (
     <PageShell>
       <PageHeader title={copy.title} />
-      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); }} meta={summaryCount != null ? `${summaryCount.toLocaleString("es-PY")} ${area === "servicios" ? "OS" : "facturas"}` : undefined}>
+      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); }} meta={summaryCount != null ? `${summaryCount.toLocaleString("es-PY")} ${area === "servicios" ? "OS" : "facturas"}` : undefined}>
         <FilterCustom label="Período rápido" width="w-[190px]"><select value={activeDatePreset} onChange={(event) => applyDatePreset(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px]"><option value="">Personalizado</option>{datePresets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></FilterCustom>
         <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
         <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
         <FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} />
         {area === "servicios" && <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />}
+        {area === "servicios" && <>
+          <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} options={[{value:"TODAS",label:"Todas"}, ...[...new Set(machineOptions.map(m => m.marca))].sort().map(value=>({value,label:value}))]} />
+          <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} options={[{value:"TODOS",label:"Todos"}, ...[...new Set(machineOptions.map(m => m.tipo_maquina))].sort().map(value=>({value,label:value}))]} />
+        </>}
       </FiltersBar>
+      {area === "servicios" && machineOptionsError && <p role="alert" className="text-xs text-destructive">{machineOptionsError}</p>}
       {error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label="Clientes" value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(summary?.promedio ?? 0)} /></KpiStrip>
         
         {area === "servicios" && (
-          <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
+          <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
         )}
-        <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} />
+        <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
       </>}
     </PageShell>
   );

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { endOfDay, endOfISOWeek, endOfMonth, endOfYear } from "date-fns";
+import { serviceSalesError } from "@/lib/serviceSalesError";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
@@ -30,8 +31,8 @@ function periodLabel(iso: string, mode: PeriodMode) {
   return new Intl.DateTimeFormat("es-PY", { month: "short", year: "numeric" }).format(date);
 }
 
-export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, periodMode, selectedPeriod, onSelectPeriod, onSummary }: {
-  desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; periodMode: PeriodMode;
+export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", periodMode, selectedPeriod, onSelectPeriod, onSummary }: {
+  desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string; periodMode: PeriodMode;
   selectedPeriod: string | null; onSelectPeriod: (periodo: string | null) => void;
   onSummary?: (summary: ServiciosSummary | null) => void;
 }) {
@@ -44,17 +45,17 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     let alive = true;
     if (!desde || !hasta || desde > hasta) return;
     setLoading(true); setError(null); onSummary?.(null);
-    (supabase as any).rpc("ventas_servicios_panorama", {
-      p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
+    (supabase as any).rpc("ventas_servicios_panorama_v2", {
+      p_marca: marca || null, p_tipo_maquina: tipoMaquina || null, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
       p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo, p_agrupacion: periodMode, p_buscar: buscar.trim() || null,
     }).then(({ data: response, error: rpcError }: any) => {
       if (!alive) return;
-      if (rpcError) { setError(rpcError.message ?? "No se pudo cargar el panorama."); setData(null); onSummary?.(null); }
+      if (rpcError) { setError(serviceSalesError(rpcError)); setData(null); onSummary?.(null); }
       else { const next = response as PanoramaResponse; setData(next); onSummary?.(next.resumen); }
       setLoading(false);
     });
     return () => { alive = false; };
-  }, [buscar, desde, hasta, onSummary, periodMode, sucursal, tipoTiempo]);
+  }, [buscar, desde, hasta, onSummary, periodMode, sucursal, tipoTiempo, marca, tipoMaquina]);
 
   const rows = useMemo(() => (data?.periodos ?? []).map((row, index, all) => {
     const previous = index > 0 ? all[index - 1] : null;
