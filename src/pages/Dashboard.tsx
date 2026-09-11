@@ -88,6 +88,7 @@ import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/Ap
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { cuadrillaIds, resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
+import { LEGACY_IMPORT_CUTOFF } from "@/lib/imports/cutoff";
 
 const PAGE = 1000;
 const MAX_FACTURAS_RENDER = 350;
@@ -955,7 +956,12 @@ export default function Dashboard() {
               // Se excluye unicamente lo confirmado en guaranies.
               .or("moneda.neq.GS,moneda.is.null")
               .gte("fecha", dateKey(desde))
-              .lte("fecha", dateKey(hasta))
+              // La tabla legacy recibe, en cada importacion de facturacion del sistema
+              // nuevo, un resumen espejo de ese mismo periodo (ver newSystemPersist.ts) --
+              // sin este tope, julio en adelante se contaria dos veces sumado a
+              // cargarFacturacionDetallada (facturacion_lineas_importadas). Mismo criterio
+              // que ya usan las vistas de Ventas (ventas_area_movimientos_base).
+              .lte("fecha", dateKey(hasta) < LEGACY_IMPORT_CUTOFF ? dateKey(hasta) : LEGACY_IMPORT_CUTOFF)
               .order("fecha", { ascending: false });
 
           try {
