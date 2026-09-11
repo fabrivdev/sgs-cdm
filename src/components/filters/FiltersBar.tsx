@@ -81,6 +81,7 @@ export function FiltersBar({
   children?: ReactNode;
   activeCount?: number;
   onClear?: () => void;
+  /** @deprecated El contador/meta ya no se renderiza junto al botón Filtros. */
   meta?: ReactNode;
   actions?: ReactNode;
   expanded?: ReactNode;
@@ -149,7 +150,6 @@ export function FiltersBar({
           </Button>
         )}
       </div>
-      {meta && <div className="mt-1 text-right text-[10px] text-muted-foreground sm:hidden">{meta}</div>}
 
       {/* Desktop: una sola fila, sin wrap. Lo que no entra se oculta y queda en el panel. */}
       <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 sm:flex">
@@ -178,7 +178,6 @@ export function FiltersBar({
               </Button>
             </Field>
           )}
-          {meta && <div className="whitespace-nowrap pb-1 text-[10px] text-muted-foreground">{meta}</div>}
           {actions && <div className="flex items-end gap-2">{actions}</div>}
         </div>
       </div>
