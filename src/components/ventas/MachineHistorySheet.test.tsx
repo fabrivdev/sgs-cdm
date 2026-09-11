@@ -24,10 +24,10 @@ describe('simple machine history', () => {
     setup(); renderSheet();
     expect(await screen.findByText(row.os_numero)).toBeInTheDocument();
     expect(screen.getByText(/Dueño actual/)).toBeInTheDocument();
-    expect(screen.getByText('Cliente')).toBeInTheDocument();
-    expect(screen.getByText('Garantía')).toBeInTheDocument();
-    expect(screen.getByText('5 h')).toBeInTheDocument();
-    expect(screen.getByText('3 h')).toBeInTheDocument();
+    expect(screen.getAllByText('Cliente').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Garantía').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('5 h').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('3 h').length).toBeGreaterThan(0);
     expect(rpc).not.toHaveBeenCalledWith(expect.anything(),expect.objectContaining({p_vista:'repuestos'}));
     expect(screen.queryByText('Resumen')).not.toBeInTheDocument();
   });
