@@ -24,18 +24,24 @@ describe('simple machine history', () => {
     setup(); renderSheet();
     expect(await screen.findByText(row.os_numero)).toBeInTheDocument();
     expect(screen.getByText(/Dueño actual/)).toBeInTheDocument();
-    expect(screen.getAllByText('Cliente').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Garantía').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('5 h').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('3 h').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Cliente/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Garantía/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/5 h/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/3 h/).length > 0).toBe(true);
     expect(rpc).not.toHaveBeenCalledWith(expect.anything(),expect.objectContaining({p_vista:'repuestos'}));
     expect(screen.queryByText('Resumen')).not.toBeInTheDocument();
   });
-  it('unifies crew names and lists every participant once', async () => {
+  it('unifies crew names, normalizes estado and shows compact invoice and total', async () => {
     setup(); renderSheet();
     await screen.findByText(row.os_numero);
-    expect(screen.getAllByText('JUAN GOMEZ')).toHaveLength(1);
-    expect(screen.getByText('PEDRO RUIZ')).toBeInTheDocument();
+    const techCell = screen.getByText(/JUAN GOMEZ, PEDRO RUIZ/);
+    expect(techCell).toBeInTheDocument();
+    expect(screen.getByText('Cerrada')).toBeInTheDocument();
+    expect(screen.getByText(/0010001005021/)).toBeInTheDocument();
+    expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(screen.queryByText('Sin dato de facturación')).not.toBeInTheDocument();
+    // 100 + 50, nulls treated as missing values.
+    expect(screen.getByText(/150/)).toBeInTheDocument();
   });
   it('shows and searches individual manufacturer and part codes', async () => {
     setup(); renderSheet();
