@@ -1,34 +1,42 @@
-# Por qué no coinciden los números de Ventas de Servicios
+# Ajuste compacto de Ventas de Servicios
 
-Revisé los datos reales de agosto. Los dos problemas tienen causas distintas y ninguna es un error de suma.
+## Resultado
 
-## 1. Los 65.215 vs 67.155: son períodos distintos, no cálculos distintos
+Las vistas conservarán las cinco pestañas actuales, pero con tablas más compactas, sin textos explicativos redundantes y con las columnas alineadas al Excel de Postventa.
 
-- La tabla de arriba (Evolución) muestra **el mes de agosto**: 65.215,08.
-- El bloque Resumen muestra **todo el rango de fechas elegido**, que en ese momento llegaba hasta el 1 de septiembre. La facturación del 1 de septiembre fue de 1.939,79, y 65.215,08 + 1.939,79 = 67.154,87, exactamente el 67.155 que se ve.
+## Cambios
 
-Verifiqué además que Resumen, Clientes, Máquinas y Detalle dan todos 65.215,08 para agosto calendario, igual que el Excel. No hay filas duplicadas ni cifras infladas.
+### Facturación por período
+- Quitar la segunda línea de texto debajo de cada período.
+- Agregar dos columnas independientes:
+  - **Variación LM**: porcentaje contra el período inmediatamente anterior equivalente.
+  - **Variación LY**: porcentaje contra el mismo período del año anterior.
+- Mostrar `—` cuando la comparación no sea válida o no exista base comparable.
+- Mantener cada fila en una sola línea.
 
-**Qué hacer**
-- Agregar en Evolución una fila final "Total del período" con el total del rango completo, para que el número de arriba y el de abajo se puedan conciliar a simple vista.
-- Mostrar en el Resumen el rango exacto que está sumando (por ejemplo "01/08 al 01/09"), en vez de dejarlo implícito.
+### Resumen
+- Mantener el cuadro superior de totales.
+- Ajustar la tabla por tipo de tiempo a las columnas del Excel: **Tipo de tiempo, MO, Km, Repuestos, Terceros, Neto, OS asociadas, Horas OS, Participación**.
+- Mostrar la columna **Horas OS**, cuyo dato ya está disponible pero hoy no se presenta.
+- Agregar debajo una segunda tabla por **Marca + Tipo de tiempo** con las columnas del Excel: **Marca, Tipo, MO, Km, Repuestos, Terceros, Neto, Horas OS, Participación**.
+- Evitar subtítulos explicativos y encabezados redundantes.
 
-## 2. Las horas y la MO por técnico no coinciden con el Excel: son reglas distintas
+### Técnicos
+- Dejar exactamente las nueve columnas del Excel: **Técnico, Horas Cliente, Horas Garantía, Horas Interno, Total horas, MO Cliente asociada, MO Garantía asociada, MO Interno asociada, MO total asociada**.
+- Eliminar **Horas sin clasificar**, **MO sin clasificar**, **Participación MO** y el texto descriptivo superior.
+- Reducir ancho, altura de filas y espaciado para aprovechar mejor la pantalla, manteniendo nombres y valores en una sola línea.
 
-Comparé fila por fila el Excel de agosto contra la app:
+### Clientes
+- Mantener exactamente las columnas del Excel: **Cliente, OS, Facturas, Notas de crédito, MO, Km, Repuestos, Terceros, Neto, Participación**.
+- Quitar la columna adicional de comparación anual de esta vista.
+- Compactar selector, encabezado y filas, evitando quiebres de texto.
 
-- **MO por técnico.** El Excel le asigna a cada técnico la MO **completa** de cada OS en la que participó (por eso su total de MO es 52.615, casi el doble de la MO real de agosto, 29.769). La app la reparte en partes iguales entre los participantes, así que la suma cierra con la facturación. La app es la correcta; el Excel duplica.
-- **Terceros.** El Excel suma Terceros dentro de MO (por eso su columna Terceros da 0 y su MO da 29.768,65 contra 26.193,62 de la app). La diferencia es exactamente el monto de Terceros. La app los separa, que es lo pedido en las columnas nuevas.
-- **Técnicos que ya no están.** El Excel tiene una nota que dice que se eliminaron técnicos que ya no forman parte; por eso lista 17 y la app 22. Los que faltan en el Excel (Evaristo Daniel Molinas, Denis Benítez, Alfredo Acevedo, Alcides Valdez, Ricardo Villar) sí tienen jornadas cargadas en agosto.
-- **Horas.** El Excel totaliza 581,75 horas; la app 897 horas-persona; las horas de las OS son 438,5. Son tres medidas distintas: horas de la OS, horas-persona de todos los que participaron, y el recorte del Excel.
-
-**Qué hacer**
-- Mantener el reparto de MO en partes iguales (cierra con la facturación) y dejar la aclaración en el encabezado, como ya está.
-- Titular la columna de horas como **Horas-persona** y agregar arriba de la tabla una línea corta con el contraste: horas de las OS del período vs horas-persona cargadas.
-- Agregar un interruptor "Solo técnicos activos" (por defecto apagado) para poder reproducir el recorte del Excel sin ocultar datos reales.
-- Documentar en `docs/pendientes-postventa.md` que el Excel incluye Terceros dentro de MO y no reparte la MO entre participantes, para que no se lo tome como referencia exacta.
+### Orden de datos
+- En Resumen, Técnicos, Clientes y Máquinas, enviar siempre al final las filas **Sin identificar**, **Sin informar**, **Sin cliente**, **Sin técnico atribuido** o equivalentes, sin importar su importe u horas.
 
 ## Detalles técnicos
-
-- Cambios de UI únicamente en `ServiciosPanorama.tsx` (fila de total del período), `ServiciosResumen.tsx` (rango visible) y `ServiciosTecnicos.tsx` (rótulo de horas, línea de contraste, filtro de activos, cruzando con `servicios_listar_tecnicos_activos` que ya se consulta ahí).
-- No hacen falta migraciones: `ventas_servicios_indicadores_v1`, `ventas_servicios_panorama_v2`, `ventas_servicios_lineas_v2` y `ventas_servicios_detalle_os_v2` devuelven los mismos 65.215,08 para agosto.
+- Ampliar la consulta de indicadores para devolver el cruce **marca × tipo de tiempo**, incluyendo importes, horas y participación, sin alterar las reglas actuales de filtros.
+- Ampliar la consulta de períodos para calcular LM y LY con rangos equivalentes y respetar los cortes de metodología; no mostrar porcentajes engañosos cuando los períodos no sean comparables.
+- Actualizar los tipos locales y las tablas de Resumen, Técnicos, Clientes y Máquinas.
+- Añadir pruebas para LM/LY, horas por tipo, cruce marca/tipo y ordenamiento de filas no informadas.
+- Verificar visualmente las cinco vistas en escritorio y móvil, además del build y las pruebas afectadas.
