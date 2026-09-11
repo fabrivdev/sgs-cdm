@@ -29,6 +29,13 @@
       "when": 1789157180472,
       "tag": "0003_fix_ventas_servicios_tecnicos_tipo_tiempo",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789170866164,
+      "tag": "0004_service_sales_brand_time_summary",
+      "breakpoints": true
     }
   ]
 }
