@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- builder mínimo para simular consultas Supabase. */
 import {afterEach,describe,it,expect,vi} from "vitest";
-import {render,screen,fireEvent,cleanup,within} from "@testing-library/react";
+import {render,screen,fireEvent,cleanup} from "@testing-library/react";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {SalesExplorer} from "./Ventas";
 import {documentsFixture,clientsFixture} from "@/test/sales-fixtures";
@@ -50,16 +50,15 @@ describe("Ventas por negocio",()=>{
   expect(screen.getByRole("columnheader",{name:"Cód. repuesto"})).toBeInTheDocument();
   expect(screen.getByRole("columnheader",{name:"Cód. fabricante"})).toBeInTheDocument();
  });
- it("presenta clientes en lista y no inventa variaciones entre metodologías",async()=>{
+  it("presenta clientes con las columnas exactas del resumen",async()=>{
   setup();
   fireEvent.click(screen.getByRole("button",{name:"Clientes"}));
   expect(await screen.findByText("Dueño B")).toBeInTheDocument();
   fireEvent.change(screen.getByRole("combobox",{name:"Agrupar clientes por"}),{target:{value:"cliente"}});
-  const name=await screen.findByText("Ganadera El Fogón S.A.");
-  const row=name.parentElement;
-  expect(row).not.toBeNull();
-  expect(within(row!).getByText("—")).toBeInTheDocument();
-  expect(screen.getByTitle(/Período no comparable/)).toBeInTheDocument();
+   expect(await screen.findByText("Ganadera El Fogón S.A.")).toBeInTheDocument();
+   expect(screen.getByText("Notas de crédito")).toBeInTheDocument();
+   expect(screen.getByText("Participación")).toBeInTheDocument();
+   expect(screen.queryByText(/año ant/i)).not.toBeInTheDocument();
  });
 });
 

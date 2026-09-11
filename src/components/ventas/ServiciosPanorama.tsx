@@ -76,8 +76,10 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
   }, [buscar, desde, hasta, onSummary, periodMode, sucursal, tipoTiempo, marca, tipoMaquina]);
 
   const rows = useMemo(() => (data?.periodos ?? []).map((row, index, all) => {
-    const previous = index > 0 ? all[index - 1] : previousPeriod?.periodos.at(-1) ?? null;
-    const lastYear = previousYear?.periodos[index] ?? null;
+    const previousKey = shift(row.periodo, periodMode, 1);
+    const previous = index > 0 ? all[index - 1] : previousPeriod?.periodos.find((item) => item.periodo === previousKey) ?? null;
+    const lastYearKey = shift(row.periodo, "anio", 1);
+    const lastYear = previousYear?.periodos.find((item) => item.periodo === lastYearKey) ?? null;
     const complete = periodEnd(row.periodo, periodMode) < new Date();
     const variationLm = previous && complete && previous.metodologia === row.metodologia
       ? pct(row.total, previous.total)
