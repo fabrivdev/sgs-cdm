@@ -22,6 +22,13 @@
       "when": 1789156911469,
       "tag": "0002_ventas_servicios_lineas_nota_credito",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789157180472,
+      "tag": "0003_fix_ventas_servicios_tecnicos_tipo_tiempo",
+      "breakpoints": true
     }
   ]
 }
