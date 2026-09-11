@@ -22,7 +22,7 @@ describe('simple machine history', () => {
   it('shows and searches individual manufacturer and part codes', async () => {
     setup(); render(<MachineHistorySheet target={target} onOpenChange={()=>{}} />);
     await screen.findByText(row.os_numero);
-    fireEvent.click(screen.getByRole('button',{name:'Repuestos',exact:true}));
+    fireEvent.click(screen.getByRole('button',{name:'Repuestos'}));
     expect(await screen.findByText('FAB002')).toBeInTheDocument();
     expect(screen.getByText('REP001')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox',{name:'Buscar en historial'}),{target:{value:'FAB002'}});
@@ -31,7 +31,7 @@ describe('simple machine history', () => {
   it('does not show zero or historical coverage on parts failure', async () => {
     setup(true); render(<MachineHistorySheet target={target} onOpenChange={()=>{}} />);
     await screen.findByText(row.os_numero);
-    fireEvent.click(screen.getByRole('button',{name:'Repuestos',exact:true}));
+    fireEvent.click(screen.getByRole('button',{name:'Repuestos'}));
     expect(await screen.findByRole('alert')).toHaveTextContent('statement timeout');
     expect(screen.queryByText('Histórica')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Historial de OS'}));
