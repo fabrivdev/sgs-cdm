@@ -130,7 +130,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
     return () => { alive = false; };
   }, [area,buscar,desde,hasta,sucursal,view]);
 
-  useEffect(() => { setView("facturas"); setExpanded(null); setDocumentPage(1); setAnalysisPage(1); setPivotRows(copy.primaryValue); setPivotMetric("usd"); }, [area, copy.primaryValue]);
+  useEffect(() => { setView(area === "servicios" ? "resumen" : "facturas"); setExpanded(null); setDocumentPage(1); setAnalysisPage(1); setPivotRows(copy.primaryValue); setPivotMetric("usd"); }, [area, copy.primaryValue]);
   useEffect(() => { setDocumentPage(1); setAnalysisPage(1); }, [buscar, desde, hasta, sucursal]);
 
   useEffect(() => {
@@ -176,17 +176,24 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
   return (
     <Panel className="p-3">
       <div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-[13px] font-semibold">{area === "servicios" ? "Órdenes de servicio facturadas" : "Ventas"}</h2>
-        <div className="grid h-8 grid-cols-3 overflow-hidden rounded-md border text-[11px]">
-          {([['facturas', area === "servicios" ? 'Detalle' : 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
+        <h2 className="text-[13px] font-semibold">{area === "servicios" ? "Indicadores de postventa" : "Ventas"}</h2>
+        <div className={cn("grid h-8 overflow-hidden rounded-md border text-[11px]", area === "servicios" ? "grid-cols-5" : "grid-cols-3")}>
+          {(area === "servicios"
+            ? ([['resumen', 'Resumen'], ['tecnicos', 'Técnicos'], ['clientes', 'Clientes'], ['maquinas', 'Máquinas'], ['facturas', 'Detalle']] as const)
+            : ([['facturas', 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const)
+          ).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
         </div>
       </div>
 
       {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
-      : area === "servicios" && view === "facturas" ? (
+      : area === "servicios" && view === "resumen" ? (
+        <ServiciosResumen desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+      ) : area === "servicios" && view === "tecnicos" ? (
+        <ServiciosTecnicos desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+      ) : area === "servicios" && view === "maquinas" ? (
+        <ServiciosMaquinas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+      ) : area === "servicios" && view === "facturas" ? (
         <ServiciosDetalleOS desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
-      ) : area === "servicios" && view === "analisis" ? (
-        <ServiciosAnalisis desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
       ) : area === "servicios" && view === "clientes" ? (
         <ServiciosClientes desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
       ) : view === "facturas" ? (
