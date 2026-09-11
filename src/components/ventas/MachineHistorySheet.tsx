@@ -80,16 +80,20 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
       .finally(() => { if (alive) setPartsLoading(false); });
     return () => { alive = false; };
   }, [tab, chassis, loading]);
+  const { data: tecnicos } = useServicioTecnicos();
+  const profiles = useMemo<TechnicianProfileReference[]>(() => (tecnicos ?? []).map(t => ({ id: t.id, nombre: t.nombre })), [tecnicos]);
+  const crewByOs = useMemo(() => new Map(rows.map(row => [row.os_numero, crewNames(row, profiles)])), [rows, profiles]);
   const term = search.trim().toLowerCase();
   const inRange = (value: string | null) => (!from || (value ?? "") >= from) && (!to || (value ?? "").slice(0,10) <= to);
-  const filtered = rows.filter(row => inRange(row.fecha_abierta_os) && [row.os_numero,row.responsable].join(" ").toLowerCase().includes(term));
+  const matchesText = (row: Row) => [row.os_numero, ...(crewByOs.get(row.os_numero) ?? [])].join(" ").toLowerCase().includes(term);
+  const filtered = rows.filter(row => inRange(row.fecha_abierta_os) && matchesText(row));
   const participation = useMemo(() => {
     const result: Record<string, number> = { Cliente: 0, Garantia: 0, Interno: 0 };
-    for (const row of rows.filter(row => (!from || (row.fecha_abierta_os ?? "") >= from) && (!to || (row.fecha_abierta_os ?? "").slice(0,10) <= to) && [row.os_numero,row.responsable].join(" ").toLowerCase().includes(term))) {
+    for (const row of rows.filter(row => (!from || (row.fecha_abierta_os ?? "") >= from) && (!to || (row.fecha_abierta_os ?? "").slice(0,10) <= to) && [row.os_numero, ...(crewByOs.get(row.os_numero) ?? [])].join(" ").toLowerCase().includes(term))) {
       for (const [type,hours] of Object.entries(hoursByType(row))) result[type] = (result[type] ?? 0) + hours;
     }
     return result;
-  }, [rows,from,to,term]);
+  }, [rows,from,to,term,crewByOs]);
   const totalHours = Object.values(participation).reduce((a,b) => a+b,0);
   const visibleParts = parts.filter(part => inRange(part.fecha_factura) && [part.cod_mercaderia,part.codigo_fabricante,part.mercaderia,part.factura,part.raw_data?.linked_service_order].join(" ").toLowerCase().includes(term));
   const tableClass = "w-full text-xs [&_th]:p-2 [&_th]:font-medium [&_td]:p-2 [&_td]:align-top";
