@@ -177,8 +177,8 @@ function Toolbar({ search, onSearch, from, to, onFrom, onTo, type, onType, showS
   </div>;
 }
 
-function OrderCard({ row, lines, open, onToggle, partsOnly = false }: {
-  row: HistoryRow; lines: BillingLine[]; open: boolean; onToggle: () => void; partsOnly?: boolean;
+function OrderCard({ row, lines, open, onToggle, partsOnly = false, billingUnavailable = false }: {
+  row: HistoryRow; lines: BillingLine[]; open: boolean; onToggle: () => void; partsOnly?: boolean; billingUnavailable?: boolean;
 }) {
   const parts = lines.filter((line) => lineComponent(line) === "repuestos");
   const relevantLines = parts;
@@ -196,9 +196,9 @@ function OrderCard({ row, lines, open, onToggle, partsOnly = false }: {
           {serviceTypes(row).map((type) => <Badge key={type} variant="outline" className={cn("h-5 px-2 text-[9px]", typeTone(type))}>{type === 'Garantia' ? 'Garantía' : type}</Badge>)}
           <Badge variant="secondary" className="h-5 px-2 text-[9px]">{row.situacion_os || "Sin estado"}</Badge>
         </div>
-        <div className="mt-1 text-[10px] text-muted-foreground">
+        {billingUnavailable ? <p className="mt-1 text-[10px] text-destructive">Facturación no disponible: error de consulta</p> : <div className="mt-1 text-[10px] text-muted-foreground">
           {partsOnly ? `${parts.length ? `${integer.format(itemCount)} repuestos` : "Detalle no disponible"} · ${lines.length ? money(repuestos) : 'Sin dato de facturación'}` : `${decimal.format(Number(row.servicios_cantidad || 0))} h OS · ${decimal.format(Number(row.km_cantidad || 0))} km OS · ${lines.length ? `${money(total)} facturado vinculado` : 'Sin dato de facturación'}`}
-        </div>
+        </div>}
       </div>
       <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
     </button>
@@ -207,7 +207,7 @@ function OrderCard({ row, lines, open, onToggle, partsOnly = false }: {
         <div className="mb-3 text-[12px]">Propietario en la OS: <strong>{serviceOwner(row)}</strong></div>
         {row.problema && !row.raw_data?.productos_agregados && <div className="mb-3"><div className="text-[10px] font-medium text-muted-foreground">Descripción registrada</div><p className="mt-0.5 text-[12px] leading-5">{row.problema}</p></div>}
         <div className="mb-2 text-[11px] font-medium">Facturación vinculada (todas las fechas)</div>
-        {!lines.length && <p className="mb-3 text-[11px] text-muted-foreground">Sin dato de facturación. Esto no significa que la OS no haya sido facturada.</p>}
+        {!lines.length && <p className="mb-3 text-[11px] text-muted-foreground">{billingUnavailable ? 'No se pudo consultar la facturación. No se muestran importes parciales.' : 'Sin dato de facturación. Esto no significa que la OS no haya sido facturada.'}</p>}
         <Composition mo={mo} km={km} repuestos={repuestos} terceros={terceros} />
         {lines.length > 0 && <div className="mt-3 overflow-x-auto"><table className="w-full text-[11px]"><thead className="text-left text-muted-foreground"><tr><th>Tipo facturado</th><th>MO</th><th>Km</th><th>Repuestos</th><th>Terceros</th><th>Total</th></tr></thead><tbody>{Array.from(new Set(lines.map(line => line.tipo_tiempo || 'No informado'))).map(type => {
           const amounts = orderFinancials(lines.filter(line => (line.tipo_tiempo || 'No informado') === type));
@@ -223,7 +223,7 @@ function OrderCard({ row, lines, open, onToggle, partsOnly = false }: {
           <div><span className="text-muted-foreground">Facturas relacionadas</span><div className="mt-0.5 break-words font-mono font-medium">{invoices.length ? invoices.join(" · ") : row.factura || "—"}</div></div>
         </div>
       </>}
-      {(parts.length > 0 || Number(row.repuesto_valor || 0) !== 0) && (parts.length ? <div className="mt-4 overflow-x-auto rounded-md border">
+      {!billingUnavailable && (parts.length > 0 || Number(row.repuesto_valor || 0) !== 0) && (parts.length ? <div className="mt-4 overflow-x-auto rounded-md border">
         <table className="w-full min-w-[650px] text-[11px]">
           <thead className="bg-muted/50 text-left text-[10px] font-medium text-muted-foreground"><tr><th className="px-2.5 py-2">Cód. repuesto</th><th className="px-2.5 py-2">Cód. fabricante</th><th className="px-2.5 py-2">Repuesto</th><th className="px-2.5 py-2 text-right">Cant.</th><th className="px-2.5 py-2 text-right">Precio unit.</th><th className="px-2.5 py-2 text-right">Total</th></tr></thead>
           <tbody>{relevantLines.map((line) => <tr key={line.id} className="border-t"><td className="px-2.5 py-2 font-mono">{line.cod_mercaderia || "—"}</td><td className="px-2.5 py-2 font-mono">{line.codigo_fabricante || "—"}</td><td className="max-w-[230px] px-2.5 py-2">{line.mercaderia || line.observacion || "Sin descripción"}</td><td className="px-2.5 py-2 text-right tabular-nums">{decimal.format(Number(line.cantidad || 0))}</td><td className="px-2.5 py-2 text-right tabular-nums">{money(Number(line.valor_unitario || 0))}</td><td className="px-2.5 py-2 text-right font-semibold tabular-nums">{money(Number(line.total_venta || 0))}</td></tr>)}</tbody>
@@ -242,6 +242,8 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
   const [machine, setMachine] = useState<MachineMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [machineError, setMachineError] = useState<string | null>(null);
   const [tab, setTab] = useState<HistoryTab>(targetOs ? "servicios" : "resumen");
   const [expanded, setExpanded] = useState<string | null>(targetOs);
   const [search, setSearch] = useState("");
@@ -252,7 +254,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
   useEffect(() => {
     if (!targetChassis && !targetOs) return;
     let alive = true;
-    setLoading(true); setError(null); setRows([]); setLines([]); setMachine(null);
+    setLoading(true); setError(null); setBillingError(null); setMachineError(null); setRows([]); setLines([]); setMachine(null);
     setTab(targetOs ? "servicios" : "resumen"); setExpanded(targetOs); setSearch(""); setFrom(""); setTo(""); setType("TODOS");
     const osQuery = (supabase.from("ordenes_servicio_importadas" as any) as any)
       .select("os_numero,fecha_abierta_os,fecha_cierre_os,fecha_emision_factura,factura,tipo_tiempo,problema,servicios_cantidad,servicios_valor,km_cantidad,kilometro_valor,repuesto_valor,terceros_valor,situacion_os,situacion_facturacion,responsable,cliente_nombre,marca,raw_data")
@@ -260,14 +262,24 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
     const filteredOsQuery = targetOs ? osQuery.eq("os_numero", targetOs) : osQuery.ilike("nro_chasis", targetChassis);
     allPages(filteredOsQuery).then(async ({ data, error: osError }: { data: HistoryRow[] | null; error?: { message?: string } | null }) => {
       if (!alive) return;
-      if (osError) { setError(osError.message || "No se pudo cargar el historial."); setLoading(false); return; }
+      if (osError) { setError(`Consulta de órdenes de servicio: ${osError.message || 'Error de carga'}`); setLoading(false); return; }
       const nextRows = data ?? [];
       setRows(nextRows);
       const osNumbers = nextRows.map((row) => row.os_numero).filter(Boolean);
       const requests: PromiseLike<any>[] = [];
-      if (osNumbers.length) requests.push(allPages((supabase.from("facturacion_lineas_importadas" as any) as any)
-        .select("id,entidad_nombre,tipo_tiempo,factura,codigo_interno_factura,fecha_factura,grupo_normalizado,subgrupo_original,cod_mercaderia,codigo_fabricante,mercaderia,observacion,cantidad,valor_unitario,total_venta,raw_data")
-        .in("raw_data->>linked_service_order", osNumbers).order("id")));
+      if (osNumbers.length) requests.push((async () => {
+        const data: BillingLine[] = [];
+        // Bound URI size and sorting cost. Never display a partial financial sum.
+        const uniqueOs = [...new Set(osNumbers)];
+        for (let offset = 0; offset < uniqueOs.length; offset += 25) {
+          const result = await allPages((supabase.from("facturacion_lineas_importadas" as any) as any)
+            .select("id,entidad_nombre,tipo_tiempo,factura,codigo_interno_factura,fecha_factura,grupo_normalizado,subgrupo_original,cod_mercaderia,codigo_fabricante,mercaderia,observacion,cantidad,valor_unitario,total_venta,raw_data")
+            .in("raw_data->>linked_service_order", uniqueOs.slice(offset, offset + 25)).order("id"));
+          if (result.error) return result;
+          data.push(...(result.data ?? []));
+        }
+        return { data, error: null };
+      })());
       if (targetChassis) requests.push((supabase.from("parque_maquinas" as any) as any)
         .select("modelo_tipo,marca,marca_nombre,subgrupo,sucursal,clientes(nombre)")
         .ilike("serie", targetChassis).limit(1).maybeSingle());
@@ -275,12 +287,14 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
       if (!alive) return;
       const lineResult = osNumbers.length ? results[0] : null;
       const machineResult = targetChassis ? results[results.length - 1] : null;
-      if (lineResult?.error || machineResult?.error) {
-        setError(lineResult?.error?.message || machineResult?.error?.message || 'No se pudo consultar el detalle');
-        setLoading(false); return;
-      }
+      if (lineResult?.error) setBillingError(`Consulta de facturación vinculada: ${lineResult.error.message}`);
+      if (machineResult?.error) setMachineError(`Consulta del parque: ${machineResult.error.message}`);
       setLines((lineResult?.data as BillingLine[] | null) ?? []);
       setMachine((machineResult?.data as MachineMeta | null) ?? null);
+      setLoading(false);
+    }).catch((cause: unknown) => {
+      if (!alive) return;
+      setError(`No se pudo completar la carga del historial: ${cause instanceof Error ? cause.message : String(cause)}`);
       setLoading(false);
     });
     return () => { alive = false; };
@@ -307,7 +321,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
 
   const latest = filteredRows.map(rowDate).filter(Boolean).sort().at(-1) ?? null;
   const model = machine?.modelo_tipo || rawText(rows[0]?.raw_data, ["MODELO", "Modelo", "modelo"]) || machine?.subgrupo || "Máquina";
-  const client = targetOs ? (rows[0] ? serviceOwner(rows[0]) : 'Propietario no informado') : machine?.clientes?.nombre || 'Propietario actual no informado';
+  const client = loading ? 'Consultando propietario…' : error || (!targetOs && machineError) ? 'Propietario no disponible: error de consulta' : targetOs ? (rows[0] ? serviceOwner(rows[0]) : 'Propietario no informado') : machine?.clientes?.nombre || 'Propietario actual no informado';
   const title = target?.os ? `Detalle de la OS ${target.os}` : "Historial de la máquina";
 
   return <Sheet open={Boolean(target)} onOpenChange={onOpenChange}>
@@ -327,12 +341,13 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
             : error ? <div className="flex min-h-64 items-center justify-center text-[12px] text-destructive">{error}</div>
             : !rows.length ? <div className="flex min-h-64 items-center justify-center text-[12px] text-muted-foreground">No se encontraron órdenes de servicio para esta máquina.</div>
             : <>
+              {(billingError || machineError) && <div role="alert" className="mb-4 rounded-md border border-destructive/30 p-3 text-[12px] text-destructive">{billingError && <p>{billingError}. Los importes no están disponibles; las OS siguen visibles.</p>}{machineError && <p>{machineError}</p>}</div>}
               <TabsContent value="resumen" className="mt-0 space-y-4">
                 <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                   <Metric icon={<Wrench className="h-3.5 w-3.5" />} label="Órdenes de servicio" value={integer.format(filteredRows.length)} />
                   <Metric icon={<Clock3 className="h-3.5 w-3.5" />} label="Horas registradas" value={`${decimal.format(totals.hours)} h`} detail={`${decimal.format(totals.km)} km`} />
                   <Metric icon={<CalendarDays className="h-3.5 w-3.5" />} label="Última intervención" value={displayDate(latest)} />
-                  <Metric icon={<FileText className="h-3.5 w-3.5" />} label="Facturación vinculada" value={filteredRows.some(row => lines.some(line => lineOs(line) === row.os_numero)) ? money(totals.total) : '—'} detail="Solo documentos disponibles" />
+                  <Metric icon={<FileText className="h-3.5 w-3.5" />} label="Facturación vinculada" value={!billingError && filteredRows.some(row => lines.some(line => lineOs(line) === row.os_numero)) ? money(totals.total) : '—'} detail={billingError ? 'Error al consultar facturación' : 'Solo documentos disponibles'} />
                 </div>
                 <Toolbar search={search} onSearch={setSearch} from={from} to={to} onFrom={setFrom} onTo={setTo} type={type} onType={setType} showSearch={false} />
                 <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
@@ -342,12 +357,12 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
               </TabsContent>
               <TabsContent value="servicios" className="mt-0 space-y-3">
                 {!targetOs && <Toolbar search={search} onSearch={setSearch} from={from} to={to} onFrom={setFrom} onTo={setTo} type={type} onType={setType} />}
-                <div className="space-y-2">{filteredRows.map((row) => <OrderCard key={row.os_numero} row={row} lines={lines.filter((line) => lineOs(line) === row.os_numero)} open={expanded === row.os_numero} onToggle={() => setExpanded(expanded === row.os_numero ? null : row.os_numero)} />)}{!filteredRows.length && <div className="py-12 text-center text-[11px] text-muted-foreground">No hay servicios con estos filtros.</div>}</div>
+                <div className="space-y-2">{filteredRows.map((row) => <OrderCard billingUnavailable={Boolean(billingError)} key={row.os_numero} row={row} lines={lines.filter((line) => lineOs(line) === row.os_numero)} open={expanded === row.os_numero} onToggle={() => setExpanded(expanded === row.os_numero ? null : row.os_numero)} />)}{!filteredRows.length && <div className="py-12 text-center text-[11px] text-muted-foreground">No hay servicios con estos filtros.</div>}</div>
               </TabsContent>
               <TabsContent value="repuestos" className="mt-0 space-y-3">
                 <Toolbar search={search} onSearch={setSearch} from={from} to={to} onFrom={setFrom} onTo={setTo} type={type} onType={setType} />
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Metric icon={<Boxes className="h-3.5 w-3.5" />} label="Órdenes con repuestos" value={integer.format(totals.partsOrders)} /><Metric icon={<Package className="h-3.5 w-3.5" />} label="Líneas identificadas" value={integer.format(lines.filter((line) => lineComponent(line) === "repuestos").length)} /><Metric icon={<Users className="h-3.5 w-3.5" />} label="Cobertura" value={totals.detailedPartsOrders === totals.partsOrders ? "Detallada" : totals.detailedPartsOrders ? "Mixta" : "Histórica"} /></div>
-                <div className="space-y-2">{filteredRows.map((row) => <OrderCard key={row.os_numero} row={row} lines={lines.filter((line) => lineOs(line) === row.os_numero)} open={expanded === row.os_numero} onToggle={() => setExpanded(expanded === row.os_numero ? null : row.os_numero)} partsOnly />)}</div>
+                <div className="space-y-2">{filteredRows.map((row) => <OrderCard billingUnavailable={Boolean(billingError)} key={row.os_numero} row={row} lines={lines.filter((line) => lineOs(line) === row.os_numero)} open={expanded === row.os_numero} onToggle={() => setExpanded(expanded === row.os_numero ? null : row.os_numero)} partsOnly />)}</div>
               </TabsContent>
             </>}
         </div>
