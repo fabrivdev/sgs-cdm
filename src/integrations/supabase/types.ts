@@ -2566,6 +2566,51 @@ export type Database = {
           },
         ]
       }
+      ordenes_servicio_importadas_archivo: {
+        Row: {
+          archivado_en: string
+          archivado_por: string | null
+          id: string
+          importacion_reconciliadora_id: string | null
+          motivo: string
+          os_numero: string
+          registro: Json
+        }
+        Insert: {
+          archivado_en?: string
+          archivado_por?: string | null
+          id?: string
+          importacion_reconciliadora_id?: string | null
+          motivo: string
+          os_numero: string
+          registro: Json
+        }
+        Update: {
+          archivado_en?: string
+          archivado_por?: string | null
+          id?: string
+          importacion_reconciliadora_id?: string | null
+          motivo?: string
+          os_numero?: string
+          registro?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordenes_servicio_importadas_a_importacion_reconciliadora_i_fkey"
+            columns: ["importacion_reconciliadora_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordenes_servicio_importadas_archivo_archivado_por_fkey"
+            columns: ["archivado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parque_factura_os_cliente: {
         Row: {
           cliente_id: string
@@ -6273,6 +6318,15 @@ export type Database = {
         Args: { p_notificacion_id: string }
         Returns: undefined
       }
+      ordenes_servicio_reconciliar_snapshot: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_importacion_id: string
+          p_os_numeros: string[]
+        }
+        Returns: Json
+      }
       parque_actividad_os_chasis: {
         Args: never
         Returns: {
@@ -6745,11 +6799,39 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_servicios_detalle_os_v2: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_dimensiones: { Args: never; Returns: Json }
+      ventas_servicios_historial: {
+        Args: { p_chasis: string; p_vista?: string }
+        Returns: Json
+      }
       ventas_servicios_lineas: {
         Args: {
           p_desde: string
           p_hasta: string
           p_sucursal?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_lineas_v2: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
           p_tipo_tiempo?: string
         }
         Returns: Json
@@ -6773,6 +6855,19 @@ export type Database = {
           p_desde: string
           p_hasta: string
           p_sucursal?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_panorama_v2: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
           p_tipo_tiempo?: string
         }
         Returns: Json
