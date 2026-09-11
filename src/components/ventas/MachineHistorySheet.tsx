@@ -75,6 +75,17 @@ const dateFormatter = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 
+function dateKey(value: string | null | undefined) {
+  return value ? String(value).slice(0, 10) : "";
+}
+
+function displayDate(value: string | null | undefined, fallback = "—") {
+  const key = dateKey(value);
+  if (!key) return fallback;
+  const parsed = new Date(`${key}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? fallback : dateFormatter.format(parsed);
+}
+
 function rawText(raw: Record<string, unknown> | null | undefined, keys: string[]) {
   if (!raw) return null;
   for (const key of keys) {
@@ -173,7 +184,7 @@ function OrderCard({ row, lines, open, onToggle, partsOnly = false }: {
       <div className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="truncate font-mono text-[12px] font-semibold">OS {row.os_numero}</span>
-          <span className="text-[10px] text-muted-foreground">{when ? dateFormatter.format(new Date(`${when}T00:00:00`)) : "Fecha no informada"}</span>
+          <span className="text-[10px] text-muted-foreground">{displayDate(when, "Fecha no informada")}</span>
           <Badge variant="outline" className={cn("h-5 px-2 text-[9px]", typeTone(row.tipo_tiempo))}>{row.tipo_tiempo || "No informado"}</Badge>
           <Badge variant="secondary" className="h-5 px-2 text-[9px]">{row.situacion_os || "Sin estado"}</Badge>
         </div>
@@ -253,7 +264,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
   }, [targetChassis, targetOs]);
 
   const filteredRows = useMemo(() => rows.filter((row) => {
-    const date = rowDate(row) ?? "";
+    const date = dateKey(rowDate(row));
     const matchesDate = (!from || date >= from) && (!to || date <= to);
     const matchesType = type === "TODOS" || String(row.tipo_tiempo ?? "No informado").toLowerCase().startsWith(type.toLowerCase());
     const haystack = `${row.os_numero} ${row.factura ?? ""} ${row.problema ?? ""} ${row.responsable ?? ""}`.toLowerCase();
@@ -297,13 +308,13 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: DrawerTa
                 <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                   <Metric icon={<Wrench className="h-3.5 w-3.5" />} label="Órdenes de servicio" value={integer.format(filteredRows.length)} />
                   <Metric icon={<Clock3 className="h-3.5 w-3.5" />} label="Horas registradas" value={`${decimal.format(totals.hours)} h`} detail={`${decimal.format(totals.km)} km`} />
-                  <Metric icon={<CalendarDays className="h-3.5 w-3.5" />} label="Última intervención" value={latest ? dateFormatter.format(new Date(`${latest}T00:00:00`)) : "—"} />
+                  <Metric icon={<CalendarDays className="h-3.5 w-3.5" />} label="Última intervención" value={displayDate(latest)} />
                   <Metric icon={<FileText className="h-3.5 w-3.5" />} label="Facturación vinculada" value={money(totals.total)} />
                 </div>
                 <Toolbar search={search} onSearch={setSearch} from={from} to={to} onFrom={setFrom} onTo={setTo} type={type} onType={setType} showSearch={false} />
                 <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
                   <div className="rounded-md border p-3"><h3 className="text-[12px] font-semibold">Actividad por tipo</h3><div className="mt-3 space-y-2">{["Cliente", "Garantia", "Interno", "No informado"].map((name) => { const count = filteredRows.filter((row) => String(row.tipo_tiempo || "No informado").toLowerCase().startsWith(name.toLowerCase())).length; const share = filteredRows.length ? (count / filteredRows.length) * 100 : 0; return <div key={name} className="grid grid-cols-[85px_1fr_28px] items-center gap-2 text-[10px]"><span>{name === "Garantia" ? "Garantía" : name}</span><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${share}%` }} /></div><span className="text-right tabular-nums text-muted-foreground">{count}</span></div>; })}</div></div>
-                  <div className="rounded-md border p-3"><h3 className="text-[12px] font-semibold">Últimas intervenciones</h3><div className="mt-2 divide-y">{filteredRows.slice(0, 4).map((row) => <button key={row.os_numero} type="button" onClick={() => { setTab("servicios"); setExpanded(row.os_numero); }} className="grid w-full grid-cols-[1fr_auto] gap-3 py-2 text-left hover:text-primary"><div className="min-w-0"><div className="truncate font-mono text-[11px] font-semibold">OS {row.os_numero}</div><div className="truncate text-[10px] text-muted-foreground">{row.problema || "Sin descripción del trabajo"}</div></div><span className="text-[10px] text-muted-foreground">{rowDate(row) ? dateFormatter.format(new Date(`${rowDate(row)}T00:00:00`)) : "—"}</span></button>)}</div></div>
+                  <div className="rounded-md border p-3"><h3 className="text-[12px] font-semibold">Últimas intervenciones</h3><div className="mt-2 divide-y">{filteredRows.slice(0, 4).map((row) => <button key={row.os_numero} type="button" onClick={() => { setTab("servicios"); setExpanded(row.os_numero); }} className="grid w-full grid-cols-[1fr_auto] gap-3 py-2 text-left hover:text-primary"><div className="min-w-0"><div className="truncate font-mono text-[11px] font-semibold">OS {row.os_numero}</div><div className="truncate text-[10px] text-muted-foreground">{row.problema || "Sin descripción del trabajo"}</div></div><span className="text-[10px] text-muted-foreground">{displayDate(rowDate(row))}</span></button>)}</div></div>
                 </div>
               </TabsContent>
               <TabsContent value="servicios" className="mt-0 space-y-3">
