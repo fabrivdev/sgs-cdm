@@ -16,7 +16,24 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
 
   const { totales } = data;
   const porTipo = [...data.por_tipo].sort((a, b) => Number(unknown(a.tipo_tiempo)) - Number(unknown(b.tipo_tiempo)) || b.neto - a.neto);
-  const porMarcaTipo = [...(data.por_marca_tipo ?? [])].sort((a, b) => Number(unknown(`${a.marca} ${a.tipo_tiempo}`)) - Number(unknown(`${b.marca} ${b.tipo_tiempo}`)) || a.marca.localeCompare(b.marca, "es") || b.neto - a.neto);
+  const marcaRows = data.por_marca_tipo ?? [];
+  const marcaConocida = marcaRows.filter((row) => !unknown(row.marca));
+  const marcaDesconocida = marcaRows.filter((row) => unknown(row.marca));
+  const agregadoDesconocido = marcaDesconocida.length
+    ? [marcaDesconocida.reduce((acc, row) => ({
+        ...acc,
+        mo: acc.mo + row.mo,
+        km: acc.km + row.km,
+        repuestos: acc.repuestos + row.repuestos,
+        terceros: acc.terceros + row.terceros,
+        neto: acc.neto + row.neto,
+        horas: acc.horas + row.horas,
+      }), { ...marcaDesconocida[0], marca: "Sin identificar", tipo_tiempo: "—", mo: 0, km: 0, repuestos: 0, terceros: 0, neto: 0, horas: 0 })]
+    : [];
+  const porMarcaTipo = [
+    ...marcaConocida.sort((a, b) => a.marca.localeCompare(b.marca, "es") || b.neto - a.neto),
+    ...agregadoDesconocido,
+  ];
   const cards: Array<[string, string]> = [
     ["Neto", money(totales.neto)],
     ["Mano de obra", money(totales.mo)],
