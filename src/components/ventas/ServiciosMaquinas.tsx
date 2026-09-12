@@ -3,7 +3,7 @@ import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/v
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
-const COLUMNS = "grid-cols-[minmax(110px,1fr)_minmax(150px,1.2fr)_90px_70px_80px_repeat(5,minmax(100px,1fr))]";
+const COLUMNS = "grid-cols-[minmax(110px,1fr)_minmax(150px,1.2fr)_90px_70px_80px_minmax(130px,1fr)_minmax(130px,1fr)_repeat(3,minmax(110px,1fr))]";
 
 export function ServiciosMaquinas(props: IndicadoresFiltros) {
   const { data, loading, error } = useServiciosIndicadores(props);
@@ -19,7 +19,7 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
         <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Marca</div><div>Tipo de máquina</div>
           <div className="text-right">Máquinas</div><div className="text-right">OS</div><div className="text-right">Horas OS</div>
-          {["MO", "Km", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className="text-right">{label}</div>)}
+          {["Mano de Obra", "Kilometraje", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className="text-right">{label}</div>)}
         </div>
         {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay facturación por máquina en el período.</div>
           : rows.map((row) => (
