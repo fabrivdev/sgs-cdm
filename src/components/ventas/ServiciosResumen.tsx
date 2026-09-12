@@ -3,8 +3,8 @@ import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/v
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const typeLabel = (value: string) => (value === "Garantia" ? "Garantía" : value);
-const COLUMNS = "grid-cols-[minmax(135px,1fr)_repeat(5,minmax(100px,1fr))_85px_85px_75px]";
-const BRAND_COLUMNS = "grid-cols-[minmax(120px,1fr)_minmax(110px,1fr)_repeat(5,minmax(100px,1fr))_85px_75px]";
+const COLUMNS = "grid-cols-[minmax(120px,1fr)_minmax(110px,1fr)_repeat(5,minmax(110px,1fr))_90px_85px]";
+const MONEY_LABELS = ["Mano de obra", "Kilometraje", "Repuestos", "Terceros", "Neto"];
 const unknown = (value: string) => /(?:sin|no) (?:identificar|identificado|informar|informado|clasificar|clasificado)/i.test(value);
 
 export function ServiciosResumen(props: IndicadoresFiltros) {
