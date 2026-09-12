@@ -36,13 +36,13 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
   }, [desde, hasta, sucursal, buscar, tipoTiempo, marca, tipoMaquina]);
 
   const total = useMemo(() => rows.reduce((acc, row) => acc + Number(row.total || 0), 0), [rows]);
-  const columns = "grid-cols-[72px_115px_110px_minmax(180px,1fr)_90px_100px_40px_85px_75px_85px_75px_95px]";
+  const columns = "grid-cols-[72px_115px_110px_minmax(180px,1fr)_90px_100px_40px_minmax(110px,1fr)_minmax(110px,1fr)_100px_90px_110px]";
 
   return <>
     <div className="mt-3 overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><div className="min-w-[1380px]">
         <div className={`grid ${columns} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
-          <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div>{["MO","Km","Repuestos","Terceros"].map(label=><div key={label} className="text-right">{label}</div>)}<div className="text-right">Facturado</div>
+          <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div>{["Mano de Obra","Kilometraje","Repuestos","Terceros"].map(label=><div key={label} className="text-right">{label}</div>)}<div className="text-right">Facturado</div>
         </div>
         <div className="max-h-[480px] overflow-y-auto">
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
