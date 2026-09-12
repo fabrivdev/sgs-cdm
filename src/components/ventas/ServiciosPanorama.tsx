@@ -102,7 +102,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
         <div className={`grid ${PANORAMA_GRID} bg-muted/60 px-2 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Período</div>{["Facturado", "Mano de obra", "Kilometraje", "Repuestos", "Terceros", "Clientes", "Facturas", "Variación LM", "Variación LY", "Participación"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
         </div>
-        {rows.map((row) => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)} className={cn(`grid w-full ${PANORAMA_GRID} items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent`, row.periodo === selectedPeriod && "bg-primary/5 outline outline-1 outline-primary/20")}>
+        {rows.map((row) => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)} className={cn(`grid w-full ${PANORAMA_GRID} items-center border-t px-2 py-1.5 text-left text-[12px] hover:bg-accent`, row.periodo === selectedPeriod && "bg-primary/5 outline outline-1 outline-primary/20")}>
           <div className="truncate font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div>
           <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
           <div className="text-right tabular-nums text-muted-foreground">{money(row.mo)}</div>
