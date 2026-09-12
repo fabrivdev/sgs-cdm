@@ -15,7 +15,7 @@ type PeriodoPanorama = {
   facturas: number; clientes: number; metodologia: "historico" | "actual" | "mixto";
 };
 type PanoramaResponse = { desde: string; hasta: string; agrupacion: PeriodMode; resumen: ServiciosSummary; periodos: PeriodoPanorama[] };
-const PANORAMA_GRID = "grid-cols-[minmax(105px,1fr)_repeat(5,minmax(100px,1fr))_70px_70px_85px_85px_70px]";
+const PANORAMA_GRID = "grid-cols-[120px_105px_110px_110px_95px_85px_75px_75px_95px_95px_85px]";
 const iso = (date: Date) => format(date, "yyyy-MM-dd");
 const shift = (value: string, mode: PeriodMode, amount: number) => {
   const date = new Date(`${value}T00:00:00`);
