@@ -268,7 +268,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const [history, setHistory] = useState<{ chassis: string | null; os: string | null } | null>(null);
   return <>
     <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1240px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
-      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[115px]">Origen</th><th className="w-[105px]">Situación</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
+      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
       <tbody>{lines.map(line => <tr key={line.id} className="border-t">
         <td>{shortDate(line.fecha)}</td>
         <td className="truncate font-mono font-medium" title={line.factura}>{line.factura}</td>
