@@ -83,18 +83,16 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
 
   const rows = useMemo(() => (data?.periodos ?? []).map((row, index, all) => {
     const previousKey = shift(row.periodo, periodMode, 1);
-    const previous = index > 0 ? all[index - 1] : previousPeriod?.periodos.find((item) => item.periodo === previousKey) ?? null;
+    const partialPeriod = iso(periodEnd(row.periodo, periodMode)) > hasta;
+    const previous = partialPeriod
+      ? previousPeriod?.periodos.find((item) => item.periodo === previousKey) ?? null
+      : index > 0 ? all[index - 1] : previousPeriod?.periodos.find((item) => item.periodo === previousKey) ?? null;
     const lastYearKey = shift(row.periodo, "anio", 1);
     const lastYear = previousYear?.periodos.find((item) => item.periodo === lastYearKey) ?? null;
-    const complete = periodEnd(row.periodo, periodMode) < new Date();
-    const variationLm = previous && complete && previous.metodologia === row.metodologia
-      ? pct(row.total, previous.total)
-      : null;
-    const variationLy = lastYear && complete && lastYear.metodologia === row.metodologia
-      ? pct(row.total, lastYear.total)
-      : null;
-    return { ...row, variationLm, variationLy, complete };
-  }), [data, periodMode, previousPeriod, previousYear]);
+    const variationLm = previous ? pct(row.total, previous.total) : null;
+    const variationLy = lastYear ? pct(row.total, lastYear.total) : null;
+    return { ...row, variationLm, variationLy };
+  }), [data, hasta, periodMode, previousPeriod, previousYear]);
 
   return <Panel className="p-3">
     <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex w-full items-start justify-between gap-2 text-left">
