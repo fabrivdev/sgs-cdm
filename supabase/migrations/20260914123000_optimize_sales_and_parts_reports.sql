@@ -7,11 +7,14 @@ CREATE INDEX IF NOT EXISTS comisiones_jornadas_os_vigente_valida_idx
   ON public.comisiones_jornadas ((upper(btrim(os_numero))), tipo_tiempo)
   WHERE vigente AND estado_validacion IS DISTINCT FROM 'INVALIDA';
 CREATE INDEX IF NOT EXISTS facturacion_lineas_importadas_fecha_usd_idx
-  ON public.facturacion_lineas_importadas ((fecha_factura::date))
+  -- fecha_factura es timestamptz. Su conversión directa a date depende de la
+  -- zona horaria de la sesión y PostgreSQL la considera STABLE, no IMMUTABLE;
+  -- por eso no puede formar parte de la expresión de un índice.
+  ON public.facturacion_lineas_importadas (fecha_factura)
   WHERE fecha_factura IS NOT NULL
     AND upper(btrim(coalesce(moneda, 'USD'))) = 'USD';
 CREATE INDEX IF NOT EXISTS facturacion_fecha_usd_reportable_idx
-  ON public.facturacion ((fecha::date))
+  ON public.facturacion (fecha)
   WHERE NOT coalesce(excluido_de_reportes, false)
     AND upper(btrim(coalesce(moneda, 'USD'))) = 'USD';
 
