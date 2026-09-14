@@ -27,6 +27,8 @@ describe("Ventas de Máquinas", () => {
     expect(screen.getAllByText("Netas").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nueva").length).toBeGreaterThan(0);
     expect(screen.queryByText("Sin identificar")).not.toBeInTheDocument();
+    expect(screen.getByText("Marca")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Vendedores" }));
     expect(screen.getByText("CARLOS BENITEZ")).toBeInTheDocument();
   });
 

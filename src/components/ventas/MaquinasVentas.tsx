@@ -52,7 +52,7 @@ export type MaquinasDashboardResponse = {
   comparacion?: { desde: string; hasta: string; total: number; netas: number; vendidas: number; notas_credito_monto: number };
 };
 
-type ExplorerView = "resumen" | "clientes" | "maquinas" | "detalle";
+type ExplorerView = "resumen" | "vendedores" | "clientes" | "maquinas" | "detalle";
 type SummaryRow = MaquinasResumen & { key: string; marca?: string; tipo?: string; modelo?: string; condicion?: string };
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -61,6 +61,16 @@ const shortDate = (value: string) => value.slice(0, 10).split("-").reverse().joi
 const conditionLabel = (value: string | null | undefined) => {
   const normalized = String(value ?? "").trim().toUpperCase();
   return normalized === "USADA" ? "Usada" : "Nueva";
+};
+
+const brandLabel = (value: string | null | undefined) => {
+  const key = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  if (key.includes("CLAAS")) return "CLAAS";
+  if (key.includes("HORSCH")) return "HORSCH";
+  return "Otros";
 };
 
 const sellerLabel = (value: string | null | undefined) => {
@@ -183,25 +193,33 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 }
 
 
-function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
+const METRIC_HEADERS = ["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"];
+const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 
+function SummaryTable({ label, grid, minWidth, rows, share, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; empty: string }) {
+  return <div className="overflow-x-auto rounded-md border"><div className={minWidth}>
+    <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
+    {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+  </div></div>;
+}
+
+function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
+  const byBrand = useMemo(() => [...group(lines, line => brandLabel(line.marca))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => BRAND_ORDER.indexOf(a.key) - BRAND_ORDER.indexOf(b.key) || b.total - a.total), [lines]);
   const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
+  const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
+  const grid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  return <div className="mt-3 space-y-3">
+    <SummaryTable label="Marca" grid={grid} minWidth="min-w-[880px]" rows={byBrand} share={share} empty="Sin ventas en el período." />
+    <SummaryTable label="Condición" grid={grid} minWidth="min-w-[880px]" rows={byCondition} share={share} empty="Sin ventas en el período." />
+  </div>;
+}
+
+function SellersTable({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
   const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
-  const conditionGrid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
-  const sellerGrid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
-  return <div className="mt-3 space-y-3">
-    
-
-    <div className="overflow-x-auto rounded-md border"><div className="min-w-[880px]">
-      <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
-      {!byCondition.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin ventas en el período.</div> : byCondition.map(row => <div key={row.key} className={`grid ${conditionGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="font-medium">{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
-    </div></div>
-
-    <div className="overflow-x-auto rounded-md border"><div className="min-w-[960px]">
-      <div className={`grid ${sellerGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Vendedor</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
-      {!bySeller.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin vendedores identificados.</div> : bySeller.map(row => <div key={row.key} className={`grid ${sellerGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
-    </div></div>
+  const grid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  return <div className="mt-3">
+    <SummaryTable label="Vendedor" grid={grid} minWidth="min-w-[960px]" rows={bySeller} share={share} empty="Sin vendedores identificados." />
   </div>;
 }
 
@@ -272,12 +290,13 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   const [view, setView] = useState<ExplorerView>("resumen");
   const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta), [data, desde, hasta]);
   const summary = useMemo(() => summarize(lines), [lines]);
-  const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
+  const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">
-    <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-4 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
+    <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-5 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
       : view === "resumen" ? <SummaryView summary={summary} lines={lines} />
+      : view === "vendedores" ? <SellersTable summary={summary} lines={lines} />
       : view === "clientes" ? <ClientsTable lines={lines} />
       : view === "maquinas" ? <MachinesTable lines={lines} />
       : <DetailTable lines={lines} />}
