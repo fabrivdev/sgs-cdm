@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
 import { Panel } from "@/components/layout/AppPrimitives";
-import { Badge } from "@/components/ui/badge";
+
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
 import { cn } from "@/lib/utils";
 
