@@ -8,12 +8,9 @@
 alter table public.facturacion_lineas_importadas
   add column if not exists vendedor text;
 
-update public.facturacion_lineas_importadas f
-set vendedor = nullif(btrim(public.valor_json_insensible(
-  coalesce(f.raw_data, '{}'::jsonb),
-  array['VENDEDOR', 'NOMVEN', 'NOMBRE VENDEDOR', 'NOMVEND', 'VEND']
-)), '')
-where nullif(btrim(f.vendedor), '') is null;
+-- No se hace un UPDATE masivo para completar cargas anteriores: esta tabla
+-- tiene varios triggers operativos y reescribirla completa puede agotar el
+-- tiempo de ejecucion. La fuente consulta raw_data como respaldo, sin mutarlo.
 
 create or replace function public.ventas_maquinas_fuente_v2(
   p_desde date,
