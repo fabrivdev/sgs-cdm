@@ -856,6 +856,7 @@ export type Database = {
           codigo_fabricante: string | null
           codigo_interno_factura: string | null
           entidad_nombre: string
+          vendedor: string | null
           factura: string | null
           fecha_factura: string | null
           grupo_normalizado: string | null
@@ -886,6 +887,7 @@ export type Database = {
           codigo_fabricante?: string | null
           codigo_interno_factura?: string | null
           entidad_nombre: string
+          vendedor?: string | null
           factura?: string | null
           fecha_factura?: string | null
           grupo_normalizado?: string | null
@@ -916,6 +918,7 @@ export type Database = {
           codigo_fabricante?: string | null
           codigo_interno_factura?: string | null
           entidad_nombre?: string
+          vendedor?: string | null
           factura?: string | null
           fecha_factura?: string | null
           grupo_normalizado?: string | null

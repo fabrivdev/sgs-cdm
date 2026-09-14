@@ -163,6 +163,7 @@ export function mapFacturaVentasSheet(
       branch: normalizeXmlSucursal(firstValue(row, ["FILIAL", "LOJA"])),
       clientCode: text(row, ["CLIENTE"]),
       clientName: text(row, ["NOMBRE"]) || "Sin cliente",
+      seller: text(row, ["VENDEDOR", "NOMVEN", "NOMBRE VENDEDOR", "NOMVEND"]) || null,
       invoiceLongNumber,
       invoiceShortNumber,
       documentNumber,

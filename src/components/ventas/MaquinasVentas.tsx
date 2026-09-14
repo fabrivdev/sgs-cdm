@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
 import { Panel } from "@/components/layout/AppPrimitives";
@@ -21,14 +20,8 @@ export type MaquinaVentaLinea = {
   tipo_maquina: string;
   modelo: string;
   chasis: string | null;
-  propietario: string;
-  operacion_id: string | null;
-  np_numero: string | null;
-  np_fecha: string | null;
-  np_cliente: string | null;
   comercial: string | null;
   condicion: string | null;
-  vinculo_np: "FACTURA_Y_CHASIS" | "CHASIS" | "PEDIDO_HISTORICO" | null;
   metodologia: "historico" | "actual";
   origen?: "Sistema anterior" | "Sistema actual";
   cod_mercaderia?: string | null;
@@ -43,28 +36,32 @@ export type MaquinasResumen = {
   notas_credito: number;
   netas: number;
   promedio_unidad: number;
-  con_np: number;
-  sin_np: number;
   venta_bruta?: number;
   notas_credito_monto?: number;
+  nuevas?: number;
+  usadas?: number;
 };
 
 export type MaquinasDashboardResponse = {
   resumen: MaquinasResumen;
   periodos: Array<MaquinasResumen & { periodo: string }>;
-  por_maquina: Array<MaquinasResumen & { marca: string; tipo_maquina: string }>;
-  por_modelo: Array<MaquinasResumen & { marca: string; tipo_maquina: string; modelo: string }>;
+  por_maquina: Array<MaquinasResumen & { marca: string; tipo_maquina: string; condicion?: string }>;
+  por_modelo: Array<MaquinasResumen & { marca: string; tipo_maquina: string; modelo: string; condicion?: string }>;
   lineas: MaquinaVentaLinea[];
   dimensiones: { marcas: string[]; tipos: string[] };
   comparacion?: { desde: string; hasta: string; total: number; netas: number; vendidas: number; notas_credito_monto: number };
 };
 
 type ExplorerView = "resumen" | "clientes" | "maquinas" | "detalle";
-type SummaryRow = MaquinasResumen & { key: string; marca?: string; tipo?: string; modelo?: string };
+type SummaryRow = MaquinasResumen & { key: string; marca?: string; tipo?: string; modelo?: string; condicion?: string };
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const shortDate = (value: string) => value.slice(0, 10).split("-").reverse().join("/");
+const conditionLabel = (value: string | null | undefined) => {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  return normalized === "NUEVA" ? "Nueva" : normalized === "USADA" ? "Usada" : "Sin identificar";
+};
 
 function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
   const facturas = new Set<string>();
@@ -73,22 +70,22 @@ function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
   let vendidas = 0;
   let notasCredito = 0;
   let netas = 0;
-  let conNp = 0;
-  let sinNp = 0;
   let gross = 0;
   let creditAmount = 0;
+  let newUnits = 0;
+  let usedUnits = 0;
   for (const line of lines) {
     const units = Number(line.unidades || 0);
     total += Number(line.facturado || 0);
     if (Number(line.facturado || 0) > 0) gross += Number(line.facturado || 0);
     if (Number(line.facturado || 0) < 0) creditAmount += Math.abs(Number(line.facturado || 0));
     if (units > 0) vendidas += units;
+    if (units > 0 && conditionLabel(line.condicion) === "Nueva") newUnits += units;
+    if (units > 0 && conditionLabel(line.condicion) === "Usada") usedUnits += units;
     if (units < 0) notasCredito += Math.abs(units);
     netas += units;
     facturas.add(line.factura);
     clientes.add(line.cliente_facturado);
-    if (line.np_numero) conNp += 1;
-    else sinNp += 1;
   }
   return {
     total,
@@ -98,10 +95,10 @@ function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
     notas_credito: notasCredito,
     netas,
     promedio_unidad: netas ? total / netas : 0,
-    con_np: conNp,
-    sin_np: sinNp,
     venta_bruta: gross,
     notas_credito_monto: creditAmount,
+    nuevas: newUnits,
+    usadas: usedUnits,
   };
 }
 
@@ -134,7 +131,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const total = Number(data?.resumen.total || 0);
-  const grid = "grid-cols-[minmax(120px,1.2fr)_minmax(115px,1fr)_repeat(3,minmax(90px,.8fr))_repeat(2,minmax(80px,.75fr))_repeat(2,minmax(90px,.8fr))]";
+  const grid = "grid-cols-[minmax(120px,1.2fr)_minmax(115px,1fr)_repeat(4,minmax(82px,.75fr))_repeat(2,minmax(80px,.7fr))_minmax(90px,.8fr)]";
   return <Panel className="p-3">
     <button type="button" onClick={() => setCollapsed(value => !value)} className="flex w-full items-start justify-between gap-2 text-left">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
@@ -149,17 +146,17 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
       : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1040px]">
         <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Período</div>
-          {['Facturado', 'Vendidas', 'Notas de crédito', 'Unidades netas', 'Clientes', 'Facturas', 'Con NP', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
+          {['Facturado', 'Nuevas', 'Usadas', 'Notas de crédito', 'Unidades netas', 'Clientes', 'Facturas', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
         </div>
         {data.periodos.map(row => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(selectedPeriod === row.periodo ? null : row.periodo)} className={cn(`grid w-full ${grid} items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent`, selectedPeriod === row.periodo && "bg-primary/5 outline outline-1 outline-primary/20")}>
           <div className="truncate font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div>
           <div className="text-right font-semibold tabular-nums">{money(Number(row.total))}</div>
-          <div className="text-right tabular-nums">{decimal.format(Number(row.vendidas))}</div>
+          <div className="text-right tabular-nums">{decimal.format(Number(row.nuevas ?? 0))}</div>
+          <div className="text-right tabular-nums">{decimal.format(Number(row.usadas ?? 0))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{decimal.format(Number(row.notas_credito))}</div>
           <div className="text-right font-medium tabular-nums">{decimal.format(Number(row.netas))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{integer.format(Number(row.clientes))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{integer.format(Number(row.facturas))}</div>
-          <div className="text-right tabular-nums text-muted-foreground">{integer.format(Number(row.con_np))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(Number(row.total) / total * 100)}%` : "—"}</div>
         </button>)}
       </div></div>)}
@@ -176,72 +173,71 @@ function deltaLabel(current: number, previous: number) {
   return value == null ? "Sin base comparable" : `${value >= 0 ? "+" : ""}${decimal.format(value)}%`;
 }
 
-function MixList({ title, rows, total }: { title: string; rows: Array<{ key: string; amount: number; units: number }>; total: number }) {
-  const maximum = Math.max(0, ...rows.map(row => Math.max(0, row.amount)));
-  return <section className="rounded-md border p-3">
-    <h3 className="text-[11px] font-semibold">{title}</h3>
-    <div className="mt-2 space-y-2.5">
-      {rows.slice(0, 6).map(row => {
-        const share = total ? row.amount / total * 100 : 0;
-        return <div key={row.key}>
-          <div className="flex items-baseline justify-between gap-3 text-[10px]"><span className="truncate font-medium" title={row.key}>{row.key}</span><span className="shrink-0 tabular-nums"><strong>{money(row.amount)}</strong> · {decimal.format(row.units)} un. · {decimal.format(share)}%</span></div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${maximum ? Math.max(0, row.amount) / maximum * 100 : 0}%` }} /></div>
-        </div>;
-      })}
-      {!rows.length && <div className="py-5 text-center text-[10px] text-muted-foreground">Sin datos en el período.</div>}
-    </div>
-  </section>;
-}
-
 function SummaryView({ summary, lines, comparison }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[]; comparison: MaquinasDashboardResponse["comparacion"] | null }) {
-  const coverage = summary.con_np + summary.sin_np ? summary.con_np / (summary.con_np + summary.sin_np) * 100 : 0;
-  const brands = useMemo(() => [...group(lines, line => line.marca)].map(([key, values]) => ({ key, amount: summarize(values).total, units: summarize(values).netas })).sort((a, b) => b.amount - a.amount), [lines]);
-  const types = useMemo(() => [...group(lines, line => line.tipo_maquina)].map(([key, values]) => ({ key, amount: summarize(values).total, units: summarize(values).netas })).sort((a, b) => b.amount - a.amount), [lines]);
-  const clients = useMemo(() => [...group(lines, line => line.cliente_facturado)].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
-  const historical = lines.filter(line => line.metodologia === "historico").reduce((sum, line) => sum + Number(line.facturado || 0), 0);
-  const current = summary.total - historical;
+  const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin identificar") - Number(b.key === "Sin identificar") || b.total - a.total), [lines]);
+  const byMachine = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${conditionLabel(line.condicion)}`)].map(([key, values]) => {
+    const [marca, tipo, condicion] = key.split("__");
+    return { key, marca, tipo, condicion, ...summarize(values) };
+  }).sort((a, b) => a.marca.localeCompare(b.marca, "es") || a.tipo.localeCompare(b.tipo, "es") || a.condicion.localeCompare(b.condicion, "es")), [lines]);
+  const bySeller = useMemo(() => [...group(lines, line => line.comercial || "Sin vendedor")].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
+  const cards: Array<[string, string]> = [
+    ["Neto", money(summary.total)],
+    ["Venta bruta", money(Number(summary.venta_bruta ?? 0))],
+    ["Notas de crédito", `-${money(Number(summary.notas_credito_monto ?? 0))}`],
+    ["Nuevas vendidas", decimal.format(Number(summary.nuevas ?? 0))],
+    ["Usadas vendidas", decimal.format(Number(summary.usadas ?? 0))],
+    ["Unidades netas", decimal.format(summary.netas)],
+    ["Clientes", integer.format(summary.clientes)],
+    ["Documentos", integer.format(summary.facturas)],
+  ];
+  const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
+  const conditionGrid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  const machineGrid = "grid-cols-[minmax(100px,.8fr)_minmax(180px,1.35fr)_minmax(100px,.8fr)_repeat(5,minmax(80px,.7fr))_minmax(125px,1fr)_85px]";
+  const sellerGrid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
   return <div className="mt-3 space-y-3">
-    <section className="overflow-hidden rounded-md border">
-      <div className="border-b bg-muted/40 px-3 py-2"><h3 className="text-[11px] font-semibold">Cómo se forma la venta del período</h3></div>
-      <div className="grid divide-y md:grid-cols-3 md:divide-x md:divide-y-0">
-        <div className="p-3"><div className="text-[10px] text-muted-foreground">Ventas emitidas</div><div className="mt-1 text-[18px] font-semibold tabular-nums">{money(Number(summary.venta_bruta ?? 0))}</div><div className="mt-1 text-[10px] text-muted-foreground">{decimal.format(summary.vendidas)} unidades vendidas</div></div>
-        <div className="p-3"><div className="text-[10px] text-muted-foreground">Notas de crédito</div><div className="mt-1 text-[18px] font-semibold tabular-nums text-amber-700">-{money(Number(summary.notas_credito_monto ?? 0))}</div><div className="mt-1 text-[10px] text-muted-foreground">{decimal.format(summary.notas_credito)} unidades revertidas</div></div>
-        <div className="p-3"><div className="text-[10px] text-muted-foreground">Facturación neta</div><div className="mt-1 text-[18px] font-semibold tabular-nums">{money(summary.total)}</div><div className="mt-1 text-[10px] text-muted-foreground">{decimal.format(summary.netas)} unidades netas · {integer.format(summary.facturas)} facturas</div></div>
-      </div>
-      {comparison && <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-[10px]"><span className="text-muted-foreground">Contra {shortDate(comparison.desde)}–{shortDate(comparison.hasta)}</span><span><strong>{deltaLabel(summary.total, Number(comparison.total))}</strong> en facturación · <strong>{deltaLabel(summary.netas, Number(comparison.netas))}</strong> en unidades netas</span></div>}
-    </section>
-    <div className="grid gap-3 lg:grid-cols-2">
-      <MixList title="Facturación por marca" rows={brands} total={summary.total} />
-      <MixList title="Mix por tipo de máquina" rows={types} total={summary.total} />
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+      {cards.map(([label, value]) => <div key={label} className="rounded-md border px-3 py-2"><p className="truncate text-[10px] font-medium text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-[13px] font-semibold tabular-nums">{value}</p></div>)}
     </div>
-    <section className="grid overflow-hidden rounded-md border md:grid-cols-3 md:divide-x">
-      <div className="p-3"><div className="text-[10px] text-muted-foreground">Principal cliente facturado</div><div className="mt-1 truncate text-[12px] font-semibold" title={clients[0]?.key}>{clients[0]?.key ?? "—"}</div><div className="mt-1 text-[10px] tabular-nums text-muted-foreground">{clients[0] ? `${money(clients[0].total)} · ${summary.total ? decimal.format(clients[0].total / summary.total * 100) : 0}% del neto` : "Sin ventas"}</div></div>
-      <div className="p-3"><div className="flex items-center justify-between gap-2 text-[10px]"><span className="text-muted-foreground">Trazabilidad con nota de pedido</span><strong>{decimal.format(coverage)}%</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${coverage}%` }} /></div><div className="mt-1 text-[10px] text-muted-foreground">{summary.con_np} máquinas con pedido · {summary.sin_np} sin vínculo</div></div>
-      <div className="p-3"><div className="text-[10px] text-muted-foreground">Origen de la facturación</div><div className="mt-1 text-[11px]"><span className="font-semibold">{money(historical)}</span> sistema anterior</div><div className="mt-1 text-[11px]"><span className="font-semibold">{money(current)}</span> sistema actual</div></div>
-    </section>
+    {comparison && <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-[10px]"><span className="text-muted-foreground">Comparación con {shortDate(comparison.desde)}–{shortDate(comparison.hasta)}</span><span><strong>{deltaLabel(summary.total, Number(comparison.total))}</strong> en facturación · <strong>{deltaLabel(summary.netas, Number(comparison.netas))}</strong> en unidades netas</span></div>}
+
+    <div className="overflow-x-auto rounded-md border"><div className="min-w-[880px]">
+      <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "NC", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="text-right">{label}</div>)}</div>
+      {!byCondition.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin ventas en el período.</div> : byCondition.map(row => <div key={row.key} className={`grid ${conditionGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="font-medium">{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+    </div></div>
+
+    <div className="overflow-x-auto rounded-md border"><div className="min-w-[1120px]">
+      <div className={`grid ${machineGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Marca</div><div>Tipo de máquina</div><div>Condición</div>{["Vendidas", "NC", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="text-right">{label}</div>)}</div>
+      {!byMachine.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin datos por máquina.</div> : byMachine.map(row => <div key={row.key} className={`grid ${machineGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium">{row.marca}</div><div className="truncate">{row.tipo}</div><div>{row.condicion}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+    </div></div>
+
+    <div className="overflow-x-auto rounded-md border"><div className="min-w-[960px]">
+      <div className={`grid ${sellerGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Vendedor</div>{["Vendidas", "NC", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="text-right">{label}</div>)}</div>
+      {!bySeller.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin vendedores identificados.</div> : bySeller.map(row => <div key={row.key} className={`grid ${sellerGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+    </div></div>
   </div>;
 }
 
 function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const total = lines.reduce((sum, line) => sum + Number(line.facturado || 0), 0);
-  const rows = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}`)].map(([key, values]) => {
-    const [marca, tipo] = key.split("__");
-    return { key, marca, tipo, ...summarize(values) };
+  const rows = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${conditionLabel(line.condicion)}`)].map(([key, values]) => {
+    const [marca, tipo, condicion] = key.split("__");
+    return { key, marca, tipo, condicion, ...summarize(values) };
   }).sort((a, b) => b.total - a.total), [lines]);
-  const modelRows = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${line.modelo}`)].map(([key, values]) => {
-    const [marca, tipo, ...model] = key.split("__");
-    return { key, marca, tipo, modelo: model.join("__"), ...summarize(values) };
+  const modelRows = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${conditionLabel(line.condicion)}__${line.modelo}`)].map(([key, values]) => {
+    const [marca, tipo, condicion, ...model] = key.split("__");
+    return { key, marca, tipo, condicion, modelo: model.join("__"), ...summarize(values) };
   }), [lines]);
-  const grid = "grid-cols-[34px_minmax(110px,1fr)_minmax(180px,1.4fr)_repeat(5,minmax(78px,.72fr))_minmax(115px,1fr)_minmax(110px,.9fr)_80px]";
+  const grid = "grid-cols-[34px_minmax(100px,.9fr)_minmax(170px,1.35fr)_minmax(90px,.7fr)_repeat(5,minmax(76px,.68fr))_minmax(115px,1fr)_minmax(110px,.9fr)_80px]";
   return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1160px]">
-    <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Vendidas', 'NC', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={label === 'Marca' || label === 'Tipo de máquina' ? '' : 'text-right'}>{label}</div>)}</div>
+    <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'NC', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={label === 'Marca' || label === 'Tipo de máquina' || label === 'Condición' ? '' : 'text-right'}>{label}</div>)}</div>
     {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
       const open = expanded === row.key;
-      const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo).sort((a, b) => b.total - a.total);
+      const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
       const cells = (item: SummaryRow, model = false) => <>
         <div className={cn("truncate", !model && "font-medium")}>{model ? item.modelo : item.marca}</div>
         <div className="truncate" title={model ? item.modelo : item.tipo}>{model ? "Modelo" : item.tipo}</div>
+        <div>{item.condicion}</div>
         <div className="text-right tabular-nums">{decimal.format(item.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(item.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(item.netas)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(item.clientes)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(item.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(item.total)}</div><div className="text-right tabular-nums text-muted-foreground">{item.netas ? money(item.total / item.netas) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(item.total / total * 100)}%` : "—"}</div>
       </>;
       return <div key={row.key}>
@@ -253,33 +249,28 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 }
 
 function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
-  const [perspective, setPerspective] = useState<"facturado" | "np">("facturado");
-  const rows = useMemo(() => [...group(lines, line => perspective === "facturado" ? line.cliente_facturado : (line.np_cliente || "Sin cliente de NP"))].map(([cliente, values]) => ({ cliente, ultima: values.reduce((max, line) => line.fecha > max ? line.fecha : max, ""), ...summarize(values) })).sort((a, b) => Number(a.cliente.startsWith("Sin ")) - Number(b.cliente.startsWith("Sin ")) || b.total - a.total), [lines, perspective]);
+  const rows = useMemo(() => [...group(lines, line => line.cliente_facturado)].map(([cliente, values]) => ({ cliente, ultima: values.reduce((max, line) => line.fecha > max ? line.fecha : max, ""), ...summarize(values) })).sort((a, b) => Number(a.cliente.startsWith("Sin ")) - Number(b.cliente.startsWith("Sin ")) || b.total - a.total), [lines]);
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   const grid = "grid-cols-[minmax(240px,1.7fr)_repeat(5,minmax(85px,.75fr))_minmax(120px,1fr)_90px_85px]";
-  return <div className="mt-3 space-y-2">
-    <label className="flex items-center gap-2 text-[11px]">Agrupar por <select aria-label="Agrupar clientes de máquinas por" value={perspective} onChange={event => setPerspective(event.target.value as "facturado" | "np")} className="h-8 rounded-md border bg-background px-2 text-[11px]"><option value="facturado">Clientes facturados</option><option value="np">Clientes de la NP</option></select></label>
-    <div className="overflow-x-auto rounded-md border"><div className="min-w-[1050px]">
+  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1050px]">
       <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Cliente</div>{['Vendidas', 'NC', 'Netas', 'Facturas', 'Última venta', 'Promedio / unidad neta', 'Facturación', 'Participación neta'].map(label => <div key={label} className="text-right">{label}</div>)}</div>
       {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : rows.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="text-right tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
-    </div></div>
-  </div>;
+  </div></div>;
 }
 
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const [history, setHistory] = useState<{ chassis: string | null; os: string | null } | null>(null);
   return <>
-    <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1420px] text-[11px] [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2.5 [&_th]:font-medium [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">
-      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th>Fecha</th><th>Factura</th><th>NP</th><th className="w-[260px]">Cliente</th><th>Marca / tipo</th><th>Modelo</th><th>Chasis</th><th>Condición</th><th>Comercial</th><th>Situación</th><th className="text-right">Facturado</th></tr></thead>
+    <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1240px] text-[11px] [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2.5 [&_th]:font-medium [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">
+      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th>Fecha</th><th>Factura</th><th className="w-[260px]">Cliente</th><th>Marca / tipo</th><th>Modelo</th><th>Chasis</th><th>Condición</th><th>Vendedor</th><th>Situación</th><th className="text-right">Facturado</th></tr></thead>
       <tbody>{lines.map(line => <tr key={line.id} className="border-t">
         <td className="whitespace-nowrap">{shortDate(line.fecha)}</td>
         <td><span className="font-mono font-medium">{line.factura}</span><span className="mt-0.5 block text-[9px] text-muted-foreground">{line.origen ?? (line.metodologia === "historico" ? "Sistema anterior" : "Sistema actual")}</span></td>
-        <td>{line.operacion_id ? <Link to={`/parque-operaciones?operacion=${encodeURIComponent(line.operacion_id)}`} className="inline-flex items-center gap-1 whitespace-nowrap font-mono font-medium text-primary hover:underline">{line.np_numero || "Abrir NP"}<ExternalLink className="h-3 w-3" /></Link> : line.np_numero ? <span className="whitespace-nowrap font-mono font-medium">{line.np_numero}</span> : <span className="text-muted-foreground">Sin NP</span>}<span className="mt-0.5 block text-[9px] text-muted-foreground">{line.vinculo_np === "FACTURA_Y_CHASIS" ? "Factura + chasis" : line.vinculo_np === "CHASIS" ? "Por chasis" : line.vinculo_np === "PEDIDO_HISTORICO" ? "Pedido del sistema anterior" : ""}</span></td>
-        <td><div className="truncate font-medium" title={line.cliente_facturado}>{line.cliente_facturado}</div>{line.np_cliente && line.np_cliente !== line.cliente_facturado && <div className="truncate text-[9px] text-muted-foreground" title={line.np_cliente}>NP: {line.np_cliente}</div>}</td>
+        <td><div className="truncate font-medium" title={line.cliente_facturado}>{line.cliente_facturado}</div></td>
         <td><div className="font-medium">{line.marca}</div><div className="text-[9px] text-muted-foreground">{line.tipo_maquina}</div></td>
         <td className="max-w-[180px] truncate" title={line.modelo}>{line.modelo}</td>
         <td>{line.chasis ? <button type="button" onClick={() => setHistory({ chassis: line.chasis, os: null })} className="font-mono font-medium text-primary hover:underline">{line.chasis}</button> : <span className="text-muted-foreground">—</span>}</td>
-        <td>{line.condicion || "—"}</td><td className="max-w-[150px] truncate" title={line.comercial || undefined}>{line.comercial || "—"}</td>
+        <td>{conditionLabel(line.condicion)}</td><td className="max-w-[150px] truncate" title={line.comercial || undefined}>{line.comercial || "Sin vendedor"}</td>
         <td><Badge variant="outline" className={cn("whitespace-nowrap text-[9px]", line.es_nota_credito ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{line.es_nota_credito ? "Nota de crédito" : "Venta"}</Badge></td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>

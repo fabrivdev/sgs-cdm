@@ -179,6 +179,7 @@ export async function persistNewSystemBundle({
       codigo_interno_factura: row.documentNumber ?? row.invoiceLongNumber,
       factura: row.invoiceShortNumber ?? row.invoiceLongNumber,
       entidad_nombre: row.clientName,
+      vendedor: row.seller ?? null,
       fecha_factura: row.emissionDate,
       sucursal: matchSucursalFromRegion(row.branch) ?? matchSucursal(row.branch),
       subgrupo_original: crosswalk?.productGroup ?? row.productGroup,

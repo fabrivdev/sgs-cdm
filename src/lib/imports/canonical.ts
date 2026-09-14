@@ -18,6 +18,7 @@ export interface CanonicalBillingRow {
   branch: string | null;
   clientCode: string | null;
   clientName: string;
+  seller?: string | null;
   invoiceLongNumber: string | null;
   invoiceShortNumber: string | null;
   documentNumber: string | null;
