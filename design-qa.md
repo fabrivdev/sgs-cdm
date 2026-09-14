@@ -49,3 +49,32 @@ No actionable P0, P1, or P2 mismatch remains. The reduced button count and simpl
 - P3: validate very long model/client combinations against production data; current header truncation and wrapping are acceptable at the tested viewport.
 
 final result: passed
+
+---
+
+# Design QA — Ventas de Máquinas
+
+## Reference and scope
+
+- Reference composition: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-5f1af5ae-fb05-491a-92b4-1d03300aa305.png` (Ventas de Servicios, 1919 × 813).
+- Implementation capture: `C:\Users\Usuario\.codex\visualizations\2026\09\08\01a081ee-91bf-73f2-ab49-65cbf14fea7c\machine-sales-qa\page-2026-09-14T14-40-18-703Z.png` (local fixture, 1600 × 1000 CSS px, DPR 1).
+- Side-by-side comparison: `C:\Users\Usuario\.codex\visualizations\2026\09\08\01a081ee-91bf-73f2-ab49-65cbf14fea7c\machine-sales-qa\machine-sales-comparison.png`.
+- Focused state checked: Máquinas expanded from Marca → Tipo de máquina → Modelo.
+- Browser console checked: no application errors; only the existing React Router future-flag warnings.
+
+## Fidelity checklist
+
+- [x] Preserves the established page hierarchy: filters, four KPIs, period evolution, then a single analysis panel.
+- [x] Uses the same restrained borders, spacing, compact typography, green active state and `$` currency convention as the app.
+- [x] Keeps the operational detail in tables rather than decorative cards.
+- [x] Adds business-specific information without changing the visual language: signed units, credit notes, NP reconciliation and model drill-down.
+- [x] Column labels distinguish net measures (`Unidades netas`, `Promedio / unidad neta`, `Participación neta`).
+- [x] NP links and chassis actions are visible but do not compete with the financial hierarchy.
+- [x] Wide tables use deliberate horizontal scrolling and do not overlap or clip cells.
+- [x] Empty states, loading states and query errors are represented in the components.
+
+## Final review
+
+No remaining P0, P1 or P2 visual issues were found in the tested desktop state. The implementation intentionally adapts the reference content to the machine-sales workflow instead of copying service-specific dimensions.
+
+final result: passed

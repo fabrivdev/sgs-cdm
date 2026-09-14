@@ -760,6 +760,17 @@ export default function MaquinariaOperaciones() {
   const [editingImport, setEditingImport] = useState<ImportRow | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedImport, setSelectedImport] = useState<ImportRow | null>(null);
+  const requestedOperationId = useMemo(() => new URLSearchParams(location.search).get("operacion"), [location.search]);
+
+  // Ventas de Máquinas enlaza una factura con su NP por operacion_id. El
+  // acceso directo abre el mismo drawer que la tabla, sin depender de que la
+  // NP coincida con el filtro operativo que estuviera seleccionado.
+  useEffect(() => {
+    if (importsView || !requestedOperationId) return;
+    setOrderState("TODOS");
+    setSearch("");
+    setSelected(requestedOperationId);
+  }, [importsView, requestedOperationId]);
 
   // Los filtros son independientes por pantalla: cambiar de pestaña no debe
   // arrastrar un filtro que no existe del otro lado.
