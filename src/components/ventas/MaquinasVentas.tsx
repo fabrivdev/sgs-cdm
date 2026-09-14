@@ -200,7 +200,7 @@ function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: Maqu
   const conditionGrid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
   const sellerGrid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
   return <div className="mt-3 space-y-3">
-    {comparison && <div className="flex min-h-8 items-center justify-between gap-4 overflow-hidden rounded-md border px-3 text-[10px]"><span className="shrink-0 text-muted-foreground">Anterior · {shortDate(comparison.desde)}–{shortDate(comparison.hasta)}</span><span className="truncate text-right"><strong>{deltaLabel(summary.total, Number(comparison.total))}</strong> facturación <span className="mx-1 text-muted-foreground">·</span> <strong>{deltaLabel(summary.netas, Number(comparison.netas))}</strong> unidades netas</span></div>}
+    
 
     <div className="overflow-x-auto rounded-md border"><div className="min-w-[880px]">
       <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
@@ -293,7 +293,7 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
     <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-4 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
-      : view === "resumen" ? <SummaryView summary={summary} lines={lines} comparison={comparison} />
+      : view === "resumen" ? <SummaryView summary={summary} lines={lines} />
       : view === "clientes" ? <ClientsTable lines={lines} />
       : view === "maquinas" ? <MachinesTable lines={lines} />
       : <DetailTable lines={lines} />}
