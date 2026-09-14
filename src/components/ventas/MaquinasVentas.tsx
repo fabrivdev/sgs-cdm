@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
 import { Panel } from "@/components/layout/AppPrimitives";
-import { Badge } from "@/components/ui/badge";
+
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
 import { cn } from "@/lib/utils";
 
@@ -267,8 +267,8 @@ function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const [history, setHistory] = useState<{ chassis: string | null; os: string | null } | null>(null);
   return <>
-    <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1460px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
-      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[115px]">Origen</th><th className="w-[105px]">Situación</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
+    <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1240px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
+      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
       <tbody>{lines.map(line => <tr key={line.id} className="border-t">
         <td>{shortDate(line.fecha)}</td>
         <td className="truncate font-mono font-medium" title={line.factura}>{line.factura}</td>
@@ -277,8 +277,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         <td className="truncate" title={line.tipo_maquina}>{line.tipo_maquina}</td>
         <td className="truncate" title={line.modelo}>{line.modelo}</td>
         <td>{line.chasis ? <button type="button" onClick={() => setHistory({ chassis: line.chasis, os: null })} className="font-mono font-medium text-primary hover:underline">{line.chasis}</button> : <span className="text-muted-foreground">—</span>}</td>
-        <td>{conditionLabel(line.condicion)}</td><td className="truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td><td className="truncate" title={line.origen ?? (line.metodologia === "historico" ? "Sistema anterior" : "Sistema actual")}>{line.origen ?? (line.metodologia === "historico" ? "Sistema anterior" : "Sistema actual")}</td>
-        <td><Badge variant="outline" className={cn("whitespace-nowrap text-[9px]", line.es_nota_credito ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{line.es_nota_credito ? "Nota de crédito" : "Venta"}</Badge></td>
+        <td>{conditionLabel(line.condicion)}</td><td className="truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>
     </table>{!lines.length && <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div>}</div>
