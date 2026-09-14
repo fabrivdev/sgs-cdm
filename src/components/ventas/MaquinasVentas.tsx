@@ -182,15 +182,6 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
   </Panel>;
 }
 
-function change(current: number, previous: number) {
-  if (!previous) return null;
-  return (current / previous - 1) * 100;
-}
-
-function deltaLabel(current: number, previous: number) {
-  const value = change(current, previous);
-  return value == null ? "Sin base comparable" : `${value >= 0 ? "+" : ""}${decimal.format(value)}%`;
-}
 
 function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
 
