@@ -275,12 +275,11 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         <td className="truncate font-medium" title={line.marca}>{line.marca}</td>
         <td className="truncate" title={line.tipo_maquina}>{line.tipo_maquina}</td>
         <td className="truncate" title={line.modelo}>{line.modelo}</td>
-        <td>{line.chasis ? <button type="button" onClick={() => setHistory({ chassis: line.chasis, os: null })} className="font-mono font-medium text-primary hover:underline">{line.chasis}</button> : <span className="text-muted-foreground">—</span>}</td>
+        <td className="font-mono font-medium">{line.chasis ?? <span className="font-sans font-normal text-muted-foreground">—</span>}</td>
         <td>{conditionLabel(line.condicion)}</td><td className="truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>
     </table>{!lines.length && <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div>}</div>
-    <MachineHistorySheet target={history} onOpenChange={open => { if (!open) setHistory(null); }} />
   </>;
 }
 
