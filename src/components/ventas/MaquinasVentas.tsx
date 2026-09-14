@@ -52,7 +52,7 @@ export type MaquinasDashboardResponse = {
   comparacion?: { desde: string; hasta: string; total: number; netas: number; vendidas: number; notas_credito_monto: number };
 };
 
-type ExplorerView = "resumen" | "clientes" | "maquinas" | "detalle";
+type ExplorerView = "resumen" | "vendedores" | "clientes" | "maquinas" | "detalle";
 type SummaryRow = MaquinasResumen & { key: string; marca?: string; tipo?: string; modelo?: string; condicion?: string };
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -61,6 +61,16 @@ const shortDate = (value: string) => value.slice(0, 10).split("-").reverse().joi
 const conditionLabel = (value: string | null | undefined) => {
   const normalized = String(value ?? "").trim().toUpperCase();
   return normalized === "USADA" ? "Usada" : "Nueva";
+};
+
+const brandLabel = (value: string | null | undefined) => {
+  const key = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  if (key.includes("CLAAS")) return "CLAAS";
+  if (key.includes("HORSCH")) return "HORSCH";
+  return "Otros";
 };
 
 const sellerLabel = (value: string | null | undefined) => {
