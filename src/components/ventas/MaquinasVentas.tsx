@@ -272,13 +272,6 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   const [view, setView] = useState<ExplorerView>("resumen");
   const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta), [data, desde, hasta]);
   const summary = useMemo(() => summarize(lines), [lines]);
-  const comparison = useMemo(() => {
-    if (!data) return null;
-    if (!selectedPeriod) return data.comparacion ?? null;
-    const index = data.periodos.findIndex(row => row.periodo === selectedPeriod);
-    const previous = index > 0 ? data.periodos[index - 1] : null;
-    return previous ? { desde: previous.periodo, hasta: previous.periodo, total: previous.total, netas: previous.netas, vendidas: previous.vendidas, notas_credito_monto: Number(previous.notas_credito_monto ?? 0) } : null;
-  }, [data, selectedPeriod]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">
     <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-4 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
