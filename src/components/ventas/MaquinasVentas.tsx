@@ -193,25 +193,33 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 }
 
 
-function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
+const METRIC_HEADERS = ["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"];
+const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 
+function SummaryTable({ label, grid, minWidth, rows, share, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; empty: string }) {
+  return <div className="overflow-x-auto rounded-md border"><div className={minWidth}>
+    <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
+    {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+  </div></div>;
+}
+
+function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
+  const byBrand = useMemo(() => [...group(lines, line => brandLabel(line.marca))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => BRAND_ORDER.indexOf(a.key) - BRAND_ORDER.indexOf(b.key) || b.total - a.total), [lines]);
   const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
+  const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
+  const grid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  return <div className="mt-3 space-y-3">
+    <SummaryTable label="Marca" grid={grid} minWidth="min-w-[880px]" rows={byBrand} share={share} empty="Sin ventas en el período." />
+    <SummaryTable label="Condición" grid={grid} minWidth="min-w-[880px]" rows={byCondition} share={share} empty="Sin ventas en el período." />
+  </div>;
+}
+
+function SellersTable({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
   const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
-  const conditionGrid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
-  const sellerGrid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
-  return <div className="mt-3 space-y-3">
-    
-
-    <div className="overflow-x-auto rounded-md border"><div className="min-w-[880px]">
-      <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
-      {!byCondition.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin ventas en el período.</div> : byCondition.map(row => <div key={row.key} className={`grid ${conditionGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="font-medium">{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
-    </div></div>
-
-    <div className="overflow-x-auto rounded-md border"><div className="min-w-[960px]">
-      <div className={`grid ${sellerGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Vendedor</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
-      {!bySeller.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin vendedores identificados.</div> : bySeller.map(row => <div key={row.key} className={`grid ${sellerGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
-    </div></div>
+  const grid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  return <div className="mt-3">
+    <SummaryTable label="Vendedor" grid={grid} minWidth="min-w-[960px]" rows={bySeller} share={share} empty="Sin vendedores identificados." />
   </div>;
 }
 
