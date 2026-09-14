@@ -192,7 +192,8 @@ function deltaLabel(current: number, previous: number) {
   return value == null ? "Sin base comparable" : `${value >= 0 ? "+" : ""}${decimal.format(value)}%`;
 }
 
-function SummaryView({ summary, lines, comparison }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[]; comparison: MaquinasDashboardResponse["comparacion"] | null }) {
+function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
+
   const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
   const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
