@@ -21,7 +21,12 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
 
   useEffect(() => {
     let alive = true;
-    if (!desde || !hasta || desde > hasta) return;
+    if (!desde || !hasta || desde > hasta) {
+      setRows([]);
+      setError("Seleccioná un rango de fechas válido.");
+      setLoading(false);
+      return;
+    }
     setLoading(true); setError(null);
     (supabase as any).rpc("ventas_servicios_detalle_os_v2", {
       p_marca: marca || null, p_tipo_maquina: tipoMaquina || null, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,

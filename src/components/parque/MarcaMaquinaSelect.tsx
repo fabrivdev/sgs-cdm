@@ -37,8 +37,8 @@ export function MarcaMaquinaSelect({
   });
 
   const brands = useMemo(() => {
-      const values = new Set<string>(data ?? DEFAULT_MACHINE_BRANDS);
-    if (normalizedValue && normalizedValue !== "OTROS") values.add(normalizedValue);
+    const values = new Set<string>([...DEFAULT_MACHINE_BRANDS, ...(data ?? [])]);
+    if (normalizedValue) values.add(normalizedValue);
     return [...values].sort((a, b) => a.localeCompare(b, "es"));
   }, [data, normalizedValue]);
 
@@ -47,7 +47,7 @@ export function MarcaMaquinaSelect({
       <div className="space-y-1.5">
         <div className="flex gap-2">
           <Input
-            value={normalizedValue === "OTROS" ? "" : value ?? ""}
+            value={value ?? ""}
             onChange={(event) => onValueChange(upperMachineText(event.target.value))}
             onBlur={(event) => onValueChange(normalizeMachineBrand(event.target.value))}
             placeholder="Escribí la nueva marca"
@@ -67,7 +67,7 @@ export function MarcaMaquinaSelect({
 
   return (
     <div className="space-y-1"><Select
-      value={normalizedValue && normalizedValue !== "OTROS" ? normalizedValue : undefined}
+      value={normalizedValue || undefined}
       onValueChange={(next) => {
         if (next === "__NEW__") { onValueChange(""); setCustomMode(true); }
         else onValueChange(next);

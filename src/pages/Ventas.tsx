@@ -300,8 +300,8 @@ export default function Ventas({ area }: { area: VentasArea }) {
   const [data, setData] = useState<SalesResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    if (area === "servicios") { setData(null); setLoading(false); return; }
     if (!desde || !hasta || desde > hasta) { setError("Seleccioná un rango de fechas válido."); setData(null); setLoading(false); return; }
+    if (area === "servicios") { setData(null); setLoading(false); return; }
     const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_area_resumen", { p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal, p_buscar: buscar.trim() || null, p_limite: 500 });
     if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas."); setData(null); } else setData(response as SalesResponse);
     setLoading(false);

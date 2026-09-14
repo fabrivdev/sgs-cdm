@@ -331,7 +331,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     if (!cliente) return;
     if (!maquinaForm.serie?.trim()) return toast.error("Número de serie requerido");
     const marcaNombre = normalizeMachineBrand(maquinaForm.marca_nombre || maquinaForm.marca);
-    if (!marcaNombre || marcaNombre === "OTROS") return toast.error("Seleccioná o escribí la marca correcta");
+    if (!marcaNombre) return toast.error("Seleccioná o escribí la marca correcta");
     if ((maquinaForm.subgrupo ?? "OTRO") === "OTRO" && !maquinaForm.subgrupo_personalizado?.trim()) return toast.error("Escribí el nuevo subgrupo");
     if (!maquinaForm.modelo_tipo?.trim()) return toast.error("Seleccioná o escribí el modelo");
     if (editMaquina) {

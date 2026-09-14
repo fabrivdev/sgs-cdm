@@ -1614,7 +1614,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         datos_extraidos: { ...(line.datos_extraidos ?? {}), marca_real: normalizeMachineBrand(line.marca), anio: line.anio ?? null, cabezal: line.cabezal || null },
       }));
       const { data, error } = operationId
-        ? await db.rpc("maquinaria_actualizar_operacion", { p_operacion_id: operationId, p_operacion: normalizedForm, p_lineas: linesForSave })
+        ? await db.rpc("maquinaria_actualizar_operacion_preservando_estado", { p_operacion_id: operationId, p_operacion: normalizedForm, p_lineas: linesForSave })
         : await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: targetOperationId, ...normalizedForm }, p_lineas: linesForSave });
       if (error) throw error;
       if (file) {

@@ -25,7 +25,12 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
 
   useEffect(() => {
     let alive = true;
-    if (!desde || !hasta || desde > hasta) return;
+    if (!desde || !hasta || desde > hasta) {
+      setRows([]);
+      setError("Seleccioná un rango de fechas válido.");
+      setLoading(false);
+      return;
+    }
     setLoading(true); setError(null);
     (supabase as any).rpc("ventas_servicios_tecnicos_v1", {
       p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,

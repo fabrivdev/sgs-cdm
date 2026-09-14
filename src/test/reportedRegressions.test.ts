@@ -1,0 +1,41 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const read = (path: string) => readFileSync(path, "utf8");
+
+describe("reported production regressions", () => {
+  it("lets admins change sections through a guarded RPC and backfills sales pages", () => {
+    const sql = read("supabase/migrations/20260914120000_restore_admin_section_access.sql");
+    const ui = read("src/pages/Admin.tsx");
+    expect(sql).toContain("has_role(auth.uid(), 'admin'::public.app_role)");
+    expect(sql).toContain("has_role(p_user_id, 'superadmin'::public.app_role)");
+    expect(sql).toContain("'servicios.ventas', 'parque.ventas', 'repuestos.ventas'");
+    expect(ui).toContain('rpc("admin_actualizar_acceso_seccion"');
+  });
+
+  it("preserves progressed machine-order states when editing", () => {
+    const sql = read("supabase/migrations/20260914121000_preserve_machine_order_progress_on_edit.sql");
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(sql).toContain("v_estado_anterior NOT IN ('ABASTECIMIENTO', 'EN_IMPORTACION')");
+    expect(sql).toContain("SET estado = v_estado_anterior");
+    expect(ui).toContain('rpc("maquinaria_actualizar_operacion_preservando_estado"');
+  });
+
+  it("moves the stock export to one RPC and tunes report plans", () => {
+    const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
+    const hook = read("src/hooks/useRepuestos.ts");
+    expect(sql).toContain("repuestos_catalogo_stock_exportar");
+    expect(sql).toContain("force_custom_plan");
+    expect(sql).toContain("statement_timeout TO '120s'");
+    expect(hook).toContain('rpc as any)("repuestos_catalogo_stock_exportar"');
+  });
+
+  it("accepts OTROS and preserves imported custom machine brands", () => {
+    const sql = read("supabase/migrations/20260914122000_allow_otros_in_customer_machine_park.sql");
+    const importer = read("src/components/parque/ImportarTab.tsx");
+    expect(sql).toContain("IF v_solicitada = 'OTROS'");
+    expect(sql).toContain("NEW.marca_nombre := 'OTROS'");
+    expect(importer).toContain("marca_nombre: marcaNombre");
+    expect(importer).not.toContain("const marcasAdmitidas = nuevos.filter");
+  });
+});

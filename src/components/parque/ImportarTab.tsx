@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { importedServiceOrderParticipants } from "@/lib/technicianMatching";
 import { canonicalMachineSubgroup } from "@/lib/machineModels";
+import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
 
 interface ParqueRow {
   anio: number | null;
@@ -43,6 +44,7 @@ interface ParqueRow {
   serie: string;
   cliente_nombre: string;
   marca: Marca;
+  marca_nombre: string;
   vendedor: string | null;
   localidad: string | null;
   _isNew: boolean;
@@ -735,7 +737,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         const serie = norm(r["SERIE"] ?? r["serie"]);
         if (!serie) continue;
 
-        const marca = matchMarca(r["MARCA"] ?? r["marca"]) ?? "CLAAS";
+        const marcaNombre = normalizeMachineBrand(r["MARCA"] ?? r["marca"]) || "OTROS";
+        const marca = matchMarca(marcaNombre) ?? legacyMachineBrand(marcaNombre);
         const subgrupoFuente = norm(r["SUBGRUPO"] ?? r["subgrupo"]);
         const subgrupo = canonicalMachineSubgroup(subgrupoFuente);
         const anioVal = r["AÑO"] ?? r["ANO"] ?? r["ANIO"] ?? r["año"];
@@ -750,6 +753,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           serie,
           cliente_nombre: norm(r["CLIENTE"] ?? r["cliente"]),
           marca,
+          marca_nombre: marcaNombre,
           vendedor: norm(r["VENDEDOR"] ?? r["vendedor"]) || null,
           localidad: norm(r["LOCALIDAD"] ?? r["localidad"]) || null,
           _isNew: !seriesExistentes.has(normText(serie)),
@@ -778,18 +782,10 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         if (c.nombre) cliMap.set(normText(c.nombre), c.id);
       }
 
-      // Parque representa equipos de clientes de marcas admitidas. Las filas
-      // OTROS siguen siendo validas en Operaciones, pero no deben hacer fallar
-      // atomicamente una importacion completa del Excel de Parque.
-      const marcasAdmitidas = nuevos.filter((r) => r.marca === "CLAAS" || r.marca === "HORSCH");
-      const omitidosMarca = nuevos.length - marcasAdmitidas.length;
-      const validos = marcasAdmitidas.filter((r) => cliMap.has(normText(r.cliente_nombre)));
-      const omitidosCliente = marcasAdmitidas.length - validos.length;
+      const validos = nuevos.filter((r) => cliMap.has(normText(r.cliente_nombre)));
+      const omitidosCliente = nuevos.length - validos.length;
 
       if (validos.length === 0) {
-        if (marcasAdmitidas.length === 0) {
-          return toast.error("El archivo no contiene máquinas CLAAS o HORSCH admitidas al Parque");
-        }
         return toast.error("Ninguna máquina coincide exactamente con un cliente existente");
       }
 
@@ -804,6 +800,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         serie: r.serie,
         vendedor: r.vendedor,
         marca: r.marca,
+        marca_nombre: r.marca_nombre,
         agregado_manualmente: false,
       }));
 
@@ -819,9 +816,8 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         archivo_nombre: parqueFile,
       });
 
-      if (omitidosMarca > 0 || omitidosCliente > 0) {
+      if (omitidosCliente > 0) {
         const motivos = [
-          omitidosMarca > 0 ? `${omitidosMarca} de marcas no admitidas al Parque` : null,
           omitidosCliente > 0 ? `${omitidosCliente} sin coincidencia exacta de cliente` : null,
         ].filter(Boolean).join("; ");
         toast.success(`Importadas ${validos.length} máquinas. Omitidas: ${motivos}.`);

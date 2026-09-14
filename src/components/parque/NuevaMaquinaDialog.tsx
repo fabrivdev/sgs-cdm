@@ -101,7 +101,7 @@ export function NuevaMaquinaDialog({ open, onOpenChange, onCreated }: Props) {
 
   const guardar = async () => {
     if (!form.cliente_id) return toast.error("Seleccioná un cliente");
-    if (!normalizeMachineBrand(form.marca) || normalizeMachineBrand(form.marca) === "OTROS") return toast.error("Seleccioná o escribí la marca correcta");
+    if (!normalizeMachineBrand(form.marca)) return toast.error("Seleccioná o escribí la marca correcta");
     if (!form.serie.trim()) return toast.error("Número de serie requerido");
     if (form.subgrupo === "OTRO" && !form.subgrupo_personalizado.trim()) return toast.error("Escribí el nuevo subgrupo");
     if (!form.modelo_tipo.trim()) return toast.error("Seleccioná un modelo o escribí uno nuevo");

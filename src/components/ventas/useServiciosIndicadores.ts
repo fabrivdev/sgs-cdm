@@ -36,7 +36,12 @@ export function useServiciosIndicadores({ desde, hasta, sucursal, buscar, tipoTi
 
   useEffect(() => {
     let alive = true;
-    if (!desde || !hasta || desde > hasta) return;
+    if (!desde || !hasta || desde > hasta) {
+      setData(null);
+      setError("Seleccioná un rango de fechas válido.");
+      setLoading(false);
+      return;
+    }
     setLoading(true); setError(null);
     (supabase as any).rpc("ventas_servicios_indicadores_v1", {
       p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,

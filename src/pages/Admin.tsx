@@ -424,26 +424,16 @@ export default function Admin() {
   };
 
   const cambiarSeccionAcceso = async (profile: Profile, section: AppSection, activo: boolean) => {
-    if (!isSuperAdmin || isProtectedProfile(profile)) return;
+    if (!canManageAdmin || isProtectedProfile(profile)) return;
     const userId = permissionOwnerId(profile);
     setSectionBusy(section.id);
     try {
-      const sectionQuery = activo
-        ? (supabase as any).from("user_seccion_acceso").insert({ user_id: userId, seccion_id: section.id })
-        : (supabase as any).from("user_seccion_acceso").delete().eq("user_id", userId).eq("seccion_id", section.id);
-      const { error } = await sectionQuery;
+      const { error } = await (supabase as any).rpc("admin_actualizar_acceso_seccion", {
+        p_user_id: userId,
+        p_seccion_id: section.id,
+        p_activo: activo,
+      });
       if (error) throw error;
-
-      if (["servicios", "parque", "repuestos"].includes(section.modulo_id)) {
-        const current = sectionsForProfile(profile);
-        const projected = activo ? Array.from(new Set([...current, section.id])) : current.filter((id) => id !== section.id);
-        const moduleStillUsed = sections.some((candidate) => candidate.modulo_id === section.modulo_id && projected.includes(candidate.id));
-        const moduleQuery = moduleStillUsed
-          ? (supabase as any).from("user_modulo_acceso").upsert({ user_id: userId, modulo_id: section.modulo_id }, { onConflict: "user_id,modulo_id" })
-          : (supabase as any).from("user_modulo_acceso").delete().eq("user_id", userId).eq("modulo_id", section.modulo_id);
-        const { error: moduleError } = await moduleQuery;
-        if (moduleError) throw moduleError;
-      }
       await load();
     } catch (error: any) {
       toast.error(error?.message ?? "No se pudo actualizar la sección");
@@ -1062,9 +1052,9 @@ export default function Admin() {
                     return <button
                       key={section.id}
                       type="button"
-                      disabled={!isSuperAdmin || !sectionUser || !emailByProfile(sectionUser) || isProtectedProfile(sectionUser) || sectionBusy === section.id}
+                      disabled={!canManageAdmin || !sectionUser || !emailByProfile(sectionUser) || isProtectedProfile(sectionUser) || sectionBusy === section.id}
                       onClick={() => sectionUser && cambiarSeccionAcceso(sectionUser, section, !active)}
-                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!isSuperAdmin || (sectionUser && (!emailByProfile(sectionUser) || isProtectedProfile(sectionUser)))) && "cursor-default")}
+                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!canManageAdmin || (sectionUser && (!emailByProfile(sectionUser) || isProtectedProfile(sectionUser)))) && "cursor-default")}
                     >
                       <span>{section.nombre}</span>
                       <span className={cn("h-2.5 w-2.5 rounded-full border", active ? "border-primary bg-primary" : "border-muted-foreground/30")} />

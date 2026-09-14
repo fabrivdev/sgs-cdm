@@ -1,7 +1,7 @@
 import type { Marca } from "@/lib/constants";
 import type { CSSProperties } from "react";
 
-export const DEFAULT_MACHINE_BRANDS = ["CLAAS", "HORSCH"] as const;
+export const DEFAULT_MACHINE_BRANDS = ["CLAAS", "HORSCH", "OTROS"] as const;
 
 export function normalizeMachineBrand(value: unknown): string {
   const normalized = String(value ?? "")
@@ -18,7 +18,7 @@ export function legacyMachineBrand(value: unknown): Marca {
 
 export function visibleMachineBrand(value: unknown): string {
   const brand = normalizeMachineBrand(value);
-  return brand && brand !== "OTROS" ? brand : "Sin marca";
+  return brand || "Sin marca";
 }
 
 export function machineBrandStyle(value: unknown): CSSProperties | undefined {

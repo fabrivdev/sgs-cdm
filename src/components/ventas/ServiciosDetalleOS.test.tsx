@@ -26,4 +26,10 @@ describe('service detail loading states', () => {
     await waitFor(() => expect(screen.getByText('No hay OS con facturación en el período.')).toBeInTheDocument());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+  it('stops loading and does not query when the date range is invalid', async () => {
+    render(<ServiciosDetalleOS {...props} desde="2026-09-12" hasta="2026-09-11" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Seleccioná un rango de fechas válido');
+    expect(rpc).not.toHaveBeenCalled();
+    expect(screen.queryByText('Cargando…')).not.toBeInTheDocument();
+  });
 });

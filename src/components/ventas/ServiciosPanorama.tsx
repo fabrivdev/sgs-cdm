@@ -52,7 +52,13 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
 
   useEffect(() => {
     let alive = true;
-    if (!desde || !hasta || desde > hasta) return;
+    if (!desde || !hasta || desde > hasta) {
+      setData(null);
+      setError("Seleccioná un rango de fechas válido.");
+      setLoading(false);
+      onSummary?.(null);
+      return;
+    }
     setLoading(true); setError(null); onSummary?.(null);
     const params = (from: string, to: string) => ({
       p_marca: marca || null, p_tipo_maquina: tipoMaquina || null, p_sucursal: sucursal === "TODAS" ? null : sucursal,

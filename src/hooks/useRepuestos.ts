@@ -82,25 +82,6 @@ export type StockSortKey =
   | "katuete"
   | "total";
 
-/** Aplica los mismos filtros a cualquier query builder contra v_repuestos_stock_matriz, para que la página paginada y el export completo nunca queden desincronizados. */
-function aplicarFiltrosStockBase(qb: any, filtros: StockFiltros) {
-  let query = qb;
-  const busqueda = filtros.busqueda.trim();
-  if (busqueda) {
-    query = query.or(`codigo_interno.ilike.%${busqueda}%,descripcion.ilike.%${busqueda}%,codigo_fabricante.ilike.%${busqueda}%`);
-  }
-  if (filtros.marcas.length) query = query.in("marca", filtros.marcas);
-  if (filtros.familias.length) query = query.in("familia", filtros.familias);
-  return query;
-}
-
-function aplicarFiltrosStock(qb: any, filtros: StockFiltros) {
-  let query = aplicarFiltrosStockBase(qb, filtros);
-  if (filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "con_stock") query = query.gt("total", 0);
-  if (filtros.estadosStock.length === 1 && filtros.estadosStock[0] === "sin_stock") query = query.eq("total", 0);
-  return query;
-}
-
 export function useStockMatriz(filtros: StockFiltros, page: number, sortKey: StockSortKey, sortDir: "asc" | "desc") {
   return useQuery({
     queryKey: ["repuestos", "stock_matriz", filtros, page, sortKey, sortDir],
@@ -161,12 +142,16 @@ export async function fetchStockMatrizCompleto(
   sortKey: StockSortKey,
   sortDir: "asc" | "desc",
 ): Promise<StockMatrizRow[]> {
-  let query = (supabase.from("v_repuestos_stock_matriz" as any) as any)
-    .select(STOCK_MATRIZ_COLUMNS)
-    .order(sortKey, { ascending: sortDir === "asc" });
-  query = aplicarFiltrosStock(query, filtros);
-
-  return cargarTodo<StockMatrizRow>(query);
+  const { data, error } = await (supabase.rpc as any)("repuestos_catalogo_stock_exportar", {
+    p_busqueda: filtros.busqueda.trim() || null,
+    p_marcas: filtros.marcas,
+    p_familias: filtros.familias,
+    p_estados_stock: filtros.estadosStock,
+    p_orden: sortKey,
+    p_direccion: sortDir,
+  });
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []) as StockMatrizRow[];
 }
 
 /** Exportación maestra: deliberadamente no recibe los filtros de pantalla. */
