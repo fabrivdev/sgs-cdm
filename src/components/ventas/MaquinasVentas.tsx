@@ -4,7 +4,7 @@ import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
 import { Panel } from "@/components/layout/AppPrimitives";
 
-import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
+
 import { cn } from "@/lib/utils";
 
 export type MaquinaVentaLinea = {
