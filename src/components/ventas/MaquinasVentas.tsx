@@ -194,43 +194,20 @@ function deltaLabel(current: number, previous: number) {
 
 function SummaryView({ summary, lines, comparison }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[]; comparison: MaquinasDashboardResponse["comparacion"] | null }) {
   const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
-  const byMachine = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${conditionLabel(line.condicion)}`)].map(([key, values]) => {
-    const [marca, tipo, condicion] = key.split("__");
-    return { key, marca, tipo, condicion, ...summarize(values) };
-  }).sort((a, b) => a.marca.localeCompare(b.marca, "es") || a.tipo.localeCompare(b.tipo, "es") || a.condicion.localeCompare(b.condicion, "es")), [lines]);
   const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
-  const cards: Array<[string, string]> = [
-    ["Neto", money(summary.total)],
-    ["Venta bruta", money(Number(summary.venta_bruta ?? 0))],
-    ["Notas de crédito", `-${money(Number(summary.notas_credito_monto ?? 0))}`],
-    ["Nuevas vendidas", decimal.format(Number(summary.nuevas ?? 0))],
-    ["Usadas vendidas", decimal.format(Number(summary.usadas ?? 0))],
-    ["Unidades netas", decimal.format(summary.netas)],
-    ["Clientes", integer.format(summary.clientes)],
-    ["Documentos", integer.format(summary.facturas)],
-  ];
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
   const conditionGrid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
-  const machineGrid = "grid-cols-[minmax(100px,.8fr)_minmax(180px,1.35fr)_minmax(100px,.8fr)_repeat(5,minmax(80px,.7fr))_minmax(125px,1fr)_85px]";
   const sellerGrid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
   return <div className="mt-3 space-y-3">
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
-      {cards.map(([label, value]) => <div key={label} className="rounded-md border px-3 py-2"><p className="truncate text-[10px] font-medium text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-[13px] font-semibold tabular-nums">{value}</p></div>)}
-    </div>
-    {comparison && <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-[10px]"><span className="text-muted-foreground">Comparación con {shortDate(comparison.desde)}–{shortDate(comparison.hasta)}</span><span><strong>{deltaLabel(summary.total, Number(comparison.total))}</strong> en facturación · <strong>{deltaLabel(summary.netas, Number(comparison.netas))}</strong> en unidades netas</span></div>}
+    {comparison && <div className="flex min-h-8 items-center justify-between gap-4 overflow-hidden rounded-md border px-3 text-[10px]"><span className="shrink-0 text-muted-foreground">Anterior · {shortDate(comparison.desde)}–{shortDate(comparison.hasta)}</span><span className="truncate text-right"><strong>{deltaLabel(summary.total, Number(comparison.total))}</strong> facturación <span className="mx-1 text-muted-foreground">·</span> <strong>{deltaLabel(summary.netas, Number(comparison.netas))}</strong> unidades netas</span></div>}
 
     <div className="overflow-x-auto rounded-md border"><div className="min-w-[880px]">
-      <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "NC", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="text-right">{label}</div>)}</div>
+      <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
       {!byCondition.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin ventas en el período.</div> : byCondition.map(row => <div key={row.key} className={`grid ${conditionGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="font-medium">{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
     </div></div>
 
-    <div className="overflow-x-auto rounded-md border"><div className="min-w-[1120px]">
-      <div className={`grid ${machineGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Marca</div><div>Tipo de máquina</div><div>Condición</div>{["Vendidas", "NC", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="text-right">{label}</div>)}</div>
-      {!byMachine.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin datos por máquina.</div> : byMachine.map(row => <div key={row.key} className={`grid ${machineGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium">{row.marca}</div><div className="truncate">{row.tipo}</div><div>{row.condicion}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
-    </div></div>
-
     <div className="overflow-x-auto rounded-md border"><div className="min-w-[960px]">
-      <div className={`grid ${sellerGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Vendedor</div>{["Vendidas", "NC", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="text-right">{label}</div>)}</div>
+      <div className={`grid ${sellerGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Vendedor</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
       {!bySeller.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin vendedores identificados.</div> : bySeller.map(row => <div key={row.key} className={`grid ${sellerGrid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
     </div></div>
   </div>;
@@ -249,7 +226,7 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   }), [lines]);
   const grid = "grid-cols-[34px_minmax(100px,.9fr)_minmax(170px,1.35fr)_minmax(90px,.7fr)_repeat(5,minmax(76px,.68fr))_minmax(115px,1fr)_minmax(110px,.9fr)_80px]";
   return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1160px]">
-    <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'NC', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={label === 'Marca' || label === 'Tipo de máquina' || label === 'Condición' ? '' : 'text-right'}>{label}</div>)}</div>
+    <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
     {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
       const open = expanded === row.key;
       const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
@@ -270,26 +247,27 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const rows = useMemo(() => [...group(lines, line => line.cliente_facturado)].map(([cliente, values]) => ({ cliente, ultima: values.reduce((max, line) => line.fecha > max ? line.fecha : max, ""), ...summarize(values) })).sort((a, b) => Number(a.cliente.startsWith("Sin ")) - Number(b.cliente.startsWith("Sin ")) || b.total - a.total), [lines]);
   const total = rows.reduce((sum, row) => sum + row.total, 0);
-  const grid = "grid-cols-[minmax(240px,1.7fr)_repeat(5,minmax(85px,.75fr))_minmax(120px,1fr)_90px_85px]";
-  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1050px]">
-      <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Cliente</div>{['Vendidas', 'NC', 'Netas', 'Facturas', 'Última venta', 'Promedio / unidad neta', 'Facturación', 'Participación neta'].map(label => <div key={label} className="text-right">{label}</div>)}</div>
-      {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : rows.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="text-right tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
+  const grid = "grid-cols-[minmax(250px,1.8fr)_repeat(2,minmax(82px,.65fr))_minmax(130px,1fr)_minmax(145px,1.05fr)_minmax(90px,.75fr)_minmax(105px,.8fr)_85px]";
+  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1040px]">
+      <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Cliente</div>{['Vendidas', 'Unidades netas', 'Facturación', 'Promedio / unidad neta', 'Facturas', 'Última venta', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
+      {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : rows.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-1.5 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="whitespace-nowrap text-right tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
   </div></div>;
 }
 
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const [history, setHistory] = useState<{ chassis: string | null; os: string | null } | null>(null);
   return <>
-    <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1240px] text-[11px] [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-2.5 [&_th]:font-medium [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">
-      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th>Fecha</th><th>Factura</th><th className="w-[260px]">Cliente</th><th>Marca / tipo</th><th>Modelo</th><th>Chasis</th><th>Condición</th><th>Vendedor</th><th>Situación</th><th className="text-right">Facturado</th></tr></thead>
+    <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1460px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
+      <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[115px]">Origen</th><th className="w-[105px]">Situación</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
       <tbody>{lines.map(line => <tr key={line.id} className="border-t">
-        <td className="whitespace-nowrap">{shortDate(line.fecha)}</td>
-        <td><span className="font-mono font-medium">{line.factura}</span><span className="mt-0.5 block text-[9px] text-muted-foreground">{line.origen ?? (line.metodologia === "historico" ? "Sistema anterior" : "Sistema actual")}</span></td>
+        <td>{shortDate(line.fecha)}</td>
+        <td className="truncate font-mono font-medium" title={line.factura}>{line.factura}</td>
         <td><div className="truncate font-medium" title={line.cliente_facturado}>{line.cliente_facturado}</div></td>
-        <td><div className="font-medium">{line.marca}</div><div className="text-[9px] text-muted-foreground">{line.tipo_maquina}</div></td>
-        <td className="max-w-[180px] truncate" title={line.modelo}>{line.modelo}</td>
+        <td className="truncate font-medium" title={line.marca}>{line.marca}</td>
+        <td className="truncate" title={line.tipo_maquina}>{line.tipo_maquina}</td>
+        <td className="truncate" title={line.modelo}>{line.modelo}</td>
         <td>{line.chasis ? <button type="button" onClick={() => setHistory({ chassis: line.chasis, os: null })} className="font-mono font-medium text-primary hover:underline">{line.chasis}</button> : <span className="text-muted-foreground">—</span>}</td>
-        <td>{conditionLabel(line.condicion)}</td><td className="max-w-[150px] truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td>
+        <td>{conditionLabel(line.condicion)}</td><td className="truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td><td className="truncate" title={line.origen ?? (line.metodologia === "historico" ? "Sistema anterior" : "Sistema actual")}>{line.origen ?? (line.metodologia === "historico" ? "Sistema anterior" : "Sistema actual")}</td>
         <td><Badge variant="outline" className={cn("whitespace-nowrap text-[9px]", line.es_nota_credito ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{line.es_nota_credito ? "Nota de crédito" : "Venta"}</Badge></td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>
@@ -311,7 +289,7 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   }, [data, selectedPeriod]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">
-    <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 grid-cols-4 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
+    <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-4 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
       : view === "resumen" ? <SummaryView summary={summary} lines={lines} comparison={comparison} />
