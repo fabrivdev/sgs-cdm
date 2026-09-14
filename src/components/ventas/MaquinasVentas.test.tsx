@@ -26,7 +26,7 @@ describe("Ventas de Máquinas", () => {
     expect(screen.getByText("Unidades netas").parentElement).toHaveTextContent("0");
     expect(screen.getAllByText("Nueva").length).toBeGreaterThan(0);
     expect(screen.queryByText("Sin identificar")).not.toBeInTheDocument();
-    expect(screen.getByText("CARLOS JAVIER BENITEZ ZARZA")).toBeInTheDocument();
+    expect(screen.getByText("CARLOS BENITEZ")).toBeInTheDocument();
   });
 
   it("agrupa por marca y tipo y permite ver el modelo", () => {
@@ -42,7 +42,7 @@ describe("Ventas de Máquinas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     expect(screen.queryByText("NP")).not.toBeInTheDocument();
     expect(screen.getByText("Vendedor")).toBeInTheDocument();
-    expect(screen.getAllByText("CARLOS JAVIER BENITEZ ZARZA")).toHaveLength(2);
+    expect(screen.getAllByText("CARLOS BENITEZ")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "24491421" })).toBeInTheDocument();
     expect(screen.getByText("Nota de crédito")).toBeInTheDocument();
   });

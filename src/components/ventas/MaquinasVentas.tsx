@@ -71,13 +71,15 @@ const sellerLabel = (value: string | null | undefined) => {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase();
-  if (key.includes("CARLOS") && key.includes("BENITEZ")) return "CARLOS JAVIER BENITEZ ZARZA";
-  if (key.includes("ANDRES") && key.includes("CANETE")) return "LUIS ANDRES CAÑETE RODRIGUEZ";
-  if (key.includes("RUBEN") && key.includes("CENTURION")) return "RUBEN JUAN ANTONIO CENTURION RAMOS";
-  if (key.includes("HELWIN") && key.includes("LOPEZ")) return "HELWIN LOPEZ BORGES";
-  if (key.includes("OSCAR") && key.includes("BENITEZ")) return "OSCAR DANIEL BENITEZ MEZA";
-  if (key.includes("JUAN") && key.includes("APODACA")) return "JUAN DANIEL APODACA FERREIRA";
-  return withoutCode.toLocaleUpperCase("es-PY");
+  if (key.includes("CARLOS") && key.includes("BENITEZ")) return "CARLOS BENITEZ";
+  if (key.includes("ANDRES") && key.includes("CANETE")) return "LUIS CAÑETE";
+  if (key.includes("RUBEN") && key.includes("CENTURION")) return "RUBEN CENTURION";
+  if (key.includes("HELWIN") && key.includes("LOPEZ")) return "HELWIN LOPEZ";
+  if (key.includes("OSCAR") && key.includes("BENITEZ")) return "OSCAR BENITEZ";
+  if (key.includes("JUAN") && key.includes("APODACA")) return "JUAN APODACA";
+  const words = withoutCode.toLocaleUpperCase("es-PY").split(" ");
+  if (words.length <= 2) return words.join(" ");
+  return `${words[0]} ${words.length === 3 ? words[1] : words[words.length - 2]}`;
 };
 
 function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
