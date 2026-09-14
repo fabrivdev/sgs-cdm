@@ -60,7 +60,24 @@ const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const shortDate = (value: string) => value.slice(0, 10).split("-").reverse().join("/");
 const conditionLabel = (value: string | null | undefined) => {
   const normalized = String(value ?? "").trim().toUpperCase();
-  return normalized === "NUEVA" ? "Nueva" : normalized === "USADA" ? "Usada" : "Sin identificar";
+  return normalized === "USADA" ? "Usada" : "Nueva";
+};
+
+const sellerLabel = (value: string | null | undefined) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "Sin vendedor";
+  const withoutCode = raw.replace(/^\d+\s*-\s*/, "").replace(/\s+/g, " ").trim();
+  const key = withoutCode
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  if (key.includes("CARLOS") && key.includes("BENITEZ")) return "CARLOS JAVIER BENITEZ ZARZA";
+  if (key.includes("ANDRES") && key.includes("CANETE")) return "LUIS ANDRES CAÑETE RODRIGUEZ";
+  if (key.includes("RUBEN") && key.includes("CENTURION")) return "RUBEN JUAN ANTONIO CENTURION RAMOS";
+  if (key.includes("HELWIN") && key.includes("LOPEZ")) return "HELWIN LOPEZ BORGES";
+  if (key.includes("OSCAR") && key.includes("BENITEZ")) return "OSCAR DANIEL BENITEZ MEZA";
+  if (key.includes("JUAN") && key.includes("APODACA")) return "JUAN DANIEL APODACA FERREIRA";
+  return withoutCode.toLocaleUpperCase("es-PY");
 };
 
 function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
@@ -174,12 +191,12 @@ function deltaLabel(current: number, previous: number) {
 }
 
 function SummaryView({ summary, lines, comparison }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[]; comparison: MaquinasDashboardResponse["comparacion"] | null }) {
-  const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin identificar") - Number(b.key === "Sin identificar") || b.total - a.total), [lines]);
+  const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
   const byMachine = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${conditionLabel(line.condicion)}`)].map(([key, values]) => {
     const [marca, tipo, condicion] = key.split("__");
     return { key, marca, tipo, condicion, ...summarize(values) };
   }).sort((a, b) => a.marca.localeCompare(b.marca, "es") || a.tipo.localeCompare(b.tipo, "es") || a.condicion.localeCompare(b.condicion, "es")), [lines]);
-  const bySeller = useMemo(() => [...group(lines, line => line.comercial || "Sin vendedor")].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
+  const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
   const cards: Array<[string, string]> = [
     ["Neto", money(summary.total)],
     ["Venta bruta", money(Number(summary.venta_bruta ?? 0))],
@@ -270,7 +287,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         <td><div className="font-medium">{line.marca}</div><div className="text-[9px] text-muted-foreground">{line.tipo_maquina}</div></td>
         <td className="max-w-[180px] truncate" title={line.modelo}>{line.modelo}</td>
         <td>{line.chasis ? <button type="button" onClick={() => setHistory({ chassis: line.chasis, os: null })} className="font-mono font-medium text-primary hover:underline">{line.chasis}</button> : <span className="text-muted-foreground">—</span>}</td>
-        <td>{conditionLabel(line.condicion)}</td><td className="max-w-[150px] truncate" title={line.comercial || undefined}>{line.comercial || "Sin vendedor"}</td>
+        <td>{conditionLabel(line.condicion)}</td><td className="max-w-[150px] truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td>
         <td><Badge variant="outline" className={cn("whitespace-nowrap text-[9px]", line.es_nota_credito ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{line.es_nota_credito ? "Nota de crédito" : "Venta"}</Badge></td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>
