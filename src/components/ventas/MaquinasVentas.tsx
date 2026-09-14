@@ -4,7 +4,7 @@ import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
 import { Panel } from "@/components/layout/AppPrimitives";
 
-import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
+
 import { cn } from "@/lib/utils";
 
 export type MaquinaVentaLinea = {
@@ -265,7 +265,6 @@ function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 }
 
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
-  const [history, setHistory] = useState<{ chassis: string | null; os: string | null } | null>(null);
   return <>
     <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[1240px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
       <thead className="bg-muted/60 text-left text-muted-foreground"><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
@@ -276,12 +275,11 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         <td className="truncate font-medium" title={line.marca}>{line.marca}</td>
         <td className="truncate" title={line.tipo_maquina}>{line.tipo_maquina}</td>
         <td className="truncate" title={line.modelo}>{line.modelo}</td>
-        <td>{line.chasis ? <button type="button" onClick={() => setHistory({ chassis: line.chasis, os: null })} className="font-mono font-medium text-primary hover:underline">{line.chasis}</button> : <span className="text-muted-foreground">—</span>}</td>
+        <td className="font-mono font-medium">{line.chasis ?? <span className="font-sans font-normal text-muted-foreground">—</span>}</td>
         <td>{conditionLabel(line.condicion)}</td><td className="truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>
     </table>{!lines.length && <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div>}</div>
-    <MachineHistorySheet target={history} onOpenChange={open => { if (!open) setHistory(null); }} />
   </>;
 }
 
