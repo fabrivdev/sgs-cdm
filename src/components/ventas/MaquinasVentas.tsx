@@ -182,24 +182,16 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
   </Panel>;
 }
 
-function change(current: number, previous: number) {
-  if (!previous) return null;
-  return (current / previous - 1) * 100;
-}
 
-function deltaLabel(current: number, previous: number) {
-  const value = change(current, previous);
-  return value == null ? "Sin base comparable" : `${value >= 0 ? "+" : ""}${decimal.format(value)}%`;
-}
+function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
 
-function SummaryView({ summary, lines, comparison }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[]; comparison: MaquinasDashboardResponse["comparacion"] | null }) {
   const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
   const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
   const conditionGrid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
   const sellerGrid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
   return <div className="mt-3 space-y-3">
-    {comparison && <div className="flex min-h-8 items-center justify-between gap-4 overflow-hidden rounded-md border px-3 text-[10px]"><span className="shrink-0 text-muted-foreground">Anterior · {shortDate(comparison.desde)}–{shortDate(comparison.hasta)}</span><span className="truncate text-right"><strong>{deltaLabel(summary.total, Number(comparison.total))}</strong> facturación <span className="mx-1 text-muted-foreground">·</span> <strong>{deltaLabel(summary.netas, Number(comparison.netas))}</strong> unidades netas</span></div>}
+    
 
     <div className="overflow-x-auto rounded-md border"><div className="min-w-[880px]">
       <div className={`grid ${conditionGrid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Condición</div>{["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
@@ -280,19 +272,12 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   const [view, setView] = useState<ExplorerView>("resumen");
   const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta), [data, desde, hasta]);
   const summary = useMemo(() => summarize(lines), [lines]);
-  const comparison = useMemo(() => {
-    if (!data) return null;
-    if (!selectedPeriod) return data.comparacion ?? null;
-    const index = data.periodos.findIndex(row => row.periodo === selectedPeriod);
-    const previous = index > 0 ? data.periodos[index - 1] : null;
-    return previous ? { desde: previous.periodo, hasta: previous.periodo, total: previous.total, netas: previous.netas, vendidas: previous.vendidas, notas_credito_monto: Number(previous.notas_credito_monto ?? 0) } : null;
-  }, [data, selectedPeriod]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">
     <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-4 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
-      : view === "resumen" ? <SummaryView summary={summary} lines={lines} comparison={comparison} />
+      : view === "resumen" ? <SummaryView summary={summary} lines={lines} />
       : view === "clientes" ? <ClientsTable lines={lines} />
       : view === "maquinas" ? <MachinesTable lines={lines} />
       : <DetailTable lines={lines} />}
