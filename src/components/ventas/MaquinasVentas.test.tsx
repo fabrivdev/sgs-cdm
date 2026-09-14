@@ -40,15 +40,16 @@ describe("Ventas de Máquinas", () => {
     expect(screen.getByText("MAESTRO 18.50")).toBeInTheDocument();
   });
 
-  it("muestra vendedor y mantiene el chasis como acceso al historial sin exponer la NP", () => {
+  it("muestra vendedor y el chasis como texto plano, sin origen ni situación", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     expect(screen.queryByText("NP")).not.toBeInTheDocument();
     expect(screen.getByText("Vendedor")).toBeInTheDocument();
-    expect(screen.getByText("Origen")).toBeInTheDocument();
     expect(screen.getByText("Tipo")).toBeInTheDocument();
+    expect(screen.queryByText("Origen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Situación")).not.toBeInTheDocument();
     expect(screen.getAllByText("CARLOS BENITEZ")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "24491421" })).toBeInTheDocument();
-    expect(screen.getByText("Nota de crédito")).toBeInTheDocument();
+    expect(screen.getByText("24491421")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "24491421" })).not.toBeInTheDocument();
   });
 });
