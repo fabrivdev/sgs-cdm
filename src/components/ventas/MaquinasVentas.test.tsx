@@ -21,9 +21,10 @@ function setup() {
 describe("Ventas de Máquinas", () => {
   it("separa ventas, notas de crédito y unidades netas", () => {
     setup();
-    expect(screen.getByText("Nuevas vendidas").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("Usadas vendidas").parentElement).toHaveTextContent("0");
-    expect(screen.getByText("Unidades netas").parentElement).toHaveTextContent("0");
+    expect(screen.queryByText("Nuevas vendidas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usadas vendidas")).not.toBeInTheDocument();
+    expect(screen.getByText("Condición")).toBeInTheDocument();
+    expect(screen.getAllByText("Netas").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Nueva").length).toBeGreaterThan(0);
     expect(screen.queryByText("Sin identificar")).not.toBeInTheDocument();
     expect(screen.getByText("CARLOS BENITEZ")).toBeInTheDocument();
@@ -42,6 +43,8 @@ describe("Ventas de Máquinas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     expect(screen.queryByText("NP")).not.toBeInTheDocument();
     expect(screen.getByText("Vendedor")).toBeInTheDocument();
+    expect(screen.getByText("Origen")).toBeInTheDocument();
+    expect(screen.getByText("Tipo")).toBeInTheDocument();
     expect(screen.getAllByText("CARLOS BENITEZ")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "24491421" })).toBeInTheDocument();
     expect(screen.getByText("Nota de crédito")).toBeInTheDocument();
