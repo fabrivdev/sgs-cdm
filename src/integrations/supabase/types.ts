@@ -856,7 +856,6 @@ export type Database = {
           codigo_fabricante: string | null
           codigo_interno_factura: string | null
           entidad_nombre: string
-          vendedor: string | null
           factura: string | null
           fecha_factura: string | null
           grupo_normalizado: string | null
@@ -878,6 +877,7 @@ export type Database = {
           tipo_tiempo: string
           total_venta: number
           valor_unitario: number | null
+          vendedor: string | null
         }
         Insert: {
           actualizado_en?: string
@@ -887,7 +887,6 @@ export type Database = {
           codigo_fabricante?: string | null
           codigo_interno_factura?: string | null
           entidad_nombre: string
-          vendedor?: string | null
           factura?: string | null
           fecha_factura?: string | null
           grupo_normalizado?: string | null
@@ -909,6 +908,7 @@ export type Database = {
           tipo_tiempo?: string
           total_venta?: number
           valor_unitario?: number | null
+          vendedor?: string | null
         }
         Update: {
           actualizado_en?: string
@@ -918,7 +918,6 @@ export type Database = {
           codigo_fabricante?: string | null
           codigo_interno_factura?: string | null
           entidad_nombre?: string
-          vendedor?: string | null
           factura?: string | null
           fecha_factura?: string | null
           grupo_normalizado?: string | null
@@ -940,6 +939,7 @@ export type Database = {
           tipo_tiempo?: string
           total_venta?: number
           valor_unitario?: number | null
+          vendedor?: string | null
         }
         Relationships: [
           {
@@ -4818,6 +4818,158 @@ export type Database = {
           },
         ]
       }
+      ventas_maquinas_historico_cargas: {
+        Row: {
+          activo: boolean
+          archivo_nombre: string
+          completado_en: string | null
+          creado_en: string
+          creado_por: string | null
+          estado: string
+          filas_archivo: number
+          id: string
+        }
+        Insert: {
+          activo?: boolean
+          archivo_nombre: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          estado?: string
+          filas_archivo: number
+          id?: string
+        }
+        Update: {
+          activo?: boolean
+          archivo_nombre?: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          estado?: string
+          filas_archivo?: number
+          id?: string
+        }
+        Relationships: []
+      }
+      ventas_maquinas_historico_lineas: {
+        Row: {
+          cantidad: number
+          carga_id: string
+          chasis: string | null
+          cod_entidad: string | null
+          cod_mercaderia: string
+          codigo_pedido: string | null
+          costo_medio: number
+          costo_total: number
+          creado_en: string
+          entidad_nombre: string
+          factura: string
+          fecha_factura: string
+          fecha_pedido: string | null
+          fecha_vencimiento: string | null
+          grupo: string
+          id: string
+          linea_clave: string
+          lucro_bruto: number
+          marca_estimada: Database["public"]["Enums"]["marca"]
+          margen_costo_pct: number
+          margen_venta_pct: number
+          modelo_estimado: string
+          nombre_mercaderia: string
+          plan_financiacion: string | null
+          precio_tabla: number
+          raw_data: Json
+          saldo: number
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_maquina_estimado: string
+          tipo_movimiento: string
+          total_cobrado: number
+          total_venta: number
+          valor_medio: number
+          vendedor: string | null
+        }
+        Insert: {
+          cantidad: number
+          carga_id: string
+          chasis?: string | null
+          cod_entidad?: string | null
+          cod_mercaderia: string
+          codigo_pedido?: string | null
+          costo_medio?: number
+          costo_total?: number
+          creado_en?: string
+          entidad_nombre: string
+          factura: string
+          fecha_factura: string
+          fecha_pedido?: string | null
+          fecha_vencimiento?: string | null
+          grupo: string
+          id?: string
+          linea_clave: string
+          lucro_bruto?: number
+          marca_estimada?: Database["public"]["Enums"]["marca"]
+          margen_costo_pct?: number
+          margen_venta_pct?: number
+          modelo_estimado?: string
+          nombre_mercaderia: string
+          plan_financiacion?: string | null
+          precio_tabla?: number
+          raw_data?: Json
+          saldo?: number
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_maquina_estimado?: string
+          tipo_movimiento: string
+          total_cobrado?: number
+          total_venta: number
+          valor_medio?: number
+          vendedor?: string | null
+        }
+        Update: {
+          cantidad?: number
+          carga_id?: string
+          chasis?: string | null
+          cod_entidad?: string | null
+          cod_mercaderia?: string
+          codigo_pedido?: string | null
+          costo_medio?: number
+          costo_total?: number
+          creado_en?: string
+          entidad_nombre?: string
+          factura?: string
+          fecha_factura?: string
+          fecha_pedido?: string | null
+          fecha_vencimiento?: string | null
+          grupo?: string
+          id?: string
+          linea_clave?: string
+          lucro_bruto?: number
+          marca_estimada?: Database["public"]["Enums"]["marca"]
+          margen_costo_pct?: number
+          margen_venta_pct?: number
+          modelo_estimado?: string
+          nombre_mercaderia?: string
+          plan_financiacion?: string | null
+          precio_tabla?: number
+          raw_data?: Json
+          saldo?: number
+          sucursal?: Database["public"]["Enums"]["sucursal"]
+          tipo_maquina_estimado?: string
+          tipo_movimiento?: string
+          total_cobrado?: number
+          total_venta?: number
+          valor_medio?: number
+          vendedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_maquinas_historico_lineas_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "ventas_maquinas_historico_cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       maquinaria_facturas_importacion_detalle: {
@@ -6070,6 +6222,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_actualizar_acceso_seccion: {
+        Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
+        Returns: undefined
+      }
       comisiones_actualizar_tipo_tiempo: {
         Args: { p_jornada_id: string; p_tipo_tiempo: string }
         Returns: string
@@ -6181,6 +6337,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
       }
       maquinaria_actualizar_operacion: {
+        Args: { p_lineas: Json; p_operacion: Json; p_operacion_id: string }
+        Returns: string
+      }
+      maquinaria_actualizar_operacion_preservando_estado: {
         Args: { p_lineas: Json; p_operacion: Json; p_operacion_id: string }
         Returns: string
       }
@@ -6521,6 +6681,37 @@ export type Database = {
         }
         Returns: undefined
       }
+      repuestos_catalogo_stock_exportar: {
+        Args: {
+          p_busqueda?: string
+          p_direccion?: string
+          p_estados_stock?: string[]
+          p_familias?: string[]
+          p_marcas?: string[]
+          p_orden?: string
+        }
+        Returns: {
+          campo_9: number | null
+          codigo_fabricante: string | null
+          codigo_interno: string | null
+          descripcion: string | null
+          familia: string | null
+          katuete: number | null
+          loma_plata: number | null
+          marca: Database["public"]["Enums"]["marca"] | null
+          misiones: number | null
+          santa_rita: number | null
+          santa_rosa: number | null
+          total: number | null
+          unidad: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "v_repuestos_stock_matriz"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       repuestos_catalogo_stock_paginado: {
         Args: {
           p_busqueda?: string
@@ -6790,6 +6981,63 @@ export type Database = {
       }
       ventas_linea_tipo_tiempo: {
         Args: { p_id: string; p_metodologia: string; p_os_tipo: string }
+        Returns: string
+      }
+      ventas_maquinas_cancelar_historico_v1: {
+        Args: { p_carga_id: string }
+        Returns: undefined
+      }
+      ventas_maquinas_dashboard_v1: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+        }
+        Returns: Json
+      }
+      ventas_maquinas_estado_historico_v1: { Args: never; Returns: Json }
+      ventas_maquinas_finalizar_historico_v1: {
+        Args: { p_carga_id: string }
+        Returns: Json
+      }
+      ventas_maquinas_fuente_v2: {
+        Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
+        Returns: {
+          cantidad: number
+          chasis: string
+          cliente: string
+          cod_mercaderia: string
+          codigo_pedido: string
+          condicion_fuente: string
+          descripcion: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          linea_id: string
+          marca: string
+          metodologia: string
+          modelo: string
+          pedido_fecha: string
+          sucursal: Database["public"]["Enums"]["sucursal"]
+          tipo_maquina: string
+          total_venta: number
+          vendedor: string
+        }[]
+      }
+      ventas_maquinas_importar_historico_lote_v1: {
+        Args: { p_carga_id: string; p_lineas: Json }
+        Returns: Json
+      }
+      ventas_maquinas_iniciar_historico_v1: {
+        Args: { p_archivo_nombre: string; p_filas_archivo: number }
+        Returns: string
+      }
+      ventas_normalizar_vendedor_maquinas: {
+        Args: { p_vendedor: string }
         Returns: string
       }
       ventas_servicios_detalle_os: {
