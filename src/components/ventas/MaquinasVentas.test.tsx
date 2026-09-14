@@ -22,10 +22,10 @@ function setup() {
 describe("Ventas de Máquinas", () => {
   it("separa ventas, notas de crédito y unidades netas", () => {
     setup();
-    expect(screen.getByText("Vendidas").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("Notas de crédito").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("Unidades netas").parentElement).toHaveTextContent("0");
-    expect(screen.getByText(/1 vinculadas · 1 sin NP/)).toBeInTheDocument();
+    expect(screen.getByText("Ventas emitidas").parentElement).toHaveTextContent("1 unidades vendidas");
+    expect(screen.getByText("Notas de crédito").parentElement).toHaveTextContent("1 unidades revertidas");
+    expect(screen.getByText("Facturación neta").parentElement).toHaveTextContent("0 unidades netas");
+    expect(screen.getByText(/1 máquinas con pedido · 1 sin vínculo/)).toBeInTheDocument();
   });
 
   it("agrupa por marca y tipo y permite ver el modelo", () => {

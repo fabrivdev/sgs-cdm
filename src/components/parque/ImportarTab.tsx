@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { importedServiceOrderParticipants } from "@/lib/technicianMatching";
 import { canonicalMachineSubgroup } from "@/lib/machineModels";
 import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
+import { MachineSalesLegacyImport } from "@/components/parque/MachineSalesLegacyImport";
 
 interface ParqueRow {
   anio: number | null;
@@ -1728,6 +1729,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         </CardContent>
       </Card>
 
+      <MachineSalesLegacyImport onChanged={() => {
+        void queryClient.invalidateQueries({ queryKey: ["ventas-maquinas"] });
+        onChanged();
+      }} />
+
       <Card className="border-muted bg-muted/20">
         <CardContent className="space-y-3 p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1740,7 +1746,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {[
               "Parque de maquinas",
-              "Facturacion historica",
+              "Facturacion historica de repuestos y servicios",
               "GRID Campos",
               "Clientes",
               "Contactos",

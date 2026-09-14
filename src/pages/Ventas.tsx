@@ -385,7 +385,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
         )}
         {area === "maquinas" && <MaquinasPanorama data={maquinasData} loading={loading} error={error} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />}
         {area === "maquinas"
-          ? <MaquinasExplorer data={maquinasData} loading={loading} error={error} desde={explorerRange.desde} hasta={explorerRange.hasta} />
+          ? <MaquinasExplorer data={maquinasData} loading={loading} error={error} desde={explorerRange.desde} hasta={explorerRange.hasta} selectedPeriod={selectedPeriod} />
           : <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />}
       </>}
     </PageShell>
