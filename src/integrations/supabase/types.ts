@@ -7063,6 +7063,10 @@ export type Database = {
         Returns: Json
       }
       ventas_servicios_dimensiones: { Args: never; Returns: Json }
+      ventas_servicios_factura_clave: {
+        Args: { p_factura: string }
+        Returns: string
+      }
       ventas_servicios_historial: {
         Args: { p_chasis: string; p_vista?: string }
         Returns: Json
@@ -7098,6 +7102,39 @@ export type Database = {
           p_tipo_tiempo?: string
         }
         Returns: Json
+      }
+      ventas_servicios_movimientos_enriquecidos: {
+        Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
+        Returns: {
+          area_calculada: string
+          cantidad: number
+          chasis: string
+          cliente: string
+          cliente_os: string
+          codigo: string
+          codigo_fabricante: string
+          concepto: string
+          descripcion: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          linea_id: string
+          marca: string
+          marca_parque: string
+          metodologia: string
+          modelo: string
+          nro_chasis: string
+          os_numero: string
+          propietario: string
+          propietario_os: string
+          sucursal: string
+          texto_busqueda: string
+          tipo_maquina: string
+          tipo_tiempo: string
+          total_venta: number
+          vinculada_os: boolean
+          vinculo_os: string
+        }[]
       }
       ventas_servicios_os: {
         Args: {
@@ -7158,6 +7195,10 @@ export type Database = {
           terceros_registrados_os: number
           total_facturado_os: number
         }[]
+      }
+      ventas_servicios_texto_normalizado: {
+        Args: { p_texto: string }
+        Returns: string
       }
       ventas_tipo_tiempo_normalizado: {
         Args: { p_valor: string }
