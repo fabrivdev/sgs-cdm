@@ -17,6 +17,7 @@ import { ServiciosResumen } from "@/components/ventas/ServiciosResumen";
 import { ServiciosTecnicos } from "@/components/ventas/ServiciosTecnicos";
 import { ServiciosMaquinas } from "@/components/ventas/ServiciosMaquinas";
 import { MaquinasExplorer, MaquinasPanorama, type MaquinasDashboardResponse } from "@/components/ventas/MaquinasVentas";
+import { RepuestosVentas } from "@/components/ventas/RepuestosVentas";
 import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
 
@@ -303,7 +304,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     if (!desde || !hasta || desde > hasta) { setError("Seleccioná un rango de fechas válido."); setData(null); setLoading(false); return; }
-    if (area === "servicios") { setData(null); setMaquinasData(null); setLoading(false); return; }
+    if (area === "servicios" || area === "repuestos") { setData(null); setMaquinasData(null); setLoading(false); return; }
     if (area === "maquinas") {
       const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_v1", {
         p_desde: desde,
@@ -318,9 +319,6 @@ export default function Ventas({ area }: { area: VentasArea }) {
       else setMaquinasData(response as MaquinasDashboardResponse);
       setData(null); setLoading(false); return;
     }
-    const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_area_resumen", { p_area: area, p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal, p_buscar: buscar.trim() || null, p_limite: 500 });
-    if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas."); setData(null); } else setData(response as SalesResponse);
-    setLoading(false);
   }, [area, buscar, desde, hasta, marca, periodMode, sucursal, tipoMaquina]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina]);
@@ -382,7 +380,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
         </>}
       </FiltersBar>
       {area === "servicios" && machineOptionsError && <p role="alert" className="text-xs text-destructive">{machineOptionsError}</p>}
-      {error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
+      {area === "repuestos" ? <RepuestosVentas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} /> : error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>
         
         {area === "servicios" && (

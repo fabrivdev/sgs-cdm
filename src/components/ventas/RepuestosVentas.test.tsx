@@ -1,0 +1,117 @@
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RepuestosVentas, type PartsListing, type PartsOverview } from "./RepuestosVentas";
+const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
+afterEach(() => { cleanup(); rpc.mockReset(); });
+const summary = { facturado: 125, ventas: 150, notas_credito: -25, clientes: 1, documentos: 2, documentos_nc: 1, lineas: 3, unidades_netas: 2 };
+const overview: PartsOverview = {
+  resumen: summary, periodos: [{ ...summary, periodo: "2026-08-01", desde: "2026-08-01", hasta: "2026-08-31", anterior: 100, anterior_lineas: 2, anio_anterior: 50, anio_anterior_lineas: 1 }],
+  por_sucursal: [{ ...summary, sucursal: "Santa Rita" }], por_origen: [{ ...summary, metodologia: "actual" }],
+  comparacion: { facturado: 100, lineas: 2, desde: "2026-07-01", hasta: "2026-07-31" }, comparacion_ly: { facturado: 50, lineas: 1, desde: "2025-08-01", hasta: "2025-08-31" },
+};
+const detail: PartsListing = { total: 3, pagina: 1, paginas: 1, total_periodo: 125, filas: [
+  { id: "a", fecha: "2026-08-10", factura: "FACT1", cliente: "Cliente A", sucursal: "Santa Rita", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", cantidad: 2, facturado: 100, metodologia: "actual" },
+  { id: "b", fecha: "2026-08-10", factura: "FACT1", cliente: "Cliente A", sucursal: "Santa Rita", codigo: "REP2", codigo_fabricante: "FAB2", descripcion: "Correa", cantidad: 1, facturado: 50, metodologia: "actual" },
+  { id: "c", fecha: "2026-08-21", factura: "NC1", cliente: "Cliente A", sucursal: "Santa Rita", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", cantidad: -1, facturado: -25, metodologia: "actual", es_nota_credito: true },
+] };
+function mockRpc() {
+  rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
+    data: name === "ventas_repuestos_panorama_v1" ? overview : name === "ventas_area_analisis_negocio" ? { total: 1, pagina: 1, paginas: 1, columns: [{ key: "2026-08", label: "Ago. 2026" }], rows: [{ key: "REP1 · Rodamiento", values: { "2026-08": 75 }, total: 75 }] }
+      : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", sucursal: "Santa Rita", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", anterior: 50, ultima: "2026-08-10" }] },
+  }) }));
+}
+function Harness({ desde = "2026-01-01", hasta = "2026-09-15" }: { desde?: string; hasta?: string }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  return <RepuestosVentas desde={desde} hasta={hasta} sucursal="TODAS" buscar="" periodMode="mes" selectedPeriod={selected} onSelectPeriod={setSelected} />;
+}
+function setup(props?: { desde?: string; hasta?: string }) {
+  mockRpc();
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(<QueryClientProvider client={client}><Harness {...props} /></QueryClientProvider>);
+}
+describe("Ventas de Repuestos", () => {
+  it("comparte panorama y resumen sin repetir la consulta", async () => {
+    setup(); await screen.findByText("Sistema actual");
+    expect(rpc.mock.calls.filter(([name]) => name === "ventas_repuestos_panorama_v1")).toHaveLength(1);
+    expect(rpc).not.toHaveBeenCalledWith("ventas_area_resumen", expect.anything());
+    const tables = screen.getAllByRole("table");
+    const periodHeads = within(tables[0]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
+    const summaryHeads = within(tables[1]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
+    expect(summaryHeads).toEqual(periodHeads);
+    expect(screen.getByText("Total del período")).toBeInTheDocument();
+  });
+  it("detalle plano: dos líneas repiten la factura, con ambos códigos y NC", async () => {
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    await screen.findByText("REP2");
+    expect(screen.getAllByText("FACT1")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "FACT1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Cód. fabricante" })).toBeInTheDocument();
+    expect(screen.getByText("FAB2")).toBeInTheDocument();
+    expect(screen.getByText("-1")).toBeInTheDocument();
+    expect(screen.getByText("NC")).toBeInTheDocument();
+    const table = screen.getAllByRole("table").at(-1)!;
+    expect(within(table).getAllByRole("row")).toHaveLength(4); // Cabecera y 3 líneas, sin agrupadores.
+    expect(within(table).getAllByText("$ -25").length).toBeGreaterThan(0);
+  });
+  it("selección agosto recorta detalle y KPI hasta el 31 y permite volver", async () => {
+    setup(); await screen.findByText("Sistema actual");
+    fireEvent.click(screen.getByRole("button", { name: /ago/i }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_panorama_v1", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31" })));
+    fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    await screen.findByText("REP2");
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v1", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31", p_vista: "detalle" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver período completo" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v1", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-09-15" })));
+  });
+  it("clientes y repuestos son listas con los mismos indicadores", async () => {
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Clientes", exact: true }));
+    await screen.findByText("Cliente A");
+    expect(screen.getByRole("columnheader", { name: "Cliente facturado" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Año anterior" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Repuestos", exact: true }));
+    await screen.findByText("REP1");
+    expect(screen.getByText("FAB1")).toBeInTheDocument();
+    expect(screen.getByText("Rodamiento")).toBeInTheDocument();
+  });
+  it("conserva análisis paginado del período completo", async () => {
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Análisis" }));
+    await screen.findByText("REP1 · Rodamiento");
+    expect(rpc).toHaveBeenCalledWith("ventas_area_analisis_negocio", expect.objectContaining({ p_area: "repuestos", p_medida: "usd" }));
+  });
+  it("evita el cruce 1:1 de sucursal contra sí misma", async () => {
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Análisis" }));
+    await screen.findByText("REP1 · Rodamiento");
+    fireEvent.change(screen.getByRole("combobox", { name: "Columnas" }), { target: { value: "sucursal" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Filas" }), { target: { value: "sucursal" } });
+    expect(screen.getByRole("combobox", { name: "Columnas" })).toHaveValue("mes");
+    expect(within(screen.getByRole("combobox", { name: "Columnas" })).getByRole("option", { name: "Sucursal" })).toBeDisabled();
+  });
+  it("pagina el detalle sin recortar su total", async () => {
+    setup();
+    rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
+      data: name === "ventas_repuestos_panorama_v1" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
+        filas: [{ ...detail.filas[0], id: String(args.p_pagina), codigo: args.p_pagina === 2 ? "ULTIMO" : "PRIMERO" }] },
+    }) }));
+    fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    await screen.findByText("PRIMERO");
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    await screen.findByText("ULTIMO");
+    expect(screen.getByText("$ 5.000")).toBeInTheDocument();
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v1", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
+  });
+  it("no lanza informes ante un rango vacío o invertido", () => {
+    setup({ desde: "", hasta: "2026-08-31" });
+    expect(screen.getByRole("alert")).toHaveTextContent("rango de fechas válido");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("una migración ausente no aparece como ventas cero", async () => {
+    rpc.mockImplementation(() => ({ abortSignal: () => Promise.resolve({ data: null, error: { code: "PGRST202" } }) }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
+    expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent("Falta aplicar el SQL");
+    expect(screen.queryByText("$ 0")).not.toBeInTheDocument();
+  });
+});
