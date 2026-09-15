@@ -6,7 +6,7 @@ vi.mock("xlsx", () => ({ read: () => ({ SheetNames: ["Fact. Repuestos"], Sheets:
   utils: { sheet_to_json: () => mocks.rows } }));
 const file = { name: "FACTURACIÓN HISTORICA.xlsx", arrayBuffer: async () => new ArrayBuffer(1) } as File;
 const positive = { "Tp. Movimento": "S", "Fecha Factura": "2026-06-30", "Cod. Mercaderia": "OLD1",
-  "Código Factura": "H1", "Cant. Unit.": 1, "Total Venta": 30, "Entidad": "Cliente A", "Sucursal": "KATUETE" };
+  "Código Factura": "H1", "Cant. Unit.": 1, "Total Venta": 30, "Entidad": "Cliente A", "Sucursal": "KATUETE", "Vendedor": "CARLOS JAVIER BENITEZ ZARZA" };
 beforeEach(() => {
   mocks.rows = [{ ...positive }, { ...positive, "Código Factura": "H2" },
     { ...positive, "Tp. Movimento": "E", "Código Factura": "NC1", "Cant. Unit.": -1, "Total Venta": -30 }];
@@ -18,10 +18,12 @@ beforeEach(() => {
 describe("carga histórica detallada S/E", () => {
   it("carga inicial conserva S/E y las claves de fila originales", async () => {
     await importarFacturacionHistorica(file);
-    const input = mocks.rpc.mock.calls.find(([name]) => name === "repuestos_importar_facturacion_historica_lote")![1];
+    const input = mocks.rpc.mock.calls.find(([name]) => name === "repuestos_importar_facturacion_historica_lote_v2")?.[1];
+    expect(input).toBeDefined();
     expect(input.p_filas.map((row: { movimiento: string }) => row.movimiento)).toEqual(["S", "S", "E"]);
     expect(input.p_filas[2].linea_clave).toBe("4|2026-06-30|NC1|OLD1");
     expect(input.p_filas[2].total_venta).toBe(-30);
+    expect(input.p_filas[0].vendedor).toBe("CARLOS JAVIER BENITEZ ZARZA");
     expect(mocks.rpc).toHaveBeenCalledWith("repuestos_verificar_notas_credito_historicas", {
       p_carga_id: "LOAD", p_claves: ["4|2026-06-30|NC1|OLD1"],
     });
