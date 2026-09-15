@@ -7,7 +7,7 @@ import { KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
-import { shortPersonName } from "@/lib/personName";
+import { partsSellerName } from "@/lib/partsSellerName";
 import { PARTS_HEADERS, partsRange, validPartsRange as validRange } from "./partsSalesFormat";
 
 type Filters = { desde: string; hasta: string; sucursal: string; buscar: string };
@@ -41,7 +41,7 @@ const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const date = (value?: string) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const number = (value: number | null | undefined) => value == null ? "—" : decimal.format(value);
 const share = (value: number, total: number) => total ? `${Math.round(value / total * 100)}%` : "—";
-const seller = (value?: string) => shortPersonName((value ?? "").replace(/^\s*\d+(?:\s*[-–—:]\s*|\s+)/, "")).toLocaleUpperCase("es-PY") || "Sin vendedor";
+const seller = partsSellerName;
 const brand = (value?: string) => value === "CLAAS" || value === "HORSCH" ? value : "Otros";
 function params(filters: Filters) {
   return { p_desde: filters.desde, p_hasta: filters.hasta, p_sucursal: filters.sucursal === "TODAS" ? null : filters.sucursal, p_buscar: filters.buscar.trim() || null };

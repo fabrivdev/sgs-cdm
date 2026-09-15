@@ -109,6 +109,48 @@ assert.equal((await db.query("select ventas_repuestos_normalizar_vendedor('OSCAR
 const futureNote={...note,linea_clave:'9|2026-06-30|NC3|OLD1',documento:'NC3',vendedor:'000006 - Oscar Benitez'};
 await call('repuestos_completar_notas_credito_historicas',`'00000000-0000-0000-0000-000000000010','${JSON.stringify([futureNote])}'::jsonb,'${JSON.stringify(anchors)}'::jsonb`);
 assert.equal((await db.query("select raw_data->>'vendedor' r from facturacion_lineas_importadas where factura='NC3'")).rows[0].r,futureNote.vendedor);
+// Alias reales de Repuestos: identidad previa a agregación, sin tocar las líneas.
+const identitiesMigration=readFileSync('supabase/migrations/20260915190000_unify_parts_seller_identities.sql','utf8');
+const intact=(await db.query('select * from facturacion_lineas_importadas order by id')).rows;
+await db.exec(identitiesMigration); await db.exec(identitiesMigration);
+assert.deepEqual((await db.query('select * from facturacion_lineas_importadas order by id')).rows,intact);
+const pairs=[
+ ['FERNANDO PETTER ANTES','AR0001 - FERNANDO PETTER','FERNANDO PETTER'],
+ ['LUCAS MAUGER QUIRING','AR0002 - LUCAS MAUGER','LUCAS MAUGER'],
+ ['FRANCISCO JAVIER NALERIO LAURENT','AR0003 - JAVIER NALERIO','FRANCISCO NALERIO'],
+ ['MAURO CABALLERO LOPEZ','AR0004 - MAURO CABALLERO','MAURO CABALLERO'],
+ ['WILLIAM DAVID CHAVEZ','AR0005 - WILLIAM CHAVEZ','WILLIAM CHAVEZ'],
+ ['PEDRO HECTOR SERVIAN ACUÑA','AR0007 - PEDRO SERVIAN','PEDRO SERVIAN'],
+ ['TIAGO ALEX LANDO DE MOURA','AS0003 - TIAGO LANDO','TIAGO LANDO'],
+ ['ROQUE ANTONIO ZARATE MEDINA','AS0006 - ROQUE ZARATE','ROQUE ZARATE'],
+ ['MONICA ROCHA RABELO','AS0009 - MONICA ROCHA','MONICA ROCHA'],
+];
+for(const [old,current,expected] of pairs) {
+ for(const name of [old,current,current.toLowerCase(),expected]) {
+  assert.equal((await db.query('select ventas_repuestos_normalizar_vendedor($1) r',[name])).rows[0].r,expected);
+ }
+}
+for(const value of [null,'','\t-','AR0001','000001','AR0001 -']) {
+ assert.equal((await db.query('select ventas_repuestos_normalizar_vendedor($1) r',[value])).rows[0].r,null);
+}
+for(const [value,expected] of [['AS0002 – Angela Knorst','ANGELA KNORST'],['ZZ0001: PABLO JAUREGUI','PABLO JAUREGUI'],
+ ['000003 - Andres Canete','LUIS CAÑETE'],['000006 - Oscar Benítez','OSCAR BENITEZ'],
+ ['000001 - Vendedor CDM','VENDEDOR CDM'],['OSCAR ARTURO SPERLING SOTELO','OSCAR ARTURO SPERLING SOTELO'],
+ ['WILLIAM EDUARDO LENGUAZA SCHONHAUSER','WILLIAM EDUARDO LENGUAZA SCHONHAUSER']]) {
+ assert.equal((await db.query('select ventas_repuestos_normalizar_vendedor($1) r',[value])).rows[0].r,expected);
+}
+await db.exec(`update facturacion_lineas_importadas set vendedor='FERNANDO PETTER ANTES' where factura='H1';
+ insert into facturacion_lineas_importadas(origen_sistema,factura,fecha_factura,cod_mercaderia,cantidad,total_venta,moneda,vendedor,raw_data)
+ values('new_xml_facturacion_os','FERN1','2026-08-12','REP1',1,10,'USD','AR0001 - FERNANDO PETTER','{}');
+ insert into movements select id::text,'2026-08-12','FERN1','Cliente B','Santa Rita','actual','REP1','FAB1','Rodamiento',1,10,false,'repuestos'
+ from facturacion_lineas_importadas where factura='FERN1';`);
+const unified=await call('ventas_repuestos_listado_v2',"'2026-06-01','2026-08-31',null,null,'vendedores'");
+assert.equal(unified.filas.filter(row=>row.vendedor==='FERNANDO PETTER').length,1);
+assert.equal(unified.filas.find(row=>row.vendedor==='FERNANDO PETTER').facturado,130);
+const reconciled=await call('ventas_repuestos_listado_v2',"'2026-06-01','2026-08-31',null,null,'detalle'");
+assert.equal(unified.total_periodo,reconciled.total_periodo);
+assert.equal(unified.filas.reduce((sum,row)=>sum+row.facturado,0),reconciled.total_periodo);
+assert.equal(unified.total_periodo,295); // 315 anteriores - NC3 30 + venta actual 10.
 await db.exec(`create or replace function has_role(uuid,app_role) returns boolean language sql as $$select false$$;`);
 await assert.rejects(recover(),/administrador/);
 await assert.rejects(complement(),/administrador/);

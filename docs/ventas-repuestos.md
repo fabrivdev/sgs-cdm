@@ -103,6 +103,29 @@ sugerencias calculadas con una base parcialmente actualizada.
 
 ## Verificación
 
+### Identidad de vendedores
+
+Después de recuperar los metadatos, aplicar
+`20260915190000_unify_parts_seller_identities.sql`. No requiere reimportar el Excel.
+La comparación se hizo con `query-results-export-2026-09-15_17-14-50.csv`:
+se quitan prefijos numéricos y AR/AS/ZZ, y se relacionan exactamente las nueve
+identidades de Repuestos presentes en ambos sistemas. Por ejemplo,
+FERNANDO PETTER ANTES / AR0001 - FERNANDO PETTER y
+FRANCISCO JAVIER NALERIO LAURENT / AR0003 - JAVIER NALERIO.
+Este último se presenta como FRANCISCO NALERIO (primer nombre y primer apellido).
+Se conservan las equivalencias comerciales anteriores, incluido OSCAR BENITEZ.
+ANGELA KNORST y PABLO JAUREGUI no tienen equivalente histórico en el export;
+se mantienen separados, sin sus códigos. VENDEDOR CDM sigue siendo un vendedor
+genérico, no una persona inventada. Vacíos, guiones y códigos sin nombre se
+muestran como Sin vendedor. Las identidades desconocidas conservan su nombre
+completo: no se adivinan apellidos ni se fusionan personas por palabras comunes.
+
+La normalización ocurre en SQL antes de agrupar/paginar; el helper específico de
+Repuestos utiliza las mismas identidades para la presentación. No modifica
+el helper compartido de Máquinas, metadatos originales, importes, cantidades,
+notas de crédito, stock ni Sugerencias. Las ventas y devoluciones de una misma
+identidad se concilian en una sola fila del reporte.
+
 - `node scripts/verify-complete-parts-history-sql.mjs`: PostgreSQL aislado,
   migración repetible, cargador inicial real, S/E, complemento idempotente,
   códigos/vínculos opcionales, cantidades normalizadas, permisos y conciliación
