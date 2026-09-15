@@ -1,5 +1,15 @@
 # Ventas de Repuestos
 
+## Vendedores del histórico ya cargado
+
+Aplicar `20260915180000_recover_and_unify_parts_sales_sellers.sql` después de los reportes v2 de `0005_parts_sales_brand_sellers.sql`. Luego, en Sugerencias → Historial → Completar vendedores históricos, seleccionar el mismo Excel original.
+
+El complemento valida carga, clave de línea, cantidad e importe y actualiza únicamente vendedor/raw_data. Incluye ventas S y NC E existentes: no inserta movimientos, no cambia hash, importes, cantidades, stock ni demanda y puede reintentarse. Las filas sin vendedor permanecen sin informar. No se atribuye el vendedor de otra factura por coincidencia de cliente.
+
+El servidor unifica alias conocidos y quita los prefijos antes de agrupar y paginar. Así Carlos Benítez del sistema nuevo y Carlos Javier Benítez Zarza del histórico forman una sola fila con ventas y NC neteadas. Las identidades desconocidas mantienen el nombre completo sin código; no se adivina el primer apellido.
+
+Las futuras NC del complemento conservan además el vendedor en raw_data. No es necesario reconstruir demanda cuando solo se completan vendedores.
+
 ## Alcance y fuentes
 
 Hasta el 30/06/2026 se utiliza `v_ventas_repuestos_historico_completo`, sobre

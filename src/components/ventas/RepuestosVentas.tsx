@@ -41,7 +41,7 @@ const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const date = (value?: string) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const number = (value: number | null | undefined) => value == null ? "—" : decimal.format(value);
 const share = (value: number, total: number) => total ? `${Math.round(value / total * 100)}%` : "—";
-const seller = (value?: string) => shortPersonName(value).toLocaleUpperCase("es-PY") || "Sin vendedor";
+const seller = (value?: string) => shortPersonName((value ?? "").replace(/^\s*\d+(?:\s*[-–—:]\s*|\s+)/, "")).toLocaleUpperCase("es-PY") || "Sin vendedor";
 const brand = (value?: string) => value === "CLAAS" || value === "HORSCH" ? value : "Otros";
 function params(filters: Filters) {
   return { p_desde: filters.desde, p_hasta: filters.hasta, p_sucursal: filters.sucursal === "TODAS" ? null : filters.sucursal, p_buscar: filters.buscar.trim() || null };
@@ -139,7 +139,7 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
     : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
       : view === "vendedores" ? ["Vendedor", ...PARTS_HEADERS, "Participación"]
       : ["Cód. repuesto", "Cód. fabricante", "Descripción", ...PARTS_HEADERS, "Unidades vendidas", "Unidades devueltas", "Participación"];
-  return <div className="space-y-2"><Table minWidth={view === "detalle" ? "min-w-[1120px]" : view === "repuestos" ? "min-w-[1530px]" : "min-w-[1300px]"}>
+  return <div className="space-y-2">{view === "vendedores" && <p className="text-[10px] text-muted-foreground">Vendedores unificados entre ambos sistemas. Para recuperar los del histórico ya cargado: Sugerencias → Historial → Completar vendedores históricos.</p>}<Table minWidth={view === "detalle" ? "min-w-[1120px]" : view === "repuestos" ? "min-w-[1530px]" : "min-w-[1300px]"}>
     <colgroup>{view === "detalle" ? <><col style={{ width: "85px" }} /><col style={{ width: "125px" }} /><col style={{ width: "190px" }} /><col style={{ width: "95px" }} /><col style={{ width: "105px" }} /><col style={{ width: "110px" }} /><col /><col style={{ width: "70px" }} /><col style={{ width: "105px" }} /></>
       : view === "clientes" ? <><col style={{ width: "220px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
         : view === "vendedores" ? <><col style={{ width: "240px" }} />{labels.slice(1).map(label => <col key={label} />)}</>

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { completarNotasCreditoHistoricas, importarFacturacionHistorica } from "./useSugerenciasCompra";
+import { completarNotasCreditoHistoricas, completarVendedoresHistoricos, importarFacturacionHistorica } from "./useSugerenciasCompra";
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), rows: [] as Record<string, unknown>[] }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mocks.rpc } }));
 vi.mock("xlsx", () => ({ read: () => ({ SheetNames: ["Fact. Repuestos"], Sheets: { "Fact. Repuestos": {} } }),
@@ -16,6 +16,21 @@ beforeEach(() => {
         : name === "repuestos_completar_notas_credito_historicas" ? { insertadas: 1 } : {} }));
 });
 describe("carga histórica detallada S/E", () => {
+  it("recupera vendedores de S y E sin volver a importar ni publicar demanda", async () => {
+    const progress = vi.fn();
+    expect(await completarVendedoresHistoricos(file, progress)).toEqual({ actualizadas: 0, verificadas: 3 });
+    const input = mocks.rpc.mock.calls.find(([name]) => name === "repuestos_completar_vendedores_historicos")![1];
+    expect(input.p_filas).toHaveLength(3);
+    expect(Object.keys(input.p_filas[0])).toEqual(["linea_clave", "vendedor", "cantidad", "total_venta"]);
+    expect(input.p_filas[2].total_venta).toBe(-30);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["repuestos_estado_facturacion_historica", "repuestos_completar_vendedores_historicos"]);
+    expect(progress).toHaveBeenCalledWith(3, 3);
+  });
+  it("no fabrica vendedores cuando el Excel no los informa", async () => {
+    mocks.rows = mocks.rows.map(row => ({ ...row, Vendedor: null }));
+    await expect(completarVendedoresHistoricos(file)).rejects.toThrow("no contiene vendedores");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("carga inicial conserva S/E y las claves de fila originales", async () => {
     await importarFacturacionHistorica(file);
     const input = mocks.rpc.mock.calls.find(([name]) => name === "repuestos_importar_facturacion_historica_lote_v2")?.[1];

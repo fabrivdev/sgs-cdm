@@ -37,6 +37,7 @@ import {
   guardarPlanificacionArticulo,
   importarFacturacionHistorica,
   completarNotasCreditoHistoricas,
+  completarVendedoresHistoricos,
   importarMaestroLegacy,
   refrescarHistorialUnificado,
   type FiltrosResultados,
@@ -255,6 +256,7 @@ export default function RepuestosSugerencias() {
   const [legacyBillingProgress, setLegacyBillingProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [historyPublishProgress, setHistoryPublishProgress] = useState<{ completed: number; total: number } | null>(null);
   const [historyRebuildRequired, setHistoryRebuildRequired] = useState(false);
+  const [sellerProgress, setSellerProgress] = useState<{ loaded: number; total: number } | null>(null);
 
   const modelBrand = brands.length === 1 ? brands[0] : "TODAS";
   const modelQuery = useModeloActivo(modelBrand);
@@ -358,6 +360,19 @@ export default function RepuestosSugerencias() {
     },
   });
 
+  const completeSellers = useMutation({
+    mutationFn: (file: File) => completarVendedoresHistoricos(file, (loaded, total) => setSellerProgress({ loaded, total })),
+    onSuccess: async result => {
+      setSellerProgress(null);
+      await queryClient.invalidateQueries({ queryKey: ["ventas-repuestos-listado-v2"] });
+      toast.success(`${integer.format(result.verificadas)} líneas verificadas; ${integer.format(result.actualizadas)} vendedores actualizados. Sin cambios en ventas ni NC.`);
+    },
+    onError: async error => {
+      setSellerProgress(null);
+      await queryClient.invalidateQueries({ queryKey: ["ventas-repuestos-listado-v2"] });
+      toast.error(error instanceof Error ? error.message : "No se pudieron completar los vendedores");
+    },
+  });
   const completeCreditNotes = useMutation({
     onMutate: () => { setHistoryRebuildRequired(true); setLegacyBillingProgress({ loaded: 0, total: 0 }); },
     mutationFn: (file: File) => completarNotasCreditoHistoricas(file, (loaded, total) => {
@@ -552,9 +567,9 @@ export default function RepuestosSugerencias() {
                 )}
                 {canLoadLegacyMaster && legacyBillingQuery.data?.cargado && <div>
                   <input id="legacy-credit-notes" type="file" accept=".xlsx,.xls" className="hidden"
-                    disabled={completeCreditNotes.isPending || refreshHistory.isPending}
+                    disabled={completeCreditNotes.isPending || refreshHistory.isPending || completeSellers.isPending}
                     onChange={event => { const file = event.target.files?.[0]; if (file) completeCreditNotes.mutate(file); event.target.value = ""; }} />
-                  <Button asChild variant="outline" className={cn((completeCreditNotes.isPending || refreshHistory.isPending) && "pointer-events-none opacity-60")}>
+                  <Button asChild variant="outline" className={cn((completeCreditNotes.isPending || refreshHistory.isPending || completeSellers.isPending) && "pointer-events-none opacity-60")}>
                     <label htmlFor="legacy-credit-notes" className="cursor-pointer">
                       {completeCreditNotes.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                       {completeCreditNotes.isPending && legacyBillingProgress ? `Completando NC ${integer.format(legacyBillingProgress.loaded)} / ${integer.format(legacyBillingProgress.total)}` : "Completar notas de crédito"}
@@ -562,7 +577,19 @@ export default function RepuestosSugerencias() {
                   </Button>
                   <p className="mt-1 text-xs text-muted-foreground">Seleccioná el mismo Excel histórico. Solo se agregan devoluciones E faltantes; las ventas S no se recargan.</p>
                 </div>}
-                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending || loadLegacyBilling.isPending || completeCreditNotes.isPending}>
+                {canLoadLegacyMaster && legacyBillingQuery.data?.cargado && <div>
+                  <input id="legacy-sellers" type="file" accept=".xlsx,.xls" className="hidden"
+                    disabled={completeSellers.isPending || completeCreditNotes.isPending || refreshHistory.isPending}
+                    onChange={event => { const file = event.target.files?.[0]; if (file) completeSellers.mutate(file); event.target.value = ""; }} />
+                  <Button asChild variant="outline" className={cn((completeSellers.isPending || completeCreditNotes.isPending || refreshHistory.isPending) && "pointer-events-none opacity-60")}>
+                    <label htmlFor="legacy-sellers" className="cursor-pointer">
+                      {completeSellers.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                      {completeSellers.isPending && sellerProgress ? `Vendedores ${integer.format(sellerProgress.loaded)} / ${integer.format(sellerProgress.total)}` : "Completar vendedores históricos"}
+                    </label>
+                  </Button>
+                  <p className="mt-1 text-xs text-muted-foreground">Mismo Excel original. Solo completa vendedores de líneas existentes, sin recargar ventas ni notas de crédito.</p>
+                </div>}
+                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending || loadLegacyBilling.isPending || completeCreditNotes.isPending || completeSellers.isPending}>
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   {historyPublishProgress
                     ? `Publicando ${historyPublishProgress.completed}/${historyPublishProgress.total}`

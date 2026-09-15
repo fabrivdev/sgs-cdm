@@ -20,7 +20,7 @@ const detail: PartsListing = { total: 3, pagina: 1, paginas: 1, total_periodo: 1
 function mockRpc() {
   rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
     data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview
-       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", anterior: 50, ultima: "2026-08-10" }] },
+       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "000007 – CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", anterior: 50, ultima: "2026-08-10" }] },
   }) }));
 }
 function Harness({ desde = "2026-01-01", hasta = "2026-09-15" }: { desde?: string; hasta?: string }) {
@@ -82,6 +82,7 @@ describe("Ventas de Repuestos", () => {
     expect(screen.queryByRole("button", { name: "Análisis" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Vendedores" }));
     expect(await screen.findByText("CARLOS BENITEZ")).toBeInTheDocument();
+    expect(screen.queryByText(/000007/)).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Vendedor" })).toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalledWith("ventas_area_analisis_negocio", expect.anything());
   });

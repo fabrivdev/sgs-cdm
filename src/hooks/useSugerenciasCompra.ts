@@ -1025,6 +1025,29 @@ export async function completarNotasCreditoHistoricas(file: File,
   return { insertadas: inserted, verificadas: creditNotes.length };
 }
 
+/** Recupera vendedores de S/E existentes sin reimportar movimientos ni publicar demanda. */
+export async function completarVendedoresHistoricos(file: File,
+  onProgress?: (loaded: number, total: number) => void) {
+  const rows = (await leerFacturacionHistorica(file)).filter(row => row.vendedor.trim());
+  if (!rows.length) throw new Error("El archivo no contiene vendedores históricos");
+  const state = await (supabase.rpc as any)("repuestos_estado_facturacion_historica");
+  if (state.error) throw new Error(mensajeErrorSupabase(state.error, "No se pudo consultar la carga histórica"));
+  if (!state.data?.cargado || !state.data?.carga_id) throw new Error("Primero debe existir una carga histórica completa");
+  let updated = 0;
+  for (let offset = 0; offset < rows.length; offset += 1000) {
+    const chunk = rows.slice(offset, offset + 1000);
+    const result = await (supabase.rpc as any)("repuestos_completar_vendedores_historicos", {
+      p_carga_id: state.data.carga_id,
+      p_filas: chunk.map(({ linea_clave, vendedor, cantidad, total_venta }) => ({ linea_clave, vendedor, cantidad, total_venta })),
+    });
+    if (result.error) throw new Error(mensajeErrorSupabase(result.error,
+      "No se pudo completar el lote de vendedores. Podés reintentar el mismo archivo"));
+    updated += Number(result.data?.actualizadas ?? 0);
+    onProgress?.(offset + chunk.length, rows.length);
+  }
+  return { actualizadas: updated, verificadas: rows.length };
+}
+
 export async function guardarPlanificacionArticulo(input: {
   productoCodigo: string;
   stockMinimoEstrategico: number;

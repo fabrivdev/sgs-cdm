@@ -80,7 +80,37 @@ assert.equal(search.total_periodo,90); // Buscar también el código legacy de u
 await db.exec(`insert into repuestos_facturacion_historica_cargas(id,activo,estado) values('00000000-0000-0000-0000-000000000011',false,'PROCESANDO');`);
 const initial=await call('repuestos_importar_facturacion_historica_lote',`'00000000-0000-0000-0000-000000000011','${JSON.stringify([{...note,linea_clave:'8|2026-06-30|NC2|OLD1',documento:'NC2'}])}'::jsonb`);
 assert.equal(initial.insertadas,1); // El cargador inicial real ahora admite E.
+// Reportes actuales de Lovable + complemento de metadatos: cantidades e importes intactos.
+await db.exec('alter table facturacion_lineas_importadas add column vendedor text;');
+await db.exec(readFileSync('drizzle/migrations/0005_parts_sales_brand_sellers.sql','utf8'));
+const sellersMigration=readFileSync('supabase/migrations/20260915180000_recover_and_unify_parts_sales_sellers.sql','utf8');
+await db.exec(sellersMigration); await db.exec(sellersMigration);
+await db.exec(`update facturacion_lineas_importadas set raw_data=raw_data||'{"carga_id":"00000000-0000-0000-0000-000000000010"}'::jsonb
+  where origen_sistema='legacy_historico_detallado' and factura='H1';`);
+const metadata=[{linea_clave:'2|2026-06-30|H1|OLD1',vendedor:'CARLOS JAVIER BENITEZ ZARZA',cantidad:2,total_venta:60},
+  {linea_clave:'3|2026-06-30|H1|OLD1',vendedor:'000007 – Carlos Benítez',cantidad:2,total_venta:60},
+  {linea_clave:note.linea_clave,vendedor:'Carlos Benitez',cantidad:note.cantidad,total_venta:note.total_venta}];
+const recover=async(rows=metadata)=>(await db.query('select repuestos_completar_vendedores_historicos($1,$2::jsonb) r',
+  ['00000000-0000-0000-0000-000000000010',JSON.stringify(rows)])).rows[0].r;
+const before=(await db.query('select id,linea_hash,cantidad,total_venta from facturacion_lineas_importadas order by id')).rows;
+assert.equal((await recover()).actualizadas,3);
+assert.equal((await recover()).actualizadas,0);
+await assert.rejects(recover([{...metadata[0],total_venta:61}]),/no coincide/);
+await assert.rejects(recover([{...metadata[0],linea_clave:'INEXISTENTE'}]),/no coincide/);
+await assert.rejects(recover([metadata[0],metadata[0]]),/duplicadas/);
+assert.deepEqual((await db.query('select id,linea_hash,cantidad,total_venta from facturacion_lineas_importadas order by id')).rows,before);
+const sellers=await call('ventas_repuestos_listado_v2',"'2026-06-01','2026-08-31',null,null,'vendedores'");
+assert.equal(sellers.total_periodo,315); // La prueba de carga inicial anterior agregó otra NC por -30.
+assert.equal(sellers.filas.filter(row=>row.vendedor==='CARLOS BENITEZ').length,1);
+assert.equal(sellers.filas.find(row=>row.vendedor==='CARLOS BENITEZ').facturado,90);
+assert.equal(sellers.filas.find(row=>row.vendedor==='CARLOS BENITEZ').notas_credito,-30);
+assert.equal((await db.query("select ventas_repuestos_normalizar_vendedor('000006: Oscar Benítez') r")).rows[0].r,'OSCAR BENITEZ');
+assert.equal((await db.query("select ventas_repuestos_normalizar_vendedor('OSCAR MIGUEL BENITEZ LOPEZ') r")).rows[0].r,'OSCAR MIGUEL BENITEZ LOPEZ');
+const futureNote={...note,linea_clave:'9|2026-06-30|NC3|OLD1',documento:'NC3',vendedor:'000006 - Oscar Benitez'};
+await call('repuestos_completar_notas_credito_historicas',`'00000000-0000-0000-0000-000000000010','${JSON.stringify([futureNote])}'::jsonb,'${JSON.stringify(anchors)}'::jsonb`);
+assert.equal((await db.query("select raw_data->>'vendedor' r from facturacion_lineas_importadas where factura='NC3'")).rows[0].r,futureNote.vendedor);
 await db.exec(`create or replace function has_role(uuid,app_role) returns boolean language sql as $$select false$$;`);
+await assert.rejects(recover(),/administrador/);
 await assert.rejects(complement(),/administrador/);
 await db.exec(`create or replace function has_section_access(uuid,text) returns boolean language sql as $$select false$$;`);
 await assert.rejects(call('ventas_repuestos_listado_v1',"'2026-06-01','2026-08-31'"),/acceso/);
