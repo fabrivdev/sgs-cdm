@@ -21,7 +21,6 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
   const marcaRows = data.por_marca_tipo ?? [];
   const porMarcaTipo = [...marcaRows].sort((a, b) => Number(Boolean(a.sin_vinculo_historico)) - Number(Boolean(b.sin_vinculo_historico)) || Number(unknown(a.marca)) - Number(unknown(b.marca)) || a.marca.localeCompare(b.marca, "es") || b.neto - a.neto);
   const missingBrandBreakdown = !Array.isArray(data.por_marca_tipo);
-  const hasUnlinkedHistory = porTipo.some((row) => row.sin_vinculo_historico);
   const cards: Array<[string, string]> = [
     ["Neto", money(totales.neto)],
     ["Mano de obra", money(totales.mo)],
@@ -44,7 +43,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
         ))}
       </div>
 
-      {hasUnlinkedHistory && <p className="text-[11px] text-muted-foreground">Horas OS: sólo órdenes vinculadas. “—” indica que el histórico sin vínculo no tiene OS u horas verificadas.</p>}
+      
 
       <div className="overflow-x-auto rounded-md border">
         <div className="min-w-[1060px]">
