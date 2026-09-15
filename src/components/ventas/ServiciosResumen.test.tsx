@@ -25,6 +25,22 @@ const fixture: IndicadoresResponse = {
 const mockData = (data: unknown) => useIndicadores.mockReturnValue({ data, loading: false, error: null });
 
 describe('service summary breakdown contract', () => {
+  it('groups other brands by time type and recalculates their participation', () => {
+    mockData({ ...fixture, por_marca_tipo: [
+      { ...amounts, marca: 'JOHN DEERE', tipo_tiempo: 'Cliente', horas: 2 },
+      { ...amounts, marca: 'VALTRA', tipo_tiempo: 'Cliente', horas: 3 },
+      { ...amounts, marca: 'NB', tipo_tiempo: 'Garantia', horas: 4 },
+    ] });
+    render(<ServiciosResumen {...props} />);
+    expect(screen.getAllByText('OTROS')).toHaveLength(2);
+    expect(screen.queryByText('JOHN DEERE')).not.toBeInTheDocument();
+    expect(screen.queryByText('VALTRA')).not.toBeInTheDocument();
+    const row = screen.getByText('Cliente').parentElement!;
+    expect(row.children[2]).toHaveTextContent('$ 200');
+    expect(row.children[6]).toHaveTextContent('$ 200');
+    expect(row.children[7]).toHaveTextContent('5');
+    expect(row.children[8]).toHaveTextContent('67%');
+  });
   it('renders brands and distinguishes missing historical OS/hours from unclassified current time', () => {
     mockData(fixture);
     render(<ServiciosResumen {...props} />);

@@ -1,5 +1,6 @@
 import { money } from "@/components/dashboard/utils";
 import { MarcaBadge } from "@/components/StatusBadges";
+import { groupServiceBrandsByTime } from "./serviceBrandGroups";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -19,7 +20,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
 
   const { totales } = data;
   const porTipo = [...data.por_tipo].sort((a, b) => Number(Boolean(a.sin_vinculo_historico)) - Number(Boolean(b.sin_vinculo_historico)) || Number(unknown(a.tipo_tiempo)) - Number(unknown(b.tipo_tiempo)) || b.neto - a.neto);
-  const marcaRows = data.por_marca_tipo ?? [];
+  const marcaRows = groupServiceBrandsByTime(data.por_marca_tipo ?? []);
   const porMarcaTipo = [...marcaRows].sort((a, b) => Number(Boolean(a.sin_vinculo_historico)) - Number(Boolean(b.sin_vinculo_historico)) || Number(unknown(a.marca)) - Number(unknown(b.marca)) || a.marca.localeCompare(b.marca, "es") || b.neto - a.neto);
   const missingBrandBreakdown = !Array.isArray(data.por_marca_tipo);
   const cards: Array<[string, string]> = [
