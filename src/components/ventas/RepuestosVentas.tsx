@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Receipt, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
+import { shortPersonName } from "@/lib/personName";
 import { PARTS_HEADERS, partsRange, validPartsRange as validRange } from "./partsSalesFormat";
 
 type Filters = { desde: string; hasta: string; sucursal: string; buscar: string };
@@ -21,15 +22,16 @@ export type PartsPeriod = PartsMetrics & {
 export type PartsOverview = {
   resumen: PartsMetrics; periodos: PartsPeriod[];
   por_sucursal: Array<PartsMetrics & { sucursal: string }>;
-  por_origen: Array<PartsMetrics & { metodologia: string }>;
+  por_marca: Array<PartsMetrics & { marca: string }>;
   comparacion: { facturado: number; lineas: number; desde: string; hasta: string };
   comparacion_ly: { facturado: number; lineas: number; desde: string; hasta: string };
 };
-type View = "resumen" | "clientes" | "repuestos" | "detalle";
+type View = "resumen" | "vendedores" | "clientes" | "repuestos" | "detalle";
 export type PartsRow = Partial<PartsMetrics> & {
   id: string; facturado: number; fecha?: string; factura?: string; cliente?: string;
   sucursal?: string; codigo?: string; codigo_fabricante?: string; descripcion?: string;
   cantidad?: number | null; metodologia?: string; es_nota_credito?: boolean;
+  marca?: string; vendedor?: string;
   unidades_vendidas?: number | null; unidades_devueltas?: number | null;
   anterior?: number | null; ultima?: string;
 };
@@ -39,6 +41,8 @@ const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const date = (value?: string) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const number = (value: number | null | undefined) => value == null ? "—" : decimal.format(value);
 const share = (value: number, total: number) => total ? `${Math.round(value / total * 100)}%` : "—";
+const seller = (value?: string) => shortPersonName(value).toLocaleUpperCase("es-PY") || "Sin vendedor";
+const brand = (value?: string) => value === "CLAAS" || value === "HORSCH" ? value : "Otros";
 function params(filters: Filters) {
   return { p_desde: filters.desde, p_hasta: filters.hasta, p_sucursal: filters.sucursal === "TODAS" ? null : filters.sucursal, p_buscar: filters.buscar.trim() || null };
 }
@@ -54,7 +58,7 @@ async function rpc<T>(name: string, args: Record<string, unknown>, signal: Abort
 }
 function useOverview(filters: Filters, mode: PeriodMode) {
   return useQuery({ queryKey: ["ventas-repuestos-panorama-v2", params(filters), mode],
-    queryFn: ({ signal }) => rpc<PartsOverview>("ventas_repuestos_panorama_v1", { ...params(filters), p_agrupacion: mode }, signal),
+    queryFn: ({ signal }) => rpc<PartsOverview>("ventas_repuestos_panorama_v2", { ...params(filters), p_agrupacion: mode }, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
 }
 function State({ loading, error, retry }: { loading?: boolean; error?: Error | null; retry?: () => void }) {
@@ -71,7 +75,7 @@ function Delta({ current, previous, lines }: { current: number; previous: number
   const value = previous == null || lines === 0 ? null : pct(current, previous);
   return <span className={cn("tabular-nums", value != null && value < 0 && "text-destructive")} title={value == null ? "Sin base de comparación distinta de cero." : undefined}>{value == null ? "—" : `${value > 0 ? "+" : ""}${value}%`}</span>;
 }
-const tableClass = "w-full table-fixed text-[12px] [&_th]:px-3 [&_th]:py-2 [&_th]:text-center [&_th]:text-[11px] [&_th]:font-medium [&_td]:px-3 [&_td]:py-2 [&_td]:align-middle [&_tbody_tr]:border-t";
+const tableClass = "w-full table-fixed text-[12px] leading-4 [&_th]:h-8 [&_th]:px-3 [&_th]:text-right [&_th]:text-[11px] [&_th]:font-medium [&_th:first-child]:text-left [&_td]:h-8 [&_td]:px-3 [&_td]:align-middle [&_tbody_tr]:border-t";
 function Table({ children, minWidth = "min-w-[1060px]" }: { children: React.ReactNode; minWidth?: string }) {
   return <div className="overflow-x-auto rounded-md border"><table className={cn(tableClass, minWidth)}>{children}</table></div>;
 }
@@ -104,50 +108,50 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
       </tr>)}</tbody>
       <tfoot className="border-t bg-muted/30"><tr><td className="font-semibold">Total del período</td><Metrics row={data.resumen} /><td className="text-center"><Delta current={data.resumen.facturado} previous={data.comparacion.facturado} lines={data.comparacion.lineas} /></td><td className="text-center"><Delta current={data.resumen.facturado} previous={data.comparacion_ly.facturado} lines={data.comparacion_ly.lineas} /></td><td className="text-right">{share(data.resumen.facturado, data.resumen.facturado)}</td></tr></tfoot>
     </Table>}
-      <p className="mt-2 text-[10px] text-muted-foreground">Ventas + notas de crédito = facturado neto. LM: período anterior; LY: año anterior, con el mismo recorte de fechas. El histórico conserva artículos, cantidades y devoluciones E. No distingue repuestos de OS: las comparaciones que cruzan el 01/07/2026 tienen distinta cobertura.</p>
     </div>}
   </Panel>;
 }
 function Summary({ data }: { data: PartsOverview }) {
-  const cards: Array<[string, string]> = [
-    ["Facturado", money(data.resumen.facturado)], ["Ventas", money(data.resumen.ventas)], ["Notas de crédito", money(data.resumen.notas_credito)],
-    ["Clientes", integer.format(data.resumen.clientes)], ["Documentos", integer.format(data.resumen.documentos)], ["Unidades netas", number(data.resumen.unidades_netas)],
-    ["Documentos NC", integer.format(data.resumen.documentos_nc)], ["Líneas", integer.format(data.resumen.lineas)],
-  ];
+  const brandOrder = ["CLAAS", "HORSCH", "Otros"];
+  const groups = [
+    ["Sucursal", data.por_sucursal.map(row => ({ ...row, label: row.sucursal }))],
+    ["Marca", data.por_marca.map(row => ({ ...row, label: brand(row.marca) })).sort((a, b) => brandOrder.indexOf(a.label) - brandOrder.indexOf(b.label))],
+  ] as const;
   return <div className="space-y-3">
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{cards.map(([label, value]) => <div key={label} className="rounded-md border px-3 py-2"><p className="truncate text-[10px] font-medium text-muted-foreground">{label}</p><p className="mt-0.5 text-[13px] font-semibold tabular-nums">{value}</p></div>)}</div>
-    {([ ["Sucursal", data.por_sucursal.map(row => ({ ...row, label: row.sucursal }))], ["Origen", data.por_origen.map(row => ({ ...row, label: row.metodologia === "historico" ? "Sistema anterior · detalle por artículo" : "Sistema actual" }))] ] as const).map(([label, rows]) => <Table key={label}>
+    {groups.map(([label, rows]) => <Table key={label}>
       <colgroup><col style={{ width: "28%" }} />{PARTS_HEADERS.map(head => <col key={head} />)}<col /></colgroup>
       <Heads labels={[label, ...PARTS_HEADERS, "Participación"]} /><tbody>{rows.map(row => <tr key={row.label}><td className="font-medium">{row.label}</td><Metrics row={row} /><td className="text-right">{share(row.facturado, data.resumen.facturado)}</td></tr>)}</tbody>
     </Table>)}
   </div>;
 }
 function Pager({ data, onPage }: { data: { total: number; pagina: number; paginas: number }; onPage: (page: number) => void }) {
-  return <div className="flex flex-col gap-2 text-[10px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>{integer.format(data.total)} registros · totales sobre todo el período</span><div className="flex shrink-0 items-center gap-2 whitespace-nowrap"><button type="button" disabled={data.pagina <= 1} onClick={() => onPage(data.pagina - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Anterior</button><span>{data.pagina} de {data.paginas}</span><button type="button" disabled={data.pagina >= data.paginas} onClick={() => onPage(data.pagina + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Siguiente</button></div></div>;
+  return <div className="flex h-8 items-center justify-between gap-3 text-[11px] text-muted-foreground"><span>{integer.format(data.total)} registros</span><div className="flex shrink-0 items-center gap-1 whitespace-nowrap"><span className="mr-1">Pág. {data.pagina} de {data.paginas}</span><button type="button" aria-label="Página anterior" disabled={data.pagina <= 1} onClick={() => onPage(data.pagina - 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" /></button><button type="button" aria-label="Página siguiente" disabled={data.pagina >= data.paginas} onClick={() => onPage(data.pagina + 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronRight className="h-3.5 w-3.5" /></button></div></div>;
 }
-function Listing({ filters, view }: { filters: Filters; view: "clientes" | "repuestos" | "detalle" }) {
+function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "clientes" | "repuestos" | "detalle" }) {
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["ventas-repuestos-listado-v2", params(filters), view, page],
-    queryFn: ({ signal }) => rpc<PartsListing>("ventas_repuestos_listado_v1", { ...params(filters), p_vista: view, p_pagina: page, p_por_pagina: 50 }, signal),
+    queryFn: ({ signal }) => rpc<PartsListing>("ventas_repuestos_listado_v2", { ...params(filters), p_vista: view, p_pagina: page, p_por_pagina: 50 }, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
   if (query.isLoading || query.error || !query.data) return <State loading={query.isLoading} error={query.error} retry={() => void query.refetch()} />;
   const data = query.data;
   if (!data.filas.length) return <State />;
   const labels = view === "detalle" ? ["Fecha", "Factura", "Cliente", "Sucursal", "Cód. repuesto", "Cód. fabricante", "Descripción", "Cantidad", "Facturado"]
-    : view === "clientes" ? ["Cliente facturado", "Sucursales", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
+    : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
+      : view === "vendedores" ? ["Vendedor", ...PARTS_HEADERS, "Participación"]
       : ["Cód. repuesto", "Cód. fabricante", "Descripción", ...PARTS_HEADERS, "Unidades vendidas", "Unidades devueltas", "Participación"];
   return <div className="space-y-2"><Table minWidth={view === "detalle" ? "min-w-[1120px]" : view === "repuestos" ? "min-w-[1530px]" : "min-w-[1300px]"}>
     <colgroup>{view === "detalle" ? <><col style={{ width: "85px" }} /><col style={{ width: "125px" }} /><col style={{ width: "190px" }} /><col style={{ width: "95px" }} /><col style={{ width: "105px" }} /><col style={{ width: "110px" }} /><col /><col style={{ width: "70px" }} /><col style={{ width: "105px" }} /></>
-      : view === "clientes" ? <><col style={{ width: "220px" }} /><col style={{ width: "140px" }} />{labels.slice(2).map(label => <col key={label} />)}</>
+      : view === "clientes" ? <><col style={{ width: "220px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
+        : view === "vendedores" ? <><col style={{ width: "240px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
         : <><col style={{ width: "130px" }} /><col style={{ width: "140px" }} /><col style={{ width: "300px" }} />{labels.slice(3).map(label => <col key={label} />)}</>}</colgroup>
     <Heads labels={labels} /><tbody>{data.filas.map(row => <tr key={row.id} className="hover:bg-muted/20">
-      {view === "detalle" ? <><td className="whitespace-nowrap text-muted-foreground">{date(row.fecha)}</td><td className="break-all font-mono text-[11px]">{row.factura || "Sin número"}{row.es_nota_credito && <span className="ml-1 inline-block whitespace-nowrap rounded bg-muted px-1 font-sans text-[10px]">NC</span>}</td><td>{row.cliente}</td><td>{row.sucursal}</td><td className="break-all font-mono text-[11px]">{row.codigo || "—"}</td><td className="break-all font-mono text-[11px]">{row.codigo_fabricante || "—"}</td><td className="break-words">{row.descripcion || "Descripción no informada"}</td><td className="text-right tabular-nums">{number(row.cantidad)}</td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td></>
-        : <>{view === "clientes" ? <><td className="font-medium">{row.cliente}</td><td className="text-muted-foreground">{row.sucursal}</td></> : <><td className="break-all font-mono text-[11px]">{row.codigo || "—"}</td><td className="break-all font-mono text-[11px]">{row.codigo_fabricante || "—"}</td><td className="break-words">{row.descripcion || "Descripción no informada"}</td></>}<Metrics row={row} client={view === "clientes"} />
+      {view === "detalle" ? <><td className="whitespace-nowrap text-muted-foreground">{date(row.fecha)}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.factura}>{row.factura || "—"}{row.es_nota_credito && <span className="ml-1 rounded bg-muted px-1 font-sans text-[10px]">NC</span>}</td><td className="truncate whitespace-nowrap" title={row.cliente}>{row.cliente || "—"}</td><td className="truncate whitespace-nowrap" title={row.sucursal}>{row.sucursal || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td><td className="text-right tabular-nums">{number(row.cantidad)}</td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td></>
+        : <>{view === "clientes" ? <td className="truncate whitespace-nowrap font-medium" title={row.cliente}>{row.cliente || "—"}</td> : view === "vendedores" ? <td className="truncate whitespace-nowrap font-medium" title={seller(row.vendedor)}>{seller(row.vendedor)}</td> : <><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td></>}<Metrics row={row} client={view === "clientes"} />
           {view === "clientes" && <><td className="text-right tabular-nums text-muted-foreground">{row.anterior == null ? "—" : money(row.anterior)}</td><td className="text-center"><Delta current={row.facturado} previous={row.anterior} /></td><td className="text-center whitespace-nowrap">{date(row.ultima)}</td></>}
           {view === "repuestos" && <><td className="text-right tabular-nums">{number(row.unidades_vendidas)}</td><td className="text-right tabular-nums">{number(row.unidades_devueltas)}</td></>}
           <td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td></>}
     </tr>)}</tbody>
-  </Table><p className="text-right text-[11px] text-muted-foreground">Total facturado en el período: <span className="font-semibold text-foreground">{money(data.total_periodo)}</span></p><Pager data={data} onPage={setPage} /></div>;
+  </Table><Pager data={data} onPage={setPage} /></div>;
 }
 export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, selectedPeriod, onSelectPeriod }: Filters & {
   periodMode: PeriodMode; selectedPeriod: string | null; onSelectPeriod: (value: string | null) => void;
@@ -174,8 +178,8 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, se
           "Histórico pendiente de conciliar: completá las notas de crédito desde Sugerencias → Historial. Los importes mostrados incluyen solamente las líneas ya cargadas."}
       </p>}
     <Panorama data={panorama.data} loading={panorama.isLoading} error={panorama.error} retry={() => void panorama.refetch()} mode={periodMode} selected={selectedPeriod} onSelect={onSelectPeriod} />
-    <Panel className="p-3"><div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="text-[13px] font-semibold">Indicadores de ventas de repuestos</h2><div className="flex h-8 overflow-x-auto rounded-md border text-[11px]">{([ ["resumen", "Resumen"], ["clientes", "Clientes"], ["repuestos", "Repuestos"], ["detalle", "Detalle"] ] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)} className={cn("shrink-0 px-2 hover:bg-accent md:px-3", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
-      <p className="my-3 text-[10px] text-muted-foreground">Facturación del {date(range.desde)} al {date(range.hasta)} · Los repuestos vinculados a OS se contabilizan en Servicios.</p>
+    <Panel className="p-3"><div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="flex h-8 shrink-0 overflow-x-auto rounded-md border text-[11px]">{([ ["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["repuestos", "Repuestos"], ["detalle", "Detalle"] ] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)} className={cn("shrink-0 whitespace-nowrap px-2 hover:bg-accent md:px-3", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
+      <div className="mt-3" />
       {view === "resumen" ? overview.isLoading || overview.error || !overview.data ? <State loading={overview.isLoading} error={overview.error} retry={() => void overview.refetch()} /> : <Summary data={overview.data} />
         : <Listing key={`${view}:${JSON.stringify(focused)}`} filters={focused} view={view} />}
     </Panel>

@@ -42,21 +42,22 @@ CENTRAL → Santa Rita y SANTA ROSA DEL AGUARAY → Santa Rosa.
 
 ## Fechas, vistas y presentación
 
-Quedan únicamente Resumen, Clientes, Repuestos y Detalle. Análisis se eliminó
-por pedido del usuario. Todas usan el mismo helper financiero. Detalle es plano:
+Las vistas son Resumen, Vendedores, Clientes, Repuestos y Detalle. Todas usan
+el mismo helper financiero. Detalle es plano:
 una fila por repuesto, factura repetida cuando corresponda, código de repuesto,
 código de fabricante, descripción completa, cantidad firmada e importe.
 
 Panorama usa el rango superior. Seleccionar un período intersecta sus límites
-con ese rango y recorta KPI y las cuatro vistas: agosto finaliza el 31/08.
+con ese rango y recorta KPI y las cinco vistas: agosto finaliza el 31/08.
 La fila Total del período mantiene el total superior. LM compara el período
 anterior; LY el año anterior, con meses completos y bisiestos correctamente.
 Si las NC históricas aún no fueron verificadas se avisa, también cuando solo
 afectan comparaciones LY. No se presenta un cero de NC como conciliación completa.
 
-Resumen presenta sucursales y origen. Clientes es una lista de compradores con
-promedio documental y comparación LY, no una lista de clientes perdidos.
-Importes usan `$`, encabezados centrados y tablas densas con scroll horizontal
+Resumen presenta sucursales y marcas. Vendedores usa el nombre conservado en
+cada línea. Clientes muestra compradores sin repetir sucursales, con promedio
+documental y comparación LY. Importes usan `$`, encabezados numéricos alineados
+a la derecha y tablas densas con scroll horizontal
 local. Los totales se calculan antes de paginar, sin limitar el universo a 500
 líneas. React Query comparte Panorama/Resumen y no reintenta informes fallidos.
 

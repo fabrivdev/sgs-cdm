@@ -36,6 +36,13 @@
       "when": 1789170866164,
       "tag": "0004_service_sales_brand_time_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789497334650,
+      "tag": "0005_parts_sales_brand_sellers",
+      "breakpoints": true
     }
   ]
 }
