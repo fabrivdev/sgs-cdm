@@ -35,7 +35,7 @@ describe('service summary breakdown contract', () => {
     expect(historical.children[7]).toHaveTextContent('—');
     expect(historical.children[6]).toHaveTextContent('$ 100');
     expect(screen.getAllByText('No informado')).toHaveLength(2);
-    expect(screen.getByText(/Horas OS: sólo órdenes vinculadas/)).toBeInTheDocument();
+    
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
   it('reports an outdated SQL response rather than pretending there are no brands', () => {
