@@ -19,6 +19,16 @@ function setup() {
 }
 
 describe("Ventas de Máquinas", () => {
+  it("uses the same Oscar identity in the seller summary and invoice detail", () => {
+    const oscarData = { ...data, lineas: data.lineas.map((line, index) => ({ ...line, comercial: index ? "OSCAR DANIEL BENITEZ MEZA" : "000006 - Oscar Benítez" })) };
+    render(<MaquinasExplorer data={oscarData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);
+    fireEvent.click(screen.getByRole("button", { name: "Vendedores" }));
+    expect(screen.getAllByText("OSCAR BENITEZ")).toHaveLength(1);
+    expect(screen.getByText("$ 280.000")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    expect(screen.getAllByText("OSCAR BENITEZ")).toHaveLength(2);
+    expect(screen.queryByText("OSCAR MEZA")).not.toBeInTheDocument();
+  });
   it("unifies Campos in customer grouping and invoice detail across systems", () => {
     const camposData = { ...data, lineas: data.lineas.map((line, index) => ({ ...line, cliente_facturado: index ? 'CAMPOS DEL MANANA S.A. - SANTA RITA' : 'campos del mañana SA (OTRA SEDE)' })) };
     render(<MaquinasExplorer data={camposData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);
