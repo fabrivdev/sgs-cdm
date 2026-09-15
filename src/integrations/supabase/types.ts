@@ -3695,6 +3695,8 @@ export type Database = {
           filas_recibidas: number
           id: string
           lineas_vinculadas: number
+          notas_credito_archivo: number | null
+          notas_credito_verificadas_en: string | null
           productos_vinculados: number
           publicacion_estado: string | null
           publicacion_hasta: string | null
@@ -3711,6 +3713,8 @@ export type Database = {
           filas_recibidas?: number
           id?: string
           lineas_vinculadas?: number
+          notas_credito_archivo?: number | null
+          notas_credito_verificadas_en?: string | null
           productos_vinculados?: number
           publicacion_estado?: string | null
           publicacion_hasta?: string | null
@@ -3727,6 +3731,8 @@ export type Database = {
           filas_recibidas?: number
           id?: string
           lineas_vinculadas?: number
+          notas_credito_archivo?: number | null
+          notas_credito_verificadas_en?: string | null
           productos_vinculados?: number
           publicacion_estado?: string | null
           publicacion_hasta?: string | null
@@ -6220,12 +6226,31 @@ export type Database = {
         }
         Relationships: []
       }
+      v_ventas_repuestos_historico_completo: {
+        Row: {
+          cantidad: number | null
+          cliente: string | null
+          codigo: string | null
+          codigo_fabricante: string | null
+          codigo_legacy: string | null
+          descripcion: string | null
+          es_nota_credito: boolean | null
+          factura: string | null
+          fecha: string | null
+          fecha_factura: string | null
+          importe: number | null
+          linea_id: string | null
+          sucursal: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_actualizar_acceso_seccion: {
         Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
         Returns: undefined
       }
+      cliente_nombre_canonico: { Args: { p_nombre: string }; Returns: string }
       comisiones_actualizar_tipo_tiempo: {
         Args: { p_jornada_id: string; p_tipo_tiempo: string }
         Returns: string
@@ -6725,6 +6750,10 @@ export type Database = {
         }
         Returns: Json
       }
+      repuestos_completar_notas_credito_historicas: {
+        Args: { p_anclas: Json; p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
       repuestos_crear_version_modelo: {
         Args: {
           p_marca: string
@@ -6867,6 +6896,10 @@ export type Database = {
           p_segmento?: string
           p_solo_sugeridos?: boolean
         }
+        Returns: Json
+      }
+      repuestos_verificar_notas_credito_historicas: {
+        Args: { p_carga_id: string; p_claves: string[] }
         Returns: Json
       }
       repuestos_vincular_codigo_legacy: {
@@ -7040,6 +7073,52 @@ export type Database = {
         Args: { p_vendedor: string }
         Returns: string
       }
+      ventas_repuestos_estado_historico_v1: { Args: never; Returns: Json }
+      ventas_repuestos_listado_v1: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+          p_vista?: string
+        }
+        Returns: Json
+      }
+      ventas_repuestos_movimientos_v1: {
+        Args: {
+          p_buscar: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal: string
+        }
+        Returns: {
+          cantidad: number
+          cliente: string
+          codigo: string
+          codigo_fabricante: string
+          descripcion: string
+          documento: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          id: string
+          importe: number
+          metodologia: string
+          sucursal: string
+        }[]
+      }
+      ventas_repuestos_panorama_v1: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
       ventas_servicios_detalle_os: {
         Args: {
           p_buscar?: string
@@ -7102,6 +7181,17 @@ export type Database = {
           p_tipo_tiempo?: string
         }
         Returns: Json
+      }
+      ventas_servicios_maquinas_identidad: {
+        Args: never
+        Returns: {
+          chasis_clave: string
+          fuente_propietario: string
+          marca_parque: string
+          modelo_tipo: string
+          propietario: string
+          tipo_maquina: string
+        }[]
       }
       ventas_servicios_movimientos_enriquecidos: {
         Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
