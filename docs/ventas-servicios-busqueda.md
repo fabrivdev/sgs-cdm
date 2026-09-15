@@ -55,3 +55,27 @@ Garantía e Interno. Una respuesta sin `por_marca_tipo` produce un aviso de SQL
 pendiente, no una afirmación falsa de que no hay marcas.
 
 Verificación sintética reproducible: `node scripts/verify-service-summary-sql.mjs`.
+# Propietarios de stock y nombre único de Campos
+
+La migración `20260915120000_resolve_service_stock_owners_and_campos_identity.sql`
+reemplaza la resolución exclusiva por parque por una identidad común que también
+consulta `parque_stock_maquinas`. La usan el enriquecimiento de Ventas y la cabecera
+del historial por chasis. Requiere `20260915100000` aplicada previamente.
+
+- El dueño explícito del parque **activo** tiene prioridad; una foto de stock no
+  reemplaza a un propietario explícito vigente. Si falta, stock con saldo positivo
+  demuestra inventario propio de **CAMPOS DEL MAÑANA S.A.**.
+- Parque inactivo, stock con saldo cero/negativo y chasis vacíos no prueban propiedad
+  actual. No se reemplaza al dueño por el cliente facturado ni por el dueño histórico
+  de la OS; este último sigue disponible como dato separado.
+- Varias filas de un chasis con el mismo dueño canónico no generan falsos desconocidos
+  ni multiplican líneas de venta. Dueños realmente distintos quedan ambiguos.
+- Campos se normaliza antes de agrupar y contar clientes: acentos, mayúsculas,
+  puntuación de S.A. y calificadores/sucursales se muestran como un único nombre.
+  El mismo normalizador se aplica en selectores/importación de clientes, clientes de
+  Servicios y clientes/detalle de Máquinas. No se fusionan IDs ni se reescriben facturas.
+- No cambia importes, fechas, horas, correcciones de Comisiones o reparto por técnico.
+
+Pruebas reproducibles sin conexión a producción:
+`node scripts/verify-service-owner-stock-sql.mjs` (stock, saldos, prioridad, colisiones,
+identidad y conciliación), más tests de `clientIdentity`, clientes e historial.

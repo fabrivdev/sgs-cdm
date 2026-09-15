@@ -8,10 +8,11 @@ import { money } from "@/components/dashboard/utils";
 import { serviceTypes } from "@/lib/serviceHistory";
 import { displayImportedTechnicianName, importedServiceOrderParticipants, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
+import { canonicalClientName } from "@/lib/clientIdentity";
 
 type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null; servicios_valor: number | null; repuesto_valor: number | null; kilometro_valor: number | null; terceros_valor: number | null };
 type Part = { id: string; fecha_factura: string; factura: string; cod_mercaderia: string; codigo_fabricante: string; mercaderia: string; observacion: string; cantidad: number; total_venta: number; grupo_normalizado: string; subgrupo_original: string; raw_data: Record<string, unknown> };
-type Machine = { modelo_tipo: string; clientes: { nombre: string } | null };
+type Machine = { modelo_tipo: string; clientes: { nombre: string | null } | null; fuente_propietario?: string };
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const date = (value: string | null) => value ? value.slice(0,10).split("-").reverse().join("/") : "—";
 const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
@@ -110,7 +111,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
   const visibleParts = parts.filter(part => inRange(part.fecha_factura) && [part.cod_mercaderia,part.codigo_fabricante,part.mercaderia,part.factura,part.raw_data?.linked_service_order].join(" ").toLowerCase().includes(term));
   const tableClass = "w-full text-xs [&_th]:p-2 [&_th]:font-medium [&_td]:p-2 [&_td]:align-top";
   return <Sheet open={Boolean(target)} onOpenChange={onOpenChange}><SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[1000px]">
-    <SheetHeader className="border-b p-5 pr-12"><SheetTitle>Historial de la máquina</SheetTitle><SheetDescription>{machine?.modelo_tipo ?? "Máquina"} · Chasis {chassis}<span className="block mt-1">Propietario actual: {machineError ? "No disponible: error de consulta" : machine?.clientes?.nombre ?? "No informado"}</span></SheetDescription></SheetHeader>
+    <SheetHeader className="border-b p-5 pr-12"><SheetTitle>Historial de la máquina</SheetTitle><SheetDescription>{machine?.modelo_tipo ?? "Máquina"} · Chasis {chassis}<span className="block mt-1">Propietario actual: {machineError ? "No disponible: error de consulta" : canonicalClientName(machine?.clientes?.nombre) || "No informado"}{machine?.fuente_propietario === "stock" && <span className="text-muted-foreground"> · Stock propio</span>}</span></SheetDescription></SheetHeader>
     <div className="flex gap-5 border-b px-5">{[["os","Historial de OS"],["repuestos","Repuestos"]].map(([key,label]) => <button key={key} onClick={() => { setTab(key); setSearch(""); }} className={"border-b-2 py-3 text-sm " + (tab === key ? "border-primary font-semibold" : "border-transparent text-muted-foreground")}>{label}</button>)}</div>
     <div className="min-h-0 flex-1 overflow-auto p-5 space-y-4">
       <div className="grid gap-2 sm:grid-cols-[1fr_150px_150px]"><Input aria-label="Buscar en historial" value={search} onChange={e=>setSearch(e.target.value)} placeholder={tab === "os" ? "Buscar OS o técnico…" : "Buscar código, fabricante, repuesto u OS…"}/><Input aria-label="Desde" type="date" value={from} onChange={e=>setFrom(e.target.value)}/><Input aria-label="Hasta" type="date" value={to} onChange={e=>setTo(e.target.value)}/></div>

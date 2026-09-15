@@ -19,6 +19,15 @@ function setup() {
 }
 
 describe("Ventas de Máquinas", () => {
+  it("unifies Campos in customer grouping and invoice detail across systems", () => {
+    const camposData = { ...data, lineas: data.lineas.map((line, index) => ({ ...line, cliente_facturado: index ? 'CAMPOS DEL MANANA S.A. - SANTA RITA' : 'campos del mañana SA (OTRA SEDE)' })) };
+    render(<MaquinasExplorer data={camposData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clientes' }));
+    expect(screen.getAllByText('CAMPOS DEL MAÑANA S.A.')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Detalle' }));
+    expect(screen.getAllByText('CAMPOS DEL MAÑANA S.A.')).toHaveLength(2);
+    expect(screen.queryByText(/SANTA RITA/)).not.toBeInTheDocument();
+  });
   it("separa ventas, notas de crédito y unidades netas", () => {
     setup();
     expect(screen.queryByText("Nuevas vendidas")).not.toBeInTheDocument();

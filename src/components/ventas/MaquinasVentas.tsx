@@ -6,6 +6,7 @@ import { Panel } from "@/components/layout/AppPrimitives";
 
 
 import { cn } from "@/lib/utils";
+import { canonicalClientName } from "@/lib/clientIdentity";
 
 export type MaquinaVentaLinea = {
   id: string;
@@ -114,7 +115,7 @@ function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
     if (units < 0) notasCredito += Math.abs(units);
     netas += units;
     facturas.add(line.factura);
-    clientes.add(line.cliente_facturado);
+    clientes.add(canonicalClientName(line.cliente_facturado));
   }
   return {
     total,
@@ -285,7 +286,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 
 export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedPeriod = null }: { data: MaquinasDashboardResponse | null; loading: boolean; error: string | null; desde: string; hasta: string; selectedPeriod?: string | null }) {
   const [view, setView] = useState<ExplorerView>("resumen");
-  const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta), [data, desde, hasta]);
+  const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta).map(line => ({ ...line, cliente_facturado: canonicalClientName(line.cliente_facturado) })), [data, desde, hasta]);
   const summary = useMemo(() => summarize(lines), [lines]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">

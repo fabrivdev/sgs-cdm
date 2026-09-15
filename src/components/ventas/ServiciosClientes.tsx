@@ -4,6 +4,7 @@ import { serviceSalesError } from "@/lib/serviceSalesError";
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/components/dashboard/utils";
 import { matchesServiceSalesSearch, type ServiceSalesSearchLine } from "@/lib/serviceSalesSearch";
+import { canonicalClientName } from "@/lib/clientIdentity";
 
 type Line = ServiceSalesSearchLine & { id: string; factura: string; os: string | null; cliente: string; propietario: string; componente: string; total_venta: number; es_nota_credito?: boolean };
 const usd = { format: (value: number) => money(value) };
@@ -35,7 +36,7 @@ export function ServiciosClientes({ desde, hasta, sucursal, buscar, tipoTiempo, 
   const rows = useMemo(() => {
     type Summary = { cliente: string; total: number; facturas: Set<string>; notas: Set<string>; os: Set<string>; mo: number; km: number; repuestos: number; terceros: number };
     const map = new Map<string, Summary>();
-    const get = (name: string) => { const key = name || "Sin cliente"; const value = map.get(key) ?? { cliente: key, total: 0, facturas: new Set<string>(), notas: new Set<string>(), os: new Set<string>(), mo: 0, km: 0, repuestos: 0, terceros: 0 }; map.set(key, value); return value; };
+    const get = (name: string) => { const key = canonicalClientName(name) || "Sin cliente"; const value = map.get(key) ?? { cliente: key, total: 0, facturas: new Set<string>(), notas: new Set<string>(), os: new Set<string>(), mo: 0, km: 0, repuestos: 0, terceros: 0 }; map.set(key, value); return value; };
     current.filter((line) => matchesServiceSalesSearch(line, buscar)).forEach((line) => { const row = get(line[perspective]); row.total += Number(line.total_venta || 0); row.facturas.add(line.factura); if (line.es_nota_credito) row.notas.add(line.factura); if (line.os) row.os.add(line.os); if (line.componente === "Mano de obra") row.mo += Number(line.total_venta || 0); else if (line.componente === "Kilometraje") row.km += Number(line.total_venta || 0); else if (line.componente === "Repuestos") row.repuestos += Number(line.total_venta || 0); else if (line.componente === "Terceros") row.terceros += Number(line.total_venta || 0); });
     return [...map.values()]
       .filter((row) => row.facturas.size > 0 || row.os.size > 0 || row.total !== 0)

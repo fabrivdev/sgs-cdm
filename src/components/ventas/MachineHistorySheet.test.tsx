@@ -20,6 +20,14 @@ function setup(partsError = false) {
     {data:[{id:'p1',fecha_factura:'2026-08-21',cod_mercaderia:'REP001',codigo_fabricante:'FAB002',mercaderia:'Rodamiento',cantidad:2,total_venta:80,raw_data:{linked_service_order:row.os_numero}}]}));
 }
 describe('simple machine history', () => {
+  it('displays the canonical Campos owner resolved from stock', async () => {
+    rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } :
+      args.p_vista === 'maquina' ? { data: { modelo_tipo: 'LEXION', clientes: { nombre: 'CAMPOS DEL MANANA S.A. - SANTA RITA' }, fuente_propietario: 'stock' } } : { data: [row] }));
+    renderSheet();
+    expect(await screen.findByText(/Propietario actual: CAMPOS DEL MAÑANA S.A./)).toBeInTheDocument();
+    expect(screen.getByText(/Stock propio/)).toBeInTheDocument();
+    expect(screen.queryByText(/SANTA RITA/)).not.toBeInTheDocument();
+  });
   it('loads OS without billing and preserves each time type in separate columns', async () => {
     setup(); renderSheet();
     expect(await screen.findByText(row.os_numero)).toBeInTheDocument();

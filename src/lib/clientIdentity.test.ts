@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { canonicalClientId, canonicalClientName, canonicalClientOptions } from "./clientIdentity";
 
 describe("client identity", () => {
+  it("canonicalizes Campos accents, casing, legal punctuation and any suffix", () => {
+    for (const name of ["campos del manana", "CAMPOS DEL MAÑANA SA - SANTA RITA", "CAMPOS DEL MANANA S. A. (TALLER)", "CAMPOS DEL MAÑANA S.A. - OTRA SEDE"]) {
+      expect(canonicalClientName(name)).toBe("CAMPOS DEL MAÑANA S.A.");
+    }
+    expect(canonicalClientName("CAMPOS DEL MAÑANAL S.A.")).toBe("CAMPOS DEL MAÑANAL S.A.");
+  });
   it("removes a branch suffix without changing the legal name", () => {
     expect(canonicalClientName("CAMPOS DEL MAÑANA S.A. - LOMA PLATA")).toBe("CAMPOS DEL MAÑANA S.A.");
   });

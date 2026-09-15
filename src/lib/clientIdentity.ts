@@ -10,6 +10,8 @@ function normalized(value: unknown) {
 
 export function canonicalClientName(value: string | null | undefined) {
   let name = String(value ?? "").trim().replace(/\s+/g, " ");
+  const camposKey = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  if (/^CAMPOS\s+DEL\s+MANANA\b/.test(camposKey)) return "CAMPOS DEL MAÑANA S.A.";
   let previous = "";
   while (name && name !== previous) {
     previous = name;
