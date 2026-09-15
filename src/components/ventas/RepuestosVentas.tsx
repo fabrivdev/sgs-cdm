@@ -58,7 +58,7 @@ async function rpc<T>(name: string, args: Record<string, unknown>, signal: Abort
 }
 function useOverview(filters: Filters, mode: PeriodMode) {
   return useQuery({ queryKey: ["ventas-repuestos-panorama-v2", params(filters), mode],
-    queryFn: ({ signal }) => rpc<PartsOverview>("ventas_repuestos_panorama_v1", { ...params(filters), p_agrupacion: mode }, signal),
+    queryFn: ({ signal }) => rpc<PartsOverview>("ventas_repuestos_panorama_v2", { ...params(filters), p_agrupacion: mode }, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
 }
 function State({ loading, error, retry }: { loading?: boolean; error?: Error | null; retry?: () => void }) {
@@ -130,7 +130,7 @@ function Pager({ data, onPage }: { data: { total: number; pagina: number; pagina
 function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "clientes" | "repuestos" | "detalle" }) {
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["ventas-repuestos-listado-v2", params(filters), view, page],
-    queryFn: ({ signal }) => rpc<PartsListing>("ventas_repuestos_listado_v1", { ...params(filters), p_vista: view, p_pagina: page, p_por_pagina: 50 }, signal),
+    queryFn: ({ signal }) => rpc<PartsListing>("ventas_repuestos_listado_v2", { ...params(filters), p_vista: view, p_pagina: page, p_por_pagina: 50 }, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
   if (query.isLoading || query.error || !query.data) return <State loading={query.isLoading} error={query.error} retry={() => void query.refetch()} />;
   const data = query.data;

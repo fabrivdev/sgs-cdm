@@ -967,7 +967,7 @@ export async function importarFacturacionHistorica(
     let completed = false;
     let lastError: unknown;
     for (let attempt = 0; attempt < 3 && !completed; attempt += 1) {
-      const result = await (supabase.rpc as any)("repuestos_importar_facturacion_historica_lote", {
+      const result = await (supabase.rpc as any)("repuestos_importar_facturacion_historica_lote_v2", {
         p_carga_id: cargaId,
         p_filas: chunk,
       });

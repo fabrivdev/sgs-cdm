@@ -19,7 +19,7 @@ const detail: PartsListing = { total: 3, pagina: 1, paginas: 1, total_periodo: 1
 ] };
 function mockRpc() {
   rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
-    data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v1" ? overview
+    data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview
        : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", anterior: 50, ultima: "2026-08-10" }] },
   }) }));
 }
@@ -35,7 +35,7 @@ function setup(props?: { desde?: string; hasta?: string }) {
 describe("Ventas de Repuestos", () => {
   it("comparte panorama y resumen sin repetir la consulta", async () => {
     setup(); await screen.findByText("CLAAS");
-    expect(rpc.mock.calls.filter(([name]) => name === "ventas_repuestos_panorama_v1")).toHaveLength(1);
+    expect(rpc.mock.calls.filter(([name]) => name === "ventas_repuestos_panorama_v2")).toHaveLength(1);
     expect(rpc).not.toHaveBeenCalledWith("ventas_area_resumen", expect.anything());
     const tables = screen.getAllByRole("table");
     const periodHeads = within(tables[0]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
@@ -59,12 +59,12 @@ describe("Ventas de Repuestos", () => {
   it("selección agosto recorta detalle y KPI hasta el 31 y permite volver", async () => {
     setup(); await screen.findByText("CLAAS");
     fireEvent.click(screen.getByRole("button", { name: /ago/i }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_panorama_v1", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31" })));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_panorama_v2", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31" })));
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     await screen.findByText("REP2");
-    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v1", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31", p_vista: "detalle" }));
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31", p_vista: "detalle" }));
     fireEvent.click(screen.getByRole("button", { name: "Ver período completo" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v1", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-09-15" })));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-09-15" })));
   });
   it("clientes y repuestos son listas con los mismos indicadores", async () => {
     setup(); fireEvent.click(screen.getByRole("button", { name: /^Clientes$/ }));
@@ -96,7 +96,7 @@ describe("Ventas de Repuestos", () => {
   it("pagina el detalle sin recortar su total", async () => {
     setup();
     rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
-      data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v1" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
+      data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
         filas: [{ ...detail.filas[0], id: String(args.p_pagina), codigo: args.p_pagina === 2 ? "ULTIMO" : "PRIMERO" }] },
     }) }));
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
@@ -104,7 +104,7 @@ describe("Ventas de Repuestos", () => {
     fireEvent.click(screen.getByRole("button", { name: "Página siguiente" }));
     await screen.findByText("ULTIMO");
     expect(screen.getByText("$ 5.000")).toBeInTheDocument();
-    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v1", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
   });
   it("no lanza informes ante un rango vacío o invertido", () => {
     setup({ desde: "", hasta: "2026-08-31" });
