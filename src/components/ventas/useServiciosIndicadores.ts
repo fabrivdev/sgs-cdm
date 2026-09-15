@@ -14,14 +14,15 @@ export type IndicadoresTotales = {
 };
 export type IndicadorTipo = {
   tipo_tiempo: string; mo: number; km: number; repuestos: number; terceros: number;
-  neto: number; ordenes: number; horas: number; clientes: number; facturas: number;
+  neto: number; ordenes: number; horas: number | null; clientes: number; facturas: number;
+  sin_vinculo_historico?: boolean;
 };
 export type IndicadorMaquina = {
   marca: string; tipo_maquina: string; maquinas: number; ordenes: number; horas: number;
   mo: number; km: number; repuestos: number; terceros: number; neto: number;
 };
 export type IndicadorMarcaTipo = {
-  marca: string; tipo_tiempo: string; horas: number;
+  marca: string; tipo_tiempo: string; horas: number | null; sin_vinculo_historico?: boolean;
   mo: number; km: number; repuestos: number; terceros: number; neto: number;
 };
 export type IndicadoresResponse = {

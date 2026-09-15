@@ -38,3 +38,20 @@ tiempo en Panorama, Resumen, Detalle y Clientes (ambas perspectivas): sus totale
 deben conciliar. No exigir el mismo número de OS que Servicios operativos, porque
 allí se incluyen OS sin factura y se usan fechas operativas. Los vínculos reales
 de Valdecir no fueron consultados en producción durante esta implementación.
+
+## Resumen por marca y tipo de tiempo
+
+La migración `20260915110000_restore_service_summary_brand_breakdown.sql` restaura
+`por_marca_tipo` en la respuesta de Indicadores. Requiere la migración anterior.
+MO, Km, Repuestos, Terceros y Neto concilian con `totales` y `por_tipo`; las horas
+se suman una vez por OS/tipo de tiempo, no por factura o línea. No cambia Técnicos.
+
+Las filas históricas sin OS llevan `sin_vinculo_historico=true`, conservan los
+importes y tienen `horas=null`. El resumen muestra “Histórico sin OS vinculada” y
+“—” en OS/horas, separado del tipo “No informado” del sistema actual. Esta bandera
+no asigna un cuarto tipo de tiempo ni recupera vínculos: identifica falta de cobertura.
+Las marcas sin identificar siguen desglosadas por tipo, sin fusionar Cliente,
+Garantía e Interno. Una respuesta sin `por_marca_tipo` produce un aviso de SQL
+pendiente, no una afirmación falsa de que no hay marcas.
+
+Verificación sintética reproducible: `node scripts/verify-service-summary-sql.mjs`.
