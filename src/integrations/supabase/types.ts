@@ -6803,6 +6803,10 @@ export type Database = {
         Args: { p_carga_id: string; p_filas: Json }
         Returns: Json
       }
+      repuestos_importar_facturacion_historica_lote_v2: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
       repuestos_importar_maestro_legacy_lote: {
         Args: { p_carga_id: string; p_filas: Json }
         Returns: number
@@ -7086,6 +7090,18 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_repuestos_listado_v2: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+          p_vista?: string
+        }
+        Returns: Json
+      }
       ventas_repuestos_movimientos_v1: {
         Args: {
           p_buscar: string
@@ -7109,7 +7125,42 @@ export type Database = {
           sucursal: string
         }[]
       }
+      ventas_repuestos_movimientos_v2: {
+        Args: {
+          p_buscar: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal: string
+        }
+        Returns: {
+          cantidad: number
+          cliente: string
+          codigo: string
+          codigo_fabricante: string
+          descripcion: string
+          documento: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          id: string
+          importe: number
+          marca: string
+          metodologia: string
+          sucursal: string
+          vendedor: string
+        }[]
+      }
       ventas_repuestos_panorama_v1: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_repuestos_panorama_v2: {
         Args: {
           p_agrupacion?: string
           p_buscar?: string
