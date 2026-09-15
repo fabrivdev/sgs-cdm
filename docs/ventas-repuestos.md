@@ -2,76 +2,104 @@
 
 ## Alcance y fuentes
 
-La pantalla reutiliza `ventas_area_movimientos_base` y selecciona únicamente
-`area_calculada = 'repuestos'`. Conserva el corte del 01/07/2026, moneda USD y
-exclusiones del histórico. Los repuestos vinculados a OS siguen en Servicios;
-no se suman por segunda vez. El histórico no permite separar ese canal.
-Por ello, las variaciones que cruzan el corte tienen distinta cobertura.
+Hasta el 30/06/2026 se utiliza `v_ventas_repuestos_historico_completo`, sobre
+`facturacion_lineas_importadas`, origen `legacy_historico_detallado`: las líneas
+que ya usa el historial de Sugerencias. No se suma además el histórico agrupado
+de `facturacion`, ni las copias de otros orígenes anteriores al corte.
 
-`cliente_nombre_canonico` unifica las variantes de CAMPOS DEL MAÑANA S.A.
-antes de agrupar y contar clientes. No modifica nombres en las fuentes.
+La vista financiera conserva también las líneas sin vínculo confirmado o
+ambiguas. Sugerencias publica demanda solo para piezas confirmadas: ese filtro
+no debe eliminar importes del reporte financiero. El código interno/fabricante
+del catálogo se incorpora únicamente con un vínculo CONFIRMADA; en caso contrario
+se conserva el código y la descripción del origen, sin adivinar equivalencias.
+Los productos confirmados se agrupan entre sistemas, sin separar por metodología.
+
+Desde el 01/07/2026 se mantiene `ventas_area_movimientos_base`, únicamente
+`area_calculada = 'repuestos'`. Las piezas vinculadas a OS siguen en Servicios.
+El histórico no permite separar ese canal: los cruces del corte tienen distinta
+cobertura. Ambas fuentes utilizan USD; no se convierte moneda implícitamente.
+Servicios y Máquinas, sus importadores y el stock físico quedan intactos.
+
+`cliente_nombre_canonico` unifica CAMPOS DEL MAÑANA S.A. antes de agrupar/contar.
+Las sucursales del archivo se normalizan al catálogo de la app, incluyendo
+CENTRAL → Santa Rita y SANTA ROSA DEL AGUARAY → Santa Rosa.
 
 ## Métricas
 
 - Facturado: suma firmada del importe del período.
 - Ventas: importe de líneas no identificadas como nota de crédito.
-- Notas de crédito: importe firmado de esas líneas; ventas + NC = facturado.
-  En el histórico se identifican por importe negativo; en el actual se respeta
-  además la clasificación documental de la fuente.
-- Documentos: identidad por origen, fecha, sucursal, número y clase documental.
-  Varias líneas de la misma factura cuentan una sola vez. Sin número, cada
-  línea queda diferenciada: no se inventa una agrupación documental.
-- Unidades: sólo sistema actual. NC con cantidad positiva se presenta negativa.
-  Si un grupo incluye histórico, sus unidades se muestran como no disponibles.
-  Por repuesto se separan vendidas, devueltas y netas, sin mezclar artículos.
-- Participación: facturado del grupo / facturado completo de la selección.
-- Promedio por documento: facturado / documentos. No es precio por artículo.
+- Notas de crédito: importe firmado de movimientos E o importes negativos del
+  histórico; en el actual se respeta también la clasificación documental.
+  Ventas + NC = facturado. Cantidades y valores no se convierten a positivos.
+- Documentos: origen, fecha, sucursal, número y clase documental. Varias líneas
+  de una factura cuentan una sola vez. Sin número se diferencia cada línea.
+- Unidades: cantidades por artículo, tanto históricas como actuales. Se respetan
+  las conversiones históricas existentes por código, fecha y precio unitario.
+  Se separan vendidas/devueltas/netas. El agregado general combina artículos,
+  no representa precio ni equivalencia entre piezas.
+- Participación: facturado del grupo / facturado de toda la selección.
+- Promedio por documento: facturado / documentos; no es precio por artículo.
 
 ## Fechas, vistas y presentación
 
-Panorama utiliza el rango superior completo. Seleccionar un período intersecta
-sus límites con ese rango y recorta KPI, resumen, clientes, repuestos, detalle
-y análisis. Agosto finaliza el 31/08; no incluye el 01/09. La fila final del
-Panorama conserva el total del rango superior y permite volver a éste.
-LM compara la agrupación anterior (día, semana, mes o año); LY el año anterior.
-Meses completos comparan meses completos, incluidos últimos días y bisiestos;
-períodos recortados conservan el recorte. No se inventa un porcentaje sin base.
+Quedan únicamente Resumen, Clientes, Repuestos y Detalle. Análisis se eliminó
+por pedido del usuario. Todas usan el mismo helper financiero. Detalle es plano:
+una fila por repuesto, factura repetida cuando corresponda, código de repuesto,
+código de fabricante, descripción completa, cantidad firmada e importe.
 
-Resumen presenta composición por sucursal y origen. Clientes son los compradores
-del período, con promedio por documento y comparación del mismo rango del año
-anterior; no es una lista de clientes perdidos. En esa lista se reemplaza el
-conteo trivial de un cliente por fila por el promedio, conservando el orden
-de importes. Repuestos agrupa por código interno y código de fabricante; sin
-ambos códigos, diferencia las descripciones actuales para no fusionar artículos.
+Panorama usa el rango superior. Seleccionar un período intersecta sus límites
+con ese rango y recorta KPI y las cuatro vistas: agosto finaliza el 31/08.
+La fila Total del período mantiene el total superior. LM compara el período
+anterior; LY el año anterior, con meses completos y bisiestos correctamente.
+Si las NC históricas aún no fueron verificadas se avisa, también cuando solo
+afectan comparaciones LY. No se presenta un cero de NC como conciliación completa.
 
-Detalle es plano y paginado en el servidor: una fila por línea facturada,
-incluyendo facturas repetidas, ambos códigos y cantidad firmada. El histórico
-se identifica explícitamente como sin detalle por artículo. Código de fabricante
-no equivale a nombre del fabricante; no se deduce éste de una descripción.
+Resumen presenta sucursales y origen. Clientes es una lista de compradores con
+promedio documental y comparación LY, no una lista de clientes perdidos.
+Importes usan `$`, encabezados centrados y tablas densas con scroll horizontal
+local. Los totales se calculan antes de paginar, sin limitar el universo a 500
+líneas. React Query comparte Panorama/Resumen y no reintenta informes fallidos.
 
-Se conservó Análisis financiero paginado (repuesto/cliente/sucursal vs mes o
-sucursal), sin permitir sucursal contra sí misma. Importes usan el formateador
-`$` de la app. Tablas densas, encabezados centrados y desplazamiento horizontal
-local cuando es necesario. El total del detalle queda fuera del scroll.
+## Aplicación manual y recuperación de NC
 
-## Implementación y verificación
+1. Ejecutar completo `20260915160000_use_complete_parts_history_and_credit_notes.sql`.
+   Incluye los contratos de la migración 15:00: no hace falta aplicar ambas.
+   Requiere las funciones/tablas históricas existentes y la identidad de Campos.
+2. En Repuestos → Sugerencias → Historial, elegir **Completar notas de crédito**.
+3. Seleccionar el mismo `FACTURACIÓN HISTORICA.xlsx` originalmente cargado.
+   Se procesa exclusivamente la hoja Fact. Repuestos, nunca Fact. Servicios.
+4. Esperar la carga por lotes y la actualización del historial de demanda.
+   Si una publicación falla, usar Actualizar historial; si falla un lote,
+   volver a seleccionar el mismo Excel. No se borran ni sobrescriben ventas.
 
-Migración manual: `20260915150000_rebuild_parts_sales_dashboard.sql`.
-Requiere las funciones previas, incluyendo la migración de identidad de Campos
-del 15/09 a las 12:00. Crea únicamente RPCs; no cambia registros ni permisos.
-Las RPCs públicas requieren sesión y acceso a `repuestos.ventas`; el helper
-de movimientos no es ejecutable por `anon` ni `authenticated`.
+El complemento admite únicamente E anteriores al corte, exige administración,
+contrasta hasta 50 líneas S existentes como referencias del mismo archivo y
+rechaza líneas existentes con valores diferentes. Conserva las claves originales
+por fila; insertar de nuevo no duplica. Solo marca verificación después de
+comprobar que todas las claves E del archivo están en la base.
+Una carga futura inicial también admite S/E y conserva esas mismas claves.
 
-Los resúmenes se calculan antes de paginar, sin el límite viejo de 500 líneas.
-React Query comparte panorama/resumen sin selección, conserva cache por filtros,
-cancela solicitudes obsoletas y no reintenta automáticamente consultas fallidas.
-Sólo se carga el listado del tab activo. No se amplió el timeout de PostgreSQL.
+La auditoría de solo lectura del archivo aportado encontró 194.976 líneas:
+185.535 S y 9.441 E, sin signos incompatibles de cantidad/importe. Son **líneas
+de NC**, no 9.441 documentos distintos. El SQL no introduce esos datos por sí
+solo: deben completarse desde el archivo mediante la opción anterior.
 
-Prueba SQL aislada (PGlite, no producción):
-`node scripts/verify-parts-sales-sql.mjs`.
-Pruebas de UI: `RepuestosVentas.test.tsx` y `partsSalesFormat.test.ts`.
-Verifican conciliación, NC, documentos, Campos, filtros, permisos, paginación
-de 524 líneas, meses completos, bisiestos y selección de agosto.
+Agregar E cambia tanto el neto financiero histórico como la demanda/devoluciones
+de Sugerencias para las piezas confirmadas. La publicación se hace con sus
+lotes mensuales existentes; no modifica existencias físicas ni reglas del modelo.
+Hasta que termine se invalida el estado de historial publicado, para no mostrar
+sugerencias calculadas con una base parcialmente actualizada.
 
-La aceptación con datos reales y los tiempos de consulta quedan por comprobar
-después de aplicar la migración en la base. Commit/push no aplican SQL.
+## Verificación
+
+- `node scripts/verify-complete-parts-history-sql.mjs`: PostgreSQL aislado,
+  migración repetible, cargador inicial real, S/E, complemento idempotente,
+  códigos/vínculos opcionales, cantidades normalizadas, permisos y conciliación
+  de las cuatro vistas sin sumar el histórico agrupado ni otras copias.
+- `legacyPartsBillingImport.test.ts`: carga inicial S/E, recuperación E únicamente,
+  clave de fila original y errores que no marcan verificación.
+- `RepuestosVentas.test.tsx`, `partsSalesFormat.test.ts` y `legacyPartsBilling.test.ts`:
+  detalle plano, nombres, fechas, signos, paginación, avisos y eliminación de Análisis.
+
+Tiempos y conciliación en producción se verifican después de aplicar el SQL y
+completar el archivo. Commit/push no ejecutan migraciones ni cargan notas de crédito.

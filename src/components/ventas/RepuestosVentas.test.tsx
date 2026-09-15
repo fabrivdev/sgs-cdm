@@ -19,7 +19,7 @@ const detail: PartsListing = { total: 3, pagina: 1, paginas: 1, total_periodo: 1
 ] };
 function mockRpc() {
   rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
-    data: name === "ventas_repuestos_panorama_v1" ? overview : name === "ventas_area_analisis_negocio" ? { total: 1, pagina: 1, paginas: 1, columns: [{ key: "2026-08", label: "Ago. 2026" }], rows: [{ key: "REP1 · Rodamiento", values: { "2026-08": 75 }, total: 75 }] }
+    data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v1" ? overview
       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", sucursal: "Santa Rita", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", anterior: 50, ultima: "2026-08-10" }] },
   }) }));
 }
@@ -76,23 +76,23 @@ describe("Ventas de Repuestos", () => {
     expect(screen.getByText("FAB1")).toBeInTheDocument();
     expect(screen.getByText("Rodamiento")).toBeInTheDocument();
   });
-  it("conserva análisis paginado del período completo", async () => {
-    setup(); fireEvent.click(screen.getByRole("button", { name: "Análisis" }));
-    await screen.findByText("REP1 · Rodamiento");
-    expect(rpc).toHaveBeenCalledWith("ventas_area_analisis_negocio", expect.objectContaining({ p_area: "repuestos", p_medida: "usd" }));
+  it("elimina Análisis y conserva solo cuatro vistas", async () => {
+    setup(); await screen.findByText("Sistema actual");
+    expect(screen.queryByRole("button", { name: "Análisis" })).not.toBeInTheDocument();
+    expect(rpc).not.toHaveBeenCalledWith("ventas_area_analisis_negocio", expect.anything());
   });
-  it("evita el cruce 1:1 de sucursal contra sí misma", async () => {
-    setup(); fireEvent.click(screen.getByRole("button", { name: "Análisis" }));
-    await screen.findByText("REP1 · Rodamiento");
-    fireEvent.change(screen.getByRole("combobox", { name: "Columnas" }), { target: { value: "sucursal" } });
-    fireEvent.change(screen.getByRole("combobox", { name: "Filas" }), { target: { value: "sucursal" } });
-    expect(screen.getByRole("combobox", { name: "Columnas" })).toHaveValue("mes");
-    expect(within(screen.getByRole("combobox", { name: "Columnas" })).getByRole("option", { name: "Sucursal" })).toBeDisabled();
+  it("muestra descripción y cantidades históricas sin un marcador agregado", async () => {
+    detail.filas[0].metodologia = "historico";
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    await screen.findByText("Correa");
+    expect(screen.getAllByText("Rodamiento").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Histórico sin detalle por artículo")).not.toBeInTheDocument();
+    detail.filas[0].metodologia = "actual";
   });
   it("pagina el detalle sin recortar su total", async () => {
     setup();
     rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
-      data: name === "ventas_repuestos_panorama_v1" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
+      data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v1" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
         filas: [{ ...detail.filas[0], id: String(args.p_pagina), codigo: args.p_pagina === 2 ? "ULTIMO" : "PRIMERO" }] },
     }) }));
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
@@ -106,6 +106,17 @@ describe("Ventas de Repuestos", () => {
     setup({ desde: "", hasta: "2026-08-31" });
     expect(screen.getByRole("alert")).toHaveTextContent("rango de fechas válido");
     expect(rpc).not.toHaveBeenCalled();
+  });
+  it("avisa si faltan NC históricas, también para comparaciones LY actuales", async () => {
+    setup({ desde: "2026-08-01", hasta: "2026-08-31" });
+    rpc.mockImplementation((name: string) => ({ abortSignal: () => Promise.resolve({ error: null,
+      data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: false } : overview,
+    }) }));
+    // Consulta fresca en un nuevo cliente para comprobar el aviso de fuente pendiente.
+    cleanup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><Harness desde="2026-08-01" hasta="2026-08-31" /></QueryClientProvider>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("pendiente de conciliar");
   });
   it("una migración ausente no aparece como ventas cero", async () => {
     rpc.mockImplementation(() => ({ abortSignal: () => Promise.resolve({ data: null, error: { code: "PGRST202" } }) }));

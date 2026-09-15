@@ -36,6 +36,7 @@ import {
   crearVersionModelo,
   guardarPlanificacionArticulo,
   importarFacturacionHistorica,
+  completarNotasCreditoHistoricas,
   importarMaestroLegacy,
   refrescarHistorialUnificado,
   type FiltrosResultados,
@@ -264,7 +265,8 @@ export default function RepuestosSugerencias() {
   const historyIsPersisted = legacyBillingQuery.data?.publicacion_estado === "COMPLETADO"
     || Boolean(legacyBillingQuery.data?.publicado_en);
   const historyQualityQuery = useCalidadHistorialRepuestos(modelBrand, historySourceVersion, !historyIsPersisted);
-  const historyIsPrepared = historyIsPersisted || Boolean(historyQualityQuery.data?.preparado);
+  const historyIsPrepared = legacyBillingQuery.data?.publicacion_estado !== "PROCESANDO"
+    && (historyIsPersisted || Boolean(historyQualityQuery.data?.preparado));
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
   const liveQuery = useSugerenciaViva(
@@ -353,6 +355,29 @@ export default function RepuestosSugerencias() {
       setHistoryRebuildRequired(false);
       setLegacyBillingProgress(null);
       toast.error(error instanceof Error ? error.message : "No se pudo cargar la facturación histórica");
+    },
+  });
+
+  const completeCreditNotes = useMutation({
+    onMutate: () => { setHistoryRebuildRequired(true); setLegacyBillingProgress({ loaded: 0, total: 0 }); },
+    mutationFn: (file: File) => completarNotasCreditoHistoricas(file, (loaded, total) => {
+      setLegacyBillingProgress({ loaded, total });
+    }),
+    onSuccess: async (result) => {
+      setLegacyBillingProgress(null);
+      for (const key of ["ventas-repuestos-estado-historico", "ventas-repuestos-panorama-v2", "ventas-repuestos-listado-v2"]) {
+        await queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "facturacion-historica", "estado"] });
+      setHistoryRebuildRequired(true);
+      toast.success(`${integer.format(result.verificadas)} líneas de NC verificadas; ${integer.format(result.insertadas)} líneas nuevas. Actualizando demanda…`);
+      refreshHistory.mutate();
+    },
+    onError: async (error) => {
+      setLegacyBillingProgress(null);
+      setHistoryRebuildRequired(false); // La BD mantiene PROCESANDO si algún lote ya se guardó.
+      await queryClient.invalidateQueries({ queryKey: ["repuestos", "facturacion-historica", "estado"] });
+      toast.error(error instanceof Error ? error.message : "No se pudo completar el histórico");
     },
   });
 
@@ -458,7 +483,9 @@ export default function RepuestosSugerencias() {
                     : `Historial publicado y persistido · actualizado ${displayDate(legacyBillingQuery.data?.publicado_en)}`}
                 </p>
               ) : (
-                <p className="mt-2 text-[12px] text-muted-foreground">La estructura está disponible, pero todavía falta preparar el primer historial consolidado.</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">{legacyBillingQuery.data?.publicacion_estado === "PROCESANDO"
+                  ? "Hay cambios históricos pendientes de publicar. Usá Actualizar historial."
+                  : "La estructura está disponible, pero todavía falta preparar el primer historial consolidado."}</p>
               )}
               {legacyMasterQuery.data?.cargado && (
                 <p className="mt-1 text-[12px] text-emerald-700">
@@ -523,7 +550,19 @@ export default function RepuestosSugerencias() {
                     </Button>
                   </>
                 )}
-                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending || loadLegacyBilling.isPending}>
+                {canLoadLegacyMaster && legacyBillingQuery.data?.cargado && <div>
+                  <input id="legacy-credit-notes" type="file" accept=".xlsx,.xls" className="hidden"
+                    disabled={completeCreditNotes.isPending || refreshHistory.isPending}
+                    onChange={event => { const file = event.target.files?.[0]; if (file) completeCreditNotes.mutate(file); event.target.value = ""; }} />
+                  <Button asChild variant="outline" className={cn((completeCreditNotes.isPending || refreshHistory.isPending) && "pointer-events-none opacity-60")}>
+                    <label htmlFor="legacy-credit-notes" className="cursor-pointer">
+                      {completeCreditNotes.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                      {completeCreditNotes.isPending && legacyBillingProgress ? `Completando NC ${integer.format(legacyBillingProgress.loaded)} / ${integer.format(legacyBillingProgress.total)}` : "Completar notas de crédito"}
+                    </label>
+                  </Button>
+                  <p className="mt-1 text-xs text-muted-foreground">Seleccioná el mismo Excel histórico. Solo se agregan devoluciones E faltantes; las ventas S no se recargan.</p>
+                </div>}
+                <Button variant="outline" onClick={() => refreshHistory.mutate()} disabled={refreshHistory.isPending || loadLegacyMaster.isPending || loadLegacyBilling.isPending || completeCreditNotes.isPending}>
                   {refreshHistory.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   {historyPublishProgress
                     ? `Publicando ${historyPublishProgress.completed}/${historyPublishProgress.total}`

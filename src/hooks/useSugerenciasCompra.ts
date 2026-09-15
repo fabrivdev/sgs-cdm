@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { legacyPartsNumber, validateLegacyPartsMovement } from "@/lib/legacyPartsBilling";
 
 export type MarcaModeloSugerencia = "CLAAS" | "HORSCH" | "OTROS";
 export type MarcaSugerencia = MarcaModeloSugerencia | "TODAS";
@@ -909,10 +910,7 @@ const numeroHistorico = (value: unknown) => {
   return Number.isFinite(result) ? result : 0;
 };
 
-export async function importarFacturacionHistorica(
-  file: File,
-  onProgress?: (loaded: number, total: number) => void,
-) {
+async function leerFacturacionHistorica(file: File) {
   const XLSX = await import("xlsx");
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", raw: true, cellDates: true });
   const sheetName = workbook.SheetNames.find((name) => claveMaestroLegacy(name).includes("factrepuestos"));
@@ -926,10 +924,10 @@ export async function importarFacturacionHistorica(
     const movimiento = textoMaestroLegacy(campoMaestroLegacy(row, "Tp. Movimento", "Tipo Movimiento")) || "S";
     const fecha = fechaExcelHistorica(campoMaestroLegacy(row, "Fecha Factura", "Fecha"));
     const codigoLegacy = textoMaestroLegacy(campoMaestroLegacy(row, "Cod. Mercaderia", "Cód. Mercadería"));
-    if (movimiento.toUpperCase() !== "S" || !fecha || !codigoLegacy) return [];
     const documento = textoMaestroLegacy(campoMaestroLegacy(row, "Código Factura", "Codigo Factura"));
-    const cantidad = numeroHistorico(campoMaestroLegacy(row, "Cant. Unit.", "Cantidad"));
-    const totalVenta = numeroHistorico(campoMaestroLegacy(row, "Total Venta"));
+    const cantidad = legacyPartsNumber(campoMaestroLegacy(row, "Cant. Unit.", "Cantidad"), index + 2, "cantidad");
+    const totalVenta = legacyPartsNumber(campoMaestroLegacy(row, "Total Venta"), index + 2, "importe");
+    const tipo = validateLegacyPartsMovement(movimiento, fecha, codigoLegacy, cantidad, totalVenta, index + 2);
     return [{
       linea_clave: `${index + 2}|${fecha}|${documento}|${codigoLegacy}`,
       fecha,
@@ -939,13 +937,21 @@ export async function importarFacturacionHistorica(
       entidad: textoMaestroLegacy(campoMaestroLegacy(row, "Entidad", "Cliente")),
       grupo: textoMaestroLegacy(campoMaestroLegacy(row, "Grupo")),
       sucursal: textoMaestroLegacy(campoMaestroLegacy(row, "Sucursal")),
-      movimiento,
+      movimiento: tipo,
       cantidad,
       valor_unitario: numeroHistorico(campoMaestroLegacy(row, "Valor Medio", "Valor Unitario")),
       total_venta: totalVenta,
     }];
   });
-  if (rows.length === 0) throw new Error("No se encontraron líneas de salida con fecha y código de mercadería");
+  if (rows.length === 0) throw new Error("No se encontraron movimientos históricos S/E");
+  return rows;
+}
+
+export async function importarFacturacionHistorica(
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+) {
+  const rows = await leerFacturacionHistorica(file);
 
   const start = await (supabase.rpc as any)("repuestos_iniciar_facturacion_historica", {
     p_archivo_nombre: file.name,
@@ -981,7 +987,41 @@ export async function importarFacturacionHistorica(
     p_carga_id: cargaId,
   });
   if (finish.error) throw new Error(mensajeErrorSupabase(finish.error, "No se pudo publicar el historial detallado"));
+  const verification = await (supabase.rpc as any)("repuestos_verificar_notas_credito_historicas", {
+    p_carga_id: cargaId, p_claves: rows.filter(row => row.movimiento === "E").map(row => row.linea_clave),
+  });
+  if (verification.error) throw new Error(mensajeErrorSupabase(verification.error, "No se pudo verificar el histórico S/E"));
   return finish.data as ResultadoFacturacionHistorica;
+}
+
+/** Completa únicamente E faltantes; reintentar no vuelve a cargar ventas S. */
+export async function completarNotasCreditoHistoricas(file: File,
+  onProgress?: (loaded: number, total: number) => void) {
+  const rows = await leerFacturacionHistorica(file);
+  const creditNotes = rows.filter(row => row.movimiento === "E");
+  if (!creditNotes.length) throw new Error("El archivo no contiene devoluciones E; no se marcará como conciliado");
+  const anchors = rows.filter(row => row.movimiento === "S").slice(0, 50)
+    .map(row => ({ linea_clave: row.linea_clave, total_venta: row.total_venta }));
+  const state = await (supabase.rpc as any)("repuestos_estado_facturacion_historica");
+  if (state.error) throw new Error(mensajeErrorSupabase(state.error, "No se pudo consultar la carga histórica"));
+  const cargaId = state.data?.carga_id;
+  if (!state.data?.cargado || !cargaId) throw new Error("Primero debe existir una carga histórica completa");
+  let inserted = 0;
+  for (let offset = 0; offset < creditNotes.length; offset += 1000) {
+    const chunk = creditNotes.slice(offset, offset + 1000);
+    const result = await (supabase.rpc as any)("repuestos_completar_notas_credito_historicas", {
+      p_carga_id: cargaId, p_filas: chunk, p_anclas: anchors,
+    });
+    if (result.error) throw new Error(mensajeErrorSupabase(result.error,
+      "No se pudo completar el lote. Las líneas cargadas se conservan; podés reintentar el mismo archivo"));
+    inserted += Number(result.data?.insertadas ?? 0);
+    onProgress?.(offset + chunk.length, creditNotes.length);
+  }
+  const verified = await (supabase.rpc as any)("repuestos_verificar_notas_credito_historicas", {
+    p_carga_id: cargaId, p_claves: creditNotes.map(row => row.linea_clave),
+  });
+  if (verified.error) throw new Error(mensajeErrorSupabase(verified.error, "Faltan notas de crédito por verificar"));
+  return { insertadas: inserted, verificadas: creditNotes.length };
 }
 
 export async function guardarPlanificacionArticulo(input: {
