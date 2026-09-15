@@ -937,6 +937,7 @@ async function leerFacturacionHistorica(file: File) {
       entidad: textoMaestroLegacy(campoMaestroLegacy(row, "Entidad", "Cliente")),
       grupo: textoMaestroLegacy(campoMaestroLegacy(row, "Grupo")),
       sucursal: textoMaestroLegacy(campoMaestroLegacy(row, "Sucursal")),
+      vendedor: textoMaestroLegacy(campoMaestroLegacy(row, "Vendedor", "Nombre Vendedor", "Nom. Vendedor")),
       movimiento: tipo,
       cantidad,
       valor_unitario: numeroHistorico(campoMaestroLegacy(row, "Valor Medio", "Valor Unitario")),
