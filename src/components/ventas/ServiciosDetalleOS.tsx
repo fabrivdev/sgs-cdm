@@ -8,7 +8,8 @@ import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
-  cliente: string; propietario?: string; sucursal: string | null; tipo_tiempo: string; facturas: number;
+  cliente: string; propietario?: string; propietario_os?: string; cliente_facturado?: string;
+  sucursal: string | null; tipo_tiempo: string; facturas: number;
   mo: number; km: number; repuestos: number; terceros: number; total: number;
 };
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -55,9 +56,13 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
             : !rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay OS con facturación en el período.</div>
             : rows.map((row) => <div key={row.id} className={`grid ${columns} items-center gap-x-3 border-t px-3 py-2 text-[12px] hover:bg-muted/30`}>
               <div className="whitespace-nowrap text-muted-foreground">{row.fecha ? shortDate.format(new Date(`${row.fecha}T00:00:00`)) : "—"}</div>
-              <div className="truncate font-mono font-semibold">{row.os}</div>
+              <div className="truncate font-mono font-semibold" title={row.os}>{row.os}</div>
               <div>{row.chasis ? <button type="button" className="max-w-full truncate font-mono text-primary hover:underline" onClick={(event) => { event.stopPropagation(); setDetailTarget({ chassis: row.chasis, os: null }); }} title="Ver historial de esta máquina">{row.chasis}</button> : "—"}</div>
-              <div className="font-medium break-words">{row.propietario || 'Propietario no disponible'}</div>
+              <div className="font-medium break-words" title={row.cliente_facturado ? `Facturado a: ${row.cliente_facturado}` : undefined}>
+                {row.propietario || 'Propietario no disponible'}
+                {(!row.propietario || row.propietario === 'Propietario no informado') && row.propietario_os &&
+                  <div className="text-[11px] font-normal text-muted-foreground">En la OS: {row.propietario_os}</div>}
+              </div>
               <div className="truncate text-muted-foreground">{row.sucursal || "Sin sucursal"}</div>
               <div className="flex flex-wrap gap-1">{row.tipo_tiempo.split(' / ').map(type => <Badge key={type} variant="outline" className="text-[10px]">{type === 'Garantia' ? 'Garantía' : type}</Badge>)}</div>
               <div className="text-right tabular-nums">{row.facturas}</div>

@@ -1,0 +1,40 @@
+# Búsqueda e identidad en Ventas de Servicios
+
+La población sigue siendo facturación dentro del rango seleccionado; no órdenes
+abiertas ni importes operativos. Las líneas, fechas, componentes e importes vienen
+de `ventas_area_movimientos_base`, que no se modifica con esta corrección.
+
+Todos los paneles usan `ventas_servicios_movimientos_enriquecidos`. Buscan por OS,
+factura, chasis, cliente facturado, propietario actual, nombre del cliente en la OS,
+propietario registrado en la OS, tipo de tiempo y descripción. Clientes filtra las
+líneas antes de agrupar: cambiar entre propietarios y facturados conserva la misma
+población y total. La búsqueda no distingue mayúsculas, acentos ni separadores.
+
+El propietario actual sale únicamente del Parque, con chasis único. El propietario
+en la OS sale de `raw_data.Nombre` o del nombre legacy cuando no hay `CLIFAC`;
+no se sustituye por el receptor de la factura. Si sólo está disponible el dueño
+histórico se muestra con la etiqueta **En la OS**, no como propietario actual.
+
+En legacy se recupera OS únicamente por factura explícita, sucursal documentada
+(`canonical_branch` o trabajo vinculado) y año de emisión de la factura. Debe haber
+una sola OS candidata. Se separan referencias de factura por `;` y se normalizan
+ceros de relleno en los tres segmentos sin concatenarlos. Faltantes y ambigüedades
+permanecen sin vínculo; no se infiere por nombre, monto o proximidad de fechas.
+Las correcciones de tiempo y el reparto por participación de Comisiones se conservan.
+
+## Despliegue y verificación
+
+Aplicar manualmente `20260915100000_unify_service_sales_identity_and_search.sql`.
+El commit/push no aplica SQL. No se requiere reimportar ni se actualizan/borran OS.
+
+Prueba reproducible aislada: `node scripts/verify-service-sales-search-sql.mjs`
+(requiere PGlite en `output/sql-check`, como los verificadores SQL existentes).
+Fixtures sintéticas: vínculo único, factura repetida entre sucursales/años, OS
+ambiguas, fecha de factura faltante, OS abierta sin factura, receptor distinto del
+dueño, búsqueda/totales uniformes, autorización e idempotencia. No conecta a producción.
+
+Después de aplicar, verificar Valdecir Mohr en el mismo rango/sucursal/tipo de
+tiempo en Panorama, Resumen, Detalle y Clientes (ambas perspectivas): sus totales
+deben conciliar. No exigir el mismo número de OS que Servicios operativos, porque
+allí se incluyen OS sin factura y se usan fechas operativas. Los vínculos reales
+de Valdecir no fueron consultados en producción durante esta implementación.

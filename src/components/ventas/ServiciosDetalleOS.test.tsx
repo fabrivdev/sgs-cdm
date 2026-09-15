@@ -9,6 +9,17 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const props = { desde: '2026-01-01', hasta: '2026-09-11', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
 
 describe('service detail loading states', () => {
+  it('keeps historical owner separate from current owner and invoice recipient', async () => {
+    rpc.mockResolvedValue({ error: null, data: [{ id: 'OS:5734', fecha: '2026-05-11', os: '5734', os_numero: '5734', chasis: 'C7501463',
+      cliente: 'Propietario no informado', propietario: 'Propietario no informado', propietario_os: 'VALDECIR MOHR', cliente_facturado: 'Pagador tercero',
+      sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', facturas: 1, mo: 200, km: 20, repuestos: 0, terceros: 0, total: 220 }] });
+    render(<ServiciosDetalleOS {...props} buscar="valdecir mohr" />);
+    expect(await screen.findByText('En la OS: VALDECIR MOHR')).toBeInTheDocument();
+    expect(screen.getByText('Propietario no informado')).toBeInTheDocument();
+    expect(screen.getByTitle('Facturado a: Pagador tercero')).toBeInTheDocument();
+    expect(screen.getByText('C7501463')).toBeInTheDocument();
+    expect(rpc).toHaveBeenCalledWith('ventas_servicios_detalle_os_v2', expect.objectContaining({ p_buscar: 'valdecir mohr' }));
+  });
   it('passes both machine filters to the same detail query', async () => {
     rpc.mockResolvedValue({data:[],error:null});
     render(<ServiciosDetalleOS {...props} marca="HORSCH" tipoMaquina="SEMBRADORAS" />);
