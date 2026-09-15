@@ -1,4 +1,5 @@
 import { money } from "@/components/dashboard/utils";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
@@ -24,7 +25,7 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
         {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay facturación por máquina en el período.</div>
           : rows.map((row) => (
             <div key={`${row.marca}__${row.tipo_maquina}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
-              <div className="truncate font-medium">{row.marca}</div>
+              <div className="min-w-0"><MarcaBadge marca={row.marca} className="text-[10px]" /></div>
               <div className="truncate" title={row.tipo_maquina}>{row.tipo_maquina}</div>
               <div className="text-right tabular-nums">{integer.format(row.maquinas)}</div>
               <div className="text-right tabular-nums">{integer.format(row.ordenes)}</div>

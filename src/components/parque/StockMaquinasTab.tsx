@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
@@ -30,13 +31,6 @@ export type StockMaquinasResumen = {
   nuevas: number;
   usadas: number;
   marcas: number;
-};
-
-const brandClass = (brand: string | null) => {
-  const normalized = (brand ?? "").toUpperCase();
-  if (normalized === "CLAAS") return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
-  if (normalized === "HORSCH") return "border-marca-horsch/30 bg-marca-horsch-bg text-marca-horsch";
-  return "border-border bg-muted text-muted-foreground";
 };
 
 export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value: StockMaquinasResumen) => void }) {
@@ -163,7 +157,7 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
                 <TableCell className="max-w-[180px] truncate text-[12px]" title={row.deposito ?? undefined}>{row.deposito ?? "—"}</TableCell>
                 <TableCell className="font-mono text-[12px]">{row.producto_codigo}</TableCell>
                 <TableCell className="text-[12px]">{row.tipo ?? "—"}</TableCell>
-                <TableCell><Badge variant="outline" className={cn("text-[10px] font-bold tracking-wide", brandClass(row.marca))}>{row.marca ?? "OTROS"}</Badge></TableCell>
+                <TableCell><MarcaBadge marca={row.marca} className="text-[10px]" /></TableCell>
                 <TableCell className="min-w-[180px] text-[12px] font-medium">{row.modelo ?? "—"}</TableCell>
                 <TableCell><Badge variant="outline" className={cn("text-[10px]", row.estado === "Nuevo" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{row.estado ?? "—"}</Badge></TableCell>
                 <TableCell className="font-mono text-[12px]">

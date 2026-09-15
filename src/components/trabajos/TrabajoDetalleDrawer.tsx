@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
@@ -353,7 +354,7 @@ export function TrabajoDetalleDrawer({
                     {trabajoReferencia(trabajo)}
                   </span>
                   <Badge variant="outline" className="text-[10px]">{trabajo.sucursal}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{trabajo.marca}</Badge>
+                  <MarcaBadge marca={trabajo.marca} className="text-[10px]" />
                   <Badge className={cn("text-[10px]", prioridadBadge(trabajo.prioridad))}>
                     {PRIORIDADES.find((p) => p.key === trabajo.prioridad)?.label}
                   </Badge>

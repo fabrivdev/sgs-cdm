@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
 import { Panel } from "@/components/layout/AppPrimitives";
+import { MarcaBadge } from "@/components/StatusBadges";
 
 
 import { cn } from "@/lib/utils";
@@ -186,7 +187,7 @@ const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 function SummaryTable({ label, grid, minWidth, rows, share, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; empty: string }) {
   return <div className="overflow-x-auto rounded-md border"><div className={minWidth}>
     <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
-    {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+    {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{label === "Marca" ? <MarcaBadge marca={row.key} className="text-[10px]" /> : row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
   </div></div>;
 }
 
@@ -228,7 +229,7 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
       const open = expanded === row.key;
       const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
       const cells = (item: SummaryRow, model = false) => <>
-        <div className={cn("truncate", !model && "font-medium")}>{model ? item.modelo : item.marca}</div>
+        <div className={cn("min-w-0 truncate", !model && "font-medium")}>{model ? item.modelo : <MarcaBadge marca={item.marca} className="text-[10px]" />}</div>
         <div className="truncate" title={model ? item.modelo : item.tipo}>{model ? "Modelo" : item.tipo}</div>
         <div>{item.condicion}</div>
         <div className="text-right tabular-nums">{decimal.format(item.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(item.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(item.netas)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(item.clientes)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(item.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(item.total)}</div><div className="text-right tabular-nums text-muted-foreground">{item.netas ? money(item.total / item.netas) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(item.total / total * 100)}%` : "—"}</div>
@@ -259,7 +260,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         <td>{shortDate(line.fecha)}</td>
         <td className="truncate font-mono font-medium" title={line.factura}>{line.factura}</td>
         <td><div className="truncate font-medium" title={line.cliente_facturado}>{line.cliente_facturado}</div></td>
-        <td className="truncate font-medium" title={line.marca}>{line.marca}</td>
+        <td><MarcaBadge marca={line.marca} className="text-[10px]" /></td>
         <td className="truncate" title={line.tipo_maquina}>{line.tipo_maquina}</td>
         <td className="truncate" title={line.modelo}>{line.modelo}</td>
         <td className="font-mono font-medium">{line.chasis ?? <span className="font-sans font-normal text-muted-foreground">—</span>}</td>

@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ESTADO_LABELS, type Estado } from "@/lib/constants";
-import { machineBrandStyle, visibleMachineBrand } from "@/lib/machineBrands";
+import { machineBrandClass, machineBrandStyle, visibleMachineBrand } from "@/lib/machineBrands";
 import { ESTADOS_TRABAJO, type EstadoTrabajo } from "@/lib/trabajos";
 
 export function EstadoBadge({ estado, className }: { estado: Estado; className?: string }) {
@@ -13,13 +13,8 @@ export function EstadoBadge({ estado, className }: { estado: Estado; className?:
   return <Badge variant="outline" className={cn("font-medium", map[estado], className)}>{ESTADO_LABELS[estado]}</Badge>;
 }
 
-export function MarcaBadge({ marca, className }: { marca: string; className?: string }) {
-  const style = marca === "CLAAS"
-    ? "bg-marca-claas-bg text-marca-claas border-marca-claas/30"
-    : marca === "HORSCH"
-      ? "bg-marca-horsch-bg text-marca-horsch border-marca-horsch/30"
-      : "bg-muted text-muted-foreground border-border";
-  return <Badge variant="outline" style={machineBrandStyle(marca)} className={cn("font-medium tracking-wide", style, className)}>{visibleMachineBrand(marca)}</Badge>;
+export function MarcaBadge({ marca, className }: { marca: string | null | undefined; className?: string }) {
+  return <Badge variant="outline" title={visibleMachineBrand(marca)} style={machineBrandStyle(marca)} className={cn("max-w-full font-medium tracking-wide", machineBrandClass(marca), className)}><span className="truncate">{visibleMachineBrand(marca)}</span></Badge>;
 }
 
 const TRABAJO_ESTADO_STYLES: Record<EstadoTrabajo, string> = {

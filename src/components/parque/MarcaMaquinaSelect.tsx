@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DEFAULT_MACHINE_BRANDS, normalizeMachineBrand } from "@/lib/machineBrands";
 import { upperMachineText } from "@/lib/machineOrderValidation";
 import { MachineCatalogManager } from "./MachineCatalogManager";
+import { MarcaBadge } from "@/components/StatusBadges";
 
 export function MarcaMaquinaSelect({
   value,
@@ -76,7 +77,7 @@ export function MarcaMaquinaSelect({
     >
       <SelectTrigger className={className}><SelectValue placeholder={isLoading ? "Cargando marcas..." : "Seleccionar marca"} /></SelectTrigger>
       <SelectContent>
-        {brands.map((brand) => <SelectItem key={brand} value={brand}>{brand}</SelectItem>)}
+        {brands.map((brand) => <SelectItem key={brand} value={brand}><MarcaBadge marca={brand} className="text-[10px]" /></SelectItem>)}
         <SelectItem value="__NEW__">+ AGREGAR NUEVA MARCA</SelectItem>
       </SelectContent>
     </Select>{isError && <p className="text-[11px] text-amber-700">No se pudo verificar el listado de marcas.</p>}<MachineCatalogManager kind="marca" disabled={disabled} /></div>

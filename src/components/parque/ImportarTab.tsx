@@ -33,7 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { importedServiceOrderParticipants } from "@/lib/technicianMatching";
 import { canonicalMachineSubgroup } from "@/lib/machineModels";
-import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
+import { legacyMachineBrand, machineBrandClass, machineBrandStyle, normalizeMachineBrand } from "@/lib/machineBrands";
 import { MachineSalesLegacyImport } from "@/components/parque/MachineSalesLegacyImport";
 
 interface ParqueRow {
@@ -1896,7 +1896,7 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {Object.entries(gridDiag.porMarca).map(([marca, count]) => (
-                    <Badge key={marca} variant="secondary" className="text-[10px]">
+                    <Badge key={marca} variant="outline" style={machineBrandStyle(marca)} className={cn("text-[10px]", machineBrandClass(marca))}>
                       {marca}: {count.toLocaleString()}
                     </Badge>
                   ))}

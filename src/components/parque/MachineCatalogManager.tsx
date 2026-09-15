@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, Settings2, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -63,7 +64,7 @@ export function MachineCatalogManager({ kind, disabled = false }: { kind: "marca
           <div className="flex gap-2"><Button size="sm" disabled={busy} onClick={() => save(editing, "editar")}>Guardar</Button><Button variant="outline" size="sm" disabled={busy} onClick={() => setEditing(null)}>Cancelar</Button></div>
         </div>}
         <div className="divide-y">{filtered.map(entry => <div key={entry.id} className="flex items-center gap-3 py-2">
-          <div className="min-w-0 flex-1"><p className="text-sm font-medium break-words">{entry.nombre}{!entry.active && " · ELIMINADO"}</p>{entry.marca && <p className="text-xs text-muted-foreground">{entry.marca} · {entry.subgrupo}</p>}</div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-medium break-words">{entry.nombre}{!entry.active && " · ELIMINADO"}</p>{entry.marca && <div className="flex items-center gap-1 text-xs text-muted-foreground"><MarcaBadge marca={entry.marca} className="text-[10px]" /><span>· {entry.subgrupo}</span></div>}</div>
           {entry.active ? <><Button size="icon" variant="ghost" aria-label={`Editar ${entry.nombre}`} disabled={busy} onClick={() => { setEditing(entry); setName(entry.nombre); setSubgroup(entry.subgrupo ?? "OTRO"); }}><Pencil className="h-4 w-4" /></Button><Button size="icon" variant="ghost" aria-label={`Eliminar ${entry.nombre} del listado`} disabled={busy} onClick={() => setPending(entry)}><Trash2 className="h-4 w-4 text-destructive" /></Button></> : <Button size="sm" variant="outline" disabled={busy} onClick={() => save(entry, "restaurar")}><RotateCcw className="mr-1 h-3 w-3" />Restaurar</Button>}
         </div>)}</div>
       </DialogContent>

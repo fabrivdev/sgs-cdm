@@ -37,7 +37,7 @@ import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem } fr
 import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
-import { legacyMachineBrand, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
+import { legacyMachineBrand, machineBrandClass as brandClass, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
 import { isImportSaleInvoiced } from "@/lib/machineImportStatus";
 import { shortPersonName } from "@/lib/personName";
 
@@ -89,13 +89,6 @@ const formatMoneyTotals = (totals: MoneyTotals) => {
   const entries = Object.entries(totals).filter(([, value]) => value !== 0);
   if (!entries.length) return "Sin valores";
   return entries.map(([currency, value]) => formatMoney(value, currency)).join(" · ");
-};
-
-const brandClass = (marca: string | null) => {
-  const normalized = (marca ?? "").trim().toUpperCase();
-  if (normalized === "CLAAS") return "border-marca-claas/30 bg-marca-claas-bg text-marca-claas";
-  if (normalized === "HORSCH") return "border-marca-horsch/30 bg-marca-horsch-bg text-marca-horsch";
-  return "border-border bg-muted text-muted-foreground";
 };
 
 // "Tipo de venta" del diseño = la condicion que ya existe en la base.

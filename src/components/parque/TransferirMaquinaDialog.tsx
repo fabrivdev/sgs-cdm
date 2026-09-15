@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ArrowRightLeft, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
@@ -138,7 +139,7 @@ export function TransferirMaquinaDialog({ maquina, clienteNombreActual, open, on
             <div className="rounded-md border bg-muted/30 p-3">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Máquina</div>
               <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                <Badge className="text-[10px]">{maquina.marca}</Badge>
+                <MarcaBadge marca={maquina.marca} className="text-[10px]" />
                 <Badge variant="outline" className="text-[10px]">{machineSubgroupLabel(maquina.subgrupo, maquina.subgrupo_personalizado)}</Badge>
                 {maquina.anio && <span className="text-[12px] text-muted-foreground">{maquina.anio}</span>}
               </div>

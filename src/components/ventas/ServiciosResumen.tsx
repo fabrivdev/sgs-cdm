@@ -1,4 +1,5 @@
 import { money } from "@/components/dashboard/utils";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -79,7 +80,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
           {missingBrandBreakdown ? <div role="alert" className="py-10 text-center text-[12px] text-destructive">Falta actualizar la consulta del resumen por marca. Aplicá el SQL de corrección.</div>
             : !porMarcaTipo.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin facturación en el período.</div>
             : porMarcaTipo.map((row) => <div key={`${row.marca}-${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
-              <div className="truncate font-medium" title={row.sin_vinculo_historico ? historicLabel : row.marca}>{row.sin_vinculo_historico ? historicLabel : row.marca}</div><div className="truncate">{row.sin_vinculo_historico ? "—" : typeLabel(row.tipo_tiempo)}</div>
+              <div className="min-w-0 truncate font-medium" title={row.sin_vinculo_historico ? historicLabel : row.marca}>{row.sin_vinculo_historico ? historicLabel : unknown(row.marca) ? row.marca : <MarcaBadge marca={row.marca} className="text-[10px]" />}</div><div className="truncate">{row.sin_vinculo_historico ? "—" : typeLabel(row.tipo_tiempo)}</div>
               {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
               <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
               <div className="text-right tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>

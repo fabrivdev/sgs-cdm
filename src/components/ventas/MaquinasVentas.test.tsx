@@ -19,6 +19,15 @@ function setup() {
 }
 
 describe("Ventas de Máquinas", () => {
+  it("keeps custom brands and their Operaciones colors in the invoice list", () => {
+    const brandedData = { ...data, lineas: data.lineas.map((line, index) => ({ ...line, marca: index ? "NB MAQUINAS" : "JOHN DEERE" })) };
+    render(<MaquinasExplorer data={brandedData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);
+    fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    expect(screen.getByTitle("JOHN DEERE")).toHaveTextContent("JOHN DEERE");
+    expect(screen.getByTitle("NB")).toHaveTextContent("NB");
+    expect(screen.queryByText("OTROS")).not.toBeInTheDocument();
+    expect(screen.getByText("$ 300.000")).toBeInTheDocument();
+  });
   it("uses the same Oscar identity in the seller summary and invoice detail", () => {
     const oscarData = { ...data, lineas: data.lineas.map((line, index) => ({ ...line, comercial: index ? "OSCAR DANIEL BENITEZ MEZA" : "000006 - Oscar Benítez" })) };
     render(<MaquinasExplorer data={oscarData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);
