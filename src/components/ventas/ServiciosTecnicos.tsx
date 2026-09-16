@@ -6,6 +6,7 @@ import { money } from "@/components/dashboard/utils";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { displayImportedTechnicianName, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import type { IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
+import { RowCount, TableScroll, scrollHead } from "./TableScroll";
 
 type Fila = {
   tecnico_clave: string; tecnico: string;
