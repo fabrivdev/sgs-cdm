@@ -198,10 +198,12 @@ const METRIC_HEADERS = ["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas",
 const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 
 function SummaryTable({ label, grid, minWidth, rows, share, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; empty: string }) {
-  return <div className="overflow-x-auto rounded-md border"><div className={minWidth}>
-    <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
+  return <div className="overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className={minWidth}>
+    <TableScroll rows={rows.length}>
+    <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
     {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{label === "Marca" ? <MarcaBadge marca={row.key} className="text-[10px]" /> : row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
-  </div></div>;
+    </TableScroll>
+  </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="filas" />}</div>;
 }
 
 function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
