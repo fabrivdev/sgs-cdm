@@ -263,10 +263,12 @@ function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const rows = useMemo(() => [...group(lines, line => line.cliente_facturado)].map(([cliente, values]) => ({ cliente, ultima: values.reduce((max, line) => line.fecha > max ? line.fecha : max, ""), ...summarize(values) })).sort((a, b) => Number(a.cliente.startsWith("Sin ")) - Number(b.cliente.startsWith("Sin ")) || b.total - a.total), [lines]);
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   const grid = "grid-cols-[minmax(250px,1.8fr)_repeat(2,minmax(82px,.65fr))_minmax(130px,1fr)_minmax(145px,1.05fr)_minmax(90px,.75fr)_minmax(105px,.8fr)_85px]";
-  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1040px]">
-      <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Cliente</div>{['Vendidas', 'Unidades netas', 'Facturación', 'Promedio / unidad neta', 'Facturas', 'Última venta', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
+  return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[1040px]">
+      <TableScroll rows={rows.length}>
+      <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Cliente</div>{['Vendidas', 'Unidades netas', 'Facturación', 'Promedio / unidad neta', 'Facturas', 'Última venta', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
       {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : rows.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-1.5 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="whitespace-nowrap text-right tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
-  </div></div>;
+      </TableScroll>
+  </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="clientes" />}</div>;
 }
 
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
