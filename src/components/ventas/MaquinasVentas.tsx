@@ -230,7 +230,7 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
       const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
       const cells = (item: SummaryRow, model = false) => <>
         <div className={cn("min-w-0 truncate", !model && "font-medium")}>{model ? item.modelo : <MarcaBadge marca={item.marca} className="text-[10px]" />}</div>
-        <div className="truncate" title={model ? item.modelo : item.tipo}>{model ? "Modelo" : item.tipo}</div>
+        <div className="truncate" title={model ? undefined : item.tipo}>{model ? "" : item.tipo}</div>
         <div>{item.condicion}</div>
         <div className="text-right tabular-nums">{decimal.format(item.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(item.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(item.netas)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(item.clientes)}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(item.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(item.total)}</div><div className="text-right tabular-nums text-muted-foreground">{item.netas ? money(item.total / item.netas) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(item.total / total * 100)}%` : "—"}</div>
       </>;
