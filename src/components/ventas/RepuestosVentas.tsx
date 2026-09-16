@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Receipt, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
+import { RowCount, TableScroll } from "./TableScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
