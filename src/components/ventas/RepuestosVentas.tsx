@@ -159,7 +159,7 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
           {view === "repuestos" && <><td className="text-right tabular-nums">{number(row.unidades_vendidas)}</td><td className="text-right tabular-nums">{number(row.unidades_devueltas)}</td></>}
           <td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td></>}
     </tr>)}
-    <tr ref={sentinel}><td colSpan={labels.length} className="text-center text-[11px] text-muted-foreground">{query.isFetchingNextPage ? "Cargando más registros…" : ""}</td></tr>
+    {query.hasNextPage && <tr ref={sentinel}><td colSpan={labels.length} className="text-center text-[11px] text-muted-foreground">{query.isFetchingNextPage ? "Cargando más registros…" : ""}</td></tr>}
     </tbody>
   </Table></div>;
 }
