@@ -124,7 +124,7 @@ function Summary({ data }: { data: PartsOverview }) {
     </Table>)}
   </div>;
 }
-function Pager({ data, onPage }: { data: { total: number; pagina: number; paginas: number }; onPage: (page: number) => void }) {
+function LegacyPager({ data, onPage }: { data: { total: number; pagina: number; paginas: number }; onPage: (page: number) => void }) {
   return <div className="flex h-8 items-center justify-between gap-3 text-[11px] text-muted-foreground"><span>{integer.format(data.total)} registros</span><div className="flex shrink-0 items-center gap-1 whitespace-nowrap"><span className="mr-1">Pág. {data.pagina} de {data.paginas}</span><button type="button" aria-label="Página anterior" disabled={data.pagina <= 1} onClick={() => onPage(data.pagina - 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" /></button><button type="button" aria-label="Página siguiente" disabled={data.pagina >= data.paginas} onClick={() => onPage(data.pagina + 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronRight className="h-3.5 w-3.5" /></button></div></div>;
 }
 function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "clientes" | "repuestos" | "detalle" }) {
