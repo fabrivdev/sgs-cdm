@@ -119,9 +119,8 @@ describe("Ventas de Repuestos", () => {
     }) }));
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     await screen.findByText("PRIMERO");
-    fireEvent.click(screen.getByRole("button", { name: "Página siguiente" }));
     await screen.findByText("ULTIMO");
-    expect(screen.getByText("51 registros")).toBeInTheDocument();
+    expect(screen.getByText("2 de 51 registros")).toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
   });
   it("no lanza informes ante un rango vacío o invertido", () => {
