@@ -71,8 +71,9 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
               <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
             </div>)}
         </div>
+        </TableScroll>
       </div></div>
-      {!error && !loading && rows.length > 0 && <div className="border-t px-3 py-2 text-right text-[11px] font-medium text-muted-foreground">Total facturado en el período: <span className="text-foreground">{money(total)}</span></div>}
+      {!error && !loading && rows.length > 0 && <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-[11px] font-medium text-muted-foreground"><span>{rows.length.toLocaleString("es-PY")} OS</span><span>Total facturado en el período: <span className="text-foreground">{money(total)}</span></span></div>}
     </div>
     <MachineHistorySheet target={detailTarget} onOpenChange={(open) => { if (!open) setDetailTarget(null); }} />
   </>;
