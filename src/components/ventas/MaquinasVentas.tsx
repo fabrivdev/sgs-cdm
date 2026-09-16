@@ -222,8 +222,8 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     const [marca, tipo, condicion, ...model] = key.split("__");
     return { key, marca, tipo, condicion, modelo: model.join("__"), ...summarize(values) };
   }), [lines]);
-  const grid = "grid-cols-[34px_minmax(100px,.9fr)_minmax(170px,1.35fr)_minmax(60px,.45fr)_repeat(5,minmax(70px,.62fr))_minmax(100px,.9fr)_minmax(100px,.8fr)_72px]";
-  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1000px]">
+  const grid = "grid-cols-[34px_minmax(100px,.9fr)_minmax(140px,1.2fr)_56px_repeat(5,minmax(70px,.62fr))_minmax(100px,.9fr)_minmax(100px,.85fr)_80px]";
+  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[960px]">
     <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
     {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
       const open = expanded === row.key;
