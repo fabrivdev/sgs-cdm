@@ -6754,6 +6754,10 @@ export type Database = {
         Args: { p_anclas: Json; p_carga_id: string; p_filas: Json }
         Returns: Json
       }
+      repuestos_completar_vendedores_historicos: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
       repuestos_crear_version_modelo: {
         Args: {
           p_marca: string
@@ -7149,6 +7153,10 @@ export type Database = {
           sucursal: string
           vendedor: string
         }[]
+      }
+      ventas_repuestos_normalizar_vendedor: {
+        Args: { p_nombre: string }
+        Returns: string
       }
       ventas_repuestos_panorama_v1: {
         Args: {
