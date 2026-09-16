@@ -111,7 +111,7 @@ describe("Ventas de Repuestos", () => {
     expect(screen.queryByText("Histórico sin detalle por artículo")).not.toBeInTheDocument();
     detail.filas[0].metodologia = "actual";
   });
-  it("pagina el detalle sin recortar su total", async () => {
+  it("carga el detalle por scroll sin recortar su total", async () => {
     setup();
     rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
       data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
