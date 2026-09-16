@@ -16,9 +16,10 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
   const rows = groupServiceBrandsByMachine(data?.por_maquina ?? []).sort((a, b) => Number(/(?:sin|no) (?:identificar|identificado|informar|informado|máquina|maquina)/i.test(`${a.marca} ${a.tipo_maquina}`)) - Number(/(?:sin|no) (?:identificar|identificado|informar|informado|máquina|maquina)/i.test(`${b.marca} ${b.tipo_maquina}`)) || b.neto - a.neto);
 
   return (
-    <div className="mt-3 overflow-x-auto rounded-md border">
-      <div className="min-w-[1120px]">
-        <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+    <div className="mt-3 overflow-hidden rounded-md border">
+      <div className="overflow-x-auto"><div className="min-w-[1120px]">
+        <TableScroll rows={rows.length}>
+        <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Marca</div><div>Tipo de máquina</div>
           <div className="text-right">Máquinas</div><div className="text-right">OS</div><div className="text-right">Horas OS</div>
           {["Mano de Obra", "Kilometraje", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className="text-right">{label}</div>)}
@@ -35,7 +36,9 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
               <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
             </div>
           ))}
-      </div>
+        </TableScroll>
+      </div></div>
+      {rows.length > 0 && <RowCount rows={rows.length} label="filas" />}
     </div>
   );
 }
