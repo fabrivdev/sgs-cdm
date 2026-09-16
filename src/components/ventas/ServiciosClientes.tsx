@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/components/dashboard/utils";
 import { matchesServiceSalesSearch, type ServiceSalesSearchLine } from "@/lib/serviceSalesSearch";
 import { canonicalClientName } from "@/lib/clientIdentity";
+import { RowCount, TableScroll, scrollHead } from "./TableScroll";
 
 type Line = ServiceSalesSearchLine & { id: string; factura: string; os: string | null; cliente: string; propietario: string; componente: string; total_venta: number; es_nota_credito?: boolean };
 const usd = { format: (value: number) => money(value) };
