@@ -177,6 +177,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
           <div className="text-right tabular-nums text-muted-foreground">{integer.format(Number(row.facturas))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(Number(row.total) / total * 100)}%` : "—"}</div>
         </button>)}
+        </TableScroll>
         <div className={`grid ${grid} items-center border-t bg-muted/30 px-3 py-2 text-[12px] font-semibold`}>
           <div>Total del período</div>
           <div className="text-right tabular-nums">{money(total)}</div>
