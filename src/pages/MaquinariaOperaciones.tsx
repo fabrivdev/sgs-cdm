@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 import { legacyMachineBrand, machineBrandClass as brandClass, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
 import { isImportSaleInvoiced } from "@/lib/machineImportStatus";
+import { matchesOperationFilters, normalizeOperationModel, operationModelOptions } from "@/lib/machineOperationFilters";
 import { shortPersonName } from "@/lib/personName";
 
 const db = supabase as any;
@@ -247,6 +248,7 @@ type OrderRow = {
   es_historico: boolean;
 };
 type ImportRow = {
+  modelo_original?: string | null;
   id: string; importacion_linea_id: string; numero_unidad: number; cantidad_lote: number | null;
   operacion_id: string | null; linea_id: string | null; unidad_id: string | null; np_numero: string | null; np_fecha: string | null;
   cliente_nombre: string | null; comercial: string | null; marca: string | null; producto: string | null; modelo: string | null;
@@ -743,6 +745,9 @@ export default function MaquinariaOperaciones() {
   const [search, setSearch] = useState("");
   const [orderState, setOrderState] = useState<SimpleOrderState | "TODOS">("PENDIENTE");
   const [marca, setMarca] = useState("TODOS");
+  const [modelo, setModelo] = useState("TODOS");
+  const [tipoMaquina, setTipoMaquina] = useState("TODOS");
+  const [vinculoNp, setVinculoNp] = useState("TODOS");
   const [condicion, setCondicion] = useState("TODOS");
   const [llegada, setLlegada] = useState<ArrivalState | "TODOS">("TODOS");
   const [situacion, setSituacion] = useState("TODOS");
@@ -767,7 +772,7 @@ export default function MaquinariaOperaciones() {
 
   // Los filtros son independientes por pantalla: cambiar de pestaña no debe
   // arrastrar un filtro que no existe del otro lado.
-  useEffect(() => { setSearch(""); }, [importsView]);
+  useEffect(() => { setSearch(""); setModelo("TODOS"); setTipoMaquina("TODOS"); setVinculoNp("TODOS"); }, [importsView]);
 
   const operationsQuery = useQuery({
     queryKey: ["machine-operations", importsView ? "imports" : "orders"],
@@ -863,10 +868,10 @@ export default function MaquinariaOperaciones() {
   const entregaByUnitId = entregaQuery.data;
   const estadoByOperacionId = operacionEstadoQuery.data;
   const stockChasisSet = stockChasisQuery.data;
-  const rows = useMemo(() => (operationsQuery.data ?? []).map(row => {
-    const match = modelCatalog.data ? reviewCatalogLine({ marca: row.marca ?? "", modelo: row.modelo ?? "", subgrupo: row.producto ?? "OTRO" }, modelCatalog.data).match : undefined;
-    return { ...row, modelo_original: row.modelo, ...(match ? { modelo: match.nombre, producto: match.subgrupo } : {}) };
-  }).filter((row) => {
+  const normalizedRows = useMemo(() => (operationsQuery.data ?? []).map(row => normalizeOperationModel(row, modelCatalog.data)), [operationsQuery.data, modelCatalog.data]);
+  const modeloOptions = useMemo(() => operationModelOptions(normalizedRows, marca, tipoMaquina), [normalizedRows, marca, tipoMaquina]);
+  const tipoOptions = useMemo(() => Array.from(new Set(normalizedRows.map(row => row.producto).filter((value): value is string => Boolean(value)))).sort(), [normalizedRows]);
+  const rows = useMemo(() => normalizedRows.filter((row) => {
     if (importsView) {
       const importRow = row as ImportRow;
       if (llegada !== "TODOS" && arrivalState(importRow) !== llegada) return false;
@@ -878,17 +883,18 @@ export default function MaquinariaOperaciones() {
       const unit = entregaByUnitId?.get(orderRow.id);
       if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet, orderRow.es_historico) !== entrega) return false;
     }
-    if (marca !== "TODOS" && row.marca !== marca) return false;
+    if (!matchesOperationFilters(row, { marca, modelo, tipo: tipoMaquina, vinculoNp: importsView ? vinculoNp : "TODOS" })) return false;
     const q = search.trim().toUpperCase();
     if (!q) return true;
     const common = [row.np_numero, formatNpCode(row.np_numero), row.cliente_nombre, row.marca, row.producto, row.modelo, row.modelo_original, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [operationsQuery.data, modelCatalog.data, importsView, search, orderState, marca, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
+  }), [normalizedRows, importsView, search, orderState, marca, modelo, tipoMaquina, vinculoNp, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
 
   const activeCount = (marca !== "TODOS" ? 1 : 0)
-    + (importsView ? (llegada !== "TODOS" ? 1 : 0) + (situacion !== "TODOS" ? 1 : 0) : (condicion !== "TODOS" ? 1 : 0) + (entrega !== "TODOS" ? 1 : 0));
-  const clearFilters = () => { setMarca("TODOS"); setCondicion("TODOS"); setLlegada("TODOS"); setSituacion("TODOS"); setEntrega("TODOS"); };
+    + (modelo !== "TODOS" ? 1 : 0) + (tipoMaquina !== "TODOS" ? 1 : 0)
+    + (importsView ? (vinculoNp !== "TODOS" ? 1 : 0) + (llegada !== "TODOS" ? 1 : 0) + (situacion !== "TODOS" ? 1 : 0) : (condicion !== "TODOS" ? 1 : 0) + (entrega !== "TODOS" ? 1 : 0));
+  const clearFilters = () => { setMarca("TODOS"); setModelo("TODOS"); setTipoMaquina("TODOS"); setVinculoNp("TODOS"); setCondicion("TODOS"); setLlegada("TODOS"); setSituacion("TODOS"); setEntrega("TODOS"); };
 
   const orderTotals = useMemo(() => {
     const orderRows = rows as OrderRow[];
@@ -939,7 +945,7 @@ export default function MaquinariaOperaciones() {
       </KpiStrip>
     )}
     <FiltersBar
-      search={{ value: search, onChange: setSearch, placeholder: importsView ? "NP, proveedor, OC/PO..." : "NP, cliente o comercial...", label: "Buscar", width: "w-[240px]" }}
+      search={{ value: search, onChange: setSearch, placeholder: importsView ? "Modelo, chasis, NP, OC/PO..." : "NP, modelo, cliente o comercial...", label: "Buscar", width: "w-[240px]" }}
       activeCount={activeCount}
       onClear={clearFilters}
       meta={`${rows.length} ${importsView ? "importaciones" : "líneas"}`}
@@ -994,7 +1000,10 @@ export default function MaquinariaOperaciones() {
           options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(AVAILABILITY_LABEL).map(([value, label]) => ({ value, label }))]}
         />
       )}
-      <FilterSelect label="Marca" value={marca} onChange={setMarca} placeholder="Marca" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...marcaOptions.map((value) => ({ value, label: value }))]} />
+      <FilterSelect label="Marca" value={marca} onChange={(value) => { setMarca(value); setModelo("TODOS"); }} placeholder="Marca" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...marcaOptions.map((value) => ({ value, label: value }))]} />
+      <FilterSelect label="Tipo de máquina" value={tipoMaquina} onChange={(value) => { setTipoMaquina(value); setModelo("TODOS"); }} placeholder="Tipo de máquina" width="w-[170px]" options={[{ value: "TODOS", label: "Todos" }, ...tipoOptions.map(value => ({ value, label: value }))]} />
+      <FilterSelect label="Modelo" value={modelo} onChange={setModelo} placeholder="Modelo" width="w-[210px]" options={[{ value: "TODOS", label: "Todos" }, ...modeloOptions.map(value => ({ value, label: value }))]} />
+      {importsView && <FilterSelect label="Vínculo con NP" value={vinculoNp} onChange={setVinculoNp} placeholder="Vínculo con NP" width="w-[150px]" options={[{ value: "TODOS", label: "Todos" }, { value: "VINCULADA", label: "Con NP vinculada" }, { value: "SIN_NP", label: "Sin NP vinculada" }]} />}
       {!importsView && (
         <FilterSelect label="Condición" value={condicion} onChange={setCondicion} placeholder="Condición" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(CONDITION_LABEL).map(([value, label]) => ({ value, label }))]} />
       )}
