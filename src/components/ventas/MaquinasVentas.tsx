@@ -255,7 +255,8 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         {open && models.map(model => <div key={model.key} className={`grid ${grid} items-center border-t bg-muted/20 px-3 py-1.5 text-[11px]`}><div />{cells(model, true)}</div>)}
       </div>;
     })}
-  </div></div>;
+    </TableScroll>
+  </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="filas" />}</div>;
 }
 
 function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
