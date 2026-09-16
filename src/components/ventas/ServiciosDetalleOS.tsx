@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/components/dashboard/utils";
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
+import { TableScroll, scrollHead } from "./TableScroll";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
@@ -47,10 +48,11 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
   return <>
     <div className="mt-3 overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><div className="min-w-[1380px]">
-        <div className={`grid ${columns} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+        <TableScroll rows={rows.length}>
+        <div className={`grid ${columns} ${scrollHead} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div>{["Mano de Obra","Kilometraje","Repuestos","Terceros"].map(label=><div key={label} className="text-right">{label}</div>)}<div className="text-right">Facturado</div>
         </div>
-        <div className="max-h-[480px] overflow-y-auto">
+        <div>
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
             : error ? <div role="alert" className="px-3 py-12 text-center text-[12px] text-destructive">No se pudo cargar el detalle. {error}</div>
             : !rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay OS con facturación en el período.</div>
@@ -70,8 +72,9 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
               <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
             </div>)}
         </div>
+        </TableScroll>
       </div></div>
-      {!error && !loading && rows.length > 0 && <div className="border-t px-3 py-2 text-right text-[11px] font-medium text-muted-foreground">Total facturado en el período: <span className="text-foreground">{money(total)}</span></div>}
+      {!error && !loading && rows.length > 0 && <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-[11px] font-medium text-muted-foreground"><span>{rows.length.toLocaleString("es-PY")} OS</span><span>Total facturado en el período: <span className="text-foreground">{money(total)}</span></span></div>}
     </div>
     <MachineHistorySheet target={detailTarget} onOpenChange={(open) => { if (!open) setDetailTarget(null); }} />
   </>;
