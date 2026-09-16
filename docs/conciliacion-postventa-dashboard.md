@@ -48,7 +48,24 @@ El dashboard separa Terceros en filtro, mix, tabla por período y exportación. 
 filtro predeterminado contiene los cuatro rubros de postventa; Máquinas/Otros
 siguen disponibles como selección explícita.
 
-## Pruebas locales
+## Carga sin recalcular cada página
+
+Aplicar también `20260916170000_dashboard_billing_single_evaluation.sql`.
+El nuevo RPC `dashboard_facturacion_lote_v1` devuelve un JSON escalar con todas
+las filas y su cantidad. Evalúa una sola vez la fuente conciliada por año,
+incluido el año anterior para comparaciones. No se pagina el resultado tabular
+del reporte, ya que eso repetía el cálculo anual por cada 1.000 registros.
+Dos consultas como máximo en paralelo. Plazo total del cliente: 45 segundos,
+con cancelación del transporte al vencer, desmontar o cambiar el rango.
+Un fallo o lote incompleto invalida toda la carga, sin cachear cifras parciales.
+Los índices de `id::text` aceleran los cruces que no podían usar la PK UUID.
+No cambia la fuente, los importes ni el uso de GRID. El tiempo real de la base
+debe medirse después de aplicar este SQL; los tests locales no prueban su SLA.
+
+## Pruebas locales de carga
+
+`cargarFacturacion.test.ts`: más de 1.000 movimientos, una llamada por año,
+fronteras, rango inválido, lote incompleto, fallos, cancelación y límite de espera.
 
 `src/components/dashboard/facturacionSource.test.ts`: normalización, signo de NC,
 rubros explícitos, desconocidos y procedencia de GRID.

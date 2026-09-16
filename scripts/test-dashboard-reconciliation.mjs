@@ -83,6 +83,27 @@ try {
   const august=(await db.query("SELECT * FROM dashboard_facturacion_movimientos_v1('2026-08-01','2026-08-31')")).rows;
   assert.equal(august.length,2); assert.equal(money(august),20);
   await db.exec(migration); assert.equal(money(await read()),345);
+  const loteMigration = readFileSync(new URL('../supabase/migrations/20260916170000_dashboard_billing_single_evaluation.sql', import.meta.url),'utf8');
+  await db.exec(loteMigration);
+  const lote = async (desde='2026-01-01',hasta='2026-12-31') =>
+    (await db.query('SELECT dashboard_facturacion_lote_v1($1::date,$2::date) AS data',[desde,hasta])).rows[0].data;
+  let batch = await lote();
+  assert.equal(batch.count,7); assert.equal(money(batch.rows),345);
+  assert.deepEqual(batch.rows,(await read()).map(r=>({ ...r,
+    fecha:r.fecha.toISOString().slice(0,10),cantidad:Number(r.cantidad),total_venta:Number(r.total_venta) })));
+  await assert.rejects(lote('2025-12-31','2026-01-01'),/rango/);
+  await assert.rejects(lote(null,'2026-12-31'),/rango/);
+  await db.exec("SET test.access='false'");
+  await assert.rejects(lote(),/No tenés acceso/);
+  await db.exec("SET test.access='true'");
+  assert.deepEqual(await lote('2026-12-01','2026-12-31'),{ rows:[],count:0 });
+  await db.exec(loteMigration);
+  // El escalar conserva todas las filas, más allá del tope REST de 1.000.
+  await db.exec(`INSERT INTO base_prueba SELECT 'EXTRA'||n,'2026-08-31','Santa Rita','CLIENTE',1,1,
+    'Servicio','servicios','actual','E'||n,NULL,NULL,'MO',NULL FROM generate_series(1,1501) n`);
+  batch=await lote(); assert.equal(batch.count,1508); assert.equal(batch.rows.length,1508);
+  assert.equal(money(batch.rows),1846);
+  await db.exec("DELETE FROM base_prueba WHERE linea_id LIKE 'EXTRA%'");
   assert.equal((await db.query('SELECT count(*) n FROM facturacion_lineas_importadas')).rows[0].n,8);
   const audit = readFileSync(new URL('../supabase/verificar_conciliacion_dashboard_2026.sql', import.meta.url),'utf8');
   const results=(await db.query(audit)).rows;
@@ -97,5 +118,5 @@ try {
   const mismatch=(await db.query(audit)).rows.find(r=>r.periodo==='2026-06' && r.modulo==='repuestos');
   assert.equal(mismatch.resultado,'REVISAR'); assert.equal(Number(mismatch.diferencia),0);
   assert.equal(Number(mismatch.registros_diferentes),2);
-  console.log('OK: migración idempotente, importes/NC, corte junio/julio, GRID no aditivo, pendientes ambiguos, conflictos, datos originales y permisos. Fixtures sintéticos, no producción.');
+  console.log('OK: migraciones idempotentes, importes/NC, corte junio/julio, GRID no aditivo, pendientes ambiguos, conflictos, datos originales, permisos y JSON completo >1000 filas. Fixtures sintéticos, no producción.');
 } finally { await db.close(); }

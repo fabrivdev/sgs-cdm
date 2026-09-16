@@ -50,7 +50,8 @@ import {
 import { MARCAS, SUCURSALES, DIAS_JORNADA_VENCIDA, MAX_TOP_RANKING, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
 import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
-import { esPostventaDashboard, normalizarFacturacionDashboard, type DashboardFacturacionMovimiento } from "@/components/dashboard/facturacionSource";
+import { esPostventaDashboard } from "@/components/dashboard/facturacionSource";
+import { cargarFacturacionDashboard, type LoteFacturacion } from "@/components/dashboard/cargarFacturacion";
 import { cn } from "@/lib/utils";
 import { cardLabel, metaText } from "@/lib/ui-classes";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal } from "@/lib/appSettings";
@@ -302,20 +303,6 @@ async function cargarProfilesDashboard(): Promise<Profile[]> {
 
 function dateKey(date: Date) {
   return format(date, "yyyy-MM-dd");
-}
-
-function rangosAnuales(desde: Date, hasta: Date) {
-  const rangos: Array<{ desde: Date; hasta: Date }> = [];
-  let cursor = desde;
-
-  while (cursor <= hasta) {
-    const cierreAnual = endOfYear(cursor);
-    const cierre = cierreAnual < hasta ? cierreAnual : hasta;
-    rangos.push({ desde: cursor, hasta: cierre });
-    cursor = addDays(cierre, 1);
-  }
-
-  return rangos;
 }
 
 function inRange(date: string, start: Date, end: Date) {
@@ -635,6 +622,7 @@ export default function Dashboard() {
   const [facturaciónLoading, setFacturacionLoading] = useState(true);
   const [excluidasGsCount, setExcluidasGsCount] = useState(0);
   const [facturacionError, setFacturacionError] = useState<string | null>(null);
+  const [facturacionReintento, setFacturacionReintento] = useState(0);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
   const [metaHorasMensual, setMetaHorasMensual] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
 
@@ -930,6 +918,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     let alive = true;
+    const controller = new AbortController();
     const cacheKey = `${dateKey(queryStart)}:${dateKey(queryEnd)}`;
     const cached = dashboardFacturacionCache.get(cacheKey);
 
@@ -948,14 +937,14 @@ export default function Dashboard() {
       try {
         // Mismas fuentes e importes que Ventas. El RPC conserva GRID sólo
         // como metadato por línea y nunca elimina MO/Km por factura completa.
-        const chunks = await Promise.all(rangosAnuales(queryStart, queryEnd).map((rango) =>
-          cargarTodo<DashboardFacturacionMovimiento>(
-            supabase.rpc("dashboard_facturacion_movimientos_v1" as never, {
-              p_desde: dateKey(rango.desde), p_hasta: dateKey(rango.hasta),
-            } as never).order("fecha", { ascending: false }).order("id", { ascending: true }),
-          ),
-        ));
-        const rows = chunks.flat().map(normalizarFacturacionDashboard);
+        const rows = await cargarFacturacionDashboard(dateKey(queryStart), dateKey(queryEnd), async (rango, signal) => {
+          const { data, error } = await supabase.rpc("dashboard_facturacion_lote_v1" as never, {
+            p_desde: rango.desde, p_hasta: rango.hasta,
+          } as never).abortSignal(signal);
+          if (error) throw error;
+          return data as unknown as LoteFacturacion;
+        }, controller.signal);
+        if (!alive) return;
         dashboardFacturacionCache.set(cacheKey, { cachedAt: Date.now(), rows });
         if (alive) setFacturacion(rows);
       } catch (error) {
@@ -972,8 +961,9 @@ export default function Dashboard() {
 
     return () => {
       alive = false;
+      controller.abort();
     };
-  }, [queryEnd, queryStart]);
+  }, [queryEnd, queryStart, facturacionReintento]);
 
   // Nota de honestidad: cuanta (sin traer filas) cuantas facturas del
   // periodo visible quedaron afuera de los totales por estar en guaranies,
@@ -3302,7 +3292,9 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        actions={dashboardExportOptions.length > 0 ? <TableExportButton options={dashboardExportOptions} /> : undefined}
+        actions={dashboardExportOptions.length > 0 &&
+          ((section !== "resumen" && section !== "facturación") || (!loading && !facturacionError))
+          ? <TableExportButton options={dashboardExportOptions} /> : undefined}
         expanded={(
           <div className="flex flex-col gap-3">
             <FilterMultiSelect
@@ -3435,11 +3427,15 @@ export default function Dashboard() {
       </FiltersBar>
 
         {facturacionError && (
-          <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
-            No se pudo cargar la facturación: {facturacionError}. Si falta el RPC,
-            aplicá la migración 20260916160000. No se muestran resultados parciales.
-          </p>
+          <div role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+            <p>No se pudo cargar la facturación: {facturacionError}. Si falta el RPC,
+              aplicá las migraciones 20260916160000 y 20260916170000. No se muestran resultados parciales.</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => setFacturacionReintento(value => value + 1)}>
+              Reintentar carga
+            </Button>
+          </div>
         )}
+        {loading && <p role="status" className="text-sm text-muted-foreground">Cargando facturación y comparación del año anterior…</p>}
         {!filtrosServiciosActivos && facturación.some((row) => row.raw_data?.dashboard_time_type_source === "grid_inferido") && (
           <p className="text-[11px] text-muted-foreground">
             El tipo de tiempo del histórico de Repuestos puede ser inferido desde GRID; no acredita el tipo de una OS.
@@ -3465,7 +3461,7 @@ export default function Dashboard() {
         <TabsContent value="resumen" className="space-y-3">
 
           {/* FILA 1 - FINANCIERO */}
-          {loading ? (
+          {facturacionError ? <p className="text-sm text-muted-foreground">Indicadores de facturación no disponibles.</p> : loading ? (
             <DashboardKPISkeleton count={4} />
           ) : (
             <KpiStrip className="grid-cols-2 lg:grid-cols-4">
@@ -3512,7 +3508,7 @@ export default function Dashboard() {
           )}
 
           {/* FILA 2 - TENDENCIA */}
-          <section className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          {!loading && !facturacionError && <section className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Card className="flex h-full min-w-0 flex-col p-3">
             <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="min-w-0">
@@ -3542,7 +3538,7 @@ export default function Dashboard() {
               <PanelTitle icon={Building2} title="Facturacion por sucursal" />
               <SucursalBars rows={factBySucursal} totalValue={totalPeriodo} comparisonLabel={periodComparisonLabel} onSelect={(sucursal) => { setFSucursales([sucursal]); goSection("facturación"); }} />
             </Card>
-          </section>
+          </section>}
 
           {/* FILA 3 - OPERATIVA */}
           <section className="grid gap-3 md:grid-cols-2" aria-busy={operationalLoading}>
@@ -3610,6 +3606,7 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="facturación" className="space-y-3">
+          {!loading && !facturacionError && <>
           <Card className="flex flex-col p-3">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
@@ -3689,6 +3686,7 @@ export default function Dashboard() {
               onSelectFullRange={() => setSelectedWeekKey(null)}
             />
           </Card>
+          </>}
         </TabsContent>
 
         <TabsContent value="servicios" className="space-y-3">
