@@ -77,9 +77,10 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
 
   return (
     <div className="mt-3">
-      <div className="overflow-x-auto rounded-md border">
-        <div className="min-w-[1120px]">
-          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+      <div className="overflow-hidden rounded-md border">
+        <div className="overflow-x-auto"><div className="min-w-[1120px]">
+          <TableScroll rows={unified.length}>
+          <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
             <div>Técnico</div>
             {["Horas Cliente", "Horas Garantía", "Horas Interno", "Total horas", "MO Cliente asociada", "MO Garantía asociada", "MO Interno asociada", "MO total asociada"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
           </div>
@@ -93,7 +94,9 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
                   <div className="text-right font-semibold tabular-nums">{money(row.mo_total)}</div>
                 </div>
               ))}
-        </div>
+          </TableScroll>
+        </div></div>
+        {unified.length > 0 && <RowCount rows={unified.length} label="técnicos" />}
       </div>
     </div>
   );
