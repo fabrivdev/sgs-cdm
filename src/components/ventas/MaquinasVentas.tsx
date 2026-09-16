@@ -9,6 +9,7 @@ import { MarcaBadge } from "@/components/StatusBadges";
 import { cn } from "@/lib/utils";
 import { canonicalClientName } from "@/lib/clientIdentity";
 import { shortPersonName } from "@/lib/personName";
+import { RowCount, TableScroll, scrollHead } from "./TableScroll";
 
 export type MaquinaVentaLinea = {
   id: string;
