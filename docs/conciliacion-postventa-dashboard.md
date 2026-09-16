@@ -74,3 +74,49 @@ rubros explícitos, desconocidos y procedencia de GRID.
 aislado (PGlite), fixtures de duplicados, NC, fronteras de fechas, GRID huérfano,
 pendientes ambiguos, conflictos, permisos e idempotencia. No usa credenciales ni
 se conecta a Supabase. Se ejecuta con un módulo PGlite local como argumento.
+
+## GRUPO FX del histórico y Otros comerciales
+
+Aplicar `20260916180000_respect_historical_group_fx_and_commercial_others.sql`
+después de la fuente conciliada de 20260916160000. No requiere reimportar ni
+modifica filas originales, OS, jornadas, ajustes de Comisiones, stock o vínculos.
+
+El histórico clásico clasifica **MANO DE OBRA** y **KILOMETRAJE** exclusivamente
+por `grupo_fx`, tolerando espacios y mayúsculas. `SERVICIOS - OTROS` / `SERVICE`
+en el grupo general no son evidencia de MO cuando GRUPO FX está vacío.
+Los demás conceptos no comerciales de esa hoja quedan en Otros, incluidos los
+descuentos con signo negativo. Un tipo de tiempo **No informado** sigue siendo
+independiente del rubro: la MO histórica con GRUPO FX correcto no se excluye.
+
+Ejemplo original: Fact. Servicios, fila 9741, factura 181925 de 05/01/2026,
+artículo 27025, COSTO DE ENVIO, importe 1, grupo SERVICIOS - OTROS y GRUPO FX
+vacío. No es MO ni una OS pendiente de vinculación. La hoja de Servicios del
+archivo suministrado tiene 195 filas de COSTO DE ENVIO en 2026, por 1.684,48;
+esta suma del archivo no sustituye el control de la base desplegada.
+
+La vista detallada de la hoja de Repuestos conserva todas sus líneas y añade
+`concepto`. Los grupos de merchandising y las descripciones explícitas de
+envíos/intereses se clasifican Otros. Ventas de Repuestos toma sólo Repuestos;
+Dashboard toma ambas clases, conservando el mismo ID/importe de cada línea.
+El resumen clásico de esa hoja (`tipo=Repuesto`) no se vuelve a sumar, tampoco
+cuando el resumen ya dice Otros. Los artículos sin catálogo siguen en Repuestos.
+GRID se conserva como metadato, nunca como una segunda venta.
+
+En el sistema nuevo los conceptos explícitos de envío/intereses/merchandising
+se separan antes de clasificar por OS. El vínculo documental se conserva;
+Otros no entra en Servicios por el mero hecho de tener OS. Terceros sigue como
+Terceros dentro de Servicios cuando está vinculado a OS. Máquinas conserva su
+clasificación por código/estructura y no se alteran sus reportes comerciales.
+
+El total de **postventa** debe bajar por los conceptos trasladados a Otros; no
+forzarlo al valor anterior incorrecto. Los importes siguen disponibles al
+seleccionar Otros en Dashboard. Comparar con Ventas usando los mismos rubros,
+fechas, moneda y sucursales. Tras aplicar, recargar la app para descartar cachés.
+
+Verificación: `verificar_clasificacion_comercial_2026.sql` para la factura 181925
+y `verificar_conciliacion_dashboard_2026.sql` para los 66 controles por ID/mes/rubro.
+`scripts/test-historical-commercial-classification.mjs` ejecuta las fuentes SQL
+reales en PostgreSQL aislado, reproduce el envío de 1 y prueba rubros, NC,
+Otros con OS, Terceros, piezas sin catálogo, ausencia de duplicación de resumen,
+conservación de filas originales, permisos, filtros e idempotencia. El desempeño
+y los valores reales se verifican después de aplicar, no mediante esta fixture.

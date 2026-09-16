@@ -6231,6 +6231,7 @@ export type Database = {
         Row: {
           cantidad: number | null
           cliente: string | null
+          concepto: string | null
           codigo: string | null
           codigo_fabricante: string | null
           codigo_legacy: string | null

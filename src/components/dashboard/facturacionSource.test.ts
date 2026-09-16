@@ -46,4 +46,16 @@ describe('fuente conciliada del Dashboard', () => {
     expect(concept(normalizarFacturacionDashboard({ ...movimiento, concepto: 'Kilometraje',
       tipo: 'Repuesto', grupo: 'Repuestos' }))).toBe('Kilometraje');
   });
+  it.each(['COSTO DE ENVIO', 'INTERESES COBRADOS', 'GAFAS DE SOL TERRA TRAC'])(
+    '%s permanece en Otros aunque el importador lo haya llamado Servicio o Repuesto', (mercaderia) => {
+      const row = normalizarFacturacionDashboard({ ...movimiento,
+        concepto: 'Otros', area_calculada: 'otros', tipo: 'Repuesto',
+        grupo: 'SERVICIOS - OTROS', grupo_fx: 'Otros', mercaderia,
+        raw_data: { linked_service_order: '01-00000165' },
+      });
+      expect(concept(row)).toBe('Otros');
+      expect(esPostventaDashboard(row)).toBe(false);
+      expect(row.total_venta).toBe(-25.5);
+      expect(row.raw_data?.linked_service_order).toBe('01-00000165');
+    });
 });
