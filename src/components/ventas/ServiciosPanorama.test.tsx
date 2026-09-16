@@ -13,6 +13,24 @@ const row = (periodo: string, total: number, metodologia: "historico" | "actual"
 });
 
 describe("Panorama de Ventas de Servicios", () => {
+  it("totaliza componentes y usa clientes/facturas únicos del rango, sin sumar porcentajes", async () => {
+    rpc.mockImplementation(async (_name: string, params: { p_desde: string }) => ({ data: {
+      desde: params.p_desde, hasta: "2026-08-31", agrupacion: "mes",
+      resumen: { ...summary, total: params.p_desde === "2026-07-01" ? 300 : 150, clientes: 1, facturas: 2 },
+      periodos: [
+        { ...row("2026-07-01", 100, "actual"), mo: 60, km: 10, repuestos: 20, terceros: 10, facturas: 2 },
+        { ...row("2026-08-01", 200, "actual"), mo: 150, km: 20, repuestos: 25, terceros: 5, facturas: 2 },
+      ],
+    }, error: null }));
+    render(<ServiciosPanorama desde="2026-07-01" hasta="2026-08-31" sucursal="TODAS" buscar="" tipoTiempo="TODOS"
+      periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined} />);
+    const total = (await screen.findByText("Total del período")).parentElement!;
+    expect(Array.from(total.children).map(cell => cell.textContent)).toEqual([
+      "Total del período", "$ 300", "$ 210", "$ 30", "$ 45", "$ 15", "1", "2", "+100%", "+100%", "100%",
+    ]);
+    expect(total.tagName).not.toBe("BUTTON");
+    expect(rpc).toHaveBeenCalledTimes(3); // Ninguna consulta adicional para el total.
+  });
   it("calcula LM y LY al cruzar sistemas y usa el mismo tramo para un mes parcial", async () => {
     rpc.mockImplementation(async (_name: string, params: { p_desde: string }) => {
       if (params.p_desde === "2026-01-01") return { data: {

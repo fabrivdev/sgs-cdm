@@ -176,6 +176,17 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
           <div className="text-right tabular-nums text-muted-foreground">{integer.format(Number(row.facturas))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(Number(row.total) / total * 100)}%` : "—"}</div>
         </button>)}
+        <div className={`grid ${grid} items-center border-t bg-muted/30 px-3 py-2 text-[12px] font-semibold`}>
+          <div>Total del período</div>
+          <div className="text-right tabular-nums">{money(total)}</div>
+          <div className="text-right tabular-nums">{decimal.format(Number(data.resumen.nuevas ?? 0))}</div>
+          <div className="text-right tabular-nums">{decimal.format(Number(data.resumen.usadas ?? 0))}</div>
+          <div className="text-right tabular-nums text-muted-foreground">{decimal.format(Number(data.resumen.notas_credito))}</div>
+          <div className="text-right tabular-nums">{decimal.format(Number(data.resumen.netas))}</div>
+          <div className="text-right tabular-nums">{integer.format(Number(data.resumen.clientes))}</div>
+          <div className="text-right tabular-nums">{integer.format(Number(data.resumen.facturas))}</div>
+          <div className="text-right tabular-nums text-muted-foreground">{total ? "100%" : "—"}</div>
+        </div>
       </div></div>)}
   </Panel>;
 }

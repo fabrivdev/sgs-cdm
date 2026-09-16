@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MaquinasExplorer, type MaquinasDashboardResponse } from "./MaquinasVentas";
+import { MaquinasExplorer, MaquinasPanorama, type MaquinasDashboardResponse } from "./MaquinasVentas";
 
 vi.mock("@/components/ventas/MachineHistorySheet", () => ({ MachineHistorySheet: () => null }));
 afterEach(cleanup);
@@ -19,6 +19,19 @@ function setup() {
 }
 
 describe("Ventas de Máquinas", () => {
+  it("muestra el total del rango en las mismas columnas sin duplicar clientes y facturas", () => {
+    const panorama = { ...data, periodos: [
+      { ...data.resumen, periodo: "2026-07-01", total: 300000, nuevas: 1, notas_credito: 0, netas: 1 },
+      { ...data.resumen, periodo: "2026-08-01", total: -20000, nuevas: 0, notas_credito: 1, netas: -1 },
+    ] };
+    render(<MaquinasPanorama data={panorama} loading={false} error={null} periodMode="mes"
+      selectedPeriod={null} onSelectPeriod={() => undefined} />);
+    const total = screen.getByText("Total del período").parentElement!;
+    expect(Array.from(total.children).map(cell => cell.textContent)).toEqual([
+      "Total del período", "$ 280.000", "1", "0", "1", "0", "2", "2", "100%",
+    ]);
+    expect(total.tagName).not.toBe("BUTTON");
+  });
   it("keeps custom brands and their Operaciones colors in the invoice list", () => {
     const brandedData = { ...data, lineas: data.lineas.map((line, index) => ({ ...line, marca: index ? "NB MAQUINAS" : "JOHN DEERE" })) };
     render(<MaquinasExplorer data={brandedData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);

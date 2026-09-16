@@ -33,6 +33,22 @@ function setup(props?: { desde?: string; hasta?: string }) {
   return render(<QueryClientProvider client={client}><Harness {...props} /></QueryClientProvider>);
 }
 describe("Ventas de Repuestos", () => {
+  it("el total conserva clientes/documentos únicos y calcula variaciones sobre el rango", async () => {
+    rpc.mockImplementation((name: string) => ({ abortSignal: () => Promise.resolve({ error: null,
+      data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : {
+        ...overview, periodos: [
+          { ...overview.periodos[0], periodo: "2026-07-01", facturado: 100, ventas: 100, notas_credito: 0, documentos: 1 },
+          { ...overview.periodos[0], facturado: 25, ventas: 50, documentos: 2 },
+        ],
+      },
+    }) }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
+    const total = (await screen.findByText("Total del período")).closest("tr")!;
+    expect(within(total).getAllByRole("cell").map(cell => cell.textContent)).toEqual([
+      "Total del período", "$ 125", "$ 150", "$ -25", "1", "2", "2", "+25%", "+150%", "100%",
+    ]);
+  });
   it("comparte panorama y resumen sin repetir la consulta", async () => {
     setup(); await screen.findByText("CLAAS");
     expect(rpc.mock.calls.filter(([name]) => name === "ventas_repuestos_panorama_v2")).toHaveLength(1);
@@ -41,8 +57,8 @@ describe("Ventas de Repuestos", () => {
     const periodHeads = within(tables[0]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
     const summaryHeads = within(tables[1]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
     expect(summaryHeads).toEqual(periodHeads);
-    expect(screen.queryByText("Total del período")).not.toBeInTheDocument();
-    expect(within(tables[0]).getAllByRole("row")).toHaveLength(2); // Cabecera y período, sin total.
+    expect(screen.getByText("Total del período")).toBeInTheDocument();
+    expect(within(tables[0]).getAllByRole("row")).toHaveLength(3); // Cabecera, período y total.
   });
   it("detalle plano: dos líneas repiten la factura, con ambos códigos y NC", async () => {
     setup(); fireEvent.click(screen.getByRole("button", { name: "Detalle" }));

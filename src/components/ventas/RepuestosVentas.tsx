@@ -106,6 +106,7 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
         <td><button type="button" aria-pressed={selected === row.periodo} onClick={() => onSelect(selected === row.periodo ? null : row.periodo)} className="w-full text-left font-medium hover:text-primary"><PeriodLabel value={row.periodo} mode={mode} /></button></td>
         <Metrics row={row} /><td className="text-center"><Delta current={row.facturado} previous={row.anterior} lines={row.anterior_lineas} /></td><td className="text-center"><Delta current={row.facturado} previous={row.anio_anterior} lines={row.anio_anterior_lineas} /></td><td className="text-right text-muted-foreground">{share(row.facturado, data.resumen.facturado)}</td>
       </tr>)}</tbody>
+      <tfoot className="border-t bg-muted/30 font-semibold"><tr><td>Total del período</td><Metrics row={data.resumen} /><td className="text-center"><Delta current={data.resumen.facturado} previous={data.comparacion.facturado} lines={data.comparacion.lineas} /></td><td className="text-center"><Delta current={data.resumen.facturado} previous={data.comparacion_ly.facturado} lines={data.comparacion_ly.lineas} /></td><td className="text-right">{share(data.resumen.facturado, data.resumen.facturado)}</td></tr></tfoot>
     </Table>}
     </div>}
   </Panel>;

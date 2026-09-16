@@ -94,6 +94,13 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     return { ...row, variationLm, variationLy };
   }), [data, hasta, periodMode, previousPeriod, previousYear]);
 
+  const components = useMemo(() => (data?.periodos ?? []).reduce((total, row) => ({
+    mo: total.mo + Number(row.mo), km: total.km + Number(row.km),
+    repuestos: total.repuestos + Number(row.repuestos), terceros: total.terceros + Number(row.terceros),
+  }), { mo: 0, km: 0, repuestos: 0, terceros: 0 }), [data]);
+  const totalLm = data && previousPeriod ? pct(data.resumen.total, previousPeriod.resumen.total) : null;
+  const totalLy = data && previousYear ? pct(data.resumen.total, previousYear.resumen.total) : null;
+
   return <Panel className="p-3">
     <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex w-full items-start justify-between gap-2 text-left">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
@@ -119,6 +126,16 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
           <div className={cn("text-right tabular-nums", row.variationLy != null && row.variationLy < 0 && "text-destructive")}>{row.variationLy == null ? "—" : `${row.variationLy > 0 ? "+" : ""}${row.variationLy}%`}</div>
           <div className="text-right tabular-nums text-muted-foreground">{data?.resumen.total ? `${Math.round((row.total / data.resumen.total) * 100)}%` : "—"}</div>
         </button>)}
+        {data && <div className={`grid ${PANORAMA_GRID} items-center border-t bg-muted/30 px-2 py-2 text-[12px] font-semibold`}>
+          <div>Total del período</div>
+          <div className="text-right tabular-nums">{money(data.resumen.total)}</div>
+          {[components.mo, components.km, components.repuestos, components.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
+          <div className="text-right tabular-nums">{data.resumen.clientes}</div>
+          <div className="text-right tabular-nums">{data.resumen.facturas}</div>
+          <div className={cn("text-right tabular-nums", totalLm != null && totalLm < 0 && "text-destructive")}>{totalLm == null ? "—" : `${totalLm > 0 ? "+" : ""}${totalLm}%`}</div>
+          <div className={cn("text-right tabular-nums", totalLy != null && totalLy < 0 && "text-destructive")}>{totalLy == null ? "—" : `${totalLy > 0 ? "+" : ""}${totalLy}%`}</div>
+          <div className="text-right tabular-nums text-muted-foreground">{data.resumen.total ? "100%" : "—"}</div>
+        </div>}
       </div></div>)}
   </Panel>;
 }
