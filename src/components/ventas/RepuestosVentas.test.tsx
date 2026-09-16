@@ -41,7 +41,8 @@ describe("Ventas de Repuestos", () => {
     const periodHeads = within(tables[0]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
     const summaryHeads = within(tables[1]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
     expect(summaryHeads).toEqual(periodHeads);
-    expect(screen.getByText("Total del período")).toBeInTheDocument();
+    expect(screen.queryByText("Total del período")).not.toBeInTheDocument();
+    expect(within(tables[0]).getAllByRole("row")).toHaveLength(2); // Cabecera y período, sin total.
   });
   it("detalle plano: dos líneas repiten la factura, con ambos códigos y NC", async () => {
     setup(); fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
