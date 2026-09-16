@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Receipt, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
+import { RowCount, TableScroll } from "./TableScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
@@ -76,11 +77,11 @@ function Delta({ current, previous, lines }: { current: number; previous: number
   return <span className={cn("tabular-nums", value != null && value < 0 && "text-destructive")} title={value == null ? "Sin base de comparación distinta de cero." : undefined}>{value == null ? "—" : `${value > 0 ? "+" : ""}${value}%`}</span>;
 }
 const tableClass = "w-full table-fixed text-[12px] leading-4 [&_th]:h-8 [&_th]:px-3 [&_th]:text-right [&_th]:text-[11px] [&_th]:font-medium [&_th:first-child]:text-left [&_td]:h-8 [&_td]:px-3 [&_td]:align-middle [&_tbody_tr]:border-t";
-function Table({ children, minWidth = "min-w-[1060px]" }: { children: React.ReactNode; minWidth?: string }) {
-  return <div className="overflow-x-auto rounded-md border"><table className={cn(tableClass, minWidth)}>{children}</table></div>;
+function Table({ children, minWidth = "min-w-[1060px]", rows = 0, footer }: { children: React.ReactNode; minWidth?: string; rows?: number; footer?: React.ReactNode }) {
+  return <div className="overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={rows}><table className={cn(tableClass, minWidth)}>{children}</table></TableScroll></div>{footer}</div>;
 }
 function Heads({ labels }: { labels: string[] }) {
-  return <thead className="bg-muted/60 text-muted-foreground"><tr>{labels.map(label => <th key={label}>{label}</th>)}</tr></thead>;
+  return <thead className="text-muted-foreground"><tr>{labels.map(label => <th key={label} className="sticky top-0 z-10 bg-muted/60">{label}</th>)}</tr></thead>;
 }
 function PeriodLabel({ value, mode }: { value: string; mode: PeriodMode }) {
   const start = new Date(`${value}T00:00:00`);
@@ -124,22 +125,29 @@ function Summary({ data }: { data: PartsOverview }) {
     </Table>)}
   </div>;
 }
-function Pager({ data, onPage }: { data: { total: number; pagina: number; paginas: number }; onPage: (page: number) => void }) {
-  return <div className="flex h-8 items-center justify-between gap-3 text-[11px] text-muted-foreground"><span>{integer.format(data.total)} registros</span><div className="flex shrink-0 items-center gap-1 whitespace-nowrap"><span className="mr-1">Pág. {data.pagina} de {data.paginas}</span><button type="button" aria-label="Página anterior" disabled={data.pagina <= 1} onClick={() => onPage(data.pagina - 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" /></button><button type="button" aria-label="Página siguiente" disabled={data.pagina >= data.paginas} onClick={() => onPage(data.pagina + 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronRight className="h-3.5 w-3.5" /></button></div></div>;
-}
 function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "clientes" | "repuestos" | "detalle" }) {
-  const [page, setPage] = useState(1);
-  const query = useQuery({ queryKey: ["ventas-repuestos-listado-v2", params(filters), view, page],
-    queryFn: ({ signal }) => rpc<PartsListing>("ventas_repuestos_listado_v2", { ...params(filters), p_vista: view, p_pagina: page, p_por_pagina: 50 }, signal),
+  const query = useInfiniteQuery({ queryKey: ["ventas-repuestos-listado-v2", params(filters), view],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) => rpc<PartsListing>("ventas_repuestos_listado_v2", { ...params(filters), p_vista: view, p_pagina: pageParam, p_por_pagina: 50 }, signal),
+    getNextPageParam: (last: PartsListing) => last.pagina < last.paginas ? last.pagina + 1 : undefined,
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
+  const sentinel = useRef<HTMLTableRowElement | null>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !hasNextPage || isFetchingNextPage) return;
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void fetchNextPage(); }, { rootMargin: "120px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, query.data]);
   if (query.isLoading || query.error || !query.data) return <State loading={query.isLoading} error={query.error} retry={() => void query.refetch()} />;
-  const data = query.data;
+  const data = { ...query.data.pages[0], filas: query.data.pages.flatMap(page => page.filas) };
   if (!data.filas.length) return <State />;
   const labels = view === "detalle" ? ["Fecha", "Factura", "Cliente", "Sucursal", "Cód. repuesto", "Cód. fabricante", "Descripción", "Cantidad", "Facturado"]
     : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
       : view === "vendedores" ? ["Vendedor", ...PARTS_HEADERS, "Participación"]
       : ["Cód. repuesto", "Cód. fabricante", "Descripción", ...PARTS_HEADERS, "Unidades vendidas", "Unidades devueltas", "Participación"];
-  return <div className="space-y-2">{view === "vendedores" && <p className="text-[10px] text-muted-foreground">Vendedores unificados entre ambos sistemas. Para recuperar los del histórico ya cargado: Sugerencias → Historial → Completar vendedores históricos.</p>}<Table minWidth={view === "detalle" ? "min-w-[1120px]" : view === "repuestos" ? "min-w-[1530px]" : "min-w-[1300px]"}>
+  return <div className="space-y-2"><Table rows={data.filas.length} footer={<RowCount rows={data.total} loaded={data.filas.length} label="registros" />} minWidth={view === "detalle" ? "min-w-[1120px]" : view === "repuestos" ? "min-w-[1530px]" : "min-w-[1300px]"}>
     <colgroup>{view === "detalle" ? <><col style={{ width: "85px" }} /><col style={{ width: "125px" }} /><col style={{ width: "190px" }} /><col style={{ width: "95px" }} /><col style={{ width: "105px" }} /><col style={{ width: "110px" }} /><col /><col style={{ width: "70px" }} /><col style={{ width: "105px" }} /></>
       : view === "clientes" ? <><col style={{ width: "220px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
         : view === "vendedores" ? <><col style={{ width: "240px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
@@ -150,8 +158,10 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
           {view === "clientes" && <><td className="text-right tabular-nums text-muted-foreground">{row.anterior == null ? "—" : money(row.anterior)}</td><td className="text-center"><Delta current={row.facturado} previous={row.anterior} /></td><td className="text-center whitespace-nowrap">{date(row.ultima)}</td></>}
           {view === "repuestos" && <><td className="text-right tabular-nums">{number(row.unidades_vendidas)}</td><td className="text-right tabular-nums">{number(row.unidades_devueltas)}</td></>}
           <td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td></>}
-    </tr>)}</tbody>
-  </Table><Pager data={data} onPage={setPage} /></div>;
+    </tr>)}
+    {query.hasNextPage && <tr ref={sentinel}><td colSpan={labels.length} className="text-center text-[11px] text-muted-foreground">{query.isFetchingNextPage ? "Cargando más registros…" : ""}</td></tr>}
+    </tbody>
+  </Table></div>;
 }
 export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, selectedPeriod, onSelectPeriod }: Filters & {
   periodMode: PeriodMode; selectedPeriod: string | null; onSelectPeriod: (value: string | null) => void;

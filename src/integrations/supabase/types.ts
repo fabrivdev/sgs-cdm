@@ -5477,6 +5477,7 @@ export type Database = {
           marca: string | null
           margen_porcentaje: number | null
           modelo: string | null
+          modelo_original: string | null
           notas: string | null
           np_fecha: string | null
           np_numero: string | null

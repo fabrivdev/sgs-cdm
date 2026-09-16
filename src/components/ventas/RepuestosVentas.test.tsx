@@ -111,7 +111,7 @@ describe("Ventas de Repuestos", () => {
     expect(screen.queryByText("Histórico sin detalle por artículo")).not.toBeInTheDocument();
     detail.filas[0].metodologia = "actual";
   });
-  it("pagina el detalle sin recortar su total", async () => {
+  it("carga el detalle por scroll sin recortar su total", async () => {
     setup();
     rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
       data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview : { ...detail, total: 51, paginas: 2, pagina: Number(args.p_pagina), total_periodo: 5000,
@@ -119,9 +119,8 @@ describe("Ventas de Repuestos", () => {
     }) }));
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     await screen.findByText("PRIMERO");
-    fireEvent.click(screen.getByRole("button", { name: "Página siguiente" }));
     await screen.findByText("ULTIMO");
-    expect(screen.getByText("51 registros")).toBeInTheDocument();
+    expect(screen.getByText("2 de 51 registros")).toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
   });
   it("no lanza informes ante un rango vacío o invertido", () => {
