@@ -238,8 +238,9 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     return { key, marca, tipo, condicion, modelo: model.join("__"), ...summarize(values) };
   }), [lines]);
   const grid = "grid-cols-[34px_minmax(78px,.8fr)_minmax(140px,1.2fr)_48px_repeat(5,minmax(66px,.6fr))_minmax(100px,.9fr)_minmax(112px,.95fr)_minmax(100px,.85fr)]";
-  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[960px]">
-    <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
+  return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[960px]">
+    <TableScroll rows={rows.length}>
+    <div className={`grid ${grid} ${scrollHead} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
     {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
       const open = expanded === row.key;
       const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
