@@ -286,7 +286,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
         <td>{conditionLabel(line.condicion)}</td><td className="truncate" title={sellerLabel(line.comercial)}>{sellerLabel(line.comercial)}</td>
         <td className="whitespace-nowrap text-right font-semibold tabular-nums">{money(Number(line.facturado))}</td>
       </tr>)}</tbody>
-    </table>{!lines.length && <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div>}</div>
+    </table>{!lines.length && <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div>}</TableScroll></div>{lines.length > 0 && <RowCount rows={lines.length} label="ventas" />}</div>
   </>;
 }
 
