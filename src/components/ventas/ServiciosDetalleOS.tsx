@@ -47,10 +47,11 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
   return <>
     <div className="mt-3 overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><div className="min-w-[1380px]">
-        <div className={`grid ${columns} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+        <TableScroll rows={rows.length}>
+        <div className={`grid ${columns} ${scrollHead} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div>{["Mano de Obra","Kilometraje","Repuestos","Terceros"].map(label=><div key={label} className="text-right">{label}</div>)}<div className="text-right">Facturado</div>
         </div>
-        <div className="max-h-[480px] overflow-y-auto">
+        <div>
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
             : error ? <div role="alert" className="px-3 py-12 text-center text-[12px] text-destructive">No se pudo cargar el detalle. {error}</div>
             : !rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay OS con facturación en el período.</div>
