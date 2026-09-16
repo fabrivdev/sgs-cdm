@@ -124,16 +124,23 @@ function Summary({ data }: { data: PartsOverview }) {
     </Table>)}
   </div>;
 }
-function LegacyPager({ data, onPage }: { data: { total: number; pagina: number; paginas: number }; onPage: (page: number) => void }) {
-  return <div className="flex h-8 items-center justify-between gap-3 text-[11px] text-muted-foreground"><span>{integer.format(data.total)} registros</span><div className="flex shrink-0 items-center gap-1 whitespace-nowrap"><span className="mr-1">Pág. {data.pagina} de {data.paginas}</span><button type="button" aria-label="Página anterior" disabled={data.pagina <= 1} onClick={() => onPage(data.pagina - 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" /></button><button type="button" aria-label="Página siguiente" disabled={data.pagina >= data.paginas} onClick={() => onPage(data.pagina + 1)} className="grid h-7 w-7 place-items-center rounded border hover:bg-accent disabled:opacity-40"><ChevronRight className="h-3.5 w-3.5" /></button></div></div>;
-}
 function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "clientes" | "repuestos" | "detalle" }) {
-  const [page, setPage] = useState(1);
-  const query = useQuery({ queryKey: ["ventas-repuestos-listado-v2", params(filters), view, page],
-    queryFn: ({ signal }) => rpc<PartsListing>("ventas_repuestos_listado_v2", { ...params(filters), p_vista: view, p_pagina: page, p_por_pagina: 50 }, signal),
+  const query = useInfiniteQuery({ queryKey: ["ventas-repuestos-listado-v2", params(filters), view],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) => rpc<PartsListing>("ventas_repuestos_listado_v2", { ...params(filters), p_vista: view, p_pagina: pageParam, p_por_pagina: 50 }, signal),
+    getNextPageParam: (last: PartsListing) => last.pagina < last.paginas ? last.pagina + 1 : undefined,
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
+  const sentinel = useRef<HTMLTableRowElement | null>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !hasNextPage || isFetchingNextPage) return;
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void fetchNextPage(); }, { rootMargin: "120px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, query.data]);
   if (query.isLoading || query.error || !query.data) return <State loading={query.isLoading} error={query.error} retry={() => void query.refetch()} />;
-  const data = query.data;
+  const data = { ...query.data.pages[0], filas: query.data.pages.flatMap(page => page.filas) };
   if (!data.filas.length) return <State />;
   const labels = view === "detalle" ? ["Fecha", "Factura", "Cliente", "Sucursal", "Cód. repuesto", "Cód. fabricante", "Descripción", "Cantidad", "Facturado"]
     : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
