@@ -189,7 +189,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
           <div className="text-right tabular-nums">{integer.format(Number(data.resumen.facturas))}</div>
           <div className="text-right tabular-nums text-muted-foreground">{total ? "100%" : "—"}</div>
         </div>
-      </div></div>)}
+      </div></div><RowCount rows={data.periodos.length} label="períodos" /></div>)}
   </Panel>;
 }
 
