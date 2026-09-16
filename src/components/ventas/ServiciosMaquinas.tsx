@@ -2,6 +2,7 @@ import { money } from "@/components/dashboard/utils";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByMachine } from "./serviceBrandGroups";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
+import { RowCount, TableScroll, scrollHead } from "./TableScroll";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
