@@ -157,8 +157,10 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
           {view === "clientes" && <><td className="text-right tabular-nums text-muted-foreground">{row.anterior == null ? "—" : money(row.anterior)}</td><td className="text-center"><Delta current={row.facturado} previous={row.anterior} /></td><td className="text-center whitespace-nowrap">{date(row.ultima)}</td></>}
           {view === "repuestos" && <><td className="text-right tabular-nums">{number(row.unidades_vendidas)}</td><td className="text-right tabular-nums">{number(row.unidades_devueltas)}</td></>}
           <td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td></>}
-    </tr>)}</tbody>
-  </Table><Pager data={data} onPage={setPage} /></div>;
+    </tr>)}
+    <tr ref={sentinel}><td colSpan={labels.length} className="text-center text-[11px] text-muted-foreground">{query.isFetchingNextPage ? "Cargando más registros…" : ""}</td></tr>
+    </tbody>
+  </Table></div>;
 }
 export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, selectedPeriod, onSelectPeriod }: Filters & {
   periodMode: PeriodMode; selectedPeriod: string | null; onSelectPeriod: (value: string | null) => void;
