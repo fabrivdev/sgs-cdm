@@ -6,7 +6,7 @@ export type FactMetric = "usd" | "horasServicio" | "kmFacturados";
 export type OSMetric = "usd" | "horas" | "km";
 export type OSSucursalMetric = "interno" | "garantia" | "total";
 export type OSRubro = "Servicio" | "Repuestos" | "Kilometraje";
-export type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Maquinarias" | "Otros";
+export type Concepto = "Repuestos" | "Servicio" | "Kilometraje" | "Terceros" | "Maquinarias" | "Otros";
 
 export interface Facturacion {
   fecha: string;
@@ -22,7 +22,9 @@ export interface Facturacion {
   cod_mercaderia?: string | null;
   mercaderia?: string | null;
   cod_factura: string;
-  tipo_tiempo: "Cliente" | "Garantia" | "Interno";
+  tipo_tiempo: "Cliente" | "Garantia" | "Interno" | "No informado";
+  concepto?: Concepto;
+  area_calculada?: string;
   marca?: Marca | null;
   origen_sistema?: string | null;
   raw_data?: Record<string, unknown> | null;
@@ -57,6 +59,7 @@ export interface WeekRow {
   servicio: number;
   kilometraje: number;
   maquinarias: number;
+  terceros?: number;
   otros: number;
   horasServicio: number;
   kmFacturados: number;

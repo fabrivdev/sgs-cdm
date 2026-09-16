@@ -12,9 +12,12 @@ export function pct(current: number, previous: number) {
 }
 
 export function concept(row: Facturacion): Concepto {
+  // El rubro de la fuente compartida tiene prioridad sobre el tipo de importación.
+  if (row.concepto) return row.concepto;
   const grupoFx = String(row.grupo_fx ?? "").toLowerCase();
   const group = `${row.grupo_fx ?? ""} ${row.grupo ?? ""}`.toLowerCase();
   if (grupoFx === "maquinarias" || group.includes("002 - picadoras")) return "Maquinarias";
+  if (group.includes("tercero")) return "Terceros";
   if (row.tipo === "Repuesto" || group.includes("repuesto")) return "Repuestos";
   if (grupoFx === "kilometraje" || group.includes("kilomet")) return "Kilometraje";
   if (grupoFx === "servicio" || group.includes("mano de obra") || group.includes("service") || group.includes("servicio")) return "Servicio";

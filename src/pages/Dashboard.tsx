@@ -50,6 +50,7 @@ import {
 import { MARCAS, SUCURSALES, DIAS_JORNADA_VENCIDA, MAX_TOP_RANKING, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
 import { clasificarMarcaFacturacion } from "@/lib/facturacionReglas";
+import { esPostventaDashboard, normalizarFacturacionDashboard, type DashboardFacturacionMovimiento } from "@/components/dashboard/facturacionSource";
 import { cn } from "@/lib/utils";
 import { cardLabel, metaText } from "@/lib/ui-classes";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal } from "@/lib/appSettings";
@@ -97,7 +98,7 @@ const todayStr = format(today, "yyyy-MM-dd");
 const initialDateFrom = format(startOfMonth(subMonths(today, 11)), "yyyy-MM-dd");
 const initialDateTo = format(today, "yyyy-MM-dd");
 const DASHBOARD_FILTERS_STORAGE_KEY = "sgs-cdm.dashboard.filters.v1";
-const DEFAULT_FACTURACION_RUBROS = ["Servicio", "Repuestos", "Kilometraje"] as const;
+const DEFAULT_FACTURACION_RUBROS = ["Servicio", "Repuestos", "Kilometraje", "Terceros"] as const;
 
 function createDefaultFacturacionRubros() {
   return [...DEFAULT_FACTURACION_RUBROS];
@@ -633,6 +634,7 @@ export default function Dashboard() {
   const [jornadasLoading, setJornadasLoading] = useState(true);
   const [facturaciónLoading, setFacturacionLoading] = useState(true);
   const [excluidasGsCount, setExcluidasGsCount] = useState(0);
+  const [facturacionError, setFacturacionError] = useState<string | null>(null);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
   const [metaHorasMensual, setMetaHorasMensual] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
 
@@ -932,6 +934,7 @@ export default function Dashboard() {
     const cached = dashboardFacturacionCache.get(cacheKey);
 
     if (cached && cacheVigente(cached.cachedAt)) {
+      setFacturacionError(null);
       setFacturacion(cached.rows);
       setFacturacionLoading(false);
       return () => {
@@ -941,120 +944,27 @@ export default function Dashboard() {
 
     (async () => {
       setFacturacionLoading(true);
+      setFacturacionError(null);
       try {
-        const rangos = rangosAnuales(queryStart, queryEnd);
-        const cargarFacturacionHistorica = async (desde: Date, hasta: Date) => {
-          const build = (cols: string) =>
-            supabase
-              .from("facturacion")
-              .select(cols)
-              .eq("excluido_de_reportes", false)
-              // Todos los montos del Dashboard son solo USD. No se filtra
-              // moneda="USD" estricto porque la facturacion importada antes
-              // de que existiera esta columna quedo con moneda=null (no
-              // "GS") -- filtrar estricto tiraria tambien todo ese historico.
-              // Se excluye unicamente lo confirmado en guaranies.
-              .or("moneda.neq.GS,moneda.is.null")
-              .gte("fecha", dateKey(desde))
-              // La tabla legacy recibe, en cada importacion de facturacion del sistema
-              // nuevo, un resumen espejo de ese mismo periodo (ver newSystemPersist.ts) --
-              // sin este tope, julio en adelante se contaria dos veces sumado a
-              // cargarFacturacionDetallada (facturacion_lineas_importadas). Mismo criterio
-              // que ya usan las vistas de Ventas (ventas_area_movimientos_base).
-              .lte("fecha", dateKey(hasta) < LEGACY_IMPORT_CUTOFF ? dateKey(hasta) : LEGACY_IMPORT_CUTOFF)
-              .order("fecha", { ascending: false });
-
-          try {
-            return await cargarTodo<Facturacion>(
-              build("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, cantidad, grupo, grupo_fx, cod_factura") as any,
-            );
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            if (!message.includes("cantidad")) throw error;
-            const rows = await cargarTodo<Omit<Facturacion, "cantidad">>(
-              build("fecha, sucursal, tipo, cliente_id, entidad_nombre, total_venta, grupo, grupo_fx, cod_factura") as any,
-            );
-            return rows.map((row) => ({ ...row, cantidad: 0 }));
-          }
-        };
-
-        const cargarFacturacionDetallada = (desde: Date, hasta: Date) => cargarTodo<any>(supabase
-          .from("facturacion_lineas_importadas" as any)
-          .select(
-            "fecha_factura, sucursal, tipo_facturacion, entidad_nombre, total_venta, cantidad, subgrupo_original, grupo_normalizado, marca_normalizada, factura, codigo_interno_factura, tipo_tiempo, origen_sistema",
-          )
-          .or("moneda.neq.GS,moneda.is.null")
-          .gte("fecha_factura", dateKey(desde))
-          .lte("fecha_factura", `${dateKey(hasta)}T23:59:59`)
-          .order("fecha_factura", { ascending: false }) as any);
-
-        // Cada año se pagina de forma independiente. Esto aprovecha consultas
-        // concurrentes acotadas y evita una unica cadena de cientos de paginas.
-        const [legacyChunks, gridChunks] = await Promise.all([
-          Promise.all(rangos.map((rango) => cargarFacturacionHistorica(rango.desde, rango.hasta))),
-          Promise.all(rangos.map((rango) => cargarFacturacionDetallada(rango.desde, rango.hasta))),
-        ]);
-        const legacyRows = legacyChunks.flat();
-        const gridRowsRaw = gridChunks.flat();
-
-        const gridCamposYears = new Set(
-          gridRowsRaw
-            .filter((row) => row.origen_sistema === "grid_campos")
-            .map((row) => String(row.fecha_factura ?? "").slice(0, 4))
-            .filter(Boolean),
-        );
-        const detailedLineKeys = new Set(
-          gridRowsRaw
-            .map((row) => {
-              const factura = String(row.codigo_interno_factura ?? row.factura ?? "").trim();
-              const fecha = String(row.fecha_factura ?? "").slice(0, 10);
-              return factura && fecha ? `${fecha}||${factura}` : null;
-            })
-            .filter(Boolean) as string[],
-        );
-        const legacyRowsNormalizados = legacyRows
-          .filter((row) => {
-            const esCampos = row.entidad_nombre.toUpperCase().includes("CAMPOS DEL MA");
-            const year = row.fecha.slice(0, 4);
-            const detailKey = `${row.fecha}||${String(row.cod_factura ?? "").trim()}`;
-            if (detailedLineKeys.has(detailKey)) return false;
-            return !esCampos || !gridCamposYears.has(year);
-          })
-          .map((row) => ({
-            ...row,
-            cantidad: Number((row as any).cantidad || 0),
-            marca: clasificarMarcaFacturacion(row.grupo),
-            tipo_tiempo: "Cliente" as Facturacion["tipo_tiempo"],
-            origen_sistema: "legacy",
-          }));
-
-        const gridRows: Facturacion[] = gridRowsRaw.map((row) => {
-          const factura = String(row.codigo_interno_factura ?? row.factura ?? "").trim();
-          const tipo = row.tipo_facturacion === "Servicio" ? "Servicio" : "Repuesto";
-          return {
-            fecha: String(row.fecha_factura ?? "").slice(0, 10),
-            sucursal: row.sucursal,
-            tipo,
-            cliente_id: null,
-            entidad_nombre: row.entidad_nombre ?? "CAMPOS DEL MANANA S.A.",
-            total_venta: Number(row.total_venta || 0),
-            cantidad: Number(row.cantidad || 0),
-            grupo: row.subgrupo_original ?? row.grupo_normalizado ?? null,
-            grupo_fx: row.grupo_normalizado ?? null,
-            cod_factura: factura,
-            tipo_tiempo: (row.tipo_tiempo ?? "Cliente") as Facturacion["tipo_tiempo"],
-            marca: (row.marca_normalizada ?? clasificarMarcaFacturacion(row.subgrupo_original ?? row.grupo_normalizado)) as Marca,
-            origen_sistema: row.origen_sistema ?? "grid_campos",
-            raw_data: null,
-          };
-        });
-
-        const rows = [...legacyRowsNormalizados, ...gridRows];
+        // Mismas fuentes e importes que Ventas. El RPC conserva GRID sólo
+        // como metadato por línea y nunca elimina MO/Km por factura completa.
+        const chunks = await Promise.all(rangosAnuales(queryStart, queryEnd).map((rango) =>
+          cargarTodo<DashboardFacturacionMovimiento>(
+            supabase.rpc("dashboard_facturacion_movimientos_v1" as never, {
+              p_desde: dateKey(rango.desde), p_hasta: dateKey(rango.hasta),
+            } as never).order("fecha", { ascending: false }).order("id", { ascending: true }),
+          ),
+        ));
+        const rows = chunks.flat().map(normalizarFacturacionDashboard);
         dashboardFacturacionCache.set(cacheKey, { cachedAt: Date.now(), rows });
         if (alive) setFacturacion(rows);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
+        if (!alive) return;
+        const msg = error && typeof error === "object" && "message" in error
+          ? String(error.message) : String(error);
         toast.error(`Error cargando facturacion: ${msg}`);
+        setFacturacion([]);
+        setFacturacionError(msg);
       } finally {
         if (alive) setFacturacionLoading(false);
       }
@@ -1080,11 +990,12 @@ export default function Dashboard() {
             .eq("excluido_de_reportes", false)
             .eq("moneda", "GS")
             .gte("fecha", dateKey(periodStart))
-            .lte("fecha", dateKey(periodEnd)),
+            .lte("fecha", dateKey(periodEnd) < LEGACY_IMPORT_CUTOFF ? dateKey(periodEnd) : LEGACY_IMPORT_CUTOFF),
           supabase
             .from("facturacion_lineas_importadas" as any)
             .select("*", { count: "exact", head: true })
             .eq("moneda", "GS")
+            .neq("origen_sistema", "grid_campos")
             .gte("fecha_factura", dateKey(periodStart))
             .lte("fecha_factura", `${dateKey(periodEnd)}T23:59:59`),
         ]);
@@ -1215,6 +1126,9 @@ export default function Dashboard() {
   const factFiltered = useMemo(
     () =>
       facturación.filter((row) => {
+        // La selección predeterminada es postventa, no movimientos en revisión
+        // sin vínculo operativo que las vistas de Ventas tampoco incluyen.
+        if (isDefaultFacturacionRubros(fRubros) && !esPostventaDashboard(row)) return false;
         if (fSucursales.length > 0 && (!row.sucursal || !fSucursales.includes(row.sucursal))) return false;
         if (fRubros.length > 0 && !fRubros.includes(concept(row))) return false;
         if (fMarcas.length > 0 && !fMarcas.includes(row.marca ?? clasificarMarcaFacturacion(row.grupo))) return false;
@@ -1947,7 +1861,7 @@ export default function Dashboard() {
       const compStart = subYears(start, 1);
       const compEnd = subYears(end, 1);
       const comparisonFacts = factFiltered.filter((row) => inRange(row.fecha, compStart, compEnd));
-      const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Maquinarias: 0, Otros: 0 };
+      const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Terceros: 0, Maquinarias: 0, Otros: 0 };
 
       for (const row of weekFacts) {
         const rowConcept = concept(row);
@@ -1974,6 +1888,7 @@ export default function Dashboard() {
         repuestos: byConcept.Repuestos,
         servicio: byConcept.Servicio,
         kilometraje: byConcept.Kilometraje,
+        terceros: byConcept.Terceros,
         maquinarias: byConcept.Maquinarias,
         otros: byConcept.Otros,
         horasServicio,
@@ -2268,16 +2183,18 @@ export default function Dashboard() {
     return count;
   })();
   const tipoFactBreakdown = (() => {
-    const groups = { Cliente: 0, Garantia: 0, Interno: 0 } as Record<"Cliente" | "Garantia" | "Interno", number>;
+    const groups = { Cliente: 0, Garantia: 0, Interno: 0, "No informado": 0 };
     for (const row of allPeriodFacts) {
-      const k = (row.tipo_tiempo ?? "Cliente") as keyof typeof groups;
+      const k = row.tipo_tiempo;
       groups[k] = (groups[k] ?? 0) + Number(row.total_venta || 0);
     }
-    const totalTF = groups.Cliente + groups.Garantia + groups.Interno;
+    const totalTF = groups.Cliente + groups.Garantia + groups.Interno + groups["No informado"];
     const p = (n: number) => (totalTF > 0 ? Math.round((n / totalTF) * 100) : 0);
-    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantia: p(groups.Garantia), pctInterno: p(groups.Interno) };
+    return { ...groups, total: totalTF, pctCliente: p(groups.Cliente), pctGarantia: p(groups.Garantia), pctInterno: p(groups.Interno), pctNoInformado: p(groups["No informado"]) };
   })();
-  const tipoFactDominante = tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
+  const tipoFactDominante = tipoFactBreakdown.pctNoInformado > Math.max(tipoFactBreakdown.pctCliente, tipoFactBreakdown.pctGarantia, tipoFactBreakdown.pctInterno)
+    ? { label: "No informado", value: tipoFactBreakdown.pctNoInformado }
+    : tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctGarantia && tipoFactBreakdown.pctCliente >= tipoFactBreakdown.pctInterno
     ? { label: "Cliente", value: tipoFactBreakdown.pctCliente }
     : tipoFactBreakdown.pctGarantia >= tipoFactBreakdown.pctInterno
       ? { label: "Garantia", value: tipoFactBreakdown.pctGarantia }
@@ -2297,7 +2214,7 @@ export default function Dashboard() {
 
   // Fila sintetica con la agregaci-n del rango completo para MixRubros
   const periodRow = useMemo<WeekRow>(() => {
-    const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Maquinarias: 0, Otros: 0 };
+    const byConcept = { Repuestos: 0, Servicio: 0, Kilometraje: 0, Terceros: 0, Maquinarias: 0, Otros: 0 };
     for (const row of allPeriodFacts) {
       const rowConcept = concept(row);
       byConcept[rowConcept] += Number(row.total_venta || 0);
@@ -2312,6 +2229,7 @@ export default function Dashboard() {
       repuestos: byConcept.Repuestos,
       servicio: byConcept.Servicio,
       kilometraje: byConcept.Kilometraje,
+      terceros: byConcept.Terceros,
       maquinarias: byConcept.Maquinarias,
       otros: byConcept.Otros,
       horasServicio,
@@ -3236,6 +3154,7 @@ export default function Dashboard() {
             Repuestos: row.repuestos,
             Servicios: row.servicio,
             Kilometraje: row.kilometraje,
+            Terceros: row.terceros ?? 0,
             Maquinarias: row.maquinarias,
             Otros: row.otros,
             Facturas: row.facturas,
@@ -3419,6 +3338,7 @@ export default function Dashboard() {
                   { value: "Repuestos", label: "Repuestos" },
                   { value: "Kilometraje", label: "Kilometraje" },
                   { value: "Maquinarias", label: "Maquinarias" },
+                  { value: "Terceros", label: "Terceros" },
                   { value: "Otros", label: "Otros" },
                 ]}
               />
@@ -3433,6 +3353,7 @@ export default function Dashboard() {
                 { value: "Cliente", label: "Cliente" },
                 { value: "Garantia", label: "Garantia" },
                 { value: "Interno", label: "Interno" },
+                ...(!filtrosServiciosActivos ? [{ value: "No informado", label: "No informado" }] : []),
               ]}
             />
             {section === "trabajos" && (
@@ -3513,9 +3434,21 @@ export default function Dashboard() {
         />
       </FiltersBar>
 
+        {facturacionError && (
+          <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+            No se pudo cargar la facturación: {facturacionError}. Si falta el RPC,
+            aplicá la migración 20260916160000. No se muestran resultados parciales.
+          </p>
+        )}
+        {!filtrosServiciosActivos && facturación.some((row) => row.raw_data?.dashboard_time_type_source === "grid_inferido") && (
+          <p className="text-[11px] text-muted-foreground">
+            El tipo de tiempo del histórico de Repuestos puede ser inferido desde GRID; no acredita el tipo de una OS.
+          </p>
+        )}
+
         {excluidasGsCount > 0 && (
           <p className="text-[11px] text-muted-foreground">
-            Los montos de este período no incluyen {excluidasGsCount} factura{excluidasGsCount !== 1 ? "s" : ""} en
+            Los montos de este período no incluyen {excluidasGsCount} registro{excluidasGsCount !== 1 ? "s" : ""} en
             guaraníes (no se suman ni se convierten).
           </p>
         )}
@@ -3570,7 +3503,7 @@ export default function Dashboard() {
                 <KpiItem
                   label="Tipo de facturación"
                   value={<>{tipoFactDominante.label} <span className="text-primary">{tipoFactDominante.value}%</span></>}
-                  detail={`Cliente ${tipoFactBreakdown.pctCliente}% · Gnt. ${tipoFactBreakdown.pctGarantia}% · Int. ${tipoFactBreakdown.pctInterno}%`}
+                  detail={`Cliente ${tipoFactBreakdown.pctCliente}% · Gnt. ${tipoFactBreakdown.pctGarantia}% · Int. ${tipoFactBreakdown.pctInterno}% · Sin dato ${tipoFactBreakdown.pctNoInformado}%`}
                   icon={<PieChart />}
                   className="h-full"
                 />
@@ -3697,13 +3630,15 @@ export default function Dashboard() {
               selectedKey={selectedWeek?.key}
               onSelect={setSelectedWeekKey}
             />
-            <div className="hidden rounded-md border md:block">
-              <div className="grid grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+            <div className="hidden overflow-x-auto rounded-md border md:block">
+              <div className="grid min-w-[1040px] grid-cols-[88px_repeat(7,minmax(0,1fr))_52px_60px_60px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
                 <div>{T.columnaPeriodo}</div>
                 <div className="text-right">{factMetricLabel("usd")}</div>
                 <div className="text-right">Repuestos</div>
                 <div className="text-right">Servicio</div>
                 <div className="text-right">Km</div>
+                <div className="text-right">Terceros</div>
+                <div className="text-right">Máquinas</div>
                 <div className="text-right">Otros</div>
                 <div className="text-right">Fact.</div>
                 <div className="text-right">Clientes</div>
@@ -3717,7 +3652,7 @@ export default function Dashboard() {
                     key={row.key}
                     onClick={() => setSelectedWeekKey(row.key)}
                     className={cn(
-                      "grid w-full grid-cols-[88px_repeat(5,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent",
+                      "grid w-full min-w-[1040px] grid-cols-[88px_repeat(7,minmax(0,1fr))_52px_60px_60px] items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent",
                       active && "bg-primary/5 outline outline-1 outline-primary/20",
                     )}
                   >
@@ -3726,6 +3661,8 @@ export default function Dashboard() {
                     <div className="text-right tabular-nums">{money(row.repuestos)}</div>
                     <div className="text-right tabular-nums">{money(row.servicio)}</div>
                     <div className="text-right tabular-nums">{money(row.kilometraje)}</div>
+                    <div className="text-right tabular-nums">{money(row.terceros ?? 0)}</div>
+                    <div className="text-right tabular-nums">{money(row.maquinarias)}</div>
                     <div className="text-right tabular-nums">{money(row.otros)}</div>
                     <div className="text-right tabular-nums">{row.facturas}</div>
                     <div className="text-right tabular-nums">{row.clientes}</div>

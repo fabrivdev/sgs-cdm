@@ -1072,6 +1072,7 @@ export function MixRubros({
     const valor = rubroFiltro === "Repuestos" ? row.repuestos
       : rubroFiltro === "Servicio" ? row.servicio
       : rubroFiltro === "Kilometraje" ? row.kilometraje
+      : rubroFiltro === "Terceros" ? row.terceros ?? 0
       : rubroFiltro === "Maquinarias" ? row.maquinarias
       : row.otros;
     return (
@@ -1090,6 +1091,7 @@ export function MixRubros({
     { label: "Repuestos", value: row.repuestos, bar: "bg-primary", dot: "bg-primary" },
     { label: "Servicios", value: row.servicio, bar: "bg-sky-500/80", dot: "bg-sky-500" },
     { label: "Kilometraje", value: row.kilometraje, bar: "bg-amber-500/80", dot: "bg-amber-500" },
+    { label: "Terceros", value: row.terceros ?? 0, bar: "bg-rose-500/80", dot: "bg-rose-500" },
     { label: "Maquinarias", value: row.maquinarias, bar: "bg-violet-500/80", dot: "bg-violet-500" },
     { label: "Otros", value: row.otros, bar: "bg-slate-400/80", dot: "bg-slate-400" },
   ];
