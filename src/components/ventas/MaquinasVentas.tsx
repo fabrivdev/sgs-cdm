@@ -160,7 +160,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
-      : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1040px]">
+      : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1000px]">
         <div className={`grid ${grid} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
           <div>Período</div>
           {['Facturado', 'Nuevas', 'Usadas', 'Notas de crédito', 'Unidades netas', 'Clientes', 'Facturas', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
@@ -222,8 +222,8 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     const [marca, tipo, condicion, ...model] = key.split("__");
     return { key, marca, tipo, condicion, modelo: model.join("__"), ...summarize(values) };
   }), [lines]);
-  const grid = "grid-cols-[34px_minmax(100px,.9fr)_minmax(170px,1.35fr)_minmax(90px,.7fr)_repeat(5,minmax(76px,.68fr))_minmax(115px,1fr)_minmax(110px,.9fr)_80px]";
-  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1160px]">
+  const grid = "grid-cols-[34px_minmax(78px,.8fr)_minmax(140px,1.2fr)_48px_repeat(5,minmax(66px,.6fr))_minmax(100px,.9fr)_minmax(112px,.95fr)_minmax(100px,.85fr)]";
+  return <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[960px]">
     <div className={`grid ${grid} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
     {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
       const open = expanded === row.key;
