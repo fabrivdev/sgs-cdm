@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/components/dashboard/utils";
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
+import { TableScroll, scrollHead } from "./TableScroll";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
