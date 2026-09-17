@@ -147,7 +147,7 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
   const data = { ...query.data.pages[0], filas: query.data.pages.flatMap(page => page.filas) };
   if (!data.filas.length) return <State />;
   const labels = view === "detalle" ? ["Fecha", "Factura", "Sucursal", "Cliente", "Marca", "Código", "Cód. fabricante", "Descripción", "Cantidad", "Facturación neta"]
-    : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
+    : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Ticket Medio" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
       : view === "vendedores" ? ["Vendedor", ...PARTS_HEADERS, "Participación"]
       : ["Código", "Descripción", "Marca", "Facturación neta", "Unidades", "Clientes", "Documentos", "Participación", "ABC"];
   return <div className="space-y-2"><Table rows={data.filas.length} footer={<RowCount rows={data.total} loaded={data.filas.length} label="registros" />} minWidth={view === "detalle" ? "min-w-[1180px]" : view === "repuestos" ? "min-w-[900px]" : "min-w-[1300px]"}>
@@ -184,7 +184,7 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, se
   const metrics = overview.data?.resumen;
   const available = metrics && !overview.error;
   return <>
-    <KpiStrip><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Promedio por documento" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>
+    <KpiStrip><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>
     {filters.desde < "2027-07-01" && history.data && (!history.data.cargado || !history.data.notas_credito_verificadas) &&
       <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">
         {!history.data?.cargado ? "Falta cargar el histórico detallado: no se usa el importador agrupado como reemplazo." :

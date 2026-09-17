@@ -33,6 +33,19 @@ function setup(props?: { desde?: string; hasta?: string }) {
   return render(<QueryClientProvider client={client}><Harness {...props} /></QueryClientProvider>);
 }
 describe("Ventas de Repuestos", () => {
+  it("usa Ticket Medio en el KPI y en Clientes, conservando el importe por documento", async () => {
+    setup();
+    await screen.findByText("CLAAS");
+    const kpi = screen.getByText("Ticket Medio").parentElement!.parentElement!;
+    expect(within(kpi).getByText("$ 63")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Clientes$/ }));
+    await screen.findByText("Cliente A");
+    const header = screen.getByRole("columnheader", { name: "Ticket Medio" });
+    const index = Array.from(header.parentElement!.children).indexOf(header);
+    const row = screen.getByText("Cliente A").closest("tr")!;
+    expect(row.children[index]).toHaveTextContent("$ 63");
+    expect(screen.queryByText("Promedio por documento")).not.toBeInTheDocument();
+  });
   it("centra todos los encabezados, sin cambiar la alineación de los importes", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /^Detalle$/ }));
