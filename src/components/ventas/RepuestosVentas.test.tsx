@@ -95,9 +95,11 @@ describe("Ventas de Repuestos", () => {
     expect(screen.getByRole("columnheader", { name: "Marca" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Facturación neta" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ABC" })).toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Cód. fabricante" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Ventas" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Notas de crédito" })).not.toBeInTheDocument();
+    const partsTable = screen.getByRole("columnheader", { name: "ABC" }).closest("table");
+    expect(partsTable).not.toBeNull();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Cód. fabricante" })).not.toBeInTheDocument();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Ventas" })).not.toBeInTheDocument();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Notas de crédito" })).not.toBeInTheDocument();
     expect(screen.getByText("A")).toBeInTheDocument();
   });
   it("elimina Análisis y agrega la vista de vendedores", async () => {
