@@ -3,6 +3,20 @@ type ImportSaleEvidence = {
   estado_disponibilidad?: string | null;
 };
 
+export type ImportArrivalState = "PLANIFICADO" | "EN_TRANSITO" | "ARRIBADO" | "COMPLETADO" | "CANCELADO";
+
+export function importArrivalState(row: {
+  estado_fuente?: string | null; eta?: string | null; ata?: string | null;
+  costo_stock_habilitado?: boolean; estado_disponibilidad?: string | null;
+}): ImportArrivalState {
+  const raw = String(row.estado_fuente ?? "").trim().toUpperCase();
+  if (raw.includes("CANCEL")) return "CANCELADO";
+  if (row.ata) return row.costo_stock_habilitado === true && row.estado_disponibilidad !== "CONFLICTO" ? "COMPLETADO" : "ARRIBADO";
+  if (raw.includes("ARRIB") || raw.includes("RECIB") || raw.includes("COMPLET")) return "ARRIBADO";
+  if (raw.includes("TRANSIT") || raw.includes("EMBARC")) return "EN_TRANSITO";
+  return "PLANIFICADO";
+}
+
 export function isImportSaleInvoiced(row: ImportSaleEvidence) {
   const reportedAsInvoiced = ["TRUE", "SI", "SÍ", "1"].includes(
     String(row.venta_facturada ?? "").trim().toUpperCase(),

@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { isImportSaleInvoiced } from "./machineImportStatus";
+import { isImportSaleInvoiced, importArrivalState } from "./machineImportStatus";
+
+describe("importArrivalState", () => {
+  it("no deduce tránsito a partir de ETA ni stock antes del arribo", () => {
+    expect(importArrivalState({ eta: "2026-10-01", costo_stock_habilitado: true })).toBe("PLANIFICADO");
+    expect(importArrivalState({ estado_fuente: "EN_TRANSITO", costo_stock_habilitado: true })).toBe("EN_TRANSITO");
+  });
+  it("separa arribado de completado y respeta conflictos", () => {
+    expect(importArrivalState({ ata: "2026-09-01" })).toBe("ARRIBADO");
+    expect(importArrivalState({ ata: "2026-09-01", costo_stock_habilitado: true })).toBe("COMPLETADO");
+    expect(importArrivalState({ ata: "2026-09-01", costo_stock_habilitado: true, estado_disponibilidad: "CONFLICTO" })).toBe("ARRIBADO");
+  });
+  it("no inventa fechas para registros históricos ni oculta cancelaciones", () => {
+    expect(importArrivalState({ estado_fuente: "Completado", costo_stock_habilitado: true })).toBe("ARRIBADO");
+    expect(importArrivalState({ estado_fuente: "CANCELADA" })).toBe("CANCELADO");
+  });
+});
 
 describe("isImportSaleInvoiced", () => {
   it("prioriza la evidencia actual del parque sobre el valor historico de importacion", () => {
