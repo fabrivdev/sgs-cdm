@@ -9,9 +9,27 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const props = { desde: '2026-01-01', hasta: '2026-09-11', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
 const line = { id: 'line-1', fecha: '2026-05-11', factura: '001-003-54', os: '5734', chasis: 'C7501463',
   cliente: 'Pagador tercero', propietario: 'Propietario no informado', propietario_os: 'VALDECIR MOHR',
-  sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', componente: 'Mano de obra', descripcion: 'Reparación de máquina', cantidad: 4, total_venta: 200 };
+  sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', componente: 'Mano de obra', descripcion: 'Reparación de máquina', cantidad: 1, cantidad_os: 4, total_venta: 200 };
 
 describe('invoice line detail', () => {
+  it('shows OS clock hours for labor, OS kilometers for travel, and invoice quantities for parts/third parties', async () => {
+    rpc.mockResolvedValue({error:null,data:[line,
+      {...line,id:'km',componente:'Kilometraje',cantidad:1,cantidad_os:76},
+      {...line,id:'part',componente:'Repuestos',cantidad:3,cantidad_os:null},
+      {...line,id:'third',componente:'Terceros',cantidad:2,cantidad_os:null},
+      {...line,id:'unknown',cantidad_os:null},
+      {...line,id:'zero',cantidad_os:0},
+      {...line,id:'old-schema',cantidad_os:undefined}
+    ]});
+    render(<ServiciosDetalleOS {...props} />);
+    expect(await screen.findByTitle('Horas de la OS: 4 h')).toHaveTextContent('4 h');
+    expect(screen.getByTitle('Kilómetros de la OS: 76 km')).toHaveTextContent('76 km');
+    expect(screen.getByTitle('Cantidad facturada: 3')).toHaveTextContent('3');
+    expect(screen.getByTitle('Cantidad facturada: 2')).toHaveTextContent('2');
+    expect(screen.getByTitle('Horas de la OS: no informada')).toHaveTextContent('—');
+    expect(screen.getByTitle('Horas de la OS: 0 h')).toHaveTextContent('0 h');
+    expect(screen.getByTitle(/requiere SQL de cantidad operacional/)).toHaveTextContent('—');
+  });
   it('keeps recipient and owners distinct; opens machine history only on demand', async () => {
     rpc.mockResolvedValue({ error: null, data: [line] });
     render(<ServiciosDetalleOS {...props} buscar="valdecir mohr" />);

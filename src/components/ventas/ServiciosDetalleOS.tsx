@@ -11,6 +11,7 @@ type InvoiceLine = ServiceSalesSearchLine & {
   cliente: string; propietario?: string; propietario_os?: string;
   sucursal: string | null; tipo_tiempo: string; componente: string;
   descripcion: string | null; cantidad: number | null; total_venta: number;
+  cantidad_os?: number | null;
   es_nota_credito?: boolean;
 };
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -20,6 +21,15 @@ const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD",
 // minimum width. Native titles preserve full values when a column truncates.
 const columns = "grid-cols-[minmax(0,.65fr)_minmax(0,1.15fr)_minmax(0,.6fr)_minmax(0,1.35fr)_minmax(0,1.35fr)_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.65fr)_minmax(0,.75fr)_minmax(0,1.75fr)_minmax(0,.45fr)_minmax(0,1fr)]";
 const cell = "min-w-0 truncate";
+function quantity(row: InvoiceLine): { label: string; title: string } {
+  const operational = row.componente === "Mano de obra" || row.componente === "Kilometraje";
+  const value = operational ? row.cantidad_os : row.cantidad;
+  const unit = row.componente === "Mano de obra" ? "h" : row.componente === "Kilometraje" ? "km" : "";
+  const source = row.componente === "Mano de obra" ? "Horas de la OS" : row.componente === "Kilometraje" ? "Kilómetros de la OS" : "Cantidad facturada";
+  if (value == null) return { label: "—", title: `${source}: no informada${operational && row.cantidad_os === undefined ? " (requiere SQL de cantidad operacional)" : ""}` };
+  const label = `${decimal.format(Number(value))}${unit ? ` ${unit}` : ""}`;
+  return { label, title: `${source}: ${label}` };
+}
 
 // Keep the name for existing callers, but represent financial lines, not OS
 // aggregates. Same population and normalized search as the Clients tab.
@@ -87,7 +97,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
             <div className={cell} title={row.tipo_tiempo || "No informado"}>{row.tipo_tiempo === "Garantia" ? "Garantía" : row.tipo_tiempo || "No informado"}</div>
             <div className={cell} title={row.componente}>{row.componente}</div>
             <div className={cell} title={row.descripcion || "Sin descripción de origen"}>{row.descripcion || "—"}</div>
-            <div className={`${cell} text-center tabular-nums`} title={row.cantidad == null ? "Cantidad no informada" : decimal.format(Number(row.cantidad))}>{row.cantidad == null ? "—" : decimal.format(Number(row.cantidad))}</div>
+            <div className={`${cell} text-center tabular-nums`} title={quantity(row).title}>{quantity(row).label}</div>
             <div className={`${cell} text-right font-semibold tabular-nums`} title={usd.format(Number(row.total_venta || 0))}>{usd.format(Number(row.total_venta || 0))}</div>
           </div>)}
       </TableScroll>

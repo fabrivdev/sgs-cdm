@@ -1,5 +1,33 @@
 # Búsqueda e identidad en Ventas de Servicios
 
+## Cantidades operacionales en el detalle
+
+Aplicar manualmente `20260917160000_service_invoice_line_operational_quantity.sql`.
+La RPC existente agrega `cantidad_os` y `unidad_cantidad`, conservando `cantidad`
+original de factura y todos los demás campos financieros. No requiere reimportar.
+
+- Mano de obra: `ordenes_servicio_importadas.servicios_cantidad`, horas-reloj ya
+  calculadas por el importador deduplicando bloques de trabajo. No sumar jornadas
+  ni horas de todos los técnicos ni deducir horas mediante importe/tarifa.
+- Kilometraje: `ordenes_servicio_importadas.km_cantidad`.
+- Repuestos y Terceros: cantidad de la línea facturada, sin sustituirla por horas.
+- OS no vinculada, inexistente o con varias coincidencias normalizadas: cantidad
+  operacional desconocida (`—`), sin inventar horas/km a partir de la unidad de factura.
+  Cero explícito sigue siendo cero. Base sin SQL nuevo: `—` y título de SQL pendiente.
+- La cantidad operacional es referencia de la OS completa, no cantidad de trabajo
+  facturado en esa línea o tipo de tiempo: puede repetirse entre líneas/facturas/NC.
+  No sumar estos valores como horas totales ni tratarlos como horas-persona; en OS
+  mixtas no se inventa reparto por tipo. La NC conserva su importe y cantidad financiera
+  negativos; la referencia de horas OS no se convierte en horas negativas.
+
+No modifica la clasificación corregida de Comisiones, importes, pagos, exclusiones
+ni totales de Clientes/Panorama/Resumen. Una sola consulta, sin consultas extra por OS.
+Comprobación aislada: `node scripts/verify-service-invoice-quantity-sql.mjs`, comparando
+todo el JSON previo con el nuevo (excepto los dos metadatos agregados), repetición de
+OS, cantidad 1 de factura frente a 8 h OS, km, repuestos, terceros, NC, histórico,
+colisiones, ceros, permisos, filtros e idempotencia. 15 pruebas de UI/filtros correctas.
+No prueba que el SQL esté aplicado en producción ni valida una OS real.
+
 ## Detalle por línea de factura
 
 El tab Detalle consulta `ventas_servicios_lineas_v2`, como Clientes. Muestra una fila
@@ -17,7 +45,8 @@ que se monta solo cuando se solicita, evitando consultar técnicos al abrir Deta
 
 Búsqueda normalizada local antes de mostrar líneas, con el mismo helper que Clientes.
 Marca, tipo de máquina, sucursal, período y tipo de tiempo se envían a la RPC existente.
-No requiere SQL nuevo ni cambios de importes, jornadas, comisiones o exclusiones.
+El cambio de granularidad no requiere SQL nuevo; la cantidad operacional sí requiere
+la migración indicada arriba. No cambia importes, jornadas, comisiones o exclusiones.
 
 Columnas flexibles alineadas con sus títulos, filas compactas de una sola línea y
 textos largos truncados con elipsis/valor completo al pasar el cursor, sin ancho
