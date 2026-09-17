@@ -1,46 +1,90 @@
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, within, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiciosDetalleOS } from './ServiciosDetalleOS';
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
-vi.mock('@/components/ventas/MachineHistorySheet', () => ({ MachineHistorySheet: () => null }));
+vi.mock('@/components/ventas/MachineHistorySheet', () => ({ MachineHistorySheet: ({target}: {target:{chassis:string}}) => <div>Historial: {target.chassis}</div> }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const props = { desde: '2026-01-01', hasta: '2026-09-11', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
+const line = { id: 'line-1', fecha: '2026-05-11', factura: '001-003-54', os: '5734', chasis: 'C7501463',
+  cliente: 'Pagador tercero', propietario: 'Propietario no informado', propietario_os: 'VALDECIR MOHR',
+  sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', componente: 'Mano de obra', descripcion: 'Reparación de máquina', cantidad: 4, total_venta: 200 };
 
-describe('service detail loading states', () => {
-  it('keeps historical owner separate from current owner and invoice recipient', async () => {
-    rpc.mockResolvedValue({ error: null, data: [{ id: 'OS:5734', fecha: '2026-05-11', os: '5734', os_numero: '5734', chasis: 'C7501463',
-      cliente: 'Propietario no informado', propietario: 'Propietario no informado', propietario_os: 'VALDECIR MOHR', cliente_facturado: 'Pagador tercero',
-      sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', facturas: 1, mo: 200, km: 20, repuestos: 0, terceros: 0, total: 220 }] });
+describe('invoice line detail', () => {
+  it('keeps recipient and owners distinct; opens machine history only on demand', async () => {
+    rpc.mockResolvedValue({ error: null, data: [line] });
     render(<ServiciosDetalleOS {...props} buscar="valdecir mohr" />);
     expect(await screen.findByText('En la OS: VALDECIR MOHR')).toBeInTheDocument();
-    expect(screen.getByText('Propietario no informado')).toBeInTheDocument();
-    expect(screen.getByTitle('Facturado a: Pagador tercero')).toBeInTheDocument();
-    expect(screen.getByText('C7501463')).toBeInTheDocument();
-    expect(rpc).toHaveBeenCalledWith('ventas_servicios_detalle_os_v2', expect.objectContaining({ p_buscar: 'valdecir mohr' }));
+    expect(screen.getByText('Propietario: Propietario no informado')).toBeInTheDocument();
+    expect(screen.getByText('Pagador tercero')).toBeInTheDocument();
+    expect(screen.queryByText('Historial: C7501463')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name:'C7501463'}));
+    expect(screen.getByText('Historial: C7501463')).toBeInTheDocument();
+    expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2', expect.objectContaining({p_desde:props.desde,p_hasta:props.hasta,p_sucursal:null,p_tipo_tiempo:null}));
   });
-  it('passes both machine filters to the same detail query', async () => {
+  it('preserves repeated invoice/OS, identical lines, individual components, NC and history without OS', async () => {
+    rpc.mockResolvedValue({data:[line, {...line,id:'line-2'}, {...line,id:'line-3',componente:'Kilometraje',descripcion:'Traslado',total_venta:20},
+      {...line,id:'credit',factura:'NC-54',es_nota_credito:true,total_venta:-50},
+      {...line,id:'legacy',factura:'legacy-99',os:null,chasis:null,total_venta:10.25}],error:null});
+    const {container} = render(<ServiciosDetalleOS {...props} />);
+    expect(await screen.findByText('5 líneas · 3 documentos')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-invoice-line]')).toHaveLength(5);
+    expect(screen.getAllByText('001-003-54')).toHaveLength(3);
+    expect(screen.getAllByText('5734')).toHaveLength(4);
+    expect(screen.getByText('Nota de crédito')).toBeInTheDocument();
+    expect(screen.getByText('Sin OS vinculada')).toBeInTheDocument();
+    expect(screen.getByText(/Total facturado en el período/)).toHaveTextContent(/380[,.]25/);
+    const mileage = container.querySelector('[data-invoice-line="line-3"]') as HTMLElement;
+    expect(within(mileage).getByText('Traslado')).toBeInTheDocument();
+    expect(within(mileage).getByText('Kilometraje')).toBeInTheDocument();
+    expect(container.querySelector('[class*="overflow-x-auto"], [class*="min-w-[1380px]"]')).toBeNull();
+  });
+  it('shares normalized search with Clients and updates without refetching', async () => {
+    rpc.mockResolvedValue({data:[line,{...line,id:'other',cliente:'Otro',propietario_os:'Otro',os:'99',factura:'99',descripcion:'Otro'}],error:null});
+    const {rerender,container} = render(<ServiciosDetalleOS {...props} buscar="Váldecir-Mohr" />);
+    expect(await screen.findByText('1 líneas · 1 documentos')).toBeInTheDocument();
+    expect(screen.queryByText('Otro')).not.toBeInTheDocument();
+    rerender(<ServiciosDetalleOS {...props} buscar="001 / 003 / 54" />);
+    expect(container.querySelectorAll('[data-invoice-line]')).toHaveLength(1);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('passes machine, branch and time filters to the financial line query', async () => {
     rpc.mockResolvedValue({data:[],error:null});
-    render(<ServiciosDetalleOS {...props} marca="HORSCH" tipoMaquina="SEMBRADORAS" />);
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_detalle_os_v2',expect.objectContaining({p_marca:'HORSCH',p_tipo_maquina:'SEMBRADORAS'})));
+    render(<ServiciosDetalleOS {...props} marca="HORSCH" tipoMaquina="SEMBRADORAS" sucursal="Katuete" tipoTiempo="Garantia" />);
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2',expect.objectContaining({p_marca:'HORSCH',p_tipo_maquina:'SEMBRADORAS',p_sucursal:'Katuete',p_tipo_tiempo:'Garantia'})));
   });
   it('shows timeout as an error, never as an empty result', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'canceling statement due to statement timeout' } });
     render(<ServiciosDetalleOS {...props} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('statement timeout');
-    expect(screen.queryByText('No hay OS con facturación en el período.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No hay líneas facturadas para estos filtros.')).not.toBeInTheDocument();
   });
-  it('shows the empty message only for a successful empty response', async () => {
+  it('handles rejected network requests without an infinite loader', async () => {
+    rpc.mockRejectedValue(new Error('Sin conexión'));
+    render(<ServiciosDetalleOS {...props} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión');
+    expect(screen.queryByText('Cargando…')).not.toBeInTheDocument();
+  });
+  it('shows empty only for a successful empty response', async () => {
     rpc.mockResolvedValue({ data: [], error: null });
     render(<ServiciosDetalleOS {...props} />);
-    await waitFor(() => expect(screen.getByText('No hay OS con facturación en el período.')).toBeInTheDocument());
+    expect(await screen.findByText('No hay líneas facturadas para estos filtros.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
-  it('stops loading and does not query when the date range is invalid', async () => {
+  it('does not query an invalid date range', async () => {
     render(<ServiciosDetalleOS {...props} desde="2026-09-12" hasta="2026-09-11" />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Seleccioná un rango de fechas válido');
     expect(rpc).not.toHaveBeenCalled();
     expect(screen.queryByText('Cargando…')).not.toBeInTheDocument();
+  });
+  it('ignores stale responses after changing the period', async () => {
+    let resolveOld: (value:unknown)=>void = ()=>{};
+    rpc.mockImplementationOnce(()=>new Promise(resolve=>{resolveOld=resolve;})).mockResolvedValue({data:[{...line,id:'new',factura:'NEW'}],error:null});
+    const {rerender} = render(<ServiciosDetalleOS {...props} />);
+    rerender(<ServiciosDetalleOS {...props} desde="2026-08-01" />);
+    expect(await screen.findByText('NEW')).toBeInTheDocument();
+    resolveOld({data:[line],error:null});
+    await waitFor(()=>expect(screen.queryByText('001-003-54')).not.toBeInTheDocument());
   });
 });

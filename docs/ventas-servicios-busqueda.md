@@ -1,5 +1,32 @@
 # Búsqueda e identidad en Ventas de Servicios
 
+## Detalle por línea de factura
+
+El tab Detalle consulta `ventas_servicios_lineas_v2`, como Clientes. Muestra una fila
+por línea canónica con factura como referencia principal y OS/chasis como complemento;
+no agrupa ni deduplica por factura, OS, descripción o importe. Conserva NC negativas y
+líneas históricas sin OS. La suma del detalle filtrado mantiene la población financiera.
+
+Columnas: Fecha, Factura (sucursal secundaria), Cliente facturado (propietarios
+actual/histórico etiquetados), OS/chasis, Tipo de tiempo, Concepto/descripción,
+Cantidad y Facturado. Importes individuales y total con dos decimales. Cantidad
+ausente se muestra como desconocida, no cero. Chasis conserva acceso al historial,
+que se monta solo cuando se solicita, evitando consultar técnicos al abrir Detalle.
+
+Búsqueda normalizada local antes de mostrar líneas, con el mismo helper que Clientes.
+Marca, tipo de máquina, sucursal, período y tipo de tiempo se envían a la RPC existente.
+No requiere SQL nuevo ni cambios de importes, jornadas, comisiones o exclusiones.
+
+En escritorio, columnas flexibles alineadas con sus títulos y texto ajustable sin
+ancho mínimo forzado; en móvil, cada fila se presenta con etiquetas sin ocultar campos
+ni requerir desplazamiento horizontal. Pruebas de componentes usan datos sintéticos;
+verificación de producción y publicación se registran separadamente.
+
+Validación local del 17/09/2026: 13 pruebas de Detalle/Clientes/búsqueda, ESLint y
+compilación de producción correctos. Playwright comprobó 25 líneas sintéticas con
+identificadores y descripciones extensos en anchos 1920, 1366, 1024, 768 y 390 px:
+sin desbordamiento horizontal del documento ni de las celdas. No consulta producción.
+
 La población sigue siendo facturación dentro del rango seleccionado; no órdenes
 abiertas ni importes operativos. Las líneas, fechas, componentes e importes vienen
 de `ventas_area_movimientos_base`, que no se modifica con esta corrección.
