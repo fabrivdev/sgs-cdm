@@ -2,16 +2,106 @@ import { render, screen, waitFor, cleanup, within, fireEvent } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiciosDetalleOS } from './ServiciosDetalleOS';
 
-const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
+const { rpc, can, exportSalesTable } = vi.hoisted(() => ({ rpc: vi.fn(), can: vi.fn(()=>true), exportSalesTable: vi.fn() }));
+vi.mock('@/hooks/useAuth', () => ({useAuth:()=>({can})}));
+vi.mock('./salesTableExport',()=>({exportSalesTable}));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
 vi.mock('@/components/ventas/MachineHistorySheet', () => ({ MachineHistorySheet: ({target}: {target:{chassis:string}}) => <div>Historial: {target.chassis}</div> }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); can.mockReturnValue(true); exportSalesTable.mockReset(); });
 const props = { desde: '2026-01-01', hasta: '2026-09-11', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
 const line = { id: 'line-1', fecha: '2026-05-11', factura: '001-003-54', os: '5734', chasis: 'C7501463',
   cliente: 'Pagador tercero', propietario: 'Propietario no informado', propietario_os: 'VALDECIR MOHR',
   sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', componente: 'Mano de obra', descripcion: 'Reparación de máquina', cantidad: 1, cantidad_os: 4, total_venta: 200 };
 
 describe('invoice line detail', () => {
+  it('sorts every header both ways, uses real numeric values, preserves ties and does not refetch', async () => {
+    rpc.mockResolvedValue({error:null,data:[{...line,id:'large',total_venta:1000,cantidad_os:20,fecha:'2026-08-01'},
+      {...line,id:'small',total_venta:9,cantidad_os:3,fecha:'2026-07-01'},
+      {...line,id:'unknown',total_venta:-50,cantidad_os:null,fecha:'2026-06-01'}]});
+    const {container}=render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('3 líneas · 3 documentos');
+    const ids=()=>Array.from(container.querySelectorAll('[data-invoice-line]')).map(row=>row.getAttribute('data-invoice-line'));
+    expect(ids()).toEqual(['large','small','unknown']);
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: menor a mayor'}));
+    expect(ids()).toEqual(['unknown','small','large']);
+    expect(screen.getByRole('columnheader',{name:'Facturado'})).toHaveAttribute('aria-sort','ascending');
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: mayor a menor'}));
+    expect(ids()).toEqual(['large','small','unknown']);
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Cant.: menor a mayor'}));
+    expect(ids()).toEqual(['small','large','unknown']);
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Cant.: mayor a menor'}));
+    expect(ids()).toEqual(['large','small','unknown']);
+    for(const header of screen.getAllByRole('columnheader')){
+      fireEvent.click(within(header).getByRole('button'));
+      fireEvent.click(within(header).getByRole('button'));
+    }
+    expect(screen.getAllByRole('columnheader')).toHaveLength(12);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('exports every filtered row in screen order, not only rows inside the vertical scroll viewport', async () => {
+    const fixture=Array.from({length:25},(_,index)=>({...line,id:`export-${index}`,cliente:'Cliente seleccionado',factura:'000001234',codigo:'MA01',total_venta:index-2,cantidad_os:index===0?null:index}));
+    rpc.mockResolvedValue({error:null,data:[...fixture,{...line,id:'excluded',cliente:'Otro',propietario_os:'Otro'}]});
+    const {container}=render(<ServiciosDetalleOS {...props} buscar="Cliente seleccionado" />);
+    await screen.findByText('25 líneas · 1 documentos');
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: menor a mayor'}));
+    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await waitFor(()=>expect(exportSalesTable).toHaveBeenCalledTimes(1));
+    const exported=exportSalesTable.mock.calls[0][0];
+    expect(exported.fileName).toBe('ventas-servicios-detalle-2026-01-01-2026-09-11.xlsx');
+    expect(exported.rows.map((row:{id:string})=>row.id)).toEqual(Array.from(container.querySelectorAll('[data-invoice-line]')).map(row=>row.getAttribute('data-invoice-line')));
+    expect(exported.rows).toHaveLength(25);
+    expect(exported.rows.some((row:{id:string})=>row.id==='excluded')).toBe(false);
+    expect(exported.columns.map((column:{label:string})=>column.label)).toEqual(['Fecha','Factura','Sucursal','Cliente facturado','Propietario','OS','Chasis','Tiempo','Código','Descripción','Cant.','Facturado']);
+    expect(exported.columns[1].exportValue(exported.rows[0])).toBe('000001234');
+    expect(exported.columns[10].value(exported.rows[0])).toBeNull();
+    expect(exported.columns[11].value(exported.rows[0])).toBe(-2);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('preserves export types and exact visible quantity semantics for NC, zero, long text and unknowns', async () => {
+    const nc={...line,id:'export-nc',factura:'000000001',es_nota_credito:true,total_venta:-10.25,cantidad_os:4.25,descripcion:'Descripción íntegra sin recortar'.repeat(6)};
+    const km={...line,id:'export-km',componente:'Kilometraje',cantidad_os:0,total_venta:0};
+    const part={...line,id:'export-part',componente:'Repuestos',cantidad:3,cantidad_os:null};
+    rpc.mockResolvedValue({error:null,data:[nc,km,part]});
+    render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('3 líneas · 2 documentos');
+    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await waitFor(()=>expect(exportSalesTable).toHaveBeenCalled());
+    const {columns}=exportSalesTable.mock.calls[0][0];
+    expect(columns[1].exportValue(nc)).toBe('NC 000000001');
+    expect(columns[9].value(nc)).toBe(nc.descripcion);
+    expect(columns[10].value(nc)).toBe(4.25);
+    expect(columns[10].value(km)).toBe(0);
+    expect(columns[10].value(part)).toBe(3);
+    expect(columns[11].value(nc)).toBe(-10.25);
+  });
+  it('hides export without permission and blocks exports while loading, after errors or without rows', async () => {
+    can.mockReturnValue(false); rpc.mockResolvedValue({error:null,data:[line]});
+    const first=render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('1 líneas · 1 documentos');
+    expect(can).toHaveBeenCalledWith('datos:exportar');
+    expect(screen.queryByRole('button',{name:'Exportar tabla a Excel'})).not.toBeInTheDocument();
+    first.unmount(); can.mockReturnValue(true);
+    rpc.mockResolvedValue({error:null,data:[]});
+    const empty=render(<ServiciosDetalleOS {...props} />);
+    expect(screen.getByRole('button',{name:'Exportar tabla a Excel'})).toBeDisabled();
+    await screen.findByText('No hay líneas facturadas para estos filtros.');
+    expect(screen.getByRole('button',{name:'Exportar tabla a Excel'})).toBeDisabled();
+    empty.unmount(); rpc.mockResolvedValue({error:{message:'Error de consulta'},data:null});
+    render(<ServiciosDetalleOS {...props} />);
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button',{name:'Exportar tabla a Excel'})).toBeDisabled();
+    expect(exportSalesTable).not.toHaveBeenCalled();
+  });
+  it('reports export failure and permits a retry without falsely claiming a download', async () => {
+    rpc.mockResolvedValue({error:null,data:[line]}); exportSalesTable.mockImplementationOnce(()=>{throw new Error('Download failed');});
+    render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('1 líneas · 1 documentos');
+    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo exportar.');
+    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await waitFor(()=>expect(exportSalesTable).toHaveBeenCalledTimes(2));
+    await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
   it('replaces Concepto with real product/service codes, leaving unknown codes empty without inventing MA01', async () => {
     rpc.mockResolvedValue({error:null,data:[{...line,codigo:'MA01'},
       {...line,id:'part-code',componente:'Repuestos',codigo:'REPIN004178'},

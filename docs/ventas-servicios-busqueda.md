@@ -48,7 +48,7 @@ no agrupa ni deduplica por factura, OS, descripción o importe. Conserva NC nega
 líneas históricas sin OS. La suma del detalle filtrado mantiene la población financiera.
 
 Columnas separadas: Fecha, Factura, Sucursal, Cliente facturado, Propietario actual,
-OS, Chasis, Tipo de tiempo, Concepto, Descripción, Cantidad y Facturado. No apilar
+OS, Chasis, Tipo de tiempo, Código, Descripción, Cantidad y Facturado. No apilar
 datos ni agregar párrafos explicativos. Propietario histórico disponible en el título
 de la celda, explícitamente etiquetado sin reemplazar al propietario actual.
 Importes individuales con `$` y dos decimales, sin total monetario al pie. Cantidad
@@ -150,6 +150,35 @@ OS de `20260917160000` para no perderlos y puede aplicarse directamente. Verific
 aislada: `node scripts/verify-service-invoice-quantity-sql.mjs`, con igualdad de
 todos los campos anteriores, NC, colisiones, componentes, filtros, autorización
 e idempotencia. UI mantiene una sola línea y 12 columnas, sin subtotal monetario.
+
+## Paso 1: orden y exportación de Detalle
+
+Las 12 columnas de `ServiciosDetalleOS` alternan ascendente/descendente por clic
+en su encabezado. Usan `salesTableInteraction` y `SalesTableControls`: fechas,
+cantidades e importes originales, textos con orden español natural, empates estables
+y desconocidos al final en ambos sentidos. No modifican filtros ni disparan RPC
+adicional; la respuesta completa de `ventas_servicios_lineas_v2` se filtra antes
+de ordenar. No trasladar este orden local a una respuesta paginada incompleta.
+
+El botón `Exportar` requiere `datos:exportar`, como Parque/Clientes, y se deshabilita
+durante carga/error/sin filas. `salesTableExport` se carga al hacer clic y exporta
+una instantánea completa de filas filtradas en el orden actual, incluidas las no
+visibles en el scroll vertical. Mismas columnas; códigos/facturas como texto con
+ceros iniciales, descripción completa, fechas reales, cantidades numéricas e importes
+con centavos/NC negativas. No agrega subtotal, deduplica ni interpreta textos como
+fórmulas. Los errores permiten reintentar, sin presentar descarga exitosa ficticia.
+
+MO/Km exportan la referencia operacional de la OS, igual que la celda visible;
+Repuestos/Terceros conservan cantidad de factura. Ausencias quedan vacías en Excel,
+no cero inventado. Las referencias OS repetidas no son horas sumables.
+
+Validación local: 103 pruebas de Ventas (incluido ida/vuelta XLSX), ESLint y
+compilación correctos. Playwright usa el componente real con 25 líneas ficticias:
+orden numérico en ambos sentidos, búsqueda, descarga con todas las filas y anchos
+1920/1366/1024/768/390 px sin desbordamiento horizontal. No consulta producción.
+No requiere SQL adicional; las migraciones previas de cantidad/código siguen
+siendo necesarias para disponer de esos metadatos. Otros filtros/tablas/módulos
+se implementarán en los siguientes pasos, no quedan declarados completos aquí.
 
 # Propietarios de stock y nombre único de Campos
 
