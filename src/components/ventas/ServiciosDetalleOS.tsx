@@ -79,7 +79,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
       </div>
       <TableScroll rows={rows.length} className="min-w-0 max-w-full">
         <div className={`grid ${columns} ${scrollHead} gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          {["Fecha", "Factura", "Sucursal", "Cliente facturado", "Propietario", "OS", "Chasis", "Tipo de tiempo", "Concepto", "Descripción", "Cant.", "Facturado"].map((label, index) =>
+          {["Fecha", "Factura", "Sucursal", "Cliente facturado", "Propietario", "OS", "Chasis", "Tiempo", "Concepto", "Descripción", "Cant.", "Facturado"].map((label, index) =>
             <div key={label} title={label} className={`${cell} ${index === 10 ? "text-center" : index === 11 ? "text-right" : "text-left"}`}>{label}</div>)}
         </div>
         {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
