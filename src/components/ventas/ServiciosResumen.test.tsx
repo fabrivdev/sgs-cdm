@@ -25,15 +25,19 @@ const fixture: IndicadoresResponse = {
 const mockData = (data: unknown) => useIndicadores.mockReturnValue({ data, loading: false, error: null });
 
 describe('service summary breakdown contract', () => {
-  it('centers both header grids without centering data rows', () => {
+  it('matches the alignment of headings and data in both breakdowns', () => {
     mockData(fixture);
     render(<ServiciosResumen {...props} />);
     for (const label of ['Tipo de tiempo', 'Marca']) {
-      expect(screen.getByText(label).parentElement).toHaveClass('[&>div]:text-center', '[&>div]:self-center');
+      expect(screen.getByText(label).parentElement).toHaveClass('text-left', '[&>div]:self-center');
     }
     const row = screen.getByText('HORSCH').closest('.grid')!;
     expect(row).not.toHaveClass('[&>div]:text-center');
     expect(row.children[6]).toHaveClass('text-right');
+    expect(row.children[7]).toHaveClass('text-center');
+    for (const header of screen.getAllByText('Horas OS').filter(node => node.parentElement?.className.includes('bg-muted/60'))) {
+      expect(header).toHaveClass('text-center');
+    }
   });
   it('groups other brands by time type and recalculates their participation', () => {
     mockData({ ...fixture, por_marca_tipo: [

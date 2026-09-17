@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { money } from "@/components/dashboard/utils";
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
 import { TableScroll, scrollHead, salesHeader } from "./TableScroll";
+import { salesColumnClass } from "./salesTableFormat";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
@@ -50,7 +51,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
       <div className="overflow-x-auto"><div className="min-w-[1380px]">
         <TableScroll rows={rows.length}>
         <div className={`grid ${columns} ${scrollHead} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div>{["Mano de Obra","Kilometraje","Repuestos","Terceros"].map(label=><div key={label} className="text-right">{label}</div>)}<div className="text-right">Facturado</div>
+          <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-center">Fact.</div>{["Mano de Obra","Kilometraje","Repuestos","Terceros"].map(label=><div key={label} className={salesColumnClass(label)}>{label}</div>)}<div className="text-right">Facturado</div>
         </div>
         <div>
           {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
@@ -67,7 +68,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
               </div>
               <div className="truncate text-muted-foreground">{row.sucursal || "Sin sucursal"}</div>
               <div className="flex flex-wrap gap-1">{row.tipo_tiempo.split(' / ').map(type => <Badge key={type} variant="outline" className="text-[10px]">{type === 'Garantia' ? 'Garantía' : type}</Badge>)}</div>
-              <div className="text-right tabular-nums">{row.facturas}</div>
+              <div className="text-center tabular-nums">{row.facturas}</div>
               {[row.mo,row.km,row.repuestos,row.terceros].map((value,i)=><div key={i} className="text-right tabular-nums">{money(value)}</div>)}
               <div className="text-right font-semibold tabular-nums">{money(row.total)}</div>
             </div>)}

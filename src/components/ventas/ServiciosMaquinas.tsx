@@ -3,6 +3,7 @@ import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByMachine } from "./serviceBrandGroups";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
 import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
+import { salesColumnClass } from "./salesTableFormat";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -22,17 +23,17 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
         <TableScroll rows={rows.length}>
         <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
           <div>Marca</div><div>Tipo de máquina</div>
-          <div className="text-right">Máquinas</div><div className="text-right">OS</div><div className="text-right">Horas OS</div>
-          {["Mano de Obra", "Kilometraje", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className="text-right">{label}</div>)}
+          <div className="text-center">Máquinas</div><div className="text-center">OS</div><div className="text-center">Horas OS</div>
+          {["Mano de Obra", "Kilometraje", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className={salesColumnClass(label)}>{label}</div>)}
         </div>
         {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay facturación por máquina en el período.</div>
           : rows.map((row) => (
             <div key={`${row.marca}__${row.tipo_maquina}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
               <div className="min-w-0"><MarcaBadge marca={row.marca} className="text-[10px]" /></div>
               <div className="truncate" title={row.tipo_maquina}>{row.tipo_maquina}</div>
-              <div className="text-right tabular-nums">{integer.format(row.maquinas)}</div>
-              <div className="text-right tabular-nums">{integer.format(row.ordenes)}</div>
-              <div className="text-right tabular-nums">{decimal.format(row.horas)}</div>
+              <div className="text-center tabular-nums">{integer.format(row.maquinas)}</div>
+              <div className="text-center tabular-nums">{integer.format(row.ordenes)}</div>
+              <div className="text-center tabular-nums">{decimal.format(row.horas)}</div>
               {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
               <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
             </div>

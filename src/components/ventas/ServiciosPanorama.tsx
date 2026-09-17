@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
 import { salesHeader } from "./TableScroll";
+import { salesColumnClass } from "./salesTableFormat";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { serviceSalesError } from "@/lib/serviceSalesError";
@@ -112,7 +113,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
       : !rows.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay datos para este rango.</div>
       : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1060px]">
         <div className={`grid ${PANORAMA_GRID} bg-muted/60 px-2 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          <div>Período</div>{["Facturado", "Mano de obra", "Kilometraje", "Repuestos", "Terceros", "Clientes", "Facturas", "Variación LM", "Variación LY", "Participación"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
+          <div>Período</div>{["Facturado", "Mano de obra", "Kilometraje", "Repuestos", "Terceros", "Clientes", "Facturas", "Variación LM", "Variación LY", "Participación"].map((label) => <div key={label} className={`whitespace-nowrap ${salesColumnClass(label)}`}>{label}</div>)}
         </div>
         {rows.map((row) => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)} className={cn(`grid w-full ${PANORAMA_GRID} items-center border-t px-2 py-1.5 text-left text-[12px] hover:bg-accent`, row.periodo === selectedPeriod && "bg-primary/5 outline outline-1 outline-primary/20")}>
           <div className="truncate font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div>
@@ -121,8 +122,8 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
           <div className="text-right tabular-nums text-muted-foreground">{money(row.km)}</div>
           <div className="text-right tabular-nums text-muted-foreground">{money(row.repuestos)}</div>
           <div className="text-right tabular-nums text-muted-foreground">{money(row.terceros)}</div>
-          <div className="text-right tabular-nums text-muted-foreground">{row.clientes}</div>
-          <div className="text-right tabular-nums text-muted-foreground">{row.facturas}</div>
+          <div className="text-center tabular-nums text-muted-foreground">{row.clientes}</div>
+          <div className="text-center tabular-nums text-muted-foreground">{row.facturas}</div>
           <div className={cn("text-right tabular-nums", row.variationLm != null && row.variationLm < 0 && "text-destructive")}>{row.variationLm == null ? "—" : `${row.variationLm > 0 ? "+" : ""}${row.variationLm}%`}</div>
           <div className={cn("text-right tabular-nums", row.variationLy != null && row.variationLy < 0 && "text-destructive")}>{row.variationLy == null ? "—" : `${row.variationLy > 0 ? "+" : ""}${row.variationLy}%`}</div>
           <div className="text-right tabular-nums text-muted-foreground">{data?.resumen.total ? `${Math.round((row.total / data.resumen.total) * 100)}%` : "—"}</div>
@@ -131,8 +132,8 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
           <div>Total del período</div>
           <div className="text-right tabular-nums">{money(data.resumen.total)}</div>
           {[components.mo, components.km, components.repuestos, components.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
-          <div className="text-right tabular-nums">{data.resumen.clientes}</div>
-          <div className="text-right tabular-nums">{data.resumen.facturas}</div>
+          <div className="text-center tabular-nums">{data.resumen.clientes}</div>
+          <div className="text-center tabular-nums">{data.resumen.facturas}</div>
           <div className={cn("text-right tabular-nums", totalLm != null && totalLm < 0 && "text-destructive")}>{totalLm == null ? "—" : `${totalLm > 0 ? "+" : ""}${totalLm}%`}</div>
           <div className={cn("text-right tabular-nums", totalLy != null && totalLy < 0 && "text-destructive")}>{totalLy == null ? "—" : `${totalLy > 0 ? "+" : ""}${totalLy}%`}</div>
           <div className="text-right tabular-nums text-muted-foreground">{data.resumen.total ? "100%" : "—"}</div>

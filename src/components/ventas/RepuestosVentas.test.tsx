@@ -46,15 +46,19 @@ describe("Ventas de Repuestos", () => {
     expect(row.children[index]).toHaveTextContent("$ 63");
     expect(screen.queryByText("Promedio por documento")).not.toBeInTheDocument();
   });
-  it("centra todos los encabezados, sin cambiar la alineación de los importes", async () => {
+  it("alinea cada encabezado con sus datos según el tipo de columna", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /^Detalle$/ }));
     await screen.findByText("REP2");
-    for (const header of screen.getAllByRole("columnheader")) {
-      expect(header.closest("thead")).toHaveClass("[&_th]:text-center");
+    const row = screen.getByText("REP2").closest("tr")!;
+    const table = row.closest("table")!;
+    for (const header of within(table).getAllByRole("columnheader")) {
+      expect(header).toHaveClass(header.textContent === "Cantidad" ? "text-center" : header.textContent === "Facturación neta" ? "text-right" : "text-left");
       expect(header.closest("table")).not.toHaveClass("[&_th]:text-right", "[&_th:first-child]:text-left");
     }
-    const row = screen.getByText("REP2").closest("tr")!;
+    const headers = within(table).getAllByRole("columnheader");
+    const quantityIndex = headers.findIndex(header => header.textContent === "Cantidad");
+    expect(row.children[quantityIndex]).toHaveClass("text-center");
     expect(row.lastElementChild).toHaveClass("text-right");
     expect(row.closest("tbody")).not.toHaveClass("[&_th]:text-center", "[&>div]:text-center");
   });

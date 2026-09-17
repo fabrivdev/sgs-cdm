@@ -81,12 +81,12 @@ function SalesLines({area,lines}:{area:VentasArea;lines:SalesLine[]}) {
   return <div className="border-b bg-muted/15 px-5 py-2">
     <table className="w-full table-fixed text-[11px] [&_th]:py-2 [&_th]:pr-3 [&_th]:font-medium [&_td]:py-2 [&_td]:pr-3 [&_td]:align-top">
       <thead className={`text-left text-muted-foreground ${salesHeader}`}><tr>
-        {area === "servicios" && <><th className="w-[150px]">Factura</th><th className="w-[90px]">Fecha</th><th className="w-[110px]">Componente</th></>}
-        <th className="w-[135px]">{area === "maquinas" ? "Modelo" : "Cód. repuesto"}</th><th className="w-[145px]">{area === "maquinas" ? "Chasis" : "Cód. fabricante"}</th><th>Descripción</th><th className="w-[80px] text-right">Cantidad</th><th className="w-[120px] text-right">Importe</th>
+        {area === "servicios" && <><th className="w-[150px] text-left">Factura</th><th className="w-[90px] text-left">Fecha</th><th className="w-[110px] text-left">Componente</th></>}
+        <th className="w-[135px] text-left">{area === "maquinas" ? "Modelo" : "Cód. repuesto"}</th><th className="w-[145px] text-left">{area === "maquinas" ? "Chasis" : "Cód. fabricante"}</th><th className="text-left">Descripción</th><th className="w-[80px] text-center">Cantidad</th><th className="w-[120px] text-right">Importe</th>
       </tr></thead>
       <tbody>{lines.map(line=><tr key={line.id} className="border-t border-border/50">
         {area === "servicios" && <><td className="font-mono">{line.factura}</td><td>{shortDate.format(new Date(line.fecha+"T00:00:00"))}</td><td>{line.concepto==="Servicio"?"Mano de obra":line.concepto}</td></>}
-        <td className="break-all font-mono text-foreground">{area === "maquinas" ? cleanModel(line.modelo) : line.codigo || "—"}</td><td className="break-all font-mono text-foreground">{area === "maquinas" ? line.chasis || "—" : line.codigo_fabricante || "—"}</td><td className="break-words">{line.descripcion || (line.metodologia==="historico"?"Histórico sin detalle de artículo":"—")}{line.es_nota_credito && <span className="ml-2 text-muted-foreground">Nota de crédito</span>}</td><td className="text-right tabular-nums">{quantity.format(Number(line.cantidad))}</td><td className="text-right tabular-nums">{money.format(Number(line.total_venta))}</td>
+        <td className="break-all font-mono text-foreground">{area === "maquinas" ? cleanModel(line.modelo) : line.codigo || "—"}</td><td className="break-all font-mono text-foreground">{area === "maquinas" ? line.chasis || "—" : line.codigo_fabricante || "—"}</td><td className="break-words">{line.descripcion || (line.metodologia==="historico"?"Histórico sin detalle de artículo":"—")}{line.es_nota_credito && <span className="ml-2 text-muted-foreground">Nota de crédito</span>}</td><td className="text-center tabular-nums">{quantity.format(Number(line.cantidad))}</td><td className="text-right tabular-nums">{money.format(Number(line.total_venta))}</td>
       </tr>)}</tbody>
     </table>
   </div>;
@@ -205,10 +205,10 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
             <div className="overflow-x-auto rounded-md border">
               <table className="w-full min-w-[1000px] text-xs [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:py-3 [&_th]:font-medium [&_td]:px-3 [&_td]:py-3 [&_td]:align-top">
                 <thead className={`border-b bg-muted/50 text-left text-muted-foreground ${salesHeader}`}>
-                  <tr><th>{area === "servicios" ? "OS / documento" : "Factura"}</th><th className="w-[24%]">Cliente</th><th>Sucursal</th>
-                    {area === "servicios" ? <><th className="text-right">Facturas</th><th className="text-right">Mano de obra</th><th className="text-right">Km</th><th className="text-right">Repuestos</th><th className="text-right">Otros</th></> :
-                      area === "maquinas" ? <><th>Modelo</th><th>Chasis</th></> : <th className="text-right">Líneas</th>}
-                    <th>{area === "servicios" ? "Última factura" : "Fecha"}</th><th className="text-right">Total</th>
+                  <tr><th className="text-left">{area === "servicios" ? "OS / documento" : "Factura"}</th><th className="w-[24%] text-left">Cliente</th><th className="text-left">Sucursal</th>
+                    {area === "servicios" ? <><th className="text-center">Facturas</th><th className="text-right">Mano de obra</th><th className="text-right">Km</th><th className="text-right">Repuestos</th><th className="text-right">Otros</th></> :
+                      area === "maquinas" ? <><th className="text-left">Modelo</th><th className="text-left">Chasis</th></> : <th className="text-center">Líneas</th>}
+                    <th className="text-left">{area === "servicios" ? "Última factura" : "Fecha"}</th><th className="text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody>{documents.documentos.map(document => {
@@ -222,12 +222,12 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
                       </button>}{area === "servicios" && !document.os_numero && <span className="mt-1 block text-[11px] text-muted-foreground">{document.tipo}</span>}</td>
                       <td className="font-medium break-words">{document.cliente}</td><td className="text-muted-foreground">{document.sucursal || "—"}</td>
                       {area === "servicios" ? <>
-                        <td className="text-right tabular-nums">{document.facturas}</td>
+                        <td className="text-center tabular-nums">{document.facturas}</td>
                         {[document.mano_obra,document.kilometraje,document.repuestos,document.otros].map((amount,i) => <td key={i} className="text-right tabular-nums">{amount == null ? "—" : money.format(Number(amount))}</td>)}
                       </> : area === "maquinas" ? <>
                         <td className="max-w-[250px]">{document.lineas.map(l => <div key={l.id}>{cleanModel(l.modelo || l.descripcion)}</div>)}</td>
                         <td className="font-mono">{document.lineas.map(l => <div key={l.id}>{l.chasis || "—"}</div>)}</td>
-                      </> : <td className="text-right tabular-nums">{document.cantidad_lineas}</td>}
+                      </> : <td className="text-center tabular-nums">{document.cantidad_lineas}</td>}
                       <td className="whitespace-nowrap text-muted-foreground">{shortDate.format(new Date(document.fecha+"T00:00:00"))}</td>
                       <td className="text-right font-semibold tabular-nums whitespace-nowrap">{money.format(Number(document.total_venta))}</td>
                     </tr>
@@ -248,13 +248,13 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
           {clientLoading ? <div className="py-10 text-center text-muted-foreground">Cargando clientes…</div> : clientError ? <div role="alert" className="py-8 text-destructive">{clientError}</div> : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[1050px] text-xs [&_th]:px-3 [&_th]:py-3 [&_th]:font-medium [&_td]:px-3 [&_td]:py-3">
-              <thead className={`border-b bg-muted/50 text-left text-muted-foreground ${salesHeader}`}><tr><th>#</th><th className="w-[24%]">Cliente</th><th>Sucursal</th><th>Última compra</th>{area === "servicios" && <th className="text-right">OS identificadas</th>}<th className="text-right">Facturas</th><th className="text-right">Promedio / factura</th><th className="text-right">Año anterior</th><th className="text-right">Variación</th><th className="text-right">Actual</th><th className="w-[130px]">Participación</th></tr></thead>
+              <thead className={`border-b bg-muted/50 text-left text-muted-foreground ${salesHeader}`}><tr><th className="text-left">#</th><th className="w-[24%] text-left">Cliente</th><th className="text-left">Sucursal</th><th className="text-left">Última compra</th>{area === "servicios" && <th className="text-center">OS identificadas</th>}<th className="text-center">Facturas</th><th className="text-right">Promedio / factura</th><th className="text-right">Año anterior</th><th className="text-right">Variación</th><th className="text-right">Actual</th><th className="w-[130px] text-right">Participación</th></tr></thead>
               <tbody>{clients.slice((clientPage-1)*25,clientPage*25).map((client,i)=>{
                 const share = (data?.total ?? 0)>0 ? Number(client.importe)/Number(data!.total)*100 : null;
                 const change = clientData?.comparable && client.importe_anterior != null && Number(client.importe_anterior)>0 ? (Number(client.importe)/Number(client.importe_anterior)-1)*100 : null;
                 return <tr key={client.nombre} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="text-muted-foreground">{(clientPage-1)*25+i+1}</td><td className="font-medium">{client.nombre}</td><td className="text-muted-foreground">{client.sucursales || "—"}</td><td className="whitespace-nowrap">{client.ultima ? shortDate.format(new Date(client.ultima+"T00:00:00")) : "—"}</td>
-                  {area === "servicios" && <td className="text-right tabular-nums">{client.ordenes}</td>}<td className="text-right tabular-nums">{client.facturas}</td><td className="text-right tabular-nums">{client.facturas ? money.format(Number(client.importe)/client.facturas) : "—"}</td>
+                  {area === "servicios" && <td className="text-center tabular-nums">{client.ordenes}</td>}<td className="text-center tabular-nums">{client.facturas}</td><td className="text-right tabular-nums">{client.facturas ? money.format(Number(client.importe)/client.facturas) : "—"}</td>
                   <td className="text-right tabular-nums">{client.importe_anterior == null ? "—" : money.format(Number(client.importe_anterior))}</td>
                   <td className={cn("text-right tabular-nums whitespace-nowrap",change != null && (change<0 ? "text-red-700" : "text-green-700"))} title={!clientData?.comparable ? "La clasificación histórica no permite comparar el porcentaje de forma homogénea." : undefined}>{change == null ? "—" : (change>0 ? "+" : "")+change.toFixed(1)+"%"}</td>
                   <td className="text-right font-semibold tabular-nums">{money.format(Number(client.importe))}</td><td><span className="block text-right tabular-nums">{share == null ? "—" : share.toFixed(1)+"%"}</span><div className="mt-1 h-1 rounded bg-muted"><div className="h-1 rounded bg-primary/60" style={{width:Math.min(100,Math.max(0,share??0))+"%"}}/></div></td>

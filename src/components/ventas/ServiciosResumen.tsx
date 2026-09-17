@@ -1,5 +1,6 @@
 import { money } from "@/components/dashboard/utils";
 import { salesHeader } from "./TableScroll";
+import { salesColumnClass } from "./salesTableFormat";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByTime } from "./serviceBrandGroups";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
@@ -52,19 +53,19 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
         <div className="min-w-[1060px]">
           <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
             <div>Tipo de tiempo</div>
-            <div className="text-right">OS asociadas</div>
-            {MONEY_LABELS.map((label) => <div key={label} className="text-right">{label}</div>)}
-            <div className="text-right">Horas OS</div>
+            <div className="text-center">OS asociadas</div>
+            {MONEY_LABELS.map((label) => <div key={label} className={salesColumnClass(label)}>{label}</div>)}
+            <div className="text-center">Horas OS</div>
             <div className="text-right">Participación</div>
           </div>
           {!porTipo.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin facturación en el período.</div>
             : porTipo.map((row) => (
               <div key={`${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
                 <div className="truncate font-medium" title={row.sin_vinculo_historico ? historicLabel : typeLabel(row.tipo_tiempo)}>{row.sin_vinculo_historico ? historicLabel : typeLabel(row.tipo_tiempo)}</div>
-                <div className="text-right tabular-nums">{row.sin_vinculo_historico ? "—" : integer.format(row.ordenes)}</div>
+                <div className="text-center tabular-nums">{row.sin_vinculo_historico ? "—" : integer.format(row.ordenes)}</div>
                 {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
                 <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
-                <div className="text-right tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>
+                <div className="text-center tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>
                 <div className="text-right tabular-nums">{totales.neto ? `${Math.round((row.neto / totales.neto) * 100)}%` : "—"}</div>
               </div>
             ))}
@@ -75,8 +76,8 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
         <div className="min-w-[1060px]">
           <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
             <div>Marca</div><div>Tipo</div>
-            {MONEY_LABELS.map((label) => <div key={label} className="text-right">{label}</div>)}
-            <div className="text-right">Horas OS</div>
+            {MONEY_LABELS.map((label) => <div key={label} className={salesColumnClass(label)}>{label}</div>)}
+            <div className="text-center">Horas OS</div>
             <div className="text-right">Participación</div>
           </div>
           {missingBrandBreakdown ? <div role="alert" className="py-10 text-center text-[12px] text-destructive">Falta actualizar la consulta del resumen por marca. Aplicá el SQL de corrección.</div>
@@ -85,7 +86,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
               <div className="min-w-0 truncate font-medium" title={row.sin_vinculo_historico ? historicLabel : row.marca}>{row.sin_vinculo_historico ? historicLabel : unknown(row.marca) ? row.marca : <MarcaBadge marca={row.marca} className="text-[10px]" />}</div><div className="truncate">{row.sin_vinculo_historico ? "—" : typeLabel(row.tipo_tiempo)}</div>
               {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
               <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
-              <div className="text-right tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>
+              <div className="text-center tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>
               <div className="text-right tabular-nums">{totales.neto ? `${Math.round((row.neto / totales.neto) * 100)}%` : "—"}</div>
             </div>)}
         </div>

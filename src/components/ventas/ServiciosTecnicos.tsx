@@ -7,6 +7,7 @@ import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { displayImportedTechnicianName, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import type { IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
 import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
+import { salesColumnClass } from "./salesTableFormat";
 
 type Fila = {
   tecnico_clave: string; tecnico: string;
@@ -83,14 +84,14 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
           <TableScroll rows={unified.length}>
           <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
             <div>Técnico</div>
-            {["Horas Cliente", "Horas Garantía", "Horas Interno", "Total horas", "MO Cliente asociada", "MO Garantía asociada", "MO Interno asociada", "MO total asociada"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
+            {["Horas Cliente", "Horas Garantía", "Horas Interno", "Total horas", "MO Cliente asociada", "MO Garantía asociada", "MO Interno asociada", "MO total asociada"].map((label) => <div key={label} className={`whitespace-nowrap ${salesColumnClass(label)}`}>{label}</div>)}
           </div>
           {!unified.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay jornadas cargadas para las OS del período.</div>
             : unified.map((row) => (
                 <div key={row.tecnico} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
                   <div className="truncate font-medium" title={row.tecnico}>{row.tecnico}</div>
-                  {[row.horas_cliente, row.horas_garantia, row.horas_interno].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{decimal.format(value)}</div>)}
-                  <div className="text-right font-semibold tabular-nums">{decimal.format(row.total_horas)}</div>
+                  {[row.horas_cliente, row.horas_garantia, row.horas_interno].map((value, index) => <div key={index} className="text-center tabular-nums text-muted-foreground">{decimal.format(value)}</div>)}
+                  <div className="text-center font-semibold tabular-nums">{decimal.format(row.total_horas)}</div>
                   {[row.mo_cliente, row.mo_garantia, row.mo_interno].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
                   <div className="text-right font-semibold tabular-nums">{money(row.mo_total)}</div>
                 </div>

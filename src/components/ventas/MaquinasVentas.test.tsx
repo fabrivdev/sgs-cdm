@@ -19,15 +19,31 @@ function setup() {
 }
 
 describe("Ventas de Máquinas", () => {
-  it("centers period and detail headings while keeping amounts right-aligned", () => {
+  it("matches summary quantity and money headings to their rows", () => {
+    const view = setup();
+    const header = Array.from(view.container.querySelectorAll('.grid')).find(node => node.firstElementChild?.textContent === 'Marca')!;
+    expect(header.children[1]).toHaveClass('text-center');
+    expect(header.children[6]).toHaveClass('text-right');
+    const row = screen.getByText('HORSCH').closest('.grid')!;
+    expect(row.children[1]).toHaveClass('text-center');
+    expect(row.children[6]).toHaveClass('text-right');
+    expect(header).toHaveClass('text-left');
+  });
+  it("matches period and detail heading alignment to their values", () => {
     const panorama = render(<MaquinasPanorama data={{ ...data, periodos: [{ ...data.resumen, periodo: "2026-08-01" }] }}
       loading={false} error={null} periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined} />);
-    expect(screen.getByText("Período").parentElement).toHaveClass("[&>div]:text-center");
+    expect(screen.getByText("Período").parentElement).toHaveClass("text-left");
+    expect(screen.getByText("Nuevas")).toHaveClass("text-center");
+    expect(screen.getByText("Notas de crédito")).toHaveClass("text-center");
+    expect(screen.getByText("Facturado")).toHaveClass("text-right");
+    const period = screen.getByText("Total del período").parentElement!;
+    expect(period.children[2]).toHaveClass("text-center");
+    expect(period.children[1]).toHaveClass("text-right");
     panorama.unmount();
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     for (const header of screen.getAllByRole("columnheader")) {
-      expect(header.closest("thead")).toHaveClass("[&_th]:text-center");
+      expect(header).toHaveClass(header.textContent === "Facturado" ? "text-right" : "text-left");
     }
     const row = screen.getByText("Cliente A").closest("tr")!;
     expect(row.lastElementChild).toHaveClass("text-right");
