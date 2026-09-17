@@ -9,6 +9,7 @@
 - Un total se distribuye explícitamente en partes iguales; la última unidad absorbe los centavos. No es un reparto implícito sin aviso.
 - Fecha y valor OC tienen indicadores de ajuste separados. Editar el chasis o la factura no congela esos campos. Cambiar la previsión general no pisa ajustes individuales, ni siquiera una fecha borrada intencionalmente.
 - Se puede volver expresamente al embarque o valor OC general desde la unidad. El importe actualmente asignado se muestra por separado, porque puede diferir tras ajustes.
+- La distinción general/individual y los botones de volver al valor o embarque general solo se muestran cuando la cabecera tiene varias unidades. En pedidos 1/1 quedan fecha e importe editables sin esos rótulos; no se borran indicadores ni datos históricos.
 - La factura del proveedor usa valor_factura_proveedor. No se guarda en costo_final ni en el valor de venta de la NP.
 - Diferencia = valor de factura del proveedor menos valor OC de la unidad. Solo se calcula si están ambos importes y las monedas son iguales; el usuario debe ingresar ambos en la misma base impositiva. No hay conversión automática.
 - El costo definitivo con IVA solo se edita tras identificar inequívocamente la máquina en stock. Esta pantalla lo registra: el stock actual no tiene una columna de costo desde la cual leerlo automáticamente.

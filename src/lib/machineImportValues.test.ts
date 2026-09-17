@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount } from "./machineImportValues";
+import { importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount } from "./machineImportValues";
 
 describe("Importaciones: OC, factura y costo separados", () => {
+  it("solo presenta opciones generales/individuales cuando hay varias unidades", () => {
+    expect(importHasMultipleUnits(1)).toBe(false);
+    expect(importHasMultipleUnits(null)).toBe(false);
+    expect(importHasMultipleUnits(undefined)).toBe(false);
+    expect(importHasMultipleUnits(0)).toBe(false);
+    expect(importHasMultipleUnits(3)).toBe(true);
+  });
   it("compara con centavos y conserva cero como importe real", () => {
     expect(importInvoiceDifference(100, "USD", 100.01, "USD")).toBe(0.01);
     expect(importInvoiceDifference(0, "USD", 0, "USD")).toBe(0);

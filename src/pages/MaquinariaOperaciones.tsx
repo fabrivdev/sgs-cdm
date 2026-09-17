@@ -42,7 +42,7 @@ import { legacyMachineBrand, machineBrandClass as brandClass, machineBrandStyle,
 import { isImportSaleInvoiced, importArrivalState as arrivalState, type ImportArrivalState as ArrivalState } from "@/lib/machineImportStatus";
 import { matchesOperationFilters, normalizeOperationModel, operationModelOptions } from "@/lib/machineOperationFilters";
 import { shortPersonName } from "@/lib/personName";
-import { formatImportMoney, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
+import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -1381,6 +1381,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
   if (!row) return null;
   const arrival = arrivalState(row);
   const stockConfirmed = importStockConfirmed(row);
+  const multipleUnits = importHasMultipleUnits(row.cantidad_lote);
   const showAvailabilityStatus = false;
   const headerStatus = showAvailabilityStatus ? (AVAILABILITY_LABEL[row.estado_disponibilidad!] ?? row.estado_disponibilidad) : ARRIVAL_LABEL[arrival];
   const closeEditors = () => { setEditingChassis(false); setEditingImportData(false); setEditingInvoice(false); setEditingStockCost(false); };
@@ -1494,9 +1495,9 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
               <KeyValueItem label="Estado de importación" value={ARRIVAL_LABEL[arrival]} />
               <KeyValueItem label="Embarque estimado" value={formatDate(row.eta)} empty="—" />
               <KeyValueItem label="Valor OC de la unidad" value={row.precio_oc != null ? formatImportMoney(row.precio_oc, row.moneda_oc ?? "USD") : null} empty="Sin cargar" />
-              <KeyValueItem label="Previsión" value={row.eta_manual || row.valor_oc_manual ? "Con ajustes individuales" : "Datos generales del pedido"} />
+              {multipleUnits && <KeyValueItem label="Previsión" value={row.eta_manual || row.valor_oc_manual ? "Con ajustes individuales" : "Datos generales del pedido"} />}
             </KeyValueGrid>}
-            {(row.eta_manual || row.valor_oc_manual) && canEdit && !editingImportData && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
+            {multipleUnits && (row.eta_manual || row.valor_oc_manual) && canEdit && !editingImportData && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
               {row.eta_manual && <Button variant="outline" size="sm" disabled={saving} onClick={() => saveUnit({ usar_eta_general: true })}>Usar embarque general</Button>}
               {row.valor_oc_manual && <Button variant="outline" size="sm" disabled={saving} onClick={() => saveUnit({ usar_valor_oc_general: true })}>Usar valor OC general</Button>}
             </div>}

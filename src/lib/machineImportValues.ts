@@ -13,6 +13,10 @@ export function validImportAmount(value: string): boolean {
   return value.trim() === "" || (Number.isFinite(Number(value)) && Number(value) >= 0);
 }
 
+export function importHasMultipleUnits(quantity: number | null | undefined): boolean {
+  return Number.isInteger(quantity) && Number(quantity) > 1;
+}
+
 export function formatImportMoney(value: number, currency = "USD"): string {
   return new Intl.NumberFormat("es-PY", {
     style: "currency", currency, currencyDisplay: "narrowSymbol",
