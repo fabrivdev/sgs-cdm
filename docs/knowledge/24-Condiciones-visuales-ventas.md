@@ -11,6 +11,7 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - No poner `Total facturado en el período` ni otro subtotal monetario al pie de Detalle. El pie puede contar filas/documentos. Esto NO elimina `Total del período` de los resúmenes por período de los tres módulos: ese total sí fue solicitado.
 - Sin scroll horizontal ni ancho mínimo forzado. Ajustar columnas al ancho disponible, con una sola línea, elipsis y valor completo al pasar el cursor para textos extensos. No reducir fuentes hasta hacerlas ilegibles para evitar el scroll.
 - Encabezado y dato comparten ancho y eje: texto a la izquierda, cantidades/horas centradas, importes/porcentajes a la derecha. Conservar colores de marcas y nombres de columnas acordados; usar `Ticket Medio`.
+- En Detalle de Servicios, usar `Código` en lugar de `Concepto`: código de producto de la línea financiera para repuestos; código operativo documentado como MA01/KM01/SE para servicios. No fabricar códigos por categoría ni tomar el REP de otra línea de la OS. Conservar el componente en el título al pasar el cursor; códigos ausentes o ambiguos quedan `—`.
 
 ## Comprobación antes de entregar/publicar
 
@@ -27,3 +28,5 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 Implementación de esta revisión: `src/components/ventas/ServiciosDetalleOS.tsx`. Pruebas de formato: `src/components/ventas/ServiciosDetalleOS.test.tsx`. No equivale a una auditoría completa de todas las pantallas ni aplica SQL automáticamente.
 
 Validación local del 17/09/2026: 16 pruebas de Detalle/Clientes/búsqueda, ESLint y compilación correctos. Las 14 pruebas de sincronización/grafo confirman enlaces válidos y conectividad de la nueva nota/regla; se sincronizó sin conflictos manuales. No se comprobó esta revisión en producción ni se publicó automáticamente.
+
+Revisión posterior de Código: 17 pruebas de Detalle/Clientes/búsqueda y fixture PostgreSQL aislada correctas. Se conserva el contrato financiero/cantidades, repeticiones y NC. Requiere SQL manual `20260917170000_service_invoice_line_product_code.sql`; commit/push no ejecuta SQL. No se consultaron códigos de producción.

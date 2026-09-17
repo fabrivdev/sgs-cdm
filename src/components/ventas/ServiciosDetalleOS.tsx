@@ -12,6 +12,7 @@ type InvoiceLine = ServiceSalesSearchLine & {
   sucursal: string | null; tipo_tiempo: string; componente: string;
   descripcion: string | null; cantidad: number | null; total_venta: number;
   cantidad_os?: number | null;
+  codigo?: string | null;
   es_nota_credito?: boolean;
 };
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -79,7 +80,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
       </div>
       <TableScroll rows={rows.length} className="min-w-0 max-w-full">
         <div className={`grid ${columns} ${scrollHead} gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          {["Fecha", "Factura", "Sucursal", "Cliente facturado", "Propietario", "OS", "Chasis", "Tipo de tiempo", "Concepto", "Descripción", "Cant.", "Facturado"].map((label, index) =>
+          {["Fecha", "Factura", "Sucursal", "Cliente facturado", "Propietario", "OS", "Chasis", "Tipo de tiempo", "Código", "Descripción", "Cant.", "Facturado"].map((label, index) =>
             <div key={label} title={label} className={`${cell} ${index === 10 ? "text-center" : index === 11 ? "text-right" : "text-left"}`}>{label}</div>)}
         </div>
         {loading ? <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando…</div>
@@ -94,7 +95,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
             <div className={`${cell} font-mono`} title={row.os || "Sin OS vinculada"}>{row.os || "Sin OS vinculada"}</div>
             <div className={cell}>{row.chasis ? <button type="button" className="block w-full truncate text-left font-mono text-[11px] text-primary hover:underline" onClick={() => setDetailTarget({ chassis: row.chasis, os: null })} title={`${row.chasis} · Ver historial de esta máquina`}>{row.chasis}</button> : "—"}</div>
             <div className={cell} title={row.tipo_tiempo || "No informado"}>{row.tipo_tiempo === "Garantia" ? "Garantía" : row.tipo_tiempo || "No informado"}</div>
-            <div className={cell} title={row.componente}>{row.componente}</div>
+            <div className={`${cell} font-mono text-[11px]`} title={`${row.codigo?.trim() || "Código no informado"} · ${row.componente}`}>{row.codigo?.trim() || "—"}</div>
             <div className={cell} title={row.descripcion || "Sin descripción de origen"}>{row.descripcion || "—"}</div>
             <div className={`${cell} text-center tabular-nums`} title={quantity(row).title}>{quantity(row).label}</div>
             <div className={`${cell} text-right font-semibold tabular-nums`} title={usd.format(Number(row.total_venta || 0))}>{usd.format(Number(row.total_venta || 0))}</div>

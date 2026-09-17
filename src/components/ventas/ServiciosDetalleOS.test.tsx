@@ -12,6 +12,28 @@ const line = { id: 'line-1', fecha: '2026-05-11', factura: '001-003-54', os: '57
   sucursal: 'Santa Rita', tipo_tiempo: 'Cliente', componente: 'Mano de obra', descripcion: 'Reparación de máquina', cantidad: 1, cantidad_os: 4, total_venta: 200 };
 
 describe('invoice line detail', () => {
+  it('replaces Concepto with real product/service codes, leaving unknown codes empty without inventing MA01', async () => {
+    rpc.mockResolvedValue({error:null,data:[{...line,codigo:'MA01'},
+      {...line,id:'part-code',componente:'Repuestos',codigo:'REPIN004178'},
+      {...line,id:'km-code',componente:'Kilometraje',codigo:'KM01'},
+      {...line,id:'third-code',componente:'Terceros',codigo:'SE'},
+      {...line,id:'missing-code',codigo:null},
+      {...line,id:'old-code',codigo:undefined},
+      {...line,id:'blank-code',codigo:'  '}
+    ]});
+    const {container}=render(<ServiciosDetalleOS {...props} />);
+    expect(await screen.findByText('MA01')).toBeInTheDocument();
+    expect(screen.getByText('Código')).toBeInTheDocument();
+    expect(screen.queryByText('Concepto')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mano de obra')).not.toBeInTheDocument();
+    for (const [id,code] of [['line-1','MA01'],['part-code','REPIN004178'],['km-code','KM01'],['third-code','SE'],['missing-code','—'],['old-code','—'],['blank-code','—']]) {
+      const row=container.querySelector(`[data-invoice-line="${id}"]`) as HTMLElement;
+      expect(row.children[8].textContent).toBe(code);
+      expect(row.children[8]).toHaveClass('truncate');
+      expect(row.children[8].getAttribute('title')).toContain(id==='part-code'?'Repuestos':id==='km-code'?'Kilometraje':id==='third-code'?'Terceros':'Mano de obra');
+    }
+    expect(container.querySelectorAll('[data-invoice-line]')).toHaveLength(7);
+  });
   it('shows OS clock hours for labor, OS kilometers for travel, and invoice quantities for parts/third parties', async () => {
     rpc.mockResolvedValue({error:null,data:[line,
       {...line,id:'km',componente:'Kilometraje',cantidad:1,cantidad_os:76},
@@ -56,7 +78,7 @@ describe('invoice line detail', () => {
     expect(screen.getByTitle('$ 10,25')).toHaveTextContent('$ 10,25');
     const mileage = container.querySelector('[data-invoice-line="line-3"]') as HTMLElement;
     expect(within(mileage).getByText('Traslado')).toBeInTheDocument();
-    expect(within(mileage).getByText('Kilometraje')).toBeInTheDocument();
+    expect(within(mileage).getByTitle('Código no informado · Kilometraje')).toHaveTextContent('—');
     expect(container.querySelector('[class*="overflow-x-auto"], [class*="min-w-[1380px]"]')).toBeNull();
   });
   it('enforces dollar symbol, numeric-only quantities and no financial footer', async () => {

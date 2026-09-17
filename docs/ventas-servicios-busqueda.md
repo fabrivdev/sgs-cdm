@@ -129,6 +129,28 @@ Garantía e Interno. Una respuesta sin `por_marca_tipo` produce un aviso de SQL
 pendiente, no una afirmación falsa de que no hay marcas.
 
 Verificación sintética reproducible: `node scripts/verify-service-summary-sql.mjs`.
+## Código de producto en Detalle
+
+`20260917170000_service_invoice_line_product_code.sql` agrega `codigo` a
+`ventas_servicios_lineas_v2`, sin alterar población, filtros, importes ni cantidades.
+La columna visible `Código` reemplaza `Concepto`; el componente sigue en el título
+al pasar el cursor y se conserva para calcular cantidad operacional.
+
+Repuestos usa el código de su línea financiera (REP u otro código de origen),
+nunca el de otra pieza de la OS. Para MO/Km/Terceros se conserva un código operativo
+explícito de factura; si usa otro identificador, se busca el código compatible
+MA[número]/KM[número]/SE[número] en CODIGO, PRODUCTO y productos_agregados de
+la OS única. Códigos distintos del mismo componente no se resuelven arbitrariamente.
+Sin código operativo inequívoco se conserva el código financiero real, si existe;
+placeholders sin alfanuméricos quedan desconocidos. No se genera MA01 por importe,
+descripción o categoría ni se reimportan/modifican los datos originales.
+
+Aplicación manual por el usuario; la migración incluye los metadatos de cantidad
+OS de `20260917160000` para no perderlos y puede aplicarse directamente. Verificación
+aislada: `node scripts/verify-service-invoice-quantity-sql.mjs`, con igualdad de
+todos los campos anteriores, NC, colisiones, componentes, filtros, autorización
+e idempotencia. UI mantiene una sola línea y 12 columnas, sin subtotal monetario.
+
 # Propietarios de stock y nombre único de Campos
 
 La migración `20260915120000_resolve_service_stock_owners_and_campos_identity.sql`

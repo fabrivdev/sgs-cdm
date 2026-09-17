@@ -16,7 +16,7 @@ INSERT INTO ordenes_servicio_importadas VALUES
 CREATE TABLE movimientos(linea_id text,fecha date,factura text,os_numero text,cliente text,sucursal text,
  tipo_tiempo text,concepto text,total_venta numeric,cantidad numeric,propietario text,marca_parque text,
  tipo_maquina text,propietario_os text,cliente_os text,nro_chasis text,descripcion text,texto_busqueda text,
- es_nota_credito boolean,vinculo_os text);
+ es_nota_credito boolean,vinculo_os text,codigo text);
 CREATE FUNCTION ventas_servicios_movimientos_enriquecidos(date,date,text) RETURNS SETOF movimientos LANGUAGE sql STABLE AS $$
  SELECT * FROM movimientos WHERE fecha BETWEEN $1 AND $2 AND ($3 IS NULL OR sucursal=$3) $$;
 INSERT INTO movimientos(linea_id,fecha,factura,os_numero,cliente,sucursal,tipo_tiempo,concepto,total_venta,cantidad,
@@ -61,10 +61,47 @@ assert.deepEqual(await call("'2026-08-01','2026-08-31','Katuete'"),[]);
 assert.deepEqual(await call("'2026-08-01','2026-08-31',NULL,'Garantia'"),[]);
 assert.deepEqual(await call("'2026-08-01','2026-08-31',NULL,NULL,'CLAAS'"),[]);
 assert.equal((await call("'2026-08-01','2026-08-31',NULL,NULL,'HORSCH','SEMBRADORAS'")).length,11);
+// Product-code metadata is additive: the full quantity/financial contract stays
+// identical, including legitimate repeated financial lines and credit notes.
+await db.exec(`UPDATE ordenes_servicio_importadas SET raw_data=raw_data ||
+ '{"CODIGO":"-------","PRODUCTO":"REP-OTHER","productos_agregados":["MA01","MA01","KM01","SERVICIO TERCERIZADO"],"extra":"ignored"}'::jsonb WHERE os_numero='OS-A';
+ UPDATE movimientos SET codigo=CASE linea_id WHEN 'part' THEN 'REPIN004178' WHEN 'third' THEN 'SE' ELSE '-------' END;
+ UPDATE ordenes_servicio_importadas SET raw_data='{"PRODUCTO":"MA01"}' WHERE os_numero='OS-C';`);
+const beforeCode=await call();
+const codeMigration=readFileSync('supabase/migrations/20260917170000_service_invoice_line_product_code.sql','utf8');
+await db.exec(codeMigration); await db.exec(codeMigration);
+const withCodes=await call();
+assert.equal(withCodes.length,beforeCode.length);
+for(const row of withCodes){
+ const {codigo,...unchanged}=row;
+ assert.deepEqual(unchanged,beforeCode.find(r=>r.id===row.id));
+}
+const code=id=>withCodes.find(r=>r.id===id).codigo;
+assert.equal(code('mo'),'MA01'); assert.equal(code('repeat'),'MA01'); assert.equal(code('nc'),'MA01');
+assert.equal(code('trim'),'MA01'); assert.equal(code('km'),'KM01');
+assert.equal(code('part'),'REPIN004178'); assert.equal(code('third'),'SE');
+assert.equal(code('legacy'),null); assert.equal(code('collision'),null); assert.equal(code('unknown'),null);
+await db.exec(`UPDATE ordenes_servicio_importadas SET raw_data=jsonb_set(raw_data,'{productos_agregados}','["MA01","MA02","KM01","SE01"]') WHERE os_numero='OS-A';
+ UPDATE movimientos SET codigo='MA02' WHERE linea_id='repeat';`);
+const mixed=await call();
+assert.equal(mixed.find(r=>r.id==='mo').codigo,null); // ambiguous OS codes are not guessed
+assert.equal(mixed.find(r=>r.id==='repeat').codigo,'MA02'); // exact invoice code wins
+assert.equal(mixed.find(r=>r.id==='third').codigo,'SE');
+assert.equal(mixed.find(r=>r.id==='km').codigo,'KM01'); // no borrowing another component
+await db.exec(`UPDATE ordenes_servicio_importadas SET raw_data='{"PRODUCTO":"MA03","productos_agregados":{"bad":"MA01"}}' WHERE os_numero='OS-A';
+ UPDATE movimientos SET codigo=CASE WHEN linea_id='legacy' THEN 'LEGACY-7' WHEN linea_id='part' THEN 'REPIN004178' ELSE '-------' END;`);
+const malformed=await call();
+assert.equal(malformed.find(r=>r.id==='mo').codigo,'MA03');
+assert.equal(malformed.find(r=>r.id==='legacy').codigo,'LEGACY-7');
+assert.equal(malformed.find(r=>r.id==='part').codigo,'REPIN004178');
+assert.equal(malformed.find(r=>r.id==='km').codigo,null);
+assert.deepEqual(await call("'2026-08-01','2026-08-31','Katuete'"),[]);
+assert.deepEqual(await call("'2026-08-01','2026-08-31',NULL,'Garantia'"),[]);
+assert.deepEqual(await call("'2026-08-01','2026-08-31',NULL,NULL,'CLAAS'"),[]);
 await assert.rejects(call("'2026-08-31','2026-08-01'"),/Rango de fechas invalido/);
 await db.exec("SET fixture.denied='on'");
 await assert.rejects(call(),/No tenes acceso/);
 await db.exec("SET fixture.denied='off'; SET fixture.logged_out='on'");
 await assert.rejects(call(),/No tenes acceso/);
 await db.close();
-console.log('PASS: operational OS quantities, unchanged financial contract, collisions, filters, authorization and idempotence.');
+console.log('PASS: real invoice/OS product codes, operational quantities, unchanged financial contract, collisions, filters, authorization and idempotence.');
