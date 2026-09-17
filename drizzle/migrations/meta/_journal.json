@@ -50,6 +50,13 @@
       "when": 1789650423209,
       "tag": "0006_order_parts_sales_products_and_abc",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789650636836,
+      "tag": "0007_fix_parts_sales_product_grouping",
+      "breakpoints": true
     }
   ]
 }
