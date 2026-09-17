@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
 import { RowCount, TableScroll, salesHeader } from "./TableScroll";
+import { MarcaBadge } from "@/components/StatusBadges";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
@@ -33,6 +35,7 @@ export type PartsRow = Partial<PartsMetrics> & {
   sucursal?: string; codigo?: string; codigo_fabricante?: string; descripcion?: string;
   cantidad?: number | null; metodologia?: string; es_nota_credito?: boolean;
   marca?: string; vendedor?: string;
+  abc?: "A" | "B" | "C" | null;
   unidades_vendidas?: number | null; unidades_devueltas?: number | null;
   anterior?: number | null; ultima?: string;
 };
@@ -143,20 +146,20 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
   if (query.isLoading || query.error || !query.data) return <State loading={query.isLoading} error={query.error} retry={() => void query.refetch()} />;
   const data = { ...query.data.pages[0], filas: query.data.pages.flatMap(page => page.filas) };
   if (!data.filas.length) return <State />;
-  const labels = view === "detalle" ? ["Fecha", "Factura", "Cliente", "Sucursal", "Cód. repuesto", "Cód. fabricante", "Descripción", "Cantidad", "Facturado"]
+  const labels = view === "detalle" ? ["Fecha", "Factura", "Sucursal", "Cliente", "Marca", "Código", "Cód. fabricante", "Descripción", "Cantidad", "Facturación neta"]
     : view === "clientes" ? ["Cliente facturado", ...PARTS_HEADERS.map(label => label === "Clientes" ? "Promedio por documento" : label), "Año anterior", "Variación LY", "Última compra", "Participación"]
       : view === "vendedores" ? ["Vendedor", ...PARTS_HEADERS, "Participación"]
-      : ["Cód. repuesto", "Cód. fabricante", "Descripción", ...PARTS_HEADERS, "Unidades vendidas", "Unidades devueltas", "Participación"];
-  return <div className="space-y-2"><Table rows={data.filas.length} footer={<RowCount rows={data.total} loaded={data.filas.length} label="registros" />} minWidth={view === "detalle" ? "min-w-[1120px]" : view === "repuestos" ? "min-w-[1530px]" : "min-w-[1300px]"}>
-    <colgroup>{view === "detalle" ? <><col style={{ width: "85px" }} /><col style={{ width: "125px" }} /><col style={{ width: "190px" }} /><col style={{ width: "95px" }} /><col style={{ width: "105px" }} /><col style={{ width: "110px" }} /><col /><col style={{ width: "70px" }} /><col style={{ width: "105px" }} /></>
+      : ["Código", "Descripción", "Marca", "Facturación neta", "Unidades", "Clientes", "Documentos", "Participación", "ABC"];
+  return <div className="space-y-2"><Table rows={data.filas.length} footer={<RowCount rows={data.total} loaded={data.filas.length} label="registros" />} minWidth={view === "detalle" ? "min-w-[1180px]" : view === "repuestos" ? "min-w-[900px]" : "min-w-[1300px]"}>
+    <colgroup>{view === "detalle" ? <><col style={{ width: "82px" }} /><col style={{ width: "118px" }} /><col style={{ width: "90px" }} /><col style={{ width: "170px" }} /><col style={{ width: "82px" }} /><col style={{ width: "105px" }} /><col style={{ width: "110px" }} /><col /><col style={{ width: "72px" }} /><col style={{ width: "110px" }} /></>
       : view === "clientes" ? <><col style={{ width: "220px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
         : view === "vendedores" ? <><col style={{ width: "240px" }} />{labels.slice(1).map(label => <col key={label} />)}</>
-        : <><col style={{ width: "130px" }} /><col style={{ width: "140px" }} /><col style={{ width: "300px" }} />{labels.slice(3).map(label => <col key={label} />)}</>}</colgroup>
+        : <><col style={{ width: "115px" }} /><col /><col style={{ width: "90px" }} /><col style={{ width: "125px" }} /><col style={{ width: "85px" }} /><col style={{ width: "78px" }} /><col style={{ width: "88px" }} /><col style={{ width: "88px" }} /><col style={{ width: "55px" }} /></>}</colgroup>
     <Heads labels={labels} /><tbody>{data.filas.map(row => <tr key={row.id} className="hover:bg-muted/20">
-      {view === "detalle" ? <><td className="whitespace-nowrap text-muted-foreground">{date(row.fecha)}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.factura}>{row.factura || "—"}{row.es_nota_credito && <span className="ml-1 rounded bg-muted px-1 font-sans text-[10px]">NC</span>}</td><td className="truncate whitespace-nowrap" title={row.cliente}>{row.cliente || "—"}</td><td className="truncate whitespace-nowrap" title={row.sucursal}>{row.sucursal || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td><td className="text-right tabular-nums">{number(row.cantidad)}</td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td></>
-        : <>{view === "clientes" ? <td className="truncate whitespace-nowrap font-medium" title={row.cliente}>{row.cliente || "—"}</td> : view === "vendedores" ? <td className="truncate whitespace-nowrap font-medium" title={seller(row.vendedor)}>{seller(row.vendedor)}</td> : <><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td></>}<Metrics row={row} client={view === "clientes"} />
+      {view === "detalle" ? <><td className="whitespace-nowrap text-muted-foreground">{date(row.fecha)}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.factura}>{row.factura || "—"}{row.es_nota_credito && <span className="ml-1 rounded bg-muted px-1 font-sans text-[10px]">NC</span>}</td><td className="truncate whitespace-nowrap" title={row.sucursal}>{row.sucursal || "—"}</td><td className="truncate whitespace-nowrap" title={row.cliente}>{row.cliente || "—"}</td><td><MarcaBadge marca={brand(row.marca)} className="px-1.5 py-0 text-[10px]" /></td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td><td className="text-right tabular-nums">{number(row.cantidad)}</td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td></>
+        : view === "repuestos" ? <><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-medium" title={row.descripcion}>{row.descripcion || "—"}</td><td><MarcaBadge marca={brand(row.marca)} className="px-1.5 py-0 text-[10px]" /></td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td><td className="text-right tabular-nums">{number(row.unidades_netas)}</td><td className="text-right tabular-nums">{number(row.clientes)}</td><td className="text-right tabular-nums">{number(row.documentos)}</td><td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td><td className="text-center">{row.abc ? <Badge variant="outline" className="min-w-6 justify-center px-1.5 py-0 text-[10px] font-semibold">{row.abc}</Badge> : "—"}</td></>
+        : <>{view === "clientes" ? <td className="truncate whitespace-nowrap font-medium" title={row.cliente}>{row.cliente || "—"}</td> : <td className="truncate whitespace-nowrap font-medium" title={seller(row.vendedor)}>{seller(row.vendedor)}</td>}<Metrics row={row} client={view === "clientes"} />
           {view === "clientes" && <><td className="text-right tabular-nums text-muted-foreground">{row.anterior == null ? "—" : money(row.anterior)}</td><td className="text-center"><Delta current={row.facturado} previous={row.anterior} /></td><td className="text-center whitespace-nowrap">{date(row.ultima)}</td></>}
-          {view === "repuestos" && <><td className="text-right tabular-nums">{number(row.unidades_vendidas)}</td><td className="text-right tabular-nums">{number(row.unidades_devueltas)}</td></>}
           <td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td></>}
     </tr>)}
     {query.hasNextPage && <tr ref={sentinel}><td colSpan={labels.length} className="text-center text-[11px] text-muted-foreground">{query.isFetchingNextPage ? "Cargando más registros…" : ""}</td></tr>}

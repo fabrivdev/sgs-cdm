@@ -1439,6 +1439,7 @@ export type Database = {
       maquinaria_importacion_lineas: {
         Row: {
           actualizado_en: string
+          alcance_valor_oc: string
           ata: string | null
           cantidad: number | null
           chasis: string | null
@@ -1464,6 +1465,7 @@ export type Database = {
           margen_porcentaje: number | null
           modelo: string | null
           modelo_catalogo_id: string | null
+          moneda_oc: string
           notas: string | null
           np_numero: string | null
           oc: string | null
@@ -1486,12 +1488,14 @@ export type Database = {
           transporte: string | null
           unidad_id: string | null
           utilidad: number | null
+          valor_oc_general: number | null
           valor_venta: number | null
           venta_facturada: string | null
           vinculo_manual: boolean
         }
         Insert: {
           actualizado_en?: string
+          alcance_valor_oc?: string
           ata?: string | null
           cantidad?: number | null
           chasis?: string | null
@@ -1517,6 +1521,7 @@ export type Database = {
           margen_porcentaje?: number | null
           modelo?: string | null
           modelo_catalogo_id?: string | null
+          moneda_oc?: string
           notas?: string | null
           np_numero?: string | null
           oc?: string | null
@@ -1539,12 +1544,14 @@ export type Database = {
           transporte?: string | null
           unidad_id?: string | null
           utilidad?: number | null
+          valor_oc_general?: number | null
           valor_venta?: number | null
           venta_facturada?: string | null
           vinculo_manual?: boolean
         }
         Update: {
           actualizado_en?: string
+          alcance_valor_oc?: string
           ata?: string | null
           cantidad?: number | null
           chasis?: string | null
@@ -1570,6 +1577,7 @@ export type Database = {
           margen_porcentaje?: number | null
           modelo?: string | null
           modelo_catalogo_id?: string | null
+          moneda_oc?: string
           notas?: string | null
           np_numero?: string | null
           oc?: string | null
@@ -1592,6 +1600,7 @@ export type Database = {
           transporte?: string | null
           unidad_id?: string | null
           utilidad?: number | null
+          valor_oc_general?: number | null
           valor_venta?: number | null
           venta_facturada?: string | null
           vinculo_manual?: boolean
@@ -1758,21 +1767,29 @@ export type Database = {
           chasis: string | null
           costo_final: number | null
           costo_final_sin_iva: number | null
+          costo_stock_moneda: string
           creado_en: string
           detalle_manual: boolean
           eliminada_manualmente: boolean
           estado_fuente: string | null
           eta: string | null
+          eta_manual: boolean
           factura_proveedor_fecha: string | null
           factura_proveedor_moneda: string | null
           id: string
           importacion_linea_id: string
           invoice_supplier: string | null
           linea_id: string | null
+          llave_interna: string | null
+          llave_manual: boolean
+          moneda_oc: string
           numero_unidad: number
           operacion_id: string | null
           situacion_vinculo: string
           unidad_id: string | null
+          valor_factura_proveedor: number | null
+          valor_oc: number | null
+          valor_oc_manual: boolean
           vinculo_manual: boolean
         }
         Insert: {
@@ -1782,21 +1799,29 @@ export type Database = {
           chasis?: string | null
           costo_final?: number | null
           costo_final_sin_iva?: number | null
+          costo_stock_moneda?: string
           creado_en?: string
           detalle_manual?: boolean
           eliminada_manualmente?: boolean
           estado_fuente?: string | null
           eta?: string | null
+          eta_manual?: boolean
           factura_proveedor_fecha?: string | null
           factura_proveedor_moneda?: string | null
           id?: string
           importacion_linea_id: string
           invoice_supplier?: string | null
           linea_id?: string | null
+          llave_interna?: string | null
+          llave_manual?: boolean
+          moneda_oc?: string
           numero_unidad: number
           operacion_id?: string | null
           situacion_vinculo?: string
           unidad_id?: string | null
+          valor_factura_proveedor?: number | null
+          valor_oc?: number | null
+          valor_oc_manual?: boolean
           vinculo_manual?: boolean
         }
         Update: {
@@ -1806,21 +1831,29 @@ export type Database = {
           chasis?: string | null
           costo_final?: number | null
           costo_final_sin_iva?: number | null
+          costo_stock_moneda?: string
           creado_en?: string
           detalle_manual?: boolean
           eliminada_manualmente?: boolean
           estado_fuente?: string | null
           eta?: string | null
+          eta_manual?: boolean
           factura_proveedor_fecha?: string | null
           factura_proveedor_moneda?: string | null
           id?: string
           importacion_linea_id?: string
           invoice_supplier?: string | null
           linea_id?: string | null
+          llave_interna?: string | null
+          llave_manual?: boolean
+          moneda_oc?: string
           numero_unidad?: number
           operacion_id?: string | null
           situacion_vinculo?: string
           unidad_id?: string | null
+          valor_factura_proveedor?: number | null
+          valor_oc?: number | null
+          valor_oc_manual?: boolean
           vinculo_manual?: boolean
         }
         Relationships: [
@@ -2611,6 +2644,65 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_exclusiones_confirmadas: {
+        Row: {
+          creada_en: string
+          factura: string
+          motivo: string
+          os_numero: string
+          reemplazada_por: string
+        }
+        Insert: {
+          creada_en?: string
+          factura: string
+          motivo: string
+          os_numero: string
+          reemplazada_por: string
+        }
+        Update: {
+          creada_en?: string
+          factura?: string
+          motivo?: string
+          os_numero?: string
+          reemplazada_por?: string
+        }
+        Relationships: []
+      }
+      os_exclusiones_evidencia: {
+        Row: {
+          id: string
+          operacion: string
+          os_numero: string
+          registrada_en: string
+          registro: Json
+          tabla: string
+        }
+        Insert: {
+          id?: string
+          operacion: string
+          os_numero: string
+          registrada_en?: string
+          registro: Json
+          tabla: string
+        }
+        Update: {
+          id?: string
+          operacion?: string
+          os_numero?: string
+          registrada_en?: string
+          registro?: Json
+          tabla?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_exclusiones_evidencia_os_numero_fkey"
+            columns: ["os_numero"]
+            isOneToOne: false
+            referencedRelation: "os_exclusiones_confirmadas"
+            referencedColumns: ["os_numero"]
           },
         ]
       }
@@ -5445,6 +5537,7 @@ export type Database = {
         Row: {
           activa: boolean | null
           actualizado_en: string | null
+          alcance_valor_oc: string | null
           ata: string | null
           cantidad: number | null
           cantidad_lote: number | null
@@ -5453,6 +5546,8 @@ export type Database = {
           comercial: string | null
           costo_final: number | null
           costo_final_sin_iva: number | null
+          costo_stock_habilitado: boolean | null
+          costo_stock_moneda: string | null
           creado_en: string | null
           datos_fuente: Json | null
           descuento_especial: number | null
@@ -5463,7 +5558,10 @@ export type Database = {
           disponibilidad_detalle: string | null
           estado_disponibilidad: string | null
           estado_fuente: string | null
+          estado_general: string | null
           eta: string | null
+          eta_general: string | null
+          eta_manual: boolean | null
           factura_proveedor_fecha: string | null
           factura_proveedor_moneda: string | null
           factura_venta: string | null
@@ -5474,15 +5572,19 @@ export type Database = {
           invoice_supplier: string | null
           linea_id: string | null
           llave_interna: string | null
+          llave_interna_general: string | null
           marca: string | null
           margen_porcentaje: number | null
           modelo: string | null
           modelo_original: string | null
+          moneda_oc: string | null
+          moneda_oc_general: string | null
           notas: string | null
           np_fecha: string | null
           np_numero: string | null
           numero_unidad: number | null
           oc: string | null
+          oc_monedas_diferentes: boolean | null
           operacion_id: string | null
           origen: string | null
           po: string | null
@@ -5498,12 +5600,17 @@ export type Database = {
           source_row: number | null
           source_sheet: string | null
           stock_deposito: string | null
+          stock_fisico_confirmado: boolean | null
           stock_saldo: number | null
           stock_sucursal: Database["public"]["Enums"]["sucursal"] | null
           tipo_cambio: number | null
           transporte: string | null
           unidad_id: string | null
           utilidad: number | null
+          valor_factura_proveedor: number | null
+          valor_oc_asignado_total: number | null
+          valor_oc_general: number | null
+          valor_oc_manual: boolean | null
           valor_venta: number | null
           venta_facturada: string | null
           vinculo_manual: boolean | null
@@ -6231,10 +6338,10 @@ export type Database = {
         Row: {
           cantidad: number | null
           cliente: string | null
-          concepto: string | null
           codigo: string | null
           codigo_fabricante: string | null
           codigo_legacy: string | null
+          concepto: string | null
           descripcion: string | null
           es_nota_credito: boolean | null
           factura: string | null
@@ -6312,6 +6419,60 @@ export type Database = {
         }
         Returns: string
       }
+      dashboard_facturacion_fuente_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          area_calculada: string
+          cantidad: number
+          cliente_id: string
+          cod_factura: string
+          cod_mercaderia: string
+          codigo_fabricante: string
+          concepto: string
+          entidad_nombre: string
+          fecha: string
+          grupo: string
+          grupo_fx: string
+          id: string
+          marca: string
+          mercaderia: string
+          origen_sistema: string
+          raw_data: Json
+          sucursal: string
+          tipo: string
+          tipo_tiempo: string
+          total_venta: number
+        }[]
+      }
+      dashboard_facturacion_lote_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
+      }
+      dashboard_facturacion_movimientos_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          area_calculada: string
+          cantidad: number
+          cliente_id: string
+          cod_factura: string
+          cod_mercaderia: string
+          codigo_fabricante: string
+          concepto: string
+          entidad_nombre: string
+          fecha: string
+          grupo: string
+          grupo_fx: string
+          id: string
+          marca: string
+          mercaderia: string
+          origen_sistema: string
+          raw_data: Json
+          sucursal: string
+          tipo: string
+          tipo_tiempo: string
+          total_venta: number
+        }[]
+      }
       descartar_notificacion_venta_maquina: {
         Args: { p_notificacion_id: string }
         Returns: undefined
@@ -6371,6 +6532,10 @@ export type Database = {
         Args: { p_lineas: Json; p_operacion: Json; p_operacion_id: string }
         Returns: string
       }
+      maquinaria_actualizar_unidad_importacion: {
+        Args: { p_datos: Json; p_unidad_id: string }
+        Returns: undefined
+      }
       maquinaria_anular_recepcion_importacion: {
         Args: { p_importacion_unidad_id: string }
         Returns: Json
@@ -6394,6 +6559,10 @@ export type Database = {
       maquinaria_asignar_stock: {
         Args: { p_chasis?: string; p_stock_id: string; p_unidad_id: string }
         Returns: Json
+      }
+      maquinaria_chasis_unico_en_stock: {
+        Args: { p_chasis: string }
+        Returns: boolean
       }
       maquinaria_cliente_es_stock_interno: {
         Args: { p_nombre: string }
@@ -6433,9 +6602,23 @@ export type Database = {
         Args: { p_filas: Json }
         Returns: Json
       }
+      maquinaria_iniciar_transito_importacion: {
+        Args: { p_importacion_unidad_id: string }
+        Returns: undefined
+      }
       maquinaria_intentar_autovinculo_historico: {
         Args: { p_chasis: string }
         Returns: boolean
+      }
+      maquinaria_llave_importacion: {
+        Args: {
+          p_cantidad: number
+          p_marca: string
+          p_numero: number
+          p_oc: string
+          p_referencia: string
+        }
+        Returns: string
       }
       maquinaria_marca_admitida: {
         Args: { p_marca: Database["public"]["Enums"]["marca"] }
@@ -7022,6 +7205,10 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_es_otro_comercial: {
+        Args: { p_descripcion: string; p_grupo: string }
+        Returns: boolean
+      }
       ventas_linea_tipo_tiempo: {
         Args: { p_id: string; p_metodologia: string; p_os_tipo: string }
         Returns: string
@@ -7349,6 +7536,10 @@ export type Database = {
       }
       ventas_servicios_texto_normalizado: {
         Args: { p_texto: string }
+        Returns: string
+      }
+      ventas_tipo_tiempo_historico_cliente: {
+        Args: { p_cliente: string; p_tipo?: string }
         Returns: string
       }
       ventas_tipo_tiempo_normalizado: {

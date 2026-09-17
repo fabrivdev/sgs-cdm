@@ -20,7 +20,7 @@ const detail: PartsListing = { total: 3, pagina: 1, paginas: 1, total_periodo: 1
 function mockRpc() {
   rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
     data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview
-       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "000007 – CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", anterior: 50, ultima: "2026-08-10" }] },
+       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "000007 – CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", marca: "CLAAS", abc: "A", anterior: 50, ultima: "2026-08-10" }] },
   }) }));
 }
 function Harness({ desde = "2026-01-01", hasta = "2026-09-15" }: { desde?: string; hasta?: string }) {
@@ -95,7 +95,7 @@ describe("Ventas de Repuestos", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ver período completo" }));
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-09-15" })));
   });
-  it("clientes y repuestos son listas con los mismos indicadores", async () => {
+  it("clientes conserva sus indicadores y repuestos muestra el resumen comercial compacto", async () => {
     setup(); fireEvent.click(screen.getByRole("button", { name: /^Clientes$/ }));
     await screen.findByText("Cliente A");
     expect(screen.getByRole("columnheader", { name: "Cliente facturado" })).toBeInTheDocument();
@@ -103,8 +103,16 @@ describe("Ventas de Repuestos", () => {
     expect(screen.getByRole("columnheader", { name: "Año anterior" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Repuestos$/ }));
     await screen.findByText("REP1");
-    expect(screen.getByText("FAB1")).toBeInTheDocument();
     expect(screen.getByText("Rodamiento")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Marca" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Facturación neta" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "ABC" })).toBeInTheDocument();
+    const partsTable = screen.getByRole("columnheader", { name: "ABC" }).closest("table");
+    expect(partsTable).not.toBeNull();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Cód. fabricante" })).not.toBeInTheDocument();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Ventas" })).not.toBeInTheDocument();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Notas de crédito" })).not.toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
   });
   it("elimina Análisis y agrega la vista de vendedores", async () => {
     setup(); await screen.findByText("CLAAS");
