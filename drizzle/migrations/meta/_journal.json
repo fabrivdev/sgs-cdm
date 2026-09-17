@@ -43,6 +43,13 @@
       "when": 1789497334650,
       "tag": "0005_parts_sales_brand_sellers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789650423209,
+      "tag": "0006_order_parts_sales_products_and_abc",
+      "breakpoints": true
     }
   ]
 }
