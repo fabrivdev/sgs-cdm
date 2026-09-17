@@ -15,8 +15,7 @@ describe('invoice line detail', () => {
   it('keeps recipient and owners distinct; opens machine history only on demand', async () => {
     rpc.mockResolvedValue({ error: null, data: [line] });
     render(<ServiciosDetalleOS {...props} buscar="valdecir mohr" />);
-    expect(await screen.findByText('En la OS: VALDECIR MOHR')).toBeInTheDocument();
-    expect(screen.getByText('Propietario: Propietario no informado')).toBeInTheDocument();
+    expect(await screen.findByTitle('Propietario actual: Propietario no informado · En la OS: VALDECIR MOHR')).toHaveTextContent('No informado');
     expect(screen.getByText('Pagador tercero')).toBeInTheDocument();
     expect(screen.queryByText('Historial: C7501463')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name:'C7501463'}));
@@ -32,13 +31,30 @@ describe('invoice line detail', () => {
     expect(container.querySelectorAll('[data-invoice-line]')).toHaveLength(5);
     expect(screen.getAllByText('001-003-54')).toHaveLength(3);
     expect(screen.getAllByText('5734')).toHaveLength(4);
-    expect(screen.getByText('Nota de crédito')).toBeInTheDocument();
+    expect(screen.getByTitle('Nota de crédito: NC-54')).toHaveTextContent('NC NC-54');
     expect(screen.getByText('Sin OS vinculada')).toBeInTheDocument();
     expect(screen.getByText(/Total facturado en el período/)).toHaveTextContent(/380[,.]25/);
     const mileage = container.querySelector('[data-invoice-line="line-3"]') as HTMLElement;
     expect(within(mileage).getByText('Traslado')).toBeInTheDocument();
     expect(within(mileage).getByText('Kilometraje')).toBeInTheDocument();
     expect(container.querySelector('[class*="overflow-x-auto"], [class*="min-w-[1380px]"]')).toBeNull();
+  });
+  it('uses one visual line with separate columns, without explanatory text or stacked metadata', async () => {
+    rpc.mockResolvedValue({data:[line],error:null});
+    const {container}=render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('Pagador tercero');
+    const row=container.querySelector('[data-invoice-line]') as HTMLElement;
+    expect(row).toHaveClass('h-9');
+    expect(row.children).toHaveLength(12);
+    for (const column of Array.from(row.children)) {
+      expect(column).toHaveClass('truncate');
+      expect(column.querySelectorAll('div, p, br')).toHaveLength(0);
+    }
+    expect(screen.queryByText(/Una fila por línea facturada/)).not.toBeInTheDocument();
+    expect(screen.getByTitle('Reparación de máquina')).toHaveTextContent('Reparación de máquina');
+    expect(screen.getByText('Sucursal')).toBeInTheDocument();
+    expect(screen.getByText('Chasis')).toBeInTheDocument();
+    expect(screen.getByText('Propietario')).toBeInTheDocument();
   });
   it('shares normalized search with Clients and updates without refetching', async () => {
     rpc.mockResolvedValue({data:[line,{...line,id:'other',cliente:'Otro',propietario_os:'Otro',os:'99',factura:'99',descripcion:'Otro'}],error:null});

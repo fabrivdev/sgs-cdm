@@ -7,9 +7,11 @@ por línea canónica con factura como referencia principal y OS/chasis como comp
 no agrupa ni deduplica por factura, OS, descripción o importe. Conserva NC negativas y
 líneas históricas sin OS. La suma del detalle filtrado mantiene la población financiera.
 
-Columnas: Fecha, Factura (sucursal secundaria), Cliente facturado (propietarios
-actual/histórico etiquetados), OS/chasis, Tipo de tiempo, Concepto/descripción,
-Cantidad y Facturado. Importes individuales y total con dos decimales. Cantidad
+Columnas separadas: Fecha, Factura, Sucursal, Cliente facturado, Propietario actual,
+OS, Chasis, Tipo de tiempo, Concepto, Descripción, Cantidad y Facturado. No apilar
+datos ni agregar párrafos explicativos. Propietario histórico disponible en el título
+de la celda, explícitamente etiquetado sin reemplazar al propietario actual.
+Importes individuales y total con dos decimales. Cantidad
 ausente se muestra como desconocida, no cero. Chasis conserva acceso al historial,
 que se monta solo cuando se solicita, evitando consultar técnicos al abrir Detalle.
 
@@ -17,15 +19,19 @@ Búsqueda normalizada local antes de mostrar líneas, con el mismo helper que Cl
 Marca, tipo de máquina, sucursal, período y tipo de tiempo se envían a la RPC existente.
 No requiere SQL nuevo ni cambios de importes, jornadas, comisiones o exclusiones.
 
-En escritorio, columnas flexibles alineadas con sus títulos y texto ajustable sin
-ancho mínimo forzado; en móvil, cada fila se presenta con etiquetas sin ocultar campos
-ni requerir desplazamiento horizontal. Pruebas de componentes usan datos sintéticos;
+Columnas flexibles alineadas con sus títulos, filas compactas de una sola línea y
+textos largos truncados con elipsis/valor completo al pasar el cursor, sin ancho
+mínimo forzado ni desplazamiento horizontal. No convertir filas en tarjetas con
+etiquetas ni usar saltos de línea. Pruebas de componentes usan datos sintéticos;
 verificación de producción y publicación se registran separadamente.
 
-Validación local del 17/09/2026: 13 pruebas de Detalle/Clientes/búsqueda, ESLint y
-compilación de producción correctos. Playwright comprobó 25 líneas sintéticas con
-identificadores y descripciones extensos en anchos 1920, 1366, 1024, 768 y 390 px:
-sin desbordamiento horizontal del documento ni de las celdas. No consulta producción.
+Validación local de la versión compacta del 17/09/2026: 14 pruebas de
+Detalle/Clientes/búsqueda, ESLint y compilación correctos. Playwright comprobó 25
+líneas sintéticas en anchos 1920, 1366, 1024, 768 y 390 px: ninguna celda apilada,
+todos los datos sin salto de línea, sin párrafo explicativo ni desbordamiento
+horizontal del documento. Textos completos conservados en títulos de celdas;
+la estrechez de pantalla implica más elipsis, no una promesa de lectura íntegra
+simultánea. No consulta producción.
 
 La población sigue siendo facturación dentro del rango seleccionado; no órdenes
 abiertas ni importes operativos. Las líneas, fechas, componentes e importes vienen
