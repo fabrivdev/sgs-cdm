@@ -9,7 +9,7 @@ import { MarcaBadge } from "@/components/StatusBadges";
 import { cn } from "@/lib/utils";
 import { canonicalClientName } from "@/lib/clientIdentity";
 import { shortPersonName } from "@/lib/personName";
-import { RowCount, TableScroll, scrollHead } from "./TableScroll";
+import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
 
 export type MaquinaVentaLinea = {
   id: string;
@@ -163,7 +163,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
       : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
       : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[1000px]">
         <TableScroll rows={data.periodos.length}>
-        <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+        <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
           <div>Período</div>
           {['Facturado', 'Nuevas', 'Usadas', 'Notas de crédito', 'Unidades netas', 'Clientes', 'Facturas', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
         </div>
@@ -201,7 +201,7 @@ const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 function SummaryTable({ label, grid, minWidth, rows, share, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; empty: string }) {
   return <div className="overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className={minWidth}>
     <TableScroll rows={rows.length}>
-    <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
+    <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className="whitespace-nowrap text-right">{head}</div>)}</div>
     {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{label === "Marca" ? <MarcaBadge marca={row.key} className="text-[10px]" /> : row.key}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right tabular-nums">{integer.format(row.clientes)}</div><div className="text-right tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
     </TableScroll>
   </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="filas" />}</div>;
@@ -241,7 +241,7 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const grid = "grid-cols-[34px_minmax(78px,.8fr)_minmax(140px,1.2fr)_48px_repeat(5,minmax(66px,.6fr))_minmax(100px,.9fr)_minmax(112px,.95fr)_minmax(100px,.85fr)]";
   return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[960px]">
     <TableScroll rows={rows.length}>
-    <div className={`grid ${grid} ${scrollHead} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
+    <div className={`grid ${grid} ${scrollHead} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", label !== 'Marca' && label !== 'Tipo de máquina' && label !== 'Condición' && 'text-right')}>{label}</div>)}</div>
     {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
       const open = expanded === row.key;
       const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
@@ -266,7 +266,7 @@ function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const grid = "grid-cols-[minmax(250px,1.8fr)_repeat(2,minmax(82px,.65fr))_minmax(130px,1fr)_minmax(145px,1.05fr)_minmax(90px,.75fr)_minmax(105px,.8fr)_85px]";
   return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[1040px]">
       <TableScroll rows={rows.length}>
-      <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}><div>Cliente</div>{['Vendidas', 'Unidades netas', 'Facturación', 'Promedio / unidad neta', 'Facturas', 'Última venta', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
+      <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div>Cliente</div>{['Vendidas', 'Unidades netas', 'Facturación', 'Promedio / unidad neta', 'Facturas', 'Última venta', 'Participación'].map(label => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}</div>
       {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : rows.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-1.5 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-right tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-right font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="whitespace-nowrap text-right tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
       </TableScroll>
   </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="clientes" />}</div>;
@@ -275,7 +275,7 @@ function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   return <>
     <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={lines.length}><table className="w-full min-w-[1240px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
-      <thead className={`bg-muted/60 text-left text-muted-foreground ${scrollHead}`}><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
+      <thead className={`bg-muted/60 text-left text-muted-foreground ${scrollHead} ${salesHeader}`}><tr><th className="w-[82px]">Fecha</th><th className="w-[120px]">Factura</th><th className="w-[220px]">Cliente</th><th className="w-[90px]">Marca</th><th className="w-[165px]">Tipo</th><th className="w-[170px]">Modelo</th><th className="w-[145px]">Chasis</th><th className="w-[85px]">Condición</th><th className="w-[145px]">Vendedor</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
       <tbody>{lines.map(line => <tr key={line.id} className="border-t">
         <td>{shortDate(line.fecha)}</td>
         <td className="truncate font-mono font-medium" title={line.factura}>{line.factura}</td>

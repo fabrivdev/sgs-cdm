@@ -2,7 +2,7 @@ import { money } from "@/components/dashboard/utils";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByMachine } from "./serviceBrandGroups";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
-import { RowCount, TableScroll, scrollHead } from "./TableScroll";
+import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -20,7 +20,7 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
     <div className="mt-3 overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><div className="min-w-[1120px]">
         <TableScroll rows={rows.length}>
-        <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+        <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
           <div>Marca</div><div>Tipo de máquina</div>
           <div className="text-right">Máquinas</div><div className="text-right">OS</div><div className="text-right">Horas OS</div>
           {["Mano de Obra", "Kilometraje", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className="text-right">{label}</div>)}

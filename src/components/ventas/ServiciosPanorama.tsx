@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
+import { salesHeader } from "./TableScroll";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { serviceSalesError } from "@/lib/serviceSalesError";
@@ -110,7 +111,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
       : error ? <div className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !rows.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay datos para este rango.</div>
       : <div className="mt-3 overflow-x-auto rounded-md border"><div className="min-w-[1060px]">
-        <div className={`grid ${PANORAMA_GRID} bg-muted/60 px-2 py-2 text-[11px] font-medium text-muted-foreground`}>
+        <div className={`grid ${PANORAMA_GRID} bg-muted/60 px-2 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
           <div>Período</div>{["Facturado", "Mano de obra", "Kilometraje", "Repuestos", "Terceros", "Clientes", "Facturas", "Variación LM", "Variación LY", "Participación"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
         </div>
         {rows.map((row) => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)} className={cn(`grid w-full ${PANORAMA_GRID} items-center border-t px-2 py-1.5 text-left text-[12px] hover:bg-accent`, row.periodo === selectedPeriod && "bg-primary/5 outline outline-1 outline-primary/20")}>

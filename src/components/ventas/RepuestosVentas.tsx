@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
-import { RowCount, TableScroll } from "./TableScroll";
+import { RowCount, TableScroll, salesHeader } from "./TableScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { KpiItem, KpiStrip, Panel } from "@/components/layout/AppPrimitives";
 import { money, pct } from "@/components/dashboard/utils";
@@ -76,12 +76,12 @@ function Delta({ current, previous, lines }: { current: number; previous: number
   const value = previous == null || lines === 0 ? null : pct(current, previous);
   return <span className={cn("tabular-nums", value != null && value < 0 && "text-destructive")} title={value == null ? "Sin base de comparación distinta de cero." : undefined}>{value == null ? "—" : `${value > 0 ? "+" : ""}${value}%`}</span>;
 }
-const tableClass = "w-full table-fixed text-[12px] leading-4 [&_th]:h-8 [&_th]:px-3 [&_th]:text-right [&_th]:text-[11px] [&_th]:font-medium [&_th:first-child]:text-left [&_td]:h-8 [&_td]:px-3 [&_td]:align-middle [&_tbody_tr]:border-t";
+const tableClass = "w-full table-fixed text-[12px] leading-4 [&_th]:h-8 [&_th]:px-3 [&_th]:text-[11px] [&_th]:font-medium [&_td]:h-8 [&_td]:px-3 [&_td]:align-middle [&_tbody_tr]:border-t";
 function Table({ children, minWidth = "min-w-[1060px]", rows = 0, footer }: { children: React.ReactNode; minWidth?: string; rows?: number; footer?: React.ReactNode }) {
   return <div className="overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={rows}><table className={cn(tableClass, minWidth)}>{children}</table></TableScroll></div>{footer}</div>;
 }
 function Heads({ labels }: { labels: string[] }) {
-  return <thead className="text-muted-foreground"><tr>{labels.map(label => <th key={label} className="sticky top-0 z-10 bg-muted/60">{label}</th>)}</tr></thead>;
+  return <thead className={`text-muted-foreground ${salesHeader}`}><tr>{labels.map(label => <th key={label} className="sticky top-0 z-10 bg-muted/60">{label}</th>)}</tr></thead>;
 }
 function PeriodLabel({ value, mode }: { value: string; mode: PeriodMode }) {
   const start = new Date(`${value}T00:00:00`);

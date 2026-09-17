@@ -33,6 +33,18 @@ function setup(props?: { desde?: string; hasta?: string }) {
   return render(<QueryClientProvider client={client}><Harness {...props} /></QueryClientProvider>);
 }
 describe("Ventas de Repuestos", () => {
+  it("centra todos los encabezados, sin cambiar la alineación de los importes", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /^Detalle$/ }));
+    await screen.findByText("REP2");
+    for (const header of screen.getAllByRole("columnheader")) {
+      expect(header.closest("thead")).toHaveClass("[&_th]:text-center");
+      expect(header.closest("table")).not.toHaveClass("[&_th]:text-right", "[&_th:first-child]:text-left");
+    }
+    const row = screen.getByText("REP2").closest("tr")!;
+    expect(row.lastElementChild).toHaveClass("text-right");
+    expect(row.closest("tbody")).not.toHaveClass("[&_th]:text-center", "[&>div]:text-center");
+  });
   it("el total conserva clientes/documentos únicos y calcula variaciones sobre el rango", async () => {
     rpc.mockImplementation((name: string) => ({ abortSignal: () => Promise.resolve({ error: null,
       data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : {

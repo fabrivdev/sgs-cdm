@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/components/dashboard/utils";
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
-import { TableScroll, scrollHead } from "./TableScroll";
+import { TableScroll, scrollHead, salesHeader } from "./TableScroll";
 
 type FilaOS = {
   id: string; fecha: string; os: string; os_numero: string | null; chasis: string | null;
@@ -49,7 +49,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
     <div className="mt-3 overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><div className="min-w-[1380px]">
         <TableScroll rows={rows.length}>
-        <div className={`grid ${columns} ${scrollHead} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+        <div className={`grid ${columns} ${scrollHead} gap-x-3 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
           <div>Fecha</div><div>OS</div><div>Chasis</div><div>Propietario actual</div><div>Sucursal</div><div>Tipos facturados</div><div className="text-right">Fact.</div>{["Mano de Obra","Kilometraje","Repuestos","Terceros"].map(label=><div key={label} className="text-right">{label}</div>)}<div className="text-right">Facturado</div>
         </div>
         <div>

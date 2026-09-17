@@ -19,6 +19,19 @@ function setup() {
 }
 
 describe("Ventas de Máquinas", () => {
+  it("centers period and detail headings while keeping amounts right-aligned", () => {
+    const panorama = render(<MaquinasPanorama data={{ ...data, periodos: [{ ...data.resumen, periodo: "2026-08-01" }] }}
+      loading={false} error={null} periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined} />);
+    expect(screen.getByText("Período").parentElement).toHaveClass("[&>div]:text-center");
+    panorama.unmount();
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    for (const header of screen.getAllByRole("columnheader")) {
+      expect(header.closest("thead")).toHaveClass("[&_th]:text-center");
+    }
+    const row = screen.getByText("Cliente A").closest("tr")!;
+    expect(row.lastElementChild).toHaveClass("text-right");
+  });
   it("muestra el total del rango en las mismas columnas sin duplicar clientes y facturas", () => {
     const panorama = { ...data, periodos: [
       { ...data.resumen, periodo: "2026-07-01", total: 300000, nuevas: 1, notas_credito: 0, netas: 1 },

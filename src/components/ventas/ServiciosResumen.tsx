@@ -1,4 +1,5 @@
 import { money } from "@/components/dashboard/utils";
+import { salesHeader } from "./TableScroll";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByTime } from "./serviceBrandGroups";
 import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
@@ -49,7 +50,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
 
       <div className="overflow-x-auto rounded-md border">
         <div className="min-w-[1060px]">
-          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
             <div>Tipo de tiempo</div>
             <div className="text-right">OS asociadas</div>
             {MONEY_LABELS.map((label) => <div key={label} className="text-right">{label}</div>)}
@@ -72,7 +73,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
 
       <div className="overflow-x-auto rounded-md border">
         <div className="min-w-[1060px]">
-          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
             <div>Marca</div><div>Tipo</div>
             {MONEY_LABELS.map((label) => <div key={label} className="text-right">{label}</div>)}
             <div className="text-right">Horas OS</div>

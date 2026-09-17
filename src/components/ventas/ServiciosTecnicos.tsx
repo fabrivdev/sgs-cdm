@@ -6,7 +6,7 @@ import { money } from "@/components/dashboard/utils";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { displayImportedTechnicianName, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import type { IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
-import { RowCount, TableScroll, scrollHead } from "./TableScroll";
+import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
 
 type Fila = {
   tecnico_clave: string; tecnico: string;
@@ -81,7 +81,7 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
       <div className="overflow-hidden rounded-md border">
         <div className="overflow-x-auto"><div className="min-w-[1120px]">
           <TableScroll rows={unified.length}>
-          <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground`}>
+          <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
             <div>Técnico</div>
             {["Horas Cliente", "Horas Garantía", "Horas Interno", "Total horas", "MO Cliente asociada", "MO Garantía asociada", "MO Interno asociada", "MO total asociada"].map((label) => <div key={label} className="whitespace-nowrap text-right">{label}</div>)}
           </div>
