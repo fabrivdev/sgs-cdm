@@ -22,12 +22,12 @@ describe('invoice line detail', () => {
       {...line,id:'old-schema',cantidad_os:undefined}
     ]});
     render(<ServiciosDetalleOS {...props} />);
-    expect(await screen.findByTitle('Horas de la OS: 4 h')).toHaveTextContent('4 h');
-    expect(screen.getByTitle('Kilómetros de la OS: 76 km')).toHaveTextContent('76 km');
+    expect(await screen.findByTitle('Horas de la OS: 4')).toHaveTextContent(/^4$/);
+    expect(screen.getByTitle('Kilómetros de la OS: 76')).toHaveTextContent(/^76$/);
     expect(screen.getByTitle('Cantidad facturada: 3')).toHaveTextContent('3');
     expect(screen.getByTitle('Cantidad facturada: 2')).toHaveTextContent('2');
     expect(screen.getByTitle('Horas de la OS: no informada')).toHaveTextContent('—');
-    expect(screen.getByTitle('Horas de la OS: 0 h')).toHaveTextContent('0 h');
+    expect(screen.getByTitle('Horas de la OS: 0')).toHaveTextContent(/^0$/);
     expect(screen.getByTitle(/requiere SQL de cantidad operacional/)).toHaveTextContent('—');
   });
   it('keeps recipient and owners distinct; opens machine history only on demand', async () => {
@@ -51,11 +51,29 @@ describe('invoice line detail', () => {
     expect(screen.getAllByText('5734')).toHaveLength(4);
     expect(screen.getByTitle('Nota de crédito: NC-54')).toHaveTextContent('NC NC-54');
     expect(screen.getByText('Sin OS vinculada')).toBeInTheDocument();
-    expect(screen.getByText(/Total facturado en el período/)).toHaveTextContent(/380[,.]25/);
+    expect(screen.queryByText(/Total facturado/)).not.toBeInTheDocument();
+    expect(screen.getByTitle('$ -50,00')).toHaveTextContent('$ -50,00');
+    expect(screen.getByTitle('$ 10,25')).toHaveTextContent('$ 10,25');
     const mileage = container.querySelector('[data-invoice-line="line-3"]') as HTMLElement;
     expect(within(mileage).getByText('Traslado')).toBeInTheDocument();
     expect(within(mileage).getByText('Kilometraje')).toBeInTheDocument();
     expect(container.querySelector('[class*="overflow-x-auto"], [class*="min-w-[1380px]"]')).toBeNull();
+  });
+  it('enforces dollar symbol, numeric-only quantities and no financial footer', async () => {
+    rpc.mockResolvedValue({error:null,data:[{...line,total_venta:1234.56,cantidad_os:4.25},
+      {...line,id:'km-format',componente:'Kilometraje',cantidad_os:76,total_venta:0}
+    ]});
+    const {container}=render(<ServiciosDetalleOS {...props} />);
+    expect(await screen.findByTitle('$ 1.234,56')).toHaveTextContent('$ 1.234,56');
+    expect(screen.getByTitle('$ 0,00')).toHaveTextContent('$ 0,00');
+    expect(screen.getByTitle('Horas de la OS: 4,25')).toHaveTextContent(/^4,25$/);
+    expect(screen.getByTitle('Kilómetros de la OS: 76')).toHaveTextContent(/^76$/);
+    for(const row of container.querySelectorAll('[data-invoice-line]')){
+      expect(row.children[10].textContent).toMatch(/^\d+(?:[.,]\d+)*$/);
+      expect(row.children[11].textContent).toMatch(/^\$ /);
+    }
+    expect(container.textContent).not.toMatch(/USD|\d\s*(?:h|hs|km)\b|Total facturado/);
+    expect(screen.getByText('2 líneas · 1 documentos')).toBeInTheDocument();
   });
   it('uses one visual line with separate columns, without explanatory text or stacked metadata', async () => {
     rpc.mockResolvedValue({data:[line],error:null});

@@ -16,7 +16,8 @@ type InvoiceLine = ServiceSalesSearchLine & {
 };
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 4 });
-const usd = new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const moneyAmount = new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd = { format: (value: number) => `$ ${moneyAmount.format(value)}` };
 // One visual line per financial line: no stacked metadata, wrapping or forced
 // minimum width. Native titles preserve full values when a column truncates.
 const columns = "grid-cols-[minmax(0,.65fr)_minmax(0,1.15fr)_minmax(0,.6fr)_minmax(0,1.35fr)_minmax(0,1.35fr)_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.65fr)_minmax(0,.75fr)_minmax(0,1.75fr)_minmax(0,.45fr)_minmax(0,1fr)]";
@@ -24,10 +25,9 @@ const cell = "min-w-0 truncate";
 function quantity(row: InvoiceLine): { label: string; title: string } {
   const operational = row.componente === "Mano de obra" || row.componente === "Kilometraje";
   const value = operational ? row.cantidad_os : row.cantidad;
-  const unit = row.componente === "Mano de obra" ? "h" : row.componente === "Kilometraje" ? "km" : "";
   const source = row.componente === "Mano de obra" ? "Horas de la OS" : row.componente === "Kilometraje" ? "Kilómetros de la OS" : "Cantidad facturada";
   if (value == null) return { label: "—", title: `${source}: no informada${operational && row.cantidad_os === undefined ? " (requiere SQL de cantidad operacional)" : ""}` };
-  const label = `${decimal.format(Number(value))}${unit ? ` ${unit}` : ""}`;
+  const label = decimal.format(Number(value));
   return { label, title: `${source}: ${label}` };
 }
 
@@ -67,7 +67,6 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
   }, [desde, hasta, sucursal, tipoTiempo, marca, tipoMaquina]);
 
   const rows = useMemo(() => lines.filter(line => matchesServiceSalesSearch(line, buscar)), [lines, buscar]);
-  const total = useMemo(() => rows.reduce((sum, row) => sum + Number(row.total_venta || 0), 0), [rows]);
   const documents = useMemo(() => new Set(rows.map(row => JSON.stringify([
     row.factura, row.fecha, row.cliente, row.sucursal, Boolean(row.es_nota_credito),
     !row.factura || row.factura === "Sin numero" ? row.id : null,
@@ -101,9 +100,8 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
             <div className={`${cell} text-right font-semibold tabular-nums`} title={usd.format(Number(row.total_venta || 0))}>{usd.format(Number(row.total_venta || 0))}</div>
           </div>)}
       </TableScroll>
-      {!error && !loading && rows.length > 0 && <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-[11px] text-muted-foreground">
+      {!error && !loading && rows.length > 0 && <div className="flex h-7 items-center justify-end border-t px-3 text-[11px] text-muted-foreground">
         <span>{rows.length.toLocaleString("es-PY")} líneas · {documents.toLocaleString("es-PY")} documentos</span>
-        <span>Total facturado en el período: <span className="font-semibold text-foreground">{usd.format(total)}</span></span>
       </div>}
     </section>
     {detailTarget && <MachineHistorySheet target={detailTarget} onOpenChange={open => { if (!open) setDetailTarget(null); }} />}

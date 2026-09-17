@@ -1,5 +1,17 @@
 # Búsqueda e identidad en Ventas de Servicios
 
+## Condiciones visuales
+
+Aplicar `docs/knowledge/24-Condiciones-visuales-ventas.md` antes de cambiar/publicar
+la vista: una sola línea por registro, sin datos apilados ni párrafos explicativos,
+importe con `$` (no `USD`), cantidades numéricas sin sufijos h/km/unid. y sin total
+monetario al pie de Detalle. Conservar conteo de líneas/documentos y el `Total del
+período` del resumen por período. Tests de Detalle impiden regresión de estos formatos.
+Es un cambio de UI; no requiere SQL adicional al de cantidad operacional.
+Validación de esta revisión: 16 pruebas de componentes/filtros, ESLint y compilación
+correctos; memoria sincronizada sin conflictos y 14 pruebas del grafo/sincronizador.
+No representa validación de producción ni publicación automática.
+
 ## Cantidades operacionales en el detalle
 
 Aplicar manualmente `20260917160000_service_invoice_line_operational_quantity.sql`.
@@ -39,7 +51,7 @@ Columnas separadas: Fecha, Factura, Sucursal, Cliente facturado, Propietario act
 OS, Chasis, Tipo de tiempo, Concepto, Descripción, Cantidad y Facturado. No apilar
 datos ni agregar párrafos explicativos. Propietario histórico disponible en el título
 de la celda, explícitamente etiquetado sin reemplazar al propietario actual.
-Importes individuales y total con dos decimales. Cantidad
+Importes individuales con `$` y dos decimales, sin total monetario al pie. Cantidad
 ausente se muestra como desconocida, no cero. Chasis conserva acceso al historial,
 que se monta solo cuando se solicita, evitando consultar técnicos al abrir Detalle.
 
