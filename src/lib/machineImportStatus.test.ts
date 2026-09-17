@@ -15,6 +15,11 @@ describe("importArrivalState", () => {
     expect(importArrivalState({ estado_fuente: "Completado", costo_stock_habilitado: true })).toBe("ARRIBADO");
     expect(importArrivalState({ estado_fuente: "CANCELADA" })).toBe("CANCELADO");
   });
+  it("confirma la llegada física aunque la reserva esté vinculada a otra NP", () => {
+    expect(importArrivalState({ ata: "2026-05-23", stock_fisico_confirmado: true, estado_disponibilidad: "RESERVADO" })).toBe("COMPLETADO");
+    expect(importArrivalState({ ata: "2026-05-23", stock_fisico_confirmado: true, estado_disponibilidad: "CONFLICTO" })).toBe("COMPLETADO");
+    expect(importArrivalState({ ata: "2026-05-23", stock_fisico_confirmado: false, costo_stock_habilitado: true })).toBe("ARRIBADO");
+  });
 });
 
 describe("isImportSaleInvoiced", () => {

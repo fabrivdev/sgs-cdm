@@ -24,11 +24,16 @@
 Aplicar además `20260917130000_import_arrival_lifecycle.sql` después de la migración inicial.
 La carga manual siempre empieza Planificado. Una ETA no prueba embarque y una factura del proveedor tampoco.
 Desde cada unidad se registra En tránsito y luego Arribado con fecha real no futura y chasis.
-Completado se calcula al consultar: exige fecha de arribo, coincidencia única del mismo chasis en stock y ausencia de conflictos de vinculación.
+Completado se calcula al consultar: exige fecha de arribo y coincidencia física única del mismo chasis en stock. No exige que la importación esté vinculada a la NP que reserva esa máquina.
 Si el stock llega después del registro de arribo, la siguiente actualización de la vista confirma la unidad sin otra edición manual.
 La situación comercial (stock, reservado, vendido o en parque) es independiente de estas etapas.
 Los estados antiguos de recepción sin fecha quedan Arribado, requieren completar la fecha y no se inventan fechas históricas.
 Las cancelaciones existentes se conservan como filtro, sin permitir que una cancelada se reciba.
+
+Corrección adicional: aplicar `20260917140000_confirm_import_arrival_by_physical_chassis.sql`.
+La señal `stock_fisico_confirmado` separa la llegada de la disponibilidad comercial. Reservado y Completado pueden coexistir.
+Los conflictos comerciales de NP no ocultan la llegada física; se mantienen visibles en Situación. Un chasis duplicado en stock sí impide confirmar.
+No se modifican vínculos de NP, reservas, importes, chasis o fechas. Los arribos ya registrados se recalculan al consultar, sin volver a recibirlos.
 
 Aplicar supabase/migrations/20260917120000_fix_import_unit_keys_and_purchase_values.sql antes de usar los nuevos editores. El frontend bloquea la carga general si no verifica la estructura nueva.
 

@@ -144,7 +144,29 @@ try {
   await db.query("SELECT maquinaria_aplicar_factura_importacion($1,'F003',current_date,'CLAAS','USD',60,$2)",[op.id,JSON.stringify([{importacion_unidad_id:u[0].id,costo_unidad:60}])]);
   assert.equal((await units())[0].estado_fuente,"PLANIFICADA","Supplier invoice does not start transit");
   await db.exec(lifecycle);
+  // Regression: stock reserved by a selling NP, import not linked to that NP.
+  await db.query("UPDATE parque_stock_maquinas SET unidad_operacion_id=$1 WHERE chasis='ARR2'",[orderUnit.id]);
+  await db.query("UPDATE maquinaria_stock_trazabilidad SET unidad_operacion_id=$1,estado_disponibilidad='RESERVADO' WHERE chasis_normalizado='ARR2'",[orderUnit.id]);
+  const reservedReceipt=await first("SELECT maquinaria_recibir_unidad_importacion($1,current_date) AS result",[newUnits[1].id]);
+  assert.equal(reservedReceipt.result.stock_confirmado,false,"Reproduces the previous bug for reserved stock");
+  assert.equal((await first("SELECT costo_stock_habilitado FROM maquinaria_importacion_unidades_operativas WHERE id=$1",[newUnits[1].id])).costo_stock_habilitado,false);
+  const physicalFix=await readFile(new URL("../supabase/migrations/20260917140000_confirm_import_arrival_by_physical_chassis.sql",import.meta.url),"utf8");
+  await db.exec(physicalFix);
+  const confirmed=await first("SELECT * FROM maquinaria_importacion_unidades_operativas WHERE id=$1",[newUnits[1].id]);
+  assert.equal(confirmed.stock_fisico_confirmado,true,"Unique physical stock confirms arrival regardless of its selling NP");
+  assert.equal(confirmed.estado_disponibilidad,"RESERVADO","Commercial reservation is retained");
+  assert.equal(confirmed.unidad_id,null,"Confirmation does not relink the import to a selling NP");
+  const receiptAfterFix=await first("SELECT maquinaria_recibir_unidad_importacion($1,current_date) AS result",[newUnits[1].id]);
+  assert.equal(receiptAfterFix.result.stock_confirmado,true);
+  assert.equal(receiptAfterFix.result.reservada,true);
+  await patch(newUnits[1].id,{costo_final:123});
+  assert.equal(Number((await first("SELECT costo_final FROM maquinaria_importacion_unidades WHERE id=$1",[newUnits[1].id])).costo_final),123,"Stock cost guard uses physical chassis, not selling NP");
+  assert.equal(Number((await first("SELECT valor_facturado FROM maquinaria_unidades_operacion WHERE id=$1",[orderUnit.id])).valor_facturado),500,"Sales values remain unchanged");
+  assert.equal((await first("SELECT stock_fisico_confirmado FROM maquinaria_importacion_unidades_operativas WHERE id=$1",[newUnits[0].id])).stock_fisico_confirmado,false,"Duplicate physical stock remains blocked");
+  await db.query("UPDATE maquinaria_stock_trazabilidad SET estado_disponibilidad='CONFLICTO' WHERE chasis_normalizado='ARR2'");
+  assert.equal((await first("SELECT stock_fisico_confirmado FROM maquinaria_importacion_unidades_operativas WHERE id=$1",[newUnits[1].id])).stock_fisico_confirmado,true,"Commercial link conflict is separate from physical reception");
+  await db.exec(physicalFix);
   await db.exec("SELECT set_config('test.role','usuario',false)");
   await assert.rejects(()=>db.query("SELECT maquinaria_iniciar_transito_importacion($1)",[newUnits[1].id]),/Solo admin/);
-  console.log("PASS: actual SQL, unit keys, overrides, rounding, cost gating, permissions, idempotency, supplier invoice separation and arrival lifecycle");
+  console.log("PASS: actual SQL, unit keys, overrides, costs, permissions, idempotency, arrival lifecycle and reserved stock confirmation independent of selling NP");
 } finally { await db.close(); }

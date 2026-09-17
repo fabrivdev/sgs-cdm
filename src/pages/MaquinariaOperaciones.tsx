@@ -237,7 +237,7 @@ type ImportRow = {
   llave_interna_general?: string | null; eta_general?: string | null; estado_general?: string | null;
   valor_oc_general?: number | null; alcance_valor_oc?: string; moneda_oc_general?: string;
   moneda_oc?: string; valor_oc_manual?: boolean; eta_manual?: boolean;
-  valor_factura_proveedor?: number | null; costo_stock_moneda?: string; costo_stock_habilitado?: boolean;
+  valor_factura_proveedor?: number | null; costo_stock_moneda?: string; costo_stock_habilitado?: boolean; stock_fisico_confirmado?: boolean;
   valor_oc_asignado_total?: number | null; oc_monedas_diferentes?: boolean;
   modelo_original?: string | null;
   id: string; importacion_linea_id: string; numero_unidad: number; cantidad_lote: number | null;
@@ -1477,7 +1477,7 @@ function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }: { row:
 
         <TabsContent value="resumen" className="space-y-4">
           <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento de importación">
-            <p className="text-[11px] text-muted-foreground">Planificado → En tránsito → Arribado → Completado. La fecha estimada no cambia el estado; completar requiere arribo registrado y chasis confirmado en stock.</p>
+            <p className="text-[11px] text-muted-foreground">Planificado → En tránsito → Arribado → Completado. Completar requiere fecha de arribo y chasis único en stock; no depende de que el pedido esté reservado o facturado.</p>
             {canEdit && <div className="mt-3 flex flex-wrap gap-2">
               {arrival === "PLANIFICADO" && <Button size="sm" variant="outline" disabled={saving} onClick={startTransit}><Ship className="mr-1.5 h-3.5 w-3.5" />Pasar a En tránsito</Button>}
               {arrival !== "COMPLETADO" && arrival !== "CANCELADO" && <Button size="sm" variant="outline" onClick={() => { setActiveTab("recepcion"); setEditingReceipt(true); }}>Registrar arribo y fecha</Button>}
