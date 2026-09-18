@@ -54,7 +54,7 @@ describe("Ventas de Repuestos", () => {
     const row = screen.getByText("REP2").closest("tr")!;
     const table = row.closest("table")!;
     for (const header of within(table).getAllByRole("columnheader")) {
-      expect(header).toHaveClass(header.textContent === "Cantidad" ? "text-center" : header.textContent === "Facturación neta" ? "text-right" : "text-left");
+      expect(header).toHaveClass(header.textContent === "Cantidad" ? "text-center" : header.textContent === "Facturación" ? "text-right" : "text-left");
       expect(header.closest("table")).not.toHaveClass("[&_th]:text-right", "[&_th:first-child]:text-left");
     }
     const headers = within(table).getAllByRole("columnheader");
@@ -123,7 +123,8 @@ describe("Ventas de Repuestos", () => {
     await screen.findByText("REP1");
     expect(screen.getByText("Rodamiento")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Marca" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Facturación neta" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Facturación" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Facturación neta" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ABC" })).toBeInTheDocument();
     const partsTable = screen.getByRole("columnheader", { name: "ABC" }).closest("table");
     expect(partsTable).not.toBeNull();

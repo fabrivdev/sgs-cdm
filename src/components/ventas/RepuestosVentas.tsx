@@ -89,7 +89,7 @@ function participation<T extends Partial<PartsMetrics>>(total: number): SalesCol
 }
 function listingColumns(view: Exclude<View, "resumen">, total: number): SalesColumn<PartsRow>[] {
   const text = (key: keyof PartsRow, label: string): SalesColumn<PartsRow> => ({ key, label, kind: "text", value: r => r[key] as string | null | undefined });
-  const amount: SalesColumn<PartsRow> = { key: "facturado", label: "Facturación neta", kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' };
+  const amount: SalesColumn<PartsRow> = { key: "facturado", label: "Facturación", kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' };
   if (view === "detalle") return [
     { key: "fecha", label: "Fecha", kind: "date", value: r => r.fecha?.slice(0, 10) },
     text("factura", "Factura"), text("sucursal", "Sucursal"), text("cliente", "Cliente"), text("marca", "Marca"),
