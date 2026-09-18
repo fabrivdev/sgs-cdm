@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ImportUnitForm, ImportUnitSection } from "@/lib/machineImportValues";
 
 const fields: Record<ImportUnitSection, { name: keyof ImportUnitForm; label: string; type?: string }[]> = {
-  unit: [{ name: "llave_interna", label: "Llave interna de esta unidad" }, { name: "chasis", label: "Chasis" }],
-  purchase: [{ name: "eta", label: "Embarque estimado", type: "date" }, { name: "valor_oc", label: "Valor OC de esta unidad", type: "number" }, { name: "moneda_oc", label: "Moneda OC", type: "currency" }],
-  invoice: [{ name: "invoice_supplier", label: "Número de factura" }, { name: "factura_proveedor_fecha", label: "Fecha de factura", type: "date" }, { name: "factura_proveedor_moneda", label: "Moneda factura", type: "currency" }, { name: "valor_factura_proveedor", label: "Valor facturado de esta unidad", type: "number" }],
-  stock: [{ name: "costo_final", label: "Costo definitivo con IVA", type: "number" }, { name: "costo_stock_moneda", label: "Moneda costo", type: "currency" }],
+  unit: [{ name: "llave_interna", label: "Llave interna" }, { name: "chasis", label: "Chasis" }],
+  purchase: [{ name: "eta", label: "Embarque est.", type: "date" }, { name: "valor_oc", label: "Valor OC", type: "number" }, { name: "moneda_oc", label: "Moneda OC", type: "currency" }],
+  invoice: [{ name: "invoice_supplier", label: "Número" }, { name: "factura_proveedor_fecha", label: "Fecha", type: "date" }, { name: "factura_proveedor_moneda", label: "Moneda factura", type: "currency" }, { name: "valor_factura_proveedor", label: "Valor factura", type: "number" }],
+  stock: [{ name: "costo_final", label: "Costo con IVA", type: "number" }, { name: "costo_stock_moneda", label: "Moneda costo", type: "currency" }],
 };
 
 export function ImportUnitFields({ section, form, onChange, onCancel, onSave, saving }: {
@@ -29,6 +29,6 @@ export function ImportUnitFields({ section, form, onChange, onCancel, onSave, sa
         </Select> : <Input id={id} type={field.type ?? "text"} min={field.type === "number" ? 0 : undefined} step={field.type === "number" ? "0.01" : undefined} value={form[field.name]} onChange={event => onChange({ ...form, [field.name]: event.target.value })} />}
       </div>;
     })}</div>
-    <div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={onCancel}>Cancelar</Button><Button size="sm" onClick={onSave} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar unidad</Button></div>
+    <div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={onCancel}>Cancelar</Button><Button size="sm" onClick={onSave} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div>
   </div>;
 }

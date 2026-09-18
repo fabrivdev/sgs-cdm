@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export function ProcessStepper({ steps, currentIndex, pulseCurrent = false }: { steps: string[]; currentIndex: number; pulseCurrent?: boolean }) {
@@ -16,13 +17,15 @@ export function ProcessStepper({ steps, currentIndex, pulseCurrent = false }: { 
   </div>;
 }
 
-export function DetailSection({ title, icon, action, children, className, card = false }: { title: string; icon?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; card?: boolean }) {
+export function DetailSection({ title, icon, help, action, children, className, card = false }: { title: string; icon?: ReactNode; help?: string; action?: ReactNode; children: ReactNode; className?: string; card?: boolean }) {
+  const assistance = help ? <Popover><PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground" aria-label={`Ayuda: ${title}`}><Info className="h-3.5 w-3.5" aria-hidden="true" /></Button></PopoverTrigger><PopoverContent align="start" className="max-w-[calc(100vw-2rem)] text-[12px] leading-relaxed" aria-label={`Ayuda: ${title}`}>{help}</PopoverContent></Popover> : null;
   if (card) {
     return <section className={cn("overflow-hidden rounded-xl border bg-card", className)}>
       <div className="flex min-h-11 items-center justify-between gap-3 border-b bg-muted/20 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           {icon && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>}
           <h3 className="truncate text-[12px] font-semibold">{title}</h3>
+          {assistance}
         </div>
         {action}
       </div>
@@ -30,7 +33,7 @@ export function DetailSection({ title, icon, action, children, className, card =
     </section>;
   }
   return <section className={cn("space-y-2", className)}>
-    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2">{icon}<h3 className="text-[12px] font-semibold">{title}</h3></div>{action}</div>
+    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2">{icon}<h3 className="text-[12px] font-semibold">{title}</h3>{assistance}</div>{action}</div>
     {children}
   </section>;
 }

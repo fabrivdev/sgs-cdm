@@ -44,6 +44,12 @@ No se modifican las NP, sus modelos, los chasis, las fechas de recepción ni los
 
 ## Verificación local
 
+### Presentación compacta (18/09/2026)
+
+Resumen conserva tarjetas con títulos cortos: Seguimiento, Unidad, Pedido y embarque, OC vs factura y Costo de stock. Campos y botones usan nombres breves, también al editar. El estado aparece una vez en la cabecera; no mostrar Seguimiento vacío cuando no hay acciones ni avisos. Las explicaciones generales se consultan mediante ⓘ (clic/teclado/móvil), no como párrafos permanentes. Mantener avisos de fecha faltante, monedas incompatibles y stock pendiente; el costo antiguo sigue visible como Referencia histórica, sin tratarlo como costo de stock. Documentos/Recepción conservan datos, permisos y acciones. No modifica RPC, cálculos, importes ni reglas de llegada y no requiere SQL adicional.
+
+Pruebas de regresión: `src/pages/ImportDetailDrawer.test.tsx` y tests de `machineImportValues`/`machineImportStatus`: 23 pruebas correctas, tipos, ESLint y compilación. Playwright comprobó el componente real con datos ficticios a 1366/768/390 px: ayuda bajo demanda, Enter/Escape, restauración de foco y ausencia de desbordamiento horizontal. Las 14 pruebas de conocimiento confirmaron conectividad y protección de notas personales. Verificación local, no producción.
+
 - scripts/test-import-unit-purchase-values.mjs: ejecuta la migración real en PostgreSQL aislado; verifica llaves, OC en varias cabeceras, ajustes, redondeo, permisos, stock, reaplicación y RPC de proveedor.
 - src/lib/machineImportValues.test.ts: comprueba importes, diferencias y aislamiento de guardados por sección.
 - La base productiva debe ser actualizada por el usuario. Los tests locales no prueban que la migración esté aplicada allí.
