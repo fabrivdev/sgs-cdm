@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ParqueTab } from "@/components/parque/ParqueTab";
+import { ParqueTab, type ParqueFacturacionEstado } from "@/components/parque/ParqueTab";
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
 import { StockMaquinasTab, type StockMaquinasResumen } from "@/components/parque/StockMaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
@@ -26,6 +26,7 @@ export default function ParqueClientes() {
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [parqueMetricas, setParqueMetricas] = useState<KpiResult | null>(null);
+  const [facturacionEstado, setFacturacionEstado] = useState<ParqueFacturacionEstado>("loading");
   const [maquinasResumen, setMaquinasResumen] = useState<MaquinasResumen>({
     totalMaquinas: 0,
     totalClientes: 0,
@@ -64,13 +65,13 @@ export default function ParqueClientes() {
       },
       {
         label: "Cobertura de servicio en período",
-        value: `${metricasMostradas.pctConServicioRango}%`,
+        value: facturacionEstado === "ready" ? `${metricasMostradas.pctConServicioRango}%` : facturacionEstado === "loading" ? "…" : "—",
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
       {
         label: "Cobertura de repuestos en período",
-        value: `${metricasMostradas.pctConRepuestosRango}%`,
+        value: facturacionEstado === "ready" ? `${metricasMostradas.pctConRepuestosRango}%` : facturacionEstado === "loading" ? "…" : "—",
         icon: PackageCheck,
         accent: "text-amber-600",
       },
@@ -85,7 +86,7 @@ export default function ParqueClientes() {
       { label: "Máquinas usadas", value: stockResumen.usadas.toLocaleString(), icon: RefreshCw, accent: "text-amber-600" },
       { label: "Marcas", value: stockResumen.marcas.toLocaleString(), icon: CheckCircle2, accent: "text-blue-600" },
     ],
-    [metricasMostradas, maquinasResumen, stockResumen, vistaParque],
+    [metricasMostradas, maquinasResumen, stockResumen, vistaParque, facturacionEstado],
   );
 
   return (
@@ -105,6 +106,7 @@ export default function ParqueClientes() {
             onChanged={handleChanged}
             onOpenCliente={handleOpenCliente}
             onMetricasChange={setParqueMetricas}
+            onFacturacionEstadoChange={setFacturacionEstado}
           />
         ) : vistaParque === "maquinas" ? (
           <MaquinasTab key={refreshCounter} onOpenCliente={handleOpenCliente} onResumenChange={setMaquinasResumen} />

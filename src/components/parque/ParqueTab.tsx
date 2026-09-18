@@ -132,18 +132,28 @@ const dias = (d: string | null | undefined) => {
 
 const fmtMoney = (n: number) => formatGuaranies(n);
 
+type ParqueRpcResult<T> = {
+  data: T | null;
+  error: { code?: string; details?: string; hint?: string; message?: string } | null;
+};
+type ParqueRpcRequest<T> = PromiseLike<ParqueRpcResult<T>> & {
+  abortSignal?: (signal: AbortSignal) => PromiseLike<ParqueRpcResult<T>>;
+};
+
 async function cargarRpcConReintento<T>(
-  requests: Array<() => PromiseLike<{
-    data: T | null;
-    error: { code?: string; details?: string; hint?: string; message?: string } | null;
-  }>>,
+  requests: Array<() => ParqueRpcRequest<T>>,
+  signal: AbortSignal,
 ) {
   let ultimoError: { code?: string; details?: string; hint?: string; message?: string } | null = null;
 
   for (let intento = 0; intento < requests.length; intento += 1) {
-    const resultado = await requests[intento]();
+    if (signal.aborted) throw new Error("Consulta cancelada");
+    const request = requests[intento]();
+    const resultado = await (request.abortSignal ? request.abortSignal(signal) : request);
     if (!resultado.error) return resultado.data;
     ultimoError = resultado.error;
+    // Repeating a cancelled statement immediately only adds database load.
+    if (resultado.error.code === "57014") break;
     if (intento < requests.length - 1) await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
@@ -179,15 +189,18 @@ const antiguedadColor = (a: number | null) => {
 };
 
 export type { KpiResult as ParqueMetricas };
+export type ParqueFacturacionEstado = "loading" | "error" | "ready";
 
 export function ParqueTab({
   onChanged: _onChanged,
   onOpenCliente,
   onMetricasChange,
+  onFacturacionEstadoChange,
 }: {
   onChanged?: () => void;
   onOpenCliente?: (id: string) => void;
   onMetricasChange?: (m: KpiResult) => void;
+  onFacturacionEstadoChange?: (estado: ParqueFacturacionEstado) => void;
 }) {
   const { can } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -347,9 +360,11 @@ export function ParqueTab({
   // Fase B: agregados de facturación (RPC) — depende del rango
   useEffect(() => {
     let cancelado = false;
+    const abortController = new AbortController();
     const cargarFact = async () => {
       setFactLoading(true);
       setFactError(null);
+      setFactAgregados(new Map());
       try {
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
         const marcaFacturacion =
@@ -389,7 +404,7 @@ export function ParqueTab({
                 () => supabase.rpc("parque_resumen_facturacion", fechas),
                 () => supabase.rpc("parque_resumen_facturacion", fechas),
               ];
-        const resumen = await cargarRpcConReintento(resumenRequests);
+        const resumen = await cargarRpcConReintento(resumenRequests, abortController.signal);
         if (cancelado) return;
 
         const map = new Map<string, FactAgregado>();
@@ -421,7 +436,7 @@ export function ParqueTab({
                 () => supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion }),
                 () => supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion }),
               ];
-          const ultimas = await cargarRpcConReintento(ultimasRequests);
+          const ultimas = await cargarRpcConReintento(ultimasRequests, abortController.signal);
           if (cancelado) return;
 
           for (const r of (ultimas ?? []) as Array<{
@@ -443,10 +458,12 @@ export function ParqueTab({
           }
           setFactAgregados(new Map(map));
         } catch (error) {
+          if (cancelado) return;
           console.error("No se pudieron cargar las últimas facturas", error);
           if (!cancelado) setFactError("La facturación cargó, pero faltan las fechas de última actividad.");
         }
       } catch (e) {
+        if (cancelado) return;
         console.error("No se pudo cargar la facturación del parque", e);
         if (!cancelado) {
           const detalle = e instanceof Error ? e.message.trim() : "";
@@ -463,8 +480,13 @@ export function ParqueTab({
     cargarFact();
     return () => {
       cancelado = true;
+      abortController.abort();
     };
   }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro, factReloadKey]);
+
+  useEffect(() => {
+    onFacturacionEstadoChange?.(factLoading ? "loading" : factError ? "error" : "ready");
+  }, [factLoading, factError, onFacturacionEstadoChange]);
 
   const subgrupoOptions = useMemo(() => {
     const values = new Set<string>(MACHINE_SUBGROUPS.filter((subgrupo) => subgrupo !== "OTRO"));

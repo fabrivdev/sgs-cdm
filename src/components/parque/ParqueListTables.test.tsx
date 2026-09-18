@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StockMaquinasTab } from "./StockMaquinasTab";
 import { MaquinasTab } from "./MaquinasTab";
 import { ParqueTab } from "./ParqueTab";
+import ParqueClientes from "@/pages/ParqueClientes";
 import MaquinariaOperaciones, { OrdersTable } from "@/pages/MaquinariaOperaciones";
 
 const mocks=vi.hoisted(()=>({tables:{} as Record<string,Record<string,unknown>[]>,can:vi.fn(),errorTable:"",rpc:vi.fn(),transfer:vi.fn(),
@@ -14,6 +15,7 @@ vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({can:mocks.can,isAdmin:false,roles:
 vi.mock("@/hooks/useMachineCatalog",()=>({useMachineCatalog:()=>({data:{brands:[],models:[],aliases:[]},isLoading:false})}));
 vi.mock("./TransferirMaquinaDialog",()=>({TransferirMaquinaDialog:(props:unknown)=>{mocks.transfer(props);return null;}}));
 vi.mock("./NuevaMaquinaDialog",()=>({NuevaMaquinaDialog:()=>null}));
+vi.mock("./ClientePanel",()=>({ClientePanel:()=>null}));
 vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc:mocks.rpc,from:(table:string)=>{
   const result=()=>({data:mocks.tables[table]??[],error:table===mocks.errorTable?{message:"Fixture read error"}:null});
   const chain={select:()=>chain,order:()=>chain,eq:()=>chain,in:()=>chain,range:()=>Promise.resolve(result()),then:(resolve:(value:ReturnType<typeof result>)=>unknown)=>Promise.resolve(result()).then(resolve)};
@@ -110,6 +112,36 @@ describe("Parque and imports compact lists",()=>{
   });
   it("permission changes do not grant export or transfers",async()=>{
     mocks.can.mockReturnValue(false);setup(<MaquinasTab/>);await screen.findByText("000123456789");expect(screen.queryByRole("button",{name:/Transferir/})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
+  });
+  it("billing timeout is not repeated automatically, blocks export and allows manual recovery",async()=>{
+    vi.spyOn(console,"error").mockImplementation(()=>undefined);
+    const state=vi.fn();mocks.rpc.mockResolvedValue({data:null,error:{code:"57014",message:"canceling statement due to statement timeout"}});
+    setup(<ParqueTab onFacturacionEstadoChange={state}/>);
+    await screen.findByText(/57014/);expect(mocks.rpc).toHaveBeenCalledTimes(1);expect(state).toHaveBeenLastCalledWith("error");
+    fireEvent.keyDown(screen.getByRole("button",{name:"Acciones de la sección"}),{key:"Enter"});
+    expect(await screen.findByRole("menuitem",{name:"Exportar clientes"})).toHaveAttribute("data-disabled");
+    fireEvent.keyDown(screen.getByRole("menuitem",{name:"Exportar clientes"}),{key:"Escape"});
+    mocks.rpc.mockImplementation((name:string)=>Promise.resolve({error:null,data:name.includes("ultimas")?[]:[{cliente_id:"C1",fact_actual:12.55,fact_prev:10,tiene_rep_rango:true,tiene_srv_rango:false}]}));
+    fireEvent.click(screen.getByRole("button",{name:"Reintentar"}));
+    await waitFor(()=>expect(state).toHaveBeenLastCalledWith("ready"));expect(screen.queryByText(/57014/)).not.toBeInTheDocument();
+    await exportTable("Exportar clientes");expect(mocks.json.mock.calls[0][0][0]["Fact. YTD"]).toBe(12.55);
+  });
+  it("the real clients page marks failed coverage unavailable but keeps machine/client counts",async()=>{
+    vi.spyOn(console,"error").mockImplementation(()=>undefined);
+    mocks.rpc.mockResolvedValue({data:null,error:{code:"57014",message:"statement timeout"}});
+    setup(<ParqueClientes/>,"/parque-clientes");await screen.findByText(/57014/);
+    const service=screen.getByText("Cobertura de servicio en período").parentElement?.parentElement;
+    const parts=screen.getByText("Cobertura de repuestos en período").parentElement?.parentElement;
+    expect(service).toHaveTextContent("—");expect(parts).toHaveTextContent("—");expect(service).not.toHaveTextContent("0%");
+    expect(screen.getByText("Máquinas activas").parentElement?.parentElement).toHaveTextContent("2");
+    expect(screen.getByText("Clientes con máquinas").parentElement?.parentElement).toHaveTextContent("2");
+  });
+  it("unmount aborts an in-flight billing request",async()=>{
+    let signal:AbortSignal|undefined;
+    mocks.rpc.mockImplementation(()=>({abortSignal:(s:AbortSignal)=>{signal=s;return new Promise(()=>undefined);}}));
+    const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+    const view=render(<QueryClientProvider client={client}><MemoryRouter><ParqueTab/></MemoryRouter></QueryClientProvider>);
+    await waitFor(()=>expect(signal).toBeDefined());view.unmount();expect(signal?.aborted).toBe(true);
   });
   it("failed stock reads block exports and show the real error",async()=>{
     mocks.errorTable="parque_stock_maquinas";vi.spyOn(console,"error").mockImplementation(()=>undefined);setup(<StockMaquinasTab/>);

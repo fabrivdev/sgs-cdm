@@ -18,6 +18,8 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 
 ## Orden y exportación compartidos
 
+Clientes del parque: vaciar agregados al cambiar filtros; coberturas `…` durante carga y `—` ante error, nunca cifras de una respuesta anterior como actuales. Conservar conteos independientes. No repetir automáticamente un timeout `57014`; permitir reintento manual y bloquear exportación incompleta. No redefine fórmulas ni cobertura según rubro monetario. Optimización SQL y evidencia local: `docs/parque-facturacion-filtros.md`; SQL manual `20260918220000_optimize_filtered_park_billing.sql` pendiente de aplicar, no validación productiva.
+
 - Un único acceso a acciones por sección: botón `Más filtros`, inmediatamente seguido por `⋮`. Las opciones de exportación viven en ese menú, no en cada tabla ni repetidas dentro del panel de filtros. Aplicar el mismo criterio en escritorio y móvil. Conservar las acciones principales y contextuales (crear, editar, validar, pagar) sin moverlas como parte de esta unificación.
 - En Servicios, Máquinas y Repuestos, el menú contiene Períodos y las tablas de la pestaña montada; cambiar de pestaña retira acciones anteriores sin consultar pestañas ocultas. Conservar filtros y permisos; la ampliación autorizada agrega las exportaciones correspondientes, no habilita acceso a datos nuevos ni altera cálculos.
 - Encabezados ordenables con un clic ascendente y otro descendente, indicador de dirección y acceso por teclado. Comparar valores originales: fechas cronológicas, cantidades/importes numéricos y textos con orden español natural; no ordenar el texto formateado con `$`. Ausencias al final en ambos sentidos; empates estables, sin deduplicar líneas.
