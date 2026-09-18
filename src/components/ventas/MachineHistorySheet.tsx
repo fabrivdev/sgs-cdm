@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- tablas importadas. */
 import { useEffect, useMemo, useState } from "react";
-import { salesHeader } from "./TableScroll";
-import { salesColumnClass } from "./salesTableFormat";
+import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { FiltersBar } from "@/components/filters/FiltersBar";
@@ -10,7 +9,6 @@ import { serviceSalesError } from "@/lib/serviceSalesError";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
-import { money } from "@/components/dashboard/utils";
 import { serviceTypes } from "@/lib/serviceHistory";
 import { displayImportedTechnicianName, importedServiceOrderParticipants, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
@@ -20,6 +18,7 @@ type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os
 type Part = { id: string; fecha_factura: string; factura: string; cod_mercaderia: string; codigo_fabricante: string; mercaderia: string; observacion: string; cantidad: number; total_venta: number; grupo_normalizado: string; subgrupo_original: string; raw_data: Record<string, unknown> };
 type Machine = { modelo_tipo: string; clientes: { nombre: string | null } | null; fuente_propietario?: string };
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
+const money = (value: number) => `$ ${new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: string | null) => value ? value.slice(0,10).split("-").reverse().join("/") : "—";
 const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
 // Sentence-case so imported rows in ALL CAPS and mixed case render the same way.
@@ -120,27 +119,72 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
     {key:"os",label:"OS",kind:"text",value:r=>r.os_numero},
     {key:"estado",label:"Estado",kind:"text",value:r=>estadoLabel(r.situacion_os)},
     {key:"tecnicos",label:"Técnicos",kind:"text",value:r=>(crewByOs.get(r.os_numero)??[]).join(", ")},
-    {key:"tipo",label:"Tipo de tiempo",kind:"text",value:r=>Object.keys(hoursByType(r)).map(typeLabel).join(" · ")},
-    {key:"horas",label:"Horas OS",kind:"number",align:"center",value:r=>Object.values(hoursByType(r)).reduce((a,b)=>a+b,0)},
-    {key:"km",label:"Km OS",kind:"number",align:"center",value:r=>r.km_cantidad},
-    {key:"factura",label:"Factura registrada",kind:"text",value:r=>r.factura},
+    {key:"tipo",label:"Tiempo",kind:"text",value:r=>Object.keys(hoursByType(r)).map(typeLabel).join(" · ")},
+    {key:"horas",label:"Horas",kind:"number",align:"center",value:r=>Object.values(hoursByType(r)).reduce((a,b)=>a+b,0)},
+    {key:"km",label:"Km",kind:"number",align:"center",value:r=>r.km_cantidad},
+    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
     {key:"total",label:"Total OS",kind:"number",align:"right",value:osTotal,excelFormat:'"$" #,##0.00'},
   ];
   const partColumns: SalesColumn<Part>[] = [
     {key:"fecha",label:"Fecha",kind:"date",value:r=>r.fecha_factura?.slice(0,10)},
+    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
     {key:"os",label:"OS",kind:"text",value:r=>String(r.raw_data?.linked_service_order??"")},
-    {key:"codigo",label:"Cód. repuesto",kind:"text",value:r=>r.cod_mercaderia},
-    {key:"fabricante",label:"Cód. fabricante",kind:"text",value:r=>r.codigo_fabricante},
+    {key:"codigo",label:"Código",kind:"text",value:r=>r.cod_mercaderia},
+    {key:"fabricante",label:"Cód. fabr.",kind:"text",value:r=>r.codigo_fabricante},
     {key:"descripcion",label:"Descripción",kind:"text",value:r=>r.mercaderia||r.observacion},
-    {key:"cantidad",label:"Cantidad",kind:"number",align:"center",value:r=>r.cantidad},
+    {key:"cantidad",label:"Cant.",kind:"number",align:"center",value:r=>r.cantidad},
     {key:"total",label:"Facturado",kind:"number",align:"right",value:r=>r.total_venta,excelFormat:'"$" #,##0.00'},
   ];
   const osTable = useSectionTable({rows:filtered,columns:osColumns,initialSort:{key:"fecha",direction:"desc"},
-    title:"Historial de OS",fileName:"historial-os-maquina",disabled:loading||!!error,register:false});
+    title:"Historial de OS",fileName:"historial-os-maquina.xlsx",disabled:loading||!!error,register:false});
   const partTable = useSectionTable({rows:visibleParts,columns:partColumns,initialSort:{key:"fecha",direction:"desc"},
-    title:"Repuestos de la máquina",fileName:"historial-repuestos-maquina",disabled:partsLoading||!!partsError,register:false});
+    title:"Repuestos de la máquina",fileName:"historial-repuestos-maquina.xlsx",disabled:partsLoading||!!partsError,register:false});
 
-  const tableClass = "w-full text-xs [&_th]:p-2 [&_th]:font-medium [&_td]:p-2 [&_td]:align-top";
+  const osView: CompactListColumn<Row>[] = osColumns.map(column => {
+    const layout: Record<string, Pick<CompactListColumn<Row>, "width" | "hiddenBelow">> = {
+      fecha: {width:"md:w-[10%] lg:w-[10%]",hiddenBelow:"md"},
+      os: {width:"w-[34%] md:w-[18%] lg:w-[14%]"},
+      estado: {width:"lg:w-[9%]",hiddenBelow:"lg"},
+      tecnicos: {width:"lg:w-[14%]",hiddenBelow:"lg"},
+      tipo: {width:"md:w-[24%] lg:w-[12%]",hiddenBelow:"md"},
+      horas: {width:"w-[18%] md:w-[10%] lg:w-[8%]"},
+      km: {width:"w-[15%] md:w-[10%] lg:w-[7%]"},
+      factura: {width:"lg:w-[14%]",hiddenBelow:"lg"},
+      total: {width:"w-[33%] md:w-[28%] lg:w-[12%]"},
+    };
+    return {...column,...layout[column.key],className:["os","factura"].includes(column.key)?"font-mono":undefined,
+      title:r=>column.key==="horas"?Object.entries(hoursByType(r)).map(([type,h])=>`${typeLabel(type)}: ${decimal.format(h)}`).join(" · "):String(column.value(r)??"—"),
+      render:r=>{
+        if(column.key==="fecha")return date(r.fecha_abierta_os);
+        if(column.key==="os")return <CompactListInfo label={r.os_numero} fields={[
+          ...osColumns.map(c=>[c.label,String(c.value(r)??"—")] as const),
+          ["Cierre",date(r.fecha_cierre_os)],["Desglose",Object.entries(hoursByType(r)).map(([type,h])=>`${typeLabel(type)}: ${decimal.format(h)}`).join(" · ")],
+        ]}/>;
+        if(column.key==="horas"||column.key==="km"){const value=column.value(r);return value==null?"—":decimal.format(Number(value));}
+        if(column.key==="total"){const value=osTotal(r);return value==null?"—":money(value);}
+        if(column.key==="factura"){const invoices=facturaList(r.factura);return invoices.length?<span>{invoices[0]}{invoices.length>1&&<span className="ml-1 rounded bg-muted px-1 text-[10px]">+{invoices.length-1}</span>}</span>:"—";}
+        return String(column.value(r)??"—");
+      }};
+  });
+  const partView: CompactListColumn<Part>[] = partColumns.map(column=>{
+    const layout:Record<string,Pick<CompactListColumn<Part>,"width"|"hiddenBelow">>={
+      fecha:{width:"md:w-[12%] lg:w-[10%]",hiddenBelow:"md"},
+      factura:{width:"md:w-[17%] lg:w-[14%]",hiddenBelow:"md"},
+      os:{width:"lg:w-[14%]",hiddenBelow:"lg"},
+      codigo:{width:"w-[23%] md:w-[18%] lg:w-[14%]"},
+      fabricante:{width:"lg:w-[12%]",hiddenBelow:"lg"},
+      descripcion:{width:"w-[26%] md:w-[29%] lg:w-[15%]"},
+      cantidad:{width:"w-[18%] md:w-[8%] lg:w-[6%]"},
+      total:{width:"w-[33%] md:w-[16%] lg:w-[15%]"},
+    };
+    return {...column,...layout[column.key],className:["os","factura","codigo","fabricante"].includes(column.key)?"font-mono":undefined,render:r=>{
+      if(column.key==="fecha")return date(r.fecha_factura);
+      if(column.key==="descripcion")return <CompactListInfo label={r.mercaderia||r.observacion||"—"} fields={partColumns.map(c=>[c.label,String(c.value(r)??"—")] as const)}/>;
+      if(column.key==="cantidad")return r.cantidad==null?"—":decimal.format(r.cantidad);
+      if(column.key==="total")return money(r.total_venta);
+      return String(column.value(r)||"—");
+    }};
+  });
   return <Sheet open={Boolean(target)} onOpenChange={onOpenChange}><SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[1000px]">
     <SheetHeader className="border-b p-5 pr-12"><SheetTitle>Historial de la máquina</SheetTitle><SheetDescription>{machine?.modelo_tipo ?? "Máquina"} · Chasis {chassis}<span className="block mt-1">Propietario actual: {machineError ? "No disponible: error de consulta" : canonicalClientName(machine?.clientes?.nombre) || "No informado"}{machine?.fuente_propietario === "stock" && <span className="text-muted-foreground"> · Stock propio</span>}</span></SheetDescription></SheetHeader>
     <div className="flex gap-5 border-b px-5">{[["os","Historial de OS"],["repuestos","Repuestos"]].map(([key,label]) => <button key={key} onClick={() => { setTab(key); setSearch(""); }} className={"border-b-2 py-3 text-sm " + (tab === key ? "border-primary font-semibold" : "border-transparent text-muted-foreground")}>{label}</button>)}</div>
@@ -160,8 +204,10 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
             <div className="text-[11px] text-muted-foreground">{totalHours > 0 ? decimal.format(hours/totalHours*100)+"% del total" : "Sin horas en el período"}</div>
           </div>)}
         </div>
-        <div className="overflow-x-auto rounded-md border"><table className={tableClass+" min-w-[920px]"}><thead className={`bg-muted/50 text-left ${salesHeader}`}><tr>{osColumns.map(c=><th key={c.key} className={c.align === "right" ? "text-right" : salesColumnClass(c.label,c.kind === "number" ? "quantity" : "text")}>{osTable.heading(c.key)}</th>)}</tr></thead><tbody>{osTable.ordered.map(row=>{const breakdown=Object.entries(hoursByType(row));const names=crewByOs.get(row.os_numero) ?? ["Sin técnico asignado"];const techs=names.join(", ");const types=breakdown.map(([type])=>typeLabel(type)).join(" · ");const hours=breakdown.map(([type,h])=>`${typeLabel(type)}: ${decimal.format(h)} h`).join(" · ");const facturas=facturaList(row.factura);const total=osTotal(row);return <tr key={row.os_numero} className="border-t"><td className="whitespace-nowrap">{date(row.fecha_abierta_os)}</td><td className="font-mono whitespace-nowrap">{row.os_numero}</td><td className="whitespace-nowrap">{estadoLabel(row.situacion_os)}</td><td className="max-w-[240px]"><div className="truncate" title={techs}>{techs}</div></td><td className="whitespace-nowrap">{types}</td><td className="text-center whitespace-nowrap" title={hours}>{hours}</td><td className="text-center">{row.km_cantidad == null ? "—" : decimal.format(row.km_cantidad)}</td><td className="font-mono whitespace-nowrap">{facturas.length ? <span title={facturas.join("; ")}>{facturas[0]}{facturas.length > 1 && <span className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground">+{facturas.length-1}</span>}</span> : <span className="text-muted-foreground">—</span>}</td><td className="text-right whitespace-nowrap">{total == null ? <span className="text-muted-foreground">—</span> : money(total)}</td></tr>;})}</tbody></table>{!filtered.length && <p className="p-6 text-center text-sm">No hay OS para estos filtros.</p>}</div>
-      </> : partsLoading ? <p>Cargando repuestos…</p> : partsError ? <p role="alert" className="text-destructive">No se pudieron consultar los repuestos. {partsError} No se muestran resultados parciales.</p> : <div className="overflow-x-auto rounded-md border"><table className={tableClass+" min-w-[850px]"}><thead className={`bg-muted/50 text-left ${salesHeader}`}><tr>{partColumns.map(c=><th key={c.key} className={c.align === "right" ? "text-right" : salesColumnClass(c.label,c.kind === "number" ? "quantity" : "text")}>{partTable.heading(c.key)}</th>)}</tr></thead><tbody>{partTable.ordered.map(part=><tr key={part.id} className="border-t"><td>{date(part.fecha_factura)}</td><td className="font-mono">{String(part.raw_data?.linked_service_order ?? "—")}</td><td className="font-mono">{part.cod_mercaderia || "—"}</td><td className="font-mono">{part.codigo_fabricante || "—"}</td><td>{part.mercaderia || part.observacion}</td><td className="text-center">{decimal.format(part.cantidad)}</td><td className="text-right whitespace-nowrap">{money(part.total_venta)}</td></tr>)}</tbody></table>{!visibleParts.length && <p className="p-6 text-sm">Sin líneas de repuestos facturados disponibles para estos filtros. No implica ausencia de consumos en la OS.</p>}</div>}
+        <div className="overflow-hidden rounded-md border"><CompactListTable rows={osTable.ordered} columns={osView} id={r=>r.os_numero} label="Historial de OS" sort={osTable.sort} heading={osTable.heading}
+          status={!filtered.length?"No hay OS para estos filtros.":undefined}/></div>
+      </> : partsLoading ? <p>Cargando repuestos…</p> : partsError ? <p role="alert" className="text-destructive">No se pudieron consultar los repuestos. {partsError} No se muestran resultados parciales.</p> : <div className="overflow-hidden rounded-md border"><CompactListTable rows={partTable.ordered} columns={partView} id={r=>r.id} label="Repuestos de la máquina" sort={partTable.sort} heading={partTable.heading}
+        status={!visibleParts.length?<span title="No implica ausencia de consumos en la OS.">Sin repuestos facturados para estos filtros.</span>:undefined}/></div>}
     </div>
   </SheetContent></Sheet>;
 }

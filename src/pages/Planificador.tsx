@@ -8,7 +8,7 @@ import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
@@ -19,14 +19,12 @@ import { ProgramarIntervencionDialog } from "@/components/trabajos/ProgramarInte
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMultiSelect";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EmptyState } from "@/components/EmptyState";
-import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, Wrench } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { addDays, format, getISOWeek, parseISO, setISOWeek, startOfWeek } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { pageShellWide, tableText } from "@/lib/ui-classes";
+import { pageShellWide } from "@/lib/ui-classes";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
 import { resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
@@ -110,6 +108,7 @@ export default function Planificador() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Servicio | null>(null);
   const [detalle, setDetalle] = useState<Servicio | null>(null);
@@ -190,15 +189,24 @@ export default function Planificador() {
 
   const load = async () => {
     setLoading(true);
+    setLoadError(false);
 
     try {
-      const [{ data: srv }, { data: prof }, { data: jor }, cli, { data: trabs }] = await Promise.all([
+      const [srvResult, profResult, jorResult, cli, trabsResult] = await Promise.all([
         supabase.from("servicios").select("*").order("fecha_programada", { ascending: true }),
         supabase.from("profiles").select("id, nombre, sucursal").order("nombre", { ascending: true }),
         supabase.from("servicio_jornadas").select("id, servicio_id, fecha, estado, horas_trabajadas, observaciones, tecnico_responsable_id, auxiliares"),
         cargarTodosLosClientes(),
         supabase.from("trabajos").select("id, codigo, os_numero, proxima_accion, descripcion_problema, cliente_id, sucursal, marca, tipo_trabajo, estado_general, legacy_servicio_id").order("creado_en", { ascending: false }),
       ]);
+
+      for (const result of [srvResult, profResult, jorResult, trabsResult]) {
+        if (result.error) throw result.error;
+      }
+      const { data: srv } = srvResult;
+      const { data: prof } = profResult;
+      const { data: jor } = jorResult;
+      const { data: trabs } = trabsResult;
 
       const trabajosRaw = (trabs ?? []) as any[];
       const trabajoPorServicio = new Map<string, any>();
@@ -283,6 +291,7 @@ export default function Planificador() {
         jornadas: t.legacy_servicio_id ? jornadasPorServicio.get(t.legacy_servicio_id) ?? [] : [],
       })));
     } catch (e: any) {
+      setLoadError(true);
       toast.error(e?.message ?? "No se pudieron cargar los datos del planificador");
     } finally {
       setLoading(false);
@@ -384,9 +393,9 @@ export default function Planificador() {
     { key: "responsable", label: "Responsable", kind: "text", value: s => s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : null },
     { key: "sucursal", label: "Suc.", kind: "text", value: s => s.sucursal },
     { key: "resultado", label: "Resultado", kind: "text", value: s => ESTADO_LABELS[s.estado] },
-    { key: "horas", label: "Hs", kind: "number", align: "right", value: s => s.horas_trabajadas },
+    { key: "horas", label: "Horas", kind: "number", align: "center", value: s => s.horas_trabajadas },
   ];
-  const list = useSectionTable({ rows: displayedSource, columns, title: "Planificador", fileName: "planificador.xlsx", initialSort: { key: "fecha", direction: "asc" }, disabled: loading });
+  const list = useSectionTable({ rows: displayedSource, columns, title: "Planificador", fileName: "planificador.xlsx", initialSort: { key: "fecha", direction: "asc" }, disabled: loading || loadError });
   const displayed = list.ordered;
 
   const continuidadByRow = useMemo(() => {
@@ -586,7 +595,7 @@ export default function Planificador() {
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
-        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar Planificador", disabled: loading || !displayed.length, onSelect: exportExcel }]} /> : undefined}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar Planificador", disabled: loading || loadError || !displayed.length, onSelect: exportExcel }]} /> : undefined}
         expanded={<>
           <FilterMultiSelect label="Marca" values={fMarcas} onChange={setFMarcas} placeholder="Todas" width="w-full" options={MARCAS.map(m => ({ value: m, label: m }))} />
           <FilterMultiSelect label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-full" options={ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))} />
@@ -644,195 +653,44 @@ export default function Planificador() {
 
 
 
-      {/* Desktop table */}
-      <Card className="hidden md:block overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className={tableText}>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="h-8 px-3 py-1.5 w-[92px]">{list.heading("fecha")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5">{list.heading("cliente")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5">{list.heading("trabajo")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[110px]">{list.heading("marca")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[150px]">{list.heading("responsable")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[80px]">{list.heading("sucursal")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[110px]">{list.heading("resultado")}</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[50px] text-right">{list.heading("horas")}</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {loading && (
-                <TableSkeletonRows columns={8} rows={7} />
-              )}
-
-              {!loading && displayed.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-6">
-                    <EmptyState title="Sin jornadas" description="No hay jornadas que coincidan con los filtros actuales." />
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {displayed.map((s) => {
-                const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
-                const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
-                const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "—" : "—";
-                const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
-                const continuidad = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`);
-
-                return (
-                  <TableRow
-                    key={`${s.id}-${s.fecha_programada}`}
-                    className={cn(rowClassByEstado(s.estado), "cursor-pointer", unseen && "ring-2 ring-inset ring-primary/40")}
-                    onClick={() => openDetalle(s)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openDetalle(s);
-                      }
-                    }}
-                  >
-                    <TableCell className="px-3 py-1.5 align-top">
-                      <div className="font-medium tabular-nums leading-tight flex items-center gap-1">
-                        {fechaLabel}
-                        {continuidad && continuidad.total > 1 && (
-                          <Badge variant="outline" className="h-5 rounded-full border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">
-                            {continuidad.orden}/{continuidad.total}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground leading-tight">{s.dia_semana.slice(0, 3)} · S{s.semana}</div>
-                    </TableCell>
-
-                    <TableCell className="px-3 py-1.5 align-top font-medium truncate max-w-[180px]" title={clienteNombre}>
-                      {clienteNombre}
-                    </TableCell>
-
-                    <TableCell className="px-3 py-1.5 align-top truncate max-w-[280px]" title={s.trabajo_descripcion}>
-                      <div className="flex items-center gap-1.5">
-                        {refByServicio.get(s.id)?.ref && (
-                          <span className="rounded bg-muted px-1 py-0 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums shrink-0">
-                            {refByServicio.get(s.id)?.ref}
-                          </span>
-                        )}
-                        <span className="truncate">{s.trabajo_descripcion}</span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="px-3 py-1.5 align-middle">
-                      <MarcaBadge marca={s.marca} className="self-start text-[10px]" />
-                    </TableCell>
-
-
-                    <TableCell className="px-3 py-1.5 align-top truncate" title={responsableNombre}>
-                      {responsableNombre}
-                    </TableCell>
-
-                    <TableCell className="px-3 py-1.5 align-top text-[12px] text-muted-foreground">
-                      {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
-                    </TableCell>
-
-                    <TableCell className="px-3 py-1.5 align-top">
-                      <EstadoBadge estado={s.estado} />
-                    </TableCell>
-
-                    <TableCell className="px-3 py-1.5 align-top text-right tabular-nums">
-                      {s.horas_trabajadas ?? "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+      <Card className="overflow-hidden">
+        <CompactListTable rows={displayed} columns={columns.map(column => {
+          const layout: Record<string, Pick<CompactListColumn<Servicio>, "width" | "hiddenBelow">> = {
+            fecha: { width: "w-[18%] md:w-[13%] xl:w-[9%]" },
+            cliente: { width: "md:w-[24%] xl:w-[17%]", hiddenBelow: "md" },
+            trabajo: { width: "w-[39%] md:w-[36%] xl:w-[28%]" },
+            marca: { width: "xl:w-[8%]", hiddenBelow: "xl" },
+            responsable: { width: "xl:w-[16%]", hiddenBelow: "xl" },
+            sucursal: { width: "xl:w-[8%]", hiddenBelow: "xl" },
+            resultado: { width: "w-[25%] md:w-[17%] xl:w-[9%]" },
+            horas: { width: "w-[18%] md:w-[10%] xl:w-[5%]" },
+          };
+          return { ...column, ...layout[column.key], title: (s: Servicio) => column.key === "fecha"
+            ? `${format(parseISO(s.fecha_programada), "dd/MM/yyyy")} · ${s.dia_semana} · Semana ${s.semana}`
+            : String(column.value(s) ?? "—"), render: (s: Servicio) => {
+            const continuity = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`);
+            if (column.key === "fecha") return <span className="inline-flex items-center gap-1"><span>{format(parseISO(s.fecha_programada), "dd/MM")}</span>{continuity && continuity.total > 1 && <span role="img" aria-label={`Jornada ${continuity.orden}/${continuity.total}`} className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />}</span>;
+            if (column.key === "marca") return <MarcaBadge marca={s.marca} className="max-w-full whitespace-nowrap text-[10px]" />;
+            if (column.key === "resultado") return <EstadoBadge estado={s.estado} className="max-w-full whitespace-nowrap px-1.5 text-[10px]" />;
+            if (column.key === "sucursal") return SUCURSAL_ABBR[s.sucursal] ?? s.sucursal;
+            if (column.key === "horas") return s.horas_trabajadas == null ? "—" : s.horas_trabajadas.toLocaleString("es-PY", { maximumFractionDigits: 6 });
+            if (column.key === "trabajo") return <CompactListInfo label={s.trabajo_descripcion || "—"} fields={[
+              ...columns.map(c => [c.label, String(c.value(s) ?? "—")] as const),
+              ["Referencia", refByServicio.get(s.id)?.ref || "—"],
+              ["OS", refByServicio.get(s.id)?.os || "—"],
+              ["Continuidad", continuity ? `${continuity.orden}/${continuity.total}` : "—"],
+              ["Día", s.dia_semana], ["Semana", String(s.semana)],
+              ["Tipo", s.tipo_trabajo],
+              ["Auxiliares", s.auxiliares.map(id => profById[id]?.nombre ?? id).join(", ") || "—"],
+              ["Observaciones", s.observaciones || "—"],
+            ]}><Button size="sm" variant="outline" onClick={() => openDetalle(s)}>Ver jornada</Button></CompactListInfo>;
+            return String(column.value(s) ?? "—");
+          }};
+        })} id={s => `${s.id}-${s.jornada_id ?? s.fecha_programada}`} label="Jornadas del Planificador"
+          sort={list.sort} heading={list.heading} onSelect={openDetalle}
+          rowClassName={s => cn(rowClassByEstado(s.estado), user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id)) && "ring-2 ring-inset ring-primary/40")}
+          status={loading ? "Cargando…" : loadError ? <span role="alert" className="text-destructive">No se pudieron cargar las jornadas. <Button variant="outline" size="sm" onClick={load}>Reintentar</Button></span> : !displayed.length ? "No hay jornadas con estos filtros." : undefined} />
       </Card>
-
-      {/* Mobile list */}
-      <div className="space-y-2 md:hidden">
-        {loading && <MobileCardSkeletons rows={4} />}
-        {!loading && displayed.length === 0 && (
-          <EmptyState title="Sin jornadas" description="No hay jornadas que coincidan con los filtros actuales." />
-        )}
-
-        {displayed.map((s) => {
-          const tipo = s.tipo_trabajo ?? "Visita de campo";
-          const TipoIcon = tipo === "Máquina en taller" ? Wrench : MapPin;
-          const unseen = user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id));
-          const clienteNombre = s.cliente_id ? cliById[s.cliente_id]?.nombre ?? "Cliente no encontrado" : "—";
-          const responsableNombre = s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre ?? "Sin asignar" : "Sin asignar";
-          const fechaLabel = format(parseISO(s.fecha_programada), "dd/MM");
-          const continuidad = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`);
-
-          return (
-            <Card
-              key={`${s.id}-${s.fecha_programada}`}
-              className={cn(
-                "cursor-pointer overflow-hidden rounded-lg border bg-card p-3 transition-colors",
-                rowClassByEstado(s.estado),
-                unseen && "ring-2 ring-primary/40",
-              )}
-              onClick={() => openDetalle(s)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  openDetalle(s);
-                }
-              }}
-            >
-              <div className="flex flex-col justify-between gap-2">
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
-                        <span className="font-semibold tabular-nums text-foreground">{fechaLabel}</span>
-                        <span>·</span>
-                        <span>{s.dia_semana.slice(0, 3)}</span>
-                        <TipoIcon className="h-3 w-3 shrink-0" />
-                        {continuidad && continuidad.total > 1 && (
-                          <Badge variant="outline" className="h-5 rounded-full border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">
-                            {continuidad.orden}/{continuidad.total}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <EstadoBadge estado={s.estado} className="shrink-0 text-[10px]" />
-                  </div>
-
-                  <div className="space-y-1">
-                    {refByServicio.get(s.id)?.ref && (
-                      <div className="flex">
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground tabular-nums">
-                          {refByServicio.get(s.id)?.ref}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="line-clamp-1 text-[15px] font-semibold leading-tight">
-                      {clienteNombre}
-                    </div>
-
-                    <div className="line-clamp-2 min-h-[36px] text-[13px] leading-[1.35] text-muted-foreground">
-                      {s.trabajo_descripcion}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="truncate pt-0.5 text-[11px] text-muted-foreground">
-                  {responsableNombre}
-                  <span className="mx-1">·</span>
-                  {SUCURSAL_ABBR[s.sucursal] ?? s.sucursal}
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
 
       <Card className="p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

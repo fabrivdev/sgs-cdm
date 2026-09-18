@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
@@ -66,7 +67,7 @@ interface TrabajoLite {
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 interface Profile { id: string; nombre: string; sucursal: Sucursal | null }
 
-const fmtMoney = (n: number | null | undefined) => n == null ? "—" : "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const fmtMoney = (n: number | null | undefined) => n == null ? "—" : "$ " + new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 const fmtNum = (n: number | null | undefined) => n == null ? "—" : new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 }).format(n);
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return "—";
@@ -177,12 +178,15 @@ export function TrabajosOSTab({
     { key: "tr", label: "TR", kind: "text", value: o => o.trabajo_id ? trabajoMap.get(o.trabajo_id)?.codigo : null },
     { key: "cliente", label: "Cliente", kind: "text", value: o => { const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null; return t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre; } },
     { key: "fecha", label: "Fecha OS", kind: "date", value: o => o.fecha_abierta_os?.slice(0, 10) },
-    { key: "horas", label: "Horas", kind: "number", align: "right", value: o => o.servicios_cantidad },
+    { key: "horas", label: "Horas", kind: "number", align: "center", value: o => o.servicios_cantidad },
     { key: "servicios", label: "Servicios", kind: "number", align: "right", value: o => o.servicios_valor },
     { key: "repuestos", label: "Repuestos", kind: "number", align: "right", value: o => o.repuesto_valor },
     { key: "km", label: "Km + Terc.", kind: "number", align: "right", value: o => (o.kilometro_valor ?? 0) + (o.terceros_valor ?? 0) },
-    { key: "total", label: "TOTAL", kind: "number", align: "right", value: totalOf },
+    { key: "total", label: "Total", kind: "number", align: "right", value: totalOf },
     { key: "situacion", label: "Situación", kind: "text", value: o => [o.situacion_os, o.situacion_facturacion].filter(Boolean).join(" · ") },
+    { key: "factura", label: "Factura", kind: "text", value: o => o.factura },
+    { key: "chasis", label: "Chasis", kind: "text", value: o => o.nro_chasis },
+    { key: "tecnico", label: "Técnico", kind: "text", value: o => o.responsable ?? o.cod_mecanico },
   ];
   const table = useSectionTable({ rows: filtered, columns, title: "OS vinculadas", fileName: "trabajos-os.xlsx", initialSort: { key: "fecha", direction: "desc" }, disabled: loading || loadError });
   const sorted = table.ordered;
@@ -239,6 +243,8 @@ export function TrabajosOSTab({
 
       {loading ? (
         <Card className="p-8 text-center text-muted-foreground">Cargando…</Card>
+      ) : loadError ? (
+        <Card role="alert" className="p-8 text-center text-destructive">No se pudieron cargar las OS. <Button variant="outline" size="sm" onClick={load}>Reintentar</Button></Card>
       ) : sorted.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">No hay OS vinculadas con los filtros seleccionados.</Card>
       ) : (
@@ -255,71 +261,32 @@ export function TrabajosOSTab({
           </Card>
 
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-[12px] tabular-nums">
-                <thead className="bg-muted/50 text-muted-foreground sticky top-0">
-                  <tr className="border-b">
-                    {columns.map(c => <th key={c.key} aria-sort={table.sort.key === c.key ? table.sort.direction === "asc" ? "ascending" : "descending" : "none"} className={cn("px-3 py-2 font-medium whitespace-nowrap", c.align === "right" ? "text-right" : "text-left")}>{table.heading(c.key)}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map(o => {
-                    const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null;
-                    const cli = t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre;
-                    const total = totalOf(o);
-                    const kmTerc = (o.kilometro_valor ?? 0) + (o.terceros_valor ?? 0);
-                    const mec = o.responsable ?? o.cod_mecanico;
-                    const subParts: string[] = [];
-                    if (mec) subParts.push(mec);
-                    if (o.factura) subParts.push(`Fact. ${o.factura}${o.fecha_emision_factura ? " · " + fmtDate(o.fecha_emision_factura) : ""}`);
-                    return (
-                      <tr
-                        key={`${o.os_numero}-${o.trabajo_id}`}
-                        onClick={() => t && setDetalleId(t.id)}
-                        className={cn(
-                          "border-b border-border/40 hover:bg-accent/40 align-top",
-                          t && "cursor-pointer",
-                        )}
-                      >
-                        <td className="px-3 py-2.5 font-mono font-semibold whitespace-nowrap">OS-{o.os_numero}</td>
-                        <td className="px-3 py-2.5 font-mono whitespace-nowrap text-muted-foreground">{t?.codigo ?? "—"}</td>
-                        <td className="px-3 py-2.5 max-w-[280px]">
-                          <div className="truncate font-medium" title={cli ?? ""}>{cli ?? "—"}</div>
-                          {subParts.length > 0 && (
-                            <div className="truncate text-[10px] text-muted-foreground" title={subParts.join(" · ")}>
-                              {subParts.join(" · ")}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(o.fecha_abierta_os)}</td>
-                        <td className="px-3 py-2.5 text-right">{fmtNum(o.servicios_cantidad)}</td>
-                        <td className="px-3 py-2.5 text-right">{fmtMoney(o.servicios_valor)}</td>
-                        <td className="px-3 py-2.5 text-right">{fmtMoney(o.repuesto_valor)}</td>
-                        <td className="px-3 py-2.5 text-right">{kmTerc > 0 ? fmtMoney(kmTerc) : "—"}</td>
-                        <td className="px-3 py-2.5 text-right font-semibold">{fmtMoney(total)}</td>
-                        <td className="px-3 py-2.5 whitespace-nowrap">
-                          <div className="flex flex-col gap-0.5 items-start">
-                            {o.situacion_os && <Badge variant="outline" className="text-[10px]">{o.situacion_os}</Badge>}
-                            {o.situacion_facturacion && <Badge variant="secondary" className="text-[10px]">{o.situacion_facturacion}</Badge>}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="bg-muted/60 font-semibold">
-                  <tr>
-                    <td colSpan={4} className="px-3 py-2 text-right">Totales ({filtered.length})</td>
-                    <td className="px-3 py-2 text-right">{fmtNum(totales.horas)}</td>
-                    <td className="px-3 py-2 text-right">{fmtMoney(totales.serv)}</td>
-                    <td className="px-3 py-2 text-right">{fmtMoney(totales.rep)}</td>
-                    <td className="px-3 py-2 text-right">{fmtMoney(totales.km + totales.terc)}</td>
-                    <td className="px-3 py-2 text-right">{fmtMoney(totales.total)}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <CompactListTable rows={sorted} columns={columns.slice(0,10).map(column=>{
+              const layout:Record<string,Pick<CompactListColumn<OSRow>,"width"|"hiddenBelow">>={
+                os:{width:"w-[28%] md:w-[16%] xl:w-[10%]"},
+                tr:{width:"md:w-[10%] xl:w-[7%]",hiddenBelow:"md"},
+                cliente:{width:"w-[42%] md:w-[28%] xl:w-[20%]"},
+                fecha:{width:"md:w-[14%] xl:w-[9%]",hiddenBelow:"md"},
+                horas:{width:"md:w-[8%] xl:w-[6%]",hiddenBelow:"md"},
+                servicios:{width:"xl:w-[10%]",hiddenBelow:"xl"},
+                repuestos:{width:"xl:w-[10%]",hiddenBelow:"xl"},
+                km:{width:"xl:w-[10%]",hiddenBelow:"xl"},
+                total:{width:"w-[30%] md:w-[24%] xl:w-[10%]"},
+                situacion:{width:"xl:w-[8%]",hiddenBelow:"xl"},
+              };
+              return {...column,...layout[column.key],title:(o:OSRow)=>String(column.value(o)??"—"),render:(o:OSRow)=>{
+                if(column.key==="os")return <CompactListInfo label={o.os_numero} fields={[
+                  ...columns.map(c=>[c.label,String(c.value(o)??"—")] as const),
+                  ["Fecha factura",fmtDate(o.fecha_emision_factura)],["Problema",o.problema||"—"],
+                  ["Km OS",fmtNum(o.km_cantidad)],["Tiempo",o.tipo_tiempo||"—"],
+                ]}>{o.trabajo_id&&trabajoMap.has(o.trabajo_id)&&<Button variant="outline" size="sm" onClick={()=>setDetalleId(o.trabajo_id)}>Ver trabajo</Button>}</CompactListInfo>;
+                if(column.key==="fecha")return fmtDate(o.fecha_abierta_os);
+                if(column.key==="horas")return fmtNum(o.servicios_cantidad);
+                if(column.kind==="number"){const value=column.value(o);return fmtMoney(value==null?null:Number(value));}
+                return String(column.value(o)??"—");
+              }};
+            })} id={o=>`${o.os_numero}-${o.trabajo_id}`} label="OS vinculadas" sort={table.sort} heading={table.heading}
+              onSelect={o=>{if(o.trabajo_id&&trabajoMap.has(o.trabajo_id))setDetalleId(o.trabajo_id);}} />
           </Card>
         </>
       )}
