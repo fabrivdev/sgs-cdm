@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { isImportSaleInvoiced, importArrivalState } from "./machineImportStatus";
+import { IMPORT_SITUATION_LABELS, importSituationState, importSituationLabel, isImportSaleInvoiced, importArrivalState } from "./machineImportStatus";
+
+describe("importSituationState", () => {
+  it("ofrece exactamente las cinco situaciones acordadas y en ese orden", () => {
+    expect(Object.values(IMPORT_SITUATION_LABELS)).toEqual(["Stock", "Reservado", "En parque", "Sin chasis", "Sin conciliar"]);
+  });
+  it.each([
+    ["DISPONIBLE", "DISPONIBLE", "Stock"],
+    ["RESERVADO", "RESERVADO", "Reservado"],
+    ["EN_PARQUE", "EN_PARQUE", "En parque"],
+    ["VENDIDO_PENDIENTE_ENTREGA", "RESERVADO", "Reservado"],
+    ["CONFLICTO", "SIN_CONCILIAR", "Sin conciliar"],
+    ["SIN_CONCILIAR", "SIN_CONCILIAR", "Sin conciliar"],
+    [null, "SIN_CONCILIAR", "Sin conciliar"],
+    ["ESTADO_DESCONOCIDO", "SIN_CONCILIAR", "Sin conciliar"],
+  ])("proyecta %s sin modificar la fuente, para filtro, orden y exportación", (source, state, label) => {
+    const row = Object.freeze({ chasis: "TEST-01", estado_disponibilidad: source });
+    expect(importSituationState(row)).toBe(state);
+    expect(importSituationLabel(row)).toBe(label);
+    expect(row.estado_disponibilidad).toBe(source);
+  });
+  it.each([null, "", "  ", "---"])("sin identificador válido %s muestra Sin chasis", (chasis) => {
+    expect(importSituationState({ chasis, estado_disponibilidad: "RESERVADO" })).toBe("SIN_CHASIS");
+  });
+  it("mantiene duplicados en Sin conciliar sin cambiar la llegada ni la facturación", () => {
+    const row = Object.freeze({ chasis: "TEST-01", estado_disponibilidad: "EN_PARQUE", chasis_ambiguo: true, parque_confirmado: true, ata: "2026-08-01" });
+    expect(importSituationState(row)).toBe("SIN_CONCILIAR");
+    expect(importArrivalState(row)).toBe("ARRIBADO");
+    expect(isImportSaleInvoiced(row)).toBe(true);
+  });
+});
 
 describe("importArrivalState", () => {
   it("no deduce tránsito a partir de ETA ni stock antes del arribo", () => {

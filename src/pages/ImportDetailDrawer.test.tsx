@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
-import { ImportDetailDrawer } from "./MaquinariaOperaciones";
+import { ImportDetailDrawer, ImportsTable } from "./MaquinariaOperaciones";
 import { DetailSection } from "@/components/maquinaria/MachineDetailPrimitives";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), admin: true }));
@@ -34,6 +34,30 @@ beforeEach(() => { mocks.admin = true; mocks.rpc.mockReset().mockResolvedValue({
 afterEach(cleanup);
 
 describe("Importaciones: detalle compacto", () => {
+  it("la tabla usa solo las cinco situaciones sin esconder registros antiguos", () => {
+    const sources = ["DISPONIBLE", "RESERVADO", "EN_PARQUE", "SIN_CHASIS", "SIN_CONCILIAR", "VENDIDO_PENDIENTE_ENTREGA", "CONFLICTO"];
+    const rows = sources.map((source, n) => ({ ...row, id: `TEST-${n}`, llave_interna: `TEST-${n}`, chasis: source === "SIN_CHASIS" ? null : `CH-${n}`, estado_disponibilidad: source }));
+    const selected = vi.fn();
+    render(<ImportsTable rows={rows} heading={key => key} onSelect={selected} />);
+    expect(screen.getAllByRole("row")).toHaveLength(8);
+    expect(screen.getByText("Stock", { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText("Reservado", { exact: true })).toHaveLength(2);
+    expect(screen.getByText("En parque", { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText("Sin conciliar", { exact: true })).toHaveLength(2);
+    expect(screen.queryByText("Conflicto", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("Vendido · por entregar", { exact: true })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("TEST-6", { exact: true }));
+    expect(selected).toHaveBeenCalledWith(rows[6]);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("Sin conciliar conserva la incidencia original en el detalle", () => {
+    setup({ chasis: "TEST-ISSUE", estado_disponibilidad: "CONFLICTO", stock_sucursal: "Sucursal ficticia", disponibilidad_detalle: "Referencia ficticia" });
+    expect(screen.getByText("Sin conciliar", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("Referencia ficticia", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("Revisá la vinculación del chasis en Stock.")).toBeInTheDocument();
+    expect(screen.queryByText("Conflicto", { exact: true })).not.toBeInTheDocument();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("usa títulos cortos, sin párrafos permanentes ni estado repetido, conservando datos", () => {
     setup();
     for (const title of ["Seguimiento", "Unidad", "Pedido y embarque", "OC vs factura", "Costo de stock"]) {

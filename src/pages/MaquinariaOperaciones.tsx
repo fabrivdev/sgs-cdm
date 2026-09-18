@@ -42,7 +42,7 @@ import { pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 import { legacyMachineBrand, machineBrandClass as brandClass, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
-import { isImportSaleInvoiced, importArrivalState as arrivalState, type ImportArrivalState as ArrivalState } from "@/lib/machineImportStatus";
+import { IMPORT_SITUATION_LABELS, importSituationState, importSituationLabel, isImportSaleInvoiced, importArrivalState as arrivalState, type ImportArrivalState as ArrivalState } from "@/lib/machineImportStatus";
 import { matchesOperationFilters, normalizeOperationModel, operationModelOptions } from "@/lib/machineOperationFilters";
 import { shortPersonName } from "@/lib/personName";
 import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
@@ -226,6 +226,10 @@ const availabilityClass = (state?: string | null) => cn(
   state === "EN_PARQUE" && "border-teal-200 bg-teal-50 text-teal-700",
   (!state || state === "SIN_CHASIS") && "border-slate-200 bg-slate-100 text-slate-600",
 );
+
+function ImportSituationBadge({ row }: { row: ImportRow }) {
+  return <Badge variant="outline" className={availabilityClass(importSituationState(row))}>{importSituationLabel(row)}</Badge>;
+}
 
 type OrderRow = {
   id: string; operacion_id: string; np_numero: string | null; np_fecha: string | null; cliente_nombre: string;
@@ -873,7 +877,7 @@ export default function MaquinariaOperaciones() {
     if (importsView) {
       const importRow = row as ImportRow;
       if (llegada !== "TODOS" && arrivalState(importRow) !== llegada) return false;
-      if (situacion !== "TODOS" && (importRow.estado_disponibilidad ?? "SIN_CHASIS") !== situacion) return false;
+      if (situacion !== "TODOS" && importSituationState(importRow) !== situacion) return false;
     } else {
       const orderRow = row as OrderRow;
       if (orderState !== "TODOS" && orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado) !== orderState) return false;
@@ -929,7 +933,7 @@ export default function MaquinariaOperaciones() {
     { key: "eta", label: "Embarque (est.)", kind: "date", value: r => (r as ImportRow).eta?.slice(0, 10) },
     { key: "ata", label: "Arribo", kind: "date", value: r => (r as ImportRow).ata?.slice(0, 10) },
     { key: "llegada", label: "Llegada", kind: "text", value: r => ARRIVAL_LABEL[arrivalState(r as ImportRow)] },
-    { key: "situacion", label: "Situación", kind: "text", value: r => AVAILABILITY_LABEL[(r as ImportRow).estado_disponibilidad ?? ""] ?? (r as ImportRow).estado_disponibilidad },
+    { key: "situacion", label: "Situación", kind: "text", value: r => importSituationLabel(r as ImportRow) },
     { key: "chasis", label: "Chasis", kind: "text", value: r => r.chasis },
   ] : [
     { key: "np", label: "NP", kind: "text", value: r => formatNpCode((r as OrderRow).np_numero) },
@@ -1027,7 +1031,7 @@ export default function MaquinariaOperaciones() {
           onChange={setSituacion}
           placeholder="Situación"
           width="w-[150px]"
-          options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(AVAILABILITY_LABEL).map(([value, label]) => ({ value, label }))]}
+          options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(IMPORT_SITUATION_LABELS).map(([value, label]) => ({ value, label }))]}
         />
       )}
       <FilterSelect label="Marca" value={marca} onChange={(value) => { setMarca(value); setModelo("TODOS"); }} placeholder="Marca" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...marcaOptions.map((value) => ({ value, label: value }))]} />
@@ -1058,7 +1062,7 @@ export default function MaquinariaOperaciones() {
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge variant="outline" style={machineBrandStyle(importRow.marca || importRow.proveedor)} className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{visibleMachineBrand(importRow.marca || importRow.proveedor)}</Badge>
                 <Badge variant="outline" className="text-[10px]">Unidad {importRow.numero_unidad}/{Math.max(1, Number(importRow.cantidad_lote) || 1)}</Badge>
-                {importRow.estado_disponibilidad && <Badge variant="outline" className={availabilityClass(importRow.estado_disponibilidad)}>{AVAILABILITY_LABEL[importRow.estado_disponibilidad] ?? importRow.estado_disponibilidad}</Badge>}
+                <ImportSituationBadge row={importRow} />
               </div>
               <div className="mt-2 font-mono text-[10px] text-muted-foreground">{row.chasis || "Sin chasis"}</div>
             </button>;
@@ -1144,7 +1148,7 @@ function OrdersTable({ rows, heading, onSelect, entregaByUnitId, estadoByOperaci
   </Table>;
 }
 
-function ImportsTable({ rows, heading, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; onSelect: (row: ImportRow) => void }) {
+export function ImportsTable({ rows, heading, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; onSelect: (row: ImportRow) => void }) {
   return <Table className="text-[12px]">
     <TableHeader><TableRow>
       <TableHead>{heading("llave")}</TableHead>
@@ -1174,7 +1178,7 @@ function ImportsTable({ rows, heading, onSelect }: { rows: ImportRow[]; heading:
         <TableCell className="whitespace-nowrap">{formatDate(row.eta)}</TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(row.ata)}</TableCell>
         <TableCell><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge></TableCell>
-        <TableCell>{row.estado_disponibilidad ? <Badge variant="outline" className={availabilityClass(row.estado_disponibilidad)}>{AVAILABILITY_LABEL[row.estado_disponibilidad] ?? row.estado_disponibilidad}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
+        <TableCell><ImportSituationBadge row={row} /></TableCell>
         <TableCell className="font-mono text-[11px]">{row.chasis || "Sin chasis"}</TableCell>
         <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
       </TableRow>;
@@ -1416,9 +1420,10 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   const arrival = arrivalState(row);
   const stockConfirmed = importSystemConfirmed(row);
   const missingArrivalDate = !row.ata && arrival !== "COMPLETADO" && arrival !== "CANCELADO" && /ARRIB|RECIB|COMPLET/i.test(row.estado_fuente ?? "");
+  const reconciliationIssue = row.chasis_ambiguo || row.estado_disponibilidad === "CONFLICTO";
   const multipleUnits = importHasMultipleUnits(row.cantidad_lote);
   const showAvailabilityStatus = false;
-  const headerStatus = showAvailabilityStatus ? (AVAILABILITY_LABEL[row.estado_disponibilidad!] ?? row.estado_disponibilidad) : ARRIVAL_LABEL[arrival];
+  const headerStatus = showAvailabilityStatus ? importSituationLabel(row) : ARRIVAL_LABEL[arrival];
   const closeEditors = () => { setEditingChassis(false); setEditingImportData(false); setEditingInvoice(false); setEditingStockCost(false); };
   const cancelEdit = () => { setForm(importUnitForm(row)); closeEditors(); };
   const uploadOc = async (file?: File) => {
@@ -1512,13 +1517,14 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
         <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
-          {((canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO") || missingArrivalDate || row.chasis_ambiguo) && <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento" help="Arribado requiere fecha real de arribo. Completado requiere chasis único confirmado en Stock o Parque, incluso sin fecha histórica. ETA, reserva o factura no prueban llegada.">
+          {((canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO") || missingArrivalDate || reconciliationIssue) && <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento" help="Arribado requiere fecha real de arribo. Completado requiere chasis único confirmado en Stock o Parque, incluso sin fecha histórica. ETA, reserva o factura no prueban llegada.">
             {canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO" && <div className="flex flex-wrap gap-2">
               {arrival === "PLANIFICADO" && <Button size="sm" variant="outline" disabled={saving} onClick={startTransit}><Ship className="mr-1.5 h-3.5 w-3.5" />Iniciar tránsito</Button>}
               <Button size="sm" variant="outline" onClick={() => { setActiveTab("recepcion"); setEditingReceipt(true); }}>Registrar arribo</Button>
             </div>}
             {missingArrivalDate && <p className="mt-2 text-[11px] text-amber-700">El registro antiguo indica recepción pero no tiene fecha de arribo.</p>}
             {row.chasis_ambiguo && <p className="mt-2 text-[11px] text-amber-700">Chasis duplicado: revisar Stock o Parque.</p>}
+            {!row.chasis_ambiguo && reconciliationIssue && <p className="mt-2 text-[11px] text-amber-700">Revisá la vinculación del chasis en Stock.</p>}
           </DetailSection>}
           <DetailSection card icon={<PackageCheck className="h-3.5 w-3.5" />} title="Unidad" action={canEdit && !editingChassis ? <Button aria-label="Editar unidad" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { closeEditors(); setEditingChassis(true); }}><Pencil className="mr-1.5 h-3 w-3" />Editar</Button> : undefined}>
             {editingChassis ? <ImportUnitFields section="unit" form={form} onChange={setForm} onCancel={cancelEdit} onSave={() => saveUnit("unit")} saving={saving} /> : <KeyValueGrid><KeyValueItem label="Llave interna" value={row.llave_interna} empty="Sin asignar" mono /><KeyValueItem label="Unidad" value={`${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`} /><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /></KeyValueGrid>}
@@ -1547,14 +1553,14 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
             {editingStockCost ? <ImportUnitFields section="stock" form={form} onChange={setForm} onCancel={cancelEdit} onSave={() => saveUnit("stock")} saving={saving} /> : row.costo_stock_habilitado ? <KeyValueGrid><KeyValueItem label="Costo con IVA" value={row.costo_final == null ? null : formatImportMoney(row.costo_final, row.costo_stock_moneda ?? "USD")} empty="Sin cargar" /></KeyValueGrid> : <p className="text-[11px] text-muted-foreground">Pendiente de stock</p>}
             {!row.costo_stock_habilitado && row.costo_final != null && <KeyValueGrid className="mt-2"><KeyValueItem label="Referencia histórica" value={formatImportMoney(row.costo_final, row.costo_stock_moneda ?? "USD")} /></KeyValueGrid>}
           </DetailSection>
-          {(row.stock_sucursal || row.stock_deposito || row.stock_saldo != null || (row.disponibilidad_detalle && row.estado_disponibilidad !== "EN_PARQUE")) && <DetailSection card icon={<PackageCheck className="h-3.5 w-3.5" />} title="Stock vinculado"><KeyValueGrid>{row.stock_sucursal && <KeyValueItem label="Sucursal" value={row.stock_sucursal} />}{row.stock_deposito && <KeyValueItem label="Depósito" value={row.stock_deposito} />}{row.stock_saldo != null && <KeyValueItem label="Saldo" value={row.stock_saldo} />}<KeyValueItem label="Estado" value={row.disponibilidad_detalle || AVAILABILITY_LABEL[row.estado_disponibilidad ?? ""]} empty="—" /></KeyValueGrid></DetailSection>}
+          {(row.stock_sucursal || row.stock_deposito || row.stock_saldo != null || (row.disponibilidad_detalle && row.estado_disponibilidad !== "EN_PARQUE")) && <DetailSection card icon={<PackageCheck className="h-3.5 w-3.5" />} title="Stock vinculado"><KeyValueGrid>{row.stock_sucursal && <KeyValueItem label="Sucursal" value={row.stock_sucursal} />}{row.stock_deposito && <KeyValueItem label="Depósito" value={row.stock_deposito} />}{row.stock_saldo != null && <KeyValueItem label="Saldo" value={row.stock_saldo} />}<KeyValueItem label="Situación" value={importSituationLabel(row)} />{row.disponibilidad_detalle && <KeyValueItem label="Referencia" value={row.disponibilidad_detalle} />}</KeyValueGrid></DetailSection>}
         </TabsContent>
 
         <TabsContent value="pedido" className="space-y-4">
           <DetailSection card icon={<FileCheck2 className="h-3.5 w-3.5" />} title={row.np_numero ? formatNpCode(row.np_numero) : "Sin pedido vinculado"} action={canEdit ? <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onEditHeader(row)}><Pencil className="mr-1.5 h-3 w-3" />{row.np_numero ? "Ver referencia del pedido" : "Vincular pedido"}</Button> : undefined}>
             {row.np_numero ? <div className="space-y-3"><div className="text-[12px] font-medium">{row.cliente_nombre || "Cliente sin cargar"}</div><KeyValueGrid><KeyValueItem label="Comercial" value={shortPersonName(row.comercial)} empty="—" /><KeyValueItem label="Fecha NP" value={formatDate(row.np_fecha)} empty="—" /></KeyValueGrid></div>
               : (["RESERVADO", "VENDIDO_PENDIENTE_ENTREGA"].includes(row.estado_disponibilidad ?? "") && row.disponibilidad_detalle)
-                ? <div className={cn("rounded-lg border px-3 py-2.5 text-[11px] font-medium", availabilityClass(row.estado_disponibilidad))}>Reservada por la venta {row.disponibilidad_detalle}</div>
+                ? <div className={cn("rounded-lg border px-3 py-2.5 text-[11px] font-medium", availabilityClass(importSituationState(row)))}>Reservada por la venta {row.disponibilidad_detalle}</div>
                 : null}
           </DetailSection>
         </TabsContent>

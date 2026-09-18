@@ -5,6 +5,35 @@ type ImportSaleEvidence = {
 
 export type ImportArrivalState = "PLANIFICADO" | "EN_TRANSITO" | "ARRIBADO" | "COMPLETADO" | "CANCELADO";
 
+// Importaciones has a deliberately smaller display vocabulary than commercial Stock.
+// Project the source state without rewriting it or using it to infer arrival/payment.
+export const IMPORT_SITUATION_LABELS = {
+  DISPONIBLE: "Stock", RESERVADO: "Reservado", EN_PARQUE: "En parque",
+  SIN_CHASIS: "Sin chasis", SIN_CONCILIAR: "Sin conciliar",
+} as const;
+export type ImportSituationState = keyof typeof IMPORT_SITUATION_LABELS;
+type ImportSituationEvidence = {
+  chasis?: string | null;
+  estado_disponibilidad?: string | null;
+  chasis_ambiguo?: boolean;
+};
+
+export function importSituationState(row: ImportSituationEvidence): ImportSituationState {
+  if (!String(row.chasis ?? "").replace(/[^a-zA-Z0-9]/g, "")) return "SIN_CHASIS";
+  if (row.chasis_ambiguo || row.estado_disponibilidad === "CONFLICTO") return "SIN_CONCILIAR";
+  switch (row.estado_disponibilidad) {
+    case "VENDIDO_PENDIENTE_ENTREGA":
+    case "RESERVADO": return "RESERVADO";
+    case "DISPONIBLE": return "DISPONIBLE";
+    case "EN_PARQUE": return "EN_PARQUE";
+    default: return "SIN_CONCILIAR";
+  }
+}
+
+export function importSituationLabel(row: ImportSituationEvidence) {
+  return IMPORT_SITUATION_LABELS[importSituationState(row)];
+}
+
 export function importArrivalState(row: {
   estado_fuente?: string | null; eta?: string | null; ata?: string | null;
   costo_stock_habilitado?: boolean; stock_fisico_confirmado?: boolean; parque_confirmado?: boolean;

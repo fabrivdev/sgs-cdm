@@ -48,6 +48,12 @@ No se modifican las NP, sus modelos, los chasis, las fechas de recepción ni los
 
 ## Verificación local
 
+### Situación simplificada (18/09/2026)
+
+En Importaciones, Situación usa exclusivamente Stock, Reservado, En parque, Sin chasis y Sin conciliar, además de Todas para quitar el filtro. `IMPORT_SITUATION_LABELS`, `importSituationState` e `importSituationLabel` comparten criterio en filtro, tabla, tarjetas, detalle, orden y exportación. Vendido pendiente de entrega se presenta como Reservado: sigue asignado al cliente, no disponible para otra venta. Conflicto/duplicado se presenta como Sin conciliar; se conserva la incidencia en el detalle. Chasis vacío o sin caracteres identificadores se presenta como Sin chasis; un estado desconocido con chasis queda Sin conciliar.
+
+Es una proyección de presentación: no reescribe la disponibilidad original, no cambia Llegada/Completado, facturación, costos, NP ni datos de Stock. Los estados comerciales completos del selector de Stock de Operaciones se conservan; la reducción pertenece solo a Importaciones. No requiere SQL adicional. Pruebas locales: 50 casos de situación/llegada, filtros de operaciones, importes, tabla y detalle; no acredita producción.
+
 ### Presentación compacta (18/09/2026)
 
 Resumen conserva tarjetas con títulos cortos: Seguimiento, Unidad, Pedido y embarque, OC vs factura y Costo de stock. Campos y botones usan nombres breves, también al editar. El estado aparece una vez en la cabecera; no mostrar Seguimiento vacío cuando no hay acciones ni avisos. Las explicaciones generales se consultan mediante ⓘ (clic/teclado/móvil), no como párrafos permanentes. Mantener avisos de fecha faltante, monedas incompatibles y stock pendiente; el costo antiguo sigue visible como Referencia histórica, sin tratarlo como costo de stock. Documentos/Recepción conservan datos, permisos y acciones. No modifica RPC, cálculos, importes ni reglas de llegada y no requiere SQL adicional.
