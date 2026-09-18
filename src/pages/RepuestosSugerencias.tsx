@@ -1,5 +1,5 @@
-import { suggestionColumns } from "@/lib/suggestionTableOrder";
-import { SalesSortButton } from "@/components/ventas/SalesTableControls";
+import { suggestionCoverage } from "@/lib/suggestionTableOrder";
+import { PurchaseSuggestionTable } from "@/components/repuestos/PurchaseSuggestionTable";
 import type { SalesSort } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
@@ -27,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
@@ -56,10 +55,9 @@ import {
   useSegmentosModelo,
 } from "@/hooks/useSugerenciasCompra";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cardLabel, metaText, pageShellWide, tableHeadText } from "@/lib/ui-classes";
+import { cardLabel, metaText, pageShellWide } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 
-const cellText = "py-2 text-[13px] leading-5";
 
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -98,22 +96,6 @@ function analysisDateDefault() {
 function displayDate(value?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("es-PY").format(new Date(`${value.slice(0, 10)}T12:00:00`));
-}
-
-function coberturaActualMeses(row: ResultadoSugerencia) {
-  const ritmoActualMensual = Math.max(0, row.unidades_12m) / 12;
-  if (ritmoActualMensual <= 0) return null;
-  return Math.max(0, row.stock_global / ritmoActualMensual);
-}
-
-function avisosFila(row: ResultadoSugerencia) {
-  const avisos: string[] = [];
-  if (row.confianza_datos === "BAJA") avisos.push("Confianza baja");
-  if (row.tipo_stock_seguridad === "ESTIMADA") avisos.push("Stock de seguridad estimado");
-  if (row.estado_datos === "CODIGO_NUEVO_SIN_HISTORIAL") avisos.push("Código nuevo sin historial");
-  if (row.estado_datos === "SIN_VENTAS_RECIENTES") avisos.push("Sin ventas en 24 meses");
-  if (row.stock_minimo_estrategico > 0) avisos.push(`Mínimo estratégico ${decimal.format(row.stock_minimo_estrategico)}`);
-  return avisos;
 }
 
 function ModelConfigSheet({
@@ -275,7 +257,6 @@ export default function RepuestosSugerencias() {
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
   const [tableSort,setTableSort] = useState<SalesSort>({key:"sugerencia_unidades",direction:"desc"});
   const toggleTableSort = (key:string) => {setPage(1);setTableSort(previous=>({key,direction:previous.key===key&&previous.direction==="asc"?"desc":"asc"}));};
-  const heading = (key:string) => {const c=suggestionColumns.find(c=>c.key===key)!;return <SalesSortButton label={c.label} kind={c.kind} align={c.align} active={tableSort.key===key} direction={tableSort.direction} onClick={()=>toggleTableSort(key)}/>;};
   const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch, orden:tableSort }), [filters, debouncedSearch,tableSort]);
   const liveQuery = useSugerenciaViva(
     brands,
@@ -431,7 +412,9 @@ export default function RepuestosSugerencias() {
         "Unidades 24m": row.unidades_24m,
         "Importe vendido 12m": row.total_vendido_12m,
         "Pedidos 12m": row.pedidos_12m,
-        "Cobertura actual meses": coberturaActualMeses(row),
+        "Demanda mensual ponderada": row.demanda_ponderada_mensual,
+        "Promedio mensual real 12m": Math.max(0, row.unidades_12m) / 12,
+        "Cobertura 12m (meses)": suggestionCoverage(row),
         "Horizonte meses": row.horizonte_meses,
         "Demanda horizonte": row.demanda_horizonte,
         "Stock seguridad": row.stock_seguridad,
@@ -702,74 +685,7 @@ export default function RepuestosSugerencias() {
           <div className="p-6 text-[13px] text-destructive">{liveQuery.error instanceof Error ? liveQuery.error.message : "No se pudo calcular la sugerencia en vivo"}</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className={cn(tableHeadText, "h-8 min-w-[280px]")}>{heading("producto_codigo")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 min-w-[170px]")}>{heading("clase")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("stock_global")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("demanda_ponderada_mensual")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("cobertura")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("ultima_venta")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("stock_objetivo")}</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("sugerencia_unidades")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => {
-                    const cobertura = coberturaActualMeses(row);
-                    const avisos = avisosFila(row);
-                    const coberturaTono = cobertura === null
-                      ? "text-muted-foreground"
-                      : cobertura < leadTimeMeses
-                        ? "text-destructive"
-                        : cobertura < leadTimeMeses + 1
-                          ? "text-amber-600"
-                          : "text-foreground";
-                    return (
-                      <TableRow key={row.producto_codigo} className="cursor-pointer" onClick={() => setSelected(row)}>
-                        <TableCell className={cn(cellText, "max-w-[360px]")}>
-                          <p className="truncate font-medium" title={row.descripcion}>{row.descripcion}</p>
-                          <p className="truncate text-[10px] text-muted-foreground">{row.producto_codigo} · {row.codigo_fabricante || "s/cód. fabricante"} · {row.familia || "sin familia"}</p>
-                        </TableCell>
-                        <TableCell className={cellText}>
-                          <div className="flex flex-wrap items-center gap-1">
-                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-semibold">{row.abc}{row.fsn}{row.xyz}</Badge>
-                            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{row.segmento}</Badge>
-                            {avisos.length > 0 && (
-                              <Badge
-                                variant="outline"
-                                className="border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-800"
-                                title={avisos.join(" · ")}
-                              >
-                                <AlertTriangle className="mr-1 h-3 w-3" />{avisos.length}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className={cn(cellText, "text-right font-medium tabular-nums")}>{decimal.format(row.stock_global)}</TableCell>
-                        <TableCell className={cn(cellText, "text-right tabular-nums")}>{decimal.format(row.demanda_ponderada_mensual)}</TableCell>
-                        <TableCell className={cn(cellText, "text-right font-medium tabular-nums", coberturaTono)}>
-                          {cobertura === null ? "—" : `${decimal.format(cobertura)} m`}
-                        </TableCell>
-                        <TableCell className={cn(cellText, "text-right tabular-nums")}>
-                          {row.ultima_venta ? (
-                            <>
-                              <span>{displayDate(row.ultima_venta)}</span>
-                              {row.dias_ultima_venta != null && <span className="ml-1 text-[10px] text-muted-foreground">{integer.format(row.dias_ultima_venta)} d</span>}
-                            </>
-                          ) : <span className="text-muted-foreground">Sin ventas</span>}
-                        </TableCell>
-                        <TableCell className={cn(cellText, "text-right tabular-nums")}>{decimal.format(row.stock_objetivo)}</TableCell>
-                        <TableCell className={cn(cellText, "text-right")}><span className={cn("inline-flex min-w-11 justify-center rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums", row.sugerencia_unidades > 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{integer.format(row.sugerencia_unidades)}</span></TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {rows.length === 0 && <TableRow><TableCell colSpan={8} className={cn(cellText, "h-32 text-center text-muted-foreground")}>No hay piezas que coincidan con los filtros.</TableCell></TableRow>}
-                </TableBody>
-              </Table>
-            </div>
+            <PurchaseSuggestionTable rows={rows} sort={tableSort} onSort={toggleTableSort} onSelect={setSelected} leadTimeMonths={leadTimeMeses} />
             <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
               <p className={metaText}>{integer.format(liveQuery.data?.total_filtrado ?? 0)} piezas · página {page} de {totalPages}</p>
               <div className="flex gap-1">

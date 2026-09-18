@@ -23,7 +23,7 @@ Base: `useSectionTable`, `salesTableInteraction`, `SalesTableControls`, `salesTa
 | Parque / Clientes | Clientes, Máquinas y Stock; ordenar todas las columnas útiles y exportar el conjunto filtrado. Stock se carga por lotes estables, no con un único límite de respuesta. |
 | Operaciones / Importaciones | Columnas visibles de ambas listas; fechas reales, llaves naturales y posición de unidad como texto `1/3`. Mantener acciones comerciales y logísticas. |
 | Repuestos / catálogo | Mantener orden paginado en servidor y exportación completa con filtros/orden. El informe maestro stock + ventas conserva su alcance por marcas; su nombre lo distingue del exportador de la tabla filtrada. |
-| Sugerencias | Ocho encabezados; orden global en servidor y después de combinar particiones. Exportar todos los resultados de los filtros actuales, no forzar “solo sugeridos”. |
+| Sugerencias | Doce encabezados: Marca, Código, Cód. fabr., Descripción, Clase, Segmento, Stock, Dem. pond., Cobertura 12m, Última venta, Objetivo y Sugerencia. Orden global en servidor y después de combinar particiones. Exportar todos los resultados de los filtros actuales, no forzar “solo sugeridos”. |
 | Compras | Pedidos y Solicitudes, incluidos ítems dentro de cada documento. Exportaciones de ítems siguen documentos/ítems ordenados y búsqueda visible. |
 | Ficha de repuesto | Facturas, Clientes/Meses y Sucursales; filtro local y exportación en menú único del panel de detalle. |
 | Trabajos / OS vinculadas | Todas las columnas; exportación completa y bloqueo tras fallo de carga. |
@@ -38,12 +38,15 @@ Las matrices cronológicas, calendarios, gráficas/rankings y previsualizaciones
 
 1. `supabase/migrations/20260918200000_parts_sales_global_sort_and_export.sql`: helper natural y `ventas_repuestos_listado_v3`. Conserva las CTE/reglas de la versión vigente, agrega claves/direcciones permitidas y exportación completa sin alterar `v2`.
 2. `supabase/migrations/20260918201000_purchase_suggestions_global_sort.sql`: `repuestos_sugerencia_viva_ordenada`, basada en el motor vigente de recurrencia. Requiere el helper anterior y conserva la RPC original y los cálculos de demanda/stock objetivo.
+3. `supabase/migrations/20260918210000_purchase_suggestion_identity_sort.sql`: agrega orden por marca, fabricante, descripción y segmento; Clase compara únicamente ABC/FSN/XYZ, no el segmento. Conserva el motor instalado, permisos, filtros, paginación, cobertura y recomendaciones. Es transaccional, admite reejecución y no escribe datos de negocio.
 
-Ambas migraciones son transaccionales, validan la definición de origen antes de generar variantes y no reescriben datos. Si cambia después el motor original, regenerar las variantes. SQL faltante produce error explícito, no fallback a una página ordenada o datos parciales. El límite de universo del motor original de sugerencias no se amplía desde este cambio.
+Las migraciones son transaccionales, validan la definición de origen antes de modificar funciones y no reescriben datos. Si cambia después el motor original, regenerar las variantes. SQL faltante produce error explícito, no fallback a una página ordenada o datos parciales. El límite de universo del motor original de sugerencias no se amplía desde este cambio.
 
 Commit/push NO ejecuta SQL. No se midió el rendimiento de producción ni se comprobó su esquema aplicado.
 
 ## Verificación
+
+Revisión compacta de Sugerencias del 18/09: registros de una sola línea, columnas separadas, MarcaBadge compartido y cantidades centradas; sin anchos mínimos ni desplazamiento horizontal. Familia, antigüedad, detalle ABC/FSN/XYZ y avisos de confianza permanecen al pasar el cursor y en la ficha/exportación. En teléfonos se muestran Marca, Código, Descripción, Stock y Sugerencia, con aviso de calidad junto a la descripción; las otras columnas no se comprimen hasta volver sus números ilegibles y permanecen en la ficha y el Excel completo. Cobertura 12m es stock / promedio mensual real de doce meses; Dem. pond. es el pronóstico ponderado, no su denominador. Excel conserva ambas bases numéricas. No modifica recomendaciones, mínimos ni horizonte. Pruebas React, tipos, lint, compilación y PostgreSQL aislado; navegador local con 122 registros ficticios en cinco anchos. Elipsis en pantallas estrechas no equivale a lectura completa simultánea. No se consultó producción ni se aplicó SQL remoto.
 
 174 pruebas React/negocio correctas (29 archivos), tipos y compilación. Fixtures PostgreSQL aisladas (`scripts/verify-parts-sales-order-sql.mjs`, `scripts/verify-suggestion-sort-sql.mjs`) comparan páginas contra exportación completa, permisos, claves inválidas, ausencias, NC, totales, ABC y sugerencias contra las RPC originales.
 

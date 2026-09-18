@@ -5,7 +5,7 @@ import { cargarSugerenciaViva, useSugerenciaViva, type ResultadoSugerencia } fro
 import { orderSuggestions } from "@/lib/suggestionTableOrder";
 const {rpc}=vi.hoisted(()=>({rpc:vi.fn()}));
 vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc}}));
-const records=Array.from({length:80},(_,i)=>({producto_codigo:"REP"+(i+1),marca:i%2?"CLAAS":"HORSCH",stock_global:80-i,sugerencia_unidades:i%3,unidades_12m:0}) as ResultadoSugerencia);
+const records=Array.from({length:80},(_,i)=>({producto_codigo:"REP"+(i+1),marca:i%2?"CLAAS":"HORSCH",codigo_fabricante:i===2?null:"FAB"+(80-i),descripcion:"Pieza "+(80-i),segmento:i%2?"FLUJO ESTABLE":"ESTRELLA",stock_global:80-i,sugerencia_unidades:i%3,unidades_12m:0}) as ResultadoSugerencia);
 const summary={total_piezas:40,piezas_sugeridas:26,unidades_sugeridas:39,piezas_nuevas_sin_historial:0,piezas_sin_ventas_recientes:0,piezas_confianza_baja:0};
 function mock(){rpc.mockImplementation(async(name,args)=>{
   const rows=orderSuggestions(records.filter(r=>r.marca===args.p_marca&&(!args.p_solo_sugeridos||r.sugerencia_unidades>0)),{key:args.p_orden,direction:args.p_direccion});
@@ -17,6 +17,13 @@ function Page({page=1}:{page?:number}){
 }
 afterEach(()=>{cleanup();rpc.mockReset();});
 describe("global suggestion ordering",()=>{
+  it.each(["marca","codigo_fabricante","descripcion","segmento"])("preserves complete merged export and server order for %s",async key=>{
+    mock();const sort={key,direction:"desc" as const};
+    const full=await cargarSugerenciaViva(["CLAAS","HORSCH"],"2026-08-31",{orden:sort,soloSugeridos:false});
+    expect(full.rows).toEqual(orderSuggestions(records,sort));
+    expect(full.rows).toHaveLength(80);
+    expect(rpc).toHaveBeenCalledWith("repuestos_sugerencia_viva_ordenada",expect.objectContaining({p_orden:key,p_direccion:"desc"}));
+  });
   it("orders on the server before merging brand partitions and paginating",async()=>{
     mock();const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
     const view=render(<QueryClientProvider client={client}><Page/></QueryClientProvider>);

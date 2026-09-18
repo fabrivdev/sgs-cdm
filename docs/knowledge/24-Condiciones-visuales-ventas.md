@@ -11,6 +11,7 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - No poner `Total facturado en el período` ni otro subtotal monetario al pie de Detalle. El pie puede contar filas/documentos. Esto NO elimina `Total del período` de los resúmenes por período de los tres módulos: ese total sí fue solicitado.
 - Sin scroll horizontal ni ancho mínimo forzado. Ajustar columnas al ancho disponible, con una sola línea, elipsis y valor completo al pasar el cursor para textos extensos. No reducir fuentes hasta hacerlas ilegibles para evitar el scroll.
 - Encabezado y dato comparten ancho y eje: texto a la izquierda, cantidades/horas centradas, importes/porcentajes a la derecha. Conservar colores de marcas y nombres de columnas acordados; usar `Ticket Medio`.
+- Aplicar también una sola línea, colores de Marca y ejes compartidos a Sugerencias de compra. Código/fabricante/descripción van separados; Clase ABC/FSN/XYZ y Segmento no se mezclan. Familia, antigüedad y ayudas permanecen al pasar el cursor/ficha/Excel, sin apilar datos. Cantidades de cobertura sin sufijo; `Cobertura 12m` identifica la base real de doce meses, distinta de `Dem. pond.`. No cambiar fórmulas para que dos bases distintas parezcan coincidir, ni ocultar advertencias de confianza.
 - Ventas de Repuestos usa `Facturación`, sin “neta”, en encabezados y Excel. Es solo el nombre: conservar importes netos y notas de crédito negativas.
 - En Detalle de Servicios, usar `Código` en lugar de `Concepto`: código de producto de la línea financiera para repuestos; código operativo documentado como MA01/KM01/SE para servicios. No fabricar códigos por categoría ni tomar el REP de otra línea de la OS. Conservar el componente en el título al pasar el cursor; códigos ausentes o ambiguos quedan `—`.
 
@@ -31,6 +32,8 @@ Pasos 1 y 2 implementados inicialmente en Servicios. Ampliación autorizada del 
 - Seleccionar agosto en Períodos limita las vistas complementarias al 31/08, nunca al 01/09. Limpiar filtros cancela texto pendiente y restaura los controles, sin volver a insertar búsquedas viejas.
 
 ## Comprobación antes de entregar/publicar
+
+Sugerencias compactas del 18/09: 24 pruebas de presentación/orden/exportación y 14 de conocimiento, tipos, lint y compilación; PostgreSQL aislado conserva resultados y totales con doce claves, ambos sentidos e idempotencia. Navegador local con 122 registros ficticios en cinco anchos: doce campos en escritorio, cinco principales en teléfonos (los secundarios en ficha/Excel), sin scroll horizontal ni doble línea. Se mantienen advertencias de calidad. Requiere SQL manual `20260918210000_purchase_suggestion_identity_sort.sql`, después del orden global anterior. No se consultó ni modificó producción.
 
 1. Comparar la vista con las otras dos áreas, no diseñar un formato distinto solo para un módulo.
 2. Verificar símbolo `$`, cantidades exclusivamente numéricas, ausencia de total monetario en Detalle, datos apilados y párrafos nuevos.

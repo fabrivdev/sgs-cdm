@@ -17,6 +17,8 @@ try {
         'stock_minimo_estrategico',0,'sugerencia_unidades',i%7,'segmento','ESTRELLA',
         'estado_datos','LISTO','unidades_12m',0,'total_vendido_12m',i/10.0,
         'abc','A','fsn','F','xyz','X','demanda_ponderada_mensual',i/10.0,
+        'marca',CASE WHEN i%2=0 THEN 'CLAAS' ELSE 'HORSCH' END,
+        'descripcion','Pieza '||(123-i),'codigo_fabricante',CASE WHEN i=3 THEN NULL ELSE 'FAB'||i END,
         'stock_objetivo',i,'ultima_venta',CASE WHEN i=3 THEN NULL ELSE (date '2026-08-01'+i%28)::text END
       ))) FROM generate_series(1,122) i
     $$;
@@ -26,25 +28,35 @@ try {
   const helper=readFileSync('supabase/migrations/20260918200000_parts_sales_global_sort_and_export.sql','utf8');
   await db.exec(helper.slice(helper.indexOf('CREATE OR REPLACE FUNCTION public.ventas_orden_natural'),helper.indexOf('DO $migration$')));
   await db.exec(readFileSync('supabase/migrations/20260918201000_purchase_suggestions_global_sort.sql','utf8'));
+  const identitySort=readFileSync('supabase/migrations/20260918210000_purchase_suggestion_identity_sort.sql','utf8');
+  await db.exec(identitySort);
+  await db.exec(identitySort); // safe to re-run without duplicating order branches
   const run=async(key,dir,limit=50,offset=0,only=false)=>(await db.query(`SELECT repuestos_sugerencia_viva_ordenada('CLAAS','2026-08-31',NULL,'TODOS','TODOS',$1,$2,$3,$4,$5) r`,[only,limit,offset,key,dir])).rows[0].r;
   const before=(await db.query(`SELECT repuestos_sugerencia_viva('CLAAS','2026-08-31',NULL,'TODOS','TODOS',false,1000,0) r`)).rows[0].r;
-  for(const key of ['producto_codigo','clase','stock_global','demanda_ponderada_mensual','cobertura','ultima_venta','stock_objetivo','sugerencia_unidades']){
+  for(const key of ['marca','producto_codigo','codigo_fabricante','descripcion','clase','segmento','stock_global','demanda_ponderada_mensual','cobertura','ultima_venta','stock_objetivo','sugerencia_unidades']){
     for(const dir of ['asc','desc']){
       const full=await run(key,dir,1000);
       const pages=[...(await run(key,dir,50,0)).rows,...(await run(key,dir,50,50)).rows,...(await run(key,dir,50,100)).rows];
       assert.deepEqual(pages,full.rows); assert.equal(full.rows.length,122);
       assert.deepEqual(full.resumen,before.resumen);assert.equal(full.total_filtrado,before.total_filtrado);
       assert.deepEqual([...full.rows].sort((a,b)=>a.producto_codigo.localeCompare(b.producto_codigo)),[...before.rows].sort((a,b)=>a.producto_codigo.localeCompare(b.producto_codigo)));
-      if(key==='stock_global'||key==='ultima_venta')assert.equal(full.rows.at(-1).producto_codigo,'REP3');
+      if(key==='stock_global'||key==='ultima_venta'||key==='codigo_fabricante')assert.equal(full.rows.at(-1).producto_codigo,'REP3');
     }
   }
   const natural=(await run('producto_codigo','asc',1000)).rows;
   assert.ok(natural.findIndex(r=>r.producto_codigo==='REP2')<natural.findIndex(r=>r.producto_codigo==='REP10'));
+  const codes=(await run('codigo_fabricante','asc',1000)).rows;
+  assert.ok(codes.findIndex(r=>r.codigo_fabricante==='FAB2')<codes.findIndex(r=>r.codigo_fabricante==='FAB10'));
+  for(const [key,value] of [['marca',r=>r.marca],['descripcion',r=>r.descripcion]]) {
+    const ordered=(await run(key,'asc',1000)).rows;
+    const collator=new Intl.Collator('es',{numeric:true,sensitivity:'base'});
+    assert.ok(ordered.every((r,i)=>i===0||collator.compare(value(ordered[i-1]),value(r))<=0));
+  }
   const filtered=await run('sugerencia_unidades','desc',1000,0,true);
   assert.ok(filtered.rows.every(r=>r.sugerencia_unidades>0));assert.equal(filtered.rows.length,filtered.total_filtrado);
   await assert.rejects(run('arbitrary','asc'),/Orden inválido/);
   await db.exec("SET fixture.denied='on'");
   await assert.rejects(run('stock_global','asc'),/No tenes acceso/);
-  console.log('OK: all eight headers, both directions, global pages, natural codes, nulls last, unchanged forecasts/summary/filters and access.');
+  console.log('OK: all twelve headers, both directions, global pages, natural identity fields, nulls last, idempotent SQL, unchanged forecasts/summary/filters and access.');
 } catch (error) { console.error(error.message); process.exitCode=1; }
 finally { await db.close(); }
