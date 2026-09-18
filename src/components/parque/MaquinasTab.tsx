@@ -1,10 +1,11 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Download, Plus } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Plus } from "lucide-react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
@@ -334,18 +335,9 @@ export function MaquinasTab({
         activeCount={activos}
         onClear={limpiar}
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
+        secondaryActions={canExport ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar máquinas", onSelect: exportar }]} /> : undefined}
         actions={
           <div className="flex items-center gap-2">
-            {canExport && <Button
-              variant="outline"
-              size="icon"
-              onClick={exportar}
-              className="hidden h-9 w-9 shrink-0 sm:inline-flex"
-              title="Exportar máquinas a Excel"
-            >
-              <Download className="h-4 w-4" />
-              <span className="sr-only">Exportar máquinas</span>
-            </Button>}
             {canManagePark && <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9 shrink-0 px-3">
               <Plus className="mr-1 h-4 w-4" /> Nueva
             </Button>}

@@ -1,3 +1,4 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,7 @@ import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMult
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/EmptyState";
 import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkeletons";
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, MapPin, Wrench } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { addDays, format, getISOWeek, parseISO, setISOWeek, startOfWeek } from "date-fns";
 import * as XLSX from "xlsx";
@@ -571,11 +572,7 @@ export default function Planificador() {
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
-        actions={(
-          <Button variant="outline" size="sm" onClick={exportExcel}>
-            <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Exportar
-          </Button>
-        )}
+        secondaryActions={<SectionActionsMenu options={[{ id: "excel", label: "Exportar Planificador", onSelect: exportExcel }]} />}
         expanded={<>
           <FilterMultiSelect label="Marca" values={fMarcas} onChange={setFMarcas} placeholder="Todas" width="w-full" options={MARCAS.map(m => ({ value: m, label: m }))} />
           <FilterMultiSelect label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-full" options={ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))} />

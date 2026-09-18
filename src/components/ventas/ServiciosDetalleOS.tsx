@@ -5,8 +5,9 @@ import { matchesServiceSalesSearch, type ServiceSalesSearchLine } from "@/lib/se
 import { supabase } from "@/integrations/supabase/client";
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
 import { TableScroll, scrollHead, salesHeader } from "./TableScroll";
+import { useSalesSectionExport } from "./SalesSectionExports";
 import { useAuth } from "@/hooks/useAuth";
-import { SalesExportButton, SalesSortButton } from "./SalesTableControls";
+import { SalesSortButton } from "./SalesTableControls";
 import { useSalesTableSort, type SalesColumn } from "./salesTableInteraction";
 import type { IndicadoresFiltros } from "./useServiciosIndicadores";
 import { serviceFiltersKey, serviceFilteredRequest } from "./serviceSalesFilters";
@@ -100,15 +101,16 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
     !row.factura || row.factura === "Sin numero" ? row.id : null,
   ]))).size, [rows]);
 
+  useSalesSectionExport({ id: "services-detail", label: "Exportar Detalle de facturación", disabled: loading || Boolean(error) || !rows.length, onSelect: async () => {
+    const snapshot = rows;
+    const { exportSalesTable } = await import("./salesTableExport");
+    exportSalesTable({rows:snapshot,columns:detailColumns,sheetName:"Detalle Servicios",fileName:`ventas-servicios-detalle-${desde}-${hasta}.xlsx`});
+  } }, can("datos:exportar"));
+
   return <>
     <section aria-label="Detalle de facturación de Servicios" className="mt-3 min-w-0 max-w-full rounded-md border">
       <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-2">
         <h3 className="truncate text-[12px] font-semibold">Detalle de facturación</h3>
-        <SalesExportButton allowed={can("datos:exportar")} disabled={loading || Boolean(error) || !rows.length} onExport={async () => {
-          const snapshot = rows;
-          const { exportSalesTable } = await import("./salesTableExport");
-          exportSalesTable({rows:snapshot,columns:detailColumns,sheetName:"Detalle Servicios",fileName:`ventas-servicios-detalle-${desde}-${hasta}.xlsx`});
-        }} />
       </div>
       <div role="table" aria-label="Líneas facturadas de Servicios" aria-colcount={detailColumns.length}>
       <TableScroll rows={rows.length} className="min-w-0 max-w-full">

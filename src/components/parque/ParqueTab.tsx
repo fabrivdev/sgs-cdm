@@ -1,3 +1,4 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,6 @@ import {
   ArrowUpDown,
   CalendarIcon,
   Check,
-  Download,
   Flag,
   Phone,
   RefreshCw,
@@ -676,6 +676,7 @@ export function ParqueTab({
   return (
     <div className="space-y-3">
       <FiltersBar
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar clientes", onSelect: exportar }]} /> : undefined}
         search={{ value: q, onChange: setQ, placeholder: "Nombre del cliente…", label: "Buscar" }}
         activeCount={filtrosActivos + (q ? 1 : 0)}
         onClear={() => { setQ(""); limpiarFiltros(); }}
@@ -758,11 +759,6 @@ export function ParqueTab({
               · cargando facturación...
             </span>
           )}
-        </div>
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          {can("datos:exportar") && <Button variant="outline" size="sm" onClick={exportar} className="hidden h-8 sm:inline-flex">
-            <Download className="mr-1 h-3.5 w-3.5" /> Exportar
-          </Button>}
         </div>
       </div>
 

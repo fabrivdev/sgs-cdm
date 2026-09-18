@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { render, selectExport } from "./salesSectionExports.test-support";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
 import { serviceNumberColumn, serviceMoneyColumn } from "./serviceSalesColumns";
@@ -35,7 +36,7 @@ describe("shared sales table",()=>{
     render(<SalesDataTable {...props} footer={footer} />);
     fireEvent.click(screen.getByRole("button",{name:/Ordenar Nombre/}));
     expect(within(screen.getByRole("table")).getAllByRole("row").at(-1)).toHaveTextContent("Total del período");
-    fireEvent.click(screen.getByRole("button",{name:"Exportar tabla a Excel"}));
+    await selectExport();
     await waitFor(()=>expect(exportTable).toHaveBeenCalled());
     const exported=exportTable.mock.calls[0][0];
     expect(exported.rows.map((row:Row)=>row.id)).toEqual(["c","b","a","footer"]);
@@ -47,7 +48,7 @@ describe("shared sales table",()=>{
     render(<SalesDataTable {...props} rows={many} />);
     expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(26);
     expect(screen.queryByText("Total del período")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button",{name:"Exportar tabla a Excel"}));
+    await selectExport();
     await waitFor(()=>expect(exportTable).toHaveBeenCalled());
     expect(exportTable.mock.calls[0][0].rows).toHaveLength(25);
   });
@@ -55,8 +56,8 @@ describe("shared sales table",()=>{
     can.mockReturnValue(false);
     const view=render(<SalesDataTable {...props} />);
     expect(can).toHaveBeenCalledWith("datos:exportar");
-    expect(screen.queryByRole("button",{name:"Exportar tabla a Excel"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
     can.mockReturnValue(true);view.rerender(<SalesDataTable {...props} rows={[]} />);
-    expect(screen.getByRole("button",{name:"Exportar tabla a Excel"})).toBeDisabled();
+    expect(screen.getByRole("button",{name:"Acciones de la sección"})).toBeDisabled();
   });
 });

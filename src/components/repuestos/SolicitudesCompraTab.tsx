@@ -242,7 +242,7 @@ export function SolicitudesCompraTab() {
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN000406, 2181800, anillo…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroSolicitud)) + Number(Boolean(filtros.solicitante))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
-          actions={<TableExportButton options={exportOptions} />}
+          secondaryActions={<TableExportButton options={exportOptions} />}
         >
           <FilterMultiSelect
             label="Sucursal"

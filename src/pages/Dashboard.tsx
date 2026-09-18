@@ -3292,7 +3292,7 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        actions={dashboardExportOptions.length > 0 &&
+        secondaryActions={dashboardExportOptions.length > 0 &&
           ((section !== "resumen" && section !== "facturación") || (!loading && !facturacionError))
           ? <TableExportButton options={dashboardExportOptions} /> : undefined}
         expanded={(

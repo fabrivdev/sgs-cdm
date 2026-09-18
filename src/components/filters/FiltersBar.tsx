@@ -59,7 +59,8 @@ function Field({ label, children, className }: { label?: string; children: React
  * Calendario / Dashboard / Parque. Siempre inline, nunca modal.
  *
  * Los filtros primarios viven en una única fila (nunca se expande a dos filas);
- * lo secundario va detrás del botón "Filtros", que abre un panel lateral.
+ * los campos secundarios van detrás de "Más filtros"; el menú de sección
+ * permanece inmediatamente a su derecha, también en móvil.
  */
 export function FiltersBar({
   search,
@@ -68,6 +69,7 @@ export function FiltersBar({
   onClear,
   meta,
   actions,
+  secondaryActions,
   expanded,
   className,
 }: {
@@ -84,6 +86,8 @@ export function FiltersBar({
   /** @deprecated El contador/meta ya no se renderiza junto al botón Filtros. */
   meta?: ReactNode;
   actions?: ReactNode;
+  /** Section menu, immediately after Más filtros; never duplicated in the drawer. */
+  secondaryActions?: ReactNode;
   expanded?: ReactNode;
   className?: string;
 }) {
@@ -93,7 +97,7 @@ export function FiltersBar({
 
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
   const debouncedSearch = useDebouncedValue(searchDraft, 250);
-  const hasControls = !!children || !!actions || !!expanded || (activeCount > 0 && !!onClear);
+  const hasControls = !!children || !!actions || !!secondaryActions || !!expanded || (activeCount > 0 && !!onClear);
 
   useEffect(() => {
     setSearchDraft(search?.value ?? "");
@@ -134,26 +138,14 @@ export function FiltersBar({
 
   return (
     <Card className={cn("min-w-0 px-3 py-2", className)}>
-      {/* Móvil: búsqueda + botón de panel */}
-      <div className="flex gap-2 sm:hidden">
+      <div className="flex min-w-0 flex-nowrap items-end gap-2">
+      {/* Móvil: búsqueda. Los controles de sección se montan una sola vez. */}
+      <div className="flex min-w-0 flex-1 gap-2 sm:hidden">
         {search && searchInput}
-        {hasControls && (
-          <Button
-            type="button"
-            variant={activeCount > 0 ? "default" : "outline"}
-            size="icon"
-            className={cn(controlHeight, "w-8 shrink-0")}
-            onClick={() => setPanelOpen(true)}
-            aria-label="Filtros"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-          </Button>
-        )}
       </div>
 
       {/* Desktop: una sola fila, sin wrap. Lo que no entra se oculta y queda en el panel. */}
-      <div className="hidden min-w-0 flex-nowrap items-end gap-x-2 sm:flex">
-        <div ref={rowRef} className="flex min-w-0 flex-1 flex-nowrap items-end gap-x-2 overflow-hidden">
+        <div ref={rowRef} className="hidden min-w-0 flex-1 flex-nowrap items-end gap-x-2 overflow-hidden sm:flex">
           {search && (
             <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] min-w-[150px] shrink"}>
               <div className="flex">{searchInput}</div>
@@ -164,21 +156,21 @@ export function FiltersBar({
         </div>
 
         <div className="flex shrink-0 items-end gap-2 pl-2">
-          {(expanded || children) && (
-            <Field>
+          {hasControls && (
               <Button
                 type="button"
                 variant={activeCount > 0 ? "secondary" : "outline"}
                 size="sm"
                 className={cn(ctrl, "shrink-0 gap-1 whitespace-nowrap")}
                 onClick={() => setPanelOpen(true)}
+                aria-label="Más filtros"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                Filtros{activeCount > 0 ? ` ${activeCount}` : ""}
+                Más filtros{activeCount > 0 ? ` ${activeCount}` : ""}
               </Button>
-            </Field>
           )}
-          {actions && <div className="flex items-end gap-2">{actions}</div>}
+          {secondaryActions}
+          {actions && <div className="hidden items-end gap-2 sm:flex">{actions}</div>}
         </div>
       </div>
 

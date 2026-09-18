@@ -652,7 +652,7 @@ export default function Comisiones() {
             activeCount={activeFilterCount}
             onClear={clearFilters}
             meta={`${detailOrders.length} OS`}
-            actions={<TableExportButton options={exportOptions} />}
+            secondaryActions={<TableExportButton options={exportOptions} />}
           >
             <FilterDate label="Desde" value={from} onChange={setFrom} />
             <FilterDate label="Hasta" value={to} onChange={setTo} />

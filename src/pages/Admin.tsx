@@ -577,7 +577,7 @@ export default function Admin() {
             activeCount={normalizedTableSearch ? 1 : 0}
             onClear={() => setTableSearch("")}
             meta={`${filteredProfiles.length} persona${filteredProfiles.length === 1 ? "" : "s"}`}
-            actions={<TableExportButton options={[exportOptions[0]]} />}
+            secondaryActions={<TableExportButton options={[exportOptions[0]]} />}
           />
         )}
 

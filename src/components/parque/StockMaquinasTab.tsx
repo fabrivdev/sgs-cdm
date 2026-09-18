@@ -1,5 +1,6 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, PackageOpen } from "lucide-react";
+import { PackageOpen } from "lucide-react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -127,11 +128,7 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
         activeCount={activeCount}
         onClear={clear}
         meta={`${filtered.length} referencia${filtered.length === 1 ? "" : "s"}${lastImport ? ` · Actualizado ${new Date(lastImport).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })}` : ""}`}
-        actions={can("datos:exportar") ? (
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={exportRows} title="Exportar stock a Excel">
-            <Download className="h-4 w-4" /><span className="sr-only">Exportar stock</span>
-          </Button>
-        ) : undefined}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar stock", onSelect: exportRows }]} /> : undefined}
         expanded={
           <FilterSelect label="Condición" value={condition} onChange={setCondition} placeholder="Condición" width="w-full" options={[{ value: "all", label: "Todas" }, { value: "Nuevo", label: "Nuevas" }, { value: "Usado", label: "Usadas" }]} />
         }

@@ -1,3 +1,4 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
-  Download,
   Info,
   Loader2,
   RefreshCw,
@@ -632,7 +632,7 @@ export default function RepuestosSugerencias() {
         search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción…", width: "w-[min(360px,26vw)]" }}
         activeCount={Number(Boolean(filters.buscar)) + Number(brands.length > 0) + Number(Boolean(filters.segmentos?.length)) + Number(Boolean(filters.estados?.length)) + Number(Boolean(filters.soloSugeridos))}
         onClear={() => { setBrands([]); setFilters({ buscar: "", segmentos: [], estados: [], soloSugeridos: false }); setPage(1); }}
-        actions={<Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => exportMutation.mutate()} disabled={!liveQuery.data || exportMutation.isPending}><Download className="mr-1 h-3.5 w-3.5" />Exportar</Button>}
+        secondaryActions={<SectionActionsMenu busy={exportMutation.isPending} options={[{ id: "excel", label: "Exportar sugerencias", disabled: !liveQuery.data, onSelect: () => exportMutation.mutate() }]} />}
       >
         <FilterMultiSelect
           label="Marca"

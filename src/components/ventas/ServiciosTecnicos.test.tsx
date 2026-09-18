@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { render, selectExport } from "./salesSectionExports.test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiciosTecnicos } from "./ServiciosTecnicos";
 import { displayImportedTechnicianName } from "@/lib/technicianMatching";
@@ -20,7 +21,7 @@ describe("service technician table",()=>{
     fireEvent.change(screen.getByRole("searchbox",{name:"Filtrar técnico en esta tabla"}),{target:{value:"tecnico a"}});
     expect(screen.queryByText(displayImportedTechnicianName("Técnico B"))).not.toBeInTheDocument();
     expect(screen.getByText("$ 100")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button",{name:"Exportar tabla a Excel"}));
+    await selectExport();
     await waitFor(()=>expect(exportTable).toHaveBeenCalled());
     expect(exportTable.mock.calls[0][0].rows).toEqual([{...row,tecnico:displayImportedTechnicianName(row.tecnico)}]);
     expect(rpc).toHaveBeenCalledTimes(1);
@@ -31,6 +32,6 @@ describe("service technician table",()=>{
     render(<ServiciosTecnicos {...props} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Network offline");
     expect(screen.queryByText("Cargando técnicos…")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button",{name:"Exportar tabla a Excel"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
   });
 });

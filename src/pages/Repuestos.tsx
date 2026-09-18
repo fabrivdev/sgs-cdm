@@ -1,12 +1,10 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Building2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
-  Download,
   Package,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,14 +36,6 @@ import { FiltersBar } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { cn } from "@/lib/utils";
 import { buildStockSalesReport, filterPartsStockSalesByBrands } from "@/lib/exports/partsStockSales";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
@@ -170,33 +160,10 @@ export default function Repuestos() {
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}
-        actions={(
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="h-8 text-[12px]" disabled={exporting}>
-                <Download className="mr-1 h-3.5 w-3.5" />Exportar<ChevronDown className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel className="text-[11px] text-muted-foreground">Elegí cómo presentar el stock</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="items-start gap-2 py-2" onSelect={() => void exportar("sucursales")}>
-                <Building2 className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <p className="text-[12px] font-medium">Stock por sucursal</p>
-                  <p className="text-[11px] text-muted-foreground">Desglosa cada sucursal y respeta todos los filtros visibles.</p>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="items-start gap-2 py-2" onSelect={() => void exportar("historico")}>
-                <Clock className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <p className="text-[12px] font-medium">Stock total + ventas históricas</p>
-                  <p className="text-[11px] text-muted-foreground">Totaliza el stock e incluye ventas 12M, 24M y 36M.</p>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        secondaryActions={<SectionActionsMenu busy={exporting} options={[
+          { id: "branches", label: "Exportar stock por sucursal", onSelect: () => exportar("sucursales") },
+          { id: "history", label: "Exportar stock total + ventas históricas", onSelect: () => exportar("historico") },
+        ]} />}
       >
         <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
         <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />

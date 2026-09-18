@@ -1,3 +1,4 @@
+import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { salesHeader } from "@/components/ventas/TableScroll";
@@ -375,9 +376,9 @@ export default function Ventas({ area }: { area: VentasArea }) {
     ? { marcas: maquinasData?.dimensiones.marcas ?? [], tipos: maquinasData?.dimensiones.tipos ?? [] }
     : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort() };
   return (
-    <PageShell>
+    <SalesSectionExportsProvider><PageShell>
       <PageHeader title={copy.title} />
-      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }}>
+      <FiltersBar secondaryActions={area === "servicios" ? <SalesSectionExportMenu /> : undefined} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }}>
         <FilterCustom label="Período rápido" width="w-[190px]"><select value={activeDatePreset} onChange={(event) => applyDatePreset(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px]"><option value="">Personalizado</option>{datePresets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></FilterCustom>
         <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
         <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
@@ -407,6 +408,6 @@ export default function Ventas({ area }: { area: VentasArea }) {
           ? <MaquinasExplorer data={maquinasData} loading={loading} error={error} desde={explorerRange.desde} hasta={explorerRange.hasta} selectedPeriod={selectedPeriod} />
           : <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={serviceFilters} />}
       </>}
-    </PageShell>
+    </PageShell></SalesSectionExportsProvider>
   );
 }

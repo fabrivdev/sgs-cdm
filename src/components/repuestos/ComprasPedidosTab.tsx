@@ -308,7 +308,7 @@ export function ComprasPedidosTab() {
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN003187, 06673230, casquillo…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroPedido)) + Number(Boolean(filtros.proveedor))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
-          actions={<TableExportButton options={exportOptions} />}
+          secondaryActions={<TableExportButton options={exportOptions} />}
         >
           <FilterMultiSelect
             label="Sucursal"

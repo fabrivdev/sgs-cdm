@@ -15,6 +15,8 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 
 ## Orden y exportación compartidos
 
+- Un único acceso a acciones por sección: botón `Más filtros`, inmediatamente seguido por `⋮`. Las opciones de exportación viven en ese menú, no en cada tabla ni repetidas dentro del panel de filtros. Aplicar el mismo criterio en escritorio y móvil. Conservar las acciones principales y contextuales (crear, editar, validar, pagar) sin moverlas como parte de esta unificación.
+- En Servicios, el menú contiene Períodos y las tablas de la pestaña montada; cambiar de pestaña retira acciones anteriores sin consultar otras RPC. Conservar los archivos, columnas, filas, orden, filtros y permisos originales; centralizar el acceso no autoriza cambiar datos ni habilitar nuevas exportaciones.
 - Encabezados ordenables con un clic ascendente y otro descendente, indicador de dirección y acceso por teclado. Comparar valores originales: fechas cronológicas, cantidades/importes numéricos y textos con orden español natural; no ordenar el texto formateado con `$`. Ausencias al final en ambos sentidos; empates estables, sin deduplicar líneas.
 - Mantener eje/ancho de encabezado y dato al agregar el icono. No apilar títulos ni ampliar la tabla para acomodarlo. Los totales de resúmenes por período permanecen al pie, fuera del conjunto ordenable.
 - Exportar a Excel todas las filas filtradas en el orden y columnas actuales, no solo la página o el área visible. Conservar textos completos, códigos/facturas como texto con ceros iniciales, fechas reales, cantidades numéricas, centavos y NC negativas. No convertir descripciones en fórmulas ni agregar subtotales al Detalle.
@@ -36,6 +38,8 @@ Pasos 1 y 2 implementados: base reutilizable `salesTableInteraction`, `SalesTabl
 5. Registrar qué fue comprobado localmente y qué requiere SQL/publicación; no declarar validación visual en producción sin comprobarla.
 
 ## Fuentes y alcance comprobado
+
+Unificación del 18/09/2026: `FiltersBar.secondaryActions`, `SectionActionsMenu` y `SalesSectionExports` reemplazan botones repetidos por `Más filtros → ⋮`. 121 pruebas de Ventas/menús, 14 de conocimiento, tipos y compilación correctos; navegador local con datos ficticios en cinco anchos y archivos descargados completos verificados. No cambia consultas, permisos, importes ni exportadores; no requiere SQL y no valida producción. Alcance y limitaciones en `docs/acciones-de-seccion.md`.
 
 [[03-Ventas-y-conciliacion]] recoge las reglas financieras; [[02-Servicios-y-comisiones]] distingue horas OS de horas-persona; [[09-Mantenimiento]] explica cómo mantener y sincronizar esta nota.
 

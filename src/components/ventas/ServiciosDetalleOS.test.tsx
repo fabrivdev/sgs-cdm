@@ -1,4 +1,5 @@
-import { render, screen, waitFor, cleanup, within, fireEvent } from '@testing-library/react';
+import { screen, waitFor, cleanup, within, fireEvent } from '@testing-library/react';
+import { render, selectExport } from "./salesSectionExports.test-support";
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiciosDetalleOS } from './ServiciosDetalleOS';
 
@@ -44,7 +45,7 @@ describe('invoice line detail', () => {
     const {container}=render(<ServiciosDetalleOS {...props} buscar="Cliente seleccionado" />);
     await screen.findByText('25 líneas · 1 documentos');
     fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: menor a mayor'}));
-    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await selectExport();
     await waitFor(()=>expect(exportSalesTable).toHaveBeenCalledTimes(1));
     const exported=exportSalesTable.mock.calls[0][0];
     expect(exported.fileName).toBe('ventas-servicios-detalle-2026-01-01-2026-09-11.xlsx');
@@ -64,7 +65,7 @@ describe('invoice line detail', () => {
     rpc.mockResolvedValue({error:null,data:[nc,km,part]});
     render(<ServiciosDetalleOS {...props} />);
     await screen.findByText('3 líneas · 2 documentos');
-    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await selectExport();
     await waitFor(()=>expect(exportSalesTable).toHaveBeenCalled());
     const {columns}=exportSalesTable.mock.calls[0][0];
     expect(columns[1].exportValue(nc)).toBe('NC 000000001');
@@ -79,26 +80,26 @@ describe('invoice line detail', () => {
     const first=render(<ServiciosDetalleOS {...props} />);
     await screen.findByText('1 líneas · 1 documentos');
     expect(can).toHaveBeenCalledWith('datos:exportar');
-    expect(screen.queryByRole('button',{name:'Exportar tabla a Excel'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Acciones de la sección'})).not.toBeInTheDocument();
     first.unmount(); can.mockReturnValue(true);
     rpc.mockResolvedValue({error:null,data:[]});
     const empty=render(<ServiciosDetalleOS {...props} />);
-    expect(screen.getByRole('button',{name:'Exportar tabla a Excel'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'Acciones de la sección'})).toBeDisabled();
     await screen.findByText('No hay líneas facturadas para estos filtros.');
-    expect(screen.getByRole('button',{name:'Exportar tabla a Excel'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'Acciones de la sección'})).toBeDisabled();
     empty.unmount(); rpc.mockResolvedValue({error:{message:'Error de consulta'},data:null});
     render(<ServiciosDetalleOS {...props} />);
     await screen.findByRole('alert');
-    expect(screen.getByRole('button',{name:'Exportar tabla a Excel'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'Acciones de la sección'})).toBeDisabled();
     expect(exportSalesTable).not.toHaveBeenCalled();
   });
   it('reports export failure and permits a retry without falsely claiming a download', async () => {
     rpc.mockResolvedValue({error:null,data:[line]}); exportSalesTable.mockImplementationOnce(()=>{throw new Error('Download failed');});
     render(<ServiciosDetalleOS {...props} />);
     await screen.findByText('1 líneas · 1 documentos');
-    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await selectExport();
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo exportar.');
-    fireEvent.click(screen.getByRole('button',{name:'Exportar tabla a Excel'}));
+    await selectExport();
     await waitFor(()=>expect(exportSalesTable).toHaveBeenCalledTimes(2));
     await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });

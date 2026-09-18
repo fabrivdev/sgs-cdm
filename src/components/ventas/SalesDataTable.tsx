@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { useSalesSectionExport } from "./SalesSectionExports";
 import { RowCount, TableScroll, salesHeader, scrollHead } from "./TableScroll";
-import { SalesExportButton, SalesSortButton } from "./SalesTableControls";
+import { SalesSortButton } from "./SalesTableControls";
 import { useSalesTableSort, type SalesColumn, type SalesSort } from "./salesTableInteraction";
 
 export type SalesDisplayColumn<T> = SalesColumn<T> & {
@@ -17,6 +18,11 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
 }) {
   const { can } = useAuth();
   const { ordered, sort, toggleSort } = useSalesTableSort(rows, columns, initialSort);
+  useSalesSectionExport({ id: fileName, label: `Exportar ${title}`, disabled: !ordered.length, onSelect: async () => {
+    const snapshot = footer ? [...ordered, footer] : ordered;
+    const { exportSalesTable } = await import("./salesTableExport");
+    exportSalesTable({ rows: snapshot, columns, fileName, sheetName: "Ventas Servicios" });
+  } }, can("datos:exportar"));
   const grid = { gridTemplateColumns: columns.map(column => `minmax(0,${column.weight ?? 1}fr)`).join(" ") };
   const cells = (row: T, interactive = false) => columns.map((column, index) => {
     const value = column.value(row);
@@ -29,11 +35,6 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
   return <section aria-label={title} className="min-w-0 max-w-full overflow-hidden rounded-md border">
     <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-2">
       <h3 className="truncate text-[12px] font-semibold">{title}</h3>
-      <SalesExportButton allowed={can("datos:exportar")} disabled={!ordered.length} onExport={async () => {
-        const snapshot = footer ? [...ordered, footer] : ordered;
-        const { exportSalesTable } = await import("./salesTableExport");
-        exportSalesTable({ rows: snapshot, columns, fileName, sheetName: "Ventas Servicios" });
-      }} />
     </div>
     <div role="table" aria-label={title} aria-colcount={columns.length}>
       <TableScroll rows={ordered.length} className="min-w-0 max-w-full">

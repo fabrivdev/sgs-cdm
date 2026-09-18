@@ -1,3 +1,4 @@
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,7 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarOff, ChevronLeft, ChevronRight, FileSpreadsheet, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, GraduationCap, MapPin, Wrench, Plus, Ban, RotateCcw, Trash2 } from "lucide-react";
 import {
   format,
   addMonths,
@@ -580,11 +581,7 @@ export default function Calendario() {
       <FiltersBar
         activeCount={fTecnicos.length > 0 ? 1 : 0}
         onClear={() => setFTecnicos([])}
-        actions={(
-          <Button variant="outline" size="sm" onClick={exportarExcel}>
-            <FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Exportar
-          </Button>
-        )}
+        secondaryActions={<SectionActionsMenu options={[{ id: "excel", label: "Exportar Calendario", onSelect: exportarExcel }]} />}
       >
         <FilterSelect
           label="Vista"
