@@ -224,7 +224,7 @@ Código sigue la prioridad de Detalle (financiero específico, operativo único 
 y componente, financiero real como respaldo); ambigüedades no se adivinan.
 La resolución operacional solo consulta OS cuando se solicita el filtro Código.
 Técnicos tiene búsqueda local: reduce esa tabla/exportación sin reasignar MO.
-Horas y MO sin clasificar se muestran separadas, conservando el total y el reparto.
+Técnicos muestra nueve columnas, sin “asociada” ni columnas Horas/MO sin clasificar; Excel usa los mismos encabezados. Los totales y el reparto se conservan íntegros. Si la respuesta contiene horas o MO pendientes de clasificación, aparece una alerta breve: quitar las columnas no elimina esos datos ni los reasigna a Cliente. No modifica RPC, Comisiones ni correcciones manuales.
 Seleccionar agosto limita las vistas complementarias al 31/08. Limpiar cancela texto
 pendiente. Carga/error nunca permite exportar resultados anteriores.
 

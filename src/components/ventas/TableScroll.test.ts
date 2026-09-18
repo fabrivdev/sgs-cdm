@@ -9,7 +9,7 @@ describe("sales column alignment", () => {
   it.each(["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Documentos", "Cantidad", "Unidades netas", "Horas OS", "Total horas", "Km OS", "ABC"])("centers quantities: %s", label => {
     expect(salesColumnClass(label)).toBe("text-center");
   });
-  it.each(["Facturado", "Facturación neta", "Mano de obra", "MO Cliente asociada", "Ticket Medio", "Notas de crédito", "Variación LM", "Participación neta", "Total OS"])("right-aligns amounts and percentages: %s", label => {
+  it.each(["Facturado", "Facturación neta", "Mano de obra", "MO Cliente", "Ticket Medio", "Notas de crédito", "Variación LM", "Participación neta", "Total OS"])("right-aligns amounts and percentages: %s", label => {
     expect(salesColumnClass(label)).toBe("text-right");
   });
   it("supports a count of credit notes and an OS identifier without confusing their meanings", () => {

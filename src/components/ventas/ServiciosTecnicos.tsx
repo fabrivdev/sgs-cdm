@@ -86,14 +86,16 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
   const columns: SalesDisplayColumn<Fila>[] = [
     { key: "tecnico", label: "Técnico", kind: "text", value: row => row.tecnico, weight: 2.4, className: "font-medium" },
     ...([ ["horas_cliente", "Horas Cliente"], ["horas_garantia", "Horas Garantía"], ["horas_interno", "Horas Interno"],
-      ["horas_otros", "Horas sin clasificar"], ["total_horas", "Total horas"] ] as const)
+      ["total_horas", "Total horas"] ] as const)
       .map(([key, label]) => serviceNumberColumn<Fila>(key, label, row => row[key])),
-    ...([ ["mo_cliente", "MO Cliente asociada"], ["mo_garantia", "MO Garantía asociada"], ["mo_interno", "MO Interno asociada"],
-      ["mo_otros", "MO sin clasificar"], ["mo_total", "MO total asociada"] ] as const)
+    ...([ ["mo_cliente", "MO Cliente"], ["mo_garantia", "MO Garantía"], ["mo_interno", "MO Interno"],
+      ["mo_total", "MO total"] ] as const)
       .map(([key, label]) => serviceMoneyColumn<Fila>(key, label, row => row[key])),
   ];
   return <div className="mt-3 min-w-0 space-y-2">
     <input type="search" aria-label="Filtrar técnico en esta tabla" placeholder="Técnico…" value={technicianSearch} onChange={event=>setTechnicianSearch(event.target.value)} className="h-8 w-full max-w-xs rounded-md border bg-background px-2 text-[12px]" />
+    {filtered.some(row => Number(row.horas_otros || 0) !== 0 || Number(row.mo_otros || 0) !== 0) &&
+      <div role="alert" className="text-[12px] text-destructive">Hay datos con tipo de tiempo pendiente de revisión.</div>}
     <SalesDataTable title="Facturación por técnico" rows={filtered} columns={columns}
       initialSort={{key:"total_horas",direction:"desc"}} rowKey={row => row.tecnico} countLabel="técnicos"
       fileName={`ventas-servicios-tecnicos-${desde}-${hasta}.xlsx`} empty="No hay jornadas cargadas para las OS del período." />
