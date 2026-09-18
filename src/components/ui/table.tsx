@@ -42,13 +42,22 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
 TableRow.displayName = "TableRow";
 
 const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, onClick, onKeyDown, tabIndex, ...props }, ref) => (
     <th
       ref={ref}
       className={cn(
         "h-9 px-3 text-left align-middle text-[11px] font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
         className,
       )}
+      onClick={onClick}
+      tabIndex={tabIndex ?? (onClick ? 0 : undefined)}
+      onKeyDown={event => {
+        onKeyDown?.(event);
+        if (!event.defaultPrevented && onClick && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          event.currentTarget.click();
+        }
+      }}
       {...props}
     />
   ),

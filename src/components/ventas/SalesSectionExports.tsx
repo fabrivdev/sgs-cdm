@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { SectionActionsMenu, type SectionAction } from "@/components/exports/SectionActionsMenu";
+import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
 type Registry = { options: SectionAction[]; register: (option: SectionAction) => () => void };
 const SalesExports = createContext<Registry | null>(null);
@@ -30,4 +31,9 @@ export function useSalesSectionExport(option: SectionAction, allowed: boolean) {
 export function SalesSectionExportMenu() {
   const registry = useContext(SalesExports);
   return <SectionActionsMenu options={registry?.options ?? []} />;
+}
+
+export function SectionTableExportMenu({ options }: { options: TableExportOption[] }) {
+  const registry = useContext(SalesExports);
+  return <TableExportButton options={options} extraActions={registry?.options ?? []} />;
 }

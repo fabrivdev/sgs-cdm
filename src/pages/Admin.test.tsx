@@ -10,7 +10,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => canManage.value
 vi.mock("@/lib/appSettings", () => ({ DEFAULT_MONTHLY_PRODUCTIVITY_GOAL: 160, loadMonthlyProductivityGoal: async () => 160, saveMonthlyProductivityGoal: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   from: () => {
-    const query = { select: () => query, order: () => query, eq: () => query, then: (resolve: (result: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve) };
+    const query = { select: () => query, order: () => query, eq: () => query, range: () => query, then: (resolve: (result: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve) };
     return query;
   },
   functions: { invoke: async () => ({ data: { users: [] }, error: null }) },

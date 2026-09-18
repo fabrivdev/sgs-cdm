@@ -11,6 +11,8 @@ import { canonicalClientName } from "@/lib/clientIdentity";
 import { shortPersonName } from "@/lib/personName";
 import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
 import { salesColumnClass } from "./salesTableFormat";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import type { SalesColumn } from "./salesTableInteraction";
 
 export type MaquinaVentaLinea = {
   id: string;
@@ -140,6 +142,18 @@ function periodLabel(value: string, mode: PeriodMode) {
   return new Intl.DateTimeFormat("es-PY", { month: "short", year: "numeric" }).format(date);
 }
 
+function metricColumns<T extends MaquinasResumen>(total: number): SalesColumn<T>[] {
+  return [
+    { key: "vendidas", label: "Vendidas", kind: "number", align: "center", value: r => r.vendidas },
+    { key: "notas_credito", label: "Nota Cr.", kind: "number", align: "center", value: r => r.notas_credito },
+    { key: "netas", label: "Netas", kind: "number", align: "center", value: r => r.netas },
+    { key: "clientes", label: "Clientes", kind: "number", align: "center", value: r => r.clientes },
+    { key: "facturas", label: "Facturas", kind: "number", align: "center", value: r => r.facturas },
+    { key: "total", label: "Facturación", kind: "number", align: "right", value: r => r.total, excelFormat: '"$" #,##0.00' },
+    { key: "participacion", label: "Participación", kind: "number", align: "right", value: r => total ? r.total / total : null, excelFormat: "0%" },
+  ];
+}
+
 export function MaquinasPanorama({ data, loading, error, periodMode, selectedPeriod, onSelectPeriod }: {
   data: MaquinasDashboardResponse | null;
   loading: boolean;
@@ -150,7 +164,18 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const total = Number(data?.resumen.total || 0);
-  const grid = "grid-cols-[minmax(120px,1.2fr)_minmax(115px,1fr)_repeat(4,minmax(82px,.75fr))_repeat(2,minmax(80px,.7fr))_minmax(90px,.8fr)]";
+  type Period = MaquinasResumen & { periodo: string };
+  const columns: SalesColumn<Period>[] = [
+    { key: "periodo", label: "Período", kind: "text", value: r => r.periodo || null, exportValue: r => r.periodo ? periodLabel(r.periodo, periodMode) : "Total del período" },
+    { key: "total", label: "Facturado", kind: "number", align: "right", value: r => r.total, excelFormat: '"$" #,##0.00' },
+    { key: "nuevas", label: "Nuevas", kind: "number", align: "center", value: r => r.nuevas ?? 0 },
+    { key: "usadas", label: "Usadas", kind: "number", align: "center", value: r => r.usadas ?? 0 },
+    ...metricColumns<Period>(total).filter(c => ["notas_credito", "netas", "clientes", "facturas", "participacion"].includes(c.key)).map(c => ({ ...c, label: c.key === "notas_credito" ? "Notas de crédito" : c.key === "netas" ? "Unidades netas" : c.label })),
+  ];
+  const table = useSectionTable({ rows: data?.periodos ?? [], columns, title: "Períodos de Máquinas", fileName: "ventas-maquinas-periodos.xlsx",
+    initialSort: { key: "periodo", direction: "asc" }, disabled: loading || !!error || collapsed,
+    footer: data ? { ...data.resumen, periodo: "" } : undefined });
+  const grid = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_repeat(4,minmax(0,.75fr))_repeat(2,minmax(0,.7fr))_minmax(0,.8fr)]";
   return <Panel className="p-3">
     <button type="button" onClick={() => setCollapsed(value => !value)} className="flex w-full items-start justify-between gap-2 text-left">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
@@ -162,13 +187,12 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
-      : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[1000px]">
+      : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
         <TableScroll rows={data.periodos.length}>
         <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          <div>Período</div>
-          {['Facturado', 'Nuevas', 'Usadas', 'Notas de crédito', 'Unidades netas', 'Clientes', 'Facturas', 'Participación'].map(label => <div key={label} className={`whitespace-nowrap ${salesColumnClass(label, label === "Notas de crédito" ? "quantity" : undefined)}`}>{label}</div>)}
+          {columns.map(c => <div key={c.key} className={`min-w-0 ${salesColumnClass(c.label, c.key === "notas_credito" ? "quantity" : undefined)}`}>{table.heading(c.key)}</div>)}
         </div>
-        {data.periodos.map(row => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(selectedPeriod === row.periodo ? null : row.periodo)} className={cn(`grid w-full ${grid} items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent`, selectedPeriod === row.periodo && "bg-primary/5 outline outline-1 outline-primary/20")}>
+        {table.ordered.map(row => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(selectedPeriod === row.periodo ? null : row.periodo)} className={cn(`grid w-full ${grid} items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent`, selectedPeriod === row.periodo && "bg-primary/5 outline outline-1 outline-primary/20")}>
           <div className="truncate font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div>
           <div className="text-right font-semibold tabular-nums">{money(Number(row.total))}</div>
           <div className="text-center tabular-nums">{decimal.format(Number(row.nuevas ?? 0))}</div>
@@ -196,14 +220,17 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 }
 
 
-const METRIC_HEADERS = ["Vendidas", "Nota Cr.", "Netas", "Clientes", "Facturas", "Facturación", "Participación"];
 const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 
-function SummaryTable({ label, grid, minWidth, rows, share, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; empty: string }) {
+function SummaryTable({ label, grid, minWidth, rows, share, total, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; total: number; empty: string }) {
+  const columns: SalesColumn<MaquinasResumen & { key: string }>[] = [
+    { key: "key", label, kind: "text", value: r => r.key }, ...metricColumns<MaquinasResumen & { key: string }>(total),
+  ];
+  const table = useSectionTable({ rows, columns, title: `Máquinas por ${label.toLowerCase()}`, fileName: `ventas-maquinas-${label.toLowerCase()}.xlsx`, initialSort: { key: "total", direction: "desc" } });
   return <div className="overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className={minWidth}>
     <TableScroll rows={rows.length}>
-    <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div>{label}</div>{METRIC_HEADERS.map(head => <div key={head} className={`whitespace-nowrap ${salesColumnClass(head)}`}>{head}</div>)}</div>
-    {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : rows.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{label === "Marca" ? <MarcaBadge marca={row.key} className="text-[10px]" /> : row.key}</div><div className="text-center tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-center tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-center font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-center tabular-nums">{integer.format(row.clientes)}</div><div className="text-center tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
+    <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>{columns.map(c => <div key={c.key} className={`min-w-0 ${salesColumnClass(c.label)}`}>{table.heading(c.key)}</div>)}</div>
+    {!rows.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div> : table.ordered.map(row => <div key={row.key} className={`grid ${grid} items-center border-t px-3 py-2 text-[12px]`}><div className="truncate font-medium" title={row.key}>{label === "Marca" ? <MarcaBadge marca={row.key} className="text-[10px]" /> : row.key}</div><div className="text-center tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-center tabular-nums text-muted-foreground">{decimal.format(row.notas_credito)}</div><div className="text-center font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-center tabular-nums">{integer.format(row.clientes)}</div><div className="text-center tabular-nums">{integer.format(row.facturas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums">{share(row.total)}</div></div>)}
     </TableScroll>
   </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="filas" />}</div>;
 }
@@ -212,19 +239,19 @@ function SummaryView({ summary, lines }: { summary: MaquinasResumen; lines: Maqu
   const byBrand = useMemo(() => [...group(lines, line => brandLabel(line.marca))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => BRAND_ORDER.indexOf(a.key) - BRAND_ORDER.indexOf(b.key) || b.total - a.total), [lines]);
   const byCondition = useMemo(() => [...group(lines, line => conditionLabel(line.condicion))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => b.total - a.total), [lines]);
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
-  const grid = "grid-cols-[minmax(140px,1.2fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  const grid = "grid-cols-[minmax(0,1.2fr)_repeat(5,minmax(0,.75fr))_minmax(0,1fr)_minmax(0,.75fr)]";
   return <div className="mt-3 space-y-3">
-    <SummaryTable label="Marca" grid={grid} minWidth="min-w-[880px]" rows={byBrand} share={share} empty="Sin ventas en el período." />
-    <SummaryTable label="Condición" grid={grid} minWidth="min-w-[880px]" rows={byCondition} share={share} empty="Sin ventas en el período." />
+    <SummaryTable label="Marca" grid={grid} minWidth="min-w-0" rows={byBrand} share={share} total={summary.total} empty="Sin ventas en el período." />
+    <SummaryTable label="Condición" grid={grid} minWidth="min-w-0" rows={byCondition} share={share} total={summary.total} empty="Sin ventas en el período." />
   </div>;
 }
 
 function SellersTable({ summary, lines }: { summary: MaquinasResumen; lines: MaquinaVentaLinea[] }) {
   const bySeller = useMemo(() => [...group(lines, line => sellerLabel(line.comercial))].map(([key, values]) => ({ key, ...summarize(values) })).sort((a, b) => Number(a.key === "Sin vendedor") - Number(b.key === "Sin vendedor") || b.total - a.total), [lines]);
   const share = (value: number) => summary.total ? `${Math.round(value / summary.total * 100)}%` : "—";
-  const grid = "grid-cols-[minmax(230px,1.5fr)_repeat(5,minmax(90px,.75fr))_minmax(125px,1fr)_90px]";
+  const grid = "grid-cols-[minmax(0,1.5fr)_repeat(5,minmax(0,.75fr))_minmax(0,1fr)_minmax(0,.75fr)]";
   return <div className="mt-3">
-    <SummaryTable label="Vendedor" grid={grid} minWidth="min-w-[960px]" rows={bySeller} share={share} empty="Sin vendedores identificados." />
+    <SummaryTable label="Vendedor" grid={grid} minWidth="min-w-0" rows={bySeller} share={share} total={summary.total} empty="Sin vendedores identificados." />
   </div>;
 }
 
@@ -239,13 +266,25 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     const [marca, tipo, condicion, ...model] = key.split("__");
     return { key, marca, tipo, condicion, modelo: model.join("__"), ...summarize(values) };
   }), [lines]);
-  const grid = "grid-cols-[34px_minmax(78px,.8fr)_minmax(140px,1.2fr)_80px_repeat(5,minmax(66px,.6fr))_minmax(100px,.9fr)_minmax(160px,1fr)_minmax(110px,.85fr)]";
-  return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[1120px]">
+  const columns: SalesColumn<SummaryRow>[] = [
+    { key: "marca", label: "Marca", kind: "text", value: r => r.marca },
+    { key: "tipo", label: "Tipo de máquina", kind: "text", value: r => r.tipo },
+    { key: "condicion", label: "Condición", kind: "text", value: r => r.condicion },
+    ...metricColumns<SummaryRow>(total).filter(c => c.key !== "participacion"),
+    { key: "promedio", label: "Promedio / unidad neta", kind: "number", align: "right", value: r => r.netas ? r.total / r.netas : null },
+    { ...metricColumns<SummaryRow>(total).at(-1)!, label: "Participación neta" },
+  ];
+  const table = useSectionTable({ rows, columns, title: "Máquinas por tipo", fileName: "ventas-maquinas-tipos.xlsx", initialSort: { key: "total", direction: "desc" } });
+  // Modelo is a separate export from the same complete filtered population.
+  const modelsTable = useSectionTable({ rows: modelRows, columns: [{ key: "modelo", label: "Modelo", kind: "text", value: r => r.modelo }, ...columns],
+    title: "Máquinas por modelo", fileName: "ventas-maquinas-modelos.xlsx", initialSort: table.sort, sortOverride: table.sort });
+  const grid = "grid-cols-[34px_minmax(0,.8fr)_minmax(0,1.2fr)_minmax(0,.7fr)_repeat(5,minmax(0,.6fr))_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.85fr)]";
+  return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
     <TableScroll rows={rows.length}>
-    <div className={`grid ${grid} ${scrollHead} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div />{['Marca', 'Tipo de máquina', 'Condición', 'Vendidas', 'Nota Cr.', 'Netas', 'Clientes', 'Facturas', 'Facturación', 'Promedio / unidad neta', 'Participación neta'].map(label => <div key={label} className={cn("whitespace-nowrap", salesColumnClass(label))}>{label}</div>)}</div>
-    {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : rows.map(row => {
+    <div className={`grid ${grid} ${scrollHead} items-center bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div />{columns.map(c => <div key={c.key} className={cn("min-w-0", salesColumnClass(c.label))}>{table.heading(c.key)}</div>)}</div>
+    {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay máquinas facturadas en el período.</div> : table.ordered.map(row => {
       const open = expanded === row.key;
-      const models = modelRows.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion).sort((a, b) => b.total - a.total);
+      const models = modelsTable.ordered.filter(model => model.marca === row.marca && model.tipo === row.tipo && model.condicion === row.condicion);
       const cells = (item: SummaryRow, model = false) => <>
         <div className={cn("min-w-0 truncate", !model && "font-medium")}>{model ? item.modelo : <MarcaBadge marca={item.marca} className="text-[10px]" />}</div>
         <div className="truncate" title={model ? undefined : item.tipo}>{model ? "" : item.tipo}</div>
@@ -264,20 +303,38 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
   const rows = useMemo(() => [...group(lines, line => line.cliente_facturado)].map(([cliente, values]) => ({ cliente, ultima: values.reduce((max, line) => line.fecha > max ? line.fecha : max, ""), ...summarize(values) })).sort((a, b) => Number(a.cliente.startsWith("Sin ")) - Number(b.cliente.startsWith("Sin ")) || b.total - a.total), [lines]);
   const total = rows.reduce((sum, row) => sum + row.total, 0);
-  const grid = "grid-cols-[minmax(250px,1.8fr)_repeat(2,minmax(82px,.65fr))_minmax(130px,1fr)_minmax(145px,1.05fr)_minmax(90px,.75fr)_minmax(105px,.8fr)_85px]";
-  return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-[1040px]">
+  type Client = typeof rows[number];
+  const columns: SalesColumn<Client>[] = [
+    { key: "cliente", label: "Cliente", kind: "text", value: r => r.cliente },
+    ...metricColumns<Client>(total).filter(c => ["vendidas", "netas", "total"].includes(c.key)).map(c => c.key === "netas" ? { ...c, label: "Unidades netas" } : c),
+    { key: "promedio", label: "Promedio / unidad neta", kind: "number", align: "right", value: r => r.netas ? r.total / r.netas : null },
+    ...metricColumns<Client>(total).filter(c => c.key === "facturas"),
+    { key: "ultima", label: "Última venta", kind: "date", value: r => r.ultima?.slice(0, 10) || null },
+    ...metricColumns<Client>(total).filter(c => c.key === "participacion"),
+  ];
+  const table = useSectionTable({ rows, columns, title: "Clientes de Máquinas", fileName: "ventas-maquinas-clientes.xlsx", initialSort: { key: "total", direction: "desc" } });
+  const grid = "grid-cols-[minmax(0,1.8fr)_repeat(2,minmax(0,.65fr))_minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,.75fr)_minmax(0,.8fr)_minmax(0,.7fr)]";
+  return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
       <TableScroll rows={rows.length}>
-      <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}><div>Cliente</div>{['Vendidas', 'Unidades netas', 'Facturación', 'Promedio / unidad neta', 'Facturas', 'Última venta', 'Participación'].map(label => <div key={label} className={`whitespace-nowrap ${salesColumnClass(label)}`}>{label}</div>)}</div>
-      {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : rows.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-1.5 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-center tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-center font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-center tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="whitespace-nowrap text-left tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
+      <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>{columns.map(c => <div key={c.key} className={`min-w-0 ${salesColumnClass(c.label)}`}>{table.heading(c.key)}</div>)}</div>
+      {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay clientes en el período.</div> : table.ordered.map(row => <div key={row.cliente} className={`grid ${grid} items-center border-t px-3 py-1.5 text-[12px]`}><div className="truncate font-medium" title={row.cliente}>{row.cliente}</div><div className="text-center tabular-nums">{decimal.format(row.vendidas)}</div><div className="text-center font-medium tabular-nums">{decimal.format(row.netas)}</div><div className="text-right font-semibold tabular-nums">{money(row.total)}</div><div className="text-right tabular-nums text-muted-foreground">{row.netas ? money(row.total / row.netas) : "—"}</div><div className="text-center tabular-nums text-muted-foreground">{integer.format(row.facturas)}</div><div className="whitespace-nowrap text-left tabular-nums text-muted-foreground">{row.ultima ? shortDate(row.ultima) : "—"}</div><div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(row.total / total * 100)}%` : "—"}</div></div>)}
       </TableScroll>
   </div></div>{rows.length > 0 && <RowCount rows={rows.length} label="clientes" />}</div>;
 }
 
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
+  const columns: SalesColumn<MaquinaVentaLinea>[] = [
+    { key: "fecha", label: "Fecha", kind: "date", value: r => r.fecha?.slice(0, 10) },
+    ...(["factura", "cliente_facturado", "marca", "tipo_maquina", "modelo", "chasis"] as const).map((key, i) => ({ key, label: ["Factura", "Cliente", "Marca", "Tipo", "Modelo", "Chasis"][i], kind: "text" as const, value: (r: MaquinaVentaLinea) => r[key] })),
+    { key: "condicion", label: "Condición", kind: "text", value: r => conditionLabel(r.condicion) },
+    { key: "comercial", label: "Vendedor", kind: "text", value: r => sellerLabel(r.comercial) },
+    { key: "facturado", label: "Facturado", kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' },
+  ];
+  const table = useSectionTable({ rows: lines, columns, title: "Detalle de Máquinas", fileName: "ventas-maquinas-detalle.xlsx", initialSort: { key: "fecha", direction: "desc" } });
   return <>
-    <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={lines.length}><table className="w-full min-w-[1240px] table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
-      <thead className={`bg-muted/60 text-left text-muted-foreground ${scrollHead} ${salesHeader}`}><tr><th className="w-[82px] text-left">Fecha</th><th className="w-[120px] text-left">Factura</th><th className="w-[220px] text-left">Cliente</th><th className="w-[90px] text-left">Marca</th><th className="w-[165px] text-left">Tipo</th><th className="w-[170px] text-left">Modelo</th><th className="w-[145px] text-left">Chasis</th><th className="w-[85px] text-left">Condición</th><th className="w-[145px] text-left">Vendedor</th><th className="w-[120px] text-right">Facturado</th></tr></thead>
-      <tbody>{lines.map(line => <tr key={line.id} className="border-t">
+    <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={lines.length}><table className="w-full min-w-0 table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
+      <thead className={`bg-muted/60 text-left text-muted-foreground ${scrollHead} ${salesHeader}`}><tr>{columns.map(c => <th key={c.key} className={c.align === "right" ? "text-right" : "text-left"}>{table.heading(c.key)}</th>)}</tr></thead>
+      <tbody>{table.ordered.map(line => <tr key={line.id} className="border-t">
         <td>{shortDate(line.fecha)}</td>
         <td className="truncate font-mono font-medium" title={line.factura}>{line.factura}</td>
         <td><div className="truncate font-medium" title={line.cliente_facturado}>{line.cliente_facturado}</div></td>
@@ -298,7 +355,7 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   const summary = useMemo(() => summarize(lines), [lines]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">
-    <div className="flex min-h-8 items-center justify-between gap-3 border-b pb-3"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 shrink-0 grid-cols-5 overflow-hidden rounded-md border text-[11px]">{tabs.map(([key, label]) => <button key={key} type="button" onClick={() => setView(key)} className={cn("whitespace-nowrap px-3 hover:bg-accent", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
+    <div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 min-w-0 grid-cols-5 overflow-hidden rounded-md border text-[11px] md:shrink-0">{tabs.map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} title={label} onClick={() => setView(key)} className={cn("min-w-0 truncate whitespace-nowrap px-2 hover:bg-accent md:px-3", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
       : view === "resumen" ? <SummaryView summary={summary} lines={lines} />

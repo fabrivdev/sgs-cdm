@@ -1,3 +1,5 @@
+import { sortSalesRows, type SalesColumn, type SalesSort } from "@/components/ventas/salesTableInteraction";
+import { SalesSortButton } from "@/components/ventas/SalesTableControls";
 import { Fragment, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -135,27 +137,30 @@ export function SolicitudesCompraTab() {
     });
   }, [solicitudesAgrupadas, filtros, filtrosActivos]);
 
-  const gruposOrdenados = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...gruposFiltrados].sort((a, b) => {
-      switch (sortKey) {
-        case "sucursal":
-          return a.sucursal.localeCompare(b.sucursal) * dir;
-        case "nroSolicitud":
-          return a.nroSolicitud.localeCompare(b.nroSolicitud) * dir;
-        case "fechaEmision":
-          return (a.fechaEmision ?? "").localeCompare(b.fechaEmision ?? "") * dir;
-        case "solicitante":
-          return (a.solicitante ?? "").localeCompare(b.solicitante ?? "") * dir;
-        case "itemsCount":
-          return (a.lineas.length - b.lineas.length) * dir;
-        default:
-          return 0;
-      }
-    });
-  }, [gruposFiltrados, sortKey, sortDir]);
+  type Group = typeof gruposFiltrados[number];
+  const columns: SalesColumn<Group>[] = [
+    {key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal},
+    {key:"nroSolicitud",label:"N° solicitud",kind:"text",value:r=>r.nroSolicitud},
+    {key:"fechaEmision",label:"Fecha",kind:"date",value:r=>r.fechaEmision?.slice(0,10)},
+    {key:"solicitante",label:"Solicitante",kind:"text",value:r=>r.solicitante},
+    {key:"itemsCount",label:"Ítems",kind:"number",value:r=>r.lineas.length},
+  ];
+  const gruposOrdenados = sortSalesRows(gruposFiltrados,columns,{key:sortKey,direction:sortDir});
+  const [itemSort,setItemSort] = useState<SalesSort>({key:"item",direction:"asc"});
+  const resolution = (r:SolicitudLinea) => resolucionPorLinea.get(`${r.sucursal}|${r.nroSolicitud}|${r.item}`);
+  const itemColumns:SalesColumn<SolicitudLinea>[] = [
+    {key:"item",label:"Ítem",kind:"text",value:r=>r.item},
+    {key:"producto",label:"Producto",kind:"text",value:r=>r.productoCodigo},
+    {key:"descripcion",label:"Descripción",kind:"text",value:r=>r.descripcion},
+    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>r.cantidad},
+    {key:"precio",label:"Precio",kind:"number",align:"right",value:r=>r.precioUnitario},
+    {key:"estado",label:"Estado",kind:"text",value:r=>resolution(r)?.estado==="reposicion_stock"?"Reposición de stock":"Cotizada"},
+    {key:"pedido",label:"Pedido",kind:"text",value:r=>{const p=resolution(r)?.pedidoVinculado;return p?`${p.sucursal}-${p.nroPedido}`:null;}},
+  ];
+  const orderItems = (rows:SolicitudLinea[]) => sortSalesRows(rows.filter(r=>!filtros.busqueda.trim()||lineaCoincideBusqueda(r,filtros.busqueda.trim().toLowerCase())),itemColumns,itemSort);
+  const itemHeading = (key:string) => {const c=itemColumns.find(c=>c.key===key)!;return <SalesSortButton label={c.label} kind={c.kind} align={c.align} active={itemSort.key===key} direction={itemSort.direction} onClick={()=>setItemSort(p=>({key,direction:p.key===key&&p.direction==="asc"?"desc":"asc"}))}/>;};
 
-  const exportOptions = useMemo<TableExportOption[]>(() => [
+  const exportOptions: TableExportOption[] = [
     {
       label: "Resumen de solicitudes",
       filename: `compras-solicitudes-${new Date().toISOString().slice(0, 10)}`,
@@ -174,7 +179,7 @@ export function SolicitudesCompraTab() {
       label: "Ítems de solicitudes",
       filename: `compras-solicitudes-items-${new Date().toISOString().slice(0, 10)}`,
       sheetName: "Ítems",
-      rows: gruposOrdenados.flatMap((grupo) => grupo.lineas.map((linea) => {
+      rows: gruposOrdenados.flatMap((grupo) => orderItems(grupo.lineas).map((linea) => {
         const resolucion = resolucionPorLinea.get(`${linea.sucursal}|${linea.nroSolicitud}|${linea.item}`);
         return {
           Sucursal: linea.sucursal,
@@ -198,7 +203,7 @@ export function SolicitudesCompraTab() {
         };
       })),
     },
-  ], [gruposOrdenados, resolucionPorLinea]);
+  ];
 
   const guardarVinculo = async (pedido: PedidoCandidato) => {
     if (!vinculando || !user) return;
@@ -242,7 +247,7 @@ export function SolicitudesCompraTab() {
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN000406, 2181800, anillo…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroSolicitud)) + Number(Boolean(filtros.solicitante))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
-          secondaryActions={<TableExportButton options={exportOptions} />}
+          secondaryActions={can("datos:exportar") && !solicitudesLineasQuery.isError && !pedidosLineasQuery.isError ? <TableExportButton options={exportOptions} /> : undefined}
         >
           <FilterMultiSelect
             label="Sucursal"
@@ -345,17 +350,17 @@ export function SolicitudesCompraTab() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="pl-8">Ítem</TableHead>
-                                <TableHead>Producto</TableHead>
-                                <TableHead>Descripción</TableHead>
-                                <TableHead className="text-right">Cantidad</TableHead>
-                                <TableHead className="text-right">Precio</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Pedido</TableHead>
+                                <TableHead className="pl-8">{itemHeading("item")}</TableHead>
+                                <TableHead>{itemHeading("producto")}</TableHead>
+                                <TableHead>{itemHeading("descripcion")}</TableHead>
+                                <TableHead className="text-right">{itemHeading("cantidad")}</TableHead>
+                                <TableHead className="text-right">{itemHeading("precio")}</TableHead>
+                                <TableHead>{itemHeading("estado")}</TableHead>
+                                <TableHead>{itemHeading("pedido")}</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {lineasVisibles.map((linea) => {
+                              {orderItems(lineasVisibles).map((linea) => {
                                 const resolucion = resolucionPorLinea.get(`${linea.sucursal}|${linea.nroSolicitud}|${linea.item}`);
 
                                 return (

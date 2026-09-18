@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RepuestosVentas, type PartsListing, type PartsOverview } from "./RepuestosVentas";
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
 afterEach(() => { cleanup(); rpc.mockReset(); });
 const summary = { facturado: 125, ventas: 150, notas_credito: -25, clientes: 1, documentos: 2, documentos_nc: 1, lineas: 3, unidades_netas: 2 };
 const overview: PartsOverview = {
@@ -108,9 +109,9 @@ describe("Ventas de Repuestos", () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_panorama_v2", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31" })));
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     await screen.findByText("REP2");
-    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31", p_vista: "detalle" }));
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v3", expect.objectContaining({ p_desde: "2026-08-01", p_hasta: "2026-08-31", p_vista: "detalle" }));
     fireEvent.click(screen.getByRole("button", { name: "Ver período completo" }));
-    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-09-15" })));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v3", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-09-15" })));
   });
   it("clientes conserva sus indicadores y repuestos muestra el resumen comercial compacto", async () => {
     setup(); fireEvent.click(screen.getByRole("button", { name: /^Clientes$/ }));
@@ -158,7 +159,7 @@ describe("Ventas de Repuestos", () => {
     await screen.findByText("PRIMERO");
     await screen.findByText("ULTIMO");
     expect(screen.getByText("2 de 51 registros")).toBeInTheDocument();
-    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v2", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_v3", expect.objectContaining({ p_pagina: 2, p_por_pagina: 50 }));
   });
   it("no lanza informes ante un rango vacío o invertido", () => {
     setup({ desde: "", hasta: "2026-08-31" });

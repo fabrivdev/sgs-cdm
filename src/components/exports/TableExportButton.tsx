@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { SectionActionsMenu } from "./SectionActionsMenu";
+import { SectionActionsMenu, type SectionAction } from "./SectionActionsMenu";
 
 export type ExportCell = string | number | boolean | null | undefined;
 
@@ -29,10 +29,12 @@ export function TableExportButton({
   options,
   label = "Exportar",
   className,
+  extraActions = [],
 }: {
   options: TableExportOption[];
   label?: string;
   className?: string;
+  extraActions?: readonly SectionAction[];
 }) {
   const [exporting, setExporting] = useState(false);
 
@@ -56,8 +58,8 @@ export function TableExportButton({
     }
   };
 
-  return <SectionActionsMenu busy={exporting} className={className} options={options.map((option, index) => ({
+  return <SectionActionsMenu busy={exporting} className={className} options={[...options.map((option, index) => ({
     id: `${option.filename}-${index}`, label: `${label} ${option.label}`,
     disabled: optionRowCount(option) === 0, onSelect: () => exportOption(option),
-  }))} />;
+  })), ...extraActions]} />;
 }

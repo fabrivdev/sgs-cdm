@@ -1,3 +1,5 @@
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { useState } from "react";
 import {
   BarChart3,
@@ -114,6 +116,24 @@ export function ServiciosDashboard({
   const [evolutionMetric, setEvolutionMetric] = useState<"orders" | "hours">("orders");
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatusFilter>("active");
 
+  type Order = ServiciosDashboardData["ordenes"][number];
+  const columns: SalesColumn<Order>[] = [
+    {key:"os",label:"OS",kind:"text",value:r=>r.os},
+    {key:"cliente",label:"Cliente",kind:"text",value:r=>r.cliente},
+    {key:"chasis",label:"Chasis",kind:"text",value:r=>r.chasis},
+    {key:"tecnicos",label:"Equipo técnico",kind:"text",value:r=>r.tecnicos.join(", ")},
+    {key:"sucursal",label:"Suc.",kind:"text",value:r=>r.sucursal},
+    {key:"tipo",label:"Tipo",kind:"text",value:r=>timeLabel(r.tipoTiempo)},
+    {key:"estado",label:"Estado",kind:"text",value:r=>r.estadoOS},
+    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
+    {key:"inicio",label:"Inicio",kind:"date",value:r=>r.fechaApertura?.slice(0,10)},
+    {key:"cierre",label:"Cierre",kind:"date",value:r=>r.fechaCierre?.slice(0,10)},
+    {key:"horas",label:"Horas",kind:"number",align:"right",value:r=>r.horas},
+    {key:"total",label:"Total",kind:"number",align:"right",value:r=>r.valorOS,excelFormat:'"$" #,##0.00'},
+  ];
+  const orderTable = useSectionTable({rows:data.ordenes,columns,initialSort:{key:"inicio",direction:"desc"},
+    title:"Órdenes de servicio",fileName:"dashboard-ordenes-servicio",disabled:loading});
+
   if (loading) {
     return (
       <div className="grid gap-3">
@@ -142,7 +162,7 @@ export function ServiciosDashboard({
     technicianStatus === "all" || (technicianStatus === "active" ? row.activo : !row.activo),
   );
   const visibleTecnicos = showAllTechnicians ? filteredTechnicians : filteredTechnicians.slice(0, 5);
-  const visibleOrders = data.ordenes;
+  const visibleOrders = orderTable.ordered;
 
   const kpis = [
     {
@@ -518,18 +538,18 @@ export function ServiciosDashboard({
           <table className="w-full min-w-[1240px] table-fixed text-[11px]">
             <thead className="sticky top-0 z-10 bg-muted text-left text-[9px] uppercase tracking-wide text-muted-foreground shadow-sm">
               <tr>
-                <th className="w-[112px] px-2.5 py-2">OS</th>
-                <th className="w-[180px] px-2.5 py-2">Cliente</th>
-                <th className="w-[105px] px-2.5 py-2">Chasis</th>
-                <th className="w-[205px] px-2.5 py-2">Equipo técnico</th>
-                <th className="w-[58px] px-2.5 py-2">Suc.</th>
-                <th className="w-[92px] px-2.5 py-2">Tipo</th>
-                <th className="w-[92px] px-2.5 py-2">Estado</th>
-                <th className="w-[100px] px-2.5 py-2">Factura</th>
-                <th className="w-[82px] px-2.5 py-2">Inicio</th>
-                <th className="w-[82px] px-2.5 py-2">Cierre</th>
-                <th className="w-[65px] px-2.5 py-2 text-right">Horas</th>
-                <th className="w-[110px] px-2.5 py-2 text-right">Total</th>
+                <th className="w-[112px] px-2.5 py-2">{orderTable.heading("os")}</th>
+                <th className="w-[180px] px-2.5 py-2">{orderTable.heading("cliente")}</th>
+                <th className="w-[105px] px-2.5 py-2">{orderTable.heading("chasis")}</th>
+                <th className="w-[205px] px-2.5 py-2">{orderTable.heading("tecnicos")}</th>
+                <th className="w-[58px] px-2.5 py-2">{orderTable.heading("sucursal")}</th>
+                <th className="w-[92px] px-2.5 py-2">{orderTable.heading("tipo")}</th>
+                <th className="w-[92px] px-2.5 py-2">{orderTable.heading("estado")}</th>
+                <th className="w-[100px] px-2.5 py-2">{orderTable.heading("factura")}</th>
+                <th className="w-[82px] px-2.5 py-2">{orderTable.heading("inicio")}</th>
+                <th className="w-[82px] px-2.5 py-2">{orderTable.heading("cierre")}</th>
+                <th className="w-[65px] px-2.5 py-2 text-right">{orderTable.heading("horas")}</th>
+                <th className="w-[110px] px-2.5 py-2 text-right">{orderTable.heading("total")}</th>
               </tr>
             </thead>
             <tbody>

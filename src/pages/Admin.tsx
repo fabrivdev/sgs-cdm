@@ -31,6 +31,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import { cargarTodo } from "@/hooks/useCatalogos";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { FiltersBar } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
@@ -114,6 +117,8 @@ export default function Admin() {
   const { can, isSuperAdmin, hasSectionAccess } = useAuth();
   const canManageAdmin = can("administracion:gestionar");
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [tableLoadError, setTableLoadError] = useState(false);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [moduloAcceso, setModuloAcceso] = useState<UserModuloAcceso[]>([]);
   const [sections, setSections] = useState<AppSection[]>([]);
@@ -227,8 +232,26 @@ export default function Admin() {
       profile.activo ? "Activo" : "Inactivo",
     ].join(" ")).includes(normalizedTableSearch);
   };
-  const filteredProfiles = profiles.filter(profileMatchesSearch);
-  const filteredProfilesConAcceso = profilesConAcceso.filter(profileMatchesSearch);
+  const profileColumns: SalesColumn<Profile>[] = [
+    { key: "persona", label: "Persona", kind: "text", value: p => p.nombre },
+    { key: "cuenta", label: "Cuenta", kind: "text", value: p => emailByProfile(p) || "Sin acceso" },
+    { key: "sucursal", label: "Sucursal", kind: "text", value: p => p.sucursal },
+    { key: "nivel", label: "Nivel", kind: "text", value: p => nivelLabel(primaryRoleForProfile(p), modulesForProfile(p)) },
+    { key: "areas", label: "Áreas", kind: "text", value: p => modulesForProfile(p).map(m => MODULO_LABELS[m]).join(", ") },
+    { key: "perfil", label: "Perfil", kind: "text", value: p => p.activo ? "Activo" : "Inactivo" },
+  ];
+  const equipoTable = useSectionTable({ rows: profiles.filter(profileMatchesSearch), columns: profileColumns,
+    title: "Equipo operativo", fileName: "administracion-equipo.xlsx", initialSort: { key: "persona", direction: "asc" } });
+  const accessColumns: SalesColumn<Profile>[] = [
+    profileColumns[0], { ...profileColumns[1], label: "Email" }, profileColumns[3],
+    { ...profileColumns[4], label: "Módulos" },
+    { key: "secciones", label: "Secciones", kind: "text", value: p => sectionsForProfile(p).map(id => sections.find(s => s.id === id)?.nombre ?? id).join(", ") },
+    profileColumns[2], { ...profileColumns[5], label: "Estado" },
+  ];
+  const accessTable = useSectionTable({ rows: profilesConAcceso.filter(profileMatchesSearch), columns: accessColumns,
+    title: "Accesos al sistema", fileName: "administracion-accesos.xlsx", initialSort: { key: "persona", direction: "asc" } });
+  const filteredProfiles = equipoTable.ordered;
+  const filteredProfilesConAcceso = accessTable.ordered;
   const filteredProfilesSinAcceso = profilesSinAcceso.filter(profileMatchesSearch);
 
   const exportOptions: TableExportOption[] = [
@@ -263,30 +286,40 @@ export default function Admin() {
   ];
 
   const load = async () => {
+    setTableLoading(true);
+    const readAll = async (query: any) => {
+      try { return { data: await cargarTodo(query), error: null }; }
+      catch (error) { return { data: [], error: { message: error instanceof Error ? error.message : String((error as any)?.message ?? error) } }; }
+    };
     const [profileResult, roleResult, moduloAccesoResult, sectionsResult, sectionAccessResult] = await Promise.all([
-      (supabase as any).from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre"),
-      supabase.from("user_roles").select("user_id, role"),
-      (supabase as any).from("user_modulo_acceso").select("user_id, modulo_id"),
-      (supabase as any).from("app_secciones").select("id, modulo_id, nombre, orden").eq("activo", true).order("modulo_id").order("orden"),
-      (supabase as any).from("user_seccion_acceso").select("user_id, seccion_id"),
+      readAll((supabase as any).from("profiles").select("id, auth_user_id, nombre, sucursal, activo").order("nombre").order("id")),
+      readAll(supabase.from("user_roles").select("user_id, role").order("user_id").order("role")),
+      readAll((supabase as any).from("user_modulo_acceso").select("user_id, modulo_id").order("user_id").order("modulo_id")),
+      readAll((supabase as any).from("app_secciones").select("id, modulo_id, nombre, orden").eq("activo", true).order("modulo_id").order("orden").order("id")),
+      readAll((supabase as any).from("user_seccion_acceso").select("user_id, seccion_id").order("user_id").order("seccion_id")),
     ]);
+    setTableLoadError(Boolean(roleResult.error || moduloAccesoResult.error || sectionsResult.error || sectionAccessResult.error));
 
     let loadedProfiles = (profileResult.data ?? []) as Profile[];
     if (profileResult.error) {
       const message = profileResult.error.message ?? "";
       if (/auth_user_id/i.test(message) && /does not exist/i.test(message)) {
-        const { data: legacyProfiles, error: legacyError } = await supabase
+        const { data: legacyProfiles, error: legacyError } = await readAll(supabase
           .from("profiles")
           .select("id, nombre, sucursal, activo")
-          .order("nombre");
+          .order("nombre").order("id"));
 
         if (legacyError) {
+          setTableLoadError(true);
+          setTableLoading(false);
           toast.error(legacyError.message);
           return;
         }
 
         loadedProfiles = (legacyProfiles ?? []) as Profile[];
       } else {
+        setTableLoadError(true);
+        setTableLoading(false);
         toast.error(profileResult.error.message);
         return;
       }
@@ -299,6 +332,7 @@ export default function Admin() {
     setSectionAccess((sectionAccessResult.data ?? []) as UserSectionAccess[]);
 
     const { data: emailData, error: emailErr } = await supabase.functions.invoke("admin-list-users");
+    if (emailErr) setTableLoadError(true);
     if (!emailErr && emailData?.users) {
       const map: Record<string, string> = {};
       for (const userItem of emailData.users as { user_id: string; email: string }[]) {
@@ -306,6 +340,7 @@ export default function Admin() {
       }
       setEmails(map);
     }
+    setTableLoading(false);
   };
 
   useEffect(() => {
@@ -578,7 +613,7 @@ export default function Admin() {
             activeCount={normalizedTableSearch ? 1 : 0}
             onClear={() => setTableSearch("")}
             meta={`${filteredProfiles.length} persona${filteredProfiles.length === 1 ? "" : "s"}`}
-            secondaryActions={<TableExportButton options={[exportOptions[0]]} />}
+            secondaryActions={can("datos:exportar") ? <TableExportButton options={tableLoading || tableLoadError ? [] : [exportOptions[0]]} /> : undefined}
           />
         )}
 
@@ -599,12 +634,12 @@ export default function Admin() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Persona</TableHead>
-                  <TableHead>Cuenta</TableHead>
-                  <TableHead>Sucursal</TableHead>
-                  <TableHead>Nivel</TableHead>
-                  <TableHead>Áreas</TableHead>
-                  <TableHead>Perfil</TableHead>
+                  <TableHead>{equipoTable.heading("persona")}</TableHead>
+                  <TableHead>{equipoTable.heading("cuenta")}</TableHead>
+                  <TableHead>{equipoTable.heading("sucursal")}</TableHead>
+                  <TableHead>{equipoTable.heading("nivel")}</TableHead>
+                  <TableHead>{equipoTable.heading("areas")}</TableHead>
+                  <TableHead>{equipoTable.heading("perfil")}</TableHead>
                   <TableHead className="w-[120px]"><span className="sr-only">Acciones</span></TableHead>
                 </TableRow>
               </TableHeader>
@@ -678,6 +713,7 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="accesos" className="space-y-4">
+          <FiltersBar search={{ value: tableSearch, onChange: setTableSearch, placeholder: "Buscar persona, email o módulo…" }} secondaryActions={can("datos:exportar") ? <TableExportButton options={tableLoading || tableLoadError ? [] : [exportOptions[1]]} /> : undefined} />
           {!canManageAdmin && (
             <Card className="flex items-start gap-3 border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
@@ -746,13 +782,13 @@ export default function Admin() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Persona</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Nivel</TableHead>
-                    <TableHead>Módulos</TableHead>
-                    <TableHead>Secciones</TableHead>
-                    <TableHead>Sucursal</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>{accessTable.heading("persona")}</TableHead>
+                    <TableHead>{accessTable.heading("cuenta")}</TableHead>
+                    <TableHead>{accessTable.heading("nivel")}</TableHead>
+                    <TableHead>{accessTable.heading("areas")}</TableHead>
+                    <TableHead>{accessTable.heading("secciones")}</TableHead>
+                    <TableHead>{accessTable.heading("sucursal")}</TableHead>
+                    <TableHead>{accessTable.heading("perfil")}</TableHead>
                     {canManageAdmin && <TableHead className="w-[120px]">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>

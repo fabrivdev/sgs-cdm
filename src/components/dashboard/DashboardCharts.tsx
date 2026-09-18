@@ -1986,6 +1986,7 @@ export function TrabajosAbiertosList({
     sucursal: string;
     estado: string;
     ultimaFecha: string;
+    ultimaFechaISO?: string | null;
     díasSinCierre: number;
     pendientes: number;
     programados: number;
@@ -1994,12 +1995,22 @@ export function TrabajosAbiertosList({
   onSelect: (row: { id: string; ref: string }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  type OpenWork = typeof rows[number];
+  const columns: SalesColumn<OpenWork>[] = [
+    { key:"ref",label:"OS/TR",kind:"text",value:r=>r.ref },
+    { key:"cliente",label:"Cliente",kind:"text",value:r=>r.cliente },
+    { key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal },
+    { key:"estado",label:"Estado",kind:"text",align:"right",value:r=>r.estado },
+    { key:"fecha",label:"Últ. fecha",kind:"date",align:"right",value:r=>r.ultimaFechaISO?.slice(0,10) },
+    { key:"dias",label:"Sin cierre",kind:"number",align:"right",value:r=>r.díasSinCierre },
+  ];
+  const table=useSectionTable({rows,columns,title:"Trabajos abiertos sin cierre",fileName:"dashboard-trabajos-abiertos.xlsx",initialSort:{key:"dias",direction:"desc"}});
 
   if (rows.length === 0) {
     return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin trabajos abiertos para los filtros actuales.</div>;
   }
 
-  const visibleRows = expanded ? rows : rows.slice(0, 5);
+  const visibleRows = expanded ? table.ordered : table.ordered.slice(0, 5);
 
   return (
     <div className="space-y-2">
@@ -2029,12 +2040,7 @@ export function TrabajosAbiertosList({
 
       <div className="hidden rounded-md border md:block">
         <div className="grid grid-cols-[90px_1.2fr_120px_100px_94px_90px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-          <div>OS/TR</div>
-          <div>Cliente</div>
-          <div>Sucursal</div>
-          <div className="text-right">Estado</div>
-          <div className="text-right">Últ. fecha</div>
-          <div className="text-right">Sin cierre</div>
+          {columns.map(c=><div key={c.key} className="min-w-0">{table.heading(c.key)}</div>)}
         </div>
         {visibleRows.map((row) => (
           <button
@@ -2612,7 +2618,7 @@ export function FacturacionExplorer({
     return { key: label, label, sortKey: label };
   };
 
-  const invoiceRows = useMemo(() => {
+  const invoiceSource = useMemo(() => {
     const map = new Map<string, {
       key: string;
       factura: string;
@@ -2661,7 +2667,7 @@ export function FacturacionExplorer({
       .sort((a, b) => b.total - a.total);
   }, [selectedFacts]);
 
-  const clientRowsComputed = useMemo(() => {
+  const clientSource = useMemo(() => {
     const map = new Map<string, { nombre: string; total: number; facturas: number; rows: Facturacion[] }>();
     for (const row of selectedFacts) {
       const key = row.entidad_nombre || "Sin cliente";
@@ -2743,6 +2749,39 @@ export function FacturacionExplorer({
 
     const visibleTotal = selectedFacts.reduce((acc, row) => acc + Number(row.total_venta || 0), 0);
   const visibleFacturas = new Set(selectedFacts.map((row) => row.cod_factura || `${row.fecha}-${row.entidad_nombre}`)).size;
+  type Invoice = typeof invoiceSource[number];
+  const invoiceColumns:SalesColumn<Invoice>[] = [
+    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
+    {key:"cliente",label:"Cliente",kind:"text",value:r=>r.cliente},
+    {key:"rubro",label:"Rubro",kind:"text",value:r=>r.rubro},
+    {key:"fecha",label:"Fecha",kind:"date",value:r=>r.fecha?.slice(0,10)},
+    {key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal},
+    {key:"lineas",label:"Lineas",kind:"number",align:"right",value:r=>r.lineas},
+    {key:"total",label:"Importe",kind:"number",align:"right",value:r=>r.total,excelFormat:'"$" #,##0.00'},
+  ];
+  const invoiceTable = useSectionTable({rows:invoiceSource,columns:invoiceColumns,title:"Facturas del Dashboard",
+    fileName:"dashboard-facturas.xlsx",initialSort:{key:"total",direction:"desc"},register:view==="facturas"});
+  const invoiceRows=invoiceTable.ordered;
+  type Client = typeof clientSource[number];
+  const clientColumns:SalesColumn<Client>[] = [
+    {key:"cliente",label:"Cliente",kind:"text",value:r=>r.nombre},
+    {key:"facturas",label:"Fact.",kind:"number",align:"right",value:r=>r.facturas},
+    {key:"ticket",label:"Ticket Medio",kind:"number",align:"right",value:r=>r.facturas?r.total/r.facturas:0,excelFormat:'"$" #,##0.00'},
+    {key:"total",label:"Facturación",kind:"number",align:"right",value:r=>r.total,excelFormat:'"$" #,##0.00'},
+  ];
+  const clientTable = useSectionTable({rows:clientSource,columns:clientColumns,title:"Clientes del Dashboard",
+    fileName:"dashboard-clientes.xlsx",initialSort:{key:"total",direction:"desc"},register:view==="clientes"});
+  const clientRowsComputed=clientTable.ordered;
+  type PivotRow=typeof pivot.rows[number];
+  const pivotTableColumns:SalesColumn<PivotRow>[]=[
+    {key:"label",label:rowOptions.find(option=>option.value===pivotRows)?.label??"Fila",kind:"text",value:r=>r.label},
+    ...pivot.columns.map(column=>({key:"cell:"+column.key,label:column.label,kind:"number" as const,align:"right" as const,
+      value:(r:PivotRow)=>{const cell=r.cells.get(column.key);return cell?metricValue(cell,pivotMetric):null;}})),
+    {key:"total",label:"Total",kind:"number",align:"right",value:r=>metricValue(r,pivotMetric)},
+  ];
+  const pivotTable=useSectionTable({rows:pivot.rows,columns:pivotTableColumns,title:"Tabla dinámica del Dashboard",
+    fileName:"dashboard-tabla-dinamica.xlsx",initialSort:{key:"total",direction:"desc"},register:view==="analisis"});
+
   const visibleClientes = new Set(selectedFacts.map((row) => row.entidad_nombre || "Sin cliente")).size;
 
   return (
@@ -2841,13 +2880,13 @@ export function FacturacionExplorer({
 
           <div className="hidden overflow-hidden rounded-md border md:block">
             <div className="grid grid-cols-[110px_1.15fr_140px_90px_90px_80px_120px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-              <div>Factura</div>
-              <div>Cliente</div>
-              <div>Rubro</div>
-              <div>Fecha</div>
-              <div>Sucursal</div>
-              <div className="text-right">Lineas</div>
-              <div className="text-right">Importe</div>
+              <div>{invoiceTable.heading("factura")}</div>
+              <div>{invoiceTable.heading("cliente")}</div>
+              <div>{invoiceTable.heading("rubro")}</div>
+              <div>{invoiceTable.heading("fecha")}</div>
+              <div>{invoiceTable.heading("sucursal")}</div>
+              <div className="text-right">{invoiceTable.heading("lineas")}</div>
+              <div className="text-right">{invoiceTable.heading("total")}</div>
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {invoiceRows.length === 0 ? (
@@ -2936,10 +2975,10 @@ export function FacturacionExplorer({
 
           <div className="hidden overflow-hidden rounded-md border md:block">
             <div className="grid grid-cols-[1.4fr_84px_120px_110px] bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
-              <div>Cliente</div>
-              <div className="text-right">Fact.</div>
-              <div className="text-right">Ticket prom.</div>
-              <div className="text-right">Facturación</div>
+              <div>{clientTable.heading("cliente")}</div>
+              <div className="text-right">{clientTable.heading("facturas")}</div>
+              <div className="text-right">{clientTable.heading("ticket")}</div>
+              <div className="text-right">{clientTable.heading("total")}</div>
             </div>
             <div className="max-h-[480px] overflow-y-auto">
               {clientRowsComputed.length === 0 ? (
@@ -3019,7 +3058,7 @@ export function FacturacionExplorer({
             ) : (
               <>
                 <div className="space-y-2 p-3 md:hidden">
-                  {pivot.rows.slice(0, 25).map((row) => (
+                  {pivotTable.ordered.slice(0, 25).map((row) => (
                     <div key={row.key} className="rounded-md border bg-background px-3 py-2.5 shadow-sm">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 text-[13px] font-semibold">{row.label}</div>
@@ -3047,14 +3086,14 @@ export function FacturacionExplorer({
                       className="grid items-center border-b bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground"
                       style={{ gridTemplateColumns: `240px repeat(${Math.max(pivot.columns.length, 1)}, minmax(120px, 1fr)) 140px` }}
                     >
-                      <div>{rowOptions.find((option) => option.value === pivotRows)?.label ?? "Fila"}</div>
+                      <div>{pivotTable.heading("label")}</div>
                       {pivot.columns.map((column) => (
-                        <div key={column.key} className="text-right">{column.label}</div>
+                        <div key={column.key} className="text-right">{pivotTable.heading("cell:"+column.key)}</div>
                       ))}
-                      <div className="text-right">Total</div>
+                      <div className="text-right">{pivotTable.heading("total")}</div>
                     </div>
                     <div className="max-h-[520px] overflow-y-auto">
-                      {pivot.rows.map((row) => (
+                      {pivotTable.ordered.map((row) => (
                         <div
                           key={row.key}
                           className="grid items-center border-b px-3 py-2 text-[12px]"
@@ -3340,3 +3379,5 @@ export function ServiciosDashboard({
 
 
 
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";

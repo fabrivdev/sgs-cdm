@@ -29,7 +29,7 @@ export function createSalesWorkbook<T>(rows: readonly T[], columns: readonly Sal
   sheet["!cols"] = columns.map(column => ({ wch: Math.min(50, Math.max(12, column.label.length + 2)) }));
   if (rows.length) sheet["!autofilter"] = { ref: sheet["!ref"]! };
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName.replace(/[\\/?*:[\]]/g, " ").slice(0, 31) || "Datos");
   return workbook;
 }
 

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MaquinasExplorer, MaquinasPanorama, type MaquinasDashboardResponse } from "./MaquinasVentas";
 
 vi.mock("@/components/ventas/MachineHistorySheet", () => ({ MachineHistorySheet: () => null }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
 afterEach(cleanup);
 
 const data: MaquinasDashboardResponse = {
@@ -32,10 +33,10 @@ describe("Ventas de Máquinas", () => {
   it("matches period and detail heading alignment to their values", () => {
     const panorama = render(<MaquinasPanorama data={{ ...data, periodos: [{ ...data.resumen, periodo: "2026-08-01" }] }}
       loading={false} error={null} periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined} />);
-    expect(screen.getByText("Período").parentElement).toHaveClass("text-left");
-    expect(screen.getByText("Nuevas")).toHaveClass("text-center");
-    expect(screen.getByText("Notas de crédito")).toHaveClass("text-center");
-    expect(screen.getByText("Facturado")).toHaveClass("text-right");
+    expect(screen.getByText("Período").closest("button")!.parentElement).toHaveClass("text-left");
+    expect(screen.getByText("Nuevas").closest("button")!.parentElement).toHaveClass("text-center");
+    expect(screen.getByText("Notas de crédito").closest("button")!.parentElement).toHaveClass("text-center");
+    expect(screen.getByText("Facturado").closest("button")!.parentElement).toHaveClass("text-right");
     const period = screen.getByText("Total del período").parentElement!;
     expect(period.children[2]).toHaveClass("text-center");
     expect(period.children[1]).toHaveClass("text-right");

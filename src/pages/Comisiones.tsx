@@ -32,6 +32,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 
 type View = "cerradas" | "abiertas" | "revisar" | "liquidaciones";
 type CommissionTimeType = "Cliente" | "Garantia" | "Interno" | "Desconocido";
@@ -231,20 +234,20 @@ function summarizeOrders(rows: CommissionRow[], paidIds: Set<string>): Commissio
   }).sort((a, b) => String(b.dateTo ?? b.dateFrom ?? "").localeCompare(String(a.dateTo ?? a.dateFrom ?? "")) || a.osNumber.localeCompare(b.osNumber));
 }
 
-function SummaryTable({ rows, onTechnician }: { rows: TechnicianSummary[]; onTechnician: (name: string) => void }) {
+function SummaryTable({ rows, heading, onTechnician }: { rows: TechnicianSummary[]; heading: (key: string) => React.ReactNode; onTechnician: (name: string) => void }) {
   return (
     <Table className={cn("w-full", tableTextDense)}>
       <TableHeader>
         <TableRow>
-          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[58px] whitespace-nowrap px-2 text-right")}>OS</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[76px] whitespace-nowrap px-2 text-right")}>Jornadas</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[110px] whitespace-nowrap px-2")}>Sucursal</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Cliente</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Garantía</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Interno</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Sin tipo</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>Total</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{heading("technician")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[58px] whitespace-nowrap px-2 text-right")}>{heading("orders")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[76px] whitespace-nowrap px-2 text-right")}>{heading("lines")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[110px] whitespace-nowrap px-2")}>{heading("branches")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>{heading("cliente")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>{heading("garantia")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>{heading("interno")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>{heading("desconocido")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[92px] whitespace-nowrap px-2 text-right")}>{heading("total")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -287,7 +290,11 @@ export default function Comisiones() {
   const [osStateFilters, setOsStateFilters] = useState<string[]>([]);
   const [technicianFilters, setTechnicianFilters] = useState<string[]>([]);
   const [schemaMissing, setSchemaMissing] = useState(false);
+  const [loadError,setLoadError] = useState(false);
   const [selectedOsKey, setSelectedOsKey] = useState<string | null>(null);
+  const [daySearch, setDaySearch] = useState("");
+  const [dayTypes, setDayTypes] = useState<string[]>([]);
+  useEffect(() => { setDaySearch(""); setDayTypes([]); }, [selectedOsKey]);
   const [updatingTimeTypeId, setUpdatingTimeTypeId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -310,7 +317,9 @@ export default function Comisiones() {
       setSettlements(settlementResult);
       setActiveTechnicianIds(new Set((technicianResult.data ?? []).map((row: { id: string }) => row.id)));
       setSchemaMissing(false);
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       const message = String((error as { message?: string })?.message ?? error);
       if (/comisiones_/i.test(message) && /does not exist|schema cache|could not find/i.test(message)) {
         setSchemaMissing(true);
@@ -385,7 +394,25 @@ export default function Comisiones() {
   const unpaidClosedRows = useMemo(() => periodRows.filter((row) => !paidIds.has(row.id)), [paidIds, periodRows]);
   const payableRows = useMemo(() => unpaidClosedRows.filter((row) => row.estado_validacion === "VALIDA" && Number(row.horas_validas ?? 0) > 0), [unpaidClosedRows]);
   const reviewRows = useMemo(() => periodRows.filter((row) => row.estado_validacion !== "VALIDA"), [periodRows]);
-  const summaryRows = useMemo(() => summarize(periodRows, paidIds), [paidIds, periodRows]);
+  const summarySource = useMemo(() => summarize(periodRows, paidIds), [paidIds, periodRows]);
+  const summaryColumns: SalesColumn<TechnicianSummary>[] = [
+    { key: "technician", label: "Técnico", kind: "text", value: r => r.technician },
+    { key: "orders", label: "OS", kind: "number", align: "right", value: r => r.orders.size },
+    { key: "lines", label: "Jornadas", kind: "number", align: "right", value: r => r.lines },
+    { key: "branches", label: "Sucursal", kind: "text", value: r => [...r.branches].sort().join(", ") },
+    ...(["cliente", "garantia", "interno", "desconocido", "total"] as const).map((key, i) => ({ key, label: ["Cliente", "Garantía", "Interno", "Sin tipo", "Total"][i], kind: "number" as const, align: "right" as const, value: (r: TechnicianSummary) => r[key] })),
+  ];
+  const summaryTable = useSectionTable({ rows: summarySource, columns: summaryColumns, title: "Resumen por técnico", fileName: "comisiones-tecnicos.xlsx", initialSort: { key: "total", direction: "desc" } });
+  const summaryRows = summaryTable.ordered;
+  const settlementColumns: SalesColumn<Settlement>[] = [
+    { key: "periodo", label: "Período", kind: "date", value: r => r.periodo_desde?.slice(0, 10) },
+    { key: "estado", label: "Estado", kind: "text", value: r => r.estado },
+    { key: "pago", label: "Fecha de pago", kind: "date", value: r => r.pagado_en ? new Date(r.pagado_en) : null },
+    { key: "observacion", label: "Observación", kind: "text", value: r => r.observacion },
+    { key: "horas", label: "Horas", kind: "number", align: "right", value: r => Number(r.total_horas) },
+  ];
+  const settlementTable = useSectionTable({ rows: settlements, columns: settlementColumns, title: "Liquidaciones", fileName: "comisiones-liquidaciones.xlsx", initialSort: { key: "periodo", direction: "desc" } });
+  const orderedSettlements = settlementTable.ordered;
   const closedAll = useMemo(() => eligibleRows.filter((row) => isClosed(row) && row.fecha_cierre && row.fecha_cierre >= from && row.fecha_cierre <= to), [eligibleRows, from, to]);
   const openAll = useMemo(() => eligibleRows.filter((row) => !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to)), [eligibleRows, to]);
   const totalClosed = totalUniqueCommissionOrderHours(closedAll);
@@ -400,20 +427,37 @@ export default function Comisiones() {
     [rows, selectedOsKey],
   );
   const selectedOs = selectedOsRows.find((row) => row.cliente_nombre || row.nro_chasis) ?? selectedOsRows[0] ?? null;
+  const dailyColumns: SalesColumn<CommissionRow>[] = [
+    { key: "fecha", label: "Fecha", kind: "date", value: r => r.fecha_inicio?.slice(0, 10) },
+    { key: "tecnico", label: "Técnico", kind: "text", value: r => r.tecnico_nombre },
+    { key: "horario", label: "Horario", kind: "text", value: r => r.hora_inicio, exportValue: r => `${r.hora_inicio?.slice(0, 5) ?? "—"}–${r.hora_fin?.slice(0, 5) ?? "—"}` },
+    { key: "tipo", label: "Tipo", kind: "text", value: r => r.tipo_tiempo },
+    { key: "estado", label: "Estado", kind: "text", value: r => r.estado_validacion === "VALIDA" ? "Válida" : r.estado_validacion === "INVALIDA" ? "Inválida" : "Revisar" },
+    { key: "pago", label: "Pago", kind: "text", value: r => paidIds.has(r.id) ? "Pagada" : "Pendiente" },
+    { key: "horas", label: "Horas", kind: "number", align: "right", value: r => r.horas_calculadas == null ? null : Number(r.horas_calculadas) },
+  ];
+  const dailyTable = useSectionTable({ rows: selectedOsRows.filter(r => (!dayTypes.length || dayTypes.includes(r.tipo_tiempo))
+    && (!daySearch.trim() || [r.tecnico_nombre, r.fecha_inicio, r.hora_inicio, r.hora_fin, r.tipo_tiempo, r.estado_validacion].join(" ").toLocaleLowerCase("es").includes(daySearch.trim().toLocaleLowerCase("es")))),
+    columns: dailyColumns, title: "Jornadas de la OS", fileName: "comisiones-jornadas-os.xlsx", initialSort: { key: "fecha", direction: "asc" }, disabled: loading || loadError || schemaMissing, register: false });
   const selectedOsDays = useMemo(() => {
     const grouped = new Map<string, CommissionRow[]>();
-    for (const row of selectedOsRows) {
+    for (const row of dailyTable.ordered) {
       const key = row.fecha_inicio ?? "sin-fecha";
       grouped.set(key, [...(grouped.get(key) ?? []), row]);
     }
     return Array.from(grouped.entries())
       .map(([date, dayRows]) => ({
         date,
-        rows: dayRows.sort((a, b) => String(a.hora_inicio ?? "").localeCompare(String(b.hora_inicio ?? ""))),
+        rows: dayRows,
         total: uniqueCommissionBlockHours(dayRows),
       }))
-      .sort((a, b) => a.date === "sin-fecha" ? 1 : b.date === "sin-fecha" ? -1 : a.date.localeCompare(b.date));
-  }, [selectedOsRows]);
+      .sort((a, b) => a.date === "sin-fecha" ? 1 : b.date === "sin-fecha" ? -1 : a.date.localeCompare(b.date) * (dailyTable.sort.key === "fecha" && dailyTable.sort.direction === "desc" ? -1 : 1));
+  }, [dailyTable.ordered, dailyTable.sort]);
+  const dailyExport = dailyTable.action ? { ...dailyTable.action, onSelect: async () => {
+    const snapshot = selectedOsDays.flatMap(day => day.rows);
+    const { exportSalesTable } = await import("@/components/ventas/salesTableExport");
+    exportSalesTable({ rows: snapshot, columns: dailyColumns, fileName: `comisiones-jornadas-${selectedOs?.os_numero ?? "os"}.xlsx`, sheetName: "Jornadas OS" });
+  } } : null;
   const selectedOsTotal = uniqueCommissionBlockHours(selectedOsRows);
   const selectedOsBlocks = new Set(selectedOsRows.map(commissionClockBlockKey)).size;
   const selectedOsTechnicians = new Set(selectedOsRows.map((row) => row.tecnico_profile_id ?? normalizeTechnicianName(row.tecnico_nombre))).size;
@@ -471,14 +515,28 @@ export default function Comisiones() {
   const detailRows = view === "cerradas" ? unpaidClosedRows : view === "revisar" ? reviewRows : periodRows;
   const selectableIds = view === "cerradas" ? payableRows.map((row) => row.id) : view === "revisar" ? reviewRows.filter((row) => isActiveTechnician(row) && Number(row.horas_calculadas ?? 0) > 0 && row.estado_validacion !== "INVALIDA").map((row) => row.id) : [];
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
-  const detailOrders = useMemo(() => summarizeOrders(detailRows, paidIds), [detailRows, paidIds]);
+  const detailSource = useMemo(() => summarizeOrders(detailRows, paidIds), [detailRows, paidIds]);
+  const orderColumns: SalesColumn<CommissionOsSummary>[] = [
+    { key: "os", label: "Orden", kind: "text", value: r => r.osNumber },
+    { key: "cliente", label: "Cliente", kind: "text", value: r => r.client },
+    { key: "equipo", label: "Equipo técnico", kind: "text", value: r => r.technicians.join(", ") },
+    { key: "sucursal", label: "Suc.", kind: "text", value: r => r.branches.join(", ") },
+    { key: "tipo", label: "Tipo", kind: "text", value: r => r.timeTypes.join(", ") },
+    { key: "periodo", label: "Período", kind: "date", value: r => (r.dateTo || r.dateFrom)?.slice(0, 10) },
+    { key: "jornadas", label: "Jorn.", kind: "number", align: "right", value: r => r.rows.length },
+    { key: "horas", label: "Horas", kind: "number", align: "right", value: r => r.totalHours },
+    { key: "estado", label: "Estado", kind: "text", value: r => r.validation },
+    { key: "pago", label: "Pago", kind: "text", value: r => r.paidCount === r.rows.length ? "Pagada" : r.paidCount > 0 ? "Parcial" : "Pendiente" },
+  ];
+  const orderTable = useSectionTable({ rows: detailSource, columns: orderColumns, title: "OS de Comisiones", fileName: "comisiones-os.xlsx", initialSort: { key: "periodo", direction: "desc" } });
+  const detailOrders = orderTable.ordered;
   const exportOptions = useMemo<TableExportOption[]>(() => {
     if (view === "liquidaciones") {
       return [{
         label: "Liquidaciones registradas",
         filename: `comisiones-liquidaciones-${from}-a-${to}`,
         sheetName: "Liquidaciones",
-        rows: settlements.map((row) => ({
+        rows: orderedSettlements.map((row) => ({
           "Período desde": row.periodo_desde,
           "Período hasta": row.periodo_hasta,
           Estado: row.estado,
@@ -537,7 +595,7 @@ export default function Comisiones() {
         rows: orderRows,
       },
     ];
-  }, [detailOrders, from, settlements, summaryRows, to, view]);
+  }, [detailOrders, from, orderedSettlements, summaryRows, to, view]);
   const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
   const activeFilterCount = Number(Boolean(searchFilter.trim()))
     + Number(technicianFilters.length > 0)
@@ -561,7 +619,7 @@ export default function Comisiones() {
   const resumenPanel = (
     <Panel className="overflow-hidden p-0">
       <div className="border-b px-3 py-2"><SectionHeader title="Horas por técnico y tipo" /></div>
-      <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>
+      <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} heading={summaryTable.heading} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>
     </Panel>
   );
 
@@ -577,16 +635,16 @@ export default function Comisiones() {
       <div className="w-full overflow-x-auto"><div className="max-h-[480px] overflow-y-auto"><Table className={cn("w-full min-w-[860px] table-fixed", tableTextDense)}>
         <TableHeader><TableRow>
           {view !== "abiertas" && <TableHead className="w-8 px-2"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
-          <TableHead className={cn(tableHeadText, "w-[104px] whitespace-nowrap px-2")}>Orden</TableHead>
-          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Cliente</TableHead>
-          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Equipo técnico</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[68px] whitespace-nowrap px-2")}>Suc.</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[96px] whitespace-nowrap px-2")}>Tipo</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[112px] whitespace-nowrap px-2")}>Período</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[54px] whitespace-nowrap px-2 text-right")}>Jorn.</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[76px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Estado</TableHead>
-          <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Pago</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[104px] whitespace-nowrap px-2")}>{orderTable.heading("os")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{orderTable.heading("cliente")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{orderTable.heading("equipo")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[68px] whitespace-nowrap px-2")}>{orderTable.heading("sucursal")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[96px] whitespace-nowrap px-2")}>{orderTable.heading("tipo")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[112px] whitespace-nowrap px-2")}>{orderTable.heading("periodo")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[54px] whitespace-nowrap px-2 text-right")}>{orderTable.heading("jornadas")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[76px] whitespace-nowrap px-2 text-right")}>{orderTable.heading("horas")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>{orderTable.heading("estado")}</TableHead>
+          <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>{orderTable.heading("pago")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>
           {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 11 : 10} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={11} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
@@ -652,7 +710,7 @@ export default function Comisiones() {
             activeCount={activeFilterCount}
             onClear={clearFilters}
             meta={`${detailOrders.length} OS`}
-            secondaryActions={<TableExportButton options={exportOptions} />}
+            secondaryActions={orderTable.action && !loading && !loadError && !schemaMissing ? <TableExportButton options={exportOptions} /> : undefined}
           >
             <FilterDate label="Desde" value={from} onChange={setFrom} />
             <FilterDate label="Hasta" value={to} onChange={setTo} />
@@ -682,14 +740,14 @@ export default function Comisiones() {
               <div className="border-b px-3 py-2"><SectionHeader title="Liquidaciones registradas" /></div>
               <Table className={tableText}>
                 <TableHeader><TableRow>
-                  <TableHead className={tableHeadText}>Período</TableHead>
-                  <TableHead className={tableHeadText}>Estado</TableHead>
-                  <TableHead className={tableHeadText}>Fecha de pago</TableHead>
-                  <TableHead className={tableHeadText}>Observación</TableHead>
-                  <TableHead className={cn(tableHeadText, "text-right")}>Horas</TableHead>
+                  <TableHead className={tableHeadText}>{settlementTable.heading("periodo")}</TableHead>
+                  <TableHead className={tableHeadText}>{settlementTable.heading("estado")}</TableHead>
+                  <TableHead className={tableHeadText}>{settlementTable.heading("pago")}</TableHead>
+                  <TableHead className={tableHeadText}>{settlementTable.heading("observacion")}</TableHead>
+                  <TableHead className={cn(tableHeadText, "text-right")}>{settlementTable.heading("horas")}</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {settlements.length === 0 ? <TableRow><TableCell colSpan={5} className="h-20 p-0"><EmptyState title="Sin pagos registrados" className="border-0 bg-transparent" /></TableCell></TableRow> : settlements.map((row) => <TableRow key={row.id}><TableCell>{dateLabel(row.periodo_desde)} — {dateLabel(row.periodo_hasta)}</TableCell><TableCell><Badge variant="outline">{row.estado}</Badge></TableCell><TableCell>{row.pagado_en ? format(new Date(row.pagado_en), "dd/MM/yyyy HH:mm") : "—"}</TableCell><TableCell>{row.observacion ?? "—"}</TableCell><TableCell className="text-right font-semibold tabular-nums">{hours(Number(row.total_horas))}</TableCell></TableRow>)}
+                  {settlements.length === 0 ? <TableRow><TableCell colSpan={5} className="h-20 p-0"><EmptyState title="Sin pagos registrados" className="border-0 bg-transparent" /></TableCell></TableRow> : orderedSettlements.map((row) => <TableRow key={row.id}><TableCell>{dateLabel(row.periodo_desde)} — {dateLabel(row.periodo_hasta)}</TableCell><TableCell><Badge variant="outline">{row.estado}</Badge></TableCell><TableCell>{row.pagado_en ? format(new Date(row.pagado_en), "dd/MM/yyyy HH:mm") : "—"}</TableCell><TableCell>{row.observacion ?? "—"}</TableCell><TableCell className="text-right font-semibold tabular-nums">{hours(Number(row.total_horas))}</TableCell></TableRow>)}
                 </TableBody>
               </Table>
             </Panel>
@@ -714,17 +772,21 @@ export default function Comisiones() {
                 <KpiItem label="Cierre" value={dateLabel(selectedOs.fecha_cierre)} />
               </KpiStrip>
 
+              <FiltersBar search={{value:daySearch,onChange:setDaySearch,placeholder:"Buscar técnico, fecha o horario…"}}
+                activeCount={dayTypes.length} onClear={()=>{setDaySearch("");setDayTypes([]);}}
+                expanded={<FilterMultiSelect label="Tipo" values={dayTypes} options={["Cliente","Garantia","Interno","Desconocido"].map(value=>({value,label:value === "Garantia" ? "Garantía" : value === "Desconocido" ? "Sin tipo" : value}))} onChange={setDayTypes}/>}
+                secondaryActions={<SectionActionsMenu options={dailyExport ? [dailyExport] : []}/>}/>
               <div className="overflow-hidden rounded-md border">
                 <div className="border-b px-3 py-1.5"><SectionHeader title="Desglose por día" /></div>
                 <Table className={cn("w-full table-fixed", tableTextDense)}>
                   <TableHeader><TableRow>
-                    <TableHead className={cn(tableHeadText, "w-[88px] whitespace-nowrap px-2 pr-3")}>Fecha</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>Técnico</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>Horario</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[118px] whitespace-nowrap px-2")}>Tipo</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[70px] whitespace-nowrap px-2")}>Estado</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>Pago</TableHead>
-                    <TableHead className={cn(tableHeadText, "w-[66px] whitespace-nowrap px-2 text-right")}>Horas</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[88px] whitespace-nowrap px-2 pr-3")}>{dailyTable.heading("fecha")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{dailyTable.heading("tecnico")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>{dailyTable.heading("horario")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[118px] whitespace-nowrap px-2")}>{dailyTable.heading("tipo")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[70px] whitespace-nowrap px-2")}>{dailyTable.heading("estado")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[72px] whitespace-nowrap px-2")}>{dailyTable.heading("pago")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "w-[66px] whitespace-nowrap px-2 text-right")}>{dailyTable.heading("horas")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {selectedOsDays.map((day) => <Fragment key={day.date}>

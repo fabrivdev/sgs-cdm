@@ -89,7 +89,9 @@ import { ServiciosDashboard } from "@/components/dashboard/ServiciosDashboard";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { cuadrillaIds, resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
-import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
+import type { TableExportOption } from "@/components/exports/TableExportButton";
+import { SalesSectionExportsProvider, SectionTableExportMenu } from "@/components/ventas/SalesSectionExports";
+import { useAuth } from "@/hooks/useAuth";
 import { LEGACY_IMPORT_CUTOFF } from "@/lib/imports/cutoff";
 
 const PAGE = 1000;
@@ -605,6 +607,7 @@ function technicianGoalForRange(
 }
 
 export default function Dashboard() {
+  const { can } = useAuth();
   const navigate = useNavigate();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const initialFilters = useMemo(() => getInitialDashboardFilters(), []);
@@ -2586,6 +2589,7 @@ export default function Dashboard() {
         cliente: row.cliente,
         sucursal: row.sucursal,
         estado: estadoTrabajoLabel(row.estado as EstadoTrabajo),
+        ultimaFechaISO: row.ultimaFechaPeriodo || row.ultimaFecha || null,
         ultimaFecha: row.ultimaFechaPeriodo
           ? format(parseISO(row.ultimaFechaPeriodo), "dd/MM/yy")
           : row.ultimaFecha
@@ -3279,7 +3283,7 @@ export default function Dashboard() {
   }, [allPeriodFacts, cargaSucursal, clienteById, dateFrom, dateTo, periodoLabel, section, serviciosDashboardData, trabajosAbiertosSinCierre, trabajosResumen, weeklyRows]);
 
   return (
-    <PageShell className="overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
+    <SalesSectionExportsProvider><PageShell className="overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
       <PageHeader title="Dashboard ejecutivo" tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
@@ -3292,9 +3296,9 @@ export default function Dashboard() {
         search={{ value: q, onChange: setQ, placeholder: filtrosServiciosActivos ? "OS, técnico, cliente o factura..." : "Cliente, factura o concepto..." }}
         activeCount={filtrosActivos}
         onClear={limpiar}
-        secondaryActions={dashboardExportOptions.length > 0 &&
+        secondaryActions={can("datos:exportar") &&
           ((section !== "resumen" && section !== "facturación") || (!loading && !facturacionError))
-          ? <TableExportButton options={dashboardExportOptions} /> : undefined}
+          ? <SectionTableExportMenu options={dashboardExportOptions.filter(option => option.label !== "Trabajos abiertos sin cierre" && (section !== "servicios" || option.label !== "Órdenes de servicio"))} /> : undefined}
         expanded={(
           <div className="flex flex-col gap-3">
             <FilterMultiSelect
@@ -3916,7 +3920,6 @@ export default function Dashboard() {
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-[13px] font-semibold leading-5">Trabajos abiertos sin cierre</h2>
-                  <p className="text-[12px] text-muted-foreground">Ordenados de mayor a menor por días sin cerrar</p>
                 </div>
                 <Badge variant="secondary">{trabajosAbiertosSinCierre.length} abiertos</Badge>
               </div>
@@ -3941,7 +3944,7 @@ export default function Dashboard() {
         </TabsContent>
       </Tabs>
       </div>
-    </PageShell>
+    </PageShell></SalesSectionExportsProvider>
   );
 }
 

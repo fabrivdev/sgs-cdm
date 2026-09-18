@@ -1,3 +1,4 @@
+import { sortSalesRows, type SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
 import { MACHINE_SUBGROUPS, machineSubgroupLabel } from "@/lib/machineModels";
-import * as XLSX from "xlsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useMachineCatalog } from "@/hooks/useMachineCatalog";
 import { reviewCatalogLine } from "@/lib/machineOrderValidation";
@@ -52,7 +52,7 @@ type Cliente = {
   activo?: boolean | null;
 };
 
-type SortKey = "cliente" | "marca" | "subgrupo" | "año" | "serie" | "sucursal";
+type SortKey = "cliente" | "marca" | "subgrupo" | "año" | "serie" | "sucursal" | "modelo" | "antiguedad" | "vendedor" | "estado";
 
 const PAGE = 1000;
 
@@ -100,6 +100,7 @@ export function MaquinasTab({
   const canManagePark = can("parque:gestionar");
   const canExport = can("datos:exportar");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [rawMaquinas, setMaquinas] = useState<Maquina[]>([]);
   const catalog = useMachineCatalog();
   const maquinas = useMemo(() => rawMaquinas.map(machine => {
@@ -123,19 +124,21 @@ export function MaquinasTab({
 
   const cargar = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
 
     try {
       const [m, c] = await Promise.all([
         cargarTodo<Maquina>(
           supabase
             .from("parque_maquinas")
-            .select("id, cliente_id, anio, marca, marca_nombre, subgrupo, subgrupo_personalizado, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en"),
+            .select("id, cliente_id, anio, marca, marca_nombre, subgrupo, subgrupo_personalizado, modelo_tipo, serie, vendedor, sucursal, localidad, activo, agregado_manualmente, notas, creado_en, actualizado_en")
+            .order("id"),
         ),
         cargarTodo<Cliente>(
           supabase
             .from("clientes")
             .select("id, nombre, sucursal, ruc, region, direccion, localidad, correo_principal, cod_entidad, activo")
-            .order("nombre", { ascending: true }),
+            .order("nombre", { ascending: true }).order("id"),
         ),
       ]);
 
@@ -150,6 +153,7 @@ export function MaquinasTab({
         totalClaas: activas.filter((maquina) => maquina.marca === "CLAAS").length,
       });
     } catch (e) {
+      setLoadError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -235,30 +239,19 @@ export function MaquinasTab({
     });
   }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, añoDesde, añoHasta, clientesConAmbasMarcas]);
 
-  const ordenadas = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-
-    return [...filtradas].sort((a, b) => {
-      const cliA = a.cliente_id ? cliById.get(a.cliente_id)?.nombre ?? "" : "";
-      const cliB = b.cliente_id ? cliById.get(b.cliente_id)?.nombre ?? "" : "";
-
-      switch (sortKey) {
-        case "cliente":
-          return cliA.localeCompare(cliB) * dir;
-        case "marca":
-          return a.marca.localeCompare(b.marca) * dir;
-        case "subgrupo":
-          return machineSubgroupLabel(a.subgrupo, a.subgrupo_personalizado)
-            .localeCompare(machineSubgroupLabel(b.subgrupo, b.subgrupo_personalizado), "es") * dir;
-        case "año":
-          return ((a.anio ?? 0) - (b.anio ?? 0)) * dir;
-        case "serie":
-          return (a.serie ?? "").localeCompare(b.serie ?? "") * dir;
-        case "sucursal":
-          return (a.sucursal ?? "").localeCompare(b.sucursal ?? "") * dir;
-      }
-    });
-  }, [filtradas, sortKey, sortDir, cliById]);
+  const columns: SalesColumn<typeof filtradas[number]>[] = [
+    { key: "cliente", label: "Cliente", kind: "text", value: m => m.cliente_id ? cliById.get(m.cliente_id)?.nombre : null },
+    { key: "sucursal", label: "Sucursal", kind: "text", value: m => m.sucursal },
+    { key: "marca", label: "Marca", kind: "text", value: m => m.marca },
+    { key: "subgrupo", label: "Tipo", kind: "text", value: m => machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado) },
+    { key: "modelo", label: "Modelo", kind: "text", value: m => m.modelo_tipo },
+    { key: "año", label: "Año", kind: "number", value: m => m.anio },
+    { key: "antiguedad", label: "Antig.", kind: "number", value: m => m.anio ? new Date().getFullYear() - m.anio : null },
+    { key: "serie", label: "Chasis", kind: "text", value: m => m.serie },
+    { key: "vendedor", label: "Vendedor", kind: "text", value: m => m.vendedor },
+    { key: "estado", label: "Estado", kind: "text", value: m => m.activo === false ? "Inactiva" : "Activa" },
+  ];
+  const ordenadas = sortSalesRows(filtradas, columns, { key: sortKey, direction: sortDir });
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) {
@@ -274,7 +267,8 @@ export function MaquinasTab({
     return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
-  const exportar = () => {
+  const exportar = async () => {
+    const XLSX = await import("xlsx");
     const hoy = new Date().getFullYear();
 
     const data = ordenadas.map((m) => {
@@ -335,7 +329,7 @@ export function MaquinasTab({
         activeCount={activos}
         onClear={limpiar}
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
-        secondaryActions={canExport ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar máquinas", onSelect: exportar }]} /> : undefined}
+        secondaryActions={canExport ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar máquinas", disabled: loading || loadError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
         actions={
           <div className="flex items-center gap-2">
             {canManagePark && <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9 shrink-0 px-3">
@@ -389,16 +383,16 @@ export function MaquinasTab({
               <TableHead className="cursor-pointer" onClick={() => toggleSort("subgrupo")}>
                 <div className="flex items-center gap-1">Subgrupo {sortIcon("subgrupo")}</div>
               </TableHead>
-              <TableHead>Modelo</TableHead>
+              <TableHead onClick={() => toggleSort("modelo")}><div className="flex items-center gap-1">Modelo {sortIcon("modelo")}</div></TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("año")}>
                 <div className="flex items-center justify-center gap-1">Año {sortIcon("año")}</div>
               </TableHead>
-              <TableHead className="text-center">Antig.</TableHead>
+              <TableHead className="text-center" onClick={() => toggleSort("antiguedad")}><div className="flex justify-center items-center gap-1">Antig. {sortIcon("antiguedad")}</div></TableHead>
               <TableHead className="cursor-pointer" onClick={() => toggleSort("serie")}>
                 <div className="flex items-center gap-1">Serie {sortIcon("serie")}</div>
               </TableHead>
-              <TableHead>Vendedor</TableHead>
-              <TableHead className="text-center">Estado</TableHead>
+              <TableHead onClick={() => toggleSort("vendedor")}><div className="flex items-center gap-1">Vendedor {sortIcon("vendedor")}</div></TableHead>
+              <TableHead className="text-center" onClick={() => toggleSort("estado")}><div className="flex justify-center items-center gap-1">Estado {sortIcon("estado")}</div></TableHead>
               <TableHead className="w-[64px] text-right">Acción</TableHead>
             </TableRow>
           </TableHeader>

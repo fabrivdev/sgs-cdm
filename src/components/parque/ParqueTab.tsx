@@ -1,3 +1,4 @@
+import { sortSalesRows, type SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +24,6 @@ import {
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { cn, formatGuaranies } from "@/lib/utils";
-import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import {
   type ClienteContactoInput,
@@ -33,6 +33,7 @@ import {
 } from "@/lib/contacto-utils";
 import { MACHINE_SUBGROUPS, machineSubgroupLabel } from "@/lib/machineModels";
 import { useAuth } from "@/hooks/useAuth";
+import { cargarTodo } from "@/hooks/useCatalogos";
 
 const MARCA_AMBAS = "ambas";
 const MARCA_OPTIONS = [
@@ -124,7 +125,7 @@ type SortKey =
   | "diasUltServicio"
   | "factYTD"
   | "factPrev"
-  | "varPct";
+  | "varPct" | "telefono" | "marcas" | "repuesto" | "servicio";
 
 type RangoPreset = "30d" | "90d" | "180d" | "365d" | "ytd" | "custom";
 
@@ -194,6 +195,7 @@ export function ParqueTab({
 }) {
   const { can } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [factLoading, setFactLoading] = useState(true);
   const [factError, setFactError] = useState<string | null>(null);
   const [factReloadKey, setFactReloadKey] = useState(0);
@@ -240,14 +242,13 @@ export function ParqueTab({
   // Fase A: datos rápidos (clientes, contactos, máquinas, seguimientos)
   const cargar = async () => {
     setLoading(true);
+    setLoadError(false);
 
     try {
-      const { data: maquinasData, error: maquinasError } = await supabase
+      const maquinasData = await cargarTodo<Maquina>(supabase
         .from("parque_maquinas")
         .select("id, cliente_id, anio, marca, subgrupo, subgrupo_personalizado, activo, sucursal")
-        .eq("activo", true);
-
-      if (maquinasError) throw maquinasError;
+        .eq("activo", true).order("id"));
 
       const maquinasRows = (maquinasData ?? []) as Maquina[];
       const clienteIds = Array.from(
@@ -267,40 +268,36 @@ export function ParqueTab({
       }
 
       const [c, ct, s, t] = await Promise.all([
-        supabase
+        cargarTodo<Cliente>(supabase
           .from("clientes")
           .select("id, nombre, sucursal, activo")
-          .in("id", clienteIds),
+          .in("id", clienteIds).order("id")),
 
-        supabase
+        cargarTodo<Contacto>(supabase
           .from("contactos_cliente")
           .select("id, cliente_id, nombre, telefono, es_principal, activo")
           .in("cliente_id", clienteIds)
-          .eq("activo", true),
+          .eq("activo", true).order("id")),
 
-        supabase
+        cargarTodo<Seguimiento>(supabase
           .from("seguimiento_comercial")
           .select("cliente_id, fecha, resultado")
           .in("cliente_id", clienteIds)
-          .order("fecha", { ascending: false }),
+          .order("fecha", { ascending: false }).order("id")),
 
-        supabase
+        cargarTodo<TrabajoParque>(supabase
           .from("trabajos")
           .select("cliente_id, estado_general")
-          .in("cliente_id", clienteIds),
+          .in("cliente_id", clienteIds).order("id")),
       ]);
 
-      if (c.error) throw c.error;
-      if (ct.error) throw ct.error;
-      if (s.error) throw s.error;
-      if (t.error) throw t.error;
-
-      setClientes((c.data ?? []) as Cliente[]);
-      setContactos((ct.data ?? []) as Contacto[]);
+      setClientes(c);
+      setContactos(ct);
       setMaquinas(maquinasRows);
-      setSeguimientos((s.data ?? []) as Seguimiento[]);
-      setTrabajos((t.data ?? []) as TrabajoParque[]);
+      setSeguimientos(s);
+      setTrabajos(t);
     } catch (e) {
+      setLoadError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -597,31 +594,15 @@ export function ParqueTab({
     onMetricasChange(calcularKpis(inputs, desdeDate));
   }, [filtradas, onMetricasChange, desdeDate, clientesConTrabajoAbierto, factAgregados]);
 
-  const ordenadas = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    const safe = (n: number | null | undefined) => (n == null ? Number.POSITIVE_INFINITY : n);
-
-    return [...filtradas].sort((a, b) => {
-      switch (sortKey) {
-        case "cliente":
-          return a.cliente.nombre.localeCompare(b.cliente.nombre) * dir;
-        case "cantTotal":
-          return (a.cantTotal - b.cantTotal) * dir;
-        case "antiguedadProm":
-          return (safe(a.antiguedadProm) - safe(b.antiguedadProm)) * dir;
-        case "diasUltRepuesto":
-          return (safe(a.diasUltRepuesto) - safe(b.diasUltRepuesto)) * dir;
-        case "diasUltServicio":
-          return (safe(a.diasUltServicio) - safe(b.diasUltServicio)) * dir;
-        case "factYTD":
-          return (a.factYTD - b.factYTD) * dir;
-        case "factPrev":
-          return (a.factPrev - b.factPrev) * dir;
-        case "varPct":
-          return (safe(a.varPct) - safe(b.varPct)) * dir;
-      }
-    });
-  }, [filtradas, sortKey, sortDir]);
+  const sortColumns: SalesColumn<typeof filtradas[number]>[] = [
+    { key: "cliente", label: "Cliente", kind: "text", value: r => r.cliente.nombre },
+    { key: "telefono", label: "Teléfono", kind: "text", value: r => r.contactoPrincipal?.telefono },
+    ...(["cantTotal", "antiguedadProm", "diasUltRepuesto", "diasUltServicio", "factYTD", "factPrev", "varPct"] as const).map(key => ({ key, label: key, kind: "number" as const, value: (r: typeof filtradas[number]) => r[key] })),
+    { key: "marcas", label: "% Marcas", kind: "number", value: r => r.cantTotal ? r.cantClaas / r.cantTotal : null },
+    { key: "repuesto", label: "Rep.", kind: "number", value: r => Number(r.tieneRepEnRango) },
+    { key: "servicio", label: "Serv.", kind: "number", value: r => Number(r.tieneSrvEnRango) },
+  ];
+  const ordenadas = sortSalesRows(filtradas, sortColumns, { key: sortKey, direction: sortDir });
 
   const servicioInfo = useMemo(() => {
     let maxServ: Date | null = null;
@@ -649,7 +630,8 @@ export function ParqueTab({
     return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
   };
 
-  const exportar = () => {
+  const exportar = async () => {
+    const XLSX = await import("xlsx");
     const data = ordenadas.map((r) => ({
       Cliente: r.cliente.nombre,
       Sucursal: r.sucursales.join(", "),
@@ -676,7 +658,7 @@ export function ParqueTab({
   return (
     <div className="space-y-3">
       <FiltersBar
-        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar clientes", onSelect: exportar }]} /> : undefined}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar clientes", disabled: loading || loadError || factLoading || !!factError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
         search={{ value: q, onChange: setQ, placeholder: "Nombre del cliente…", label: "Buscar" }}
         activeCount={filtrosActivos + (q ? 1 : 0)}
         onClear={() => { setQ(""); limpiarFiltros(); }}
@@ -804,22 +786,22 @@ export function ParqueTab({
               <TableHead className="cursor-pointer whitespace-nowrap min-w-[200px]" onClick={() => toggleSort("cliente")}>
                 <div className="flex items-center gap-1">Cliente {sortIcon("cliente")}</div>
               </TableHead>
-              <TableHead className="whitespace-nowrap min-w-[170px]">Teléfono</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[170px]" onClick={() => toggleSort("telefono")}><div className="flex items-center gap-1">Teléfono {sortIcon("telefono")}</div></TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("cantTotal")}>
                 <div className="flex items-center justify-center gap-1">Maq. {sortIcon("cantTotal")}</div>
               </TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("antiguedadProm")}>
                 <div className="flex items-center justify-center gap-1">Antig. {sortIcon("antiguedadProm")}</div>
               </TableHead>
-              <TableHead className="whitespace-nowrap min-w-[140px]">% Marcas</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[140px]" title="Ordenar por participación de CLAAS" onClick={() => toggleSort("marcas")}><div className="flex items-center gap-1">% Marcas {sortIcon("marcas")}</div></TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("diasUltRepuesto")}>
                 <div className="flex items-center justify-end gap-1">Últ. Rep. {sortIcon("diasUltRepuesto")}</div>
               </TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("diasUltServicio")}>
                 <div className="flex items-center justify-end gap-1">Últ. Serv. {sortIcon("diasUltServicio")}</div>
               </TableHead>
-              <TableHead className="whitespace-nowrap text-center">Rep.</TableHead>
-              <TableHead className="whitespace-nowrap text-center">Serv.</TableHead>
+              <TableHead className="whitespace-nowrap text-center" onClick={() => toggleSort("repuesto")}><div className="flex items-center justify-center gap-1">Rep. {sortIcon("repuesto")}</div></TableHead>
+              <TableHead className="whitespace-nowrap text-center" onClick={() => toggleSort("servicio")}><div className="flex items-center justify-center gap-1">Serv. {sortIcon("servicio")}</div></TableHead>
               <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("factYTD")}>
                 <div className="flex items-center justify-end gap-1">Fact. Período {sortIcon("factYTD")}</div>
               </TableHead>

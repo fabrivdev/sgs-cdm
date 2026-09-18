@@ -78,6 +78,7 @@ export function FiltersBar({
     onChange: (v: string) => void;
     placeholder?: string;
     label?: string;
+    ariaLabel?: string;
     width?: string;
   };
   children?: ReactNode;
@@ -117,6 +118,7 @@ export function FiltersBar({
       <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
+        aria-label={search?.ariaLabel ?? search?.label ?? "Buscar"}
         enterKeyHint="search"
         value={searchDraft}
         onChange={(e) => setSearchDraft(e.target.value)}

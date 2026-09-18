@@ -1,3 +1,6 @@
+import { suggestionColumns } from "@/lib/suggestionTableOrder";
+import { SalesSortButton } from "@/components/ventas/SalesTableControls";
+import type { SalesSort } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -242,7 +245,7 @@ function ModelConfigSheet({
 
 export default function RepuestosSugerencias() {
   const queryClient = useQueryClient();
-  const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
+  const { isAdmin, isJefatura, isSuperAdmin, can } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
   const canLoadLegacyMaster = isAdmin || isSuperAdmin;
   const [brands, setBrands] = useState<MarcaModeloSugerencia[]>([]);
@@ -270,7 +273,10 @@ export default function RepuestosSugerencias() {
   const historyIsPrepared = legacyBillingQuery.data?.publicacion_estado !== "PROCESANDO"
     && (historyIsPersisted || Boolean(historyQualityQuery.data?.preparado));
   const debouncedSearch = useDebouncedValue(filters.buscar ?? "", 300);
-  const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch }), [filters, debouncedSearch]);
+  const [tableSort,setTableSort] = useState<SalesSort>({key:"sugerencia_unidades",direction:"desc"});
+  const toggleTableSort = (key:string) => {setPage(1);setTableSort(previous=>({key,direction:previous.key===key&&previous.direction==="asc"?"desc":"asc"}));};
+  const heading = (key:string) => {const c=suggestionColumns.find(c=>c.key===key)!;return <SalesSortButton label={c.label} kind={c.kind} align={c.align} active={tableSort.key===key} direction={tableSort.direction} onClick={()=>toggleTableSort(key)}/>;};
+  const liveFilters = useMemo(() => ({ ...filters, buscar: debouncedSearch, orden:tableSort }), [filters, debouncedSearch,tableSort]);
   const liveQuery = useSugerenciaViva(
     brands,
     analysisDate,
@@ -364,12 +370,12 @@ export default function RepuestosSugerencias() {
     mutationFn: (file: File) => completarVendedoresHistoricos(file, (loaded, total) => setSellerProgress({ loaded, total })),
     onSuccess: async result => {
       setSellerProgress(null);
-      await queryClient.invalidateQueries({ queryKey: ["ventas-repuestos-listado-v2"] });
+      await queryClient.invalidateQueries({ queryKey: ["ventas-repuestos-listado-v3"] });
       toast.success(`${integer.format(result.verificadas)} líneas verificadas; ${integer.format(result.actualizadas)} vendedores actualizados. Sin cambios en ventas ni NC.`);
     },
     onError: async error => {
       setSellerProgress(null);
-      await queryClient.invalidateQueries({ queryKey: ["ventas-repuestos-listado-v2"] });
+      await queryClient.invalidateQueries({ queryKey: ["ventas-repuestos-listado-v3"] });
       toast.error(error instanceof Error ? error.message : "No se pudieron completar los vendedores");
     },
   });
@@ -380,7 +386,7 @@ export default function RepuestosSugerencias() {
     }),
     onSuccess: async (result) => {
       setLegacyBillingProgress(null);
-      for (const key of ["ventas-repuestos-estado-historico", "ventas-repuestos-panorama-v2", "ventas-repuestos-listado-v2"]) {
+      for (const key of ["ventas-repuestos-estado-historico", "ventas-repuestos-panorama-v2", "ventas-repuestos-listado-v3"]) {
         await queryClient.invalidateQueries({ queryKey: [key] });
       }
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "facturacion-historica", "estado"] });
@@ -400,7 +406,7 @@ export default function RepuestosSugerencias() {
     mutationFn: async () => {
       const toastId = toast.loading("Preparando exportación…");
       try {
-        const exportFilters = { ...liveFilters, soloSugeridos: true };
+        const exportFilters = { ...liveFilters };
         const response = await cargarSugerenciaViva(brands, analysisDate, exportFilters, (loaded, total) => {
           toast.loading(`Descargando ${integer.format(Math.min(loaded, total))} de ${integer.format(total)} piezas…`, { id: toastId });
         });
@@ -632,7 +638,7 @@ export default function RepuestosSugerencias() {
         search={{ value: filters.buscar ?? "", onChange: (buscar) => { setFilters((current) => ({ ...current, buscar })); setPage(1); }, placeholder: "Código, fabricante o descripción…", width: "w-[min(360px,26vw)]" }}
         activeCount={Number(Boolean(filters.buscar)) + Number(brands.length > 0) + Number(Boolean(filters.segmentos?.length)) + Number(Boolean(filters.estados?.length)) + Number(Boolean(filters.soloSugeridos))}
         onClear={() => { setBrands([]); setFilters({ buscar: "", segmentos: [], estados: [], soloSugeridos: false }); setPage(1); }}
-        secondaryActions={<SectionActionsMenu busy={exportMutation.isPending} options={[{ id: "excel", label: "Exportar sugerencias", disabled: !liveQuery.data, onSelect: () => exportMutation.mutate() }]} />}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu busy={exportMutation.isPending} options={[{ id: "excel", label: "Exportar sugerencias", disabled: liveQuery.isFetching || !!liveQuery.error || !liveQuery.data?.total_filtrado, onSelect: () => exportMutation.mutate() }]} /> : undefined}
       >
         <FilterMultiSelect
           label="Marca"
@@ -700,14 +706,14 @@ export default function RepuestosSugerencias() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={cn(tableHeadText, "h-8 min-w-[280px]")}>Pieza</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 min-w-[170px]")}>Clase</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Stock</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Demanda mensual</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Cobertura</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Última venta</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Objetivo</TableHead>
-                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>Sugerencia</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 min-w-[280px]")}>{heading("producto_codigo")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 min-w-[170px]")}>{heading("clase")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("stock_global")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("demanda_ponderada_mensual")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("cobertura")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("ultima_venta")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("stock_objetivo")}</TableHead>
+                    <TableHead className={cn(tableHeadText, "h-8 text-right")}>{heading("sugerencia_unidades")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

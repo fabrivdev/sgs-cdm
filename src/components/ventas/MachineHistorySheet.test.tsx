@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MachineHistorySheet } from './MachineHistorySheet';
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ can: () => true }) }));
+beforeEach(()=>vi.stubGlobal('ResizeObserver',class { observe() {} disconnect() {} }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 const target = { chassis: '24491414', os: null };
 const row = { os_numero: '01-00000057', fecha_abierta_os: '2026-08-01', tipo_tiempo: 'Cliente / Garantia', servicios_cantidad: 8, responsable: '12 - juan gómez', situacion_os: 'CERRADA', factura: '0010001005021; 0010000000077', servicios_valor: 100, repuesto_valor: 50, kilometro_valor: null, terceros_valor: null, raw_data: { 'Mec Aux 1': 'JUAN GOMEZ', 'Mec Aux 2': 'Pedro Ruiz', totales_por_tipo: { Cliente: { horas: 5 }, Garantia: { horas: 3 } } } };
 function renderSheet() {
@@ -57,7 +59,7 @@ describe('simple machine history', () => {
     fireEvent.click(screen.getByRole('button',{name:'Repuestos'}));
     expect(await screen.findByText('FAB002')).toBeInTheDocument();
     expect(screen.getByText('REP001')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox',{name:'Buscar en historial'}),{target:{value:'FAB002'}});
+    fireEvent.change(screen.getAllByRole('searchbox',{name:'Buscar en historial'})[0],{target:{value:'FAB002'}});
     expect(screen.getByText('Rodamiento')).toBeInTheDocument();
   });
   it('does not show zero or historical coverage on parts failure', async () => {

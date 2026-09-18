@@ -1,3 +1,6 @@
+import { sortSalesRows, type SalesColumn, type SalesSort } from "@/components/ventas/salesTableInteraction";
+import { SalesSortButton } from "@/components/ventas/SalesTableControls";
+import { cargarTodo } from "@/hooks/useCatalogos";
 import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,11 +107,8 @@ function usePedidosResumen() {
   return useQuery({
     queryKey: ["compras", "pedidos_resumen"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from("v_compras_pedidos_resumen" as any) as any)
-        .select("*")
-        .order("fecha_emision", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as PedidoResumenRow[];
+      return cargarTodo<PedidoResumenRow>((supabase.from("v_compras_pedidos_resumen" as any) as any)
+        .select("*").order("sucursal").order("nro_pedido"));
     },
   });
 }
@@ -176,35 +176,33 @@ export function ComprasPedidosTab() {
     });
   }, [resumenQuery.data, filtros, filtrosActivos, lineasPorPedido, fabricanteMapQuery.data]);
 
-  const filasOrdenadas = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...filasFiltradas].sort((a, b) => {
-      switch (sortKey) {
-        case "sucursal":
-          return (a.sucursal ?? "").localeCompare(b.sucursal ?? "") * dir;
-        case "nro_pedido":
-          return a.nro_pedido.localeCompare(b.nro_pedido) * dir;
-        case "fecha_emision":
-          return (a.fecha_emision ?? "").localeCompare(b.fecha_emision ?? "") * dir;
-        case "proveedor_nombre":
-          return (a.proveedor_nombre ?? "").localeCompare(b.proveedor_nombre ?? "") * dir;
-        case "cantidad_items":
-          return (a.cantidad_items - b.cantidad_items) * dir;
-        case "valor_total":
-          return (a.valor_total - b.valor_total) * dir;
-        case "estado_seguimiento":
-          return a.estado_seguimiento.localeCompare(b.estado_seguimiento) * dir;
-        default:
-          return 0;
-      }
-    });
-  }, [filasFiltradas, sortKey, sortDir]);
+  const columns: SalesColumn<PedidoResumenRow>[] = [
+    {key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal},
+    {key:"nro_pedido",label:"N° Pedido",kind:"text",value:r=>r.nro_pedido},
+    {key:"fecha_emision",label:"Fecha",kind:"date",value:r=>r.fecha_emision?.slice(0,10)},
+    {key:"proveedor_nombre",label:"Proveedor",kind:"text",value:r=>r.proveedor_nombre},
+    {key:"cantidad_items",label:"Ítems",kind:"number",value:r=>r.cantidad_items},
+    {key:"valor_total",label:"Total",kind:"number",value:r=>Number(r.valor_total)},
+    {key:"estado_seguimiento",label:"Seguimiento",kind:"text",value:r=>r.estado_seguimiento},
+  ];
+  const filasOrdenadas = sortSalesRows(filasFiltradas,columns,{key:sortKey,direction:sortDir});
+  const [itemSort,setItemSort] = useState<SalesSort>({key:"item",direction:"asc"});
+  const itemColumns:SalesColumn<PedidoLinea>[] = [
+    {key:"item",label:"Ítem",kind:"text",value:r=>r.item},
+    {key:"producto",label:"Producto",kind:"text",value:r=>r.productoCodigo},
+    {key:"descripcion",label:"Descripción",kind:"text",value:r=>r.descripcion},
+    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>r.cantidad},
+    {key:"precio",label:"Precio unit.",kind:"number",align:"right",value:r=>r.precioUnitario},
+    {key:"total",label:"Total",kind:"number",align:"right",value:r=>r.valorTotal},
+    {key:"pendiente",label:"Pendiente",kind:"number",align:"right",value:r=>r.cantidadPendiente},
+    {key:"solicitud",label:"Solicitud",kind:"text",value:r=>(solicitudesPorPedidoMap.get(`${r.sucursal}|${r.nroPedido}|${r.item}`)??[]).map((s:{sucursal:string;nroSolicitud:string})=>`${s.sucursal}-${s.nroSolicitud}`).join(", ")},
+  ];
+  const orderItems = (rows:PedidoLinea[]) => sortSalesRows(rows,itemColumns,itemSort);
+  const itemHeading = (key:string) => {const c=itemColumns.find(c=>c.key===key)!;return <SalesSortButton label={c.label} kind={c.kind} align={c.align} active={itemSort.key===key} direction={itemSort.direction} onClick={()=>setItemSort(p=>({key,direction:p.key===key&&p.direction==="asc"?"desc":"asc"}))}/>;};
 
-  const exportOptions = useMemo<TableExportOption[]>(() => {
-    const filteredKeys = new Set(filasOrdenadas.map(rowKey));
-    const lineas = (pedidosLineasQuery.data ?? []).filter((linea) =>
-      filteredKeys.has(`${linea.sucursal}-${linea.nroPedido}`),
-    );
+  const exportOptions: TableExportOption[] = (() => {
+    const term = filtros.busqueda.trim().toLowerCase();
+    const lineas = filasOrdenadas.flatMap(row=>orderItems((lineasPorPedido.get(rowKey(row))??[]).filter(linea=>!term||lineaCoincideBusqueda(linea,term,fabricanteMapQuery.data))));
 
     return [
       {
@@ -253,7 +251,7 @@ export function ComprasPedidosTab() {
         }),
       },
     ];
-  }, [filasOrdenadas, pedidosLineasQuery.data, solicitudesPorPedidoMap]);
+  })();
 
   const abrirEdicion = (row: PedidoResumenRow) => {
     setEditing(row);
@@ -308,7 +306,7 @@ export function ComprasPedidosTab() {
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN003187, 06673230, casquillo…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroPedido)) + Number(Boolean(filtros.proveedor))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
-          secondaryActions={<TableExportButton options={exportOptions} />}
+          secondaryActions={can("datos:exportar") && !resumenQuery.isError && !pedidosLineasQuery.isError ? <TableExportButton options={exportOptions} /> : undefined}
         >
           <FilterMultiSelect
             label="Sucursal"
@@ -449,18 +447,18 @@ export function ComprasPedidosTab() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="pl-8">Ítem</TableHead>
-                                  <TableHead>Producto</TableHead>
-                                  <TableHead>Descripción</TableHead>
-                                  <TableHead className="text-right">Cantidad</TableHead>
-                                  <TableHead className="text-right">Precio unit.</TableHead>
-                                  <TableHead className="text-right">Total</TableHead>
-                                  <TableHead className="text-right">Pendiente</TableHead>
-                                  <TableHead>Solicitud</TableHead>
+                                  <TableHead className="pl-8">{itemHeading("item")}</TableHead>
+                                  <TableHead>{itemHeading("producto")}</TableHead>
+                                  <TableHead>{itemHeading("descripcion")}</TableHead>
+                                  <TableHead className="text-right">{itemHeading("cantidad")}</TableHead>
+                                  <TableHead className="text-right">{itemHeading("precio")}</TableHead>
+                                  <TableHead className="text-right">{itemHeading("total")}</TableHead>
+                                  <TableHead className="text-right">{itemHeading("pendiente")}</TableHead>
+                                  <TableHead>{itemHeading("solicitud")}</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {lineas.map((linea) => {
+                                {orderItems(lineas).map((linea) => {
                                   const solicitudes = solicitudesPorPedidoMap.get(
                                     `${linea.sucursal}|${linea.nroPedido}|${linea.item}`,
                                   ) as { sucursal: string; nroSolicitud: string; esManual: boolean }[] | undefined;

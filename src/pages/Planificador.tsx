@@ -1,4 +1,6 @@
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +24,6 @@ import { MobileCardSkeletons, TableSkeletonRows } from "@/components/LoadingSkel
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock, MapPin, Wrench } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { addDays, format, getISOWeek, parseISO, setISOWeek, startOfWeek } from "date-fns";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { pageShellWide, tableText } from "@/lib/ui-classes";
@@ -102,7 +103,7 @@ async function cargarTodosLosClientes() {
 }
 
 export default function Planificador() {
-  const { user, profile, isAdmin, isCabecilla } = useAuth();
+  const { user, profile, isAdmin, isCabecilla, can } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [searchParams] = useSearchParams();
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -364,7 +365,7 @@ export default function Planificador() {
     });
   }, [servicios, fSemana, fSucursales, fTecnicos, fMarcas, fEstados, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
-  const displayed = useMemo(() => {
+  const displayedSource = useMemo(() => {
     if (!soloPrincipalesSemana || fSemana === "all") return filtered;
 
     const firstByServicio = new Set<string>();
@@ -374,6 +375,19 @@ export default function Planificador() {
       return true;
     });
   }, [filtered, soloPrincipalesSemana, fSemana]);
+
+  const columns: SalesColumn<Servicio>[] = [
+    { key: "fecha", label: "Fecha", kind: "date", value: s => s.fecha_programada?.slice(0, 10) },
+    { key: "cliente", label: "Cliente", kind: "text", value: s => s.cliente_id ? cliById[s.cliente_id]?.nombre : null },
+    { key: "trabajo", label: "Trabajo", kind: "text", value: s => s.trabajo_descripcion },
+    { key: "marca", label: "Marca", kind: "text", value: s => s.marca },
+    { key: "responsable", label: "Responsable", kind: "text", value: s => s.tecnico_responsable_id ? profById[s.tecnico_responsable_id]?.nombre : null },
+    { key: "sucursal", label: "Suc.", kind: "text", value: s => s.sucursal },
+    { key: "resultado", label: "Resultado", kind: "text", value: s => ESTADO_LABELS[s.estado] },
+    { key: "horas", label: "Hs", kind: "number", align: "right", value: s => s.horas_trabajadas },
+  ];
+  const list = useSectionTable({ rows: displayedSource, columns, title: "Planificador", fileName: "planificador.xlsx", initialSort: { key: "fecha", direction: "asc" }, disabled: loading });
+  const displayed = list.ordered;
 
   const continuidadByRow = useMemo(() => {
     const meta = new Map<string, { orden: number; total: number }>();
@@ -572,7 +586,7 @@ export default function Planificador() {
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
         meta={`${displayed.length} jornada${displayed.length !== 1 ? "s" : ""}`}
-        secondaryActions={<SectionActionsMenu options={[{ id: "excel", label: "Exportar Planificador", onSelect: exportExcel }]} />}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar Planificador", disabled: loading || !displayed.length, onSelect: exportExcel }]} /> : undefined}
         expanded={<>
           <FilterMultiSelect label="Marca" values={fMarcas} onChange={setFMarcas} placeholder="Todas" width="w-full" options={MARCAS.map(m => ({ value: m, label: m }))} />
           <FilterMultiSelect label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-full" options={ESTADOS.map(e => ({ value: e, label: ESTADO_LABELS[e] }))} />
@@ -636,14 +650,14 @@ export default function Planificador() {
           <Table className={tableText}>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="h-8 px-3 py-1.5 w-[92px]">Fecha</TableHead>
-                <TableHead className="h-8 px-3 py-1.5">Cliente</TableHead>
-                <TableHead className="h-8 px-3 py-1.5">Trabajo</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[110px]">Marca</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[150px]">Responsable</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[80px]">Suc.</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[110px]">Resultado</TableHead>
-                <TableHead className="h-8 px-3 py-1.5 w-[50px] text-right">Hs</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[92px]">{list.heading("fecha")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5">{list.heading("cliente")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5">{list.heading("trabajo")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[110px]">{list.heading("marca")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[150px]">{list.heading("responsable")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[80px]">{list.heading("sucursal")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[110px]">{list.heading("resultado")}</TableHead>
+                <TableHead className="h-8 px-3 py-1.5 w-[50px] text-right">{list.heading("horas")}</TableHead>
               </TableRow>
             </TableHeader>
 

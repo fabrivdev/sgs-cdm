@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown } from "lucide-react";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { trabajoReferencia } from "@/lib/trabajos";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
@@ -71,7 +73,6 @@ const fmtDate = (s: string | null | undefined) => {
   try { return format(parseISO(s), "dd/MM/yyyy"); } catch { return s; }
 };
 
-type SortKey = "fecha" | "total" | "horas" | "os";
 
 function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
@@ -95,6 +96,7 @@ export function TrabajosOSTab({
   const [os, setOs] = useState<OSRow[]>([]);
   const [trabajos, setTrabajos] = useState<TrabajoLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
 
   const [q, setQ] = useState("");
@@ -103,8 +105,6 @@ export function TrabajosOSTab({
   const [fSitFac, setFSitFac] = useState<string[]>([]);
   const [fDesde, setFDesde] = useState("");
   const [fHasta, setFHasta] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("fecha");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const load = async () => {
     setLoading(true);
@@ -122,7 +122,9 @@ export function TrabajosOSTab({
       ]);
       setOs(osRows);
       setTrabajos(tRows);
+      setLoadError(false);
     } catch (e: any) {
+      setLoadError(true);
       toast.error(e?.message ?? "Error cargando OS");
     } finally {
       setLoading(false);
@@ -170,21 +172,20 @@ export function TrabajosOSTab({
     });
   }, [os, q, fSucursales, fSitOs, fSitFac, fDesde, fHasta, trabajoMap, clienteMap]);
 
-  const sorted = useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      let av: number | string = 0, bv: number | string = 0;
-      switch (sortKey) {
-        case "fecha": av = a.fecha_abierta_os ?? ""; bv = b.fecha_abierta_os ?? ""; break;
-        case "total": av = totalOf(a); bv = totalOf(b); break;
-        case "horas": av = a.servicios_cantidad ?? 0; bv = b.servicios_cantidad ?? 0; break;
-        case "os": av = a.os_numero; bv = b.os_numero; break;
-      }
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
-    });
-  }, [filtered, sortKey, sortDir]);
+  const columns: SalesColumn<OSRow>[] = [
+    { key: "os", label: "OS", kind: "text", value: o => o.os_numero },
+    { key: "tr", label: "TR", kind: "text", value: o => o.trabajo_id ? trabajoMap.get(o.trabajo_id)?.codigo : null },
+    { key: "cliente", label: "Cliente", kind: "text", value: o => { const t = o.trabajo_id ? trabajoMap.get(o.trabajo_id) : null; return t?.cliente_id ? clienteMap.get(t.cliente_id)?.nombre : o.cliente_nombre; } },
+    { key: "fecha", label: "Fecha OS", kind: "date", value: o => o.fecha_abierta_os?.slice(0, 10) },
+    { key: "horas", label: "Horas", kind: "number", align: "right", value: o => o.servicios_cantidad },
+    { key: "servicios", label: "Servicios", kind: "number", align: "right", value: o => o.servicios_valor },
+    { key: "repuestos", label: "Repuestos", kind: "number", align: "right", value: o => o.repuesto_valor },
+    { key: "km", label: "Km + Terc.", kind: "number", align: "right", value: o => (o.kilometro_valor ?? 0) + (o.terceros_valor ?? 0) },
+    { key: "total", label: "TOTAL", kind: "number", align: "right", value: totalOf },
+    { key: "situacion", label: "Situación", kind: "text", value: o => [o.situacion_os, o.situacion_facturacion].filter(Boolean).join(" · ") },
+  ];
+  const table = useSectionTable({ rows: filtered, columns, title: "OS vinculadas", fileName: "trabajos-os.xlsx", initialSort: { key: "fecha", direction: "desc" }, disabled: loading || loadError });
+  const sorted = table.ordered;
 
   const totales = useMemo(() => {
     let horas = 0, serv = 0, rep = 0, km = 0, terc = 0, total = 0;
@@ -211,23 +212,10 @@ export function TrabajosOSTab({
     (fDesde ? 1 : 0) +
     (fHasta ? 1 : 0);
 
-  const toggleSort = (k: SortKey) => {
-    if (sortKey === k) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(k); setSortDir("desc"); }
-  };
-
-  const SortHeader = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
-    <th className={cn("px-2 py-1.5 text-left font-medium whitespace-nowrap", className)}>
-      <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 hover:text-foreground">
-        {children}
-        <ArrowUpDown className={cn("h-3 w-3", sortKey === k ? "opacity-100" : "opacity-30")} />
-      </button>
-    </th>
-  );
-
   return (
     <div className="flex flex-col gap-3">
       <FiltersBar
+        secondaryActions={<SectionActionsMenu options={table.action ? [table.action] : []} />}
         search={{ value: q, onChange: setQ, placeholder: "Buscar OS, factura, cliente, chasis, mecánico…" }}
         activeCount={activosCount}
         onClear={limpiar}
@@ -271,16 +259,7 @@ export function TrabajosOSTab({
               <table className="w-full min-w-[1100px] text-[12px] tabular-nums">
                 <thead className="bg-muted/50 text-muted-foreground sticky top-0">
                   <tr className="border-b">
-                    <SortHeader k="os">OS</SortHeader>
-                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">TR</th>
-                    <th className="px-3 py-2 text-left font-medium">Cliente</th>
-                    <SortHeader k="fecha">Fecha OS</SortHeader>
-                    <SortHeader k="horas" className="text-right">Horas</SortHeader>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Servicios</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Repuestos</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Km + Terc.</th>
-                    <SortHeader k="total" className="text-right">TOTAL</SortHeader>
-                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Situación</th>
+                    {columns.map(c => <th key={c.key} aria-sort={table.sort.key === c.key ? table.sort.direction === "asc" ? "ascending" : "descending" : "none"} className={cn("px-3 py-2 font-medium whitespace-nowrap", c.align === "right" ? "text-right" : "text-left")}>{table.heading(c.key)}</th>)}
                   </tr>
                 </thead>
                 <tbody>

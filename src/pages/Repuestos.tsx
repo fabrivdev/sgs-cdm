@@ -72,7 +72,7 @@ export default function Repuestos() {
     setPage(0);
   }, [filtros, sortKey, sortDir]);
 
-  const { isAdmin, isJefatura, isSuperAdmin } = useAuth();
+  const { isAdmin, isJefatura, isSuperAdmin, can } = useAuth();
   const canManage = isAdmin || isJefatura || isSuperAdmin;
   const familiasQuery = useFamiliasStock();
   const matrizQuery = useStockMatriz(filtros, page, sortKey, sortDir);
@@ -160,10 +160,10 @@ export default function Repuestos() {
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}
-        secondaryActions={<SectionActionsMenu busy={exporting} options={[
-          { id: "branches", label: "Exportar stock por sucursal", onSelect: () => exportar("sucursales") },
-          { id: "history", label: "Exportar stock total + ventas históricas", onSelect: () => exportar("historico") },
-        ]} />}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu busy={exporting} options={[
+          { id: "branches", label: "Exportar stock por sucursal", disabled: matrizQuery.isFetching || matrizQuery.isError || !rows.length, onSelect: () => exportar("sucursales") },
+          { id: "history", label: "Exportar informe maestro de stock + ventas (marcas)", disabled: matrizQuery.isFetching || matrizQuery.isError, onSelect: () => exportar("historico") },
+        ]} /> : undefined}
       >
         <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
         <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />

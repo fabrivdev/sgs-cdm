@@ -9,11 +9,11 @@ import { useSalesTableSort, type SalesColumn, type SalesSort } from "./salesTabl
 export type SalesDisplayColumn<T> = SalesColumn<T> & {
   render?: (row: T) => ReactNode; className?: string; weight?: number;
 };
-export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, fileName,
+export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, fileName, sheetName = "Ventas Servicios",
   empty = "Sin facturación en el período.", footer, onRowClick, selected, countLabel = "filas",
 }: {
   title: string; rows: readonly T[]; columns: readonly SalesDisplayColumn<T>[];
-  initialSort: SalesSort; rowKey: (row: T) => string; fileName: string;
+  initialSort: SalesSort; rowKey: (row: T) => string; fileName: string; sheetName?: string;
   empty?: string; footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; countLabel?: string;
 }) {
   const { can } = useAuth();
@@ -21,7 +21,7 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
   useSalesSectionExport({ id: fileName, label: `Exportar ${title}`, disabled: !ordered.length, onSelect: async () => {
     const snapshot = footer ? [...ordered, footer] : ordered;
     const { exportSalesTable } = await import("./salesTableExport");
-    exportSalesTable({ rows: snapshot, columns, fileName, sheetName: "Ventas Servicios" });
+    exportSalesTable({ rows: snapshot, columns, fileName, sheetName });
   } }, can("datos:exportar"));
   const grid = { gridTemplateColumns: columns.map(column => `minmax(0,${column.weight ?? 1}fr)`).join(" ") };
   const cells = (row: T, interactive = false) => columns.map((column, index) => {

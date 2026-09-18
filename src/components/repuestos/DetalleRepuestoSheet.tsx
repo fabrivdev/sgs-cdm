@@ -1,3 +1,8 @@
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
+import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
+import type { VentaRepuestoHistorial } from "@/hooks/useRepuestos";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Calculator, Link2, Loader2, RefreshCw } from "lucide-react";
@@ -566,6 +571,43 @@ export function DetalleRepuestoSheet({
     [vendidoPorSucursal],
   );
 
+  const [tableSearch,setTableSearch] = useState("");
+  const term = tableSearch.trim().toLocaleLowerCase("es");
+  const matches = (values:unknown[]) => values.join(" ").toLocaleLowerCase("es").includes(term);
+  const invoiceColumns:SalesColumn<VentaRepuestoHistorial>[] = [
+    {key:"fecha",label:"Fecha",kind:"date",value:r=>fechaLocal(r.fecha_factura)},
+    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
+    {key:"cliente",label:"Cliente",kind:"text",value:r=>r.cliente},
+    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>Number(r.cantidad)},
+    {key:"precio",label:"Precio Unit.",kind:"number",align:"right",value:r=>Number(r.cantidad)>0?Number(r.total_venta_usd)/Number(r.cantidad):null},
+    {key:"total",label:"Precio Total",kind:"number",align:"right",value:r=>Number(r.total_venta_usd)},
+  ];
+  const invoiceTable = useSectionTable({rows:ventas.filter(r=>matches([r.fecha_factura,r.factura,r.cliente])),
+    columns:invoiceColumns,title:"Historial de facturas",fileName:"repuesto-facturas.xlsx",
+    initialSort:{key:"fecha",direction:"desc"},disabled:historialCargando||historialError,register:false});
+  const groupColumns:SalesColumn<VentaAgrupada>[] = [
+    {key:"etiqueta",label:vistaHistorial==="clientes"?"Cliente":"Período",kind:vistaHistorial==="meses"?"date":"text",
+      value:r=>vistaHistorial==="meses"?(r.clave==="Sin fecha"?null:r.clave+"-01"):r.etiqueta},
+    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>r.cantidad},
+    {key:"facturas",label:"Facturas",kind:"number",align:"right",value:r=>r.facturas},
+    {key:"total",label:"Total USD",kind:"number",align:"right",value:r=>r.total},
+  ];
+  const groupTable = useSectionTable({rows:(vistaHistorial==="clientes"?ventasPorCliente:ventasPorMes).filter(r=>matches([r.etiqueta,r.clave])),
+    columns:groupColumns,title:vistaHistorial==="clientes"?"Historial por cliente":"Historial por mes",fileName:"repuesto-historial-agrupado.xlsx",
+    initialSort:{key:"total",direction:"desc"},disabled:historialCargando||historialError,register:false});
+  const branches = SUCURSAL_COLUMNAS.map(c=>({sucursal:c.label,ventas12:vendidoPorSucursal.get(normalizarSucursal(c.label))??0,
+    ventas24:vendidoPorSucursal24m.get(normalizarSucursal(c.label))??0,stock:stock?Number(stock[c.key]??0):null}));
+  const branchColumns:SalesColumn<typeof branches[number]>[] = [
+    {key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal},
+    {key:"ventas12",label:"Ventas 12M",kind:"number",align:"right",value:r=>r.ventas12},
+    {key:"ventas24",label:"Ventas 24M",kind:"number",align:"right",value:r=>r.ventas24},
+    {key:"stock",label:"Disponible",kind:"number",align:"right",value:r=>r.stock},
+  ];
+  const branchTable = useSectionTable({rows:branches.filter(r=>matches([r.sucursal])),columns:branchColumns,title:"Stock y ventas por sucursal",
+    fileName:"repuesto-sucursales.xlsx",initialSort:{key:"sucursal",direction:"asc"},
+    disabled:historialCargando||historialError||(!stock&&stockQuery.isLoading)||stockQuery.isError,register:false});
+  const activeAction = tab==="sucursales"?branchTable.action:tab==="ventas"?(vistaHistorial==="facturas"?invoiceTable.action:groupTable.action):null;
+
   const stockGlobal = stock ? Number(stock.total ?? 0) : sugerencia ? Number(sugerencia.stock_global ?? 0) : null;
   const ritmoMensual = sugerencia
     ? Number(sugerencia.demanda_ponderada_mensual ?? 0)
@@ -738,35 +780,29 @@ export function DetalleRepuestoSheet({
                 {tab === "consumo" && <span className={metaText}>Unidades vendidas</span>}
               </div>
 
+              {(tab==="ventas"||tab==="sucursales") && <FiltersBar
+                search={{value:tableSearch,onChange:setTableSearch,placeholder:"Buscar en esta tabla…"}}
+                activeCount={Number(!!term)} onClear={()=>setTableSearch("")}
+                secondaryActions={<SectionActionsMenu options={activeAction?[activeAction]:[]}/>}
+                expanded={<FilterCustom label="Buscar en esta tabla"><Input value={tableSearch} onChange={e=>setTableSearch(e.target.value)} /></FilterCustom>}/>}
               <TabsContent value="sucursales" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                 <div className="h-full overflow-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead className={th}>Sucursal</TableHead>
-                        <TableHead className={cn(th, "text-right")}>Ventas 12M</TableHead>
-                        <TableHead className={cn(th, "text-right")}>Ventas 24M</TableHead>
-                        <TableHead className={cn(th, "text-right")}>Disponible</TableHead>
+                        <TableHead className={th}>{branchTable.heading("sucursal")}</TableHead>
+                        <TableHead className={cn(th, "text-right")}>{branchTable.heading("ventas12")}</TableHead>
+                        <TableHead className={cn(th, "text-right")}>{branchTable.heading("ventas24")}</TableHead>
+                        <TableHead className={cn(th, "text-right")}>{branchTable.heading("stock")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {SUCURSAL_COLUMNAS.map((columna) => {
-                        const clave = normalizarSucursal(columna.label);
-                        return (
-                          <TableRow key={String(columna.key)}>
-                            <TableCell className={td}>{columna.label}</TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>
-                              {historialCargando ? "…" : historialError ? "—" : integer.format(vendidoPorSucursal.get(clave) ?? 0)}
-                            </TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>
-                              {historialCargando ? "…" : historialError ? "—" : integer.format(vendidoPorSucursal24m.get(clave) ?? 0)}
-                            </TableCell>
-                            <TableCell className={cn(td, "text-right font-semibold tabular-nums")}>
-                              {stock ? integer.format(Number(stock[columna.key] ?? 0)) : stockQuery.isLoading ? "…" : "—"}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {branchTable.ordered.map(row=><TableRow key={row.sucursal}>
+                        <TableCell className={td}>{row.sucursal}</TableCell>
+                        <TableCell className={cn(td,"text-right tabular-nums")}>{historialCargando?"…":historialError?"—":integer.format(row.ventas12)}</TableCell>
+                        <TableCell className={cn(td,"text-right tabular-nums")}>{historialCargando?"…":historialError?"—":integer.format(row.ventas24)}</TableCell>
+                        <TableCell className={cn(td,"text-right font-semibold tabular-nums")}>{row.stock==null?"—":integer.format(row.stock)}</TableCell>
+                      </TableRow>)}
                     </TableBody>
                   </Table>
                 </div>
@@ -807,19 +843,19 @@ export function DetalleRepuestoSheet({
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       {vistaHistorial === "facturas" ? (
                         <TableRow>
-                          <TableHead className={th}>Fecha</TableHead>
-                          <TableHead className={th}>Factura</TableHead>
-                          <TableHead className={th}>Cliente</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Cantidad</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Precio Unit.</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Precio Total</TableHead>
+                          <TableHead className={th}>{invoiceTable.heading("fecha")}</TableHead>
+                          <TableHead className={th}>{invoiceTable.heading("factura")}</TableHead>
+                          <TableHead className={th}>{invoiceTable.heading("cliente")}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>{invoiceTable.heading("cantidad")}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>{invoiceTable.heading("precio")}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>{invoiceTable.heading("total")}</TableHead>
                         </TableRow>
                       ) : (
                         <TableRow>
-                          <TableHead className={th}>{vistaHistorial === "clientes" ? "Cliente" : "Período"}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Cantidad</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Facturas</TableHead>
-                          <TableHead className={cn(th, "text-right")}>Total USD</TableHead>
+                          <TableHead className={th}>{groupTable.heading("etiqueta")}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>{groupTable.heading("cantidad")}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>{groupTable.heading("facturas")}</TableHead>
+                          <TableHead className={cn(th, "text-right")}>{groupTable.heading("total")}</TableHead>
                         </TableRow>
                       )}
                     </TableHeader>
@@ -838,7 +874,7 @@ export function DetalleRepuestoSheet({
                           </TableCell>
                         </TableRow>
                       )}
-                      {!historialCargando && !historialError && vistaHistorial === "facturas" && ventas.map((linea) => {
+                      {!historialCargando && !historialError && vistaHistorial === "facturas" && invoiceTable.ordered.map((linea) => {
                         const cantidad = Number(linea.cantidad || 0);
                         const total = Number(linea.total_venta_usd || 0);
                         const precioUnitario = cantidad > 0 ? total / cantidad : null;
@@ -868,7 +904,7 @@ export function DetalleRepuestoSheet({
                         );
                       })}
                       {!historialCargando && !historialError && vistaHistorial !== "facturas" &&
-                        (vistaHistorial === "clientes" ? ventasPorCliente : ventasPorMes).map((fila) => (
+                        groupTable.ordered.map((fila) => (
                           <TableRow key={fila.clave}>
                             <TableCell className={cn(td, "max-w-48 truncate")}>{fila.etiqueta}</TableCell>
                             <TableCell className={cn(td, "text-right tabular-nums")}>{integer.format(fila.cantidad)}</TableCell>

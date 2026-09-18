@@ -1,3 +1,5 @@
+import { orderSuggestions } from "@/lib/suggestionTableOrder";
+import type { SalesSort } from "@/components/ventas/salesTableInteraction";
 /* Las tablas nacen en la migración de esta entrega y todavía no forman parte
  * del archivo de tipos generado por Supabase. Se elimina este override cuando
  * se regeneren los tipos contra producción. */
@@ -175,6 +177,7 @@ export interface ResultadoSugerencia {
 }
 
 export interface FiltrosResultados {
+  orden?: SalesSort;
   buscar?: string;
   segmento?: string;
   estado?: string;
@@ -376,7 +379,8 @@ async function consultarSugerenciaVivaMarcaCombinacion(
   segmento: string,
   estado: string,
 ) {
-  const { data, error } = await (supabase.rpc as any)("repuestos_sugerencia_viva", {
+  const { data, error } = await (supabase.rpc as any)(filtros.orden ? "repuestos_sugerencia_viva_ordenada" : "repuestos_sugerencia_viva", {
+    ...(filtros.orden ? { p_orden:filtros.orden.key, p_direccion:filtros.orden.direction } : {}),
     p_marca: marca,
     p_fecha_analisis: fechaAnalisis,
     p_buscar: filtros.buscar?.trim() || null,
@@ -452,7 +456,7 @@ async function consultarSugerenciaVivaMarca(
   const respuestas = await Promise.all(combinaciones.map(({ segmento, estado }) =>
     consultarCombinacionHasta(marca, fechaAnalisis, filtros, segmento, estado, hasta),
   ));
-  const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
+  const rows = filtros.orden ? orderSuggestions(respuestas.flatMap((response) => response.rows), filtros.orden) : respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
   const primera = respuestas[0];
   return {
     ...primera,
@@ -515,7 +519,7 @@ async function consultarSugerenciaViva(
   const respuestas = await Promise.all(
     marcas.map((item) => consultarMarcaHasta(item, fechaAnalisis, filtros, hasta)),
   );
-  const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
+  const rows = filtros.orden ? orderSuggestions(respuestas.flatMap((response) => response.rows), filtros.orden) : respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
   const resumen = respuestas.reduce<ResumenSugerenciaViva>((total, response) => ({
     total_piezas: total.total_piezas + (response.resumen?.total_piezas ?? 0),
     piezas_sugeridas: total.piezas_sugeridas + (response.resumen?.piezas_sugeridas ?? 0),
@@ -614,7 +618,7 @@ export async function cargarSugerenciaViva(
       onProgress?.(completadas, marcas.length);
       return response;
     }));
-    const rows = respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
+    const rows = filtros.orden ? orderSuggestions(respuestas.flatMap((response) => response.rows), filtros.orden) : respuestas.flatMap((response) => response.rows).sort(ordenarSugerencias);
     return {
       modelo: { id: "TODAS", version: 1, nombre: "Modelos activos por marca" },
       fecha_analisis: fechaAnalisis,
@@ -667,6 +671,7 @@ export async function cargarSugerenciaViva(
   }
 
   if (!latest) throw new Error("No se encontraron resultados para exportar");
+  if (rows.length !== latest.total_filtrado) throw new Error("La exportación está incompleta. No se generó el archivo.");
   return { ...latest, rows };
 }
 

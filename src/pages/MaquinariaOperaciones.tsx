@@ -8,6 +8,9 @@ import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -913,6 +916,35 @@ export default function MaquinariaOperaciones() {
     };
   }, [rows]);
 
+  type ListRow = OrderRow | ImportRow;
+  const columns: SalesColumn<ListRow>[] = importsView ? [
+    { key: "llave", label: "Llave interna", kind: "text", value: r => (r as ImportRow).llave_interna },
+    { key: "oc", label: "OC", kind: "text", value: r => (r as ImportRow).oc },
+    { key: "marca", label: "Marca / proveedor", kind: "text", value: r => visibleMachineBrand(r.marca || (r as ImportRow).proveedor) },
+    { key: "producto", label: "Máquina", kind: "text", value: r => r.producto },
+    { key: "modelo", label: "Modelo", kind: "text", value: r => r.modelo },
+    { key: "unidad", label: "Unidad", kind: "text", align: "center", value: r => `${(r as ImportRow).numero_unidad}/${(r as ImportRow).cantidad_lote}` },
+    { key: "fecha", label: "Fecha pedido", kind: "date", value: r => (r as ImportRow).fecha_pedido?.slice(0, 10) },
+    { key: "eta", label: "Embarque (est.)", kind: "date", value: r => (r as ImportRow).eta?.slice(0, 10) },
+    { key: "ata", label: "Arribo", kind: "date", value: r => (r as ImportRow).ata?.slice(0, 10) },
+    { key: "llegada", label: "Llegada", kind: "text", value: r => ARRIVAL_LABEL[arrivalState(r as ImportRow)] },
+    { key: "situacion", label: "Situación", kind: "text", value: r => AVAILABILITY_LABEL[(r as ImportRow).estado_disponibilidad ?? ""] ?? (r as ImportRow).estado_disponibilidad },
+    { key: "chasis", label: "Chasis", kind: "text", value: r => r.chasis },
+  ] : [
+    { key: "np", label: "NP", kind: "text", value: r => formatNpCode((r as OrderRow).np_numero) },
+    { key: "fecha", label: "Fecha", kind: "date", value: r => (r as OrderRow).np_fecha?.slice(0, 10) },
+    { key: "cliente", label: "Cliente", kind: "text", value: r => (r as OrderRow).cliente_nombre },
+    { key: "modelo", label: "Máquina", kind: "text", value: r => r.modelo || r.producto },
+    { key: "marca", label: "Marca", kind: "text", value: r => visibleMachineBrand(r.marca) },
+    { key: "condicion", label: "Condición", kind: "text", value: r => CONDITION_LABEL[(r as OrderRow).condicion ?? ""] ?? (r as OrderRow).condicion },
+    { key: "origen", label: "Origen", kind: "text", value: r => SUPPLY_LABEL[(r as OrderRow).abastecimiento ?? ""] ?? null },
+    { key: "facturacion", label: "Facturación", kind: "text", value: r => SIMPLE_STATE_LABEL[orderBillingState(r as OrderRow, entregaByUnitId?.get(r.id)?.estado)] },
+    { key: "entrega", label: "Entrega", kind: "text", value: r => { const o = r as OrderRow; const u = entregaByUnitId?.get(o.id); const s = entregaStateFromUnit(u?.estado, u?.chasis, o.marca, estadoByOperacionId?.get(o.operacion_id), stockChasisSet, o.es_historico); return s ? ENTREGA_LABEL[s] : null; } },
+    { key: "valor", label: "Valor", kind: "number", align: "right", value: r => (r as OrderRow).valor_venta == null ? null : Number((r as OrderRow).valor_venta) },
+  ];
+  const list = useSectionTable({ rows, columns, initialSort: { key: "fecha", direction: "desc" },
+    title: importsView ? "Importaciones" : "Operaciones", fileName: importsView ? "importaciones.xlsx" : "operaciones.xlsx",
+    disabled: operationsQuery.isLoading || operationsQuery.isError });
   return <main className={pageShell}>
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
@@ -941,6 +973,7 @@ export default function MaquinariaOperaciones() {
       </KpiStrip>
     )}
     <FiltersBar
+      secondaryActions={<SectionActionsMenu options={list.action ? [list.action] : []} />}
       search={{ value: search, onChange: setSearch, placeholder: importsView ? "Modelo, chasis, NP, OC/PO..." : "NP, modelo, cliente o comercial...", label: "Buscar", width: "w-[240px]" }}
       activeCount={activeCount}
       onClear={clearFilters}
@@ -1008,9 +1041,9 @@ export default function MaquinariaOperaciones() {
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
       <>
         <div className="hidden overflow-x-auto md:block">
-          {importsView ? <ImportsTable rows={rows as ImportRow[]} onSelect={setSelectedImport} /> : <OrdersTable rows={rows as OrderRow[]} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
+          {importsView ? <ImportsTable rows={list.ordered as ImportRow[]} heading={list.heading} onSelect={setSelectedImport} /> : <OrdersTable rows={list.ordered as OrderRow[]} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
         </div>
-        <div className="space-y-2 p-3 md:hidden">{rows.map((row) => {
+        <div className="space-y-2 p-3 md:hidden">{list.ordered.map((row) => {
           if (importsView) {
             const importRow = row as ImportRow;
             const arrival = arrivalState(importRow);
@@ -1074,19 +1107,19 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
+function OrdersTable({ rows, heading, onSelect, entregaByUnitId, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
   return <Table className="text-[12px]">
     <TableHeader><TableRow>
-      <TableHead>NP</TableHead>
-      <TableHead>Fecha</TableHead>
-      <TableHead>Cliente</TableHead>
-      <TableHead>Máquina</TableHead>
-      <TableHead>Marca</TableHead>
-      <TableHead>Condición</TableHead>
-      <TableHead>Origen</TableHead>
-      <TableHead>Facturación</TableHead>
-      <TableHead>Entrega</TableHead>
-      <TableHead className="text-right">Valor</TableHead>
+      <TableHead>{heading("np")}</TableHead>
+      <TableHead>{heading("fecha")}</TableHead>
+      <TableHead>{heading("cliente")}</TableHead>
+      <TableHead>{heading("modelo")}</TableHead>
+      <TableHead>{heading("marca")}</TableHead>
+      <TableHead>{heading("condicion")}</TableHead>
+      <TableHead>{heading("origen")}</TableHead>
+      <TableHead>{heading("facturacion")}</TableHead>
+      <TableHead>{heading("entrega")}</TableHead>
+      <TableHead className="text-right">{heading("valor")}</TableHead>
       <TableHead className="w-[40px]" />
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {
@@ -1110,21 +1143,21 @@ function OrdersTable({ rows, onSelect, entregaByUnitId, estadoByOperacionId, sto
   </Table>;
 }
 
-function ImportsTable({ rows, onSelect }: { rows: ImportRow[]; onSelect: (row: ImportRow) => void }) {
+function ImportsTable({ rows, heading, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; onSelect: (row: ImportRow) => void }) {
   return <Table className="text-[12px]">
     <TableHeader><TableRow>
-      <TableHead>Llave interna</TableHead>
-      <TableHead>OC</TableHead>
-      <TableHead>Marca / proveedor</TableHead>
-      <TableHead>Máquina</TableHead>
-      <TableHead>Modelo</TableHead>
-      <TableHead>Unidad</TableHead>
-      <TableHead>Fecha pedido</TableHead>
-      <TableHead>Embarque (est.)</TableHead>
-      <TableHead>Arribo</TableHead>
-      <TableHead>Llegada</TableHead>
-      <TableHead>Situación</TableHead>
-      <TableHead>Chasis</TableHead>
+      <TableHead>{heading("llave")}</TableHead>
+      <TableHead>{heading("oc")}</TableHead>
+      <TableHead>{heading("marca")}</TableHead>
+      <TableHead>{heading("producto")}</TableHead>
+      <TableHead>{heading("modelo")}</TableHead>
+      <TableHead>{heading("unidad")}</TableHead>
+      <TableHead>{heading("fecha")}</TableHead>
+      <TableHead>{heading("eta")}</TableHead>
+      <TableHead>{heading("ata")}</TableHead>
+      <TableHead>{heading("llegada")}</TableHead>
+      <TableHead>{heading("situacion")}</TableHead>
+      <TableHead>{heading("chasis")}</TableHead>
       <TableHead className="w-[40px]" />
     </TableRow></TableHeader>
     <TableBody>{rows.map((row) => {

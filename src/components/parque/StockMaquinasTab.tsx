@@ -1,7 +1,9 @@
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PackageOpen } from "lucide-react";
-import * as XLSX from "xlsx";
+import { useSectionTable } from "@/components/exports/useSectionTable";
+import { cargarTodo } from "@/hooks/useCatalogos";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -48,14 +50,8 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const { data, error } = await supabase
-      .from("parque_stock_maquinas")
-      .select("*")
-      .order("marca")
-      .order("modelo");
-
-    if (!error) {
-      const stock = (data ?? []) as StockMaquina[];
+    try {
+      const stock = await cargarTodo<StockMaquina>(supabase.from("parque_stock_maquinas").select("*").order("id"));
       setRows(stock);
       onResumenChange?.({
         total: stock.reduce((sum, row) => sum + Number(row.saldo_actual || 0), 0),
@@ -63,7 +59,7 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
         usadas: stock.filter((row) => row.estado === "Usado").reduce((sum, row) => sum + Number(row.saldo_actual || 0), 0),
         marcas: new Set(stock.map((row) => row.marca).filter(Boolean)).size,
       });
-    } else {
+    } catch (error) {
       console.error(error);
       setLoadError("No se pudo cargar el stock. Verificá que el SQL de instalación esté aplicado.");
     }
@@ -100,26 +96,16 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
     });
   }, [rows, q, branch, brand, type, condition]);
 
+  const columns: SalesColumn<StockMaquina>[] = [
+    { key: "sucursal", label: "Sucursal", kind: "text", value: r => r.sucursal ?? r.filial_original },
+    ...(["deposito", "producto_codigo", "tipo", "marca", "modelo", "estado", "chasis"] as const).map((key, i) => ({ key, label: ["Depósito", "Producto", "Tipo", "Marca", "Modelo", "Condición", "Chasis"][i], kind: "text" as const, value: (r: StockMaquina) => r[key] })),
+    { key: "saldo", label: "Saldo", kind: "number", align: "right", value: r => Number(r.saldo_actual) },
+  ];
+  const list = useSectionTable({ rows: filtered, columns, title: "Stock de máquinas", fileName: "stock-maquinas.xlsx", initialSort: { key: "marca", direction: "asc" }, disabled: loading || !!loadError });
   const lastImport = rows.reduce<string | null>((latest, row) => !latest || row.importado_en > latest ? row.importado_en : latest, null);
   const activeCount = (q ? 1 : 0) + (branch !== "all" ? 1 : 0) + (brand !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0) + (condition !== "all" ? 1 : 0);
 
   const clear = () => { setQ(""); setBranch("all"); setBrand("all"); setType("all"); setCondition("all"); };
-  const exportRows = () => {
-    const sheet = XLSX.utils.json_to_sheet(filtered.map((row) => ({
-      Sucursal: row.sucursal ?? row.filial_original ?? "",
-      Depósito: row.deposito ?? "",
-      Producto: row.producto_codigo,
-      Tipo: row.tipo ?? "",
-      Marca: row.marca ?? "",
-      Modelo: row.modelo ?? "",
-      Estado: row.estado ?? "",
-      Chasis: row.chasis ?? "",
-      Saldo: row.saldo_actual,
-    })));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, "Stock de máquinas");
-    XLSX.writeFile(workbook, `stock-maquinas-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  };
 
   return (
     <div className="space-y-3">
@@ -128,7 +114,7 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
         activeCount={activeCount}
         onClear={clear}
         meta={`${filtered.length} referencia${filtered.length === 1 ? "" : "s"}${lastImport ? ` · Actualizado ${new Date(lastImport).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })}` : ""}`}
-        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar stock", onSelect: exportRows }]} /> : undefined}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={list.action ? [list.action] : []} /> : undefined}
         expanded={
           <FilterSelect label="Condición" value={condition} onChange={setCondition} placeholder="Condición" width="w-full" options={[{ value: "all", label: "Todas" }, { value: "Nuevo", label: "Nuevas" }, { value: "Usado", label: "Usadas" }]} />
         }
@@ -142,13 +128,13 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
       <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Sucursal</TableHead><TableHead>Depósito</TableHead><TableHead>Producto</TableHead><TableHead>Tipo</TableHead><TableHead>Marca</TableHead><TableHead>Modelo</TableHead><TableHead>Condición</TableHead><TableHead>Chasis</TableHead><TableHead className="text-right">Saldo</TableHead>
+            {columns.map(c => <TableHead key={c.key} className={c.align === "right" ? "text-right" : "text-left"} aria-sort={list.sort.key === c.key ? list.sort.direction === "asc" ? "ascending" : "descending" : "none"}>{list.heading(c.key)}</TableHead>)}
           </TableRow></TableHeader>
           <TableBody>
             {loading && <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">Cargando stock…</TableCell></TableRow>}
             {!loading && loadError && <TableRow><TableCell colSpan={9} className="h-24 text-center text-[13px] text-destructive">{loadError}</TableCell></TableRow>}
             {!loading && !loadError && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="h-28 text-center"><PackageOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" /><span className="text-[13px] text-muted-foreground">Sin máquinas en stock.</span></TableCell></TableRow>}
-            {!loading && filtered.map((row) => (
+            {!loading && !loadError && list.ordered.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="text-[12px]">{row.sucursal ?? row.filial_original ?? "—"}</TableCell>
                 <TableCell className="max-w-[180px] truncate text-[12px]" title={row.deposito ?? undefined}>{row.deposito ?? "—"}</TableCell>
