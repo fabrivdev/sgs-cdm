@@ -1,5 +1,5 @@
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -10,9 +10,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-import { MarcaBadge } from "@/components/StatusBadges";
+import { PartsStockTable } from "@/components/repuestos/PartsStockTable";
 import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -37,17 +35,6 @@ import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { cn } from "@/lib/utils";
 import { buildStockSalesReport, filterPartsStockSalesByBrands } from "@/lib/exports/partsStockSales";
 
-const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
-  { key: "santa_rita", label: "Santa Rita" },
-  { key: "santa_rosa", label: "Santa Rosa" },
-  { key: "campo_9", label: "Campo 9" },
-  { key: "misiones", label: "Misiones" },
-  { key: "loma_plata", label: "Loma Plata" },
-  { key: "katuete", label: "Katuete" },
-];
-
-const th = "px-2 py-1.5 text-[11px] font-medium";
-const td = "px-2 py-1.5 text-[12px]";
 type ExportMode = "sucursales" | "historico";
 
 
@@ -62,7 +49,7 @@ export default function Repuestos() {
   const [page, setPage] = useState(0);
   const [seleccionado, setSeleccionado] = useState<StockMatrizRow | null>(null);
   const [exporting, setExporting] = useState(false);
-  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<StockSortKey>("total", "desc");
+  const { sortKey, sortDir, toggleSort } = useSortable<StockSortKey>("total", "desc");
 
   useEffect(() => {
     setFiltros((f) => ({ ...f, busqueda: debouncedBusqueda }));
@@ -188,71 +175,7 @@ export default function Repuestos() {
 
           {!matrizQuery.isLoading && !matrizQuery.isError && rows.length > 0 && (
             <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className={cn(th, "cursor-pointer select-none")} onClick={() => toggleSort("codigo_interno")}>
-                        <div className="flex items-center gap-1">Código {sortIcon("codigo_interno")}</div>
-                      </TableHead>
-                      <TableHead className={cn(th, "cursor-pointer select-none")} onClick={() => toggleSort("descripcion")}>
-                        <div className="flex items-center gap-1">Descripción {sortIcon("descripcion")}</div>
-                      </TableHead>
-                      {SUCURSAL_COLUMNAS.map((c) => (
-                        <TableHead
-                          key={c.key}
-                          className={cn(th, "cursor-pointer select-none text-right")}
-                          onClick={() => toggleSort(c.key as StockSortKey)}
-                        >
-                          <div className="flex items-center justify-end gap-1">
-                            {c.label} {sortIcon(c.key as StockSortKey)}
-                          </div>
-                        </TableHead>
-                      ))}
-                      <TableHead className={cn(th, "cursor-pointer select-none text-right")} onClick={() => toggleSort("total")}>
-                        <div className="flex items-center justify-end gap-1">Total {sortIcon("total")}</div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row) => (
-                      <TableRow
-                        key={row.codigo_interno}
-                        className="cursor-pointer"
-                        onClick={() => setSeleccionado(row)}
-                      >
-                        <TableCell className={cn(td, "font-mono")}>
-                          <div>{row.codigo_interno}</div>
-                          {row.codigo_fabricante && (
-                            <div className="text-[10px] text-muted-foreground">Fab. {row.codigo_fabricante}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className={cn(td, "max-w-[320px]")}>
-                          <div className="truncate font-medium">{row.descripcion}</div>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <MarcaBadge marca={row.marca} />
-                            {row.familia && <span className="truncate">{row.familia}</span>}
-                          </div>
-                        </TableCell>
-                        {SUCURSAL_COLUMNAS.map((c) => {
-                          const valor = Number(row[c.key] ?? 0);
-                          return (
-                            <TableCell
-                              key={c.key}
-                              className={cn(td, "text-right tabular-nums", valor === 0 && "text-destructive/70")}
-                            >
-                              {valor.toLocaleString("es-PY")}
-                            </TableCell>
-                          );
-                        })}
-                        <TableCell className={cn(td, "text-right font-semibold tabular-nums")}>
-                          {row.total.toLocaleString("es-PY")}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <PartsStockTable rows={rows} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} onSelect={setSeleccionado} />
 
               <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
                 <p className={metaText}>
