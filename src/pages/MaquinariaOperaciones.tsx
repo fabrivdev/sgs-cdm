@@ -920,7 +920,7 @@ export default function MaquinariaOperaciones() {
   const columns: SalesColumn<ListRow>[] = importsView ? [
     { key: "llave", label: "Llave interna", kind: "text", value: r => (r as ImportRow).llave_interna },
     { key: "oc", label: "OC", kind: "text", value: r => (r as ImportRow).oc },
-    { key: "marca", label: "Marca / proveedor", kind: "text", value: r => visibleMachineBrand(r.marca || (r as ImportRow).proveedor) },
+    { key: "marca", label: "Marca", kind: "text", value: r => visibleMachineBrand(r.marca || (r as ImportRow).proveedor) },
     { key: "producto", label: "Máquina", kind: "text", value: r => r.producto },
     { key: "modelo", label: "Modelo", kind: "text", value: r => r.modelo },
     { key: "unidad", label: "Unidad", kind: "text", align: "center", value: r => `${(r as ImportRow).numero_unidad}/${(r as ImportRow).cantidad_lote}` },
@@ -1347,7 +1347,7 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
       {schemaQuery.isError && <p role="alert" className="rounded-lg border border-amber-200 p-3 text-[11px] text-amber-800">No se pudo verificar la nueva estructura de Importaciones. Aplicá la migración y reintentá antes de guardar. <Button variant="outline" size="sm" onClick={() => schemaQuery.refetch()}>Reintentar</Button></p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={form.marca === "CLAAS" ? "Llave de referencia (opcional)" : "Llave de la primera unidad *"}><Input autoFocus value={form.llave_interna} onChange={(event) => setForm((value) => ({ ...value, llave_interna: event.target.value }))} placeholder={form.marca === "CLAAS" ? "Automática: CLA + OC + unidad" : "Ej. 26.61L2"} /></Field>
-        <Field label="Marca / proveedor"><MarcaMaquinaSelect value={form.marca} disabled={Boolean(selectedNp)} onValueChange={(marca) => setForm((value) => ({ ...value, marca, modelo: "" }))} /></Field>
+        <Field label="Marca"><MarcaMaquinaSelect value={form.marca} disabled={Boolean(selectedNp)} onValueChange={(marca) => setForm((value) => ({ ...value, marca, modelo: "" }))} /></Field>
         <Field label="Producto / tipo"><CompactSelect value={form.producto} values={MACHINE_SUBGROUPS as readonly string[]} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
         <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo, model) => setForm((value) => ({ ...value, modelo, producto: model?.subgrupo ?? value.producto }))} disabled={Boolean(selectedNp)} /></Field>
         <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
