@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiciosClientes } from './ServiciosClientes';
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ can: () => true }) }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const props = { desde: '2026-01-01', hasta: '2026-08-31', sucursal: 'TODAS', buscar: 'valdecir mohr', tipoTiempo: 'TODOS' };
 describe('client search population', () => {

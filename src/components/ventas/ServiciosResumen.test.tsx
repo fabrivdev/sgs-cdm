@@ -5,6 +5,7 @@ import type { IndicadoresResponse } from './useServiciosIndicadores';
 
 const { useIndicadores } = vi.hoisted(() => ({ useIndicadores: vi.fn() }));
 vi.mock('./useServiciosIndicadores', () => ({ useServiciosIndicadores: useIndicadores }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ can: () => true }) }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const props = { desde: '2026-01-01', hasta: '2026-08-31', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
 const amounts = { mo: 100, km: 0, repuestos: 0, terceros: 0, neto: 100 };
@@ -29,14 +30,15 @@ describe('service summary breakdown contract', () => {
     mockData(fixture);
     render(<ServiciosResumen {...props} />);
     for (const label of ['Tipo de tiempo', 'Marca']) {
-      expect(screen.getByText(label).parentElement).toHaveClass('text-left', '[&>div]:self-center');
+      expect(screen.getByText(label).closest('[role=row]')).toHaveClass('text-left', '[&>div]:self-center');
+      expect(screen.getByText(label).closest('button')).toHaveClass('justify-start');
     }
     const row = screen.getByText('HORSCH').closest('.grid')!;
     expect(row).not.toHaveClass('[&>div]:text-center');
     expect(row.children[6]).toHaveClass('text-right');
     expect(row.children[7]).toHaveClass('text-center');
-    for (const header of screen.getAllByText('Horas OS').filter(node => node.parentElement?.className.includes('bg-muted/60'))) {
-      expect(header).toHaveClass('text-center');
+    for (const header of screen.getAllByRole('button', { name: /Ordenar Horas OS/ })) {
+      expect(header).toHaveClass('justify-center');
     }
   });
   it('groups other brands by time type and recalculates their participation', () => {

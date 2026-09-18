@@ -21,6 +21,8 @@ import { MaquinasExplorer, MaquinasPanorama, type MaquinasDashboardResponse } fr
 import { RepuestosVentas } from "@/components/ventas/RepuestosVentas";
 import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
+import { SERVICE_FILTER_FIELDS, serviceFiltersKey, type ServiceSalesFilters } from "@/components/ventas/serviceSalesFilters";
+import { ServiceSalesTextFilter } from "@/components/ventas/ServiceSalesTextFilter";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
 type ExplorerView = "facturas" | "clientes" | "analisis" | "resumen" | "tecnicos" | "maquinas";
@@ -97,7 +99,7 @@ function Pager({ page, pages, total, onChange }: { page: number; pages: number; 
   return <div className="flex items-center justify-between border-t px-3 py-2 text-[10px] text-muted-foreground"><span>{total.toLocaleString("es-PY")} registros</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Anterior</button><span>{page} de {pages}</span><button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className="rounded border px-2 py-1 text-foreground disabled:opacity-40">Siguiente</button></div></div>;
 }
 
-export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string }) {
+export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string; filtros?: ServiceSalesFilters }) {
   const copy = AREA_COPY[area];
   const [view, setView] = useState<ExplorerView>("facturas");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -190,15 +192,15 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
 
       {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : area === "servicios" && view === "resumen" ? (
-        <ServiciosResumen desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+        <ServiciosResumen desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={filtros} />
       ) : area === "servicios" && view === "tecnicos" ? (
-        <ServiciosTecnicos desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+        <ServiciosTecnicos desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={filtros} />
       ) : area === "servicios" && view === "maquinas" ? (
-        <ServiciosMaquinas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+        <ServiciosMaquinas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={filtros} />
       ) : area === "servicios" && view === "facturas" ? (
-        <ServiciosDetalleOS desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+        <ServiciosDetalleOS desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={filtros} />
       ) : area === "servicios" && view === "clientes" ? (
-        <ServiciosClientes desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />
+        <ServiciosClientes desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={filtros} />
       ) : view === "facturas" ? (
         <div className="mt-3">
           {documentsLoading ? <div className="py-12 text-center text-sm text-muted-foreground">Cargando…</div> : documentsError ? <div role="alert" className="py-8 text-destructive">{documentsError}</div> : !documents.documentos.length ? <div className="py-12 text-center text-sm text-muted-foreground">{copy.empty}</div> : (
@@ -286,6 +288,12 @@ export default function Ventas({ area }: { area: VentasArea }) {
   const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
   const [marca, setMarca] = useState("");
   const [tipoMaquina, setTipoMaquina] = useState("");
+  const [serviceFilters, setServiceFilters] = useState<ServiceSalesFilters>({});
+  const [serviceFiltersReset, setServiceFiltersReset] = useState(0);
+  const serviceFilterKey = serviceFiltersKey(serviceFilters);
+  const changeServiceFilter = useCallback((key: keyof ServiceSalesFilters, value: string) => {
+    setServiceFilters(previous => previous[key] === value ? previous : { ...previous, [key]: value });
+  }, []);
   const [machineOptions, setMachineOptions] = useState<{marca: string; tipo_maquina: string}[]>([]);
   const [machineOptionsError, setMachineOptionsError] = useState("");
   useEffect(() => {
@@ -322,7 +330,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
     }
   }, [area, buscar, desde, hasta, marca, periodMode, sucursal, tipoMaquina]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina]);
+  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina, serviceFilterKey]);
 
   const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);
   const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
@@ -355,7 +363,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
     return { desde: selectedPeriod > desde ? selectedPeriod : desde, hasta: periodEndIso < hasta ? periodEndIso : hasta };
   }, [selectedPeriod, desde, hasta, periodMode]);
   const copy = AREA_COPY[area];
-  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number((area === "servicios" || area === "maquinas") && Boolean(marca)) + Number((area === "servicios" || area === "maquinas") && Boolean(tipoMaquina));
+  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number((area === "servicios" || area === "maquinas") && Boolean(marca)) + Number((area === "servicios" || area === "maquinas") && Boolean(tipoMaquina)) + (area === "servicios" ? Object.keys(JSON.parse(serviceFilterKey)).length : 0);
   
   const summary = area === "servicios" ? serviciosSummary : area === "maquinas" ? maquinasData?.resumen : data;
   const averageValue = area === "maquinas"
@@ -369,7 +377,7 @@ export default function Ventas({ area }: { area: VentasArea }) {
   return (
     <PageShell>
       <PageHeader title={copy.title} />
-      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); }}>
+      <FiltersBar search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }}>
         <FilterCustom label="Período rápido" width="w-[190px]"><select value={activeDatePreset} onChange={(event) => applyDatePreset(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px]"><option value="">Personalizado</option>{datePresets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></FilterCustom>
         <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
         <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
@@ -379,18 +387,25 @@ export default function Ventas({ area }: { area: VentasArea }) {
           <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
           <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
         </>}
+        {area === "servicios" && <>
+          {SERVICE_FILTER_FIELDS.map(([key,label]) => <ServiceSalesTextFilter key={`${key}-${serviceFiltersReset}`} label={label} value={serviceFilters[key] ?? ""} onChange={value=>changeServiceFilter(key,value)} />)}
+          <FilterSelect label="Componente" value={serviceFilters.componente || "TODOS"} onChange={v=>changeServiceFilter("componente",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"}, ...["Servicio","Kilometraje","Repuestos","Terceros"].map(value=>({value,label:value === "Servicio" ? "Mano de obra" : value}))]} />
+          <FilterSelect label="Origen" value={serviceFilters.origen || "TODOS"} onChange={v=>changeServiceFilter("origen",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"historico",label:"Histórico"},{value:"actual",label:"Actual"}]} />
+          <FilterSelect label="Documento" value={serviceFilters.documento || "TODOS"} onChange={v=>changeServiceFilter("documento",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"factura",label:"Factura"},{value:"nc",label:"Nota de crédito"}]} />
+          <FilterSelect label="Vínculo OS" value={serviceFilters.vinculo || "TODOS"} onChange={v=>changeServiceFilter("vinculo",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"con_os",label:"Con OS"},{value:"sin_os",label:"Sin OS"}]} />
+        </>}
       </FiltersBar>
       {area === "servicios" && machineOptionsError && <p role="alert" className="text-xs text-destructive">{machineOptionsError}</p>}
       {area === "repuestos" ? <RepuestosVentas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} /> : error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>
         
         {area === "servicios" && (
-          <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
+          <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={serviceFilters} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
         )}
         {area === "maquinas" && <MaquinasPanorama data={maquinasData} loading={loading} error={error} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />}
         {area === "maquinas"
           ? <MaquinasExplorer data={maquinasData} loading={loading} error={error} desde={explorerRange.desde} hasta={explorerRange.hasta} selectedPeriod={selectedPeriod} />
-          : <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} />}
+          : <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={serviceFilters} />}
       </>}
     </PageShell>
   );

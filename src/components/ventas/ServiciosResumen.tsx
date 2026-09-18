@@ -1,96 +1,58 @@
+import { useMemo } from "react";
 import { money } from "@/components/dashboard/utils";
-import { salesHeader } from "./TableScroll";
-import { salesColumnClass } from "./salesTableFormat";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByTime } from "./serviceBrandGroups";
-import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
+import { useServiciosIndicadores, type IndicadoresFiltros, type IndicadorTipo, type IndicadorMarcaTipo } from "./useServiciosIndicadores";
+import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
+import { serviceMoneyColumn, serviceNumberColumn, serviceShareColumn } from "./serviceSalesColumns";
+
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
-const typeLabel = (value: string) => (value === "Garantia" ? "Garantía" : value);
-const COLUMNS = "grid-cols-[minmax(120px,1fr)_minmax(110px,1fr)_repeat(5,minmax(110px,1fr))_90px_85px]";
-const MONEY_LABELS = ["Mano de obra", "Kilometraje", "Repuestos", "Terceros", "Neto"];
-const unknown = (value: string) => /(?:sin|no) (?:identificar|identificado|informar|informado|clasificar|clasificado)/i.test(value);
+const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
 const historicLabel = "Histórico sin OS vinculada";
-const hoursLabel = (value: number | null, historic?: boolean) => historic || value == null ? "—" : decimal.format(value);
-
+const unknown = (value: string) => /(?:sin|no) (?:identificar|identificado|informar|informado|clasificar|clasificado)/i.test(value);
+type Amounts = { mo: number; km: number; repuestos: number; terceros: number; neto: number; horas: number | null; sin_vinculo_historico?: boolean };
+function amountColumns<T extends Amounts>(total: number): SalesDisplayColumn<T>[] {
+  return [
+    ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["neto", "Neto"] ] as const)
+      .map(([key, label]) => serviceMoneyColumn<T>(key, label, row => row[key])),
+    serviceNumberColumn<T>("horas", "Horas OS", row => row.sin_vinculo_historico ? null : row.horas),
+    serviceShareColumn<T>(row => total ? row.neto / total : null),
+  ];
+}
 export function ServiciosResumen(props: IndicadoresFiltros) {
   const { data, loading, error } = useServiciosIndicadores(props);
-
+  const marcaRows = useMemo(() => groupServiceBrandsByTime(data?.por_marca_tipo ?? []), [data]);
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando indicadores…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
   if (!data) return <div className="py-12 text-center text-[12px] text-muted-foreground">No hay datos para el período.</div>;
-
   const { totales } = data;
-  const porTipo = [...data.por_tipo].sort((a, b) => Number(Boolean(a.sin_vinculo_historico)) - Number(Boolean(b.sin_vinculo_historico)) || Number(unknown(a.tipo_tiempo)) - Number(unknown(b.tipo_tiempo)) || b.neto - a.neto);
-  const marcaRows = groupServiceBrandsByTime(data.por_marca_tipo ?? []);
-  const porMarcaTipo = [...marcaRows].sort((a, b) => Number(Boolean(a.sin_vinculo_historico)) - Number(Boolean(b.sin_vinculo_historico)) || Number(unknown(a.marca)) - Number(unknown(b.marca)) || a.marca.localeCompare(b.marca, "es") || b.neto - a.neto);
-  const missingBrandBreakdown = !Array.isArray(data.por_marca_tipo);
-  const cards: Array<[string, string]> = [
-    ["Neto", money(totales.neto)],
-    ["Mano de obra", money(totales.mo)],
-    ["Kilometraje", money(totales.km)],
-    ["Repuestos", money(totales.repuestos)],
-    ["Terceros", money(totales.terceros)],
-    ["OS facturadas", integer.format(totales.ordenes)],
-    ["Documentos", integer.format(totales.documentos)],
-    ["Horas OS", decimal.format(totales.horas)],
+  const tipoColumns: SalesDisplayColumn<IndicadorTipo>[] = [
+    { key: "tipo", label: "Tipo de tiempo", kind: "text", weight: 1.6, value: row => row.sin_vinculo_historico ? historicLabel : typeLabel(row.tipo_tiempo) },
+    serviceNumberColumn("ordenes", "OS asociadas", row => row.sin_vinculo_historico ? null : row.ordenes),
+    ...amountColumns<IndicadorTipo>(totales.neto),
   ];
-
-  return (
-    <div className="mt-3 space-y-3">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
-        {cards.map(([label, value]) => (
-          <div key={label} className="rounded-md border px-3 py-2">
-            <p className="truncate text-[10px] font-medium text-muted-foreground">{label}</p>
-            <p className="mt-0.5 truncate text-[13px] font-semibold tabular-nums">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      
-
-      <div className="overflow-x-auto rounded-md border">
-        <div className="min-w-[1060px]">
-          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-            <div>Tipo de tiempo</div>
-            <div className="text-center">OS asociadas</div>
-            {MONEY_LABELS.map((label) => <div key={label} className={salesColumnClass(label)}>{label}</div>)}
-            <div className="text-center">Horas OS</div>
-            <div className="text-right">Participación</div>
-          </div>
-          {!porTipo.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin facturación en el período.</div>
-            : porTipo.map((row) => (
-              <div key={`${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
-                <div className="truncate font-medium" title={row.sin_vinculo_historico ? historicLabel : typeLabel(row.tipo_tiempo)}>{row.sin_vinculo_historico ? historicLabel : typeLabel(row.tipo_tiempo)}</div>
-                <div className="text-center tabular-nums">{row.sin_vinculo_historico ? "—" : integer.format(row.ordenes)}</div>
-                {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
-                <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
-                <div className="text-center tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>
-                <div className="text-right tabular-nums">{totales.neto ? `${Math.round((row.neto / totales.neto) * 100)}%` : "—"}</div>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      <div className="overflow-x-auto rounded-md border">
-        <div className="min-w-[1060px]">
-          <div className={`grid ${COLUMNS} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-            <div>Marca</div><div>Tipo</div>
-            {MONEY_LABELS.map((label) => <div key={label} className={salesColumnClass(label)}>{label}</div>)}
-            <div className="text-center">Horas OS</div>
-            <div className="text-right">Participación</div>
-          </div>
-          {missingBrandBreakdown ? <div role="alert" className="py-10 text-center text-[12px] text-destructive">Falta actualizar la consulta del resumen por marca. Aplicá el SQL de corrección.</div>
-            : !porMarcaTipo.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">Sin facturación en el período.</div>
-            : porMarcaTipo.map((row) => <div key={`${row.marca}-${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
-              <div className="min-w-0 truncate font-medium" title={row.sin_vinculo_historico ? historicLabel : row.marca}>{row.sin_vinculo_historico ? historicLabel : unknown(row.marca) ? row.marca : <MarcaBadge marca={row.marca} className="text-[10px]" />}</div><div className="truncate">{row.sin_vinculo_historico ? "—" : typeLabel(row.tipo_tiempo)}</div>
-              {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
-              <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
-              <div className="text-center tabular-nums">{hoursLabel(row.horas, row.sin_vinculo_historico)}</div>
-              <div className="text-right tabular-nums">{totales.neto ? `${Math.round((row.neto / totales.neto) * 100)}%` : "—"}</div>
-            </div>)}
-        </div>
-      </div>
-    </div>
-  );
+  const brandColumns: SalesDisplayColumn<IndicadorMarcaTipo>[] = [
+    { key: "marca", label: "Marca", kind: "text", weight: 1.6, value: row => row.sin_vinculo_historico ? historicLabel : row.marca,
+      render: row => row.sin_vinculo_historico ? historicLabel : unknown(row.marca) ? row.marca : <MarcaBadge marca={row.marca} className="max-w-full truncate text-[10px]" /> },
+    { key: "tipo", label: "Tipo", kind: "text", value: row => row.sin_vinculo_historico ? null : typeLabel(row.tipo_tiempo) },
+    ...amountColumns<IndicadorMarcaTipo>(totales.neto),
+  ];
+  const cards: Array<[string, string]> = [
+    ["Neto", money(totales.neto)], ["Mano de obra", money(totales.mo)], ["Kilometraje", money(totales.km)],
+    ["Repuestos", money(totales.repuestos)], ["Terceros", money(totales.terceros)],
+    ["OS facturadas", integer.format(totales.ordenes)], ["Documentos", integer.format(totales.documentos)], ["Horas OS", decimal.format(totales.horas)],
+  ];
+  return <div className="mt-3 min-w-0 space-y-3">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{cards.map(([label, value]) => <div key={label} className="min-w-0 rounded-md border px-3 py-2">
+      <p className="truncate text-[10px] font-medium text-muted-foreground">{label}</p><p className="mt-0.5 truncate text-[13px] font-semibold tabular-nums">{value}</p>
+    </div>)}</div>
+    <SalesDataTable title="Facturación por tipo de tiempo" rows={data.por_tipo} columns={tipoColumns}
+      initialSort={{key:"neto",direction:"desc"}} rowKey={row => `${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`}
+      fileName={`ventas-servicios-tipos-${props.desde}-${props.hasta}.xlsx`} />
+    {!Array.isArray(data.por_marca_tipo) ? <div role="alert" className="py-10 text-center text-[12px] text-destructive">Falta actualizar la consulta del resumen por marca. Aplicá el SQL de corrección.</div>
+      : <SalesDataTable title="Facturación por marca y tiempo" rows={marcaRows} columns={brandColumns}
+        initialSort={{key:"neto",direction:"desc"}} rowKey={row => `${row.marca}-${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`}
+        fileName={`ventas-servicios-marcas-${props.desde}-${props.hasta}.xlsx`} />}
+  </div>;
 }

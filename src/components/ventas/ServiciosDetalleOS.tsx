@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
-import { serviceSalesError } from "@/lib/serviceSalesError";
+import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
 import { matchesServiceSalesSearch, type ServiceSalesSearchLine } from "@/lib/serviceSalesSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { MachineHistorySheet } from "@/components/ventas/MachineHistorySheet";
@@ -8,6 +8,8 @@ import { TableScroll, scrollHead, salesHeader } from "./TableScroll";
 import { useAuth } from "@/hooks/useAuth";
 import { SalesExportButton, SalesSortButton } from "./SalesTableControls";
 import { useSalesTableSort, type SalesColumn } from "./salesTableInteraction";
+import type { IndicadoresFiltros } from "./useServiciosIndicadores";
+import { serviceFiltersKey, serviceFilteredRequest } from "./serviceSalesFilters";
 
 type InvoiceLine = ServiceSalesSearchLine & {
   id: string; fecha: string; factura: string; os: string | null; chasis: string | null;
@@ -54,7 +56,8 @@ function quantity(row: InvoiceLine): { label: string; title: string } {
 
 // Keep the name for existing callers, but represent financial lines, not OS
 // aggregates. Same population and normalized search as the Clients tab.
-export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: { desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string }) {
+export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: IndicadoresFiltros) {
+  const filterKey = serviceFiltersKey(filtros);
   const { can } = useAuth();
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,23 +73,25 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
     setLines([]); setLoading(true); setError(null);
     void (async () => {
       try {
-        const { data, error: rpcError } = await (supabase as any).rpc("ventas_servicios_lineas_v2", {
+        const request = serviceFilteredRequest("ventas_servicios_lineas_v2", filterKey);
+        const { data, error: rpcError } = await (supabase as any).rpc(request.name, {
+          ...request.params,
           p_marca: marca || null, p_tipo_maquina: tipoMaquina || null,
           p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
           p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo,
         });
         if (!alive) return;
-        if (rpcError) { setError(serviceSalesError(rpcError)); return; }
+        if (rpcError) { setError(serviceSalesError(rpcError, filterKey)); return; }
         if (data != null && !Array.isArray(data)) throw new Error("Respuesta de facturación inválida.");
         setLines(data ?? []);
       } catch (failure) {
-        if (alive) setError(serviceSalesError(failure instanceof Error ? failure : { message: "No se pudo consultar la facturación." }));
+        if (alive) setError(serviceSalesError(failure instanceof Error ? failure : { message: "No se pudo consultar la facturación." }, filterKey));
       } finally {
         if (alive) setLoading(false);
       }
     })();
     return () => { alive = false; };
-  }, [desde, hasta, sucursal, tipoTiempo, marca, tipoMaquina]);
+  }, [desde, hasta, sucursal, tipoTiempo, marca, tipoMaquina, filterKey]);
 
   const filtered = useMemo(() => lines.filter(line => matchesServiceSalesSearch(line, buscar)), [lines, buscar]);
   const { ordered: rows, sort, toggleSort } = useSalesTableSort(filtered, detailColumns, { key:"fecha", direction:"desc" });

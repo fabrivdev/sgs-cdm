@@ -153,6 +153,8 @@ e idempotencia. UI mantiene una sola línea y 12 columnas, sin subtotal monetari
 
 ## Paso 1: orden y exportación de Detalle
 
+El paso 2 extiende estos criterios a todas las tablas de Servicios; ver la sección siguiente al final del documento.
+
 Las 12 columnas de `ServiciosDetalleOS` alternan ascendente/descendente por clic
 en su encabezado. Usan `salesTableInteraction` y `SalesTableControls`: fechas,
 cantidades e importes originales, textos con orden español natural, empates estables
@@ -204,3 +206,52 @@ del historial por chasis. Requiere `20260915100000` aplicada previamente.
 Pruebas reproducibles sin conexión a producción:
 `node scripts/verify-service-owner-stock-sql.mjs` (stock, saldos, prioridad, colisiones,
 identidad y conciliación), más tests de `clientIdentity`, clientes e historial.
+
+## Paso 2: filtros compartidos y todas las tablas de Servicios
+
+Períodos, ambos resúmenes, Clientes, Máquinas y Técnicos usan `SalesDataTable`:
+orden tipado en ambas direcciones, ausencias al final, empate estable y exportación
+completa del resultado filtrado en el orden/columnas actuales. Detalle mantiene sus
+12 columnas. No se exporta solo el viewport ni se agrega un total monetario a Detalle.
+El total de Períodos queda fijo al final y se exporta allí; conserva los conteos únicos
+del rango, no la suma de conteos mensuales. Los encabezados mantienen el eje de los datos.
+
+Filtros generales nuevos: cliente facturado, propietario actual, factura, OS, chasis,
+descripción, código, componente, origen histórico/actual, factura/NC y con/sin OS.
+Se combinan con AND antes de agregación, junto a fechas, sucursal, marca, tipo de
+máquina, tipo de tiempo y búsqueda. Cliente no se sustituye por propietario.
+Código sigue la prioridad de Detalle (financiero específico, operativo único por OS
+y componente, financiero real como respaldo); ambigüedades no se adivinan.
+La resolución operacional solo consulta OS cuando se solicita el filtro Código.
+Técnicos tiene búsqueda local: reduce esa tabla/exportación sin reasignar MO.
+Horas y MO sin clasificar se muestran separadas, conservando el total y el reparto.
+Seleccionar agosto limita las vistas complementarias al 31/08. Limpiar cancela texto
+pendiente. Carga/error nunca permite exportar resultados anteriores.
+
+### SQL manual y compatibilidad
+
+Ejecutar completo `supabase/migrations/20260917180000_service_sales_shared_filters.sql`.
+Necesita las RPC vigentes con autorización de `servicios.ventas`, el resumen por marca
+de `20260915110000_restore_service_summary_brand_breakdown.sql` y el código/cantidad
+de `20260917170000_service_invoice_line_product_code.sql`. Si falta un prerequisito o
+la estructura de una función difiere, falla explícitamente y la transacción no modifica
+reportes parcialmente. No ejecutar SQL remoto automáticamente.
+
+Se crean cuatro variantes `_filtrado` de las funciones instaladas, sin restaurar
+versiones viejas de reglas financieras ni modificar las originales. Conservan sus
+correcciones de Comisiones, participación, exclusiones, metadatos y configuraciones.
+Las funciones originales siguen usándose sin filtros nuevos. Si falta el SQL filtrado,
+la app muestra un error, no un resultado general disfrazado de filtrado.
+La migración es repetible: si luego se cambia una RPC original, volver a ejecutarla
+para actualizar su variante filtrada. No toca importaciones ni datos comerciales.
+Commit/push no ejecuta la migración y las pruebas locales no demuestran rendimiento
+o conciliación de la base de producción.
+
+Validación local: tests de componentes/integración, ESLint, TypeScript y build;
+`scripts/verify-service-sales-filters-sql.mjs` usa PostgreSQL aislado/PGlite, disponible
+en el entorno local de pruebas `output/sql-check`, no conectado a producción.
+Cubre conciliación entre líneas/Períodos/Resumen, contratos originales, NC, tipos
+manuales, participación ponderada, código/ambigüedad, permisos e idempotencia.
+Playwright comprobó las vistas reales con datos ficticios en 1920/1366/1024/768/390 px,
+sin scroll horizontal y sin registros apilados; limpiar, ordenar y descargar Excel
+preserva las 25 líneas, textos completos, ceros iniciales, cantidades OS y centavos.

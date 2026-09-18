@@ -1,46 +1,25 @@
-import { money } from "@/components/dashboard/utils";
+import { useMemo } from "react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByMachine } from "./serviceBrandGroups";
-import { useServiciosIndicadores, type IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
-import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
-import { salesColumnClass } from "./salesTableFormat";
+import { useServiciosIndicadores, type IndicadoresFiltros, type IndicadorMaquina } from "./useServiciosIndicadores";
+import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
+import { serviceMoneyColumn, serviceNumberColumn } from "./serviceSalesColumns";
 
-const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
-const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
-const COLUMNS = "grid-cols-[minmax(110px,1fr)_minmax(150px,1.2fr)_90px_70px_80px_minmax(130px,1fr)_minmax(130px,1fr)_repeat(3,minmax(110px,1fr))]";
-
+const columns: readonly SalesDisplayColumn<IndicadorMaquina>[] = [
+  { key: "marca", label: "Marca", kind: "text", value: row => row.marca, render: row => <MarcaBadge marca={row.marca} className="max-w-full truncate text-[10px]" /> },
+  { key: "tipo", label: "Tipo de máquina", kind: "text", value: row => row.tipo_maquina, weight: 1.7 },
+  serviceNumberColumn("maquinas", "Máquinas", row => row.maquinas),
+  serviceNumberColumn("ordenes", "OS", row => row.ordenes),
+  serviceNumberColumn("horas", "Horas OS", row => row.horas),
+  ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["neto", "Neto"] ] as const)
+    .map(([key, label]) => serviceMoneyColumn<IndicadorMaquina>(key, label, row => row[key])),
+];
 export function ServiciosMaquinas(props: IndicadoresFiltros) {
   const { data, loading, error } = useServiciosIndicadores(props);
-
+  const rows = useMemo(() => groupServiceBrandsByMachine(data?.por_maquina ?? []), [data]);
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando máquinas…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
-
-  const rows = groupServiceBrandsByMachine(data?.por_maquina ?? []).sort((a, b) => Number(/(?:sin|no) (?:identificar|identificado|informar|informado|máquina|maquina)/i.test(`${a.marca} ${a.tipo_maquina}`)) - Number(/(?:sin|no) (?:identificar|identificado|informar|informado|máquina|maquina)/i.test(`${b.marca} ${b.tipo_maquina}`)) || b.neto - a.neto);
-
-  return (
-    <div className="mt-3 overflow-hidden rounded-md border">
-      <div className="overflow-x-auto"><div className="min-w-[1120px]">
-        <TableScroll rows={rows.length}>
-        <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          <div>Marca</div><div>Tipo de máquina</div>
-          <div className="text-center">Máquinas</div><div className="text-center">OS</div><div className="text-center">Horas OS</div>
-          {["Mano de Obra", "Kilometraje", "Repuestos", "Terceros", "Neto"].map((label) => <div key={label} className={salesColumnClass(label)}>{label}</div>)}
-        </div>
-        {!rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay facturación por máquina en el período.</div>
-          : rows.map((row) => (
-            <div key={`${row.marca}__${row.tipo_maquina}`} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
-              <div className="min-w-0"><MarcaBadge marca={row.marca} className="text-[10px]" /></div>
-              <div className="truncate" title={row.tipo_maquina}>{row.tipo_maquina}</div>
-              <div className="text-center tabular-nums">{integer.format(row.maquinas)}</div>
-              <div className="text-center tabular-nums">{integer.format(row.ordenes)}</div>
-              <div className="text-center tabular-nums">{decimal.format(row.horas)}</div>
-              {[row.mo, row.km, row.repuestos, row.terceros].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
-              <div className="text-right font-semibold tabular-nums">{money(row.neto)}</div>
-            </div>
-          ))}
-        </TableScroll>
-      </div></div>
-      {rows.length > 0 && <RowCount rows={rows.length} label="filas" />}
-    </div>
-  );
+  return <div className="mt-3 min-w-0"><SalesDataTable title="Facturación por máquina" rows={rows} columns={columns}
+    initialSort={{ key: "neto", direction: "desc" }} rowKey={row => `${row.marca}__${row.tipo_maquina}`}
+    fileName={`ventas-servicios-maquinas-${props.desde}-${props.hasta}.xlsx`} empty="No hay facturación por máquina en el período." /></div>;
 }

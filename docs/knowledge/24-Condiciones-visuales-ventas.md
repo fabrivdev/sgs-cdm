@@ -21,7 +21,11 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - Respetar `datos:exportar`, igual que Parque/Clientes. No habilitar exportación durante carga/error/sin filas; mostrar fallo y permitir reintento. Cargar la librería Excel solo al solicitarla.
 - Orden local únicamente sobre una respuesta completa. En reportes paginados ordenar antes de paginar en SQL y exportar el conjunto completo de filtros, nunca presentar una página ordenada como el resultado global.
 
-Paso 1 implementado: base reutilizable `salesTableInteraction`, `SalesTableControls` y `salesTableExport`, aplicada únicamente a las 12 columnas de Detalle de Servicios. Ampliación de filtros y demás tablas/módulos pendiente. No modifica población financiera, correcciones de Comisiones, exclusiones ni cantidades operativas.
+Pasos 1 y 2 implementados: base reutilizable `salesTableInteraction`, `SalesTableControls`, `salesTableExport` y `SalesDataTable`, aplicada a Detalle, Períodos, ambos resúmenes, Clientes, Máquinas y Técnicos de Servicios. Máquinas/Repuestos como módulos de Ventas siguen pendientes de esta interacción compartida. No modifica las correcciones de Comisiones, exclusiones ni cantidades operativas.
+
+- Los filtros globales de Servicios se aplican a líneas financieras antes de agregar: cliente facturado y propietario son campos distintos; también factura, OS, chasis, descripción, código, componente, origen, documento y vínculo con OS. No mostrar totales generales como si estuvieran filtrados. Si falta el SQL nuevo, mostrar error explícito; las consultas originales sin esos filtros siguen disponibles.
+- El filtro de técnico es local a esa tabla y a su exportación: no altera la participación calculada de la persona ni los indicadores generales. Horas/MO sin clasificar se muestran por separado para conciliar con los totales, sin reasignarlas a Cliente.
+- Seleccionar agosto en Períodos limita las vistas complementarias al 31/08, nunca al 01/09. Limpiar filtros cancela texto pendiente y restaura los controles, sin volver a insertar búsquedas viejas.
 
 ## Comprobación antes de entregar/publicar
 
@@ -42,3 +46,5 @@ Validación local del 17/09/2026: 16 pruebas de Detalle/Clientes/búsqueda, ESLi
 Revisión posterior de Código: 17 pruebas de Detalle/Clientes/búsqueda y fixture PostgreSQL aislada correctas. Se conserva el contrato financiero/cantidades, repeticiones y NC. Requiere SQL manual `20260917170000_service_invoice_line_product_code.sql`; commit/push no ejecuta SQL. No se consultaron códigos de producción.
 
 Paso 1 de orden/exportación del 17/09/2026: 103 pruebas de componentes de Ventas, ESLint de los archivos afectados y compilación correctos. Playwright verificó el componente real con 25 líneas ficticias, ambos sentidos de importes, búsqueda y descarga Excel completa; el archivo descargado preserva orden, códigos, centavos, NC y cantidades OS. Anchos 1920/1366/1024/768/390 px sin desbordamiento horizontal del documento. Elipsis en pantallas estrechas no equivale a lectura íntegra simultánea. No se consultó producción y no requiere SQL adicional por este paso.
+
+Paso 2 del 17/09/2026: filtros generales y orden/exportación en todas las tablas de Servicios. Pruebas de componentes/integración y PostgreSQL aislado cubren conciliación, permisos, códigos financieros/operativos y ambigüedad, reparto por participación y tipo manual. Playwright comprobó los componentes reales con datos ficticios: cinco anchos sin desbordamiento horizontal, registros de una línea, panel de filtros, limpiar y descarga completa ordenada. Elipsis sigue siendo necesaria en pantallas estrechas. Requiere SQL manual `20260917180000_service_sales_shared_filters.sql`; commit/push no lo aplica ni verifica producción.

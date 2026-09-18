@@ -4,6 +4,7 @@ import { ServiciosPanorama } from "./ServiciosPanorama";
 
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
 afterEach(() => { cleanup(); rpc.mockReset(); });
 
 const summary = { total: 415, facturas: 4, clientes: 4, ordenes: 4, promedio: 103.75 };
@@ -53,11 +54,11 @@ describe("Panorama de Ventas de Servicios", () => {
       periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined}
     />);
 
-    const july = (await screen.findByText(/jul.*2026/i)).closest("button");
+    const july = (await screen.findByText(/jul.*2026/i)).closest('[role="row"]');
     expect(july).toHaveTextContent("+25%");
     expect(july).toHaveTextContent("+100%");
 
-    const september = screen.getByText(/sept.*2026/i).closest("button");
+    const september = screen.getByText(/sept.*2026/i).closest('[role="row"]');
     expect(september).toHaveTextContent("+100%");
     expect(september).toHaveTextContent("+150%");
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_servicios_panorama_v2", expect.objectContaining({ p_desde: "2025-12-01", p_hasta: "2026-08-14" })));

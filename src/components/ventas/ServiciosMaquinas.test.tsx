@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiciosMaquinas } from "./ServiciosMaquinas";
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
 
 vi.mock("./useServiciosIndicadores", () => ({
   useServiciosIndicadores: () => ({ loading: false, error: null, data: { por_maquina: [

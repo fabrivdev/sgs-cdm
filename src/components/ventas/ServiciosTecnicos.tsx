@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { serviceSalesError } from "@/lib/serviceSalesError";
-import { money } from "@/components/dashboard/utils";
+import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { displayImportedTechnicianName, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import type { IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
-import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
-import { salesColumnClass } from "./salesTableFormat";
+import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
+import { serviceNumberColumn, serviceMoneyColumn } from "./serviceSalesColumns";
+import { serviceFiltersKey, serviceFilteredRequest } from "./serviceSalesFilters";
 
 type Fila = {
   tecnico_clave: string; tecnico: string;
@@ -15,11 +15,11 @@ type Fila = {
   mo_cliente: number; mo_garantia: number; mo_interno: number; mo_otros: number; mo_total: number;
 };
 
-const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
-const COLUMNS = "grid-cols-[minmax(210px,1.5fr)_repeat(8,minmax(105px,1fr))]";
 const unknown = (value: string) => /sin (tecnico|técnico|identificar|informar|atribuir)/i.test(value);
 
-export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: IndicadoresFiltros) {
+export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: IndicadoresFiltros) {
+  const filterKey = serviceFiltersKey(filtros);
+  const [technicianSearch, setTechnicianSearch] = useState("");
   const [rows, setRows] = useState<Fila[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,18 +34,23 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
       return;
     }
     setLoading(true); setError(null);
-    (supabase as any).rpc("ventas_servicios_tecnicos_v1", {
+    const request = serviceFilteredRequest("ventas_servicios_tecnicos_v1", filterKey);
+    (supabase as any).rpc(request.name, {
+      ...request.params,
       p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
       p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo,
       p_marca: marca || null, p_tipo_maquina: tipoMaquina || null, p_buscar: buscar.trim() || null,
     }).then(({ data, error: rpcError }: any) => {
       if (!alive) return;
-      if (rpcError) { setError(serviceSalesError(rpcError)); setRows([]); }
+      if (rpcError) { setError(serviceSalesError(rpcError, filterKey)); setRows([]); }
       else setRows((data as Fila[]) ?? []);
       setLoading(false);
+    }).catch((failure: { message?: string }) => {
+      if (!alive) return;
+      setError(serviceSalesError(failure, filterKey)); setRows([]); setLoading(false);
     });
     return () => { alive = false; };
-  }, [desde, hasta, sucursal, buscar, tipoTiempo, marca, tipoMaquina]);
+  }, [desde, hasta, sucursal, buscar, tipoTiempo, marca, tipoMaquina, filterKey]);
 
   // Mismo criterio de nombres que el historial de la máquina: un técnico, un nombre.
   const unified = useMemo(() => {
@@ -77,29 +82,20 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando técnicos…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
 
-  return (
-    <div className="mt-3">
-      <div className="overflow-hidden rounded-md border">
-        <div className="overflow-x-auto"><div className="min-w-[1120px]">
-          <TableScroll rows={unified.length}>
-          <div className={`grid ${COLUMNS} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-            <div>Técnico</div>
-            {["Horas Cliente", "Horas Garantía", "Horas Interno", "Total horas", "MO Cliente asociada", "MO Garantía asociada", "MO Interno asociada", "MO total asociada"].map((label) => <div key={label} className={`whitespace-nowrap ${salesColumnClass(label)}`}>{label}</div>)}
-          </div>
-          {!unified.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay jornadas cargadas para las OS del período.</div>
-            : unified.map((row) => (
-                <div key={row.tecnico} className={`grid ${COLUMNS} items-center border-t px-3 py-2 text-[12px]`}>
-                  <div className="truncate font-medium" title={row.tecnico}>{row.tecnico}</div>
-                  {[row.horas_cliente, row.horas_garantia, row.horas_interno].map((value, index) => <div key={index} className="text-center tabular-nums text-muted-foreground">{decimal.format(value)}</div>)}
-                  <div className="text-center font-semibold tabular-nums">{decimal.format(row.total_horas)}</div>
-                  {[row.mo_cliente, row.mo_garantia, row.mo_interno].map((value, index) => <div key={index} className="text-right tabular-nums text-muted-foreground">{money(value)}</div>)}
-                  <div className="text-right font-semibold tabular-nums">{money(row.mo_total)}</div>
-                </div>
-              ))}
-          </TableScroll>
-        </div></div>
-        {unified.length > 0 && <RowCount rows={unified.length} label="técnicos" />}
-      </div>
-    </div>
-  );
+  const filtered = unified.filter(row => row.tecnico.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().includes(technicianSearch.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim()));
+  const columns: SalesDisplayColumn<Fila>[] = [
+    { key: "tecnico", label: "Técnico", kind: "text", value: row => row.tecnico, weight: 2.4, className: "font-medium" },
+    ...([ ["horas_cliente", "Horas Cliente"], ["horas_garantia", "Horas Garantía"], ["horas_interno", "Horas Interno"],
+      ["horas_otros", "Horas sin clasificar"], ["total_horas", "Total horas"] ] as const)
+      .map(([key, label]) => serviceNumberColumn<Fila>(key, label, row => row[key])),
+    ...([ ["mo_cliente", "MO Cliente asociada"], ["mo_garantia", "MO Garantía asociada"], ["mo_interno", "MO Interno asociada"],
+      ["mo_otros", "MO sin clasificar"], ["mo_total", "MO total asociada"] ] as const)
+      .map(([key, label]) => serviceMoneyColumn<Fila>(key, label, row => row[key])),
+  ];
+  return <div className="mt-3 min-w-0 space-y-2">
+    <input type="search" aria-label="Filtrar técnico en esta tabla" placeholder="Técnico…" value={technicianSearch} onChange={event=>setTechnicianSearch(event.target.value)} className="h-8 w-full max-w-xs rounded-md border bg-background px-2 text-[12px]" />
+    <SalesDataTable title="Facturación por técnico" rows={filtered} columns={columns}
+      initialSort={{key:"total_horas",direction:"desc"}} rowKey={row => row.tecnico} countLabel="técnicos"
+      fileName={`ventas-servicios-tecnicos-${desde}-${hasta}.xlsx`} empty="No hay jornadas cargadas para las OS del período." />
+  </div>;
 }

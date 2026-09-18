@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { serviceSalesError } from "@/lib/serviceSalesError";
+import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
+import { serviceFiltersKey, serviceFilteredRequest, type ServiceSalesFilters } from "./serviceSalesFilters";
 
 export type IndicadoresFiltros = {
   desde: string; hasta: string; sucursal: string; buscar: string;
-  tipoTiempo: string; marca?: string; tipoMaquina?: string;
+  tipoTiempo: string; marca?: string; tipoMaquina?: string; filtros?: ServiceSalesFilters;
 };
 
 export type IndicadoresTotales = {
@@ -30,7 +31,8 @@ export type IndicadoresResponse = {
   por_marca_tipo: IndicadorMarcaTipo[];
 };
 
-export function useServiciosIndicadores({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "" }: IndicadoresFiltros) {
+export function useServiciosIndicadores({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: IndicadoresFiltros) {
+  const filterKey = serviceFiltersKey(filtros);
   const [data, setData] = useState<IndicadoresResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,18 +46,23 @@ export function useServiciosIndicadores({ desde, hasta, sucursal, buscar, tipoTi
       return;
     }
     setLoading(true); setError(null);
-    (supabase as any).rpc("ventas_servicios_indicadores_v1", {
+    const request = serviceFilteredRequest("ventas_servicios_indicadores_v1", filterKey);
+    (supabase as any).rpc(request.name, {
+      ...request.params,
       p_desde: desde, p_hasta: hasta, p_sucursal: sucursal === "TODAS" ? null : sucursal,
       p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo,
       p_marca: marca || null, p_tipo_maquina: tipoMaquina || null, p_buscar: buscar.trim() || null,
     }).then(({ data: response, error: rpcError }: any) => {
       if (!alive) return;
-      if (rpcError) { setError(serviceSalesError(rpcError)); setData(null); }
+      if (rpcError) { setError(serviceSalesError(rpcError, filterKey)); setData(null); }
       else setData(response as IndicadoresResponse);
       setLoading(false);
+    }).catch((failure: { message?: string }) => {
+      if (!alive) return;
+      setError(serviceSalesError(failure, filterKey)); setData(null); setLoading(false);
     });
     return () => { alive = false; };
-  }, [desde, hasta, sucursal, buscar, tipoTiempo, marca, tipoMaquina]);
+  }, [desde, hasta, sucursal, buscar, tipoTiempo, marca, tipoMaquina, filterKey]);
 
   return { data, loading, error };
 }
