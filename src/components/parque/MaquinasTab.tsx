@@ -5,8 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDown, ArrowRightLeft, ArrowUp, ArrowUpDown, Plus } from "lucide-react";
+import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
+import { ArrowRightLeft, Plus } from "lucide-react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
@@ -245,8 +245,8 @@ export function MaquinasTab({
     { key: "marca", label: "Marca", kind: "text", value: m => m.marca },
     { key: "subgrupo", label: "Tipo", kind: "text", value: m => machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado) },
     { key: "modelo", label: "Modelo", kind: "text", value: m => m.modelo_tipo },
-    { key: "año", label: "Año", kind: "number", value: m => m.anio },
-    { key: "antiguedad", label: "Antig.", kind: "number", value: m => m.anio ? new Date().getFullYear() - m.anio : null },
+    { key: "año", label: "Año", kind: "number", align: "center", value: m => m.anio },
+    { key: "antiguedad", label: "Antig.", kind: "number", align: "center", value: m => m.anio ? new Date().getFullYear() - m.anio : null },
     { key: "serie", label: "Chasis", kind: "text", value: m => m.serie },
     { key: "vendedor", label: "Vendedor", kind: "text", value: m => m.vendedor },
     { key: "estado", label: "Estado", kind: "text", value: m => m.activo === false ? "Inactiva" : "Activa" },
@@ -262,10 +262,6 @@ export function MaquinasTab({
     }
   };
 
-  const sortIcon = (k: SortKey) => {
-    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-50" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
-  };
 
   const exportar = async () => {
     const XLSX = await import("xlsx");
@@ -367,89 +363,38 @@ export function MaquinasTab({
       </FiltersBar>
 
 
-      <div className="rounded-md border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="cursor-pointer min-w-[200px]" onClick={() => toggleSort("cliente")}>
-                <div className="flex items-center gap-1">Cliente {sortIcon("cliente")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("sucursal")}>
-                <div className="flex items-center gap-1">Sucursal {sortIcon("sucursal")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("marca")}>
-                <div className="flex items-center gap-1">Marca {sortIcon("marca")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("subgrupo")}>
-                <div className="flex items-center gap-1">Subgrupo {sortIcon("subgrupo")}</div>
-              </TableHead>
-              <TableHead onClick={() => toggleSort("modelo")}><div className="flex items-center gap-1">Modelo {sortIcon("modelo")}</div></TableHead>
-              <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("año")}>
-                <div className="flex items-center justify-center gap-1">Año {sortIcon("año")}</div>
-              </TableHead>
-              <TableHead className="text-center" onClick={() => toggleSort("antiguedad")}><div className="flex justify-center items-center gap-1">Antig. {sortIcon("antiguedad")}</div></TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("serie")}>
-                <div className="flex items-center gap-1">Serie {sortIcon("serie")}</div>
-              </TableHead>
-              <TableHead onClick={() => toggleSort("vendedor")}><div className="flex items-center gap-1">Vendedor {sortIcon("vendedor")}</div></TableHead>
-              <TableHead className="text-center" onClick={() => toggleSort("estado")}><div className="flex justify-center items-center gap-1">Estado {sortIcon("estado")}</div></TableHead>
-              <TableHead className="w-[64px] text-right">Acción</TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {loading && (
-              <TableRow>
-                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
-                  Cargando...
-                </TableCell>
-              </TableRow>
-            )}
-
-            {!loading && ordenadas.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={11} className="h-20 text-center text-muted-foreground">
-                  Sin máquinas.
-                </TableCell>
-              </TableRow>
-            )}
-
-            {!loading &&
-              ordenadas.map((m) => {
-                const cli = m.cliente_id ? cliById.get(m.cliente_id) : null;
-                const antig = m.anio ? hoy - m.anio : null;
-                const activa = m.activo !== false;
-
-                return (
-                  <TableRow
-                    key={m.id}
-                    className={cn(onOpenCliente && cli && "cursor-pointer hover:bg-accent/40", !activa && "opacity-60")}
-                    onClick={() => cli && onOpenCliente?.(cli.id)}
-                  >
-                    <TableCell className="font-medium">{cli?.nombre ?? "—"}</TableCell>
-                    <TableCell className="text-[12px]">{m.sucursal ?? "—"}</TableCell>
-                    <TableCell>
-                      <MarcaBadge marca={m.marca} className="text-[10px]" />
-                    </TableCell>
-                    <TableCell className="text-[12px]">{machineSubgroupLabel(m.subgrupo, m.subgrupo_personalizado)}</TableCell>
-                    <TableCell className="text-[12px]">{m.modelo_tipo ?? "—"}</TableCell>
-                    <TableCell className="text-center tabular-nums">{m.anio ?? "—"}</TableCell>
-                    <TableCell className="text-center tabular-nums text-[12px]">{antig != null ? `${antig}a` : "—"}</TableCell>
-                    <TableCell className="text-[12px] font-mono">{m.serie}</TableCell>
-                    <TableCell className="text-[12px]">{m.vendedor ?? "—"}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={activa ? "default" : "secondary"} className="text-[10px]">
-                        {activa ? "Activa" : "Inactiva"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {activa && canManagePark && (
+      <div className="overflow-hidden rounded-md border bg-card">
+        <CompactListTable rows={ordenadas} id={m=>m.id} label="Máquinas del parque" sort={{key:sortKey,direction:sortDir}} onSort={key=>toggleSort(key as SortKey)}
+          status={loading?"Cargando…":loadError?<span className="text-destructive">No se pudieron cargar las máquinas.</span>:!ordenadas.length?"Sin máquinas.":undefined}
+          onSelect={onOpenCliente?m=>m.cliente_id&&onOpenCliente(m.cliente_id):undefined} rowClassName={m=>m.activo===false?"opacity-60":""}
+          columns={columns.map(column=>{
+            const layout:Record<string,Pick<CompactListColumn<Maquina>,"width"|"hiddenBelow">>={
+              cliente:{width:"w-[35%] md:w-[22%] lg:w-[18%]"},sucursal:{width:"md:w-[12%] lg:w-[8%]",hiddenBelow:"md"},
+              marca:{width:"w-[17%] md:w-[9%] lg:w-[7%]"},subgrupo:{width:"lg:w-[11%]",hiddenBelow:"lg"},
+              modelo:{width:"w-[40%] md:w-[25%] lg:w-[15%]"},año:{width:"lg:w-[5%]",hiddenBelow:"lg"},
+              antiguedad:{width:"lg:w-[5%]",hiddenBelow:"lg"},serie:{width:"md:w-[21%] lg:w-[14%]",hiddenBelow:"md"},
+              vendedor:{width:"lg:w-[8%]",hiddenBelow:"lg"},estado:{width:"md:w-[7%] lg:w-[6%]",hiddenBelow:"md"},
+            };
+            return {...column,...layout[column.key],className:column.key==="serie"?"font-mono":undefined,
+              render:(m:Maquina)=>{
+                const cli=m.cliente_id?cliById.get(m.cliente_id):null;
+                if(column.key==="marca")return <MarcaBadge marca={m.marca} className="max-w-full whitespace-nowrap text-[10px]" />;
+                if(column.key==="cliente"&&cli&&onOpenCliente)return <button type="button" className="max-w-full truncate text-left font-medium focus-visible:ring-2 focus-visible:ring-ring" onClick={event=>{event.stopPropagation();onOpenCliente(cli.id);}}>{cli.nombre}</button>;
+                if(column.key==="modelo")return <CompactListInfo label={m.modelo_tipo??"—"} fields={columns.map(c=>[c.key==="antiguedad"?"Antig. (años)":c.label,String(c.value(m)??"—")] as const)} />;
+                if(column.key==="estado")return <Badge variant={m.activo!==false?"default":"secondary"} className="max-w-full whitespace-nowrap px-2 text-[10px]">{m.activo!==false?"Activa":"Inactiva"}</Badge>;
+                return String(column.value(m)??"—");
+              }};
+          })}
+          actions={{width:"w-[8%] md:w-[4%] lg:w-[3%]",render:m=>{
+            const activa=m.activo!==false;
+            return <>                      {activa && canManagePark && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7 max-w-full"
                           title="Transferir a otro cliente"
+                          aria-label={`Transferir ${m.serie}`}
                           onClick={(event) => {
                             event.stopPropagation();
                             setTransferMaquina({
@@ -467,13 +412,8 @@ export function MaquinasTab({
                         >
                           <ArrowRightLeft className="h-3.5 w-3.5" />
                         </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-          </TableBody>
-        </Table>
+                      )}</>;
+          }}} />
       </div>
       {canManagePark && <TransferirMaquinaDialog
         maquina={transferMaquina}

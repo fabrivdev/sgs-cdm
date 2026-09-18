@@ -7,13 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   CalendarIcon,
   Check,
   Flag,
@@ -119,6 +116,7 @@ interface Row {
 
 type SortKey =
   | "cliente"
+  | "sucursal"
   | "cantTotal"
   | "antiguedadProm"
   | "diasUltRepuesto"
@@ -596,6 +594,7 @@ export function ParqueTab({
 
   const sortColumns: SalesColumn<typeof filtradas[number]>[] = [
     { key: "cliente", label: "Cliente", kind: "text", value: r => r.cliente.nombre },
+    { key: "sucursal", label: "Sucursal", kind: "text", value: r => r.sucursales.join(", ") },
     { key: "telefono", label: "Teléfono", kind: "text", value: r => r.contactoPrincipal?.telefono },
     ...(["cantTotal", "antiguedadProm", "diasUltRepuesto", "diasUltServicio", "factYTD", "factPrev", "varPct"] as const).map(key => ({ key, label: key, kind: "number" as const, value: (r: typeof filtradas[number]) => r[key] })),
     { key: "marcas", label: "% Marcas", kind: "number", value: r => r.cantTotal ? r.cantClaas / r.cantTotal : null },
@@ -625,10 +624,6 @@ export function ParqueTab({
     }
   };
 
-  const sortIcon = (k: SortKey) => {
-    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-50" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
-  };
 
   const exportar = async () => {
     const XLSX = await import("xlsx");
@@ -779,189 +774,51 @@ export function ParqueTab({
         )}
       </div>
 
-      <div className="rounded-md border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="cursor-pointer whitespace-nowrap min-w-[200px]" onClick={() => toggleSort("cliente")}>
-                <div className="flex items-center gap-1">Cliente {sortIcon("cliente")}</div>
-              </TableHead>
-              <TableHead className="whitespace-nowrap min-w-[170px]" onClick={() => toggleSort("telefono")}><div className="flex items-center gap-1">Teléfono {sortIcon("telefono")}</div></TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("cantTotal")}>
-                <div className="flex items-center justify-center gap-1">Maq. {sortIcon("cantTotal")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-center" onClick={() => toggleSort("antiguedadProm")}>
-                <div className="flex items-center justify-center gap-1">Antig. {sortIcon("antiguedadProm")}</div>
-              </TableHead>
-              <TableHead className="whitespace-nowrap min-w-[140px]" title="Ordenar por participación de CLAAS" onClick={() => toggleSort("marcas")}><div className="flex items-center gap-1">% Marcas {sortIcon("marcas")}</div></TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("diasUltRepuesto")}>
-                <div className="flex items-center justify-end gap-1">Últ. Rep. {sortIcon("diasUltRepuesto")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("diasUltServicio")}>
-                <div className="flex items-center justify-end gap-1">Últ. Serv. {sortIcon("diasUltServicio")}</div>
-              </TableHead>
-              <TableHead className="whitespace-nowrap text-center" onClick={() => toggleSort("repuesto")}><div className="flex items-center justify-center gap-1">Rep. {sortIcon("repuesto")}</div></TableHead>
-              <TableHead className="whitespace-nowrap text-center" onClick={() => toggleSort("servicio")}><div className="flex items-center justify-center gap-1">Serv. {sortIcon("servicio")}</div></TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("factYTD")}>
-                <div className="flex items-center justify-end gap-1">Fact. Período {sortIcon("factYTD")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("factPrev")}>
-                <div className="flex items-center justify-end gap-1">Fact. LY {sortIcon("factPrev")}</div>
-              </TableHead>
-              <TableHead className="cursor-pointer whitespace-nowrap text-right" onClick={() => toggleSort("varPct")}>
-                <div className="flex items-center justify-end gap-1">%VAR {sortIcon("varPct")}</div>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {loading && (
-              <TableRow>
-                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
-                  Cargando...
-                </TableCell>
-              </TableRow>
-            )}
-
-            {!loading && ordenadas.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={12} className="h-20 text-center text-muted-foreground">
-                  Sin clientes que coincidan con los filtros.
-                </TableCell>
-              </TableRow>
-            )}
-
-            {!loading &&
-              ordenadas.map((r) => {
-                const pctClaas = r.cantTotal ? (r.cantClaas / r.cantTotal) * 100 : 0;
-                const pctHorsch = r.cantTotal ? (r.cantHorsch / r.cantTotal) * 100 : 0;
-
-                return (
-                  <TableRow
-                    key={r.cliente.id}
-                    className={cn("hover:bg-accent/40", onOpenCliente && "cursor-pointer")}
-                    onClick={() => onOpenCliente?.(r.cliente.id)}
-                  >
-                    <TableCell>
-                      <div className="font-medium">{r.cliente.nombre}</div>
-                      {r.sucursales.length > 0 && (
-                        <div className="text-[11px] text-muted-foreground">{r.sucursales.join(", ")}</div>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="min-w-[170px]">
-                      {r.contactoPrincipal?.telefono ? (
-                        <a
-  href={`tel:${r.contactoPrincipal.telefono}`}
-  onClick={(e) => e.stopPropagation()}
-  className="flex items-center gap-1 text-[13px] hover:text-primary whitespace-nowrap"
->
-  <Phone className="h-3 w-3 shrink-0" />
-  <span className="whitespace-nowrap">{r.contactoPrincipal.telefono}</span>
-</a>
-                      ) : (
-                        <span className="text-[12px] text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-center tabular-nums font-medium">{r.cantTotal}</TableCell>
-
-                    <TableCell className="text-center">
-                      {r.antiguedadProm != null ? (
-                        <Badge className={cn("min-w-[36px] justify-center tabular-nums", antiguedadColor(r.antiguedadProm))}>
-                          {r.antiguedadProm}
-                        </Badge>
-                      ) : (
-                        <span className="text-[12px] text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell>
-                      {r.cantTotal > 0 ? (
-                        <div className="flex items-center gap-1">
-                          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-                            {pctClaas > 0 && (
-  <div
-    style={{ width: `${pctClaas}%`, backgroundColor: "#9DBB00" }}
-    title={`CLAAS ${r.cantClaas}`}
-  />
-)}
-{pctHorsch > 0 && (
-  <div
-    style={{ width: `${pctHorsch}%`, backgroundColor: "#C8102E" }}
-    title={`HORSCH ${r.cantHorsch}`}
-  />
-)}
-                          </div>
-                          <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
-                            {r.cantClaas}/{r.cantHorsch}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[12px] text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right tabular-nums">
-                      {r.diasUltRepuesto != null ? (
-                        <span className="inline-flex items-center gap-1">
-                          {r.diasUltRepuesto > 365 && <Flag className="h-3 w-3 text-destructive" />}
-                          {r.diasUltRepuesto}d
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right tabular-nums">
-                      {r.diasUltServicio != null ? (
-                        <span className="inline-flex items-center gap-1">
-                          {r.diasUltServicio > 365 && <Flag className="h-3 w-3 text-destructive" />}
-                          {r.diasUltServicio}d
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      {r.tieneRepEnRango ? (
-                        <Check className="mx-auto h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <X className="mx-auto h-4 w-4 text-destructive" />
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      {r.tieneSrvEnRango ? (
-                        <Check className="mx-auto h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <X className="mx-auto h-4 w-4 text-destructive" />
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right tabular-nums">
-                      {r.factYTD > 0 ? `$${fmtMoney(r.factYTD)}` : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {r.factPrev > 0 ? `$${fmtMoney(r.factPrev)}` : "—"}
-                    </TableCell>
-
-                    <TableCell
-                      className={cn(
-                        "text-right tabular-nums font-medium",
-                        r.varPct != null && r.varPct >= 0 && "text-emerald-600",
-                        r.varPct != null && r.varPct < 0 && "text-destructive",
-                      )}
-                    >
-                      {r.varPct != null ? `${r.varPct > 0 ? "+" : ""}${r.varPct}%` : "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-          </TableBody>
-        </Table>
+      <div className="overflow-hidden rounded-md border bg-card">
+        <CompactListTable rows={ordenadas} id={r=>r.cliente.id} label="Clientes del parque" sort={{key:sortKey,direction:sortDir}} onSort={key=>toggleSort(key as SortKey)}
+          status={loading?"Cargando…":loadError?<span className="text-destructive">No se pudieron cargar los clientes.</span>:!ordenadas.length?"Sin clientes que coincidan con los filtros.":undefined}
+          onSelect={onOpenCliente?r=>onOpenCliente(r.cliente.id):undefined}
+          columns={["cliente","sucursal","telefono","cantTotal","antiguedadProm","marcas","diasUltRepuesto","diasUltServicio","repuesto","servicio","factYTD","factPrev","varPct"].map(key=>{
+            const column=sortColumns.find(c=>c.key===key)!;
+            const layout:Record<string,Pick<CompactListColumn<Row>,"width"|"hiddenBelow"|"label"|"align">>={
+              cliente:{width:"w-[35%] md:w-[25%] xl:w-[19%]",label:"Cliente"},
+              sucursal:{width:"w-[20%] md:w-[13%] xl:w-[8%]",label:"Sucursal"},
+              telefono:{width:"md:w-[17%] xl:w-[11%]",label:"Teléfono",hiddenBelow:"md"},
+              cantTotal:{width:"w-[10%] md:w-[6%] xl:w-[4%]",label:"Maq.",align:"center"},
+              antiguedadProm:{width:"xl:w-[5%]",label:"Antig.",align:"center",hiddenBelow:"xl"},
+              marcas:{width:"md:w-[12%] xl:w-[7%]",label:"Marcas",align:"right",hiddenBelow:"md"},
+              diasUltRepuesto:{width:"xl:w-[7%]",label:"Días rep.",align:"center",hiddenBelow:"xl"},
+              diasUltServicio:{width:"xl:w-[7%]",label:"Días serv.",align:"center",hiddenBelow:"xl"},
+              repuesto:{width:"xl:w-[3%]",label:"Rep.",align:"center",hiddenBelow:"xl"},
+              servicio:{width:"xl:w-[3%]",label:"Serv.",align:"center",hiddenBelow:"xl"},
+              factYTD:{width:"w-[35%] md:w-[17%] xl:w-[11%]",label:"Facturación",align:"right"},
+              factPrev:{width:"xl:w-[10%]",label:"Fact. LY",align:"right",hiddenBelow:"xl"},
+              varPct:{width:"md:w-[10%] xl:w-[5%]",label:"Var.",align:"right",hiddenBelow:"md"},
+            };
+            return {...column,...layout[key],title:(r:Row)=>{
+              if(key==="factYTD")return factLoading?"Cargando facturación…":factError??`$ ${fmtMoney(r.factYTD)}`;
+              if(key==="factPrev")return factLoading?"Cargando facturación…":factError??`$ ${fmtMoney(r.factPrev)}`;
+              if(key==="marcas")return `CLAAS: ${r.cantClaas} · HORSCH: ${r.cantHorsch} · Orden por participación CLAAS`;
+              return String(column.value(r)??"—");
+            },render:(r:Row)=>{
+              if(key==="cliente")return <CompactListInfo label={r.cliente.nombre} fields={[
+                ["Sucursal",r.sucursales.join(", ")||"—"],["Teléfono",r.contactoPrincipal?.telefono??"—"],["Máquinas",String(r.cantTotal)],
+                ["Antig. (años)",String(r.antiguedadProm??"—")],["CLAAS",String(r.cantClaas)],["HORSCH",String(r.cantHorsch)],
+                ["Días rep.",String(r.diasUltRepuesto??"—")],["Días serv.",String(r.diasUltServicio??"—")],
+                ["Repuestos",r.tieneRepEnRango?"Sí":"No"],["Servicios",r.tieneSrvEnRango?"Sí":"No"],
+                ["Facturación",factLoading?"Cargando…":factError??`$ ${fmtMoney(r.factYTD)}`],["Fact. LY",factLoading?"Cargando…":factError??`$ ${fmtMoney(r.factPrev)}`],
+                ["Variación",factLoading?"Cargando…":factError??(r.varPct==null?"—":`${r.varPct}%`)]
+              ]}>{onOpenCliente&&<Button size="sm" variant="outline" onClick={event=>{event.stopPropagation();onOpenCliente(r.cliente.id);}}>Ver cliente</Button>}</CompactListInfo>;
+              if(key==="telefono")return r.contactoPrincipal?.telefono?<a href={`tel:${r.contactoPrincipal.telefono}`} onClick={event=>event.stopPropagation()} className="inline-flex max-w-full items-center gap-1 hover:text-primary"><Phone className="h-3 w-3 shrink-0" /><span className="truncate">{r.contactoPrincipal.telefono}</span></a>:"—";
+              if(key==="antiguedadProm")return r.antiguedadProm!=null?<Badge className={cn("max-w-full whitespace-nowrap px-1.5 tabular-nums",antiguedadColor(r.antiguedadProm))}>{r.antiguedadProm}</Badge>:"—";
+              if(key==="marcas")return r.cantTotal?<span className="inline-flex max-w-full gap-1 tabular-nums"><span className="text-marca-claas">{Math.round(r.cantClaas/r.cantTotal*100)}%</span><span>/</span><span className="text-marca-horsch">{Math.round(r.cantHorsch/r.cantTotal*100)}%</span></span>:"—";
+              if(key==="diasUltRepuesto"||key==="diasUltServicio"){const value=r[key];return value!=null?<span className="inline-flex items-center gap-1">{value>365&&<Flag className="h-3 w-3 shrink-0 text-destructive" aria-label="Más de un año" />}{value}</span>:"—";}
+              if(key==="repuesto"||key==="servicio"){const value=key==="repuesto"?r.tieneRepEnRango:r.tieneSrvEnRango;return value?<Check className="mx-auto h-4 w-4 text-emerald-600" role="img" aria-label="Sí" />:<X className="mx-auto h-4 w-4 text-destructive" role="img" aria-label="No" />;}
+              if(key==="factYTD"||key==="factPrev")return factLoading?"…":factError?"—":r[key]!==0?`$ ${fmtMoney(r[key])}`:"—";
+              if(key==="varPct")return factLoading?"…":factError||r.varPct==null?"—":<span className={r.varPct>=0?"text-emerald-600":"text-destructive"}>{r.varPct>0?"+":""}{r.varPct}%</span>;
+              return String(column.value(r)??"—");
+            }};
+          })} />
       </div>
     </div>
   );

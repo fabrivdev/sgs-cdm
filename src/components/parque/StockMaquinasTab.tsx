@@ -1,15 +1,14 @@
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PackageOpen } from "lucide-react";
+import { AlertTriangle, PackageOpen } from "lucide-react";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 
@@ -99,11 +98,35 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
   const columns: SalesColumn<StockMaquina>[] = [
     { key: "sucursal", label: "Sucursal", kind: "text", value: r => r.sucursal ?? r.filial_original },
     ...(["deposito", "producto_codigo", "tipo", "marca", "modelo", "estado", "chasis"] as const).map((key, i) => ({ key, label: ["Depósito", "Producto", "Tipo", "Marca", "Modelo", "Condición", "Chasis"][i], kind: "text" as const, value: (r: StockMaquina) => r[key] })),
-    { key: "saldo", label: "Saldo", kind: "number", align: "right", value: r => Number(r.saldo_actual) },
+    { key: "saldo", label: "Saldo", kind: "number", align: "center", value: r => Number(r.saldo_actual) },
   ];
   const list = useSectionTable({ rows: filtered, columns, title: "Stock de máquinas", fileName: "stock-maquinas.xlsx", initialSort: { key: "marca", direction: "asc" }, disabled: loading || !!loadError });
   const lastImport = rows.reduce<string | null>((latest, row) => !latest || row.importado_en > latest ? row.importado_en : latest, null);
   const activeCount = (q ? 1 : 0) + (branch !== "all" ? 1 : 0) + (brand !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0) + (condition !== "all" ? 1 : 0);
+
+  const viewColumns: CompactListColumn<StockMaquina>[] = columns.map(column => {
+    const layout: Record<string, Pick<CompactListColumn<StockMaquina>, "width" | "hiddenBelow">> = {
+      sucursal: {width:"w-[18%] md:w-[12%] lg:w-[11%]"},
+      deposito: {width:"lg:w-[10%]",hiddenBelow:"lg"},
+      producto_codigo: {width:"md:w-[14%] lg:w-[12%]",hiddenBelow:"md"},
+      tipo: {width:"lg:w-[11%]",hiddenBelow:"lg"},
+      marca: {width:"w-[15%] md:w-[10%] lg:w-[8%]"},
+      modelo: {width:"w-[28%] md:w-[25%] lg:w-[18%]"},
+      estado: {width:"md:w-[12%] lg:w-[8%]",hiddenBelow:"md"},
+      chasis: {width:"w-[25%] md:w-[19%] lg:w-[16%]"},
+      saldo: {width:"w-[14%] md:w-[8%] lg:w-[6%]"},
+    };
+    return {...column,...layout[column.key], className:["producto_codigo","chasis"].includes(column.key)?"font-mono":undefined,
+      render:row=>{
+        const repeated = !!row.chasis && duplicateChassis.has(row.chasis.trim().toUpperCase());
+        if(column.key==="marca")return <MarcaBadge marca={row.marca} className="max-w-full whitespace-nowrap text-[10px]" />;
+        if(column.key==="modelo")return <CompactListInfo label={row.modelo??"—"} fields={columns.map(c=>[c.label,String(c.value(row)??"—")] as const).concat([["Chasis repetido",repeated?"Sí":"No"]])} />;
+        if(column.key==="estado")return <Badge variant="outline" className={cn("max-w-full whitespace-nowrap text-[10px]", row.estado==="Nuevo"?"border-emerald-200 bg-emerald-50 text-emerald-700":"border-amber-200 bg-amber-50 text-amber-700")}>{row.estado??"—"}</Badge>;
+        if(column.key==="chasis")return <span className="flex min-w-0 items-center gap-1"><span className="truncate">{row.chasis??"—"}</span>{repeated&&<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" role="img" aria-label="Chasis repetido" />}</span>;
+        if(column.key==="saldo")return Number(row.saldo_actual).toLocaleString("es-PY");
+        return String(column.value(row)??"—");
+      },title:row=>column.key==="chasis"&&row.chasis&&duplicateChassis.has(row.chasis.trim().toUpperCase())?`${row.chasis} · Este chasis aparece en más de una referencia del archivo`:String(column.value(row)??"—")};
+  });
 
   const clear = () => { setQ(""); setBranch("all"); setBrand("all"); setType("all"); setCondition("all"); };
 
@@ -125,39 +148,9 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
 
       </FiltersBar>
 
-      <div className="overflow-x-auto rounded-md border bg-card">
-        <Table>
-          <TableHeader><TableRow>
-            {columns.map(c => <TableHead key={c.key} className={c.align === "right" ? "text-right" : "text-left"} aria-sort={list.sort.key === c.key ? list.sort.direction === "asc" ? "ascending" : "descending" : "none"}>{list.heading(c.key)}</TableHead>)}
-          </TableRow></TableHeader>
-          <TableBody>
-            {loading && <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">Cargando stock…</TableCell></TableRow>}
-            {!loading && loadError && <TableRow><TableCell colSpan={9} className="h-24 text-center text-[13px] text-destructive">{loadError}</TableCell></TableRow>}
-            {!loading && !loadError && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="h-28 text-center"><PackageOpen className="mx-auto mb-2 h-6 w-6 text-muted-foreground" /><span className="text-[13px] text-muted-foreground">Sin máquinas en stock.</span></TableCell></TableRow>}
-            {!loading && !loadError && list.ordered.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="text-[12px]">{row.sucursal ?? row.filial_original ?? "—"}</TableCell>
-                <TableCell className="max-w-[180px] truncate text-[12px]" title={row.deposito ?? undefined}>{row.deposito ?? "—"}</TableCell>
-                <TableCell className="font-mono text-[12px]">{row.producto_codigo}</TableCell>
-                <TableCell className="text-[12px]">{row.tipo ?? "—"}</TableCell>
-                <TableCell><MarcaBadge marca={row.marca} className="text-[10px]" /></TableCell>
-                <TableCell className="min-w-[180px] text-[12px] font-medium">{row.modelo ?? "—"}</TableCell>
-                <TableCell><Badge variant="outline" className={cn("text-[10px]", row.estado === "Nuevo" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>{row.estado ?? "—"}</Badge></TableCell>
-                <TableCell className="font-mono text-[12px]">
-                  <div className="flex items-center gap-1.5">
-                    <span>{row.chasis ?? "—"}</span>
-                    {row.chasis && duplicateChassis.has(row.chasis.trim().toUpperCase()) && (
-                      <Badge variant="outline" className="border-amber-200 bg-amber-50 px-1.5 text-[9px] text-amber-700" title="Este chasis aparece en más de una referencia del archivo">
-                        Repetido
-                      </Badge>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">{Number(row.saldo_actual).toLocaleString("es-PY")}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="overflow-hidden rounded-md border bg-card">
+        <CompactListTable rows={list.ordered} columns={viewColumns} id={row=>row.id} label="Stock de máquinas" sort={list.sort} heading={list.heading}
+          status={loading?"Cargando stock…":loadError?<span className="text-destructive">{loadError}</span>:!filtered.length?<><PackageOpen className="mx-auto mb-2 h-6 w-6" />Sin máquinas en stock.</>:undefined} />
       </div>
     </div>
   );

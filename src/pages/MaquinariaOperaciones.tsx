@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
-import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
+import type { SalesColumn, SalesSort } from "@/components/ventas/salesTableInteraction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import {
   ResponsiveDrawer,
@@ -77,7 +77,7 @@ const formatMoney = (value: unknown, currency = "USD") => {
   const number = Number(value);
   if (value == null || value === "" || !Number.isFinite(number)) return "—";
   try {
-    return new Intl.NumberFormat("es-PY", { style: "currency", currency, maximumFractionDigits: currency === "PYG" ? 0 : 2 }).format(number);
+    return new Intl.NumberFormat("es-PY", { style: "currency", currency, currencyDisplay: "narrowSymbol", maximumFractionDigits: currency === "PYG" ? 0 : 2 }).format(number);
   } catch {
     return `${currency} ${number.toLocaleString("es-PY")}`;
   }
@@ -228,7 +228,7 @@ const availabilityClass = (state?: string | null) => cn(
 );
 
 function ImportSituationBadge({ row }: { row: ImportRow }) {
-  return <Badge variant="outline" className={availabilityClass(importSituationState(row))}>{importSituationLabel(row)}</Badge>;
+  return <Badge variant="outline" className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",availabilityClass(importSituationState(row)))}>{importSituationLabel(row)}</Badge>;
 }
 
 type OrderRow = {
@@ -923,14 +923,14 @@ export default function MaquinariaOperaciones() {
 
   type ListRow = OrderRow | ImportRow;
   const columns: SalesColumn<ListRow>[] = importsView ? [
-    { key: "llave", label: "Llave interna", kind: "text", value: r => (r as ImportRow).llave_interna },
+    { key: "llave", label: "Llave", kind: "text", value: r => (r as ImportRow).llave_interna },
     { key: "oc", label: "OC", kind: "text", value: r => (r as ImportRow).oc },
     { key: "marca", label: "Marca", kind: "text", value: r => visibleMachineBrand(r.marca || (r as ImportRow).proveedor) },
     { key: "producto", label: "Máquina", kind: "text", value: r => r.producto },
     { key: "modelo", label: "Modelo", kind: "text", value: r => r.modelo },
     { key: "unidad", label: "Unidad", kind: "text", align: "center", value: r => `${(r as ImportRow).numero_unidad}/${(r as ImportRow).cantidad_lote}` },
-    { key: "fecha", label: "Fecha pedido", kind: "date", value: r => (r as ImportRow).fecha_pedido?.slice(0, 10) },
-    { key: "eta", label: "Embarque (est.)", kind: "date", value: r => (r as ImportRow).eta?.slice(0, 10) },
+    { key: "fecha", label: "Pedido", kind: "date", value: r => (r as ImportRow).fecha_pedido?.slice(0, 10) },
+    { key: "eta", label: "Embarque", kind: "date", value: r => (r as ImportRow).eta?.slice(0, 10) },
     { key: "ata", label: "Arribo", kind: "date", value: r => (r as ImportRow).ata?.slice(0, 10) },
     { key: "llegada", label: "Llegada", kind: "text", value: r => ARRIVAL_LABEL[arrivalState(r as ImportRow)] },
     { key: "situacion", label: "Situación", kind: "text", value: r => importSituationLabel(r as ImportRow) },
@@ -1045,49 +1045,11 @@ export default function MaquinariaOperaciones() {
     <Panel className="p-0">
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :
       <>
-        <div className="hidden overflow-x-auto md:block">
-          {importsView ? <ImportsTable rows={list.ordered as ImportRow[]} heading={list.heading} onSelect={setSelectedImport} /> : <OrdersTable rows={list.ordered as OrderRow[]} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
+        <div className="overflow-hidden">
+          {operationsQuery.isLoading ? <div className="p-8 text-center text-[13px] text-muted-foreground">Cargando…</div> :
+            importsView ? <ImportsTable rows={list.ordered as ImportRow[]} sort={list.sort} heading={list.heading} onSelect={setSelectedImport} /> :
+              <OrdersTable rows={list.ordered as OrderRow[]} sort={list.sort} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
         </div>
-        <div className="space-y-2 p-3 md:hidden">{list.ordered.map((row) => {
-          if (importsView) {
-            const importRow = row as ImportRow;
-            const arrival = arrivalState(importRow);
-            return <button type="button" key={row.id} onClick={() => setSelectedImport(importRow)} className="w-full rounded-xl border bg-card p-3 text-left">
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-mono text-[12px] font-semibold">{importRow.llave_interna || (importRow.oc ? `OC ${importRow.oc}` : "Sin llave interna")}</span>
-                <Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge>
-              </div>
-              <div className="mt-2 text-[13px] font-medium">{row.producto || row.modelo || "Sin descripción"}</div>
-              <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{row.modelo && row.modelo !== row.producto ? row.modelo : ""}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" style={machineBrandStyle(importRow.marca || importRow.proveedor)} className={cn("text-[10px]", brandClass(importRow.marca || importRow.proveedor))}>{visibleMachineBrand(importRow.marca || importRow.proveedor)}</Badge>
-                <Badge variant="outline" className="text-[10px]">Unidad {importRow.numero_unidad}/{Math.max(1, Number(importRow.cantidad_lote) || 1)}</Badge>
-                <ImportSituationBadge row={importRow} />
-              </div>
-              <div className="mt-2 font-mono text-[10px] text-muted-foreground">{row.chasis || "Sin chasis"}</div>
-            </button>;
-          }
-          const orderRow = row as OrderRow;
-          const orderUnit = entregaByUnitId?.get(orderRow.id);
-          const state = orderBillingState(orderRow, orderUnit?.estado);
-          const entregaState = entregaStateFromUnit(orderUnit?.estado, orderUnit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet, orderRow.es_historico);
-          return <button type="button" key={row.id} onClick={() => setSelected(orderRow.operacion_id)} className="w-full rounded-xl border bg-card p-3 text-left">
-            <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-[12px] font-semibold">{formatNpCode(row.np_numero)}</span>
-              <div className="flex flex-col items-end gap-1">
-                <Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge>
-                {entregaState && <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge>}
-              </div>
-            </div>
-            <div className="mt-2 text-[13px] font-medium">{row.modelo || row.producto || "Sin descripción"}</div>
-            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{orderRow.cliente_nombre || "Sin cliente"}</div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge>
-              {orderRow.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(orderRow.condicion))}>{CONDITION_LABEL[orderRow.condicion] ?? orderRow.condicion}</Badge>}
-              <span className="ml-auto text-[11px] font-medium tabular-nums">{formatMoney(orderRow.valor_venta, orderRow.moneda_valor || "USD")}</span>
-            </div>
-          </button>;
-        })}</div>
         {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "líneas"} con estos filtros.</div>}
       </>}
     </Panel>
@@ -1112,78 +1074,80 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-function OrdersTable({ rows, heading, onSelect, entregaByUnitId, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
-  return <Table className="text-[12px]">
-    <TableHeader><TableRow>
-      <TableHead>{heading("np")}</TableHead>
-      <TableHead>{heading("fecha")}</TableHead>
-      <TableHead>{heading("cliente")}</TableHead>
-      <TableHead>{heading("modelo")}</TableHead>
-      <TableHead>{heading("marca")}</TableHead>
-      <TableHead>{heading("condicion")}</TableHead>
-      <TableHead>{heading("origen")}</TableHead>
-      <TableHead>{heading("facturacion")}</TableHead>
-      <TableHead>{heading("entrega")}</TableHead>
-      <TableHead className="text-right">{heading("valor")}</TableHead>
-      <TableHead className="w-[40px]" />
-    </TableRow></TableHeader>
-    <TableBody>{rows.map((row) => {
-      const unit = entregaByUnitId?.get(row.id);
-      const state = orderBillingState(row, unit?.estado);
-      const entregaState = entregaStateFromUnit(unit?.estado, unit?.chasis, row.marca, estadoByOperacionId?.get(row.operacion_id), stockChasisSet, row.es_historico);
-      return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
-        <TableCell className="font-mono font-medium">{formatNpCode(row.np_numero)}</TableCell>
-        <TableCell className="whitespace-nowrap">{formatDate(row.np_fecha)}</TableCell>
-        <TableCell className="max-w-[220px] truncate">{row.cliente_nombre}</TableCell>
-        <TableCell className="max-w-[220px] truncate">{row.modelo || row.producto || "—"}</TableCell>
-        <TableCell><Badge variant="outline" style={machineBrandStyle(row.marca)} className={cn("text-[10px]", brandClass(row.marca))}>{visibleMachineBrand(row.marca)}</Badge></TableCell>
-        <TableCell>{row.condicion && <Badge variant="outline" className={cn("text-[10px]", conditionClass(row.condicion))}>{CONDITION_LABEL[row.condicion] ?? row.condicion}</Badge>}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", supplyClass(row.abastecimiento))}>{SUPPLY_LABEL[row.abastecimiento ?? ""] ?? "Sin definir"}</Badge></TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(state))}>{SIMPLE_STATE_LABEL[state]}</Badge></TableCell>
-        <TableCell>{entregaState ? <Badge variant="outline" className={cn("text-[10px]", entregaClass(entregaState))}>{ENTREGA_LABEL[entregaState]}</Badge> : <span className="text-muted-foreground">—</span>}</TableCell>
-        <TableCell className="text-right tabular-nums">{formatMoney(row.valor_venta, row.moneda_valor || "USD")}</TableCell>
-        <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
-      </TableRow>;
-    })}</TableBody>
-  </Table>;
+export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
+  const billing=(row:OrderRow)=>orderBillingState(row,entregaByUnitId?.get(row.id)?.estado);
+  const delivery=(row:OrderRow)=>{const unit=entregaByUnitId?.get(row.id);return entregaStateFromUnit(unit?.estado,unit?.chasis,row.marca,estadoByOperacionId?.get(row.operacion_id),stockChasisSet,row.es_historico);};
+  const schema: {key:string;label:string;width:string;hiddenBelow?:"md"|"lg"}[]=[
+    {key:"np",label:"NP",width:"w-[20%] md:w-[9%] lg:w-[8%]"},
+    {key:"fecha",label:"Fecha",width:"lg:w-[8%]",hiddenBelow:"lg"},
+    {key:"cliente",label:"Cliente",width:"md:w-[18%] lg:w-[16%]",hiddenBelow:"md"},
+    {key:"modelo",label:"Máquina",width:"w-[30%] md:w-[22%] lg:w-[17%]"},
+    {key:"marca",label:"Marca",width:"md:w-[8%] lg:w-[7%]",hiddenBelow:"md"},
+    {key:"condicion",label:"Condición",width:"lg:w-[6%]",hiddenBelow:"lg"},
+    {key:"origen",label:"Origen",width:"lg:w-[7%]",hiddenBelow:"lg"},
+    {key:"facturacion",label:"Facturación",width:"md:w-[13%] lg:w-[8%]",hiddenBelow:"md"},
+    {key:"entrega",label:"Entrega",width:"md:w-[12%] lg:w-[8%]",hiddenBelow:"md"},
+    {key:"valor",label:"Valor",width:"w-[40%] md:w-[14%] lg:w-[12%]"},
+  ];
+  const value=(key:string,row:OrderRow)=>{
+    if(key==="np")return formatNpCode(row.np_numero);
+    if(key==="fecha")return formatDate(row.np_fecha);
+    if(key==="cliente")return row.cliente_nombre;
+    if(key==="modelo")return row.modelo||row.producto||"—";
+    if(key==="marca")return visibleMachineBrand(row.marca);
+    if(key==="condicion")return CONDITION_LABEL[row.condicion??""]??row.condicion??"—";
+    if(key==="origen")return SUPPLY_LABEL[row.abastecimiento??""]??"Sin definir";
+    if(key==="facturacion")return SIMPLE_STATE_LABEL[billing(row)];
+    if(key==="entrega"){const state=delivery(row);return state?ENTREGA_LABEL[state]:"—";}
+    return formatMoney(row.valor_venta,row.moneda_valor||"USD");
+  };
+  const columns:CompactListColumn<OrderRow>[]=schema.map(column=>({...column,kind:column.key==="valor"?"number":"text",align:column.key==="valor"?"right":"left",value:r=>value(column.key,r),className:column.key==="np"?"font-mono font-medium":undefined,render:r=>{
+    const text=value(column.key,r);
+    const deliveryState=delivery(r);
+    const style=column.key==="marca"?brandClass(r.marca):column.key==="condicion"?conditionClass(r.condicion):column.key==="origen"?supplyClass(r.abastecimiento):column.key==="facturacion"?simpleStateClass(billing(r)):column.key==="entrega"&&deliveryState?entregaClass(deliveryState):"";
+    return ["marca","condicion","origen","facturacion","entrega"].includes(column.key)&&text!=="—"?<Badge variant="outline" style={column.key==="marca"?machineBrandStyle(r.marca):undefined} className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",style)}>{text}</Badge>:text;
+  }}));
+  return <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Operaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
+    actions={{width:"w-[10%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-7 w-7 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} />;
 }
 
-export function ImportsTable({ rows, heading, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; onSelect: (row: ImportRow) => void }) {
-  return <Table className="text-[12px]">
-    <TableHeader><TableRow>
-      <TableHead>{heading("llave")}</TableHead>
-      <TableHead>{heading("oc")}</TableHead>
-      <TableHead>{heading("marca")}</TableHead>
-      <TableHead>{heading("producto")}</TableHead>
-      <TableHead>{heading("modelo")}</TableHead>
-      <TableHead>{heading("unidad")}</TableHead>
-      <TableHead>{heading("fecha")}</TableHead>
-      <TableHead>{heading("eta")}</TableHead>
-      <TableHead>{heading("ata")}</TableHead>
-      <TableHead>{heading("llegada")}</TableHead>
-      <TableHead>{heading("situacion")}</TableHead>
-      <TableHead>{heading("chasis")}</TableHead>
-      <TableHead className="w-[40px]" />
-    </TableRow></TableHeader>
-    <TableBody>{rows.map((row) => {
-      const arrival = arrivalState(row);
-      return <TableRow key={row.id} className="cursor-pointer" onClick={() => onSelect(row)}>
-        <TableCell className="font-mono font-semibold">{row.llave_interna || "—"}</TableCell>
-        <TableCell className="font-mono font-medium">{row.oc || "—"}</TableCell>
-        <TableCell><Badge variant="outline" style={machineBrandStyle(row.marca || row.proveedor)} className={cn("text-[10px]", brandClass(row.marca || row.proveedor))}>{visibleMachineBrand(row.marca || row.proveedor)}</Badge></TableCell>
-        <TableCell className="max-w-[200px] truncate">{row.producto || "—"}</TableCell>
-        <TableCell className="max-w-[200px] truncate font-medium">{row.modelo || "—"}</TableCell>
-        <TableCell className="whitespace-nowrap tabular-nums">{row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</TableCell>
-        <TableCell className="whitespace-nowrap">{formatDate(row.fecha_pedido)}</TableCell>
-        <TableCell className="whitespace-nowrap">{formatDate(row.eta)}</TableCell>
-        <TableCell className="whitespace-nowrap">{formatDate(row.ata)}</TableCell>
-        <TableCell><Badge variant="outline" className={cn("text-[10px]", arrivalClass(arrival))}>{ARRIVAL_LABEL[arrival]}</Badge></TableCell>
-        <TableCell><ImportSituationBadge row={row} /></TableCell>
-        <TableCell className="font-mono text-[11px]">{row.chasis || "Sin chasis"}</TableCell>
-        <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
-      </TableRow>;
-    })}</TableBody>
-  </Table>;
+export function ImportsTable({ rows, heading, sort, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: ImportRow) => void }) {
+  const schema:{key:string;label:string;width:string;hiddenBelow?:"md"|"lg"}[]=[
+    {key:"llave",label:"Llave",width:"w-[25%] md:w-[11%] lg:w-[8%]"},
+    {key:"oc",label:"OC",width:"lg:w-[6%]",hiddenBelow:"lg"},
+    {key:"marca",label:"Marca",width:"md:w-[8%] lg:w-[6%]",hiddenBelow:"md"},
+    {key:"producto",label:"Tipo",width:"lg:w-[10%]",hiddenBelow:"lg"},
+    {key:"modelo",label:"Modelo",width:"w-[40%] md:w-[20%] lg:w-[12%]"},
+    {key:"unidad",label:"Unidad",width:"md:w-[6%] lg:w-[4%]",hiddenBelow:"md"},
+    {key:"fecha",label:"Pedido",width:"lg:w-[8%]",hiddenBelow:"lg"},
+    {key:"eta",label:"Embarque",width:"md:w-[13%] lg:w-[8%]",hiddenBelow:"md"},
+    {key:"ata",label:"Arribo",width:"lg:w-[8%]",hiddenBelow:"lg"},
+    {key:"llegada",label:"Llegada",width:"w-[25%] md:w-[12%] lg:w-[8%]"},
+    {key:"situacion",label:"Situación",width:"md:w-[12%] lg:w-[9%]",hiddenBelow:"md"},
+    {key:"chasis",label:"Chasis",width:"md:w-[14%] lg:w-[10%]",hiddenBelow:"md"},
+  ];
+  const value=(key:string,row:ImportRow)=>{
+    if(key==="llave")return row.llave_interna||"—";
+    if(key==="oc")return row.oc||"—";
+    if(key==="marca")return visibleMachineBrand(row.marca||row.proveedor);
+    if(key==="producto")return row.producto||"—";
+    if(key==="modelo")return row.modelo||"—";
+    if(key==="unidad")return `${row.numero_unidad}/${Math.max(1,Number(row.cantidad_lote)||1)}`;
+    if(key==="fecha")return formatDate(row.fecha_pedido);
+    if(key==="eta")return formatDate(row.eta);
+    if(key==="ata")return formatDate(row.ata);
+    if(key==="llegada")return ARRIVAL_LABEL[arrivalState(row)];
+    if(key==="situacion")return importSituationLabel(row);
+    return row.chasis||"Sin chasis";
+  };
+  const columns:CompactListColumn<ImportRow>[]=schema.map(column=>({...column,kind:"text",align:column.key==="unidad"?"center":"left",value:r=>value(column.key,r),className:["llave","oc","chasis"].includes(column.key)?"font-mono":column.key==="modelo"?"font-medium":undefined,title:r=>column.key==="eta"?`Embarque estimado: ${formatDate(r.eta)}`:value(column.key,r),render:r=>{
+    if(column.key==="marca")return <Badge variant="outline" style={machineBrandStyle(r.marca||r.proveedor)} className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",brandClass(r.marca||r.proveedor))}>{visibleMachineBrand(r.marca||r.proveedor)}</Badge>;
+    if(column.key==="llegada")return <Badge variant="outline" className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",arrivalClass(arrivalState(r)))}>{ARRIVAL_LABEL[arrivalState(r)]}</Badge>;
+    if(column.key==="situacion")return <ImportSituationBadge row={r} />;
+    return value(column.key,r);
+  }}));
+  return <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Importaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
+    actions={{width:"w-[10%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver importación ${r.llave_interna||r.oc||r.id}`} title="Ver importación" className="flex h-7 w-7 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} />;
 }
 
 /** Adjunta un documento comercial con un tipo explicito a un pedido. */
