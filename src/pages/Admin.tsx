@@ -33,6 +33,9 @@ import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMon
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 import { FiltersBar } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { createAdminPerson } from "@/lib/admin-create-person";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Profile {
   id: string;
@@ -107,6 +110,7 @@ function ModuloChips({
 }
 
 export default function Admin() {
+  const queryClient = useQueryClient();
   const { can, isSuperAdmin, hasSectionAccess } = useAuth();
   const canManageAdmin = can("administracion:gestionar");
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -125,6 +129,7 @@ export default function Admin() {
   const [nuRol, setNuRol] = useState<AssignableRole>("operativo");
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createWithAccess, setCreateWithAccess] = useState(false);
 
   const [credUser, setCredUser] = useState<Profile | null>(null);
   const [credEmail, setCredEmail] = useState("");
@@ -328,29 +333,25 @@ export default function Admin() {
     }
   };
 
-  const crearUsuario = async () => {
-    if (!email.trim() || !password.trim() || !nombre.trim()) {
-      toast.error("Email, contraseña y nombre son obligatorios");
-      return;
-    }
-
+  const crearUsuario = async (conAcceso: boolean) => {
+    if (busy || !canManageAdmin) return;
     setBusy(true);
-    const { data, error } = await supabase.functions.invoke("admin-create-user", {
-      body: { email: email.trim(), password, nombre: nombre.trim(), sucursal: nuSucursal, role: nuRol },
-    });
-    setBusy(false);
-
-    if (error || data?.error) {
-      toast.error(error?.message || data?.error);
-      return;
+    try {
+      await createAdminPerson({ nombre, sucursal: nuSucursal, conAcceso, email, password, role: conAcceso ? nuRol : "operativo" });
+      void queryClient.invalidateQueries({ queryKey: ["servicios", "tecnicos-activos"] });
+      toast.success(conAcceso ? "Usuario creado" : "Operativo de Servicios creado");
+      setEmail("");
+      setPassword("");
+      setNombre("");
+      setNuRol("operativo");
+      setCreateWithAccess(false);
+      setCreateOpen(false);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear la persona");
+    } finally {
+      setBusy(false);
     }
-
-    toast.success("Usuario creado");
-    setEmail("");
-    setPassword("");
-    setNombre("");
-    setCreateOpen(false);
-    load();
   };
 
   const updateProfileActive = async (id: string, activo: boolean) => {
@@ -729,7 +730,7 @@ export default function Admin() {
                   </Select>
                 </div>
               </div>
-              <Button className="mt-3" onClick={crearUsuario} disabled={busy}>{busy ? "Creando..." : "Crear acceso"}</Button>
+              <Button className="mt-3" onClick={() => crearUsuario(true)} disabled={busy}>{busy ? "Creando..." : "Crear acceso"}</Button>
             </Card>
           )}
 
@@ -883,47 +884,55 @@ export default function Admin() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={createOpen} onOpenChange={(open) => { if (!busy) setCreateOpen(open); }}>
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>Nuevo usuario</DialogTitle>
+            <DialogTitle>{createWithAccess ? "Nuevo usuario" : "Nuevo operativo de Servicios"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-[12px]">Nombre y apellido</Label>
-              <Input value={nombre} onChange={(event) => setNombre(event.target.value)} autoFocus />
+              <Label htmlFor="new-person-name" className="text-[12px]">Nombre y apellido</Label>
+              <Input id="new-person-name" value={nombre} onChange={(event) => setNombre(event.target.value)} disabled={busy} autoFocus />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-[12px]">Email</Label>
-              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            <div className="flex items-center justify-between sm:col-span-2">
+              <Label htmlFor="new-person-access" className="text-[12px]">Acceso al sistema</Label>
+              <Switch id="new-person-access" checked={createWithAccess} onCheckedChange={setCreateWithAccess} disabled={busy} />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-[12px]">Contraseña inicial</Label>
-              <div className="relative">
-                <Input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} className="pr-9" />
-                <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            {createWithAccess && (
+              <>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="new-person-email" className="text-[12px]">Email</Label>
+                  <Input id="new-person-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="new-person-password" className="text-[12px]">Contraseña inicial</Label>
+                  <div className="relative">
+                    <Input id="new-person-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} className="pr-9" />
+                    <button type="button" disabled={busy} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
-              <Label className="text-[12px]">Sucursal</Label>
-              <Select value={nuSucursal} onValueChange={(value) => setNuSucursal(value as Sucursal)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label htmlFor="new-person-branch" className="text-[12px]">Sucursal</Label>
+              <Select value={nuSucursal} onValueChange={(value) => setNuSucursal(value as Sucursal)} disabled={busy}>
+                <SelectTrigger id="new-person-branch"><SelectValue /></SelectTrigger>
                 <SelectContent>{SUCURSALES.map((sucursal) => <SelectItem key={sucursal} value={sucursal}>{sucursal}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[12px]">Nivel</Label>
-              <Select value={nuRol} onValueChange={(value) => setNuRol(value as AssignableRole)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label htmlFor="new-person-level" className="text-[12px]">Nivel</Label>
+              <Select value={createWithAccess ? nuRol : "operativo"} onValueChange={(value) => setNuRol(value as AssignableRole)} disabled={busy || !createWithAccess}>
+                <SelectTrigger id="new-person-level"><SelectValue /></SelectTrigger>
                 <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-            <Button onClick={crearUsuario} disabled={busy}>{busy ? "Creando…" : "Crear usuario"}</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={busy}>Cancelar</Button>
+            <Button onClick={() => crearUsuario(createWithAccess)} disabled={busy}>{busy ? "Creando…" : createWithAccess ? "Crear usuario" : "Crear operativo"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
