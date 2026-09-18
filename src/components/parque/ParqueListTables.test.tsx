@@ -78,21 +78,35 @@ describe("Parque and imports compact lists",()=>{
     await waitFor(()=>expect(screen.queryByText("000999")).not.toBeInTheDocument());await exportTable("Exportar máquinas");
     expect(mocks.json.mock.calls[0][0]).toHaveLength(1);expect(mocks.json.mock.calls[0][0][0]).toMatchObject({Serie:"000123456789",Vendedor:"VENDEDOR COMPLETO",Sucursal:"Santa Rita",Año:2020});
   });
-  it("clients separates branch, preserves negative billing and accessible context",async()=>{
+  it("clients keeps branch and activity in context without crowding visible headings",async()=>{
     const open=vi.fn();setup(<ParqueTab onOpenCliente={open}/>);await screen.findByRole("button",{name:"Detalle CLIENTE CON NOMBRE MUY LARGO"});
     await waitFor(()=>expect(screen.queryByText("cargando facturación...")).not.toBeInTheDocument());
     const table=screen.getByRole("table",{name:"Clientes del parque"});const row=within(table).getAllByRole("row")[1];const cells=within(row).getAllByRole("cell");
-    expect(cells[0]).not.toHaveTextContent("Santa Rita");expect(cells[1]).toHaveTextContent("Santa Rita");expect(cells[3]).toHaveClass("text-center");expect(cells[6]).not.toHaveTextContent(/\d+d/);
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(10);
+    expect(within(table).queryByRole("columnheader",{name:/Sucursal|^Rep\.|^Serv\./})).not.toBeInTheDocument();
+    expect(cells[0]).not.toHaveTextContent("Santa Rita");expect(cells[2]).toHaveClass("text-center");expect(cells[5]).not.toHaveTextContent(/\d+d/);
     expect(within(table).getAllByRole("row")[2]).toHaveTextContent("$ -10");
     fireEvent.click(screen.getByRole("button",{name:"Detalle CLIENTE CON NOMBRE MUY LARGO"}));
-    const context=await screen.findByRole("dialog",{name:"Detalle CLIENTE CON NOMBRE MUY LARGO"});expect(context).toHaveTextContent("000123456");fireEvent.click(context);expect(open).not.toHaveBeenCalled();fireEvent.click(screen.getByRole("button",{name:"Ver cliente"}));expect(open).toHaveBeenCalledWith("C1");
+    const context=await screen.findByRole("dialog",{name:"Detalle CLIENTE CON NOMBRE MUY LARGO"});expect(context).toHaveTextContent("000123456");expect(context).toHaveTextContent("Santa Rita");expect(context).toHaveTextContent("RepuestosSí");expect(context).toHaveTextContent("ServiciosSí");fireEvent.click(context);expect(open).not.toHaveBeenCalled();fireEvent.click(screen.getByRole("button",{name:"Ver cliente"}));expect(open).toHaveBeenCalledWith("C1");
   });
   it("client export retains original cents and filtering despite compact columns",async()=>{
     setup(<ParqueTab/>);await screen.findByRole("button",{name:"Detalle CLIENTE CON NOMBRE MUY LARGO"});
     await waitFor(()=>expect(screen.queryByText("cargando facturación...")).not.toBeInTheDocument());
     fireEvent.change(screen.getAllByRole("searchbox",{name:"Buscar"})[0],{target:{value:"CLIENTE CON NOMBRE"}});
     await waitFor(()=>expect(screen.queryByRole("button",{name:"Detalle OTRO CLIENTE"})).not.toBeInTheDocument());
-    await exportTable("Exportar clientes");expect(mocks.json.mock.calls[0][0]).toHaveLength(1);expect(mocks.json.mock.calls[0][0][0]).toMatchObject({"Fact. YTD":125.55,Teléfono:"000123456",Sucursal:"Santa Rita"});
+    await exportTable("Exportar clientes");expect(mocks.json.mock.calls[0][0]).toHaveLength(1);expect(mocks.json.mock.calls[0][0][0]).toMatchObject({"Fact. YTD":125.55,Teléfono:"000123456",Sucursal:"Santa Rita",Repuesto:"Sí",Servicio:"Sí"});
+  });
+  it("client machine sorting still works both ways and exports every branch",async()=>{
+    mocks.tables.parque_maquinas.push({...machine,id:"M3",sucursal:"Santa Rosa",serie:"000333"});
+    setup(<ParqueTab/>);await screen.findByRole("button",{name:"Detalle CLIENTE CON NOMBRE MUY LARGO"});
+    const table=screen.getByRole("table",{name:"Clientes del parque"});
+    const sort=within(table).getByRole("button",{name:/Ordenar Maq\.:/});
+    fireEvent.click(sort);expect(sort.closest("th")).toHaveAttribute("aria-sort","ascending");
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("OTRO CLIENTE");
+    fireEvent.click(sort);expect(sort.closest("th")).toHaveAttribute("aria-sort","descending");
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("CLIENTE CON NOMBRE MUY LARGO");
+    await exportTable("Exportar clientes");expect(mocks.json.mock.calls[0][0]).toHaveLength(2);
+    expect(mocks.json.mock.calls[0][0][0]).toMatchObject({Sucursal:"Santa Rita, Santa Rosa",Maquinarias:2});
   });
   it("permission changes do not grant export or transfers",async()=>{
     mocks.can.mockReturnValue(false);setup(<MaquinasTab/>);await screen.findByText("000123456789");expect(screen.queryByRole("button",{name:/Transferir/})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();

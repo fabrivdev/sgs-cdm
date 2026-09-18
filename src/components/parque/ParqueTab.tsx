@@ -12,11 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   CalendarIcon,
-  Check,
   Flag,
   Phone,
   RefreshCw,
-  X,
 } from "lucide-react";
 import { SUCURSALES, MARCAS, type Marca, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
@@ -778,22 +776,19 @@ export function ParqueTab({
         <CompactListTable rows={ordenadas} id={r=>r.cliente.id} label="Clientes del parque" sort={{key:sortKey,direction:sortDir}} onSort={key=>toggleSort(key as SortKey)}
           status={loading?"Cargando…":loadError?<span className="text-destructive">No se pudieron cargar los clientes.</span>:!ordenadas.length?"Sin clientes que coincidan con los filtros.":undefined}
           onSelect={onOpenCliente?r=>onOpenCliente(r.cliente.id):undefined}
-          columns={["cliente","sucursal","telefono","cantTotal","antiguedadProm","marcas","diasUltRepuesto","diasUltServicio","repuesto","servicio","factYTD","factPrev","varPct"].map(key=>{
+          columns={["cliente","telefono","cantTotal","antiguedadProm","marcas","diasUltRepuesto","diasUltServicio","factYTD","factPrev","varPct"].map(key=>{
             const column=sortColumns.find(c=>c.key===key)!;
             const layout:Record<string,Pick<CompactListColumn<Row>,"width"|"hiddenBelow"|"label"|"align">>={
-              cliente:{width:"w-[35%] md:w-[25%] xl:w-[19%]",label:"Cliente"},
-              sucursal:{width:"w-[20%] md:w-[13%] xl:w-[8%]",label:"Sucursal"},
-              telefono:{width:"md:w-[17%] xl:w-[11%]",label:"Teléfono",hiddenBelow:"md"},
-              cantTotal:{width:"w-[10%] md:w-[6%] xl:w-[4%]",label:"Maq.",align:"center"},
-              antiguedadProm:{width:"xl:w-[5%]",label:"Antig.",align:"center",hiddenBelow:"xl"},
-              marcas:{width:"md:w-[12%] xl:w-[7%]",label:"Marcas",align:"right",hiddenBelow:"md"},
-              diasUltRepuesto:{width:"xl:w-[7%]",label:"Días rep.",align:"center",hiddenBelow:"xl"},
-              diasUltServicio:{width:"xl:w-[7%]",label:"Días serv.",align:"center",hiddenBelow:"xl"},
-              repuesto:{width:"xl:w-[3%]",label:"Rep.",align:"center",hiddenBelow:"xl"},
-              servicio:{width:"xl:w-[3%]",label:"Serv.",align:"center",hiddenBelow:"xl"},
-              factYTD:{width:"w-[35%] md:w-[17%] xl:w-[11%]",label:"Facturación",align:"right"},
-              factPrev:{width:"xl:w-[10%]",label:"Fact. LY",align:"right",hiddenBelow:"xl"},
-              varPct:{width:"md:w-[10%] xl:w-[5%]",label:"Var.",align:"right",hiddenBelow:"md"},
+              cliente:{width:"w-[42%] md:w-[25%] xl:w-[19%]",label:"Cliente"},
+              telefono:{width:"md:w-[22%] xl:w-[13%]",label:"Teléfono",hiddenBelow:"md"},
+              cantTotal:{width:"w-[20%] md:w-[10%] xl:w-[6%]",label:"Maq.",align:"center"},
+              antiguedadProm:{width:"xl:w-[6%]",label:"Antig.",align:"center",hiddenBelow:"xl"},
+              marcas:{width:"md:w-[15%] xl:w-[10%]",label:"Marcas",align:"right",hiddenBelow:"md"},
+              diasUltRepuesto:{width:"xl:w-[8%]",label:"Días rep.",align:"center",hiddenBelow:"xl"},
+              diasUltServicio:{width:"xl:w-[9%]",label:"Días serv.",align:"center",hiddenBelow:"xl"},
+              factYTD:{width:"w-[38%] md:w-[18%] xl:w-[11%]",label:"Facturación",align:"right"},
+              factPrev:{width:"xl:w-[11%]",label:"Fact. LY",align:"right",hiddenBelow:"xl"},
+              varPct:{width:"md:w-[10%] xl:w-[7%]",label:"Var.",align:"right",hiddenBelow:"md"},
             };
             return {...column,...layout[key],title:(r:Row)=>{
               if(key==="factYTD")return factLoading?"Cargando facturación…":factError??`$ ${fmtMoney(r.factYTD)}`;
@@ -813,7 +808,6 @@ export function ParqueTab({
               if(key==="antiguedadProm")return r.antiguedadProm!=null?<Badge className={cn("max-w-full whitespace-nowrap px-1.5 tabular-nums",antiguedadColor(r.antiguedadProm))}>{r.antiguedadProm}</Badge>:"—";
               if(key==="marcas")return r.cantTotal?<span className="inline-flex max-w-full gap-1 tabular-nums"><span className="text-marca-claas">{Math.round(r.cantClaas/r.cantTotal*100)}%</span><span>/</span><span className="text-marca-horsch">{Math.round(r.cantHorsch/r.cantTotal*100)}%</span></span>:"—";
               if(key==="diasUltRepuesto"||key==="diasUltServicio"){const value=r[key];return value!=null?<span className="inline-flex items-center gap-1">{value>365&&<Flag className="h-3 w-3 shrink-0 text-destructive" aria-label="Más de un año" />}{value}</span>:"—";}
-              if(key==="repuesto"||key==="servicio"){const value=key==="repuesto"?r.tieneRepEnRango:r.tieneSrvEnRango;return value?<Check className="mx-auto h-4 w-4 text-emerald-600" role="img" aria-label="Sí" />:<X className="mx-auto h-4 w-4 text-destructive" role="img" aria-label="No" />;}
               if(key==="factYTD"||key==="factPrev")return factLoading?"…":factError?"—":r[key]!==0?`$ ${fmtMoney(r[key])}`:"—";
               if(key==="varPct")return factLoading?"…":factError||r.varPct==null?"—":<span className={r.varPct>=0?"text-emerald-600":"text-destructive"}>{r.varPct>0?"+":""}{r.varPct}%</span>;
               return String(column.value(r)??"—");
