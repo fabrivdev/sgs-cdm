@@ -42,9 +42,9 @@ try {
       creado_en timestamptz DEFAULT now(),actualizado_en timestamptz DEFAULT now(),
       UNIQUE(importacion_linea_id,numero_unidad)
     );
-    CREATE TABLE parque_stock_maquinas(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),chasis text,unidad_operacion_id uuid);
+    CREATE TABLE parque_stock_maquinas(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),chasis text,unidad_operacion_id uuid,saldo_actual numeric NOT NULL DEFAULT 1);
     CREATE TABLE maquinaria_stock_trazabilidad(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),chasis_normalizado text,unidad_operacion_id uuid,estado_disponibilidad text,disponibilidad_detalle text,importado_en timestamptz,sucursal text,deposito text,saldo_actual numeric);
-    CREATE TABLE parque_maquinas(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),serie text,actualizado_en timestamptz);
+    CREATE TABLE parque_maquinas(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),serie text,actualizado_en timestamptz,activo boolean NOT NULL DEFAULT true);
     CREATE TABLE maquinaria_documentos(id uuid PRIMARY KEY);
     CREATE TABLE maquinaria_facturas_importacion(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),operacion_id uuid,proveedor text,factura_numero text,factura_fecha date,moneda text,valor_total numeric,documento_id uuid,creado_por uuid,actualizado_en timestamptz,UNIQUE(operacion_id,factura_numero));
     CREATE TABLE maquinaria_factura_importacion_unidades(factura_id uuid,importacion_unidad_id uuid UNIQUE,chasis text,costo_unidad numeric,actualizado_en timestamptz,PRIMARY KEY(factura_id,importacion_unidad_id));
@@ -166,7 +166,58 @@ try {
   await db.query("UPDATE maquinaria_stock_trazabilidad SET estado_disponibilidad='CONFLICTO' WHERE chasis_normalizado='ARR2'");
   assert.equal((await first("SELECT stock_fisico_confirmado FROM maquinaria_importacion_unidades_operativas WHERE id=$1",[newUnits[1].id])).stock_fisico_confirmado,true,"Commercial link conflict is separate from physical reception");
   await db.exec(physicalFix);
+  // Load the real reversal RPC without its obsolete view definition.
+  const reversal=await readFile(new URL("../supabase/migrations/20260901100000_allow_import_receipt_reversal.sql",import.meta.url),"utf8");
+  await db.exec(reversal.slice(reversal.indexOf("CREATE OR REPLACE FUNCTION public.maquinaria_anular_recepcion_importacion(")));
+  const evidenceHeader=await save(null,{...base,oc:"18-555",cantidad:7});
+  const evidenceUnits=(await db.query("SELECT * FROM maquinaria_importacion_unidades WHERE importacion_linea_id=$1 ORDER BY numero_unidad",[evidenceHeader])).rows;
+  const chassis=[" park-01 ","STOCK-01","ZERO-01","DUP-STOCK","INACTIVE-01","NP-OTHER","DUP-PARK"];
+  for(let n=0;n<chassis.length;n++) await patch(evidenceUnits[n].id,{chasis:chassis[n]});
+  await db.exec(`
+    INSERT INTO parque_maquinas(serie) VALUES('PARK01'),('DUPPARK'),('dup-park');
+    INSERT INTO parque_maquinas(serie,activo) VALUES('INACTIVE01',false);
+    INSERT INTO parque_stock_maquinas(chasis,saldo_actual) VALUES('STOCK01',1),('ZERO01',0),('DUPSTOCK',1),('dup-stock',1);
+  `);
+  await db.query("UPDATE maquinaria_importacion_unidades SET unidad_id=$1 WHERE id=$2",[orderUnit.id,evidenceUnits[5].id]);
+  await db.query("UPDATE maquinaria_unidades_operacion SET estado='EN_PARQUE',chasis='DIFFERENT' WHERE id=$1",[orderUnit.id]);
+  const snapshot=(await db.query("SELECT * FROM maquinaria_importacion_unidades ORDER BY id")).rows;
+  const completionFix=await readFile(new URL("../supabase/migrations/20260918170000_complete_imports_by_stock_or_park_chassis.sql",import.meta.url),"utf8");
+  await db.exec(completionFix);
+  const evidence=async n=>first("SELECT * FROM maquinaria_importacion_unidades_operativas WHERE id=$1",[evidenceUnits[n].id]);
+  assert.equal((await evidence(0)).parque_confirmado,true,"Exact normalized active Park chassis confirms completion without current stock");
+  assert.equal((await evidence(0)).stock_fisico_confirmado,false);
+  assert.equal((await evidence(0)).ata,null,"Completion does not invent an arrival date");
+  assert.equal((await evidence(0)).costo_stock_habilitado,false,"Sold Park machines do not enable stock cost editing");
+  assert.equal((await evidence(1)).stock_fisico_confirmado,true,"Positive stock confirms even without ATA");
+  assert.equal((await evidence(1)).costo_stock_habilitado,false,"Stock cost keeps its separate real-arrival guard");
+  assert.equal((await evidence(2)).stock_fisico_confirmado,false,"Zero balance is not physical stock");
+  assert.equal((await evidence(3)).chasis_ambiguo,true,"Duplicate normalized stock remains explicit");
+  assert.equal((await evidence(4)).parque_confirmado,false,"Inactive Park entries are not current confirmation");
+  assert.equal((await evidence(5)).estado_disponibilidad,"EN_PARQUE","Commercial state is retained");
+  assert.equal((await evidence(5)).parque_confirmado,false,"An NP state or another chassis never proves completion");
+  assert.equal((await evidence(5)).stock_fisico_confirmado,false);
+  assert.equal((await evidence(6)).chasis_ambiguo,true,"Duplicate normalized active Park entries remain explicit");
+  assert.equal((await evidence(6)).parque_confirmado,false);
+  for(const n of [0,1]) await assert.rejects(()=>db.query("SELECT maquinaria_iniciar_transito_importacion($1)",[evidenceUnits[n].id]),/arribada/);
+  await db.exec(completionFix);
+  assert.deepEqual((await db.query("SELECT * FROM maquinaria_importacion_unidades ORDER BY id")).rows,snapshot,"Migration and reapplication preserve all existing unit fields");
+  const parkReceipt=await first("SELECT maquinaria_recibir_unidad_importacion($1,current_date) AS result",[evidenceUnits[0].id]);
+  assert.equal(parkReceipt.result.parque_confirmado,true,"Receipt returns Park evidence without relinking the selling NP");
+  assert.equal(parkReceipt.result.stock_confirmado,false);
+  await assert.rejects(()=>db.query("SELECT maquinaria_anular_recepcion_importacion($1)",[evidenceUnits[0].id]),/Chasis registrado en Parque/);
+  const zeroReceipt=await first("SELECT maquinaria_recibir_unidad_importacion($1,current_date) AS result",[evidenceUnits[2].id]);
+  assert.equal(zeroReceipt.result.stock_confirmado,false,"Receipt does not confirm zero balance stock");
+  assert.equal((await evidence(2)).costo_stock_habilitado,false);
+  await assert.rejects(()=>patch(evidenceUnits[2].id,{costo_final:1}),/identificada en stock/);
+  const controls=await db.exec(await readFile(new URL("../supabase/verificar_importaciones_stock_parque.sql",import.meta.url),"utf8"));
+  assert.equal(controls.length,2,"Both read-only controls execute against the real view");
+  assert.ok(controls[0].rows.some(r=>r.llegada==="Completado" && Number(r.unidades)>=2));
+  assert.ok(!controls[1].rows.some(r=>[chassis[0].trim(),chassis[1]].includes(r.chasis)),"Confirmed Stock/Park imports are absent from the pending list");
   await db.exec("SELECT set_config('test.role','usuario',false)");
   await assert.rejects(()=>db.query("SELECT maquinaria_iniciar_transito_importacion($1)",[newUnits[1].id]),/Solo admin/);
-  console.log("PASS: actual SQL, unit keys, overrides, costs, permissions, idempotency, arrival lifecycle and reserved stock confirmation independent of selling NP");
+  await assert.rejects(()=>db.query("SELECT maquinaria_recibir_unidad_importacion($1,current_date)",[evidenceUnits[0].id]),/Solo admin/);
+  await assert.rejects(()=>db.query("SELECT maquinaria_anular_recepcion_importacion($1)",[evidenceUnits[0].id]),/Solo admin/);
+  assert.equal((await first("SELECT has_function_privilege('anon','maquinaria_chasis_confirmado_en_sistema(text)','EXECUTE') AS allowed")).allowed,false);
+  assert.equal((await first("SELECT has_function_privilege('authenticated','maquinaria_chasis_confirmado_en_sistema(text)','EXECUTE') AS allowed")).allowed,true);
+  console.log("PASS: actual SQL, unit keys, overrides, costs, permissions, idempotency, arrival lifecycle and chassis confirmation in positive Stock or active Park without fabricated dates");
 } finally { await db.close(); }

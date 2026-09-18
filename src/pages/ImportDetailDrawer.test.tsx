@@ -86,6 +86,39 @@ describe("Importaciones: detalle compacto", () => {
     expect(screen.getByText("Costo con IVA")).toBeInTheDocument();
     expect(screen.queryByText("Referencia histórica")).not.toBeInTheDocument();
   });
+  it("completa una máquina en parque sin inventar ATA ni habilitar su costo de stock", () => {
+    setup({ estado_fuente: "ARRIBADA", chasis: "TEST-PARK", parque_confirmado: true, estado_disponibilidad: "EN_PARQUE" });
+    expect(screen.getAllByText("Completado", { exact: true })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Seguimiento" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar costo de stock" })).not.toBeInTheDocument();
+    expect(screen.getByText("Referencia histórica")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Recepción" }), { button: 0 });
+    expect(screen.getByText("En parque", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("Pendiente de confirmación")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Anular recepción" })).not.toBeInTheDocument();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("no llama completado a un chasis duplicado y conserva el aviso", () => {
+    setup({ chasis: "DUP", ata: "2026-05-23", chasis_ambiguo: true, stock_fisico_confirmado: true });
+    expect(screen.getAllByText("Arribado", { exact: true })).toHaveLength(1);
+    expect(screen.getByText("Chasis duplicado: revisar Stock o Parque.")).toBeInTheDocument();
+  });
+  it("completa por stock sin ATA y mantiene pendiente el costo", () => {
+    setup({ chasis: "TEST-STOCK", stock_fisico_confirmado: true, estado_disponibilidad: "RESERVADO" });
+    expect(screen.getByText("Completado", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Iniciar tránsito" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar costo de stock" })).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Recepción" }), { button: 0 });
+    expect(screen.getByText("Stock confirmado", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText("Pendiente de confirmación")).not.toBeInTheDocument();
+  });
+  it("reserva Arribado para fecha registrada sin coincidencia en sistema", () => {
+    setup({ chasis: "TEST-PENDING", ata: "2026-05-23" });
+    expect(screen.getByText("Arribado", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Iniciar tránsito" })).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Recepción" }), { button: 0 });
+    expect(screen.getByText("Pendiente de confirmación", { exact: true })).toBeInTheDocument();
+  });
   it("respeta permisos de solo lectura y conserva la ayuda", () => {
     mocks.admin = false; setup();
     expect(screen.queryByRole("button", { name: /Editar/ })).not.toBeInTheDocument();

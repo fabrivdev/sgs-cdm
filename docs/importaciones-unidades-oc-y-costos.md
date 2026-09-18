@@ -25,16 +25,20 @@
 Aplicar además `20260917130000_import_arrival_lifecycle.sql` después de la migración inicial.
 La carga manual siempre empieza Planificado. Una ETA no prueba embarque y una factura del proveedor tampoco.
 Desde cada unidad se registra En tránsito y luego Arribado con fecha real no futura y chasis.
-Completado se calcula al consultar: exige fecha de arribo y coincidencia física única del mismo chasis en stock. No exige que la importación esté vinculada a la NP que reserva esa máquina.
-Si el stock llega después del registro de arribo, la siguiente actualización de la vista confirma la unidad sin otra edición manual.
+Completado se calcula al consultar: coincidencia única del mismo chasis normalizado en stock con saldo positivo **o en Parque activo**. No exige ATA histórica ni que la importación esté vinculada a la NP que reserva esa máquina. Parque acredita que ya ingresó y fue incorporada al parque del cliente, aunque no exista stock vigente.
+Si Stock o Parque se carga después, la siguiente actualización de la vista confirma la unidad sin otra edición manual. Lista, filtros, indicadores, exportación y detalle comparten `importArrivalState`.
 La situación comercial (stock, reservado, vendido o en parque) es independiente de estas etapas.
-Los estados antiguos de recepción sin fecha quedan Arribado, requieren completar la fecha y no se inventan fechas históricas.
+Arribado corresponde exclusivamente a ATA registrada sin coincidencia vigente confirmada. Una etiqueta antigua de recepción, ETA, factura o estado comercial de una NP no prueba llegada. Sin ATA ni evidencia se conserva tránsito explícito o Planificado, con aviso de fecha faltante para la etiqueta antigua; nunca se inventan fechas históricas.
 Las cancelaciones existentes se conservan como filtro, sin permitir que una cancelada se reciba.
 
 Corrección adicional: aplicar `20260917140000_confirm_import_arrival_by_physical_chassis.sql`.
 La señal `stock_fisico_confirmado` separa la llegada de la disponibilidad comercial. Reservado y Completado pueden coexistir.
 Los conflictos comerciales de NP no ocultan la llegada física; se mantienen visibles en Situación. Un chasis duplicado en stock sí impide confirmar.
 No se modifican vínculos de NP, reservas, importes, chasis o fechas. Los arribos ya registrados se recalculan al consultar, sin volver a recibirlos.
+
+Corrección Stock/Parque (18/09): aplicar `20260918170000_complete_imports_by_stock_or_park_chassis.sql` después de la anterior. `stock_fisico_confirmado` ya no exige ATA; `parque_confirmado` exige chasis exacto y único en Parque activo. `chasis_ambiguo` impide completar con duplicados normalizados. Un conflicto comercial de NP no equivale a un duplicado físico. La evidencia no habilita costos por estar en Parque: `costo_stock_habilitado` mantiene su requisito separado de ATA y stock único con saldo positivo. La recepción informa Stock o Parque; no permite volver a tránsito una unidad confirmada ni anular la recepción de un chasis existente en Parque. Mantiene permisos, importes y vínculos actuales.
+
+Control de solo lectura: `supabase/verificar_importaciones_stock_parque.sql`, consultas separadas de distribución y pendientes reales. El código anterior limitaba completar a ATA + Stock y por eso podía mostrar Arribado junto a En parque; esta migración recalcula, no reescribe registros históricos.
 
 Aplicar supabase/migrations/20260917120000_fix_import_unit_keys_and_purchase_values.sql antes de usar los nuevos editores. El frontend bloquea la carga general si no verifica la estructura nueva.
 
@@ -53,3 +57,5 @@ Pruebas de regresión: `src/pages/ImportDetailDrawer.test.tsx` y tests de `machi
 - scripts/test-import-unit-purchase-values.mjs: ejecuta la migración real en PostgreSQL aislado; verifica llaves, OC en varias cabeceras, ajustes, redondeo, permisos, stock, reaplicación y RPC de proveedor.
 - src/lib/machineImportValues.test.ts: comprueba importes, diferencias y aislamiento de guardados por sección.
 - La base productiva debe ser actualizada por el usuario. Los tests locales no prueban que la migración esté aplicada allí.
+
+Regresión Stock/Parque del 18/09: 29 pruebas de frontend correctas. PostgreSQL aislado ejecuta el SQL real y verifica normalización, stock positivo sin ATA, Parque vendido sin stock, saldo cero, Parque inactivo, duplicados, NP con otro chasis, recepción, protección de anulación, permisos y reaplicación sin cambios en datos de unidades. Verificación local, no producción.

@@ -206,7 +206,7 @@ const arrivalClass = (state: ArrivalState) =>
       : state === "ARRIBADO" ? "border-amber-200 bg-amber-50 text-amber-700"
       : "border-slate-200 bg-slate-100 text-slate-600";
 
-function importStockConfirmed(row: ImportRow) {
+function importSystemConfirmed(row: ImportRow) {
   return arrivalState(row) === "COMPLETADO";
 }
 
@@ -241,6 +241,7 @@ type ImportRow = {
   valor_oc_general?: number | null; alcance_valor_oc?: string; moneda_oc_general?: string;
   moneda_oc?: string; valor_oc_manual?: boolean; eta_manual?: boolean;
   valor_factura_proveedor?: number | null; costo_stock_moneda?: string; costo_stock_habilitado?: boolean; stock_fisico_confirmado?: boolean;
+  parque_confirmado?: boolean; chasis_ambiguo?: boolean;
   valor_oc_asignado_total?: number | null; oc_monedas_diferentes?: boolean;
   modelo_original?: string | null;
   id: string; importacion_linea_id: string; numero_unidad: number; cantidad_lote: number | null;
@@ -1413,7 +1414,8 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   }, [row]);
   if (!row) return null;
   const arrival = arrivalState(row);
-  const stockConfirmed = importStockConfirmed(row);
+  const stockConfirmed = importSystemConfirmed(row);
+  const missingArrivalDate = !row.ata && arrival !== "COMPLETADO" && arrival !== "CANCELADO" && /ARRIB|RECIB|COMPLET/i.test(row.estado_fuente ?? "");
   const multipleUnits = importHasMultipleUnits(row.cantidad_lote);
   const showAvailabilityStatus = false;
   const headerStatus = showAvailabilityStatus ? (AVAILABILITY_LABEL[row.estado_disponibilidad!] ?? row.estado_disponibilidad) : ARRIVAL_LABEL[arrival];
@@ -1455,7 +1457,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
     try {
       const { data, error } = await db.rpc("maquinaria_recibir_unidad_importacion", { p_importacion_unidad_id: row.id, p_fecha: receipt.fecha });
       if (error) throw error;
-      toast.success(data?.stock_confirmado ? "Arribo registrado y chasis confirmado en stock" : "Arribo registrado; pendiente de confirmación en stock");
+      toast.success(data?.parque_confirmado ? "Arribo registrado y chasis confirmado en parque" : data?.stock_confirmado ? "Arribo registrado y chasis confirmado en stock" : "Arribo registrado; pendiente de confirmación en sistema");
       setEditingReceipt(false); onSaved();
     } catch (error: any) { toast.error(error?.message ?? "No se pudo registrar la recepción"); }
     finally { setReceiving(false); }
@@ -1510,12 +1512,13 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
         <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
-          {((canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO") || (arrival === "ARRIBADO" && !row.ata)) && <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento" help="Planificado → En tránsito → Arribado → Completado. Completar requiere fecha de arribo y chasis único en stock; no depende de que el pedido esté reservado o facturado.">
-            {canEdit && <div className="flex flex-wrap gap-2">
+          {((canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO") || missingArrivalDate || row.chasis_ambiguo) && <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento" help="Arribado requiere fecha real de arribo. Completado requiere chasis único confirmado en Stock o Parque, incluso sin fecha histórica. ETA, reserva o factura no prueban llegada.">
+            {canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO" && <div className="flex flex-wrap gap-2">
               {arrival === "PLANIFICADO" && <Button size="sm" variant="outline" disabled={saving} onClick={startTransit}><Ship className="mr-1.5 h-3.5 w-3.5" />Iniciar tránsito</Button>}
               <Button size="sm" variant="outline" onClick={() => { setActiveTab("recepcion"); setEditingReceipt(true); }}>Registrar arribo</Button>
             </div>}
-            {arrival === "ARRIBADO" && !row.ata && <p className="mt-2 text-[11px] text-amber-700">El registro antiguo indica recepción pero no tiene fecha. Completá la fecha de arribo para validar el stock.</p>}
+            {missingArrivalDate && <p className="mt-2 text-[11px] text-amber-700">El registro antiguo indica recepción pero no tiene fecha de arribo.</p>}
+            {row.chasis_ambiguo && <p className="mt-2 text-[11px] text-amber-700">Chasis duplicado: revisar Stock o Parque.</p>}
           </DetailSection>}
           <DetailSection card icon={<PackageCheck className="h-3.5 w-3.5" />} title="Unidad" action={canEdit && !editingChassis ? <Button aria-label="Editar unidad" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { closeEditors(); setEditingChassis(true); }}><Pencil className="mr-1.5 h-3 w-3" />Editar</Button> : undefined}>
             {editingChassis ? <ImportUnitFields section="unit" form={form} onChange={setForm} onCancel={cancelEdit} onSave={() => saveUnit("unit")} saving={saving} /> : <KeyValueGrid><KeyValueItem label="Llave interna" value={row.llave_interna} empty="Sin asignar" mono /><KeyValueItem label="Unidad" value={`${row.numero_unidad}/${Math.max(1, Number(row.cantidad_lote) || 1)}`} /><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /></KeyValueGrid>}
@@ -1570,10 +1573,10 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
         </TabsContent>
 
         <TabsContent value="recepcion" className="space-y-4">
-          <KeyValueGrid><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /><KeyValueItem label="Fecha de arribo" value={formatDate(row.ata)} empty="—" /><KeyValueItem label="Estado en stock" value={stockConfirmed ? (AVAILABILITY_LABEL[row.estado_disponibilidad ?? ""] ?? "Confirmado") : row.ata ? "Pendiente de confirmación" : "Aún no recibido"} /></KeyValueGrid>
+          <KeyValueGrid><KeyValueItem label="Chasis" value={row.chasis} empty="Sin asignar" mono /><KeyValueItem label="Fecha de arribo" value={formatDate(row.ata)} empty="—" /><KeyValueItem label="Confirmación" value={stockConfirmed ? (row.parque_confirmado ? "En parque" : "Stock confirmado") : row.chasis_ambiguo ? "Chasis duplicado" : row.ata ? "Pendiente de confirmación" : "Aún no recibido"} /></KeyValueGrid>
           {!row.chasis && canEdit ? <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5"><span className="text-[11px] text-amber-800">Primero asigná el chasis.</span><Button variant="outline" size="sm" className="bg-white" onClick={() => { setActiveTab("resumen"); setEditingChassis(true); }}>Asignar chasis</Button></div> : canEdit && (editingReceipt || !row.ata) ? <div className="space-y-3 border-t pt-4"><div className="max-w-xs"><Field label="Fecha de arribo"><Input type="date" value={receipt.fecha} onChange={(event) => setReceipt({ fecha: event.target.value })} /></Field></div><div className="flex gap-2">{row.ata && <Button variant="outline" size="sm" onClick={() => { setReceipt({ fecha: row.ata ?? TODAY }); setEditingReceipt(false); }}>Cancelar</Button>}<Button size="sm" onClick={receiveUnit} disabled={receiving || !receipt.fecha}><PackageCheck className="mr-1.5 h-3.5 w-3.5" />{receiving ? "Registrando..." : "Registrar arribo"}</Button></div></div> : canEdit && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => setEditingReceipt(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Modificar arribo</Button>{!stockConfirmed && <AlertDialog><AlertDialogTrigger asChild><Button variant="outline" size="sm" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Anular recepción</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Anular esta recepción</AlertDialogTitle><AlertDialogDescription>Se quitarán la fecha de arribo y el chasis de esta unidad para que puedas recibir la máquina correcta. La OC, la factura del proveedor y el pedido vinculado se conservarán.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={reversingReceipt} onClick={reverseReceipt}>{reversingReceipt ? "Anulando..." : "Anular recepción"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}</div>}
-          {row.ata && !stockConfirmed && <p className="text-[10px] text-muted-foreground">Arribo registrado; pendiente de stock.</p>}
-          {row.ata && stockConfirmed && <p className="text-[10px] text-muted-foreground">Stock confirmado. Corregí el stock antes de anular la recepción.</p>}
+          {row.ata && !stockConfirmed && <p className="text-[10px] text-muted-foreground">Arribo registrado; pendiente de confirmación en sistema.</p>}
+          {row.ata && stockConfirmed && <p className="text-[10px] text-muted-foreground">Chasis confirmado en sistema. No se puede anular la recepción.</p>}
         </TabsContent>
       </Tabs>
     </ResponsiveDrawerBody>
