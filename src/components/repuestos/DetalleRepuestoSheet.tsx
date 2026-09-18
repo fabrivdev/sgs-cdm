@@ -1,17 +1,18 @@
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
-import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
+import type { SalesColumn, SalesSort } from "@/components/ventas/salesTableInteraction";
 import type { VentaRepuestoHistorial } from "@/hooks/useRepuestos";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Calculator, Link2, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Calculator, Info, Link2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,6 +72,8 @@ const MESES_KPI_LARGO = 24;
 
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
+const quantity = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 });
+const money = (value: number) => `$ ${value.toLocaleString("es-PY", { maximumFractionDigits: 2 })}`;
 
 const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "Santa Rita" },
@@ -81,8 +84,28 @@ const SUCURSAL_COLUMNAS: { key: keyof StockMatrizRow; label: string }[] = [
   { key: "katuete", label: "Katuete" },
 ];
 
-const th = "px-2 py-1.5 text-[11px] font-medium";
-const td = "px-2 py-1.5 text-[12px]";
+const th = "overflow-hidden whitespace-nowrap px-1 py-1.5 text-[11px] font-medium sm:px-2";
+const td = "overflow-hidden whitespace-nowrap px-1 py-2 text-[13px] leading-5 sm:px-2";
+
+function conversionLabel(line: VentaRepuestoHistorial) {
+  return `${quantity.format(Number(line.cantidad_original || 0))} ${line.unidad_original || ""} × ${line.factor_conversion} = ${quantity.format(Number(line.cantidad || 0))} ${line.unidad_destino || ""}`;
+}
+
+function ConversionHelp({ line }: { line: VentaRepuestoHistorial }) {
+  const label = conversionLabel(line);
+  return <Popover><PopoverTrigger asChild>
+    <button type="button" className="shrink-0 rounded-sm text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`Conversión de cantidad: ${line.factura || "Sin número"}`} title={`Conversión: ${label}`}>
+      <Info className="h-3.5 w-3.5" aria-hidden="true" />
+    </button>
+  </PopoverTrigger><PopoverContent align="end" className="max-w-[calc(100vw-2rem)] text-[12px]" aria-label="Conversión de cantidad">
+    {label}{line.regla_conversion && <p className="mt-1 text-muted-foreground">{line.regla_conversion}</p>}
+  </PopoverContent></Popover>;
+}
+
+function sortDirection(sort: SalesSort, key: string) {
+  return sort.key !== key ? "none" : sort.direction === "asc" ? "ascending" : "descending";
+}
 
 function fechaLocal(fecha: string | null | undefined): Date | null {
   const valor = String(fecha ?? "").trim();
@@ -578,9 +601,9 @@ export function DetalleRepuestoSheet({
     {key:"fecha",label:"Fecha",kind:"date",value:r=>fechaLocal(r.fecha_factura)},
     {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
     {key:"cliente",label:"Cliente",kind:"text",value:r=>r.cliente},
-    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>Number(r.cantidad)},
-    {key:"precio",label:"Precio Unit.",kind:"number",align:"right",value:r=>Number(r.cantidad)>0?Number(r.total_venta_usd)/Number(r.cantidad):null},
-    {key:"total",label:"Precio Total",kind:"number",align:"right",value:r=>Number(r.total_venta_usd)},
+    {key:"cantidad",label:"Cant.",kind:"number",align:"center",value:r=>Number(r.cantidad),excelFormat:"0.######"},
+    {key:"precio",label:"P. unit.",kind:"number",align:"right",value:r=>Number(r.cantidad)>0?Number(r.total_venta_usd)/Number(r.cantidad):null,excelFormat:'"$" #,##0.00'},
+    {key:"total",label:"Facturación",kind:"number",align:"right",value:r=>Number(r.total_venta_usd),excelFormat:'"$" #,##0.00'},
   ];
   const invoiceTable = useSectionTable({rows:ventas.filter(r=>matches([r.fecha_factura,r.factura,r.cliente])),
     columns:invoiceColumns,title:"Historial de facturas",fileName:"repuesto-facturas.xlsx",
@@ -588,9 +611,9 @@ export function DetalleRepuestoSheet({
   const groupColumns:SalesColumn<VentaAgrupada>[] = [
     {key:"etiqueta",label:vistaHistorial==="clientes"?"Cliente":"Período",kind:vistaHistorial==="meses"?"date":"text",
       value:r=>vistaHistorial==="meses"?(r.clave==="Sin fecha"?null:r.clave+"-01"):r.etiqueta},
-    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>r.cantidad},
-    {key:"facturas",label:"Facturas",kind:"number",align:"right",value:r=>r.facturas},
-    {key:"total",label:"Total USD",kind:"number",align:"right",value:r=>r.total},
+    {key:"cantidad",label:"Cant.",kind:"number",align:"center",value:r=>r.cantidad,excelFormat:"0.######"},
+    {key:"facturas",label:"Facturas",kind:"number",align:"center",value:r=>r.facturas},
+    {key:"total",label:"Facturación",kind:"number",align:"right",value:r=>r.total,excelFormat:'"$" #,##0.00'},
   ];
   const groupTable = useSectionTable({rows:(vistaHistorial==="clientes"?ventasPorCliente:ventasPorMes).filter(r=>matches([r.etiqueta,r.clave])),
     columns:groupColumns,title:vistaHistorial==="clientes"?"Historial por cliente":"Historial por mes",fileName:"repuesto-historial-agrupado.xlsx",
@@ -599,9 +622,9 @@ export function DetalleRepuestoSheet({
     ventas24:vendidoPorSucursal24m.get(normalizarSucursal(c.label))??0,stock:stock?Number(stock[c.key]??0):null}));
   const branchColumns:SalesColumn<typeof branches[number]>[] = [
     {key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal},
-    {key:"ventas12",label:"Ventas 12M",kind:"number",align:"right",value:r=>r.ventas12},
-    {key:"ventas24",label:"Ventas 24M",kind:"number",align:"right",value:r=>r.ventas24},
-    {key:"stock",label:"Disponible",kind:"number",align:"right",value:r=>r.stock},
+    {key:"ventas12",label:"Ventas 12m",kind:"number",align:"center",value:r=>r.ventas12,excelFormat:"0.######"},
+    {key:"ventas24",label:"Ventas 24m",kind:"number",align:"center",value:r=>r.ventas24,excelFormat:"0.######"},
+    {key:"stock",label:"Stock",kind:"number",align:"center",value:r=>r.stock,excelFormat:"0.######"},
   ];
   const branchTable = useSectionTable({rows:branches.filter(r=>matches([r.sucursal])),columns:branchColumns,title:"Stock y ventas por sucursal",
     fileName:"repuesto-sucursales.xlsx",initialSort:{key:"sucursal",direction:"asc"},
@@ -615,15 +638,15 @@ export function DetalleRepuestoSheet({
   const coberturaMeses = ritmoMensual > 0 && stockGlobal !== null ? stockGlobal / ritmoMensual : null;
 
   const resumen = [
-    { label: "Stock global", value: stockGlobal === null ? "—" : integer.format(stockGlobal) },
-    { label: "Venta 12m", value: historialCargando ? "…" : historialError ? "—" : integer.format(unidades12m) },
+    { label: "Stock global", value: stockGlobal === null ? "—" : quantity.format(stockGlobal) },
+    { label: "Venta 12m", value: historialCargando ? "…" : historialError ? "—" : quantity.format(unidades12m) },
     {
       label: "Demanda mensual",
       value: sugerencia
         ? decimal.format(sugerencia.demanda_ponderada_mensual)
         : historialCargando ? "…" : decimal.format(promedioMensual),
     },
-    { label: "Cobertura", value: coberturaMeses === null ? "—" : `${decimal.format(coberturaMeses)} m` },
+    { label: "Cobertura (m)", value: coberturaMeses === null ? "—" : decimal.format(coberturaMeses) },
     { label: "Objetivo", value: sugerencia ? decimal.format(sugerencia.stock_objetivo) : "—" },
     { label: "Sugerencia", value: sugerencia ? integer.format(sugerencia.sugerencia_unidades) : "—" },
   ];
@@ -636,11 +659,11 @@ export function DetalleRepuestoSheet({
             <SheetHeader className="border-b px-5 py-3 pr-12 text-left">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <SheetTitle className="text-[14px]">{producto.descripcion}</SheetTitle>
-                  <SheetDescription className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-                    <span className="font-mono">{producto.codigo_interno}</span>
-                    {producto.codigo_fabricante && <span>Fabricante: {producto.codigo_fabricante}</span>}
-                    {producto.familia && <span>{producto.familia}</span>}
+                  <SheetTitle className="truncate text-[14px]" title={producto.descripcion}>{producto.descripcion}</SheetTitle>
+                  <SheetDescription className="mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px]">
+                    <span className="truncate font-mono" title={producto.codigo_interno}>{producto.codigo_interno}</span>
+                    {producto.codigo_fabricante && <span className="min-w-0 truncate" title={`Fabricante: ${producto.codigo_fabricante}`}>Fab. {producto.codigo_fabricante}</span>}
+                    {producto.familia && <span className="min-w-0 truncate" title={producto.familia}>{producto.familia}</span>}
                   </SheetDescription>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -654,8 +677,8 @@ export function DetalleRepuestoSheet({
                       )}
                     >
                       {sugerencia.sugerencia_unidades > 0
-                        ? `Sugerido pedir ${integer.format(sugerencia.sugerencia_unidades)} un.`
-                        : "Sin necesidad de pedido"}
+                        ? `Pedir ${integer.format(sugerencia.sugerencia_unidades)}`
+                        : "Sin pedido"}
                     </span>
                   )}
                   <MarcaBadge marca={producto.marca as never} />
@@ -750,11 +773,11 @@ export function DetalleRepuestoSheet({
 
             <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
-                <TabsList className="h-8">
-                  <TabsTrigger value="ventas" className="h-6 text-[12px]">Ventas</TabsTrigger>
-                  <TabsTrigger value="sucursales" className="h-6 text-[12px]">Sucursales</TabsTrigger>
-                  <TabsTrigger value="consumo" className="h-6 text-[12px]">Consumo</TabsTrigger>
-                  <TabsTrigger value="planificacion" className="h-6 text-[12px]">Planificación</TabsTrigger>
+                <TabsList className="grid h-8 w-full min-w-0 grid-cols-4 sm:w-auto">
+                  <TabsTrigger value="ventas" className="h-6 min-w-0 truncate px-2 text-[12px]">Ventas</TabsTrigger>
+                  <TabsTrigger value="sucursales" className="h-6 min-w-0 truncate px-2 text-[12px]">Sucursales</TabsTrigger>
+                  <TabsTrigger value="consumo" className="h-6 min-w-0 truncate px-2 text-[12px]">Consumo</TabsTrigger>
+                  <TabsTrigger value="planificacion" className="h-6 min-w-0 truncate px-2 text-[12px]">Planificación</TabsTrigger>
                 </TabsList>
 
                 {tab === "ventas" && (
@@ -787,21 +810,22 @@ export function DetalleRepuestoSheet({
                 expanded={<FilterCustom label="Buscar en esta tabla"><Input value={tableSearch} onChange={e=>setTableSearch(e.target.value)} /></FilterCustom>}/>}
               <TabsContent value="sucursales" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                 <div className="h-full overflow-auto">
-                  <Table>
+                  <Table className="table-fixed" aria-label="Stock y ventas por sucursal">
+                    <colgroup><col className="w-[34%]" /><col className="w-[22%]" /><col className="w-[22%]" /><col className="w-[22%]" /></colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead className={th}>{branchTable.heading("sucursal")}</TableHead>
-                        <TableHead className={cn(th, "text-right")}>{branchTable.heading("ventas12")}</TableHead>
-                        <TableHead className={cn(th, "text-right")}>{branchTable.heading("ventas24")}</TableHead>
-                        <TableHead className={cn(th, "text-right")}>{branchTable.heading("stock")}</TableHead>
+                        <TableHead className={th} aria-sort={sortDirection(branchTable.sort,"sucursal")}>{branchTable.heading("sucursal")}</TableHead>
+                        <TableHead className={cn(th, "text-center")} aria-sort={sortDirection(branchTable.sort,"ventas12")}>{branchTable.heading("ventas12")}</TableHead>
+                        <TableHead className={cn(th, "text-center")} aria-sort={sortDirection(branchTable.sort,"ventas24")}>{branchTable.heading("ventas24")}</TableHead>
+                        <TableHead className={cn(th, "text-center")} aria-sort={sortDirection(branchTable.sort,"stock")}>{branchTable.heading("stock")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {branchTable.ordered.map(row=><TableRow key={row.sucursal}>
-                        <TableCell className={td}>{row.sucursal}</TableCell>
-                        <TableCell className={cn(td,"text-right tabular-nums")}>{historialCargando?"…":historialError?"—":integer.format(row.ventas12)}</TableCell>
-                        <TableCell className={cn(td,"text-right tabular-nums")}>{historialCargando?"…":historialError?"—":integer.format(row.ventas24)}</TableCell>
-                        <TableCell className={cn(td,"text-right font-semibold tabular-nums")}>{row.stock==null?"—":integer.format(row.stock)}</TableCell>
+                        <TableCell className={cn(td,"truncate")} title={row.sucursal}>{row.sucursal}</TableCell>
+                        <TableCell className={cn(td,"text-center tabular-nums")} title={String(row.ventas12)}>{historialCargando?"…":historialError?"—":quantity.format(row.ventas12)}</TableCell>
+                        <TableCell className={cn(td,"text-center tabular-nums")} title={String(row.ventas24)}>{historialCargando?"…":historialError?"—":quantity.format(row.ventas24)}</TableCell>
+                        <TableCell className={cn(td,"text-center font-semibold tabular-nums")} title={row.stock==null?"No informado":String(row.stock)}>{row.stock==null?"—":quantity.format(row.stock)}</TableCell>
                       </TableRow>)}
                     </TableBody>
                   </Table>
@@ -839,23 +863,28 @@ export function DetalleRepuestoSheet({
 
               <TabsContent value="ventas" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                 <div className="h-full overflow-auto">
-                  <Table>
+                  <Table className="table-fixed" aria-label="Historial de ventas del repuesto">
+                    {vistaHistorial === "facturas" ? <colgroup>
+                      <col className="w-[20%] sm:w-[14%]" /><col className="w-[31%] sm:w-[19%]" />
+                      <col className="hidden sm:table-column sm:w-[29%]" /><col className="w-[17%] sm:w-[10%]" />
+                      <col className="hidden sm:table-column sm:w-[13%]" /><col className="w-[32%] sm:w-[15%]" />
+                    </colgroup> : <colgroup><col className="w-[40%]" /><col className="w-[17%]" /><col className="w-[17%]" /><col className="w-[26%]" /></colgroup>}
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       {vistaHistorial === "facturas" ? (
                         <TableRow>
-                          <TableHead className={th}>{invoiceTable.heading("fecha")}</TableHead>
-                          <TableHead className={th}>{invoiceTable.heading("factura")}</TableHead>
-                          <TableHead className={th}>{invoiceTable.heading("cliente")}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>{invoiceTable.heading("cantidad")}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>{invoiceTable.heading("precio")}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>{invoiceTable.heading("total")}</TableHead>
+                          <TableHead className={th} aria-sort={sortDirection(invoiceTable.sort,"fecha")}>{invoiceTable.heading("fecha")}</TableHead>
+                          <TableHead className={th} aria-sort={sortDirection(invoiceTable.sort,"factura")}>{invoiceTable.heading("factura")}</TableHead>
+                          <TableHead className={cn(th,"hidden sm:table-cell")} aria-sort={sortDirection(invoiceTable.sort,"cliente")}>{invoiceTable.heading("cliente")}</TableHead>
+                          <TableHead className={cn(th, "text-center")} aria-sort={sortDirection(invoiceTable.sort,"cantidad")}>{invoiceTable.heading("cantidad")}</TableHead>
+                          <TableHead className={cn(th, "hidden text-right sm:table-cell")} title="Precio unitario" aria-sort={sortDirection(invoiceTable.sort,"precio")}>{invoiceTable.heading("precio")}</TableHead>
+                          <TableHead className={cn(th, "text-right")} aria-sort={sortDirection(invoiceTable.sort,"total")}>{invoiceTable.heading("total")}</TableHead>
                         </TableRow>
                       ) : (
                         <TableRow>
-                          <TableHead className={th}>{groupTable.heading("etiqueta")}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>{groupTable.heading("cantidad")}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>{groupTable.heading("facturas")}</TableHead>
-                          <TableHead className={cn(th, "text-right")}>{groupTable.heading("total")}</TableHead>
+                          <TableHead className={th} aria-sort={sortDirection(groupTable.sort,"etiqueta")}>{groupTable.heading("etiqueta")}</TableHead>
+                          <TableHead className={cn(th, "text-center")} aria-sort={sortDirection(groupTable.sort,"cantidad")}>{groupTable.heading("cantidad")}</TableHead>
+                          <TableHead className={cn(th, "text-center")} aria-sort={sortDirection(groupTable.sort,"facturas")}>{groupTable.heading("facturas")}</TableHead>
+                          <TableHead className={cn(th, "text-right")} aria-sort={sortDirection(groupTable.sort,"total")}>{groupTable.heading("total")}</TableHead>
                         </TableRow>
                       )}
                     </TableHeader>
@@ -880,36 +909,28 @@ export function DetalleRepuestoSheet({
                         const precioUnitario = cantidad > 0 ? total / cantidad : null;
                         return (
                           <TableRow key={linea.linea_id}>
-                            <TableCell className={cn(td, "whitespace-nowrap")}>{fechaVentaLabel(linea.fecha_factura)}</TableCell>
-                            <TableCell className={cn(td, "whitespace-nowrap font-mono text-[10px]")}>{linea.factura || "Sin número"}</TableCell>
-                            <TableCell className={cn(td, "max-w-48 truncate")}>{linea.cliente || "Sin cliente"}</TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>
-                              <div className="flex items-center justify-end gap-1.5">
-                                <span>{integer.format(cantidad)}</span>
-                                {linea.conversion_aplicada && (
-                                  <span
-                                    className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold text-amber-700"
-                                    title={`${integer.format(Number(linea.cantidad_original || 0))} ${linea.unidad_original || ""} x ${linea.factor_conversion} = ${integer.format(cantidad)} ${linea.unidad_destino || ""}`}
-                                  >
-                                    {linea.unidad_original}-{">"}{linea.unidad_destino}
-                                  </span>
-                                )}
-                              </div>
+                            <TableCell className={cn(td, "truncate")} title={fechaVentaLabel(linea.fecha_factura)}>{fechaVentaLabel(linea.fecha_factura)}</TableCell>
+                            <TableCell className={td} title={`${linea.factura || "Sin número"} · ${linea.cliente || "Sin cliente"} · P. unit.: ${precioUnitario === null ? "—" : money(precioUnitario)}`}>
+                              <span className="flex min-w-0 items-center gap-1"><span className="min-w-0 truncate font-mono">{linea.factura || "Sin número"}</span>
+                                {linea.conversion_aplicada && <ConversionHelp line={linea} />}
+                              </span>
                             </TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>
-                              {precioUnitario === null ? "—" : precioUnitario.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
+                            <TableCell className={cn(td, "hidden truncate sm:table-cell")} title={linea.cliente || "Sin cliente"}>{linea.cliente || "Sin cliente"}</TableCell>
+                            <TableCell className={cn(td, "text-center tabular-nums")} title={linea.conversion_aplicada ? `Conversión: ${conversionLabel(linea)}` : String(cantidad)}>{quantity.format(cantidad)}</TableCell>
+                            <TableCell className={cn(td, "hidden truncate text-right tabular-nums sm:table-cell")} title={precioUnitario === null ? "No informado" : money(precioUnitario)}>
+                              {precioUnitario === null ? "—" : money(precioUnitario)}
                             </TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>{integer.format(total)}</TableCell>
+                            <TableCell className={cn(td, "truncate text-right tabular-nums")} title={money(total)}>{money(total)}</TableCell>
                           </TableRow>
                         );
                       })}
                       {!historialCargando && !historialError && vistaHistorial !== "facturas" &&
                         groupTable.ordered.map((fila) => (
                           <TableRow key={fila.clave}>
-                            <TableCell className={cn(td, "max-w-48 truncate")}>{fila.etiqueta}</TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>{integer.format(fila.cantidad)}</TableCell>
-                            <TableCell className={cn(td, "text-right tabular-nums")}>{integer.format(fila.facturas)}</TableCell>
-                            <TableCell className={cn(td, "text-right font-medium tabular-nums")}>{integer.format(fila.total)}</TableCell>
+                            <TableCell className={cn(td, "truncate")} title={fila.etiqueta}>{fila.etiqueta}</TableCell>
+                            <TableCell className={cn(td, "text-center tabular-nums")} title={String(fila.cantidad)}>{quantity.format(fila.cantidad)}</TableCell>
+                            <TableCell className={cn(td, "text-center tabular-nums")} title={String(fila.facturas)}>{integer.format(fila.facturas)}</TableCell>
+                            <TableCell className={cn(td, "truncate text-right font-medium tabular-nums")} title={money(fila.total)}>{money(fila.total)}</TableCell>
                           </TableRow>
                         ))}
                       {!historialCargando && !historialError && ventas.length === 0 && (
