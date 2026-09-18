@@ -48,7 +48,7 @@ describe("Stock catalogue integration", () => {
     await waitFor(() => expect(mocks.write).toHaveBeenCalled());
     expect(mocks.full).toHaveBeenCalledWith(STOCK_FILTROS_VACIOS, "total", "desc");
     const exported = mocks.sheet.mock.calls[0][0] as unknown as Record<string, unknown>[];
-    expect(exported).toHaveLength(51); expect(exported[0]).toMatchObject({ "Código interno": "REPIN000001", "Código fabricante": "000123", "Santa Rita": 5, "Stock total": 5 });
+    expect(exported).toHaveLength(51); expect(exported[0]).toMatchObject({ "Código interno": "REPIN000001", "Código fabricante": "000123", Familia: "BUJES", "Santa Rita": 5, "Stock total": 5 });
   });
   it("does not give export access to a user without the existing permission", () => {
     mocks.can.mockReturnValue(false); render(<Repuestos />);

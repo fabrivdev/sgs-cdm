@@ -17,8 +17,10 @@ describe("compact parts stock table", () => {
   it("separates all identity and branch fields without stacking records", () => {
     const { container } = setup();
     const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
-    expect(cells).toHaveLength(12);
-    expect(cells.slice(0, 5).map(cell => cell.textContent)).toEqual([row.codigo_interno, row.codigo_fabricante, row.marca, row.descripcion, row.familia]);
+    expect(cells).toHaveLength(11);
+    expect(cells.slice(0, 4).map(cell => cell.textContent)).toEqual([row.codigo_interno, row.codigo_fabricante, row.marca, row.descripcion]);
+    expect(screen.queryByText(row.familia!)).toBeNull();
+    expect(container.querySelector('[title*="Familia"]')).toBeNull();
     expect(container.querySelectorAll("td p, td br, td .flex-wrap")).toHaveLength(0);
     cells.forEach(cell => expect(cell.children).toHaveLength(1));
     cells.forEach(cell => expect(cell).toHaveClass("whitespace-nowrap", "overflow-hidden"));
@@ -28,13 +30,13 @@ describe("compact parts stock table", () => {
   it("aligns numeric headers and values on the same centered axis without suffixes", () => {
     setup(); const heads = screen.getAllByRole("columnheader");
     const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell");
-    for (let index = 5; index < 12; index++) {
+    for (let index = 4; index < 11; index++) {
       expect(heads[index]).toHaveClass("text-center"); expect(cells[index]).toHaveClass("text-center");
       expect(within(heads[index]).getByRole("button")).toHaveClass("justify-center");
     }
-    expect(cells[5].textContent).toBe("1.000,25"); expect(cells[6].textContent).toBe("0"); expect(cells[7].textContent).toBe("-2");
-    expect(cells[11].textContent).toBe("1.010,25"); expect(cells[6]).toHaveClass("text-destructive/70");
-    expect(heads[11]).toHaveAttribute("aria-sort", "descending");
+    expect(cells[4].textContent).toBe("1.000,25"); expect(cells[5].textContent).toBe("0"); expect(cells[6].textContent).toBe("-2");
+    expect(cells[10].textContent).toBe("1.010,25"); expect(cells[5]).toHaveClass("text-destructive/70");
+    expect(heads[10]).toHaveAttribute("aria-sort", "descending");
   });
   it("preserves existing global sorting callbacks without sorting only the page", () => {
     const { onSort } = setup();
@@ -42,24 +44,25 @@ describe("compact parts stock table", () => {
     screen.getAllByRole("button").forEach((button, index) => { fireEvent.click(button); expect(onSort).toHaveBeenLastCalledWith(keys[index]); });
     // These fields are displayed separately; extending their server-order
     // contract is a later step, never an apparent order of 50 local rows.
-    for (const index of [1, 2, 4]) expect(within(screen.getAllByRole("columnheader")[index]).queryByRole("button")).toBeNull();
+    for (const index of [1, 2]) expect(within(screen.getAllByRole("columnheader")[index]).queryByRole("button")).toBeNull();
   });
   it("retains source order, full hover values and opening the original product", () => {
     const second = { ...row, codigo_interno: "REPIN000002", total: 2000 };
     const { onSelect } = setup([row, second]);
     expect(within(screen.getAllByRole("row")[1]).getAllByRole("cell")[0].textContent).toBe(row.codigo_interno);
-    expect(screen.getAllByTitle(`${row.descripcion} · Fabricante: ${row.codigo_fabricante} · Familia: ${row.familia}`)).toHaveLength(2);
+    expect(screen.getAllByTitle(`${row.descripcion} · Fabricante: ${row.codigo_fabricante}`)).toHaveLength(2);
     fireEvent.click(screen.getAllByText(row.descripcion)[0]); expect(onSelect).toHaveBeenCalledWith(row);
     expect(screen.getAllByText("CLAAS")[0].closest("[title=CLAAS]")).toHaveClass("text-marca-claas");
   });
   it("keeps four readable columns on narrow screens and secondary values in the detail/export", () => {
     setup(); const heads = screen.getAllByRole("columnheader");
     expect(heads.filter(head => !head.classList.contains("hidden")).map(head => head.textContent)).toEqual(["Código", "Marca", "Descripción", "Total"]);
-    expect(heads.filter(head => head.classList.contains("hidden"))).toHaveLength(8);
+    expect(heads.filter(head => head.classList.contains("hidden"))).toHaveLength(7);
     expect(screen.getByText("000123").closest("td")).toHaveClass("hidden", "lg:table-cell");
+    for (const index of [4,5,6,7,8,9]) expect(heads[index]).toHaveClass("hidden", "md:table-cell");
   });
   it("shows absent identifiers as absent without inventing a code or changing zero stock", () => {
-    setup([{ ...row, codigo_fabricante: null, familia: null }]); expect(screen.getAllByText("—")).toHaveLength(2);
+    setup([{ ...row, codigo_fabricante: null, familia: null }]); expect(screen.getAllByText("—")).toHaveLength(1);
     expect(screen.getByText("0")).toBeInTheDocument();
   });
 });

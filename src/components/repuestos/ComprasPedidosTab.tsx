@@ -1,5 +1,6 @@
 import { sortSalesRows, type SalesColumn, type SalesSort } from "@/components/ventas/salesTableInteraction";
-import { SalesSortButton } from "@/components/ventas/SalesTableControls";
+import { PurchaseInfo, PurchaseTableHeading } from "./PurchaseTableHeading";
+import { purchaseCell, purchaseHead, purchaseMoney, purchaseQuantity } from "./purchaseTableFormat";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -32,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { resolverSolicitudes, solicitudesPorPedido } from "@/lib/imports";
 import { SUCURSALES } from "@/lib/constants";
@@ -133,7 +134,7 @@ export function ComprasPedidosTab() {
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VACIOS);
-  const { sortKey, sortDir, toggleSort, sortIcon } = useSortable<PedidoSortKey>("fecha_emision", "desc");
+  const { sortKey, sortDir, toggleSort } = useSortable<PedidoSortKey>("fecha_emision", "desc");
 
   const lineasPorPedido = useMemo(() => {
     const map = new Map<string, PedidoLinea[]>();
@@ -178,27 +179,27 @@ export function ComprasPedidosTab() {
 
   const columns: SalesColumn<PedidoResumenRow>[] = [
     {key:"sucursal",label:"Sucursal",kind:"text",value:r=>r.sucursal},
-    {key:"nro_pedido",label:"N° Pedido",kind:"text",value:r=>r.nro_pedido},
+    {key:"nro_pedido",label:"Pedido",kind:"text",value:r=>r.nro_pedido},
     {key:"fecha_emision",label:"Fecha",kind:"date",value:r=>r.fecha_emision?.slice(0,10)},
     {key:"proveedor_nombre",label:"Proveedor",kind:"text",value:r=>r.proveedor_nombre},
-    {key:"cantidad_items",label:"Ítems",kind:"number",value:r=>r.cantidad_items},
-    {key:"valor_total",label:"Total",kind:"number",value:r=>Number(r.valor_total)},
-    {key:"estado_seguimiento",label:"Seguimiento",kind:"text",value:r=>r.estado_seguimiento},
+    {key:"cantidad_items",label:"Ítems",kind:"number",align:"center",value:r=>r.cantidad_items},
+    {key:"valor_total",label:"Total",kind:"number",align:"right",value:r=>Number(r.valor_total)},
+    {key:"estado_seguimiento",label:"Estado",kind:"text",value:r=>r.estado_seguimiento},
   ];
   const filasOrdenadas = sortSalesRows(filasFiltradas,columns,{key:sortKey,direction:sortDir});
   const [itemSort,setItemSort] = useState<SalesSort>({key:"item",direction:"asc"});
   const itemColumns:SalesColumn<PedidoLinea>[] = [
     {key:"item",label:"Ítem",kind:"text",value:r=>r.item},
-    {key:"producto",label:"Producto",kind:"text",value:r=>r.productoCodigo},
+    {key:"producto",label:"Código",kind:"text",value:r=>r.productoCodigo},
     {key:"descripcion",label:"Descripción",kind:"text",value:r=>r.descripcion},
-    {key:"cantidad",label:"Cantidad",kind:"number",align:"right",value:r=>r.cantidad},
-    {key:"precio",label:"Precio unit.",kind:"number",align:"right",value:r=>r.precioUnitario},
+    {key:"cantidad",label:"Cant.",kind:"number",align:"center",value:r=>r.cantidad},
+    {key:"precio",label:"P. unit.",kind:"number",align:"right",value:r=>r.precioUnitario},
     {key:"total",label:"Total",kind:"number",align:"right",value:r=>r.valorTotal},
-    {key:"pendiente",label:"Pendiente",kind:"number",align:"right",value:r=>r.cantidadPendiente},
+    {key:"pendiente",label:"Pendiente",kind:"number",align:"center",value:r=>r.cantidadPendiente},
     {key:"solicitud",label:"Solicitud",kind:"text",value:r=>(solicitudesPorPedidoMap.get(`${r.sucursal}|${r.nroPedido}|${r.item}`)??[]).map((s:{sucursal:string;nroSolicitud:string})=>`${s.sucursal}-${s.nroSolicitud}`).join(", ")},
   ];
   const orderItems = (rows:PedidoLinea[]) => sortSalesRows(rows,itemColumns,itemSort);
-  const itemHeading = (key:string) => {const c=itemColumns.find(c=>c.key===key)!;return <SalesSortButton label={c.label} kind={c.kind} align={c.align} active={itemSort.key===key} direction={itemSort.direction} onClick={()=>setItemSort(p=>({key,direction:p.key===key&&p.direction==="asc"?"desc":"asc"}))}/>;};
+  const toggleItemSort = (key:string) => setItemSort(p=>({key,direction:p.key===key&&p.direction==="asc"?"desc":"asc"}));
 
   const exportOptions: TableExportOption[] = (() => {
     const term = filtros.busqueda.trim().toLowerCase();
@@ -292,8 +293,14 @@ export function ComprasPedidosTab() {
     }
   };
 
-  const loading = resumenQuery.isLoading || pedidosLineasQuery.isLoading;
+  const queries = [resumenQuery, pedidosLineasQuery, solicitudesLineasQuery, vinculosQuery, fabricanteMapQuery];
+  const loading = queries.some(query=>query.isLoading);
   if (loading) return <p className={metaText}>Cargando pedidos…</p>;
+
+  if (queries.some(query=>query.isError)) return <div role="alert" className="space-y-2">
+    <p className={metaText}>No se pudieron cargar los pedidos completos.</p>
+    <Button variant="outline" size="sm" onClick={()=>void Promise.all(queries.map(query=>query.refetch()))}>Reintentar</Button>
+  </div>;
 
   if (!resumenQuery.data || resumenQuery.data.length === 0) {
     return <p className={metaText}>Todavía no se importó ningún pedido de compra.</p>;
@@ -330,36 +337,17 @@ export function ComprasPedidosTab() {
           </p>
         )}
 
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
+        <div className="overflow-hidden rounded-md border">
+          <Table className="table-fixed" aria-label="Pedidos de compra">
+            <colgroup><col className="w-[5%] sm:w-[3%]" /><col className="w-[20%] sm:w-[12%]" /><col className="w-[20%] sm:w-[12%]" />
+              <col className="hidden sm:table-column sm:w-[11%]" /><col className="hidden sm:table-column sm:w-[23%]" />
+              <col className="hidden sm:table-column sm:w-[6%]" /><col className="w-[30%] sm:w-[14%]" /><col className="w-[20%] sm:w-[14%]" /><col className="w-[5%]" /></colgroup>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8" />
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("sucursal")}>
-                  <div className="flex items-center gap-1">Sucursal {sortIcon("sucursal")}</div>
-                </TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("nro_pedido")}>
-                  <div className="flex items-center gap-1">N° Pedido {sortIcon("nro_pedido")}</div>
-                </TableHead>
-                <TableHead
-                  className="hidden cursor-pointer select-none sm:table-cell"
-                  onClick={() => toggleSort("fecha_emision")}
-                >
-                  <div className="flex items-center gap-1">Fecha {sortIcon("fecha_emision")}</div>
-                </TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("proveedor_nombre")}>
-                  <div className="flex items-center gap-1">Proveedor {sortIcon("proveedor_nombre")}</div>
-                </TableHead>
-                <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("cantidad_items")}>
-                  <div className="flex items-center justify-end gap-1">Ítems {sortIcon("cantidad_items")}</div>
-                </TableHead>
-                <TableHead className="cursor-pointer select-none text-right" onClick={() => toggleSort("valor_total")}>
-                  <div className="flex items-center justify-end gap-1">Total {sortIcon("valor_total")}</div>
-                </TableHead>
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("estado_seguimiento")}>
-                  <div className="flex items-center gap-1">Seguimiento {sortIcon("estado_seguimiento")}</div>
-                </TableHead>
-                <TableHead />
+                <TableHead className={purchaseHead} />
+                {columns.map(column => <PurchaseTableHeading key={column.key} column={column} sort={{key:sortKey,direction:sortDir}}
+                  onSort={key=>toggleSort(key as PedidoSortKey)} className={["fecha_emision","proveedor_nombre","cantidad_items"].includes(column.key)?"hidden sm:table-cell":undefined} />)}
+                <TableHead className={purchaseHead} />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -394,47 +382,56 @@ export function ComprasPedidosTab() {
                         });
                       }}
                     >
-                      <TableCell>
+                      <TableCell className={cn(purchaseCell,"px-0 sm:px-0")}>
+                        <button type="button" className="flex w-full justify-center" aria-expanded={isOpen} disabled={filtrosActivos}
+                          aria-label={`Ítems del pedido ${row.nro_pedido} (${row.sucursal})`}>
                         {isOpen ? (
                           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : (
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
+                        </button>
                       </TableCell>
-                      <TableCell className="text-[12px]">{row.sucursal ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-[12px]">{row.nro_pedido}</TableCell>
-                      <TableCell className="hidden text-[12px] text-muted-foreground sm:table-cell">
+                      <TableCell className={purchaseCell} title={row.sucursal ?? "—"}>{row.sucursal ?? "—"}</TableCell>
+                      <TableCell className={cn(purchaseCell,"font-mono")} title={`${row.nro_pedido} · ${row.fecha_emision ?? "—"}`}>
+                        <PurchaseInfo label={row.nro_pedido} fields={[["Sucursal",row.sucursal??"—"],["Fecha",row.fecha_emision??"—"],["Proveedor",row.proveedor_nombre??"—"],["Ítems",String(row.cantidad_items)],["Estado",row.estado_seguimiento],["Total",purchaseMoney(row.valor_total,row.moneda)],["Moneda",row.moneda??"No informada"]]} />
+                      </TableCell>
+                      <TableCell className={cn(purchaseCell,"hidden text-muted-foreground sm:table-cell")} title={row.fecha_emision ?? "—"}>
                         {row.fecha_emision ?? "—"}
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-[12px]">{row.proveedor_nombre ?? "—"}</TableCell>
-                      <TableCell className="text-right text-[12px]">
+                      <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={row.proveedor_nombre ?? "—"}>{row.proveedor_nombre ?? "—"}</TableCell>
+                      <TableCell className={cn(purchaseCell,"hidden text-center tabular-nums sm:table-cell")}>
                         {busquedaActiva ? `${lineas.length} / ${row.cantidad_items}` : row.cantidad_items}
                       </TableCell>
-                      <TableCell className="text-right text-[12px] font-medium">
-                        {row.moneda ?? ""} {Number(row.valor_total ?? 0).toLocaleString("es-PY", { maximumFractionDigits: 2 })}
+                      <TableCell className={cn(purchaseCell,"text-right font-medium tabular-nums")} title={`${row.moneda ?? ""} ${row.valor_total}`}>
+                        {purchaseMoney(Number(row.valor_total ?? 0),row.moneda)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={purchaseCell} title={row.estado_seguimiento}>
                         <Badge
                           variant="outline"
                           className={cn(
-                            "font-medium",
+                            "max-w-full overflow-hidden whitespace-nowrap font-medium",
                             ESTADO_STYLES[row.estado_seguimiento as (typeof ESTADOS_SEGUIMIENTO)[number]] ?? ESTADO_STYLES["Sin gestionar"],
                           )}
                         >
-                          {row.estado_seguimiento}
+                          <span className="truncate sm:hidden">{row.estado_seguimiento==="Solicitado a fabrica"?"A fábrica":row.estado_seguimiento==="Sin gestionar"?"Pendiente":row.estado_seguimiento}</span>
+                          <span className="hidden truncate sm:inline">{row.estado_seguimiento}</span>
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={cn(purchaseCell,"px-0 sm:px-0")}>
                         {canManageParts && <Button
                           type="button"
                           variant="ghost"
                           size="sm"
+                          className="h-7 max-w-full overflow-hidden px-1 text-[12px]"
+                          title={`Editar pedido ${row.nro_pedido}`}
+                          aria-label="Editar"
                           onClick={(e) => {
                             e.stopPropagation();
                             abrirEdicion(row);
                           }}
                         >
-                          Editar
+                          <Pencil className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" /><span className="hidden sm:inline">Editar</span>
                         </Button>}
                       </TableCell>
                     </TableRow>
@@ -444,17 +441,12 @@ export function ComprasPedidosTab() {
                         <TableCell colSpan={9} className="bg-muted/30 p-0">
                           {lineas.length === 0 && <p className={cn(metaText, "p-3")}>Sin ítems para este pedido.</p>}
                           {lineas.length > 0 && (
-                            <Table>
+                            <Table className="table-fixed" aria-label={`Ítems del pedido ${row.nro_pedido}`}>
+                              <colgroup>{["hidden sm:table-column sm:w-[5%]","w-[28%] sm:w-[16%]","w-[32%] sm:w-[26%]","w-[15%] sm:w-[8%]","hidden sm:table-column sm:w-[11%]","w-[25%] sm:w-[12%]","hidden sm:table-column sm:w-[10%]","hidden sm:table-column sm:w-[12%]"].map((width,index)=><col key={index} className={width} />)}</colgroup>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="pl-8">{itemHeading("item")}</TableHead>
-                                  <TableHead>{itemHeading("producto")}</TableHead>
-                                  <TableHead>{itemHeading("descripcion")}</TableHead>
-                                  <TableHead className="text-right">{itemHeading("cantidad")}</TableHead>
-                                  <TableHead className="text-right">{itemHeading("precio")}</TableHead>
-                                  <TableHead className="text-right">{itemHeading("total")}</TableHead>
-                                  <TableHead className="text-right">{itemHeading("pendiente")}</TableHead>
-                                  <TableHead>{itemHeading("solicitud")}</TableHead>
+                                  {itemColumns.map(column=><PurchaseTableHeading key={column.key} column={column} sort={itemSort} onSort={toggleItemSort}
+                                    className={["item","precio","pendiente","solicitud"].includes(column.key)?"hidden sm:table-cell":undefined} />)}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -465,35 +457,38 @@ export function ComprasPedidosTab() {
 
                                   return (
                                     <TableRow key={linea.item}>
-                                      <TableCell className="pl-8 text-[12px]">{linea.item}</TableCell>
-                                      <TableCell className="font-mono text-[12px]">{linea.productoCodigo}</TableCell>
-                                      <TableCell className="max-w-[220px] truncate text-[12px]">{linea.descripcion ?? "—"}</TableCell>
-                                      <TableCell className="text-right text-[12px]">
-                                        {linea.cantidad} {linea.unidad ?? ""}
+                                      <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={linea.item}>{linea.item}</TableCell>
+                                      <TableCell className={cn(purchaseCell,"font-mono")} title={linea.productoCodigo}>
+                                        <PurchaseInfo label={linea.productoCodigo} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["Unidad",linea.unidad??"—"],["P. unit.",purchaseMoney(linea.precioUnitario,linea.moneda)],["Total",purchaseMoney(linea.valorTotal,linea.moneda)],["Pendiente",purchaseQuantity.format(linea.cantidadPendiente)],["Solicitudes",(solicitudes??[]).map(s=>`${s.sucursal}-${s.nroSolicitud}${s.esManual?"":" (probable)"}`).join(", ")||"—"],["Moneda",linea.moneda??"No informada"]]} />
                                       </TableCell>
-                                      <TableCell className="text-right text-[12px]">
-                                        {linea.precioUnitario.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
+                                      <TableCell className={purchaseCell} title={linea.descripcion ?? "—"}>{linea.descripcion ?? "—"}</TableCell>
+                                      <TableCell className={cn(purchaseCell,"text-center tabular-nums")} title={`${linea.cantidad} ${linea.unidad ?? ""}`}>
+                                        {purchaseQuantity.format(linea.cantidad)}
                                       </TableCell>
-                                      <TableCell className="text-right text-[12px] font-medium">
-                                        {linea.valorTotal.toLocaleString("es-PY", { maximumFractionDigits: 2 })}
+                                      <TableCell className={cn(purchaseCell,"hidden text-right tabular-nums sm:table-cell")} title={`${linea.moneda ?? ""} ${linea.precioUnitario}`}>
+                                        {purchaseMoney(linea.precioUnitario,linea.moneda)}
+                                      </TableCell>
+                                      <TableCell className={cn(purchaseCell,"text-right font-medium tabular-nums")} title={`${linea.moneda ?? ""} ${linea.valorTotal}`}>
+                                        {purchaseMoney(linea.valorTotal,linea.moneda)}
                                       </TableCell>
                                       <TableCell
                                         className={cn(
-                                          "text-right text-[12px]",
+                                          purchaseCell,"hidden text-center tabular-nums sm:table-cell",
                                           linea.cantidadPendiente > 0 && "font-semibold text-amber-700",
                                         )}
+                                        title={String(linea.cantidadPendiente)}
                                       >
-                                        {linea.cantidadPendiente}
+                                        {purchaseQuantity.format(linea.cantidadPendiente)}
                                       </TableCell>
-                                      <TableCell className="text-[12px]">
+                                      <TableCell className={cn(purchaseCell,"hidden sm:table-cell")}>
                                         {!solicitudes || solicitudes.length === 0 ? (
                                           <span className="text-muted-foreground">—</span>
                                         ) : (
                                           solicitudes.map((s) => (
                                             <span
                                               key={`${s.sucursal}-${s.nroSolicitud}`}
-                                              className="mr-1.5 inline-block font-mono"
-                                              title={s.esManual ? "Vinculada a mano" : "Sugerida por producto, sucursal y precio parecido"}
+                                              className="mr-1.5 font-mono"
+                                              title={`${s.sucursal}-${s.nroSolicitud} · ${s.esManual ? "Vinculada a mano" : "Sugerida por producto, sucursal y precio parecido"}`}
                                             >
                                               {s.sucursal}-{s.nroSolicitud}
                                               {!s.esManual && " (probable)"}
