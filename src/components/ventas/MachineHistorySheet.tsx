@@ -17,22 +17,34 @@ import { canonicalClientName } from "@/lib/clientIdentity";
 type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null; servicios_valor: number | null; repuesto_valor: number | null; kilometro_valor: number | null; terceros_valor: number | null };
 type Part = { id: string; fecha_factura: string; factura: string; cod_mercaderia: string; codigo_fabricante: string; mercaderia: string; observacion: string; cantidad: number; total_venta: number; grupo_normalizado: string; subgrupo_original: string; raw_data: Record<string, unknown> };
 type Machine = { modelo_tipo: string; clientes: { nombre: string | null } | null; fuente_propietario?: string };
+type EntryKind = "Servicio" | "Kilometraje" | "Terceros" | "Repuesto";
+type HistoryEntry = {
+  id: string;
+  date: string | null;
+  closeDate: string | null;
+  kind: EntryKind;
+  os: string;
+  state: string;
+  technicians: string;
+  timeType: string;
+  code: string;
+  manufacturerCode: string;
+  description: string;
+  quantity: number | null;
+  invoice: string;
+  amount: number | null;
+};
+
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const money = (value: number) => `$ ${new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
-const date = (value: string | null) => value ? value.slice(0,10).split("-").reverse().join("/") : "—";
+const date = (value: string | null) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
 const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
-// Sentence-case so imported rows in ALL CAPS and mixed case render the same way.
 const estadoLabel = (value: string | null) => {
   if (!value?.trim()) return "—";
   const lower = value.trim().toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 };
-const facturaList = (value: string | null) => (value ?? "").split(/[;,]/).map(v => v.trim()).filter(Boolean);
-// Same total as TrabajosOSTab: servicios + repuestos + kilometraje + terceros.
-function osTotal(row: Row): number | null {
-  const values = [row.servicios_valor, row.repuesto_valor, row.kilometro_valor, row.terceros_valor];
-  return values.every(v => v == null) ? null : values.reduce((sum, v) => sum + (v ?? 0), 0);
-}
+
 function hoursByType(row: Row): Record<string, number> {
   const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number }> | undefined;
   const result: Record<string, number> = {};
@@ -44,10 +56,10 @@ function hoursByType(row: Row): Record<string, number> {
     return result;
   }
   const types = serviceTypes(row);
-  // A mixed legacy total cannot be allocated to a type without a breakdown.
+  // Un total legado mixto no puede repartirse entre tipos sin evidencia.
   return { [types.length === 1 ? types[0] : "Sin desglose"]: Number(row.servicios_cantidad ?? 0) };
 }
-// Unified crew naming, same rule as Dashboard / Servicios: all participants, canonical name when the technician exists.
+
 function crewNames(row: Row, profiles: TechnicianProfileReference[]): string[] {
   const sources = importedServiceOrderParticipants(row.raw_data, row.responsable);
   const unique = new Map<string, string>();
@@ -57,11 +69,86 @@ function crewNames(row: Row, profiles: TechnicianProfileReference[]): string[] {
   }
   return unique.size ? [...unique.values()] : ["Sin técnico asignado"];
 }
+
+function realSourceCode(raw: Record<string, unknown> | null, accepted: readonly string[]): string {
+  const candidates = [raw?.source_product_code, raw?.codigo_producto, raw?.CODIGO, raw?.PRODUCTO];
+  for (const candidate of candidates) {
+    const code = String(candidate ?? "").trim().toUpperCase();
+    if (accepted.includes(code)) return code;
+  }
+  return "";
+}
+
+function historyEntries(rows: Row[], parts: Part[], profiles: TechnicianProfileReference[]): HistoryEntry[] {
+  const entries: HistoryEntry[] = [];
+  rows.forEach((row, rowIndex) => {
+    const common = {
+      date: row.fecha_abierta_os,
+      closeDate: row.fecha_cierre_os,
+      os: row.os_numero,
+      state: estadoLabel(row.situacion_os),
+      technicians: crewNames(row, profiles).join(", "),
+      invoice: row.factura ?? "",
+      manufacturerCode: "",
+    };
+    const types = Object.entries(hoursByType(row));
+    types.forEach(([timeType, hours], typeIndex) => entries.push({
+      ...common,
+      id: `servicio:${rowIndex}:${typeIndex}:${row.os_numero}:${timeType}`,
+      kind: "Servicio",
+      timeType: typeLabel(timeType),
+      code: realSourceCode(row.raw_data, ["MA01"]),
+      description: "Mano de obra",
+      quantity: hours,
+      // El valor total de una OS mixta no se reparte sin una fuente por tipo.
+      amount: types.length === 1 ? row.servicios_valor : null,
+    }));
+    if (Number(row.km_cantidad ?? 0) !== 0 || row.kilometro_valor != null) entries.push({
+      ...common,
+      id: `kilometraje:${rowIndex}:${row.os_numero}`,
+      kind: "Kilometraje",
+      timeType: "",
+      code: realSourceCode(row.raw_data, ["KM", "KM01"]),
+      description: "Kilometraje",
+      quantity: row.km_cantidad,
+      amount: row.kilometro_valor,
+    });
+    if (row.terceros_valor != null && Number(row.terceros_valor) !== 0) entries.push({
+      ...common,
+      id: `terceros:${rowIndex}:${row.os_numero}`,
+      kind: "Terceros",
+      timeType: "",
+      code: realSourceCode(row.raw_data, ["SE"]),
+      description: "Servicio de terceros",
+      quantity: null,
+      amount: row.terceros_valor,
+    });
+  });
+  parts.forEach(part => entries.push({
+    id: `repuesto:${part.id}`,
+    date: part.fecha_factura,
+    closeDate: null,
+    kind: "Repuesto",
+    os: String(part.raw_data?.linked_service_order ?? ""),
+    state: "",
+    technicians: "",
+    timeType: "",
+    code: part.cod_mercaderia ?? "",
+    manufacturerCode: part.codigo_fabricante ?? "",
+    description: part.mercaderia || part.observacion || "",
+    quantity: part.cantidad,
+    invoice: part.factura ?? "",
+    amount: part.total_venta,
+  }));
+  return entries;
+}
+
 async function history(chassis: string, view: string) {
-  const {data,error} = await (supabase as any).rpc("ventas_servicios_historial", {p_chasis:chassis,p_vista:view});
+  const { data, error } = await (supabase as any).rpc("ventas_servicios_historial", { p_chasis: chassis, p_vista: view });
   if (error) throw new Error(serviceSalesError(error));
   return data;
 }
+
 export function MachineHistorySheet({ target, onOpenChange }: { target: { chassis: string | null; os: string | null } | null; onOpenChange: (open: boolean) => void }) {
   const chassis = target?.chassis;
   const [rows, setRows] = useState<Row[]>([]);
@@ -69,145 +156,108 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
   const [machine, setMachine] = useState<Machine | null>(null);
   const [error, setError] = useState("");
   const [machineError, setMachineError] = useState("");
-  const [partsError, setPartsError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [partsLoading, setPartsLoading] = useState(false);
-  const [tab, setTab] = useState("os");
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+
   useEffect(() => {
     if (!chassis) return;
     let alive = true;
-    setRows([]); setParts([]); setMachine(null); setError(""); setPartsError(""); setMachineError(""); setLoading(true); setTab("os"); setSearch(""); setFrom(""); setTo("");
-    history(chassis, "os")
-      .then(data => { if (alive) setRows(data ?? []); }).catch(e => { if (alive) setError(e.message); }).finally(() => { if (alive) setLoading(false); });
+    setRows([]); setParts([]); setMachine(null); setError(""); setMachineError(""); setLoading(true); setSearch(""); setFrom(""); setTo("");
+    Promise.all([history(chassis, "os"), history(chassis, "repuestos")])
+      .then(([orders, billedParts]) => {
+        if (!alive) return;
+        setRows(orders ?? []);
+        setParts(billedParts ?? []);
+      })
+      .catch(e => {
+        if (!alive) return;
+        setRows([]);
+        setParts([]);
+        setError(e.message);
+      })
+      .finally(() => { if (alive) setLoading(false); });
     history(chassis, "maquina")
       .then(data => { if (alive) setMachine(data); })
       .catch(e => { if (alive) setMachineError(e.message); });
     return () => { alive = false; };
   }, [chassis]);
-  // Billing is only requested when opening the parts list, never for the OS history.
-  useEffect(() => {
-    if (tab !== "repuestos" || !chassis || loading) return;
-    let alive = true;
-    setPartsLoading(true); setPartsError(""); setParts([]);
-    history(chassis, "repuestos")
-      .then(data => { if (alive) setParts(data ?? []); })
-      .catch(e => { if (alive) setPartsError(e.message); })
-      .finally(() => { if (alive) setPartsLoading(false); });
-    return () => { alive = false; };
-  }, [tab, chassis, loading]);
-  const { data: tecnicos } = useServicioTecnicos();
+
+  const { data: tecnicos } = useServicioTecnicos(Boolean(chassis));
   const profiles = useMemo<TechnicianProfileReference[]>(() => (tecnicos ?? []).map(t => ({ id: t.id, nombre: t.nombre })), [tecnicos]);
-  const crewByOs = useMemo(() => new Map(rows.map(row => [row.os_numero, crewNames(row, profiles)])), [rows, profiles]);
+  const entries = useMemo(() => historyEntries(rows, parts, profiles), [rows, parts, profiles]);
   const term = search.trim().toLowerCase();
-  const inRange = (value: string | null) => (!from || (value ?? "") >= from) && (!to || (value ?? "").slice(0,10) <= to);
-  const matchesText = (row: Row) => [row.os_numero, ...(crewByOs.get(row.os_numero) ?? [])].join(" ").toLowerCase().includes(term);
-  const filtered = rows.filter(row => inRange(row.fecha_abierta_os) && matchesText(row));
-  const participation = useMemo(() => {
-    const result: Record<string, number> = { Cliente: 0, Garantia: 0, Interno: 0 };
-    for (const row of rows.filter(row => (!from || (row.fecha_abierta_os ?? "") >= from) && (!to || (row.fecha_abierta_os ?? "").slice(0,10) <= to) && [row.os_numero, ...(crewByOs.get(row.os_numero) ?? [])].join(" ").toLowerCase().includes(term))) {
-      for (const [type,hours] of Object.entries(hoursByType(row))) result[type] = (result[type] ?? 0) + hours;
-    }
-    return result;
-  }, [rows,from,to,term,crewByOs]);
-  const totalHours = Object.values(participation).reduce((a,b) => a+b,0);
-  const visibleParts = parts.filter(part => inRange(part.fecha_factura) && [part.cod_mercaderia,part.codigo_fabricante,part.mercaderia,part.factura,part.raw_data?.linked_service_order].join(" ").toLowerCase().includes(term));
-  const osColumns: SalesColumn<Row>[] = [
-    {key:"fecha",label:"Apertura",kind:"date",value:r=>r.fecha_abierta_os?.slice(0,10)},
-    {key:"os",label:"OS",kind:"text",value:r=>r.os_numero},
-    {key:"estado",label:"Estado",kind:"text",value:r=>estadoLabel(r.situacion_os)},
-    {key:"tecnicos",label:"Técnicos",kind:"text",value:r=>(crewByOs.get(r.os_numero)??[]).join(", ")},
-    {key:"tipo",label:"Tiempo",kind:"text",value:r=>Object.keys(hoursByType(r)).map(typeLabel).join(" · ")},
-    {key:"horas",label:"Horas",kind:"number",align:"center",value:r=>Object.values(hoursByType(r)).reduce((a,b)=>a+b,0)},
-    {key:"km",label:"Km",kind:"number",align:"center",value:r=>r.km_cantidad},
-    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
-    {key:"total",label:"Total OS",kind:"number",align:"right",value:osTotal,excelFormat:'"$" #,##0.00'},
-  ];
-  const partColumns: SalesColumn<Part>[] = [
-    {key:"fecha",label:"Fecha",kind:"date",value:r=>r.fecha_factura?.slice(0,10)},
-    {key:"factura",label:"Factura",kind:"text",value:r=>r.factura},
-    {key:"os",label:"OS",kind:"text",value:r=>String(r.raw_data?.linked_service_order??"")},
-    {key:"codigo",label:"Código",kind:"text",value:r=>r.cod_mercaderia},
-    {key:"fabricante",label:"Cód. fabr.",kind:"text",value:r=>r.codigo_fabricante},
-    {key:"descripcion",label:"Descripción",kind:"text",value:r=>r.mercaderia||r.observacion},
-    {key:"cantidad",label:"Cant.",kind:"number",align:"center",value:r=>r.cantidad},
-    {key:"total",label:"Facturado",kind:"number",align:"right",value:r=>r.total_venta,excelFormat:'"$" #,##0.00'},
-  ];
-  const osTable = useSectionTable({rows:filtered,columns:osColumns,initialSort:{key:"fecha",direction:"desc"},
-    title:"Historial de OS",fileName:"historial-os-maquina.xlsx",disabled:loading||!!error,register:false});
-  const partTable = useSectionTable({rows:visibleParts,columns:partColumns,initialSort:{key:"fecha",direction:"desc"},
-    title:"Repuestos de la máquina",fileName:"historial-repuestos-maquina.xlsx",disabled:partsLoading||!!partsError,register:false});
+  const visible = entries.filter(entry => {
+    const entryDate = entry.date?.slice(0, 10) ?? "";
+    const inRange = (!from || entryDate >= from) && (!to || entryDate <= to);
+    const haystack = [entry.kind, entry.os, entry.state, entry.technicians, entry.timeType, entry.code, entry.manufacturerCode, entry.description, entry.invoice].join(" ").toLowerCase();
+    return inRange && haystack.includes(term);
+  });
 
-  const osView: CompactListColumn<Row>[] = osColumns.map(column => {
-    const layout: Record<string, Pick<CompactListColumn<Row>, "width" | "hiddenBelow">> = {
-      fecha: {width:"md:w-[10%] lg:w-[10%]",hiddenBelow:"md"},
-      os: {width:"w-[34%] md:w-[18%] lg:w-[14%]"},
-      estado: {width:"lg:w-[9%]",hiddenBelow:"lg"},
-      tecnicos: {width:"lg:w-[14%]",hiddenBelow:"lg"},
-      tipo: {width:"md:w-[24%] lg:w-[12%]",hiddenBelow:"md"},
-      horas: {width:"w-[18%] md:w-[10%] lg:w-[8%]"},
-      km: {width:"w-[15%] md:w-[10%] lg:w-[7%]"},
-      factura: {width:"lg:w-[14%]",hiddenBelow:"lg"},
-      total: {width:"w-[33%] md:w-[28%] lg:w-[12%]"},
-    };
-    return {...column,...layout[column.key],className:["os","factura"].includes(column.key)?"font-mono":undefined,
-      title:r=>column.key==="horas"?Object.entries(hoursByType(r)).map(([type,h])=>`${typeLabel(type)}: ${decimal.format(h)}`).join(" · "):String(column.value(r)??"—"),
-      render:r=>{
-        if(column.key==="fecha")return date(r.fecha_abierta_os);
-        if(column.key==="os")return <CompactListInfo label={r.os_numero} fields={[
-          ...osColumns.map(c=>[c.label,String(c.value(r)??"—")] as const),
-          ["Cierre",date(r.fecha_cierre_os)],["Desglose",Object.entries(hoursByType(r)).map(([type,h])=>`${typeLabel(type)}: ${decimal.format(h)}`).join(" · ")],
-        ]}/>;
-        if(column.key==="horas"||column.key==="km"){const value=column.value(r);return value==null?"—":decimal.format(Number(value));}
-        if(column.key==="total"){const value=osTotal(r);return value==null?"—":money(value);}
-        if(column.key==="factura"){const invoices=facturaList(r.factura);return invoices.length?<span>{invoices[0]}{invoices.length>1&&<span className="ml-1 rounded bg-muted px-1 text-[10px]">+{invoices.length-1}</span>}</span>:"—";}
-        return String(column.value(r)??"—");
-      }};
+  const columns: SalesColumn<HistoryEntry>[] = [
+    { key: "fecha", label: "Fecha", kind: "date", value: row => row.date?.slice(0, 10) },
+    { key: "tipo", label: "Tipo", kind: "text", value: row => row.kind === "Servicio" ? row.timeType || row.kind : row.kind },
+    { key: "os", label: "OS", kind: "text", value: row => row.os },
+    { key: "estado", label: "Estado", kind: "text", value: row => row.state },
+    { key: "tecnicos", label: "Técnicos", kind: "text", value: row => row.technicians },
+    { key: "codigo", label: "Código", kind: "text", value: row => row.code },
+    { key: "fabricante", label: "Cód. fabr.", kind: "text", value: row => row.manufacturerCode },
+    { key: "descripcion", label: "Descripción", kind: "text", value: row => row.description },
+    { key: "cantidad", label: "Cant.", kind: "number", align: "center", value: row => row.quantity },
+    { key: "factura", label: "Factura", kind: "text", value: row => row.invoice },
+    { key: "facturado", label: "Facturado", kind: "number", align: "right", value: row => row.amount, excelFormat: '"$" #,##0.00' },
+  ];
+  const table = useSectionTable({
+    rows: visible,
+    columns,
+    initialSort: { key: "fecha", direction: "desc" },
+    title: "Historial completo de la máquina",
+    fileName: "historial-completo-maquina.xlsx",
+    disabled: loading || !!error,
+    register: false,
   });
-  const partView: CompactListColumn<Part>[] = partColumns.map(column=>{
-    const layout:Record<string,Pick<CompactListColumn<Part>,"width"|"hiddenBelow">>={
-      fecha:{width:"md:w-[12%] lg:w-[10%]",hiddenBelow:"md"},
-      factura:{width:"md:w-[17%] lg:w-[14%]",hiddenBelow:"md"},
-      os:{width:"lg:w-[14%]",hiddenBelow:"lg"},
-      codigo:{width:"w-[23%] md:w-[18%] lg:w-[14%]"},
-      fabricante:{width:"lg:w-[12%]",hiddenBelow:"lg"},
-      descripcion:{width:"w-[26%] md:w-[29%] lg:w-[15%]"},
-      cantidad:{width:"w-[18%] md:w-[8%] lg:w-[6%]"},
-      total:{width:"w-[33%] md:w-[16%] lg:w-[15%]"},
+  const visibleKeys = ["fecha", "tipo", "os", "codigo", "descripcion", "cantidad", "factura", "facturado"];
+  const view: CompactListColumn<HistoryEntry>[] = columns.filter(column => visibleKeys.includes(column.key)).map(column => {
+    const layout: Record<string, Pick<CompactListColumn<HistoryEntry>, "width" | "hiddenBelow">> = {
+      fecha: { width: "md:w-[10%] lg:w-[10%]", hiddenBelow: "md" },
+      tipo: { width: "w-[23%] md:w-[16%] lg:w-[11%]" },
+      os: { width: "md:w-[14%] lg:w-[13%]", hiddenBelow: "md" },
+      codigo: { width: "lg:w-[11%]", hiddenBelow: "lg" },
+      descripcion: { width: "w-[33%] md:w-[34%] lg:w-[26%]" },
+      cantidad: { width: "w-[17%] md:w-[12%] lg:w-[8%]" },
+      factura: { width: "lg:w-[12%]", hiddenBelow: "lg" },
+      facturado: { width: "w-[27%] md:w-[14%] lg:w-[9%]" },
     };
-    return {...column,...layout[column.key],className:["os","factura","codigo","fabricante"].includes(column.key)?"font-mono":undefined,render:r=>{
-      if(column.key==="fecha")return date(r.fecha_factura);
-      if(column.key==="descripcion")return <CompactListInfo label={r.mercaderia||r.observacion||"—"} fields={partColumns.map(c=>[c.label,String(c.value(r)??"—")] as const)}/>;
-      if(column.key==="cantidad")return r.cantidad==null?"—":decimal.format(r.cantidad);
-      if(column.key==="total")return money(r.total_venta);
-      return String(column.value(r)||"—");
-    }};
+    return {
+      ...column,
+      ...layout[column.key],
+      className: ["os", "codigo", "factura"].includes(column.key) ? "font-mono" : undefined,
+      render: row => {
+        if (column.key === "fecha") return date(row.date);
+        if (column.key === "descripcion") return <CompactListInfo label={row.description || "—"} fields={[
+          ["Ítem", row.kind], ["OS", row.os || "—"], ["Estado", row.state || "—"], ["Técnicos", row.technicians || "—"],
+          ["Tiempo", row.timeType || "—"], ["Código", row.code || "—"], ["Cód. fabr.", row.manufacturerCode || "—"],
+          ["Factura", row.invoice || "—"], ["Cierre", date(row.closeDate)],
+        ]} />;
+        if (column.key === "cantidad") return row.quantity == null ? "—" : decimal.format(row.quantity);
+        if (column.key === "facturado") return row.amount == null ? "—" : money(row.amount);
+        return String(column.value(row) || "—");
+      },
+    };
   });
+
   return <Sheet open={Boolean(target)} onOpenChange={onOpenChange}><SheetContent className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[1000px]">
-    <SheetHeader className="border-b p-5 pr-12"><SheetTitle>Historial de la máquina</SheetTitle><SheetDescription>{machine?.modelo_tipo ?? "Máquina"} · Chasis {chassis}<span className="block mt-1">Propietario actual: {machineError ? "No disponible: error de consulta" : canonicalClientName(machine?.clientes?.nombre) || "No informado"}{machine?.fuente_propietario === "stock" && <span className="text-muted-foreground"> · Stock propio</span>}</span></SheetDescription></SheetHeader>
-    <div className="flex gap-5 border-b px-5">{[["os","Historial de OS"],["repuestos","Repuestos"]].map(([key,label]) => <button key={key} onClick={() => { setTab(key); setSearch(""); }} className={"border-b-2 py-3 text-sm " + (tab === key ? "border-primary font-semibold" : "border-transparent text-muted-foreground")}>{label}</button>)}</div>
-    <div className="min-h-0 flex-1 overflow-auto p-5 space-y-4">
-      <FiltersBar search={{value:search,onChange:setSearch,ariaLabel:"Buscar en historial",placeholder:tab==="os"?"Buscar OS o técnico…":"Buscar código, fabricante, repuesto u OS…"}}
-        activeCount={Number(!!from)+Number(!!to)} onClear={()=>{setSearch("");setFrom("");setTo("");}}
-        expanded={<><Input aria-label="Desde" type="date" value={from} onChange={e=>setFrom(e.target.value)}/><Input aria-label="Hasta" type="date" value={to} onChange={e=>setTo(e.target.value)}/></>}
-        secondaryActions={<SectionActionsMenu options={(tab==="os"?osTable.action:partTable.action)?[tab==="os"?osTable.action!:partTable.action!]:[]}/>}/>
-
+    <SheetHeader className="border-b p-5 pr-12"><SheetTitle>Historial de la máquina</SheetTitle><SheetDescription>{machine?.modelo_tipo ?? "Máquina"} · Chasis {chassis}<span className="mt-1 block">Propietario actual: {machineError ? "No disponible: error de consulta" : canonicalClientName(machine?.clientes?.nombre) || "No informado"}{machine?.fuente_propietario === "stock" && <span className="text-muted-foreground"> · Stock propio</span>}</span></SheetDescription></SheetHeader>
+    <div className="min-h-0 flex-1 space-y-4 overflow-auto p-5">
+      <FiltersBar search={{ value: search, onChange: setSearch, ariaLabel: "Buscar en historial", placeholder: "Buscar OS, factura, técnico, código o descripción…" }}
+        activeCount={Number(!!from) + Number(!!to)} onClear={() => { setSearch(""); setFrom(""); setTo(""); }}
+        expanded={<><Input aria-label="Desde" type="date" value={from} onChange={event => setFrom(event.target.value)} /><Input aria-label="Hasta" type="date" value={to} onChange={event => setTo(event.target.value)} /></>}
+        secondaryActions={<SectionActionsMenu options={table.action ? [table.action] : []} />} />
       {machineError && <p role="alert" className="text-xs text-destructive">{machineError}</p>}
-      {loading ? <p>Cargando historial…</p> : error ? <p role="alert" className="text-destructive">{error}</p> : tab === "os" ? <>
-        <div className="grid gap-2 sm:grid-cols-[minmax(150px,1fr)_repeat(3,minmax(0,1fr))]">
-          <div className="rounded-md border bg-muted/40 p-2.5"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Órdenes de servicio</div><div className="text-[15px] font-semibold leading-5">{filtered.length} OS</div><div className="text-[11px] text-muted-foreground">{decimal.format(totalHours)} h OS en total</div></div>
-          {Object.entries(participation).map(([type,hours]) => <div key={type} className="rounded-md border p-2.5">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><span className={"h-1.5 w-1.5 rounded-full " + (type === "Cliente" ? "bg-primary" : type === "Garantia" ? "bg-blue-500" : "bg-amber-500")} />{typeLabel(type)}</div>
-            <div className="text-[15px] font-semibold leading-5">{decimal.format(hours)} h</div>
-            <div className="text-[11px] text-muted-foreground">{totalHours > 0 ? decimal.format(hours/totalHours*100)+"% del total" : "Sin horas en el período"}</div>
-          </div>)}
-        </div>
-        <div className="overflow-hidden rounded-md border"><CompactListTable rows={osTable.ordered} columns={osView} id={r=>r.os_numero} label="Historial de OS" sort={osTable.sort} heading={osTable.heading}
-          status={!filtered.length?"No hay OS para estos filtros.":undefined}/></div>
-      </> : partsLoading ? <p>Cargando repuestos…</p> : partsError ? <p role="alert" className="text-destructive">No se pudieron consultar los repuestos. {partsError} No se muestran resultados parciales.</p> : <div className="overflow-hidden rounded-md border"><CompactListTable rows={partTable.ordered} columns={partView} id={r=>r.id} label="Repuestos de la máquina" sort={partTable.sort} heading={partTable.heading}
-        status={!visibleParts.length?<span title="No implica ausencia de consumos en la OS.">Sin repuestos facturados para estos filtros.</span>:undefined}/></div>}
+      {loading ? <p>Cargando historial…</p> : error ? <p role="alert" className="text-destructive">No se pudo cargar el historial completo. {error} No se muestran resultados parciales.</p> :
+        <div className="overflow-hidden rounded-md border"><CompactListTable rows={table.ordered} columns={view} id={row => row.id} label="Historial completo de la máquina" sort={table.sort} heading={table.heading}
+          status={!visible.length ? "No hay movimientos para estos filtros." : undefined} /></div>}
     </div>
   </SheetContent></Sheet>;
 }
