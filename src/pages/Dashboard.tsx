@@ -940,6 +940,8 @@ export default function Dashboard() {
       try {
         // Mismas fuentes e importes que Ventas. El RPC conserva GRID sólo
         // como metadato por línea y nunca elimina MO/Km por factura completa.
+        // La carga se divide en trimestres disjuntos para que los cruces de la
+        // fuente no agoten el límite de PostgreSQL al evaluar un año entero.
         const rows = await cargarFacturacionDashboard(dateKey(queryStart), dateKey(queryEnd), async (rango, signal) => {
           const { data, error } = await supabase.rpc("dashboard_facturacion_lote_v1" as never, {
             p_desde: rango.desde, p_hasta: rango.hasta,
@@ -3432,8 +3434,7 @@ export default function Dashboard() {
 
         {facturacionError && (
           <div role="alert" className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
-            <p>No se pudo cargar la facturación: {facturacionError}. Si falta el RPC,
-              aplicá las migraciones 20260916160000 y 20260916170000. No se muestran resultados parciales.</p>
+            <p>No se pudo cargar la facturación: {facturacionError}. No se muestran resultados parciales.</p>
             <Button variant="outline" size="sm" className="mt-2" onClick={() => setFacturacionReintento(value => value + 1)}>
               Reintentar carga
             </Button>

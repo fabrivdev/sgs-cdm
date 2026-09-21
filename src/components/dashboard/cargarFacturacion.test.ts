@@ -8,21 +8,32 @@ const row: DashboardFacturacionMovimiento = {
   grupo_fx: 'Servicio', cod_factura: 'NC1', tipo_tiempo: 'Garantía', concepto: 'Servicio',
 };
 afterEach(() => vi.useRealTimers());
-describe('carga de facturación sin paginar el reporte anual', () => {
-  it('consulta cada año una sola vez aunque tenga más de 1.000 filas', async () => {
+describe('carga de facturación sin paginar el reporte', () => {
+  it('consulta cada trimestre una sola vez aunque tenga más de 1.000 filas', async () => {
     const leer = vi.fn(async ({ desde }) => ({ rows: Array.from({ length: 1_501 }, () => ({ ...row, fecha: desde })), count: 1_501 }));
     const result = await cargarFacturacionDashboard('2025-01-01', '2026-12-31', leer, new AbortController().signal);
-    expect(leer).toHaveBeenCalledTimes(2);
-    expect(result).toHaveLength(3_002);
-    expect(result.reduce((sum, r) => sum + r.total_venta, 0)).toBe(-31_521);
+    expect(leer).toHaveBeenCalledTimes(8);
+    expect(result).toHaveLength(12_008);
+    expect(result.reduce((sum, r) => sum + r.total_venta, 0)).toBe(-126_084);
     expect(result.every(r => r.cantidad === -1 && r.tipo_tiempo === 'Garantia')).toBe(true);
   });
   it('no incluye el 1 de septiembre cuando se solicita agosto', () => {
     expect(rangosFacturacion('2026-08-01','2026-08-31')).toEqual([{ desde: '2026-08-01', hasta: '2026-08-31' }]);
     expect(rangosFacturacion('2024-12-31','2026-01-01')).toEqual([
       { desde: '2024-12-31', hasta: '2024-12-31' },
-      { desde: '2025-01-01', hasta: '2025-12-31' },
+      { desde: '2025-01-01', hasta: '2025-03-31' },
+      { desde: '2025-04-01', hasta: '2025-06-30' },
+      { desde: '2025-07-01', hasta: '2025-09-30' },
+      { desde: '2025-10-01', hasta: '2025-12-31' },
       { desde: '2026-01-01', hasta: '2026-01-01' },
+    ]);
+  });
+  it('parte un año bisiesto sin huecos ni días repetidos', () => {
+    expect(rangosFacturacion('2024-02-29','2024-10-01')).toEqual([
+      { desde: '2024-02-29', hasta: '2024-03-31' },
+      { desde: '2024-04-01', hasta: '2024-06-30' },
+      { desde: '2024-07-01', hasta: '2024-09-30' },
+      { desde: '2024-10-01', hasta: '2024-10-01' },
     ]);
   });
   it.each([['','2026-08-31'],['2026-09-01','2026-08-31']])('rechaza un rango inválido sin consultar', async (desde, hasta) => {
@@ -34,7 +45,7 @@ describe('carga de facturación sin paginar el reporte anual', () => {
     await expect(cargarFacturacionDashboard('2026-01-01','2026-12-31', async () => ({ rows: [row], count: 2 }),
       new AbortController().signal)).rejects.toThrow('incompleta');
   });
-  it('un fallo en otro año tampoco publica sólo el año exitoso', async () => {
+  it('un fallo en otro trimestre tampoco publica sólo los lotes exitosos', async () => {
     const leer = vi.fn(async ({ desde }) => {
       if (desde.startsWith('2026')) throw new Error('statement timeout');
       return { rows: [row], count: 1 };
@@ -61,7 +72,7 @@ describe('carga de facturación sin paginar el reporte anual', () => {
     controller.abort(new Error('filtro cambiado'));
     await assertion;
   });
-  it('limita a dos consultas simultáneas para rangos de varios años', async () => {
+  it('limita a dos consultas simultáneas para rangos de varios trimestres', async () => {
     let activas = 0, maximo = 0;
     const leer = vi.fn(async () => {
       activas++; maximo = Math.max(activas, maximo);
@@ -69,7 +80,7 @@ describe('carga de facturación sin paginar el reporte anual', () => {
       activas--; return { rows: [], count: 0 };
     });
     expect(await cargarFacturacionDashboard('2020-01-01','2026-12-31', leer, new AbortController().signal)).toEqual([]);
-    expect(leer).toHaveBeenCalledTimes(7);
+    expect(leer).toHaveBeenCalledTimes(28);
     expect(maximo).toBe(2);
   });
 });

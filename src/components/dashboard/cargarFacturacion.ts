@@ -1,4 +1,4 @@
-import { addDays, endOfYear, format, isValid, parseISO, startOfDay } from 'date-fns';
+import { addDays, endOfQuarter, format, isValid, parseISO, startOfDay } from 'date-fns';
 import { normalizarFacturacionDashboard, type DashboardFacturacionMovimiento } from './facturacionSource';
 
 export type RangoFacturacion = { desde: string; hasta: string };
@@ -13,15 +13,21 @@ export function rangosFacturacion(desde: string, hasta: string): RangoFacturacio
   }
   const rangos: RangoFacturacion[] = [];
   for (let cursor = inicio; cursor <= fin;) {
-    const cierre = endOfYear(cursor) < fin ? endOfYear(cursor) : fin;
+    // La fuente conciliada cruza histórico, líneas actuales y metadatos GRID.
+    // Un año completo puede exceder el límite de PostgreSQL aun cuando el JSON
+    // final sea pequeño. Los trimestres reducen el conjunto de cada cruce sin
+    // paginar ni repetir un mismo período y preservan todos los límites diarios.
+    const cierreTrimestre = endOfQuarter(cursor);
+    const cierre = cierreTrimestre < fin ? cierreTrimestre : fin;
     rangos.push({ desde: format(cursor, 'yyyy-MM-dd'), hasta: format(cierre, 'yyyy-MM-dd') });
     cursor = startOfDay(addDays(cierre, 1));
   }
   return rangos;
 }
 
-// Una evaluación por año, no una por cada página de 1.000 movimientos.
-// El JSON escalar no está sujeto al límite de filas REST de Supabase.
+// Una evaluación por trimestre, no una por cada página de 1.000 movimientos.
+// El JSON escalar no está sujeto al límite de filas REST de Supabase. Cada día
+// pertenece a un único lote, por lo que no se duplican líneas entre períodos.
 export async function cargarFacturacionDashboard(
   desde: string, hasta: string, leer: LeerLote, signal: AbortSignal, timeoutMs = 45_000,
 ) {
