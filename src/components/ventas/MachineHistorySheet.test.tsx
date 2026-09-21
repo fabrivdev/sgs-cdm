@@ -11,6 +11,7 @@ vi.mock("xlsx", () => ({ utils: { aoa_to_sheet: sheet, encode_cell: () => "A1", 
 beforeEach(() => {
   can.mockReturnValue(true);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
@@ -24,14 +25,14 @@ const row = {
   km_cantidad: null,
   responsable: "12 - juan gómez",
   situacion_os: "CERRADA",
-  factura: "0010001005021; 0010000000077",
+  factura: "001-001-005021; 001-000-000077",
   servicios_valor: 100,
   repuesto_valor: 50,
   kilometro_valor: null,
   terceros_valor: null,
   raw_data: { "Mec Aux 1": "JUAN GOMEZ", "Mec Aux 2": "Pedro Ruiz", totales_por_tipo: { Cliente: { horas: 5 }, Garantia: { horas: 3 } } },
 };
-const part = { id: "p1", fecha_factura: "2026-08-21", factura: "00000123", cod_mercaderia: "REP001", codigo_fabricante: "FAB002", mercaderia: "Rodamiento", observacion: "", cantidad: 2, total_venta: 80, raw_data: { linked_service_order: row.os_numero } };
+const part = { id: "p1", fecha_factura: "2026-08-21", factura: "001-003-0000123", cod_mercaderia: "REP001", codigo_fabricante: "FAB002", mercaderia: "Rodamiento", observacion: "", cantidad: 2, total_venta: 80, raw_data: { linked_service_order: row.os_numero } };
 
 function renderSheet() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -61,6 +62,7 @@ describe("complete machine history", () => {
     expect(screen.queryByText("Órdenes de servicio")).not.toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("ventas_servicios_historial", expect.objectContaining({ p_vista: "os" }));
     expect(rpc).toHaveBeenCalledWith("ventas_servicios_historial", expect.objectContaining({ p_vista: "repuestos" }));
+    expect(within(table).getAllByText("001001005021; 001000000077")).toHaveLength(2);
   });
 
   it("uses one row per real time type and never allocates a mixed OS amount", async () => {
@@ -94,7 +96,19 @@ describe("complete machine history", () => {
     expect(cells[5]).toHaveTextContent("-2,5");
     expect(cells[5]).toHaveClass("text-center");
     expect(cells[7]).toHaveTextContent("$ -80,55");
-    expect(within(table).getAllByText("00000123")).toHaveLength(2);
+    expect(within(table).getAllByText("0010030000123")).toHaveLength(2);
+  });
+
+  it("shows exact labor amounts by time type when the source provides them", async () => {
+    const detailedRow = { ...row, raw_data: { ...row.raw_data, totales_por_tipo: {
+      Cliente: { horas: 5, valor_servicio: 62.5 },
+      Garantia: { horas: 3, valor_servicio: -10.25 },
+    } } };
+    rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [detailedRow] } : args.p_vista === "maquina" ? { data: null } : { data: [] }));
+    renderSheet();
+    const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
+    expect(within(rowContaining(table, "Cliente")!).getAllByRole("cell")[7]).toHaveTextContent("$ 62,50");
+    expect(within(rowContaining(table, "Garantía")!).getAllByRole("cell")[7]).toHaveTextContent("$ -10,25");
   });
 
   it("adds kilometraje and terceros only from real source values", async () => {
@@ -120,7 +134,7 @@ describe("complete machine history", () => {
     const exported = sheet.mock.calls[0][0] as unknown[][];
     expect(exported).toHaveLength(4);
     expect(exported[0]).toEqual(["Fecha", "Tipo", "OS", "Estado", "Técnicos", "Código", "Cód. fabr.", "Descripción", "Cant.", "Factura", "Facturado"]);
-    expect(exported.find(exportRow => exportRow[1] === "Repuesto")).toEqual([expect.any(Date), "Repuesto", row.os_numero, null, null, "REP001", "FAB002", "Rodamiento", 2, "00000123", 80]);
+    expect(exported.find(exportRow => exportRow[1] === "Repuesto")).toEqual([expect.any(Date), "Repuesto", row.os_numero, null, null, "REP001", "FAB002", "Rodamiento", 2, "0010030000123", 80]);
     expect(exported.filter(exportRow => ["Cliente", "Garantía"].includes(String(exportRow[1]))).map(exportRow => exportRow[1])).toEqual(expect.arrayContaining(["Cliente", "Garantía"]));
   });
 
@@ -128,6 +142,19 @@ describe("complete machine history", () => {
     setup(); renderSheet();
     const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
     fireEvent.change(screen.getAllByRole("searchbox", { name: "Buscar en historial" })[0], { target: { value: "FAB002" } });
+    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(2));
+    expect(screen.getByText("Rodamiento")).toBeInTheDocument();
+    expect(screen.queryByText("Mano de obra")).not.toBeInTheDocument();
+  });
+
+  it("filters the unified ledger by movement from the single filters panel", async () => {
+    setup(); renderSheet();
+    const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const panel = await screen.findByRole("dialog");
+    fireEvent.click(within(panel).getAllByRole("combobox")[0]);
+    fireEvent.click(await screen.findByRole("option", { name: "Repuestos" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Aplicar" }));
     await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(2));
     expect(screen.getByText("Rodamiento")).toBeInTheDocument();
     expect(screen.queryByText("Mano de obra")).not.toBeInTheDocument();

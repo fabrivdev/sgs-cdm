@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
-import { FiltersBar } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import type { SalesColumn } from "./salesTableInteraction";
 import { serviceSalesError } from "@/lib/serviceSalesError";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,26 +38,41 @@ type HistoryEntry = {
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const money = (value: number) => `$ ${new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: string | null) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
-const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
+const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value === "No informado" ? "Por confirmar" : value;
+const canonicalInvoice = (value: string | null | undefined) => String(value ?? "")
+  .split(/[;,]/)
+  .map(invoice => invoice.replace(/[-\s]/g, ""))
+  .filter(Boolean)
+  .join("; ");
 const estadoLabel = (value: string | null) => {
   if (!value?.trim()) return "—";
   const lower = value.trim().toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 };
 
-function hoursByType(row: Row): Record<string, number> {
-  const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number }> | undefined;
-  const result: Record<string, number> = {};
+type LaborTotal = { quantity: number; amount: number | null };
+
+function laborByType(row: Row): Record<string, LaborTotal> {
+  const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number; valor_servicio?: number }> | undefined;
+  const result: Record<string, LaborTotal> = {};
   if (totals && Object.keys(totals).length) {
     for (const [key, value] of Object.entries(totals)) {
       const normalized = serviceTypes({ tipo_tiempo: key, raw_data: null })[0];
-      result[normalized] = (result[normalized] ?? 0) + Number(value.horas ?? 0);
+      const previous = result[normalized] ?? { quantity: 0, amount: null };
+      const hasAmount = value.valor_servicio !== undefined && value.valor_servicio !== null;
+      result[normalized] = {
+        quantity: previous.quantity + Number(value.horas ?? 0),
+        amount: hasAmount ? Number(previous.amount ?? 0) + Number(value.valor_servicio) : previous.amount,
+      };
     }
     return result;
   }
   const types = serviceTypes(row);
   // Un total legado mixto no puede repartirse entre tipos sin evidencia.
-  return { [types.length === 1 ? types[0] : "Sin desglose"]: Number(row.servicios_cantidad ?? 0) };
+  return { [types.length === 1 ? types[0] : "Sin desglose"]: {
+    quantity: Number(row.servicios_cantidad ?? 0),
+    amount: types.length === 1 ? row.servicios_valor : null,
+  } };
 }
 
 function crewNames(row: Row, profiles: TechnicianProfileReference[]): string[] {
@@ -88,20 +103,20 @@ function historyEntries(rows: Row[], parts: Part[], profiles: TechnicianProfileR
       os: row.os_numero,
       state: estadoLabel(row.situacion_os),
       technicians: crewNames(row, profiles).join(", "),
-      invoice: row.factura ?? "",
+      invoice: canonicalInvoice(row.factura),
       manufacturerCode: "",
     };
-    const types = Object.entries(hoursByType(row));
-    types.forEach(([timeType, hours], typeIndex) => entries.push({
+    const types = Object.entries(laborByType(row));
+    types.forEach(([timeType, total], typeIndex) => entries.push({
       ...common,
       id: `servicio:${rowIndex}:${typeIndex}:${row.os_numero}:${timeType}`,
       kind: "Servicio",
       timeType: typeLabel(timeType),
       code: realSourceCode(row.raw_data, ["MA01"]),
       description: "Mano de obra",
-      quantity: hours,
-      // El valor total de una OS mixta no se reparte sin una fuente por tipo.
-      amount: types.length === 1 ? row.servicios_valor : null,
+      quantity: total.quantity,
+      // Para OS nuevas se usa el valor real por tipo; un legado mixto no se reparte.
+      amount: total.amount ?? (types.length === 1 ? row.servicios_valor : null),
     }));
     if (Number(row.km_cantidad ?? 0) !== 0 || row.kilometro_valor != null) entries.push({
       ...common,
@@ -137,7 +152,7 @@ function historyEntries(rows: Row[], parts: Part[], profiles: TechnicianProfileR
     manufacturerCode: part.codigo_fabricante ?? "",
     description: part.mercaderia || part.observacion || "",
     quantity: part.cantidad,
-    invoice: part.factura ?? "",
+    invoice: canonicalInvoice(part.factura),
     amount: part.total_venta,
   }));
   return entries;
@@ -160,11 +175,15 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [movement, setMovement] = useState("TODOS");
+  const [timeType, setTimeType] = useState("TODOS");
+  const [status, setStatus] = useState("TODOS");
+  const [invoiceStatus, setInvoiceStatus] = useState("TODAS");
 
   useEffect(() => {
     if (!chassis) return;
     let alive = true;
-    setRows([]); setParts([]); setMachine(null); setError(""); setMachineError(""); setLoading(true); setSearch(""); setFrom(""); setTo("");
+    setRows([]); setParts([]); setMachine(null); setError(""); setMachineError(""); setLoading(true); setSearch(""); setFrom(""); setTo(""); setMovement("TODOS"); setTimeType("TODOS"); setStatus("TODOS"); setInvoiceStatus("TODAS");
     Promise.all([history(chassis, "os"), history(chassis, "repuestos")])
       .then(([orders, billedParts]) => {
         if (!alive) return;
@@ -187,12 +206,23 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
   const { data: tecnicos } = useServicioTecnicos(Boolean(chassis));
   const profiles = useMemo<TechnicianProfileReference[]>(() => (tecnicos ?? []).map(t => ({ id: t.id, nombre: t.nombre })), [tecnicos]);
   const entries = useMemo(() => historyEntries(rows, parts, profiles), [rows, parts, profiles]);
+  const statusOptions = useMemo(() => [
+    { value: "TODOS", label: "Todos" },
+    ...Array.from(new Set(entries.map(entry => entry.state).filter(value => value && value !== "—")))
+      .sort((a, b) => a.localeCompare(b, "es"))
+      .map(value => ({ value, label: value })),
+  ], [entries]);
   const term = search.trim().toLowerCase();
   const visible = entries.filter(entry => {
     const entryDate = entry.date?.slice(0, 10) ?? "";
     const inRange = (!from || entryDate >= from) && (!to || entryDate <= to);
     const haystack = [entry.kind, entry.os, entry.state, entry.technicians, entry.timeType, entry.code, entry.manufacturerCode, entry.description, entry.invoice].join(" ").toLowerCase();
-    return inRange && haystack.includes(term);
+    const matchesMovement = movement === "TODOS" || entry.kind === movement;
+    const matchesTime = timeType === "TODOS" || (entry.kind === "Servicio" && entry.timeType === timeType);
+    const matchesStatus = status === "TODOS" || entry.state === status;
+    const matchesInvoice = invoiceStatus === "TODAS" || (invoiceStatus === "CON" ? Boolean(entry.invoice) : !entry.invoice);
+    const matchesSearch = haystack.includes(term) || entry.invoice.toLowerCase().includes(term.replace(/[-\s]/g, ""));
+    return inRange && matchesMovement && matchesTime && matchesStatus && matchesInvoice && matchesSearch;
   });
 
   const columns: SalesColumn<HistoryEntry>[] = [
@@ -251,8 +281,16 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
     <SheetHeader className="border-b p-5 pr-12"><SheetTitle>Historial de la máquina</SheetTitle><SheetDescription>{machine?.modelo_tipo ?? "Máquina"} · Chasis {chassis}<span className="mt-1 block">Propietario actual: {machineError ? "No disponible: error de consulta" : canonicalClientName(machine?.clientes?.nombre) || "No informado"}{machine?.fuente_propietario === "stock" && <span className="text-muted-foreground"> · Stock propio</span>}</span></SheetDescription></SheetHeader>
     <div className="min-h-0 flex-1 space-y-4 overflow-auto p-5">
       <FiltersBar search={{ value: search, onChange: setSearch, ariaLabel: "Buscar en historial", placeholder: "Buscar OS, factura, técnico, código o descripción…" }}
-        activeCount={Number(!!from) + Number(!!to)} onClear={() => { setSearch(""); setFrom(""); setTo(""); }}
-        expanded={<><Input aria-label="Desde" type="date" value={from} onChange={event => setFrom(event.target.value)} /><Input aria-label="Hasta" type="date" value={to} onChange={event => setTo(event.target.value)} /></>}
+        activeCount={Number(!!from) + Number(!!to) + Number(movement !== "TODOS") + Number(timeType !== "TODOS") + Number(status !== "TODOS") + Number(invoiceStatus !== "TODAS")}
+        onClear={() => { setSearch(""); setFrom(""); setTo(""); setMovement("TODOS"); setTimeType("TODOS"); setStatus("TODOS"); setInvoiceStatus("TODAS"); }}
+        expanded={<>
+          <FilterSelect label="Movimiento" value={movement} onChange={setMovement} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Servicio", label: "Mano de obra" }, { value: "Kilometraje", label: "Kilometraje" }, { value: "Terceros", label: "Terceros" }, { value: "Repuesto", label: "Repuestos" }]} />
+          <FilterSelect label="Tipo de tiempo" value={timeType} onChange={setTimeType} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantía", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "Por confirmar", label: "Por confirmar" }, { value: "Sin desglose", label: "Sin desglose" }]} />
+          <FilterSelect label="Estado" value={status} onChange={setStatus} placeholder="Todos" options={statusOptions} />
+          <FilterSelect label="Factura" value={invoiceStatus} onChange={setInvoiceStatus} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, { value: "CON", label: "Con factura" }, { value: "SIN", label: "Sin factura" }]} />
+          <Input aria-label="Desde" type="date" value={from} onChange={event => setFrom(event.target.value)} />
+          <Input aria-label="Hasta" type="date" value={to} onChange={event => setTo(event.target.value)} />
+        </>}
         secondaryActions={<SectionActionsMenu options={table.action ? [table.action] : []} />} />
       {machineError && <p role="alert" className="text-xs text-destructive">{machineError}</p>}
       {loading ? <p>Cargando historial…</p> : error ? <p role="alert" className="text-destructive">No se pudo cargar el historial completo. {error} No se muestran resultados parciales.</p> :
