@@ -50,19 +50,25 @@ const estadoLabel = (value: string | null) => {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 };
 
-type LaborTotal = { quantity: number; amount: number | null };
+type LaborTotal = { quantity: number; amount: number | null; kmQuantity: number; kmAmount: number | null };
 
 function laborByType(row: Row): Record<string, LaborTotal> {
-  const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number; valor_servicio?: number }> | undefined;
+  const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number; valor_servicio?: number; kilometros?: number; valor_kilometraje?: number }> | undefined;
   const result: Record<string, LaborTotal> = {};
+  const rowType = serviceTypes({ tipo_tiempo: row.tipo_tiempo, raw_data: null });
+  const correctedType = rowType.length === 1 && rowType[0] !== "No informado" ? rowType[0] : null;
   if (totals && Object.keys(totals).length) {
     for (const [key, value] of Object.entries(totals)) {
-      const normalized = serviceTypes({ tipo_tiempo: key, raw_data: null })[0];
-      const previous = result[normalized] ?? { quantity: 0, amount: null };
+      const sourceType = serviceTypes({ tipo_tiempo: key, raw_data: null })[0];
+      const normalized = sourceType === "No informado" && correctedType ? correctedType : sourceType;
+      const previous = result[normalized] ?? { quantity: 0, amount: null, kmQuantity: 0, kmAmount: null };
       const hasAmount = value.valor_servicio !== undefined && value.valor_servicio !== null;
+      const hasKmAmount = value.valor_kilometraje !== undefined && value.valor_kilometraje !== null;
       result[normalized] = {
         quantity: previous.quantity + Number(value.horas ?? 0),
         amount: hasAmount ? Number(previous.amount ?? 0) + Number(value.valor_servicio) : previous.amount,
+        kmQuantity: previous.kmQuantity + Number(value.kilometros ?? 0),
+        kmAmount: hasKmAmount ? Number(previous.kmAmount ?? 0) + Number(value.valor_kilometraje) : previous.kmAmount,
       };
     }
     return result;
@@ -72,6 +78,8 @@ function laborByType(row: Row): Record<string, LaborTotal> {
   return { [types.length === 1 ? types[0] : "Sin desglose"]: {
     quantity: Number(row.servicios_cantidad ?? 0),
     amount: types.length === 1 ? row.servicios_valor : null,
+    kmQuantity: Number(row.km_cantidad ?? 0),
+    kmAmount: types.length === 1 ? row.kilometro_valor : null,
   } };
 }
 
@@ -107,7 +115,16 @@ function historyEntries(rows: Row[], parts: Part[], profiles: TechnicianProfileR
       manufacturerCode: "",
     };
     const types = Object.entries(laborByType(row));
-    types.forEach(([timeType, total], typeIndex) => entries.push({
+    const fallbackType = types.length === 1 ? typeLabel(types[0][0]) : "Sin desglose";
+    let laborTypes: [string, LaborTotal][] = types.map(([timeType, total]) => [timeType, {
+      ...total,
+      quantity: types.length === 1 && Number(total.quantity) === 0 && Number(row.servicios_cantidad ?? 0) !== 0 ? Number(row.servicios_cantidad) : total.quantity,
+      amount: types.length === 1 && Number(total.amount ?? 0) === 0 && Number(row.servicios_valor ?? 0) !== 0 ? row.servicios_valor : total.amount,
+    }] as [string, LaborTotal]).filter(([, total]) => Number(total.quantity) !== 0 || Number(total.amount ?? 0) !== 0);
+    if (!laborTypes.length && (Number(row.servicios_cantidad ?? 0) !== 0 || Number(row.servicios_valor ?? 0) !== 0)) {
+      laborTypes = [[fallbackType, { quantity: Number(row.servicios_cantidad ?? 0), amount: row.servicios_valor, kmQuantity: 0, kmAmount: null }]];
+    }
+    laborTypes.forEach(([timeType, total], typeIndex) => entries.push({
       ...common,
       id: `servicio:${rowIndex}:${typeIndex}:${row.os_numero}:${timeType}`,
       kind: "Servicio",
@@ -116,23 +133,28 @@ function historyEntries(rows: Row[], parts: Part[], profiles: TechnicianProfileR
       description: "Mano de obra",
       quantity: total.quantity,
       // Para OS nuevas se usa el valor real por tipo; un legado mixto no se reparte.
-      amount: total.amount ?? (types.length === 1 ? row.servicios_valor : null),
+      amount: total.amount,
     }));
-    if (Number(row.km_cantidad ?? 0) !== 0 || row.kilometro_valor != null) entries.push({
+    const exactKmTypes = types.filter(([, total]) => Number(total.kmQuantity) !== 0 || Number(total.kmAmount ?? 0) !== 0);
+    const kmTypes: [string, LaborTotal][] = exactKmTypes.length ? exactKmTypes :
+      (Number(row.km_cantidad ?? 0) !== 0 || Number(row.kilometro_valor ?? 0) !== 0
+        ? [[fallbackType, { quantity: 0, amount: null, kmQuantity: Number(row.km_cantidad ?? 0), kmAmount: row.kilometro_valor }]]
+        : []);
+    kmTypes.forEach(([timeType, total], typeIndex) => entries.push({
       ...common,
-      id: `kilometraje:${rowIndex}:${row.os_numero}`,
+      id: `kilometraje:${rowIndex}:${typeIndex}:${row.os_numero}:${timeType}`,
       kind: "Kilometraje",
-      timeType: "",
+      timeType: typeLabel(timeType),
       code: realSourceCode(row.raw_data, ["KM", "KM01"]),
       description: "Kilometraje",
-      quantity: row.km_cantidad,
-      amount: row.kilometro_valor,
-    });
+      quantity: total.kmQuantity,
+      amount: total.kmAmount,
+    }));
     if (row.terceros_valor != null && Number(row.terceros_valor) !== 0) entries.push({
       ...common,
       id: `terceros:${rowIndex}:${row.os_numero}`,
       kind: "Terceros",
-      timeType: "",
+      timeType: fallbackType,
       code: realSourceCode(row.raw_data, ["SE"]),
       description: "Servicio de terceros",
       quantity: null,
@@ -155,7 +177,11 @@ function historyEntries(rows: Row[], parts: Part[], profiles: TechnicianProfileR
     invoice: canonicalInvoice(part.factura),
     amount: part.total_venta,
   }));
-  return entries;
+  // Un importe cero no representa facturación en este detalle; si el importe
+  // es desconocido, la actividad permanece únicamente con cantidad real.
+  return entries.filter(entry => entry.amount == null
+    ? Number(entry.quantity ?? 0) !== 0
+    : Number(entry.amount) !== 0);
 }
 
 async function history(chassis: string, view: string) {
@@ -218,7 +244,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
     const inRange = (!from || entryDate >= from) && (!to || entryDate <= to);
     const haystack = [entry.kind, entry.os, entry.state, entry.technicians, entry.timeType, entry.code, entry.manufacturerCode, entry.description, entry.invoice].join(" ").toLowerCase();
     const matchesMovement = movement === "TODOS" || entry.kind === movement;
-    const matchesTime = timeType === "TODOS" || (entry.kind === "Servicio" && entry.timeType === timeType);
+    const matchesTime = timeType === "TODOS" || entry.timeType === timeType;
     const matchesStatus = status === "TODOS" || entry.state === status;
     const matchesInvoice = invoiceStatus === "TODAS" || (invoiceStatus === "CON" ? Boolean(entry.invoice) : !entry.invoice);
     const matchesSearch = haystack.includes(term) || entry.invoice.toLowerCase().includes(term.replace(/[-\s]/g, ""));
@@ -227,7 +253,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
 
   const columns: SalesColumn<HistoryEntry>[] = [
     { key: "fecha", label: "Fecha", kind: "date", value: row => row.date?.slice(0, 10) },
-    { key: "tipo", label: "Tipo", kind: "text", value: row => row.kind === "Servicio" ? row.timeType || row.kind : row.kind },
+    { key: "tipo", label: "Tipo", kind: "text", value: row => row.kind === "Repuesto" ? row.kind : row.timeType || row.kind },
     { key: "os", label: "OS", kind: "text", value: row => row.os },
     { key: "estado", label: "Estado", kind: "text", value: row => row.state },
     { key: "tecnicos", label: "Técnicos", kind: "text", value: row => row.technicians },

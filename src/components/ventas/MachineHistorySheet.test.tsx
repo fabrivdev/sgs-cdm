@@ -82,7 +82,7 @@ describe("complete machine history", () => {
     expect(table.querySelectorAll("td br,td .flex-col")).toHaveLength(0);
   });
 
-  it("keeps every billed part line separate with cents, negatives and repeated invoices", async () => {
+  it("keeps billed part lines separate with cents and negatives and omits zero-value lines", async () => {
     const parts = [
       { ...part, id: "P1", cod_mercaderia: "REP000001", codigo_fabricante: "000FAB", mercaderia: "DESCRIPCIÓN EXTENSA", cantidad: -2.5, total_venta: -80.55 },
       { ...part, id: "P2", cod_mercaderia: "REP000002", codigo_fabricante: "000FAB2", mercaderia: "OTRA DESCRIPCIÓN", cantidad: 0, total_venta: 0 },
@@ -90,13 +90,14 @@ describe("complete machine history", () => {
     rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [row] } : args.p_vista === "maquina" ? { data: null } : { data: parts }));
     renderSheet();
     const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
-    expect(within(table).getAllByRole("row")).toHaveLength(5);
+    expect(within(table).getAllByRole("row")).toHaveLength(4);
     const firstPart = rowContaining(table, "REP000001");
     const cells = within(firstPart!).getAllByRole("cell");
     expect(cells[5]).toHaveTextContent("-2,5");
     expect(cells[5]).toHaveClass("text-center");
     expect(cells[7]).toHaveTextContent("$ -80,55");
-    expect(within(table).getAllByText("0010030000123")).toHaveLength(2);
+    expect(within(table).getAllByText("0010030000123")).toHaveLength(1);
+    expect(within(table).queryByText("REP000002")).not.toBeInTheDocument();
   });
 
   it("shows exact labor amounts by time type when the source provides them", async () => {
@@ -111,6 +112,25 @@ describe("complete machine history", () => {
     expect(within(rowContaining(table, "Garantía")!).getAllByRole("cell")[7]).toHaveTextContent("$ -10,25");
   });
 
+  it("uses the corrected OS time type for labor and kilometraje and hides all-zero lines", async () => {
+    const correctedRow = { ...row, os_numero: "6198", tipo_tiempo: "Cliente", servicios_cantidad: 17, servicios_valor: 952,
+      km_cantidad: 265, kilometro_valor: 159, raw_data: { totales_por_tipo: { "No informado": {
+        horas: 17, valor_servicio: 952, kilometros: 265, valor_kilometraje: 159,
+      } } } };
+    const zeroRow = { ...row, os_numero: "6191", tipo_tiempo: "Cliente", servicios_cantidad: 0, servicios_valor: 0,
+      km_cantidad: 0, kilometro_valor: 0, raw_data: { totales_por_tipo: { "No informado": {
+        horas: 0, valor_servicio: 0, kilometros: 0, valor_kilometraje: 0,
+      } } } };
+    rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [correctedRow, zeroRow] } : args.p_vista === "maquina" ? { data: null } : { data: [] }));
+    renderSheet();
+    const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
+    expect(within(table).getAllByRole("row")).toHaveLength(3);
+    expect(within(rowContaining(table, "Mano de obra")!).getAllByRole("cell")[1]).toHaveTextContent("Cliente");
+    expect(within(rowContaining(table, "Kilometraje")!).getAllByRole("cell")[1]).toHaveTextContent("Cliente");
+    expect(within(table).queryByText("Por confirmar")).not.toBeInTheDocument();
+    expect(within(table).queryByText("$ 0,00")).not.toBeInTheDocument();
+  });
+
   it("adds kilometraje and terceros only from real source values", async () => {
     const completeRow = { ...row, km_cantidad: 12.5, kilometro_valor: -1.25, terceros_valor: 20, raw_data: { ...row.raw_data, source_product_code: "MA01" } };
     rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [completeRow] } : args.p_vista === "maquina" ? { data: null } : { data: [] }));
@@ -118,7 +138,7 @@ describe("complete machine history", () => {
     const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
     expect(within(table).getAllByRole("row")).toHaveLength(5);
     const kmRow = rowContaining(table, "Kilometraje");
-    const thirdPartyRow = rowContaining(table, "Terceros");
+    const thirdPartyRow = rowContaining(table, "Servicio de terceros");
     expect(within(kmRow!).getAllByRole("cell")[5]).toHaveTextContent("12,5");
     expect(within(kmRow!).getAllByRole("cell")[7]).toHaveTextContent("$ -1,25");
     expect(within(thirdPartyRow!).getAllByRole("cell")[5]).toHaveTextContent("—");
