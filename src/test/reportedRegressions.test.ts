@@ -63,14 +63,17 @@ describe("reported production regressions", () => {
 
   it("uses the import-style header menu and deletes a whole machine order atomically", () => {
     const ui = read("src/pages/MaquinariaOperaciones.tsx");
-    const sql = read("supabase/migrations/20260922150000_add_safe_machine_order_deletion.sql");
+    const sql = read("supabase/migrations/20260922160000_allow_deleting_unbilled_machine_orders.sql");
     expect(ui).toContain('aria-label="Acciones del pedido"');
     expect(ui).toContain("Eliminar pedido");
     expect(ui).toContain('rpc("maquinaria_eliminar_pedido"');
     expect(ui).not.toContain('ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEdit(operationId)}');
     expect(sql).toContain("CREATE OR REPLACE FUNCTION public.maquinaria_eliminar_pedido");
     expect(sql).toContain("FOR UPDATE");
-    expect(sql).toContain("No se puede eliminar: el pedido ya tiene factura, recepcion, stock o parque vinculado");
+    expect(sql).toContain("factura de venta o una maquina entregada al parque");
+    expect(sql).not.toContain("u.valor_facturado IS NOT NULL");
+    expect(sql).not.toContain("s.id IS NOT NULL");
+    expect(sql).toContain("u.estado IN ('FACTURADA', 'EN_PARQUE', 'TRANSFERIDA')");
     expect(sql).toContain("DELETE FROM public.maquinaria_operaciones");
   });
 
