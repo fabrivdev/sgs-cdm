@@ -104,6 +104,16 @@ describe("reported production regressions", () => {
     expect(ui).toContain('rpc("maquinaria_vincular_factura_venta"');
   });
 
+  it("uses the compact import-style actions for machine-order documents", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(ui).toContain('<DocumentRow compactActions label="Nota de pedido"');
+    expect(ui).toContain('<AttachOrderDocumentButton compact operationId={operationId}');
+    expect(ui).toContain('<SaleInvoiceButton compact operationId={operationId}');
+    expect(ui).toContain('<DeleteDocumentButton compact documentLabel="Nota de pedido"');
+    expect(ui).toContain('aria-label={compact ? actionLabel : undefined}');
+    expect(ui).toContain('className={compact ? "h-8 w-8" : undefined}');
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

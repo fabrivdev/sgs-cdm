@@ -1275,7 +1275,7 @@ export function ImportsTable({ rows, heading, sort, onSelect }: { rows: ImportRo
 }
 
 /** Adjunta un documento comercial con un tipo explicito a un pedido. */
-function AttachOrderDocumentButton({ operationId, type, label, onUploaded }: { operationId: string | null; type: "NP" | "FACTURA_VENTA"; label: string; onUploaded: () => void }) {
+function AttachOrderDocumentButton({ operationId, type, label, onUploaded, compact = false }: { operationId: string | null; type: "NP" | "FACTURA_VENTA"; label: string; onUploaded: () => void; compact?: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const choose = async (file?: File) => {
@@ -1295,21 +1295,25 @@ function AttachOrderDocumentButton({ operationId, type, label, onUploaded }: { o
   return <>
     <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => choose(e.target.files?.[0])} />
     <Button
-      variant="outline" size="sm" disabled={busy || !operationId}
+      variant={compact ? "ghost" : "outline"} size={compact ? "icon" : "sm"} className={compact ? "h-8 w-8" : undefined}
+      aria-label={compact ? `${label} ${MACHINE_DOCUMENT_LABELS[type].toLowerCase()}` : undefined}
+      title={compact ? `${label} ${MACHINE_DOCUMENT_LABELS[type].toLowerCase()}` : undefined}
+      disabled={busy || !operationId}
       onClick={() => fileRef.current?.click()}
     >
-      <Paperclip className="mr-1.5 h-3.5 w-3.5" />{busy ? "Subiendo..." : label}
+      {busy ? <LoaderCircle className={cn("h-3.5 w-3.5 animate-spin", !compact && "mr-1.5")} /> : <Upload className={cn("h-3.5 w-3.5", !compact && "mr-1.5")} />}{!compact && (busy ? "Subiendo..." : label)}
     </Button>
   </>;
 }
 
-function SaleInvoiceButton({ operationId, units, lines, links, documentId, onSaved }: {
+function SaleInvoiceButton({ operationId, units, lines, links, documentId, onSaved, compact = false }: {
   operationId: string;
   units: any[];
   lines: any[];
   links: SaleInvoiceLink[];
   documentId?: string;
   onSaved: () => void;
+  compact?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -1340,9 +1344,10 @@ function SaleInvoiceButton({ operationId, units, lines, links, documentId, onSav
       if (fileRef.current) fileRef.current.value = "";
     }
   };
+  const actionLabel = documentId ? "Asignar máquina a factura" : "Adjuntar factura";
   return <Dialog open={open} onOpenChange={reset}>
-    <Button type="button" variant={documentId ? "ghost" : "outline"} size="sm" disabled={!available.length} onClick={() => reset(true)}>
-      <Paperclip className="mr-1.5 h-3.5 w-3.5" />{documentId ? "Asignar máquina" : "Adjuntar factura"}
+    <Button type="button" variant={compact || documentId ? "ghost" : "outline"} size={compact ? "icon" : "sm"} className={compact ? "h-8 w-8" : undefined} aria-label={compact ? actionLabel : undefined} title={compact ? actionLabel : undefined} disabled={!available.length} onClick={() => reset(true)}>
+      <Paperclip className={cn("h-3.5 w-3.5", !compact && "mr-1.5")} />{!compact && (documentId ? "Asignar máquina" : "Adjuntar factura")}
     </Button>
     <DialogContent className="max-w-lg">
       <DialogHeader><DialogTitle>{documentId ? "Asignar factura" : "Nueva factura"}</DialogTitle><DialogDescription>Seleccioná únicamente las máquinas incluidas en esta factura.</DialogDescription></DialogHeader>
@@ -2335,10 +2340,10 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
 
         <TabsContent value="documentos" className="space-y-4">
           <div className="divide-y">
-            <DocumentRow label="Nota de pedido" fileName={npDocument?.archivo_nombre} date={npDocument ? formatDate(npDocument.creado_en) : null} onOpen={npDocument ? () => openDocument(npDocument.storage_path, npDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton operationId={operationId} type="NP" label={npDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{npDocument && <DeleteDocumentButton documentLabel="Nota de pedido" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "NP" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
+            <DocumentRow compactActions label="Nota de pedido" fileName={npDocument?.archivo_nombre} date={npDocument ? formatDate(npDocument.creado_en) : null} onOpen={npDocument ? () => openDocument(npDocument.storage_path, npDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton compact operationId={operationId} type="NP" label={npDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{npDocument && <DeleteDocumentButton compact documentLabel="Nota de pedido" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "NP" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Facturas al cliente</h3>{operationId && <SaleInvoiceButton operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}</div>
+            <div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Facturas al cliente</h3>{operationId && <SaleInvoiceButton compact operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}</div>
             {saleInvoiceDocuments.length ? <div className="divide-y rounded-xl border px-3">{saleInvoiceDocuments.map((document: StoredMachineDocument) => {
               const linkedUnitIds = detail.invoiceLinks.filter(link => link.documento_id === document.id).map(link => link.unidad_operacion_id);
               const linkedUnits = detail.units.filter((unit: any) => linkedUnitIds.includes(unit.id));
@@ -2346,7 +2351,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
                 const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
                 return `${line?.modelo || line?.producto || "Máquina"} · U${unit.numero_unidad}`;
               });
-              return <DocumentRow key={document.id} compactActions label={unitNames.length ? unitNames.join(" + ") : "Factura sin máquina asignada"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} action={<>{!unitNames.length && operationId && <SaleInvoiceButton operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} documentId={document.id} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}<DeleteDocumentButton compact documentLabel="Factura al cliente" onDelete={async () => { await deleteSaleInvoiceDocument(document); await detailQuery.refetch(); onChanged(); }} /></>} />;
+              return <DocumentRow key={document.id} compactActions label={unitNames.length ? unitNames.join(" + ") : "Factura sin máquina asignada"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} action={<>{!unitNames.length && operationId && <SaleInvoiceButton compact operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} documentId={document.id} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}<DeleteDocumentButton compact documentLabel="Factura al cliente" onDelete={async () => { await deleteSaleInvoiceDocument(document); await detailQuery.refetch(); onChanged(); }} /></>} />;
             })}</div> : <p className="rounded-xl border px-3 py-4 text-[11px] text-muted-foreground">Sin facturas cargadas.</p>}
           </div>
         </TabsContent>
