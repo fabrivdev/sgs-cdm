@@ -96,6 +96,23 @@ ceros de relleno en los tres segmentos sin concatenarlos. Faltantes y ambigüeda
 permanecen sin vínculo; no se infiere por nombre, monto o proximidad de fechas.
 Las correcciones de tiempo y el reparto por participación de Comisiones se conservan.
 
+## Refacturaciones sin OS
+
+Una refacturación actual puede pertenecer a Ventas de Servicios aunque no exista una
+OS vinculada. La migración manual
+`20260922130000_include_unlinked_service_refacturations.sql` incorpora únicamente
+líneas cuya evidencia original de TOTVS sea el grupo `008 - SERVICIOS` (incluida la
+grafía de origen `SEVICIOS`) y cuyo componente ya sea Servicio, Kilometraje o Terceros.
+No crea una OS ni vincula por cliente, fecha o importe.
+
+Envíos, intereses, merchandising y otros conceptos comerciales siguen fuera de
+Servicios. Un grupo genérico o ambiguo permanece en revisión. Cuando la refacturación
+se emitió a un cliente externo y no trae tipo de tiempo explícito, el reporte usa
+Cliente; Garantía/Interno explícitos prevalecen y CAMPOS DEL MAÑANA o identidades
+ausentes no se fuerzan. La regla modifica la población de reportes, no los datos
+importados. Commit/push no aplica el SQL en producción. Verificación aislada:
+`node scripts/verify-unlinked-service-refacturations-sql.mjs`.
+
 ## Despliegue y verificación
 
 Aplicar manualmente `20260915100000_unify_service_sales_identity_and_search.sql`.
