@@ -57,6 +57,13 @@
       "when": 1789650636836,
       "tag": "0007_fix_parts_sales_product_grouping",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790103846089,
+      "tag": "0008_unify_configured_machine_models",
+      "breakpoints": true
     }
   ]
 }
