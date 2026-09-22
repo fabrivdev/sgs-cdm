@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Download, Eye, FileCheck2, FileText, LoaderCircle, MoreVertical, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, Download, Eye, FileCheck2, FileText, Info, LoaderCircle, MoreVertical, Paperclip, PackageCheck, Pencil, Plus, RotateCcw, Save, Ship, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import {
@@ -1311,7 +1312,13 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
     }
   };
   return <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
-    <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{row ? "Editar pedido de importación" : "Nueva importación"}</h2></ResponsiveDrawerHeader>
+    <ResponsiveDrawerHeader><div className="flex items-center gap-1.5"><h2 className="text-[16px] font-semibold">{row ? "Editar pedido de importación" : "Nueva importación"}</h2><ContextHelp label="Ayuda sobre el pedido de importación">
+      <div className="space-y-2">
+        <p>La carga empieza en Planificado. Tránsito y arribo se registran por unidad; Completado exige chasis confirmado en Stock o Parque.</p>
+        <p>Embarque y valor OC son generales salvo ajustes por unidad. Si el valor es total, se reparte entre las unidades. CLAAS genera una llave distinta para cada unidad.</p>
+        {row && <p><span className="font-medium text-foreground">Asignado:</span> {row.oc_monedas_diferentes ? "monedas distintas por unidad" : row.valor_oc_asignado_total == null ? "sin valor" : formatImportMoney(row.valor_oc_asignado_total, row.moneda_oc_general ?? "USD")}.</p>}
+      </div>
+    </ContextHelp></div></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
       {schemaQuery.isError && <p role="alert" className="rounded-lg border border-amber-200 p-3 text-[11px] text-amber-800">No se pudo verificar la nueva estructura de Importaciones. Aplicá la migración y reintentá antes de guardar. <Button variant="outline" size="sm" onClick={() => schemaQuery.refetch()}>Reintentar</Button></p>}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -1320,17 +1327,15 @@ function ImportFormDrawer({ open, row, onOpenChange, onSaved }: { open: boolean;
         <Field label="Producto / tipo"><CompactSelect value={form.producto} values={MACHINE_SUBGROUPS as readonly string[]} disabled={Boolean(selectedNp)} onChange={(producto) => setForm((value) => ({ ...value, producto, modelo: "" }))} /></Field>
         <Field label="Modelo"><ModeloMaquinaSelect marca={form.marca} subgrupo={form.producto} value={form.modelo} onValueChange={(modelo, model) => setForm((value) => ({ ...value, modelo, producto: model?.subgrupo ?? value.producto }))} disabled={Boolean(selectedNp)} /></Field>
         <Field label="Cantidad"><Input type="number" min={1} max={selectedNp?.unidades_disponibles ?? 500} value={form.cantidad} onChange={(event) => setForm((value) => ({ ...value, cantidad: Math.min(selectedNp?.unidades_disponibles ?? 500, Math.max(1, Number(event.target.value) || 1)) }))} /></Field>
-        <p className="text-[11px] text-muted-foreground sm:col-span-2">Al crear queda Planificado. El tránsito y el arribo se registran por unidad; Completado requiere fecha de arribo y chasis confirmado en stock.</p>
         <Field label="NP de referencia"><Select value={form.linea_id || "NONE"} onValueChange={selectNp} disabled={Boolean(row?.linea_id)}><SelectTrigger><SelectValue placeholder={availableNpQuery.isLoading ? "Cargando NP..." : "Seleccionar NP disponible"} /></SelectTrigger><SelectContent><SelectItem value="NONE">Sin NP asignada</SelectItem>{npOptions.map((option) => <SelectItem key={option.linea_id} value={option.linea_id}>{formatNpCode(option.np_numero)} · {option.modelo || option.producto} · {option.unidades_disponibles} libre{option.unidades_disponibles === 1 ? "" : "s"}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="OC"><Input value={form.oc} onChange={(event) => setForm((value) => ({ ...value, oc: event.target.value }))} /></Field>
         <Field label="Fecha de pedido"><Input type="date" value={form.fecha_pedido} onChange={(event) => setForm((value) => ({ ...value, fecha_pedido: event.target.value }))} /></Field>
         <Field label="Embarque estimado"><Input type="date" value={form.eta} onChange={(event) => setForm((value) => ({ ...value, eta: event.target.value }))} /></Field>
-        <Field label="Valor acordado OC"><Input type="number" min="0" step="0.01" value={form.valor_oc_general} placeholder="Sin cargar" onChange={(event) => setForm((value) => ({ ...value, valor_oc_general: event.target.value }))} /></Field>
-        <Field label="Moneda OC"><CompactSelect value={form.moneda_oc} values={["USD", "EUR", "PYG"]} onChange={(moneda_oc) => setForm((value) => ({ ...value, moneda_oc }))} /></Field>
-        <Field label="El valor OC corresponde a"><Select value={form.alcance_valor_oc} onValueChange={(alcance_valor_oc) => setForm((value) => ({ ...value, alcance_valor_oc }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="UNITARIO">Cada unidad</SelectItem><SelectItem value="TOTAL">Total de estas unidades</SelectItem></SelectContent></Select></Field>
+        <Field label="Valor OC"><Input type="number" min="0" step="0.01" value={form.valor_oc_general} placeholder="Sin cargar" onChange={(event) => setForm((value) => ({ ...value, valor_oc_general: event.target.value }))} /></Field>
+        <Field label="Moneda"><CompactSelect value={form.moneda_oc} values={["USD", "EUR", "PYG"]} onChange={(moneda_oc) => setForm((value) => ({ ...value, moneda_oc }))} /></Field>
+        <Field label="Alcance" help="Indicá si el valor corresponde a cada unidad o al total de las unidades de este pedido."><Select value={form.alcance_valor_oc} onValueChange={(alcance_valor_oc) => setForm((value) => ({ ...value, alcance_valor_oc }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="UNITARIO">Cada unidad</SelectItem><SelectItem value="TOTAL">Total del pedido</SelectItem></SelectContent></Select></Field>
       </div>
-      <p className="text-[11px] text-muted-foreground">Estos datos son generales del pedido. El embarque y el valor OC se aplican a las unidades sin ajustes individuales. Si cargás un total, se distribuye en partes iguales, con ajuste de centavos en la última unidad; luego podés editar cada una. CLAAS genera una llave por unidad: CLA111-1, CLA111-2…</p>
-      {row && <p className="text-[11px] text-muted-foreground">Valor OC actualmente asignado: {row.oc_monedas_diferentes ? "Hay unidades en monedas distintas; no se suman entre sí." : row.valor_oc_asignado_total == null ? "Sin cargar" : formatImportMoney(row.valor_oc_asignado_total, row.moneda_oc_general ?? "USD")}. Los ajustes individuales se conservan; el total asignado puede diferir del valor general.</p>}
+      {row?.oc_monedas_diferentes && <p role="alert" className="text-[11px] font-medium text-amber-700">Las unidades tienen monedas distintas.</p>}
       <section className="rounded-xl border p-3"><div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Documento de OC</h3><><input ref={ocFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => setOcFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" size="sm" onClick={() => ocFileRef.current?.click()}><Upload className="mr-1.5 h-3.5 w-3.5" />{ocFile || existingOc ? "Reemplazar" : "Subir OC"}</Button></></div>{ocFile && <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-[11px]"><span className="truncate">{ocFile.name}</span><Button type="button" variant="ghost" size="sm" onClick={() => setOcFile(null)}>Quitar selección</Button></div>}{existingOc && !ocFile && <DocumentRow label="Orden de compra" fileName={existingOc.archivo_nombre} date={formatDate(existingOc.creado_en)} onOpen={() => openMachineDocument(existingOc.storage_path, existingOc.archivo_nombre)} action={<DeleteDocumentButton documentLabel="Orden de compra" onDelete={async () => { await deleteMachineDocuments({ importLineId: importLineId!, type: "OC" }); await ocDocumentsQuery.refetch(); }} />} />}</section>
       <Field label="Notas"><Textarea rows={3} value={form.notas} onChange={(event) => setForm((value) => ({ ...value, notas: event.target.value }))} /></Field>
     </ResponsiveDrawerBody>
@@ -1530,7 +1535,6 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-4">
-          <p className="text-[11px] text-muted-foreground">Los documentos adjuntos son compartidos por el pedido/lote. Los importes y datos de factura de abajo corresponden únicamente a esta unidad.</p>
           <input ref={detailOcRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadOc(event.target.files?.[0])} />
           <input ref={detailSupplierInvoiceRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadSupplierInvoice(event.target.files?.[0])} />
           <div className="divide-y">
@@ -2306,5 +2310,9 @@ function UnitImportAssignment({ unit, line, imports, suggestion, onSaved }: { un
 }
 
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-1"><Label className="text-[11px] text-muted-foreground">{label}</Label>{children}</div>; }
+function ContextHelp({ label, children }: { label: string; children: React.ReactNode }) {
+  return <Popover><PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground" aria-label={label}><Info className="h-3.5 w-3.5" aria-hidden="true" /></Button></PopoverTrigger><PopoverContent align="start" className="max-w-[calc(100vw-2rem)] text-[12px] leading-relaxed" aria-label={label}>{children}</PopoverContent></Popover>;
+}
+
+function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) { return <div className="space-y-1"><div className="flex items-center gap-1"><Label className="text-[11px] text-muted-foreground">{label}</Label>{help && <ContextHelp label={`Ayuda: ${label}`}>{help}</ContextHelp>}</div>{children}</div>; }
 function CompactSelect({ value, values, onChange, disabled = false }: { value: string; values: readonly string[]; onChange: (v: string) => void; disabled?: boolean }) { return <Select value={value} onValueChange={onChange} disabled={disabled}><SelectTrigger className="h-9 text-[12px]"><SelectValue /></SelectTrigger><SelectContent>{values.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>; }

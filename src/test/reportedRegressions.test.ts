@@ -21,6 +21,18 @@ describe("reported production regressions", () => {
     expect(ui).toContain('rpc("maquinaria_actualizar_operacion_preservando_estado"');
   });
 
+  it("keeps import order editing compact and moves explanations on demand", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(ui).toContain('Field label="Valor OC"');
+    expect(ui).toContain('Field label="Moneda"');
+    expect(ui).toContain('Field label="Alcance"');
+    expect(ui).toContain('label="Ayuda sobre el pedido de importación"');
+    expect(ui).not.toContain('Valor acordado OC');
+    expect(ui).not.toContain('El valor OC corresponde a');
+    expect(ui).not.toContain('Estos datos son generales del pedido.');
+    expect(ui).not.toContain('Los documentos adjuntos son compartidos por el pedido/lote.');
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

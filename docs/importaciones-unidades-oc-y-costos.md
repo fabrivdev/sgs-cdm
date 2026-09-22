@@ -60,6 +60,8 @@ Resumen conserva tarjetas con títulos cortos: Seguimiento, Unidad, Pedido y emb
 
 Pruebas de regresión: `src/pages/ImportDetailDrawer.test.tsx` y tests de `machineImportValues`/`machineImportStatus`: 23 pruebas correctas, tipos, ESLint y compilación. Playwright comprobó el componente real con datos ficticios a 1366/768/390 px: ayuda bajo demanda, Enter/Escape, restauración de foco y ausencia de desbordamiento horizontal. Las 14 pruebas de conocimiento confirmaron conectividad y protección de notas personales. Verificación local, no producción.
 
+El formulario general sigue el mismo criterio: etiquetas breves (`Valor OC`, `Moneda`, `Alcance`) y ninguna explicación permanente entre los campos. El ciclo de llegada, la herencia por unidad, el reparto del total y la suma actualmente asignada quedan disponibles desde la ayuda de la cabecera; el alcance tiene ayuda puntual. Solo una incompatibilidad real de monedas permanece visible como advertencia. La pestaña Documentos tampoco repite texto introductorio: la factura ya identifica sus datos como unitarios mediante ayuda bajo demanda. Esta simplificación es únicamente visual y no cambia distribución, ajustes individuales, documentos, estados ni RPC.
+
 - scripts/test-import-unit-purchase-values.mjs: ejecuta la migración real en PostgreSQL aislado; verifica llaves, OC en varias cabeceras, ajustes, redondeo, permisos, stock, reaplicación y RPC de proveedor.
 - src/lib/machineImportValues.test.ts: comprueba importes, diferencias y aislamiento de guardados por sección.
 - La base productiva debe ser actualizada por el usuario. Los tests locales no prueban que la migración esté aplicada allí.
