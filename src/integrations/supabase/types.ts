@@ -1436,6 +1436,66 @@ export type Database = {
           },
         ]
       }
+      maquinaria_facturas_venta_unidades: {
+        Row: {
+          creado_en: string
+          creado_por: string | null
+          documento_id: string
+          estado_unidad_anterior: string
+          unidad_operacion_id: string
+        }
+        Insert: {
+          creado_en?: string
+          creado_por?: string | null
+          documento_id: string
+          estado_unidad_anterior: string
+          unidad_operacion_id: string
+        }
+        Update: {
+          creado_en?: string
+          creado_por?: string | null
+          documento_id?: string
+          estado_unidad_anterior?: string
+          unidad_operacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_facturas_venta_unidades_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_venta_unidades_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_pedidos_lineas_estado_actual"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_venta_unidades_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_pedidos_lineas_operativas"
+            referencedColumns: ["unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_venta_unidades_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_stock_trazabilidad"
+            referencedColumns: ["unidad_vinculada_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_facturas_venta_unidades_unidad_operacion_id_fkey"
+            columns: ["unidad_operacion_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_unidades_operacion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maquinaria_importacion_lineas: {
         Row: {
           actualizado_en: string
@@ -6578,6 +6638,10 @@ export type Database = {
         Args: { p_facturacion_linea_id: string }
         Returns: string
       }
+      maquinaria_eliminar_factura_venta: {
+        Args: { p_documento_id: string }
+        Returns: Json
+      }
       maquinaria_eliminar_linea_pedido: {
         Args: { p_linea_id: string }
         Returns: Json
@@ -6675,6 +6739,10 @@ export type Database = {
       maquinaria_subgrupo_desde_producto: {
         Args: { p_producto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
+      }
+      maquinaria_vincular_factura_venta: {
+        Args: { p_documento_id: string; p_unidad_ids: string[] }
+        Returns: Json
       }
       maquinaria_vincular_importacion_historica: {
         Args: { p_importacion_id: string; p_unidad_id: string }
