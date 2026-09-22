@@ -151,6 +151,16 @@ describe("Importaciones: detalle compacto", () => {
     expect(screen.queryByRole("button", { name: "Iniciar tránsito" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ayuda: Costo de stock" })).toBeInTheDocument();
   });
+  it("mantiene compactas y accesibles las acciones de documentos", () => {
+    setup();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Documentos" }), { button: 0 });
+    expect(screen.getByRole("button", { name: "Adjuntar orden de compra" })).toHaveAttribute("title", "Adjuntar orden de compra");
+    expect(screen.getByRole("button", { name: "Adjuntar factura del proveedor" })).toHaveAttribute("title", "Adjuntar factura del proveedor");
+    expect(screen.getByRole("button", { name: "Editar factura proveedor" })).toHaveAttribute("title", "Editar factura proveedor");
+    expect(screen.queryByText("Adjuntar", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("Editar", { exact: true })).not.toBeInTheDocument();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("no añade ayuda ni modifica acciones en otras secciones sin help", () => {
     render(<DetailSection card title="Otro panel" action={<button>Acción existente</button>}><span>Dato existente</span></DetailSection>);
     expect(screen.queryByRole("button", { name: /Ayuda/ })).not.toBeInTheDocument();

@@ -51,9 +51,12 @@ export function EntityCard({ children, className }: { children: ReactNode; class
   return <div className={cn("rounded-xl border p-3", className)}>{children}</div>;
 }
 
-export function DocumentRow({ label, fileName, date, onOpen, action }: { label: string; fileName?: string | null; date?: string | null; onOpen?: () => void; action?: ReactNode }) {
+export function DocumentRow({ label, fileName, date, onOpen, action, compactActions = false }: { label: string; fileName?: string | null; date?: string | null; onOpen?: () => void; action?: ReactNode; compactActions?: boolean }) {
   return <div className="flex min-w-0 items-center justify-between gap-3 border-b py-2.5 last:border-b-0">
     <div className="min-w-0"><div className="text-[11px] font-medium">{label}</div><div className="mt-0.5 truncate text-[10px] text-muted-foreground">{fileName || "Sin documento"}{fileName && date ? ` · ${date}` : ""}</div></div>
-    <div className="flex shrink-0 items-center gap-1.5">{fileName && onOpen && <Button type="button" variant="ghost" size="sm" className="h-8" onClick={onOpen}><Eye className="mr-1.5 h-3.5 w-3.5" />Ver</Button>}{action}</div>
+    <div className={cn("ml-auto flex shrink-0 items-center justify-end", compactActions ? "gap-0.5" : "gap-1.5")}>
+      {fileName && onOpen && <Button type="button" variant="ghost" size={compactActions ? "icon" : "sm"} className={compactActions ? "h-8 w-8" : "h-8"} aria-label={compactActions ? `Ver ${label.toLowerCase()}` : undefined} title={compactActions ? `Ver ${label.toLowerCase()}` : undefined} onClick={onOpen}><Eye className={cn("h-3.5 w-3.5", !compactActions && "mr-1.5")} />{!compactActions && "Ver"}</Button>}
+      {action}
+    </div>
   </div>;
 }
