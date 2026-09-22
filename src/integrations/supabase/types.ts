@@ -5542,6 +5542,7 @@ export type Database = {
           cantidad: number | null
           cantidad_lote: number | null
           chasis: string | null
+          chasis_ambiguo: boolean | null
           cliente_nombre: string | null
           comercial: string | null
           costo_final: number | null
@@ -5587,6 +5588,7 @@ export type Database = {
           oc_monedas_diferentes: boolean | null
           operacion_id: string | null
           origen: string | null
+          parque_confirmado: boolean | null
           po: string | null
           precio_oc: number | null
           precio_teorico_oc: number | null
@@ -6560,6 +6562,10 @@ export type Database = {
         Args: { p_chasis?: string; p_stock_id: string; p_unidad_id: string }
         Returns: Json
       }
+      maquinaria_chasis_confirmado_en_sistema: {
+        Args: { p_chasis: string }
+        Returns: boolean
+      }
       maquinaria_chasis_unico_en_stock: {
         Args: { p_chasis: string }
         Returns: boolean
@@ -6574,6 +6580,10 @@ export type Database = {
       }
       maquinaria_eliminar_linea_pedido: {
         Args: { p_linea_id: string }
+        Returns: Json
+      }
+      maquinaria_eliminar_pedido: {
+        Args: { p_operacion_id: string }
         Returns: Json
       }
       maquinaria_eliminar_unidad_importacion: {
@@ -7091,6 +7101,21 @@ export type Database = {
         }
         Returns: Json
       }
+      repuestos_sugerencia_viva_ordenada: {
+        Args: {
+          p_buscar?: string
+          p_direccion?: string
+          p_estado?: string
+          p_fecha_analisis: string
+          p_limite?: number
+          p_marca: string
+          p_offset?: number
+          p_orden?: string
+          p_segmento?: string
+          p_solo_sugeridos?: boolean
+        }
+        Returns: Json
+      }
       repuestos_verificar_notas_credito_historicas: {
         Args: { p_carga_id: string; p_claves: string[] }
         Returns: Json
@@ -7209,6 +7234,15 @@ export type Database = {
         Args: { p_descripcion: string; p_grupo: string }
         Returns: boolean
       }
+      ventas_es_refacturacion_servicio_sin_os: {
+        Args: {
+          p_codigo: string
+          p_concepto: string
+          p_descripcion: string
+          p_raw_data: Json
+        }
+        Returns: boolean
+      }
       ventas_linea_tipo_tiempo: {
         Args: { p_id: string; p_metodologia: string; p_os_tipo: string }
         Returns: string
@@ -7270,6 +7304,7 @@ export type Database = {
         Args: { p_vendedor: string }
         Returns: string
       }
+      ventas_orden_natural: { Args: { p_texto: string }; Returns: string }
       ventas_repuestos_estado_historico_v1: { Args: never; Returns: Json }
       ventas_repuestos_listado_v1: {
         Args: {
@@ -7288,6 +7323,21 @@ export type Database = {
           p_buscar?: string
           p_desde: string
           p_hasta: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+          p_vista?: string
+        }
+        Returns: Json
+      }
+      ventas_repuestos_listado_v3: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_direccion?: string
+          p_exportar?: boolean
+          p_hasta: string
+          p_orden?: string
           p_pagina?: number
           p_por_pagina?: number
           p_sucursal?: string
@@ -7367,6 +7417,14 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_servicios_codigo_filtro: {
+        Args: { p_linea: Json }
+        Returns: string
+      }
+      ventas_servicios_cumple_filtros: {
+        Args: { p_filtros: Json; p_linea: Json }
+        Returns: boolean
+      }
       ventas_servicios_detalle_os: {
         Args: {
           p_buscar?: string
@@ -7410,6 +7468,19 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_servicios_indicadores_v1_filtrado: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_filtros?: Json
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
       ventas_servicios_lineas: {
         Args: {
           p_desde: string
@@ -7422,6 +7493,18 @@ export type Database = {
       ventas_servicios_lineas_v2: {
         Args: {
           p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_lineas_v2_filtrado: {
+        Args: {
+          p_desde: string
+          p_filtros?: Json
           p_hasta: string
           p_marca?: string
           p_sucursal?: string
@@ -7510,10 +7593,37 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_servicios_panorama_v2_filtrado: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_filtros?: Json
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
       ventas_servicios_tecnicos_v1: {
         Args: {
           p_buscar?: string
           p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
+      ventas_servicios_tecnicos_v1_filtrado: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_filtros?: Json
           p_hasta: string
           p_marca?: string
           p_sucursal?: string
@@ -7538,12 +7648,29 @@ export type Database = {
         Args: { p_texto: string }
         Returns: string
       }
+      ventas_servicios_validar_filtros: {
+        Args: { p_filtros: Json }
+        Returns: undefined
+      }
+      ventas_tipo_tiempo_historial_os: {
+        Args: {
+          p_cliente: string
+          p_factura: string
+          p_servicios_valor: number
+          p_tipo: string
+        }
+        Returns: string
+      }
       ventas_tipo_tiempo_historico_cliente: {
         Args: { p_cliente: string; p_tipo?: string }
         Returns: string
       }
       ventas_tipo_tiempo_normalizado: {
         Args: { p_valor: string }
+        Returns: string
+      }
+      ventas_tipo_tiempo_refacturacion_cliente: {
+        Args: { p_cliente: string; p_tipo?: string }
         Returns: string
       }
     }
