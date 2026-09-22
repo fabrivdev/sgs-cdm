@@ -33,6 +33,16 @@ describe("reported production regressions", () => {
     expect(ui).not.toContain('Los documentos adjuntos son compartidos por el pedido/lote.');
   });
 
+  it("extracts supplier invoice fields on upload and does not offer arrival twice", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(ui).toContain("extractSupplierInvoice(file)");
+    expect(ui).toContain("machineSupplierInvoicePatch(extraction)");
+    expect(ui).toContain('rpc("maquinaria_actualizar_unidad_importacion"');
+    expect(ui).toContain('arrival === "PLANIFICADO" || arrival === "EN_TRANSITO"');
+    expect(ui).toContain("canEdit && canRegisterArrival");
+    expect(ui).toContain("const refreshed = await operationsQuery.refetch()");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

@@ -47,6 +47,7 @@ import { IMPORT_SITUATION_LABELS, importSituationState, importSituationLabel, is
 import { matchesOperationFilters, normalizeOperationModel, operationModelOptions } from "@/lib/machineOperationFilters";
 import { shortPersonName } from "@/lib/personName";
 import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
+import { extractMachineSupplierInvoice, machineSupplierInvoicePatch, type MachineSupplierInvoiceExtraction } from "@/lib/machineSupplierInvoice";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -485,6 +486,43 @@ async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTA
   return data?.data ?? {};
 }
 
+function providerInvoiceExtraction(data: Record<string, unknown>, fileName: string): MachineSupplierInvoiceExtraction {
+  const fallback = extractMachineSupplierInvoice("", fileName);
+  const rawNumber = safeExtractedText(data.factura_numero);
+  const invoiceNumber = rawNumber.match(/^(\d{3,})\.[A-Z0-9-]+$/)?.[1] ?? rawNumber;
+  const amount = data.valor_facturado == null || data.valor_facturado === "" ? Number.NaN : Number(data.valor_facturado);
+  const currency = String(data.moneda ?? "").trim().toUpperCase();
+  return {
+    factura_numero: invoiceNumber || fallback.factura_numero,
+    factura_fecha: safeExtractedDate(data.factura_fecha) || fallback.factura_fecha,
+    moneda: (["USD", "EUR", "PYG"].includes(currency) ? currency : fallback.moneda) as MachineSupplierInvoiceExtraction["moneda"],
+    valor_facturado: Number.isFinite(amount) && amount >= 0 ? amount : fallback.valor_facturado,
+    chasis: Array.isArray(data.chasis) ? data.chasis.map(safeExtractedText).filter(Boolean) : [],
+  };
+}
+
+async function extractSupplierInvoice(file: File): Promise<MachineSupplierInvoiceExtraction> {
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  if (!isPdf) return providerInvoiceExtraction(await extractDocument(file, "FACTURA_IMPORTACION"), file.name);
+  const pdf = await getDocument({
+    data: new Uint8Array(await file.arrayBuffer()),
+    isImageDecoderSupported: false,
+    isOffscreenCanvasSupported: false,
+  }).promise;
+  try {
+    const text: string[] = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      text.push(content.items.map(item => "str" in item ? item.str : "").join(" "));
+      page.cleanup();
+    }
+    return extractMachineSupplierInvoice(text.join("\n"), file.name);
+  } finally {
+    await pdf.destroy();
+  }
+}
+
 type MachineDocumentType = "NP" | "OC" | "FACTURA_IMPORTACION" | "FACTURA_VENTA" | "OTRO";
 type StoredMachineDocument = { id: string; archivo_nombre: string; storage_path: string; creado_en: string };
 
@@ -531,7 +569,7 @@ async function uploadEvidence(file: File, operationId: string, type: MachineDocu
   return document;
 }
 
-async function uploadImportDocument(file: File, importLineId: string, type: "OC" | "FACTURA_IMPORTACION", operationId?: string | null) {
+async function uploadImportDocument(file: File, importLineId: string, type: "OC" | "FACTURA_IMPORTACION", operationId?: string | null, extracted: unknown = {}) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Sesión no válida");
   const { data: existing, error: existingError } = await db.from("maquinaria_documentos")
@@ -546,7 +584,7 @@ async function uploadImportDocument(file: File, importLineId: string, type: "OC"
   const payload = {
     operacion_id: operationId || null, importacion_linea_id: importLineId, tipo: type,
     archivo_nombre: file.name, storage_path: path, mime_type: file.type,
-    tamano_bytes: file.size, estado_extraccion: "REVISADO", datos_extraidos: {},
+    tamano_bytes: file.size, estado_extraccion: "REVISADO", datos_extraidos: extracted,
     revisado_por: auth.user.id, revisado_en: savedAt,
     creado_en: savedAt, actualizado_en: savedAt,
   };
@@ -1066,9 +1104,11 @@ export default function MaquinariaOperaciones() {
       row={selectedImport}
       onEditHeader={(importRow) => { setSelectedImport(null); setEditingImport(importRow); setImportFormOpen(true); }}
       onOpenChange={(open) => !open && setSelectedImport(null)}
-      onSaved={() => {
-        setSelectedImport(null);
-        queryClient.invalidateQueries({ queryKey: ["machine-operations", "imports"] });
+      onSaved={async () => {
+        const selectedId = selectedImport?.id;
+        const refreshed = await operationsQuery.refetch();
+        const updated = (refreshed.data ?? []).find(item => item.id === selectedId) as ImportRow | undefined;
+        setSelectedImport(updated ?? null);
       }}
     />
     <MachineDocumentViewer />
@@ -1387,6 +1427,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   }, [row]);
   if (!row) return null;
   const arrival = arrivalState(row);
+  const canRegisterArrival = arrival === "PLANIFICADO" || arrival === "EN_TRANSITO";
   const stockConfirmed = importSystemConfirmed(row);
   const missingArrivalDate = !row.ata && arrival !== "COMPLETADO" && arrival !== "CANCELADO" && /ARRIB|RECIB|COMPLET/i.test(row.estado_fuente ?? "");
   const reconciliationIssue = row.chasis_ambiguo || row.estado_disponibilidad === "CONFLICTO";
@@ -1405,8 +1446,28 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   const uploadSupplierInvoice = async (file?: File) => {
     if (!file) return;
     setUploadingSupplierInvoice(true);
-    try { await uploadImportDocument(file, row.importacion_linea_id, "FACTURA_IMPORTACION", row.operacion_id); await detailSupplierInvoiceQuery.refetch(); toast.success("Factura del proveedor adjuntada"); }
-    catch (error: any) { toast.error(error?.message ?? "No se pudo adjuntar la factura del proveedor"); }
+    try {
+      let autoSaved = false;
+      let extraction: MachineSupplierInvoiceExtraction | null = null;
+      try { extraction = await extractSupplierInvoice(file); }
+      catch (error) { console.warn("No se pudieron leer automáticamente los datos de la factura", error); }
+      await uploadImportDocument(file, row.importacion_linea_id, "FACTURA_IMPORTACION", row.operacion_id, extraction ?? {});
+      const patch = extraction ? machineSupplierInvoicePatch(extraction) : {};
+      if (Object.keys(patch).length) {
+        const { error } = await db.rpc("maquinaria_actualizar_unidad_importacion", { p_unidad_id: row.id, p_datos: patch });
+        if (error) toast.warning(`La factura se adjuntó, pero sus datos no pudieron guardarse: ${error.message}`);
+        else {
+          setForm(current => ({ ...current, ...patch }));
+          const complete = Object.keys(patch).length === 4;
+          toast.success(complete ? "Factura adjuntada y datos completados" : "Factura adjuntada; revisá los datos faltantes");
+          autoSaved = true;
+        }
+      } else {
+        toast.warning("Factura adjuntada, pero no se pudieron leer sus datos. Podés completarlos manualmente.");
+      }
+      await detailSupplierInvoiceQuery.refetch();
+      if (autoSaved) onSaved();
+    } catch (error: any) { toast.error(error?.message ?? "No se pudo adjuntar la factura del proveedor"); }
     finally { setUploadingSupplierInvoice(false); if (detailSupplierInvoiceRef.current) detailSupplierInvoiceRef.current.value = ""; }
   };
   const saveUnit = async (section: ImportUnitSection | Record<string, unknown>) => {
@@ -1486,8 +1547,8 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
         <TabsList className="grid h-auto w-full grid-cols-4"><TabsTrigger value="resumen" className="px-2 text-[11px]">Resumen</TabsTrigger><TabsTrigger value="pedido" className="px-2 text-[11px]">Pedido</TabsTrigger><TabsTrigger value="documentos" className="px-2 text-[11px]">Documentos</TabsTrigger><TabsTrigger value="recepcion" className="px-2 text-[11px]">Recepción</TabsTrigger></TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
-          {((canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO") || missingArrivalDate || reconciliationIssue) && <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento" help="Arribado requiere fecha real de arribo. Completado requiere chasis único confirmado en Stock o Parque, incluso sin fecha histórica. ETA, reserva o factura no prueban llegada.">
-            {canEdit && arrival !== "COMPLETADO" && arrival !== "CANCELADO" && <div className="flex flex-wrap gap-2">
+          {((canEdit && canRegisterArrival) || missingArrivalDate || reconciliationIssue) && <DetailSection card icon={<Ship className="h-3.5 w-3.5" />} title="Seguimiento" help="Arribado requiere fecha real de arribo. Completado requiere chasis único confirmado en Stock o Parque, incluso sin fecha histórica. ETA, reserva o factura no prueban llegada.">
+            {canEdit && canRegisterArrival && <div className="flex flex-wrap gap-2">
               {arrival === "PLANIFICADO" && <Button size="sm" variant="outline" disabled={saving} onClick={startTransit}><Ship className="mr-1.5 h-3.5 w-3.5" />Iniciar tránsito</Button>}
               <Button size="sm" variant="outline" onClick={() => { setActiveTab("recepcion"); setEditingReceipt(true); }}>Registrar arribo</Button>
             </div>}

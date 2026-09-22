@@ -139,6 +139,8 @@ describe("Importaciones: detalle compacto", () => {
   it("reserva Arribado para fecha registrada sin coincidencia en sistema", () => {
     setup({ chasis: "TEST-PENDING", ata: "2026-05-23" });
     expect(screen.getByText("Arribado", { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Registrar arribo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Seguimiento" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Iniciar tránsito" })).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Recepción" }), { button: 0 });
     expect(screen.getByText("Pendiente de confirmación", { exact: true })).toBeInTheDocument();
