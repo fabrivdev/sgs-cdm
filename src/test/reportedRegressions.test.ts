@@ -114,6 +114,31 @@ describe("reported production regressions", () => {
     expect(ui).toContain('className={compact ? "h-8 w-8" : undefined}');
   });
 
+  it("requires authorization before moving a returned machine from Park to Stock", () => {
+    const sql = read("supabase/migrations/20260922200000_authorize_stock_returns_from_park.sql");
+    const panel = read("src/components/NotificationsPanel.tsx");
+    const dialog = read("src/components/parque/MachineStockReturnNotificationDialog.tsx");
+    const stock = read("src/components/parque/StockMaquinasTab.tsx");
+    expect(sql).toContain("generar_notificaciones_stock_en_parque");
+    expect(sql).toContain("'stock_chasis_en_parque'");
+    expect(sql).toContain("confirmar_notificacion_ingreso_stock_parque");
+    expect(sql).toContain("FOR UPDATE");
+    expect(sql).toContain("SET activo = false");
+    expect(sql).toContain("parque_origen_id = v_parque.id");
+    expect(sql).toContain("'movimiento', 'PARTE_DE_PAGO'");
+    expect(sql).toContain("v_avisos := public.generar_notificaciones_stock_en_parque(p_carga_id)");
+    expect(sql).toContain("maquinaria_bloquear_stock_activo_en_parque");
+    expect(sql).toContain("NEW.unidad_operacion_id := NULL");
+    expect(sql).toContain("primero confirme su ingreso a Stock desde la notificación");
+    expect(sql).not.toContain("PERFORM public.confirmar_notificacion_ingreso_stock_parque");
+    expect(panel).toContain('item.tipo === "stock_chasis_en_parque"');
+    expect(dialog).toContain("Hasta entonces no se realiza ningún movimiento");
+    expect(dialog).toContain("Mantener pendiente");
+    expect(stock).toContain("Ingreso desde Parque pendiente de autorizar");
+    const operations = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(operations).toContain('row.estado_disponibilidad !== "EN_PARQUE"');
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

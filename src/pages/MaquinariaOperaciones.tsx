@@ -274,7 +274,7 @@ type DraftLine = {
 type StockAssignmentRow = {
   id: string; producto_codigo: string; marca: string | null; modelo: string | null; sucursal: string | null;
   deposito: string | null; chasis: string | null; saldo_actual: number | null; estado_disponibilidad: string | null;
-  disponibilidad_detalle: string | null; unidad_operacion_id: string | null;
+  disponibilidad_detalle: string | null; unidad_operacion_id: string | null; parque_maquina_id: string | null;
 };
 type ImportAssignmentRow = {
   id: string; importacion_linea_id: string; numero_unidad: number; cantidad_lote: number | null;
@@ -2077,7 +2077,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       const [units, stock, linkedImports, availableImports, suggestions] = await Promise.all([
         lineIds.length ? db.from("maquinaria_unidades_operacion").select("*").in("linea_id", lineIds).order("numero_unidad") : Promise.resolve({ data: [], error: null }),
         db.from("maquinaria_stock_trazabilidad")
-          .select("id,producto_codigo,marca,modelo,sucursal,deposito,chasis,saldo_actual,estado_disponibilidad,disponibilidad_detalle,unidad_operacion_id")
+          .select("id,producto_codigo,marca,modelo,sucursal,deposito,chasis,saldo_actual,estado_disponibilidad,disponibilidad_detalle,unidad_operacion_id,parque_maquina_id")
           .or("saldo_actual.gt.0,unidad_operacion_id.not.is.null")
           .order("marca").order("modelo").limit(1000),
         db.from("maquinaria_importacion_unidades_operativas")
@@ -2485,6 +2485,7 @@ function UnitStockAssignment({ unit, line, stock, suggestion, onSaved }: { unit:
   const query = normalizeAssignmentText(searchStock);
   const candidates = stock
     .filter((row) => !row.unidad_operacion_id || row.unidad_operacion_id === unit.id || row.estado_disponibilidad === "DISPONIBLE")
+    .filter((row) => row.unidad_operacion_id === unit.id || (!row.parque_maquina_id && row.estado_disponibilidad !== "EN_PARQUE"))
     .filter((row) => !query || normalizeAssignmentText([row.producto_codigo, row.marca, row.modelo, row.sucursal, row.deposito, row.chasis].join(" ")).includes(query))
     .sort((a, b) => {
       const aMatch = expected && normalizeAssignmentText([a.marca, a.modelo].join(" ")).split(" ").some((part) => part.length > 2 && expected.includes(part)) ? 1 : 0;

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
+import type { Json } from "@/integrations/supabase/types";
 
 type StockMaquina = {
   carga_id: string;
@@ -26,7 +27,15 @@ type StockMaquina = {
   chasis: string | null;
   saldo_actual: number;
   importado_en: string;
+  datos_fuente: Json;
 };
+
+function pendingParkTransfer(row: StockMaquina) {
+  return !!row.datos_fuente
+    && !Array.isArray(row.datos_fuente)
+    && typeof row.datos_fuente === "object"
+    && row.datos_fuente.pendiente_transferencia_parque === true;
+}
 
 export type StockMaquinasResumen = {
   total: number;
@@ -119,13 +128,14 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
     return {...column,...layout[column.key], className:["producto_codigo","chasis"].includes(column.key)?"font-mono":undefined,
       render:row=>{
         const repeated = !!row.chasis && duplicateChassis.has(row.chasis.trim().toUpperCase());
+        const pendingTransfer = pendingParkTransfer(row);
         if(column.key==="marca")return <MarcaBadge marca={row.marca} className="max-w-full whitespace-nowrap text-[10px]" />;
-        if(column.key==="modelo")return <CompactListInfo label={row.modelo??"—"} fields={columns.map(c=>[c.label,String(c.value(row)??"—")] as const).concat([["Chasis repetido",repeated?"Sí":"No"]])} />;
+        if(column.key==="modelo")return <CompactListInfo label={row.modelo??"—"} fields={columns.map(c=>[c.label,String(c.value(row)??"—")] as const).concat([["Chasis repetido",repeated?"Sí":"No"],["Ingreso desde Parque",pendingTransfer?"Pendiente de autorizar":"No"]])} />;
         if(column.key==="estado")return <Badge variant="outline" className={cn("max-w-full whitespace-nowrap text-[10px]", row.estado==="Nuevo"?"border-emerald-200 bg-emerald-50 text-emerald-700":"border-amber-200 bg-amber-50 text-amber-700")}>{row.estado??"—"}</Badge>;
-        if(column.key==="chasis")return <span className="flex min-w-0 items-center gap-1"><span className="truncate">{row.chasis??"—"}</span>{repeated&&<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" role="img" aria-label="Chasis repetido" />}</span>;
+        if(column.key==="chasis")return <span className="flex min-w-0 items-center gap-1"><span className="truncate">{row.chasis??"—"}</span>{(repeated||pendingTransfer)&&<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" role="img" aria-label={pendingTransfer?"Ingreso desde Parque pendiente de autorizar":"Chasis repetido"} />}</span>;
         if(column.key==="saldo")return Number(row.saldo_actual).toLocaleString("es-PY");
         return String(column.value(row)??"—");
-      },title:row=>column.key==="chasis"&&row.chasis&&duplicateChassis.has(row.chasis.trim().toUpperCase())?`${row.chasis} · Este chasis aparece en más de una referencia del archivo`:String(column.value(row)??"—")};
+      },title:row=>column.key==="chasis"&&pendingParkTransfer(row)?`${row.chasis} · Ingreso desde Parque pendiente de autorizar`:column.key==="chasis"&&row.chasis&&duplicateChassis.has(row.chasis.trim().toUpperCase())?`${row.chasis} · Este chasis aparece en más de una referencia del archivo`:String(column.value(row)??"—")};
   });
 
   const clear = () => { setQ(""); setBranch("all"); setBrand("all"); setType("all"); setCondition("all"); };

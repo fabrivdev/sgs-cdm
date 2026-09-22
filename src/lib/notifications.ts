@@ -16,6 +16,28 @@ export type MachineSaleNotificationData = {
   origen_sistema?: string | null;
 };
 
+export type MachineStockReturnNotificationData = {
+  carga_id?: string | null;
+  stock_id?: string | null;
+  stock_key?: string | null;
+  producto_codigo?: string | null;
+  stock_sucursal?: string | null;
+  stock_deposito?: string | null;
+  stock_tipo?: string | null;
+  stock_marca?: string | null;
+  stock_modelo?: string | null;
+  stock_estado?: string | null;
+  saldo_actual?: number | null;
+  chasis?: string | null;
+  parque_maquina_id?: string | null;
+  cliente_id?: string | null;
+  cliente_nombre?: string | null;
+  parque_sucursal?: string | null;
+  parque_marca?: string | null;
+  parque_modelo?: string | null;
+  destino?: string | null;
+};
+
 export type AppNotification = {
   id: string;
   tipo: string;
@@ -30,4 +52,9 @@ export type AppNotification = {
 export function machineSaleNotificationData(notification: AppNotification): MachineSaleNotificationData {
   if (!notification.datos || Array.isArray(notification.datos) || typeof notification.datos !== "object") return {};
   return notification.datos as MachineSaleNotificationData;
+}
+
+export function machineStockReturnNotificationData(notification: AppNotification): MachineStockReturnNotificationData {
+  if (!notification.datos || Array.isArray(notification.datos) || typeof notification.datos !== "object") return {};
+  return notification.datos as MachineStockReturnNotificationData;
 }

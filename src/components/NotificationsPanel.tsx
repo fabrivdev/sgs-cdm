@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, BriefcaseBusiness, Tractor } from "lucide-react";
+import { Bell, BriefcaseBusiness, PackageCheck, Tractor } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { AppNotification } from "@/lib/notifications";
 import { MachineSaleNotificationDialog } from "@/components/parque/MachineSaleNotificationDialog";
+import { MachineStockReturnNotificationDialog } from "@/components/parque/MachineStockReturnNotificationDialog";
 
 type ServicioNotificacion = {
   id: string;
@@ -122,7 +123,7 @@ export function NotificationsPanel({ count }: { count: number }) {
                   onClick={() => openMachineAlert(item)}
                 >
                   <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
-                    <Tractor className="h-3.5 w-3.5" />
+                    {item.tipo === "stock_chasis_en_parque" ? <PackageCheck className="h-3.5 w-3.5" /> : <Tractor className="h-3.5 w-3.5" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-[12px] font-medium">
@@ -132,7 +133,9 @@ export function NotificationsPanel({ count }: { count: number }) {
                       <span>{item.titulo}</span>
                     </span>
                     {item.mensaje && <span className="mt-0.5 block line-clamp-2 text-[11px] text-muted-foreground">{item.mensaje}</span>}
-                    <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-primary">Parque · Revisar alta</span>
+                    <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-primary">
+                      {item.tipo === "stock_chasis_en_parque" ? "Stock · Autorizar ingreso" : "Parque · Revisar alta"}
+                    </span>
                   </span>
                 </button>
               ))}
@@ -157,8 +160,17 @@ export function NotificationsPanel({ count }: { count: number }) {
         </PopoverContent>
       </Popover>
       <MachineSaleNotificationDialog
-        notification={selectedMachineAlert}
-        open={machineDialogOpen}
+        notification={selectedMachineAlert?.tipo === "venta_maquina_sin_parque" ? selectedMachineAlert : null}
+        open={machineDialogOpen && selectedMachineAlert?.tipo === "venta_maquina_sin_parque"}
+        onOpenChange={setMachineDialogOpen}
+        onResolved={() => {
+          setSelectedMachineAlert(null);
+          void load();
+        }}
+      />
+      <MachineStockReturnNotificationDialog
+        notification={selectedMachineAlert?.tipo === "stock_chasis_en_parque" ? selectedMachineAlert : null}
+        open={machineDialogOpen && selectedMachineAlert?.tipo === "stock_chasis_en_parque"}
         onOpenChange={setMachineDialogOpen}
         onResolved={() => {
           setSelectedMachineAlert(null);

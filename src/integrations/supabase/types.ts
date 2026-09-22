@@ -6481,6 +6481,10 @@ export type Database = {
         }
         Returns: string
       }
+      confirmar_notificacion_ingreso_stock_parque: {
+        Args: { p_notificacion_id: string }
+        Returns: string
+      }
       dashboard_facturacion_fuente_v1: {
         Args: { p_desde: string; p_hasta: string }
         Returns: {
