@@ -87,6 +87,23 @@ describe("reported production regressions", () => {
     expect(extractor).toContain("El documento supera el limite de 12 MB");
   });
 
+  it("keeps one canonical configured model and bills multi-unit orders by unit", () => {
+    const catalogSql = read("supabase/migrations/20260922170000_unify_configured_machine_models.sql");
+    const billingSql = read("supabase/migrations/20260922180000_bill_machine_orders_by_unit.sql");
+    const validation = read("src/lib/machineOrderValidation.ts");
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(catalogSql).toContain("CONVIO FLEX 1080 35 PIES");
+    expect(catalogSql).toContain("CONVIO FLEX 1080");
+    expect(catalogSql).toContain("revisado_manual = true");
+    expect(validation).toContain("configuredHeaderBase");
+    expect(billingSql).toContain("DROP INDEX IF EXISTS public.maquinaria_documentos_comerciales_unico_idx");
+    expect(billingSql).toContain("maquinaria_facturas_venta_unidades");
+    expect(billingSql).toContain("maquinaria_vincular_factura_venta");
+    expect(ui).toContain("Factura sin máquina asignada");
+    expect(ui).toContain("Adjuntar factura");
+    expect(ui).toContain('rpc("maquinaria_vincular_factura_venta"');
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

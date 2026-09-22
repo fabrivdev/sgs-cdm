@@ -65,6 +65,19 @@ describe("catalog validation", () => {
     const ambiguous = { ...catalog, models: [...catalog.models, { ...catalog.models[0], id: "4", subgrupo: "OTRO" }] };
     expect(reviewCatalogLine({ marca: "HORSCH", modelo: "LEEB 5.280", subgrupo: "TRACTORES" }, ambiguous).match).toBeUndefined();
   });
+  it("shows one canonical CONVIO model and treats width/configuration as an attribute", () => {
+    const claas: MachineCatalog = {
+      brands: [{ nombre: "CLAAS", activa: true }],
+      models: [
+        { id: "base", marca_nombre: "CLAAS", subgrupo: "PLATAFORMAS/CABEZALES", nombre: "CONVIO FLEX 1080", activo: true },
+        { id: "width", marca_nombre: "CLAAS", subgrupo: "PLATAFORMAS/CABEZALES", nombre: "CONVIO FLEX 1080 35 PIES", activo: true },
+        { id: "rice", marca_nombre: "CLAAS", subgrupo: "PLATAFORMAS/CABEZALES", nombre: "CONVIO FLEX 930 RICE 30 PIES", activo: true },
+        { id: "rice-base", marca_nombre: "CLAAS", subgrupo: "PLATAFORMAS/CABEZALES", nombre: "CONVIO FLEX 930", activo: true },
+      ],
+    };
+    expect(catalogModelsForBrand(claas, "CLAAS").map(model => model.nombre)).toEqual(["CONVIO FLEX 930", "CONVIO FLEX 1080"]);
+    expect(reconcileCatalogLine({ marca: "CLAAS", modelo: "CONVIO FLEX 1080 35 PIES", subgrupo: "PLATAFORMAS/CABEZALES" }, claas).modelo).toBe("CONVIO FLEX 1080");
+  });
 });
 
 describe("data normalization", () => {

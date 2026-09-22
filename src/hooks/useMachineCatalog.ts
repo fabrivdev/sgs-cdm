@@ -10,7 +10,7 @@ export function useMachineCatalog(enabled = true) {
       const [brands, models, aliases] = await Promise.all([
         cargarTodo<MachineCatalogBrand>(supabase.from("maquinaria_marcas_catalogo").select("nombre,activa").order("nombre")),
         cargarTodo<MachineCatalogModel>(supabase.from("parque_modelos_catalogo").select("id,nombre,marca_nombre,subgrupo,activo").order("id")),
-        cargarTodo<MachineCatalogAlias>(supabase.from("parque_modelos_alias").select("marca,alias,modelo_catalogo_id").order("id")),
+        cargarTodo<MachineCatalogAlias>(supabase.from("parque_modelos_alias").select("marca,alias,modelo_catalogo_id,revisado_manual").order("id")),
       ]);
       return { brands, models, aliases };
     },

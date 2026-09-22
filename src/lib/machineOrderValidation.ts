@@ -12,7 +12,7 @@ export function normalizeNpCode(value: unknown): string | null {
 
 export type MachineCatalogBrand = { nombre: string; activa: boolean };
 export type MachineCatalogModel = { id: string; nombre: string; marca_nombre: string; subgrupo: string; activo: boolean };
-export type MachineCatalogAlias = { marca: string; alias: string; modelo_catalogo_id: string };
+export type MachineCatalogAlias = { marca: string; alias: string; modelo_catalogo_id: string; revisado_manual?: boolean };
 export type MachineCatalog = { brands: MachineCatalogBrand[]; models: MachineCatalogModel[]; aliases?: MachineCatalogAlias[] };
 export type CatalogLine = { marca: string; modelo: string; subgrupo: string };
 export const catalogLineKey = (line: CatalogLine) => JSON.stringify([normalizeMachineBrand(line.marca), canonicalMachineSubgroup(line.subgrupo), normalizeMachineModelKey(line.modelo)]);
@@ -21,10 +21,32 @@ export const catalogLineKey = (line: CatalogLine) => JSON.stringify([normalizeMa
 export const safeMachineModelAlias = (alias: string, name: string) =>
   normalizeMachineModelKey(alias).replace(/[^0-9]/g, "") === normalizeMachineModelKey(name).replace(/[^0-9]/g, "");
 
+// Ancho/configuración no crea otro modelo comercial. Solo se unifica cuando el
+// catálogo también contiene explícitamente el modelo base de la misma marca y tipo.
+function configuredHeaderBase(value: string) {
+  const normalized = upperMachineText(value).replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+  return normalized.match(/^(CONVIO FLEX \d+)\s+(?:RICE\s+)?\d+\s+(?:PIES|FT)$/)?.[1] ?? null;
+}
+
+function canonicalConfiguredModel(model: MachineCatalogModel, models: MachineCatalogModel[]) {
+  const base = configuredHeaderBase(model.nombre);
+  if (!base) return model;
+  return models.find(candidate => candidate.activo
+    && normalizeMachineBrand(candidate.marca_nombre) === normalizeMachineBrand(model.marca_nombre)
+    && canonicalMachineSubgroup(candidate.subgrupo) === canonicalMachineSubgroup(model.subgrupo)
+    && normalizeMachineModelKey(candidate.nombre) === normalizeMachineModelKey(base)) ?? model;
+}
+
 export function catalogModelsForBrand(catalog: MachineCatalog, brand: string) {
   const normalized = normalizeMachineBrand(brand);
   if (catalog.brands.some(b => normalizeMachineBrand(b.nombre) === normalized && !b.activa)) return [];
-  return catalog.models.filter(m => m.activo && normalizeMachineBrand(m.marca_nombre) === normalized)
+  const scoped = catalog.models.filter(m => m.activo && normalizeMachineBrand(m.marca_nombre) === normalized);
+  const unique = new Map<string, MachineCatalogModel>();
+  scoped.forEach(model => {
+    const canonical = canonicalConfiguredModel(model, scoped);
+    unique.set(`${canonicalMachineSubgroup(canonical.subgrupo)}|${normalizeMachineModelKey(canonical.nombre)}`, canonical);
+  });
+  return [...unique.values()]
     .sort((a, b) => a.subgrupo.localeCompare(b.subgrupo) || a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
 }
 
@@ -44,9 +66,13 @@ export function reviewCatalogLine(line: CatalogLine, catalog: MachineCatalog) {
   const subgroup = canonicalMachineSubgroup(line.subgrupo);
   const brandEntry = catalog.brands.find(b => normalizeMachineBrand(b.nombre) === brand);
   const scoped = catalog.models.filter(m => normalizeMachineBrand(m.marca_nombre) === brand);
-  const exactNames = scoped.filter(m => m.activo && normalizeMachineModelKey(m.nombre) === key && key);
-  const aliasIds = new Set((catalog.aliases ?? []).filter(a => normalizeMachineBrand(a.marca) === brand && key && normalizeMachineModelKey(a.alias) === key).map(a => a.modelo_catalogo_id));
-  const exact = exactNames.length ? exactNames : scoped.filter(m => m.activo && aliasIds.has(m.id) && safeMachineModelAlias(line.modelo, m.nombre));
+  const exactNames = scoped.filter(m => m.activo && normalizeMachineModelKey(m.nombre) === key && key)
+    .map(model => canonicalConfiguredModel(model, scoped));
+  const aliases = (catalog.aliases ?? []).filter(a => normalizeMachineBrand(a.marca) === brand && key && normalizeMachineModelKey(a.alias) === key);
+  const aliasIds = new Set(aliases.filter(alias => alias.revisado_manual).map(alias => alias.modelo_catalogo_id));
+  const safeAliasIds = new Set(aliases.filter(alias => !alias.revisado_manual).map(alias => alias.modelo_catalogo_id));
+  const exact = exactNames.length ? [...new Map(exactNames.map(model => [model.id, model])).values()]
+    : scoped.filter(m => m.activo && (aliasIds.has(m.id) || (safeAliasIds.has(m.id) && safeMachineModelAlias(line.modelo, m.nombre))));
   const withinSubgroup = exact.filter(m => m.subgrupo === subgroup);
   const match = withinSubgroup.length === 1 ? withinSubgroup[0] : exact.length === 1 ? exact[0] : undefined;
   const archived = brandEntry?.activa === false || (!match && scoped.some(m => !m.activo && normalizeMachineModelKey(m.nombre) === key));

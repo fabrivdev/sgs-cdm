@@ -320,7 +320,8 @@ type LinkSuggestionRow = {
   recurso_id: string; chasis: string; modelo: string | null; marca: string | null;
   ubicacion: string | null; motivo: string;
 };
-type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; valor_acordado?: number | null; valor_facturado?: number | null; moneda_valor?: string | null; unidades_facturadas?: number; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; suggestions: LinkSuggestionRow[]; docs: any[]; importation?: any };
+type SaleInvoiceLink = { documento_id: string; unidad_operacion_id: string };
+type OperationDetail = OrderRow & { estado: string; unidades: number; documentos: number; requiere_importacion: boolean; valor_acordado?: number | null; valor_facturado?: number | null; moneda_valor?: string | null; unidades_facturadas?: number; lines: any[]; units: any[]; stock: StockAssignmentRow[]; imports: ImportAssignmentRow[]; suggestions: LinkSuggestionRow[]; docs: any[]; invoiceLinks: SaleInvoiceLink[]; importation?: any };
 
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "", producto: "", modelo: "", cantidad: 1,
@@ -595,6 +596,60 @@ async function uploadEvidence(file: File, operationId: string, type: MachineDocu
   previousPaths.forEach((previousPath: string) => machineDocumentCache.delete(previousPath));
   const document = result.data;
   return document;
+}
+
+async function linkSaleInvoice(documentId: string, unitIds: string[]) {
+  const { error } = await db.rpc("maquinaria_vincular_factura_venta", {
+    p_documento_id: documentId,
+    p_unidad_ids: unitIds,
+  });
+  if (error) throw error;
+}
+
+async function uploadSaleInvoice(file: File, operationId: string, unitIds: string[]) {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error("Sesión no válida");
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
+  const path = `${auth.user.id}/${operationId}/facturas/${crypto.randomUUID()}-${safeName}`;
+  const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
+  if (storageError) throw storageError;
+  const savedAt = new Date().toISOString();
+  const { data: document, error: documentError } = await db.from("maquinaria_documentos").insert({
+    operacion_id: operationId,
+    tipo: "FACTURA_VENTA",
+    archivo_nombre: file.name,
+    storage_path: path,
+    mime_type: file.type,
+    tamano_bytes: file.size,
+    estado_extraccion: "REVISADO",
+    datos_extraidos: {},
+    revisado_por: auth.user.id,
+    revisado_en: savedAt,
+    creado_en: savedAt,
+    actualizado_en: savedAt,
+  }).select("id").single();
+  if (documentError) {
+    await supabase.storage.from("maquinaria-documentos").remove([path]);
+    throw documentError;
+  }
+  try {
+    await linkSaleInvoice(document.id, unitIds);
+  } catch (error) {
+    await db.from("maquinaria_documentos").delete().eq("id", document.id);
+    await supabase.storage.from("maquinaria-documentos").remove([path]);
+    throw error;
+  }
+}
+
+async function deleteSaleInvoiceDocument(document: StoredMachineDocument) {
+  const { data, error } = await db.rpc("maquinaria_eliminar_factura_venta", { p_documento_id: document.id });
+  if (error) throw error;
+  const path = data?.storage_path || document.storage_path;
+  if (path) {
+    const { error: storageError } = await supabase.storage.from("maquinaria-documentos").remove([path]);
+    if (storageError) console.warn("No se pudo limpiar la factura eliminada del almacenamiento", storageError);
+    machineDocumentCache.delete(path);
+  }
 }
 
 async function uploadImportDocument(file: File, importLineId: string, type: "OC" | "FACTURA_IMPORTACION", operationId?: string | null, extracted: unknown = {}) {
@@ -1246,6 +1301,60 @@ function AttachOrderDocumentButton({ operationId, type, label, onUploaded }: { o
       <Paperclip className="mr-1.5 h-3.5 w-3.5" />{busy ? "Subiendo..." : label}
     </Button>
   </>;
+}
+
+function SaleInvoiceButton({ operationId, units, lines, links, documentId, onSaved }: {
+  operationId: string;
+  units: any[];
+  lines: any[];
+  links: SaleInvoiceLink[];
+  documentId?: string;
+  onSaved: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const occupied = new Set(links.filter(link => link.documento_id !== documentId).map(link => link.unidad_operacion_id));
+  const current = new Set(links.filter(link => link.documento_id === documentId).map(link => link.unidad_operacion_id));
+  const available = units.filter(unit => !occupied.has(unit.id));
+  const reset = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) setSelected([...current]);
+    else { setFile(null); setSelected([]); }
+  };
+  const save = async () => {
+    if (!selected.length || (!documentId && !file)) return;
+    setBusy(true);
+    try {
+      if (documentId) await linkSaleInvoice(documentId, selected);
+      else await uploadSaleInvoice(file!, operationId, selected);
+      toast.success(documentId ? "Factura asignada a la máquina" : "Factura agregada");
+      reset(false);
+      onSaved();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo registrar la factura");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+  return <Dialog open={open} onOpenChange={reset}>
+    <Button type="button" variant={documentId ? "ghost" : "outline"} size="sm" disabled={!available.length} onClick={() => reset(true)}>
+      <Paperclip className="mr-1.5 h-3.5 w-3.5" />{documentId ? "Asignar máquina" : "Adjuntar factura"}
+    </Button>
+    <DialogContent className="max-w-lg">
+      <DialogHeader><DialogTitle>{documentId ? "Asignar factura" : "Nueva factura"}</DialogTitle><DialogDescription>Seleccioná únicamente las máquinas incluidas en esta factura.</DialogDescription></DialogHeader>
+      {!documentId && <div className="space-y-1.5"><Label>Archivo</Label><input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={event => setFile(event.target.files?.[0] ?? null)} /><Button type="button" variant="outline" className="w-full justify-start" onClick={() => fileRef.current?.click()}><Upload className="mr-2 h-4 w-4" />{file?.name ?? "Seleccionar PDF o imagen"}</Button></div>}
+      <div className="space-y-2"><Label>Máquinas facturadas</Label>{available.map(unit => {
+        const line = lines.find(candidate => candidate.id === unit.linea_id);
+        const checked = selected.includes(unit.id);
+        return <label key={unit.id} className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm"><input type="checkbox" checked={checked} onChange={() => setSelected(value => checked ? value.filter(id => id !== unit.id) : [...value, unit.id])} /><span className="min-w-0"><span className="block font-medium">{line?.modelo || line?.producto || "Máquina"}</span><span className="block text-[11px] text-muted-foreground">Unidad {unit.numero_unidad}{unit.chasis ? ` · Ch. ${unit.chasis}` : ""}</span></span></label>;
+      })}</div>
+      <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => reset(false)}>Cancelar</Button><Button onClick={save} disabled={busy || !selected.length || (!documentId && !file)}>{busy ? "Guardando..." : "Guardar"}</Button></div>
+    </DialogContent>
+  </Dialog>;
 }
 
 function DeleteDocumentButton({ documentLabel, onDelete, compact = false }: { documentLabel: string; onDelete: () => Promise<void>; compact?: boolean }) {
@@ -1958,7 +2067,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         db.from("maquinaria_documentos").select("*").eq("operacion_id", operationId).in("tipo", ["NP", "FACTURA_VENTA"]).order("creado_en", { ascending: false }),
         db.from("maquinaria_importaciones_operativas").select("*").eq("operacion_id", operationId).maybeSingle(),
       ]);
-      if (summary.error) throw summary.error; if (lines.error) throw lines.error;
+      if (summary.error) throw summary.error; if (lines.error) throw lines.error; if (docs.error) throw docs.error;
       const lineIds = (lines.data ?? []).map((l: any) => l.id);
       const [units, stock, linkedImports, availableImports, suggestions] = await Promise.all([
         lineIds.length ? db.from("maquinaria_unidades_operacion").select("*").in("linea_id", lineIds).order("numero_unidad") : Promise.resolve({ data: [], error: null }),
@@ -1974,6 +2083,12 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         db.from("maquinaria_vinculos_sugeridos").select("*").eq("operacion_id", operationId),
       ]);
       if (units.error) throw units.error; if (stock.error) throw stock.error; if (linkedImports.error) throw linkedImports.error; if (availableImports.error) throw availableImports.error; if (suggestions.error) throw suggestions.error;
+      const saleDocumentIds = (docs.data ?? []).filter((document: any) => document.tipo === "FACTURA_VENTA").map((document: any) => document.id);
+      const invoiceLinksResult = saleDocumentIds.length
+        ? await db.from("maquinaria_facturas_venta_unidades").select("documento_id,unidad_operacion_id").in("documento_id", saleDocumentIds)
+        : { data: [], error: null };
+      const invoiceLinksMissing = invoiceLinksResult.error && ["42P01", "PGRST205"].includes(invoiceLinksResult.error.code);
+      if (invoiceLinksResult.error && !invoiceLinksMissing) throw invoiceLinksResult.error;
       const historicalChassis = [...new Set((units.data ?? []).map((unit: any) => normalizeChassisKey(unit.chasis)).filter(Boolean))];
       const historicalImports = simpleOrderState(summary.data?.estado) === "COMPLETADO" && historicalChassis.length
         ? await db.from("maquinaria_importacion_unidades_historicas").select("*").in("chasis_normalizado", historicalChassis).limit(500)
@@ -1985,7 +2100,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       (linkedImports.data ?? []).forEach((item: ImportAssignmentRow) => importsById.set(item.id, { ...item, asignable: false }));
       (availableImports.data ?? []).forEach((item: ImportAssignmentRow) => importsById.set(item.id, { ...item, asignable: true }));
       (historicalImports.data ?? []).forEach((item: ImportAssignmentRow) => importsById.set(item.id, { ...item, asignable: false }));
-      return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: [...importsById.values()], suggestions: suggestions.data ?? [], importation: importation.data };
+      return { ...summary.data, observaciones: operation.data?.observaciones, lines: lines.data ?? [], docs: docs.data ?? [], invoiceLinks: invoiceLinksResult.data ?? [], units: units.data ?? [], stock: stock.data ?? [], imports: [...importsById.values()], suggestions: suggestions.data ?? [], importation: importation.data };
     },
   });
   const openDocument = (storagePath: string, fileName: string) => {
@@ -2098,7 +2213,6 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const npDocuments = detail?.docs.filter((document: any) => document.tipo === "NP") ?? [];
   const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
   const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
-  const saleInvoiceDocument = (saleInvoiceDocuments[0] ?? null) as StoredMachineDocument | null;
   const canEditOrder = Boolean(detail && canEditChasis && operationId && (!isConcludedHistorical || isSuperAdmin) && detail.estado !== "CANCELADA");
   const canDeleteOrder = Boolean(detail && canEditChasis && operationId && !isConcludedHistorical && !["FACTURADA", "CERRADA", "CANCELADA"].includes(detail.estado));
   const deleteOrder = async () => {
@@ -2222,7 +2336,18 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         <TabsContent value="documentos" className="space-y-4">
           <div className="divide-y">
             <DocumentRow label="Nota de pedido" fileName={npDocument?.archivo_nombre} date={npDocument ? formatDate(npDocument.creado_en) : null} onOpen={npDocument ? () => openDocument(npDocument.storage_path, npDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton operationId={operationId} type="NP" label={npDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{npDocument && <DeleteDocumentButton documentLabel="Nota de pedido" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "NP" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
-            <DocumentRow label="Factura al cliente" fileName={saleInvoiceDocument?.archivo_nombre} date={saleInvoiceDocument ? formatDate(saleInvoiceDocument.creado_en) : null} onOpen={saleInvoiceDocument ? () => openDocument(saleInvoiceDocument.storage_path, saleInvoiceDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton operationId={operationId} type="FACTURA_VENTA" label={saleInvoiceDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{saleInvoiceDocument && <DeleteDocumentButton documentLabel="Factura al cliente" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "FACTURA_VENTA" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Facturas al cliente</h3>{operationId && <SaleInvoiceButton operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}</div>
+            {saleInvoiceDocuments.length ? <div className="divide-y rounded-xl border px-3">{saleInvoiceDocuments.map((document: StoredMachineDocument) => {
+              const linkedUnitIds = detail.invoiceLinks.filter(link => link.documento_id === document.id).map(link => link.unidad_operacion_id);
+              const linkedUnits = detail.units.filter((unit: any) => linkedUnitIds.includes(unit.id));
+              const unitNames = linkedUnits.map((unit: any) => {
+                const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
+                return `${line?.modelo || line?.producto || "Máquina"} · U${unit.numero_unidad}`;
+              });
+              return <DocumentRow key={document.id} compactActions label={unitNames.length ? unitNames.join(" + ") : "Factura sin máquina asignada"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} action={<>{!unitNames.length && operationId && <SaleInvoiceButton operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} documentId={document.id} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}<DeleteDocumentButton compact documentLabel="Factura al cliente" onDelete={async () => { await deleteSaleInvoiceDocument(document); await detailQuery.refetch(); onChanged(); }} /></>} />;
+            })}</div> : <p className="rounded-xl border px-3 py-4 text-[11px] text-muted-foreground">Sin facturas cargadas.</p>}
           </div>
         </TabsContent>
       </Tabs>}
