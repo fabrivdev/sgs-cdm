@@ -61,6 +61,19 @@ describe("reported production regressions", () => {
     expect(sql).toContain("importacion.unidad_id = unidad.id");
   });
 
+  it("uses the import-style header menu and deletes a whole machine order atomically", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    const sql = read("supabase/migrations/20260922150000_add_safe_machine_order_deletion.sql");
+    expect(ui).toContain('aria-label="Acciones del pedido"');
+    expect(ui).toContain("Eliminar pedido");
+    expect(ui).toContain('rpc("maquinaria_eliminar_pedido"');
+    expect(ui).not.toContain('ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEdit(operationId)}');
+    expect(sql).toContain("CREATE OR REPLACE FUNCTION public.maquinaria_eliminar_pedido");
+    expect(sql).toContain("FOR UPDATE");
+    expect(sql).toContain("No se puede eliminar: el pedido ya tiene factura, recepcion, stock o parque vinculado");
+    expect(sql).toContain("DELETE FROM public.maquinaria_operaciones");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

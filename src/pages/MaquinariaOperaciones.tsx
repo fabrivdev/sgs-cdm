@@ -1937,6 +1937,8 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const canEditChasis = isAdmin || roles.includes("jefatura");
   const [activeTab, setActiveTab] = useState("resumen");
   const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
+  const [deleteOrderDialogOpen, setDeleteOrderDialogOpen] = useState(false);
+  const [deletingOrder, setDeletingOrder] = useState(false);
   const detailQuery = useQuery({
     queryKey: ["machine-operation-detail", operationId], enabled: !!operationId,
     queryFn: async (): Promise<OperationDetail> => {
@@ -2088,6 +2090,26 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const saleInvoiceDocuments = detail?.docs.filter((document: any) => document.tipo === "FACTURA_VENTA") ?? [];
   const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
   const saleInvoiceDocument = (saleInvoiceDocuments[0] ?? null) as StoredMachineDocument | null;
+  const canEditOrder = Boolean(detail && canEditChasis && operationId && (!isConcludedHistorical || isSuperAdmin) && detail.estado !== "CANCELADA");
+  const canDeleteOrder = Boolean(detail && canEditChasis && operationId && !isConcludedHistorical && !["FACTURADA", "CERRADA", "CANCELADA"].includes(detail.estado));
+  const deleteOrder = async () => {
+    if (!operationId) return;
+    setDeletingOrder(true);
+    try {
+      const documentPaths = detail?.docs.map((document: any) => document.storage_path) ?? [];
+      const { error } = await db.rpc("maquinaria_eliminar_pedido", { p_operacion_id: operationId });
+      if (error) throw error;
+      await deleteStoredMachineFiles(documentPaths);
+      toast.success("Pedido eliminado");
+      setDeleteOrderDialogOpen(false);
+      onOpenChange(false);
+      onChanged();
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo eliminar el pedido");
+    } finally {
+      setDeletingOrder(false);
+    }
+  };
   const deleteOrderLine = async (lineId: string) => {
     setDeletingLineId(lineId);
     try {
@@ -2113,7 +2135,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-[16px] font-semibold">{detail ? formatNpCode(detail.np_numero) : "Cargando..."}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
-        {detail && <div className="flex flex-wrap justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><Badge variant="outline" className={cn("text-[10px]", deliveryComplete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600")}>{deliveryLabel}</Badge></div>}
+        {detail && <div className="flex flex-wrap items-start justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><Badge variant="outline" className={cn("text-[10px]", deliveryComplete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600")}>{deliveryLabel}</Badge>{(canEditOrder || canDeleteOrder) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="-mt-1 h-8 w-8 shrink-0" aria-label="Acciones del pedido"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48">{canEditOrder && <DropdownMenuItem onClick={() => onEdit(operationId!)}><Pencil className="mr-2 h-4 w-4" />Editar pedido</DropdownMenuItem>}{canEditOrder && canDeleteOrder && <DropdownMenuSeparator />}{canDeleteOrder && <DropdownMenuItem onSelect={() => setDeleteOrderDialogOpen(true)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar pedido</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu>}</div>}
       </div>
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
@@ -2196,7 +2218,12 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
         </TabsContent>
       </Tabs>}
     </ResponsiveDrawerBody>
-    {detail && canEditChasis && operationId && (!isConcludedHistorical || isSuperAdmin) && detail.estado !== "CANCELADA" && <ResponsiveDrawerFooter><Button variant="outline" size="sm" onClick={() => onEdit(operationId)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Editar pedido</Button></ResponsiveDrawerFooter>}
+    <AlertDialog open={deleteOrderDialogOpen} onOpenChange={setDeleteOrderDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>¿Eliminar este pedido?</AlertDialogTitle><AlertDialogDescription>Se eliminarán el pedido completo, sus líneas, unidades y documentos propios. Solo se permite si todavía no tiene factura, recepción, stock ni parque vinculados.</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={deleteOrder} disabled={deletingOrder}>{deletingOrder ? "Eliminando..." : "Eliminar pedido"}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </ResponsiveDrawer>;
 }
 
