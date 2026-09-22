@@ -77,6 +77,16 @@ describe("reported production regressions", () => {
     expect(sql).toContain("DELETE FROM public.maquinaria_operaciones");
   });
 
+  it("accepts and reads a machine order supplied as PDF", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    const extractor = read("supabase/functions/machine-document-extractor/index.ts");
+    expect(ui).toContain('accept=".pdf,application/pdf,image/jpeg,image/png,image/webp"');
+    expect(ui).toContain('mimeType: "application/pdf"');
+    expect(ui).toContain("Subir NP en PDF o imagen");
+    expect(extractor).toContain("application\\/pdf|image\\/(jpeg|png|webp)");
+    expect(extractor).toContain("El documento supera el limite de 12 MB");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

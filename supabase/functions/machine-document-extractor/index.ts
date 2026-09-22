@@ -104,10 +104,10 @@ Deno.serve(async (req) => {
     const documentType = body?.documentType === "FACTURA_IMPORTACION" ? "FACTURA_IMPORTACION" : "NP";
     const dataUrl = String(body?.dataUrl ?? "");
     const mimeType = String(body?.mimeType ?? "");
-    if (!/^image\/(jpeg|png|webp)$/.test(mimeType) || !dataUrl.startsWith(`data:${mimeType};base64,`)) {
-      return extractionIssue("Para la lectura automatica usa una foto JPG, PNG o WEBP nitida.", "INVALID_INPUT", false);
+    if (!/^(application\/pdf|image\/(jpeg|png|webp))$/.test(mimeType) || !dataUrl.startsWith(`data:${mimeType};base64,`)) {
+      return extractionIssue("Para la lectura automatica usa un PDF o una imagen JPG, PNG o WEBP.", "INVALID_INPUT", false);
     }
-    if (dataUrl.length > 16_500_000) return extractionIssue("La imagen supera el limite de 12 MB.", "INVALID_INPUT", false);
+    if (dataUrl.length > 16_500_000) return extractionIssue("El documento supera el limite de 12 MB.", "INVALID_INPUT", false);
 
     const apiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
     if (!apiKey) return extractionIssue("La lectura automatica no esta configurada.", "CONFIG", false);

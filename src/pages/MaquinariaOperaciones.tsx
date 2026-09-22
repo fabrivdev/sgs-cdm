@@ -444,6 +444,8 @@ function fileToDataUrl(file: File) {
   });
 }
 
+const MAX_MACHINE_DOCUMENT_BYTES = 12 * 1024 * 1024;
+
 async function prepareImageForExtraction(file: File) {
   // Las fotos tomadas con celular suelen guardar los pixeles de costado y
   // depender de EXIF para mostrarse derechas. Algunos proveedores de vision
@@ -466,13 +468,20 @@ async function prepareImageForExtraction(file: File) {
 }
 
 async function extractDocument(file: File, documentType: "NP" | "FACTURA_IMPORTACION") {
-  if (!file.type.startsWith("image/")) throw new Error("La lectura automática requiere una foto JPG, PNG o WEBP.");
+  if (file.size > MAX_MACHINE_DOCUMENT_BYTES) throw new Error("El documento supera el límite de 12 MB.");
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  const isImage = /^image\/(jpeg|png|webp)$/.test(file.type);
+  if (!isPdf && !isImage) throw new Error("La NP debe ser un PDF o una imagen JPG, PNG o WEBP.");
   let prepared: { dataUrl: string; mimeType: string };
-  try {
-    prepared = await prepareImageForExtraction(file);
-  } catch (error) {
-    console.error("No se pudo normalizar la orientación de la imagen", error);
-    prepared = { dataUrl: await fileToDataUrl(file), mimeType: file.type };
+  if (isPdf) {
+    prepared = { dataUrl: await fileToDataUrl(file), mimeType: "application/pdf" };
+  } else {
+    try {
+      prepared = await prepareImageForExtraction(file);
+    } catch (error) {
+      console.error("No se pudo normalizar la orientación de la imagen", error);
+      prepared = { dataUrl: await fileToDataUrl(file), mimeType: file.type };
+    }
   }
   const { data, error } = await supabase.functions.invoke("machine-document-extractor", {
     body: { documentType, mimeType: prepared.mimeType, dataUrl: prepared.dataUrl },
@@ -1819,16 +1828,16 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
   return <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="xl">
     <ResponsiveDrawerHeader><h2 className="text-[16px] font-semibold">{operationId ? "Editar pedido" : "Nuevo pedido"}</h2></ResponsiveDrawerHeader>
     <ResponsiveDrawerBody className="space-y-4">
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
+      <input ref={fileRef} type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => chooseFile(e.target.files?.[0])} />
       <div className="flex items-center gap-2 rounded-xl border border-dashed p-3">
         <button type="button" disabled={reading} onClick={() => fileRef.current?.click()} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Upload className="h-4 w-4" /></span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{reading ? "Leyendo la NP..." : file?.name ?? "Subir foto de la NP"}</span></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{reading ? "Leyendo la NP..." : file?.name ?? "Subir NP en PDF o imagen"}</span></span>
           {reading && <Sparkles className="h-4 w-4 animate-pulse text-primary" />}
         </button>
         {previewUrl && <Button type="button" variant="outline" size="sm" onClick={() => window.open(previewUrl, "_blank", "noopener,noreferrer")}><Eye className="mr-1.5 h-3.5 w-3.5" />Ver documento</Button>}
       </div>
-      {extractionError && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div className="min-w-0 flex-1"><p>{extractionError}</p><p className="mt-0.5 text-amber-700">La foto sigue seleccionada. Podés reintentar o completar los campos manualmente.</p></div>{file && <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-amber-300 bg-white px-2 text-[11px]" disabled={reading} onClick={() => chooseFile(file)}><RotateCcw className="mr-1 h-3 w-3" />Reintentar</Button>}</div>}
+      {extractionError && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div className="min-w-0 flex-1"><p>{extractionError}</p><p className="mt-0.5 text-amber-700">El documento sigue seleccionado. Podés reintentar o completar los campos manualmente.</p></div>{file && <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-amber-300 bg-white px-2 text-[11px]" disabled={reading} onClick={() => chooseFile(file)}><RotateCcw className="mr-1 h-3 w-3" />Reintentar</Button>}</div>}
       {!extractionError && Array.isArray(extracted?.confianza?.campos_dudosos) && extracted.confianza.campos_dudosos.length > 0 && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><div><p className="font-medium">Revisá estos datos antes de guardar</p><p className="mt-0.5">{extracted.confianza.campos_dudosos.map(String).join(" · ")}</p></div></div>}
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input placeholder="NP0002" value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: upperMachineText(e.target.value) })} onBlur={() => setForm(v => ({ ...v, np_numero: normalizeNpCode(v.np_numero) ?? v.np_numero }))} />{form.np_numero && !normalizeNpCode(form.np_numero) && <p className="text-xs text-destructive">Usá NP y cuatro números. No se recortan números de más.</p>}</Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input list="np-clientes" value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: upperMachineText(e.target.value) })} /><datalist id="np-clientes">{references.data?.clients.map(c => <option key={c.id} value={upperMachineText(c.nombre)} />)}</datalist></Field><Field label="Operativo comercial"><Input list="np-comerciales" value={form.comercial} onChange={(e) => setForm({ ...form, comercial: upperMachineText(e.target.value) })} /><datalist id="np-comerciales">{references.data?.commercials.map(c => <option key={c} value={c} />)}</datalist></Field></div>
       {(catalog.isError || references.isError) && <div className="rounded-md border border-amber-200 p-2 text-xs">No se pudo validar contra los datos registrados. <Button size="sm" variant="outline" onClick={() => { catalog.refetch(); references.refetch(); }}>Reintentar validación</Button></div>}

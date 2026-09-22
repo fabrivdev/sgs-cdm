@@ -8,6 +8,7 @@ const catalog = () => Response.json({ models: [
   { name: "models/gemini-2.5-flash-lite", supportedGenerationMethods: ["generateContent"] },
 ] });
 const read = (model?: string, validate?: (value: unknown) => unknown) => requestDocumentExtraction("test-key", "Read this NP", "data:image/jpeg;base64,dGVzdA==", "image/jpeg", model, validate);
+const readPdf = (model?: string) => requestDocumentExtraction("test-key", "Read this NP", "data:application/pdf;base64,dGVzdA==", "application/pdf", model);
 const untilAbort = (_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
   init.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
 });
@@ -27,6 +28,13 @@ describe("Gemini document reading recovery", () => {
     expect(await read(" models/gemini-2.5-flash ")).toEqual({ data, model: "gemini-2.5-flash" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain("/gemini-2.5-flash:generateContent");
+  });
+
+  it("sends a PDF to Gemini with its original MIME type", async () => {
+    fetchMock.mockResolvedValueOnce(answer());
+    expect((await readPdf("gemini-2.5-flash")).data).toEqual(data);
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request.contents[0].parts[1].inlineData).toEqual({ mimeType: "application/pdf", data: "dGVzdA==" });
   });
 
   it("allows a valid 30-second reading that used to be cut off at 25 seconds", async () => {
