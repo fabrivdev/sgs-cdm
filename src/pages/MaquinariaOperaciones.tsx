@@ -267,6 +267,8 @@ type DraftLine = {
   linea_numero: number; marca: string; producto: string; modelo: string;
   anio?: number | null; cabezal?: string;
   cantidad: number; condicion: "NUEVA" | "USADA"; abastecimiento: "DEFINIR" | "STOCK" | "IMPORTAR";
+  valor_acordado_unitario: number | string | null; moneda_acordada: "USD" | "EUR" | "PYG";
+  unidades_facturadas?: number;
   subgrupo: string; chasis: string[]; confianza?: Record<string, unknown>; datos_extraidos?: Record<string, unknown>;
 };
 type StockAssignmentRow = {
@@ -323,6 +325,7 @@ type OperationDetail = OrderRow & { estado: string; unidades: number; documentos
 const blankLine = (n = 1): DraftLine => ({
   linea_numero: n, marca: "", producto: "", modelo: "", cantidad: 1,
   anio: null, cabezal: "", condicion: "NUEVA", abastecimiento: "DEFINIR", subgrupo: "OTRO", chasis: [],
+  valor_acordado_unitario: null, moneda_acordada: "USD",
 });
 const blankImport = (): ImportDraft => ({
   marca: "CLAAS", producto: "COSECHADORAS", modelo: "", cantidad: 1,
@@ -364,6 +367,18 @@ function safeExtractedText(value: unknown) {
   return normalized && normalized.toLowerCase() !== "null" ? upperMachineText(normalized) : "";
 }
 
+function parseDraftAgreedValue(value: number | string | null): number | null | undefined {
+  const raw = String(value ?? "").trim().replace(/\s/g, "");
+  if (!raw) return null;
+  const comma = raw.lastIndexOf(",");
+  const dot = raw.lastIndexOf(".");
+  const normalized = comma >= 0 && dot >= 0
+    ? comma > dot ? raw.replace(/\./g, "").replace(",", ".") : raw.replace(/,/g, "")
+    : comma >= 0 ? raw.replace(",", ".") : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
 function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, unknown> = {}) {
   const result: DraftLine[] = [];
   rawLines.forEach((raw) => {
@@ -386,6 +401,8 @@ function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, u
       cantidad: quantity,
       condicion: condition,
       abastecimiento: supply,
+      valor_acordado_unitario: null,
+      moneda_acordada: "USD",
       subgrupo: safeSubgroup(line.subgrupo),
       chasis: Array.isArray(line.chasis) ? line.chasis.map(chasis => upperMachineText(String(chasis))) : [],
       confianza: confidence,
@@ -406,6 +423,8 @@ function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, u
         cantidad: quantity,
         condicion: condition,
         abastecimiento: supply,
+        valor_acordado_unitario: null,
+        moneda_acordada: "USD",
         subgrupo: "PLATAFORMAS/CABEZALES",
         chasis: [],
         confianza: confidence,
@@ -1658,7 +1677,12 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
       ]);
       if (operation.error) throw operation.error;
       if (existingLines.error) throw existingLines.error;
-      return { operation: { ...operation.data, cliente_nombre: summary.data?.cliente_nombre ?? operation.data.cliente_nombre }, lines: existingLines.data ?? [] };
+      const lineIds = (existingLines.data ?? []).map((line: any) => line.id);
+      const units = lineIds.length
+        ? await db.from("maquinaria_unidades_operacion").select("linea_id,valor_facturado").in("linea_id", lineIds)
+        : { data: [], error: null };
+      if (units.error) throw units.error;
+      return { operation: { ...operation.data, cliente_nombre: summary.data?.cliente_nombre ?? operation.data.cliente_nombre }, lines: existingLines.data ?? [], units: units.data ?? [] };
     },
   });
   useEffect(() => {
@@ -1679,6 +1703,9 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         cantidad: Math.max(1, Number(line.cantidad) || 1),
         condicion: line.condicion === "USADA" ? "USADA" : "NUEVA",
         abastecimiento: ["STOCK", "IMPORTAR"].includes(line.abastecimiento) ? line.abastecimiento : "DEFINIR",
+        valor_acordado_unitario: line.valor_acordado_unitario == null ? null : Number(line.valor_acordado_unitario),
+        moneda_acordada: (["USD", "EUR", "PYG"].includes(line.moneda_acordada) ? line.moneda_acordada : "USD") as DraftLine["moneda_acordada"],
+        unidades_facturadas: editQuery.data.units.filter((unit: any) => unit.linea_id === line.id && unit.valor_facturado != null).length,
         subgrupo: safeSubgroup(line.subgrupo), chasis: [],
         confianza: line.confianza_extraccion ?? {}, datos_extraidos: line.datos_extraidos ?? {},
       })));
@@ -1738,6 +1765,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
     if (lines.some((l) => !normalizeMachineBrand(l.marca))) return toast.error("Cada línea necesita una marca correcta");
     if (lines.some(l => !l.modelo.trim())) return toast.error("Cada línea necesita un modelo");
     if (lines.some(l => !Number.isInteger(l.cantidad) || l.cantidad < 1 || l.cantidad > 500)) return toast.error("La cantidad debe ser un entero entre 1 y 500");
+    if (lines.some(l => parseDraftAgreedValue(l.valor_acordado_unitario) === undefined)) return toast.error("Revisá el valor por unidad");
     if (lines.some(l => l.anio != null && (!Number.isInteger(l.anio) || l.anio < 1900 || l.anio > 2200))) return toast.error("Revisá el año de la máquina");
     if (!references.data || references.isError) return toast.error("Primero cargá los datos de referencia para validar cliente y operativo");
     if (unknownNames.length && namesConfirmed !== namesKey) return toast.error("Confirmá los nombres que no coinciden con los datos registrados");
@@ -1757,6 +1785,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
       const targetOperationId = operationId ?? crypto.randomUUID();
       const linesForSave = checkedLines.map((line) => ({
         ...line,
+        valor_acordado_unitario: parseDraftAgreedValue(line.valor_acordado_unitario),
         marca: legacyMachineBrand(line.marca), producto: upperMachineText(line.producto || line.subgrupo), modelo: upperMachineText(line.modelo), chasis: line.chasis.map(upperMachineText),
         datos_extraidos: { ...(line.datos_extraidos ?? {}), marca_real: normalizeMachineBrand(line.marca), anio: line.anio ?? null, cabezal: line.cabezal || null },
       }));
@@ -1764,6 +1793,20 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
         ? await db.rpc("maquinaria_actualizar_operacion_preservando_estado", { p_operacion_id: operationId, p_operacion: normalizedForm, p_lineas: linesForSave })
         : await db.rpc("maquinaria_registrar_operacion", { p_operacion: { id: targetOperationId, ...normalizedForm }, p_lineas: linesForSave });
       if (error) throw error;
+      const savedLines = await db.from("maquinaria_operacion_lineas").select("id,linea_numero").eq("operacion_id", targetOperationId);
+      if (savedLines.error) throw savedLines.error;
+      const valueUpdates = await Promise.all(linesForSave.map((line) => {
+        const savedLine = (savedLines.data ?? []).find((candidate: any) => candidate.id === line.id)
+          ?? (savedLines.data ?? []).find((candidate: any) => Number(candidate.linea_numero) === Number(line.linea_numero));
+        if (!savedLine) return Promise.resolve({ error: new Error("No se encontró la línea guardada") });
+        return db.from("maquinaria_operacion_lineas").update({
+          valor_acordado_unitario: line.valor_acordado_unitario,
+          moneda_acordada: line.moneda_acordada,
+          actualizado_en: new Date().toISOString(),
+        }).eq("id", savedLine.id).eq("operacion_id", targetOperationId);
+      }));
+      const valueError = valueUpdates.find((result) => result.error)?.error;
+      if (valueError) throw valueError;
       if (file) {
         try { await uploadEvidence(file, data ?? targetOperationId, "NP", extracted); }
         catch (uploadError) { console.error(uploadError); toast.warning("La operación se guardó, pero el archivo no pudo adjuntarse."); }
@@ -1790,7 +1833,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
       <div className="grid gap-3 sm:grid-cols-2"><Field label="Número de NP"><Input placeholder="NP0002" value={form.np_numero} onChange={(e) => setForm({ ...form, np_numero: upperMachineText(e.target.value) })} onBlur={() => setForm(v => ({ ...v, np_numero: normalizeNpCode(v.np_numero) ?? v.np_numero }))} />{form.np_numero && !normalizeNpCode(form.np_numero) && <p className="text-xs text-destructive">Usá NP y cuatro números. No se recortan números de más.</p>}</Field><Field label="Fecha"><Input type="date" value={form.np_fecha} onChange={(e) => setForm({ ...form, np_fecha: e.target.value })} />{!form.np_fecha && <p className="text-[10px] text-amber-700">No se pudo confirmar la fecha automáticamente; completala según la NP.</p>}</Field><Field label="Cliente"><Input list="np-clientes" value={form.cliente_nombre} onChange={(e) => setForm({ ...form, cliente_nombre: upperMachineText(e.target.value) })} /><datalist id="np-clientes">{references.data?.clients.map(c => <option key={c.id} value={upperMachineText(c.nombre)} />)}</datalist></Field><Field label="Operativo comercial"><Input list="np-comerciales" value={form.comercial} onChange={(e) => setForm({ ...form, comercial: upperMachineText(e.target.value) })} /><datalist id="np-comerciales">{references.data?.commercials.map(c => <option key={c} value={c} />)}</datalist></Field></div>
       {(catalog.isError || references.isError) && <div className="rounded-md border border-amber-200 p-2 text-xs">No se pudo validar contra los datos registrados. <Button size="sm" variant="outline" onClick={() => { catalog.refetch(); references.refetch(); }}>Reintentar validación</Button></div>}
       {references.data && unknownNames.length > 0 && <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"><input type="checkbox" checked={namesConfirmed === namesKey} onChange={e => setNamesConfirmed(e.target.checked ? namesKey : "")} /><span>{unknownNames.join(" Y ")} sin coincidencia exacta. Revisé la NP y confirmo los nombres escritos.</span></label>}
-      <div className="space-y-2"><div className="flex items-center justify-between"><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca: upperMachineText(marca), modelo: "", catalogConfirmed: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo, model) => updateLine(i, { modelo: upperMachineText(modelo), subgrupo: model?.subgrupo ?? line.subgrupo, catalogConfirmed: "" })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field></div>{catalog.data && <MachineCatalogLineReview line={line} catalog={catalog.data} confirmed={line.catalogConfirmed} preserved={isPreservedLine(line)} onConfirm={key => updateLine(i, { catalogConfirmed: key })} onSelect={selection => updateLine(i, { ...selection, catalogConfirmed: "" })} />}</div>)}</div>
+      <div className="space-y-2"><div className="flex items-center justify-between"><h3 className="text-[13px] font-semibold">Unidades de la NP</h3><Button variant="outline" size="sm" onClick={() => setLines((v) => [...v, blankLine(v.length + 1)])}><Plus className="mr-1 h-3.5 w-3.5" />Agregar</Button></div>{lines.map((line, i) => { const fullyBilled = Number(line.unidades_facturadas ?? 0) >= line.cantidad; return <div key={line.id ?? `new-${i}`} className="rounded-xl border p-3"><div className="mb-2 flex justify-between"><span className="text-[11px] font-medium text-muted-foreground">Línea {i + 1}</span>{lines.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLines((v) => v.filter((_, x) => x !== i).map((l, x) => ({ ...l, linea_numero: x + 1 })))}><X className="h-3.5 w-3.5" /></Button>}</div><div className="grid gap-2 sm:grid-cols-2"><Field label="Marca"><MarcaMaquinaSelect value={line.marca} onValueChange={(marca) => updateLine(i, { marca: upperMachineText(marca), modelo: "", catalogConfirmed: "" })} /></Field><Field label="Tipo"><CompactSelect value={line.subgrupo} values={MACHINE_SUBGROUPS as readonly string[]} onChange={(v) => updateLine(i, { subgrupo: v, modelo: "" })} /></Field><Field label="Modelo del catálogo"><ModeloMaquinaSelect marca={line.marca} subgrupo={line.subgrupo} value={line.modelo} onValueChange={(modelo, model) => updateLine(i, { modelo: upperMachineText(modelo), subgrupo: model?.subgrupo ?? line.subgrupo, catalogConfirmed: "" })} /></Field><Field label="Año"><Input type="number" min={1900} max={2200} value={line.anio ?? ""} onChange={(e) => updateLine(i, { anio: e.target.value ? Number(e.target.value) : null })} /></Field><Field label="Cantidad"><Input type="number" min={1} value={line.cantidad} onChange={(e) => updateLine(i, { cantidad: Math.max(1, Number(e.target.value) || 1) })} /></Field><Field label="Condición"><CompactSelect value={line.condicion} values={["NUEVA", "USADA"]} onChange={(v) => updateLine(i, { condicion: v as DraftLine["condicion"] })} /></Field><Field label="Abastecimiento"><CompactSelect value={line.abastecimiento} values={["DEFINIR", "STOCK", "IMPORTAR"]} onChange={(v) => updateLine(i, { abastecimiento: v as DraftLine["abastecimiento"] })} /></Field><Field label={Number(line.unidades_facturadas ?? 0) > 0 && !fullyBilled ? `Valor pendiente por unidad (${line.unidades_facturadas}/${line.cantidad} facturada)` : "Valor por unidad"}><Input inputMode="decimal" value={line.valor_acordado_unitario ?? ""} disabled={fullyBilled} placeholder={fullyBilled ? "Ya facturada" : "Sin cargar"} onChange={(event) => updateLine(i, { valor_acordado_unitario: event.target.value })} /></Field><Field label="Moneda">{fullyBilled ? <Input value={line.moneda_acordada} disabled /> : <CompactSelect value={line.moneda_acordada} values={["USD", "EUR", "PYG"]} onChange={(value) => updateLine(i, { moneda_acordada: value as DraftLine["moneda_acordada"] })} />}</Field></div>{catalog.data && <MachineCatalogLineReview line={line} catalog={catalog.data} confirmed={line.catalogConfirmed} preserved={isPreservedLine(line)} onConfirm={key => updateLine(i, { catalogConfirmed: key })} onSelect={selection => updateLine(i, { ...selection, catalogConfirmed: "" })} />}</div>; })}</div>
       <Field label="Observaciones"><Textarea rows={3} value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: upperMachineText(e.target.value) })} /></Field>
     </ResponsiveDrawerBody>
     <ResponsiveDrawerFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={save} disabled={saving || reading || editQuery.isLoading || catalog.isLoading || references.isLoading}>{saving ? "Guardando..." : operationId ? "Guardar cambios" : "Validar y crear"}</Button></ResponsiveDrawerFooter>

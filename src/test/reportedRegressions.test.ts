@@ -43,6 +43,14 @@ describe("reported production regressions", () => {
     expect(ui).toContain("const refreshed = await operationsQuery.refetch()");
   });
 
+  it("lets an open or partially billed order correct the pending agreed value", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(ui).toContain("Valor pendiente por unidad");
+    expect(ui).toContain("valor_acordado_unitario: line.valor_acordado_unitario");
+    expect(ui).toContain("unit.linea_id === line.id && unit.valor_facturado != null");
+    expect(ui).toContain("disabled={fullyBilled}");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");
