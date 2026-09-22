@@ -51,6 +51,16 @@ describe("reported production regressions", () => {
     expect(ui).toContain("disabled={fullyBilled}");
   });
 
+  it("inherits the chassis from a linked import instead of requesting it twice", () => {
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    const sql = read("supabase/migrations/20260922140000_sync_linked_import_chassis.sql");
+    expect(ui).toContain("const importChassis = String(linkedImport?.chasis");
+    expect(ui).toContain("canEdit && !chassisComesFromImport");
+    expect(ui).toContain("linkedImport={detail.imports.find");
+    expect(sql).toContain("maquinaria_sincronizar_chasis_importacion_vinculada");
+    expect(sql).toContain("importacion.unidad_id = unidad.id");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

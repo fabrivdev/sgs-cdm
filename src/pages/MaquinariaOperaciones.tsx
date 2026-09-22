@@ -1844,11 +1844,14 @@ function DetailValue({ label, value, mono = false }: { label: string; value: Rea
   return <KeyValueItem label={label} value={value} mono={mono} />;
 }
 
-function OperationChassisValue({ unit, canEdit, onSaved }: { unit: any; canEdit: boolean; onSaved: () => void }) {
+function OperationChassisValue({ unit, linkedImport, canEdit, onSaved }: { unit: any; linkedImport?: ImportAssignmentRow; canEdit: boolean; onSaved: () => void }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(unit.chasis ?? "");
   const [saving, setSaving] = useState(false);
   useEffect(() => setValue(unit.chasis ?? ""), [unit.chasis]);
+  const importChassis = String(linkedImport?.chasis ?? "").trim();
+  const effectiveChassis = importChassis || unit.chasis || "Sin asignar";
+  const chassisComesFromImport = Boolean(importChassis);
   const save = async () => {
     setSaving(true);
     try {
@@ -1863,7 +1866,7 @@ function OperationChassisValue({ unit, canEdit, onSaved }: { unit: any; canEdit:
     } catch (error: any) { toast.error(error?.message ?? "No se pudo actualizar el chasis"); }
     finally { setSaving(false); }
   };
-  return editing ? <div className="flex items-end gap-2"><Field label={`Unidad ${unit.numero_unidad} · Chasis`}><Input autoFocus value={value} onChange={(event) => setValue(event.target.value)} /></Field><Button variant="outline" size="sm" onClick={() => { setValue(unit.chasis ?? ""); setEditing(false); }}>Cancelar</Button><Button size="sm" onClick={save} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div> : <div className="flex items-start justify-between gap-2"><KeyValueGrid className="min-w-0 flex-1 grid-cols-2 sm:grid-cols-2"><DetailValue label={`Unidad ${unit.numero_unidad}`} value={unit.chasis || "Sin asignar"} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></KeyValueGrid>{canEdit && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="h-3 w-3" /><span className="sr-only">Editar chasis</span></Button>}</div>;
+  return editing ? <div className="flex items-end gap-2"><Field label={`Unidad ${unit.numero_unidad} · Chasis`}><Input autoFocus value={value} onChange={(event) => setValue(event.target.value)} /></Field><Button variant="outline" size="sm" onClick={() => { setValue(unit.chasis ?? ""); setEditing(false); }}>Cancelar</Button><Button size="sm" onClick={save} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div> : <div className="flex items-start justify-between gap-2"><KeyValueGrid className="min-w-0 flex-1 grid-cols-2 sm:grid-cols-2"><DetailValue label={`Unidad ${unit.numero_unidad}`} value={effectiveChassis} mono /><DetailValue label="Estado" value={UNIT_STATE_LABEL[unit.estado] ?? unit.estado} /></KeyValueGrid>{canEdit && !chassisComesFromImport && <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setEditing(true)}><Pencil className="h-3 w-3" /><span className="sr-only">Editar chasis</span></Button>}</div>;
 }
 
 function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; units: any[]; canEdit: boolean; onSaved: () => void }) {
@@ -2169,7 +2172,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
                 </div>
                 {lineUnits.length > 0 && (
                   <div className="mt-3 space-y-3 border-t pt-3">
-                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} canEdit={canEditChasis && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
+                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} linkedImport={detail.imports.find((item) => item.unidad_id === unit.id)} canEdit={canEditChasis && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
                   </div>
                 )}
                 <OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && !["CANCELADA", "CERRADA"].includes(detail.estado) && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />
