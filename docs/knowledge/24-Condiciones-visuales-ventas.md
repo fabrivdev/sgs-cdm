@@ -29,6 +29,12 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - Implementación: `20260923120000_reconcile_machine_credit_notes_and_resales.sql`. Commit/push no aplica esta migración ni acredita producción; entregar siempre el SQL o una instrucción exacta para que Lovable lo despliegue.
 - No sugerir una transferencia por UUID distintos si Parque y factura representan al mismo cliente. Reconciliar primero por ID o RUC y, cuando falta RUC comparable, por nombre normalizado; dos RUC informados y diferentes mantienen la revisión. Las falsas alertas pendientes se descartan sin confirmar venta ni modificar Parque/Stock. Corrección incremental: `20260923140000_suppress_same_customer_machine_transfer_alerts.sql` después de la migración anterior.
 
+## Identidad compartida de modelos de Máquinas
+
+- Parque, Stock, Operaciones e Importaciones deben consumir una sola identidad canónica por marca, tipo y modelo. Una grafía histórica confirmada se conserva como alias auditable, pero no permanece como segunda opción activa ni crea otro modelo comercial.
+- Las variantes HORSCH `MAESTRO <surcos> CF E45/E50` se muestran como `MAESTRO CF <surcos>.45/.50` cuando existe ese modelo canónico de la misma marca y tipo. La regla es exacta y revisada; no autoriza fusionar por similitud difusa ni cambiar números.
+- La corrección actualiza catálogo, alias y referencias/textos operativos existentes de NP, Importaciones, Parque y Stock. Las futuras cargas se resuelven mediante el alias compartido. Requiere aplicar `20260923180000_unify_horsch_maestro_model_notation.sql`; publicar código no demuestra que la base productiva ya la ejecutó.
+
 ## Orden y exportación compartidos
 
 Dashboard: la facturación conciliada se solicita por trimestres disjuntos, con hasta dos consultas simultáneas. Cada día pertenece a un solo lote; un fallo invalida la carga completa, sin mostrar ceros o importes parciales. Es una partición de lectura: no cambia fuente, filtros, clasificación, GRID, cantidades ni importes. La comprobación local no acredita el tiempo de producción.

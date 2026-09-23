@@ -95,13 +95,26 @@ describe("reported production regressions", () => {
     expect(catalogSql).toContain("CONVIO FLEX 1080 35 PIES");
     expect(catalogSql).toContain("CONVIO FLEX 1080");
     expect(catalogSql).toContain("revisado_manual = true");
-    expect(validation).toContain("configuredHeaderBase");
+    expect(validation).toContain("reviewedVariantBase");
     expect(billingSql).toContain("DROP INDEX IF EXISTS public.maquinaria_documentos_comerciales_unico_idx");
     expect(billingSql).toContain("maquinaria_facturas_venta_unidades");
     expect(billingSql).toContain("maquinaria_vincular_factura_venta");
     expect(ui).toContain("Factura sin máquina asignada");
     expect(ui).toContain("Adjuntar factura");
     expect(ui).toContain('rpc("maquinaria_vincular_factura_venta"');
+  });
+
+  it("unifies reviewed MAESTRO E45 and E50 notation in every operational machine source", () => {
+    const sql = read("supabase/migrations/20260923180000_unify_horsch_maestro_model_notation.sql");
+    const validation = read("src/lib/machineOrderValidation.ts");
+    expect(sql).toContain("MAESTRO 14 CF E50");
+    expect(sql).toContain("MAESTRO CF 14.50");
+    expect(sql).toContain("public.maquinaria_operacion_lineas");
+    expect(sql).toContain("public.maquinaria_importacion_lineas");
+    expect(sql).toContain("public.parque_maquinas");
+    expect(sql).toContain("public.parque_stock_maquinas");
+    expect(sql).toContain("revisado_manual = true");
+    expect(validation).toContain("/^MAESTRO (\\d+) CF E(45|50)$/");
   });
 
   it("uses the compact import-style actions for machine-order documents", () => {

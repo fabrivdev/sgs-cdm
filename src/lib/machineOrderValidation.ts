@@ -21,15 +21,19 @@ export const catalogLineKey = (line: CatalogLine) => JSON.stringify([normalizeMa
 export const safeMachineModelAlias = (alias: string, name: string) =>
   normalizeMachineModelKey(alias).replace(/[^0-9]/g, "") === normalizeMachineModelKey(name).replace(/[^0-9]/g, "");
 
-// Ancho/configuración no crea otro modelo comercial. Solo se unifica cuando el
-// catálogo también contiene explícitamente el modelo base de la misma marca y tipo.
-function configuredHeaderBase(value: string) {
+// Una configuración o una grafía técnica revisada no crea otro modelo comercial.
+// Solo se unifica cuando el catálogo también contiene explícitamente el modelo
+// canónico de la misma marca y tipo; no se hace ninguna similitud difusa.
+function reviewedVariantBase(value: string) {
   const normalized = upperMachineText(value).replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
-  return normalized.match(/^(CONVIO FLEX \d+)\s+(?:RICE\s+)?\d+\s+(?:PIES|FT)$/)?.[1] ?? null;
+  const configuredHeader = normalized.match(/^(CONVIO FLEX \d+)\s+(?:RICE\s+)?\d+\s+(?:PIES|FT)$/)?.[1];
+  if (configuredHeader) return configuredHeader;
+  const maestro = normalized.match(/^MAESTRO (\d+) CF E(45|50)$/);
+  return maestro ? `MAESTRO CF ${maestro[1]}.${maestro[2]}` : null;
 }
 
 function canonicalConfiguredModel(model: MachineCatalogModel, models: MachineCatalogModel[]) {
-  const base = configuredHeaderBase(model.nombre);
+  const base = reviewedVariantBase(model.nombre);
   if (!base) return model;
   return models.find(candidate => candidate.activo
     && normalizeMachineBrand(candidate.marca_nombre) === normalizeMachineBrand(model.marca_nombre)

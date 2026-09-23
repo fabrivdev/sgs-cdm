@@ -78,6 +78,19 @@ describe("catalog validation", () => {
     expect(catalogModelsForBrand(claas, "CLAAS").map(model => model.nombre)).toEqual(["CONVIO FLEX 930", "CONVIO FLEX 1080"]);
     expect(reconcileCatalogLine({ marca: "CLAAS", modelo: "CONVIO FLEX 1080 35 PIES", subgrupo: "PLATAFORMAS/CABEZALES" }, claas).modelo).toBe("CONVIO FLEX 1080");
   });
+  it("shows one canonical MAESTRO model for the reviewed E45/E50 notation", () => {
+    const horsch: MachineCatalog = {
+      brands: [{ nombre: "HORSCH", activa: true }],
+      models: [
+        { id: "14-e50", marca_nombre: "HORSCH", subgrupo: "SEMBRADORAS", nombre: "MAESTRO 14 CF E50", activo: true },
+        { id: "14-50", marca_nombre: "HORSCH", subgrupo: "SEMBRADORAS", nombre: "MAESTRO CF 14.50", activo: true },
+        { id: "18-e45", marca_nombre: "HORSCH", subgrupo: "SEMBRADORAS", nombre: "MAESTRO 18 CF E45", activo: true },
+        { id: "18-45", marca_nombre: "HORSCH", subgrupo: "SEMBRADORAS", nombre: "MAESTRO CF 18.45", activo: true },
+      ],
+    };
+    expect(catalogModelsForBrand(horsch, "HORSCH").map(model => model.nombre)).toEqual(["MAESTRO CF 14.50", "MAESTRO CF 18.45"]);
+    expect(reconcileCatalogLine({ marca: "HORSCH", modelo: "MAESTRO 14 CF E50", subgrupo: "SEMBRADORAS" }, horsch).modelo).toBe("MAESTRO CF 14.50");
+  });
 });
 
 describe("data normalization", () => {
