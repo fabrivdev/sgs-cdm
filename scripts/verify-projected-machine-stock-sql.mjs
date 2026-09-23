@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 
 const migration = fileURLToPath(new URL("../supabase/migrations/20260923190000_add_projected_machine_stock.sql", import.meta.url));
 const sql = await readFile(migration, "utf8");
+const correctionMigration = fileURLToPath(new URL("../supabase/migrations/20260923200000_fix_projected_stock_pending_sales.sql", import.meta.url));
+const correction = await readFile(correctionMigration, "utf8");
+const pagePath = fileURLToPath(new URL("../src/pages/StockProyectado.tsx", import.meta.url));
+const page = await readFile(pagePath, "utf8");
 const values = sql.slice(sql.indexOf("VALUES\n", sql.indexOf("INSERT INTO public.parque_stock_proyectado_apertura")), sql.indexOf("ON CONFLICT", sql.indexOf("INSERT INTO public.parque_stock_proyectado_apertura")));
 const rows = [...values.matchAll(/\('2026-08-31','([^']+)','([^']+)','([^']+)','([^']+)',(\d+),(\d+),(\d+),'[^']+'\)/g)]
   .map((match) => ({ program: match[1], stock: Number(match[5]), purchases: Number(match[6]), pending: Number(match[7]) }));
@@ -24,5 +28,20 @@ assert.match(sql, /LIKE '%USAD%' THEN false/);
 assert.match(sql, /LIKE '%NUEV%' THEN true/);
 assert.match(sql, /stock\+pedidos_compra-ventas_pendientes AS stock_proyectado/);
 assert.match(sql, /parque_stock_proyectado_ajustes/);
+assert.match(correction, /ventas_por_chasis AS MATERIALIZED/);
+assert.match(correction, /venta\.unidades_netas>0/);
+assert.match(correction, /greatest\(coalesce\(a\.ventas_pendientes_inicial,0\)-coalesce\(v\.ventas_netas,0\),0\)/);
+assert.match(correction, /coalesce\(a\.pedidos_compra_inicial,0\)\+coalesce\(im\.pedidos_nuevos,0\)[\s\S]*-coalesce\(im\.arribos,0\)\+coalesce\(aj\.pedidos_compra_delta,0\),[\s\S]*0[\s\S]*\) AS pedidos_compra/);
+assert.match(correction, /maquinaria_normalizar_marca\(coalesce\(p_marca,''\)\)='OTROS'/);
+assert.match(correction, /count\(DISTINCT public\.maquinaria_normalizar_marca\(x\.marca\)\)/);
+assert.match(correction, /'parque\.stock_proyectado','parque','Stock proyectado',35,true/);
+assert.match(correction, /acceso\.seccion_id='parque\.stock'/);
+assert.match(correction, /has_section_access\(auth\.uid\(\),'parque\.stock_proyectado'\)/);
+assert.doesNotMatch(correction, /coalesce\(a\.marca,im\.marca,p\.marca,v\.marca,aj\.marca,'OTROS'\) AS marca/);
+assert.doesNotMatch(correction, /ventas_pedido_netas/);
+assert.doesNotMatch(page, /label: "Programa"/);
+assert.doesNotMatch(page, /label="Programa"/);
+assert.match(page, /<FilterDate label="Fecha de corte"/);
+assert.doesNotMatch(page, /<Filter(?:Date|Select)[^>]+width=/);
 
 console.log("Stock proyectado SQL: apertura y reglas verificadas");

@@ -9,6 +9,7 @@ describe("matriz de permisos", () => {
 
   it("respeta la primera sección habilitada dentro de un módulo", () => {
     expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.stock"])).toBe("/parque-stock");
+    expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.stock_proyectado"])).toBe("/parque-stock-proyectado");
     expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.importaciones"])).toBe("/parque-importaciones");
   });
 

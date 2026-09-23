@@ -113,7 +113,7 @@ const App = () => (
                 <Route
                   path="/parque-stock-proyectado"
                   element={
-                    <ProtectedRoute requireModulo="parque" requireSection="parque.stock">
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.stock_proyectado">
                       <StockProyectado />
                     </ProtectedRoute>
                   }

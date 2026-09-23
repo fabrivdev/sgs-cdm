@@ -42,8 +42,11 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - Incluye solo máquinas nuevas. Usadas y máquinas recibidas como parte de pago no forman parte de este informe.
 - Para cada modelo: `A Stock = apertura + arribos - facturas + NC ± ajustes`; `B OC = apertura + pedidos de compra - arribos ± ajustes`; `D Ventas pendientes = apertura + NP nuevas - facturas vinculadas por chasis ± ajustes`; `Stock proyectado = A + B - D`.
 - La factura retira la máquina de A y, cuando coincide por chasis con una NP, también cierra D. Entrega física y el estado “facturada pendiente de entrega” no intervienen ni deben duplicar la salida.
+- Como la apertura solo identifica pendientes por modelo, las facturas posteriores consumen primero ese saldo (FIFO agregado por modelo). Una NP posterior ya facturada por el mismo chasis no se suma otra vez a D. Corrección incremental: `20260923200000_fix_projected_stock_pending_sales.sql`.
+- Un arribo aumenta A y consume B solo hasta agotar las OC pendientes conocidas. Si la OC anterior al 31/08 no estaba incluida en la apertura del Excel, B queda en cero y nunca en negativo; la inconsistencia no debe reducir la disponibilidad física.
 - Arribos usan ATA real, no ETA. Ventas/NC usan la fuente financiera canónica de Máquinas. Pedidos de cliente usan condición `NUEVA`. Cancelaciones o correcciones sin fecha histórica comprobable deben registrarse como ajuste explícito; no inferir fechas.
-- La tabla de apertura conserva `programa` además de `marca`: el total del programa CLAAS del Excel incluye referencias auxiliares y no debe alterarse para forzar un total por marca.
+- La tabla de apertura conserva `programa` únicamente como dato interno de conciliación del Excel. En pantalla se muestra y filtra por `Marca`; no repetir `Programa` como columna o filtro porque duplica la lectura operativa. El valor técnico heredado `OTROS` no es una marca comercial: resolverlo por `marca_nombre` o por un modelo canónico inequívoco y no exponerlo en el informe.
+- `Stock proyectado` usa el permiso independiente `parque.stock_proyectado`; debe aparecer como opción propia en Administración y no heredar permanentemente `parque.stock`. Al introducirlo, copiar una vez los accesos actuales de Stock evita bloqueos y permite revocarlo después de forma independiente.
 - Implementación: `src/pages/StockProyectado.tsx` y migración manual `20260923190000_add_projected_machine_stock.sql`. El código publicado no instala la función en Lovable/Supabase ni valida cifras productivas.
 
 ## Orden y exportación compartidos

@@ -90,7 +90,7 @@ const navGroups: NavGroup[] = [
       { to: "/parque-clientes", label: "Clientes", icon: Users, section: "parque.clientes", end: true },
       { to: "/parque-maquinas", label: "Máquinas", icon: Tractor, section: "parque.maquinas", end: true },
       { to: "/parque-stock", label: "Stock", icon: Package, section: "parque.stock", end: true },
-      { to: "/parque-stock-proyectado", label: "Stock proyectado", icon: Boxes, section: "parque.stock", end: true },
+      { to: "/parque-stock-proyectado", label: "Stock proyectado", icon: Boxes, section: "parque.stock_proyectado", end: true },
       { to: "/parque-operaciones", label: "Operaciones", icon: ClipboardList, section: "parque.operaciones", end: true },
       { to: "/parque-importaciones", label: "Importaciones", icon: Ship, section: "parque.importaciones", end: true },
     ],

@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Boxes, ClipboardList, PackageCheck, ShoppingCart } from "lucide-react";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useSectionTable } from "@/components/exports/useSectionTable";
-import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { FilterDate, FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageShell } from "@/lib/ui-classes";
@@ -35,7 +34,6 @@ export default function StockProyectado() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [program, setProgram] = useState("all");
   const [brand, setBrand] = useState("all");
   const [type, setType] = useState("all");
 
@@ -57,7 +55,6 @@ export default function StockProyectado() {
   useEffect(() => { void load(); }, [load]);
 
   const options = useMemo(() => ({
-    programs: [...new Set(rows.map((row) => row.programa))].sort(),
     brands: [...new Set(rows.map((row) => row.marca))].sort(),
     types: [...new Set(rows.map((row) => row.tipo))].sort(),
   }), [rows]);
@@ -65,17 +62,15 @@ export default function StockProyectado() {
   const filtered = useMemo(() => {
     const term = q.trim().toLocaleUpperCase("es");
     return rows.filter((row) => {
-      if (program !== "all" && row.programa !== program) return false;
       if (brand !== "all" && row.marca !== brand) return false;
       if (type !== "all" && row.tipo !== type) return false;
-      return !term || [row.programa, row.marca, row.tipo, row.modelo]
+      return !term || [row.marca, row.tipo, row.modelo]
         .some((value) => value.toLocaleUpperCase("es").includes(term));
     });
-  }, [brand, program, q, rows, type]);
+  }, [brand, q, rows, type]);
 
   const totals = useMemo(() => projectedStockTotals(filtered), [filtered]);
   const columns: SalesColumn<ProjectedMachineStockRow>[] = [
-    { key: "programa", label: "Programa", kind: "text", value: (row) => row.programa },
     { key: "marca", label: "Marca", kind: "text", value: (row) => row.marca },
     { key: "tipo", label: "Tipo", kind: "text", value: (row) => row.tipo },
     { key: "modelo", label: "Modelo", kind: "text", value: (row) => row.modelo },
@@ -95,10 +90,9 @@ export default function StockProyectado() {
   });
   const viewColumns: CompactListColumn<ProjectedMachineStockRow>[] = columns.map((column) => {
     const layout: Record<string, Pick<CompactListColumn<ProjectedMachineStockRow>, "width" | "hiddenBelow">> = {
-      programa: { width: "lg:w-[9%]", hiddenBelow: "lg" },
-      marca: { width: "w-[18%] md:w-[12%] lg:w-[9%]" },
-      tipo: { width: "md:w-[18%] lg:w-[15%]", hiddenBelow: "md" },
-      modelo: { width: "w-[40%] md:w-[26%] lg:w-[24%]" },
+      marca: { width: "w-[18%] md:w-[13%] lg:w-[11%]" },
+      tipo: { width: "md:w-[19%] lg:w-[17%]", hiddenBelow: "md" },
+      modelo: { width: "w-[40%] md:w-[29%] lg:w-[29%]" },
       stock: { width: "w-[14%] md:w-[9%] lg:w-[8%]" },
       pedidos_compra: { width: "md:w-[8%]", hiddenBelow: "md" },
       disponibilidad: { width: "lg:w-[9%]", hiddenBelow: "lg" },
@@ -110,7 +104,7 @@ export default function StockProyectado() {
       ...layout[column.key],
       render: (row) => column.key === "modelo" ? (
         <CompactListInfo label={row.modelo} fields={[
-          ["Programa", row.programa], ["Marca", row.marca], ["Tipo", row.tipo],
+          ["Marca", row.marca], ["Tipo", row.tipo],
           ["Arribos", units(row.arribos_periodo)], ["Facturas/NC", units(row.ventas_netas_periodo)],
         ]} />
       ) : column.kind === "number" ? (
@@ -120,8 +114,8 @@ export default function StockProyectado() {
       ) : String(column.value(row) ?? "—"),
     };
   });
-  const activeCount = (q ? 1 : 0) + (program !== "all" ? 1 : 0) + (brand !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0);
-  const clear = () => { setQ(""); setProgram("all"); setBrand("all"); setType("all"); };
+  const activeCount = (q ? 1 : 0) + (brand !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0);
+  const clear = () => { setQ(""); setBrand("all"); setType("all"); };
 
   return (
     <div className={pageShell}>
@@ -135,18 +129,14 @@ export default function StockProyectado() {
 
       <div className="space-y-3">
         <FiltersBar
-          search={{ value: q, onChange: setQ, placeholder: "Modelo, marca o tipo…", width: "w-[220px]" }}
+          search={{ value: q, onChange: setQ, placeholder: "Modelo, marca o tipo…" }}
           activeCount={activeCount}
           onClear={clear}
           secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={table.action ? [table.action] : []} /> : undefined}
-          expanded={<FilterSelect label="Programa" value={program} onChange={setProgram} placeholder="Programa" width="w-full" options={[{ value: "all", label: "Todos" }, ...options.programs.map((value) => ({ value, label: value }))]} />}
         >
-          <div data-filter-field className="flex w-[155px] min-w-0 flex-col gap-2">
-            <span className="block h-4 truncate whitespace-nowrap text-xs text-muted-foreground">Fecha de corte</span>
-            <Input aria-label="Fecha de corte" type="date" min={PROJECTED_STOCK_START} max={today()} value={cutoff} onChange={(event) => setCutoff(event.target.value)} className="h-9 text-[13px]" />
-          </div>
-          <FilterSelect label="Marca" value={brand} onChange={setBrand} placeholder="Marca" width="w-[125px]" options={[{ value: "all", label: "Todas" }, ...options.brands.map((value) => ({ value, label: value }))]} />
-          <FilterSelect label="Tipo" value={type} onChange={setType} placeholder="Tipo" width="w-[165px]" options={[{ value: "all", label: "Todos" }, ...options.types.map((value) => ({ value, label: value }))]} />
+          <FilterDate label="Fecha de corte" min={PROJECTED_STOCK_START} max={today()} value={cutoff} onChange={setCutoff} />
+          <FilterSelect label="Marca" value={brand} onChange={setBrand} placeholder="Marca" options={[{ value: "all", label: "Todas" }, ...options.brands.map((value) => ({ value, label: value }))]} />
+          <FilterSelect label="Tipo" value={type} onChange={setType} placeholder="Tipo" options={[{ value: "all", label: "Todos" }, ...options.types.map((value) => ({ value, label: value }))]} />
         </FiltersBar>
 
         <div className="overflow-hidden rounded-md border bg-card">
