@@ -48,6 +48,7 @@ import { matchesOperationFilters, normalizeOperationModel, operationModelOptions
 import { shortPersonName } from "@/lib/personName";
 import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
 import { extractMachineSupplierInvoice, machineSupplierInvoicePatch, type MachineSupplierInvoiceExtraction } from "@/lib/machineSupplierInvoice";
+import { parseLocalizedNonNegativeAmount } from "@/lib/localizedAmount";
 
 const db = supabase as any;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -392,15 +393,7 @@ function safeExtractedText(value: unknown) {
 }
 
 function parseDraftAgreedValue(value: number | string | null): number | null | undefined {
-  const raw = String(value ?? "").trim().replace(/\s/g, "");
-  if (!raw) return null;
-  const comma = raw.lastIndexOf(",");
-  const dot = raw.lastIndexOf(".");
-  const normalized = comma >= 0 && dot >= 0
-    ? comma > dot ? raw.replace(/\./g, "").replace(",", ".") : raw.replace(/,/g, "")
-    : comma >= 0 ? raw.replace(",", ".") : raw;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  return parseLocalizedNonNegativeAmount(value);
 }
 
 function extractedLinesToDraft(rawLines: unknown[], confidence: Record<string, unknown> = {}) {
@@ -1917,7 +1910,7 @@ function NewOperationDrawer({ operationId, open, onOpenChange, onSaved }: { oper
     if (lines.some((l) => !normalizeMachineBrand(l.marca))) return toast.error("Cada línea necesita una marca correcta");
     if (lines.some(l => !l.modelo.trim())) return toast.error("Cada línea necesita un modelo");
     if (lines.some(l => !Number.isInteger(l.cantidad) || l.cantidad < 1 || l.cantidad > 500)) return toast.error("La cantidad debe ser un entero entre 1 y 500");
-    if (lines.some(l => parseDraftAgreedValue(l.valor_acordado_unitario) === undefined)) return toast.error("Revisá el valor por unidad");
+    if (lines.some(l => parseDraftAgreedValue(l.valor_acordado_unitario) === undefined)) return toast.error("Revisá el valor por unidad. Usá, por ejemplo, 1.500.000 o 1.500.000,50");
     if (lines.some(l => l.anio != null && (!Number.isInteger(l.anio) || l.anio < 1900 || l.anio > 2200))) return toast.error("Revisá el año de la máquina");
     if (!references.data || references.isError) return toast.error("Primero cargá los datos de referencia para validar cliente y operativo");
     if (unknownNames.length && namesConfirmed !== namesKey) return toast.error("Confirmá los nombres que no coinciden con los datos registrados");
@@ -2044,9 +2037,9 @@ function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; unit
   const valueLabel = fullyBilled ? "Valor facturado" : billedUnits.length ? "Valor vigente" : "Valor acordado";
 
   const save = async () => {
-    const parsed = value === "" ? null : Number(value);
-    if (parsed != null && (!Number.isFinite(parsed) || parsed < 0)) {
-      toast.error("Ingresá un valor válido");
+    const parsed = parseLocalizedNonNegativeAmount(value);
+    if (parsed === undefined) {
+      toast.error("Ingresá un valor válido, por ejemplo 1.500.000 o 1.500.000,50");
       return;
     }
     setSaving(true);
@@ -2070,7 +2063,7 @@ function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; unit
   if (editing) {
     return <div className="mt-3 space-y-2 border-t pt-3">
       <div className="grid grid-cols-[1fr_92px] gap-2">
-        <Field label="Valor acordado por unidad"><Input autoFocus type="number" min="0" step="0.01" value={value} onChange={(event) => setValue(event.target.value)} placeholder="Sin cargar" /></Field>
+        <Field label="Valor acordado por unidad"><Input autoFocus inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} placeholder="Sin cargar" /></Field>
         <Field label="Moneda"><CompactSelect value={currency} values={["USD", "EUR", "PYG"]} onChange={setCurrency} /></Field>
       </div>
       <div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setValue(line.valor_acordado_unitario == null ? "" : String(line.valor_acordado_unitario)); setCurrency(line.moneda_acordada || "USD"); setEditing(false); }}>Cancelar</Button><Button size="sm" onClick={save} disabled={saving}><Save className="mr-1.5 h-3.5 w-3.5" />Guardar</Button></div>

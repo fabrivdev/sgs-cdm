@@ -42,8 +42,8 @@ describe('shared sales Excel export',()=>{
     expect(()=>createSalesWorkbook([{...row,money:NaN}],columns,'Detalle')).toThrow(/inválido/);
     expect(()=>createSalesWorkbook([{...row,date:'2026-02-30'}],columns,'Detalle')).toThrow(/inválida/);
   });
-  it('writes an xlsx workbook with the agreed name',()=>{
-    exportSalesTable({rows:[row],columns,sheetName:'Detalle',fileName:'ventas-detalle.xlsx'});
+  it('always writes an xlsx workbook with an explicit extension',()=>{
+    exportSalesTable({rows:[row],columns,sheetName:'Detalle',fileName:'ventas-detalle'});
     expect(XLSX.writeFile).toHaveBeenCalledWith(expect.objectContaining({SheetNames:['Detalle']}),'ventas-detalle.xlsx',{bookType:'xlsx'});
   });
 });

@@ -37,6 +37,9 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 
 ## Orden y exportación compartidos
 
+- Los importes editables de pedidos de máquinas usan convención local: punto para miles y coma para decimales (`1.500`, `1.500.000`, `1.500.000,50`). Nuevo pedido, edición del pedido y edición rápida del valor comparten el mismo parser; no pasar el texto local directamente a `Number`, porque transforma `1.500` en `1,5` o rechaza múltiples separadores.
+- Toda descarga Excel debe salir con extensión `.xlsx` explícita, incluso si la pantalla entrega solo un nombre base. La normalización se aplica en el límite compartido de exportación para cubrir Dashboard, historial de OS/repuestos de máquina y futuras tablas sin depender de cada llamador.
+
 Dashboard: la facturación conciliada se solicita por trimestres disjuntos, con hasta dos consultas simultáneas. Cada día pertenece a un solo lote; un fallo invalida la carga completa, sin mostrar ceros o importes parciales. Es una partición de lectura: no cambia fuente, filtros, clasificación, GRID, cantidades ni importes. La comprobación local no acredita el tiempo de producción.
 
 Clientes del parque: vaciar agregados al cambiar filtros; coberturas `…` durante carga y `—` ante error, nunca cifras de una respuesta anterior como actuales. Conservar conteos independientes. No repetir automáticamente un timeout `57014`; permitir reintento manual y bloquear exportación incompleta. No redefine fórmulas ni cobertura según rubro monetario. Optimización SQL y evidencia local: `docs/parque-facturacion-filtros.md`; SQL manual `20260918220000_optimize_filtered_park_billing.sql` pendiente de aplicar, no validación productiva.

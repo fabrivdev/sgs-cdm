@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { ensureXlsxFileName } from "@/lib/xlsxFileName";
 import { salesDate, type SalesColumn, type SalesValue } from "./salesTableInteraction";
 
 // Build from typed values, NEVER from DOM text, truncated labels or formatted $.
@@ -36,5 +37,5 @@ export function createSalesWorkbook<T>(rows: readonly T[], columns: readonly Sal
 export function exportSalesTable<T>({ rows, columns, sheetName, fileName }: {
   rows: readonly T[]; columns: readonly SalesColumn<T>[]; sheetName: string; fileName: string;
 }) {
-  XLSX.writeFile(createSalesWorkbook(rows, columns, sheetName), fileName, { bookType: "xlsx" });
+  XLSX.writeFile(createSalesWorkbook(rows, columns, sheetName), ensureXlsxFileName(fileName), { bookType: "xlsx" });
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { SectionActionsMenu, type SectionAction } from "./SectionActionsMenu";
+import { ensureXlsxFileName } from "@/lib/xlsxFileName";
 
 export type ExportCell = string | number | boolean | null | undefined;
 
@@ -14,11 +15,6 @@ export interface TableExportOption {
 
 function optionRowCount(option: TableExportOption) {
   return option.rowCount ?? (Array.isArray(option.rows) ? option.rows.length : null);
-}
-
-function safeFilename(value: string) {
-  const base = value.replace(/\.xlsx$/i, "").replace(/[<>:"/\\|?*]+/g, "-").trim();
-  return `${base || "exportacion"}.xlsx`;
 }
 
 function safeSheetName(value: string) {
@@ -50,7 +46,7 @@ export function TableExportButton({
       const worksheet = XLSX.utils.json_to_sheet(rows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName(option.sheetName ?? option.label));
-      XLSX.writeFile(workbook, safeFilename(option.filename));
+      XLSX.writeFile(workbook, ensureXlsxFileName(option.filename));
     } catch (error) {
       toast.error(`No se pudo generar el archivo: ${error instanceof Error ? error.message : "error desconocido"}`);
     } finally {
