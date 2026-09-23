@@ -162,6 +162,17 @@ describe("reported production regressions", () => {
     expect(dialog).toContain("Confirmar venta");
   });
 
+  it("carries the invoice seller into future machine-sale confirmations", () => {
+    const sql = read("supabase/migrations/20260923160000_copy_machine_sale_seller_to_park.sql");
+    const dialog = read("src/components/parque/MachineSaleNotificationDialog.tsx");
+    expect(sql).toContain("completar_vendedor_notificacion_venta_maquina");
+    expect(sql).toContain("nullif(btrim(f.vendedor), '')");
+    expect(sql).toContain("jsonb_build_object('vendedor', v_vendedor)");
+    expect(sql).not.toContain("UPDATE public.parque_maquinas");
+    expect(dialog).toContain('vendedor: data.vendedor ?? ""');
+    expect(dialog).toContain("p_vendedor: form.vendedor || null");
+  });
+
   it("does not suggest a transfer for duplicate rows of the same customer", () => {
     const sql = read("supabase/migrations/20260923140000_suppress_same_customer_machine_transfer_alerts.sql");
     expect(sql).toContain("normalizar_cliente_notificacion");

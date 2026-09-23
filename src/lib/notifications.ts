@@ -11,6 +11,7 @@ export type MachineSaleNotificationData = {
   modelo_tipo?: string | null;
   subgrupo?: string | null;
   sucursal?: string | null;
+  vendedor?: string | null;
   producto_codigo?: string | null;
   producto?: string | null;
   origen_sistema?: string | null;

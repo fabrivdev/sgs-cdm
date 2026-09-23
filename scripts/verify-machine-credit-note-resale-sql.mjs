@@ -123,6 +123,7 @@ try {
       mercaderia text,
       cantidad numeric,
       total_venta numeric DEFAULT 0,
+      vendedor text,
       raw_data jsonb DEFAULT '{}'::jsonb,
       importado_en timestamptz DEFAULT now()
     );
@@ -224,6 +225,11 @@ try {
     "utf8",
   );
   await db.exec(identityMigration);
+  const sellerMigration = await readFile(
+    new URL("../supabase/migrations/20260923160000_copy_machine_sale_seller_to_park.sql", import.meta.url),
+    "utf8",
+  );
+  await db.exec(sellerMigration);
 
   const refactNotification = await first(`
     SELECT * FROM public.notificaciones
@@ -277,6 +283,39 @@ try {
   assert.equal(realTransferNotice.datos.revision_sugerida, "TRANSFERENCIA");
 
   await db.exec(`
+    INSERT INTO public.parque_maquinas(
+      id,cliente_id,marca,subgrupo,modelo_tipo,serie,activo
+    ) VALUES (
+      '20000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000001',
+      'CLAAS','COSECHADORAS','LEXION 880','CASE-5',true
+    );
+    INSERT INTO public.facturacion_lineas_importadas(
+      id,factura,entidad_nombre,cliente_id,fecha_factura,grupo_normalizado,
+      marca_normalizada,mercaderia,cod_mercaderia,cantidad,total_venta,vendedor,raw_data
+    ) VALUES (
+      '50000000-0000-0000-0000-000000000007','F-FUTURE','CLIENTE B',
+      '10000000-0000-0000-0000-000000000002','2026-09-23','MAQUINARIAS',
+      'CLAAS','LEXION 880','VEIC_5',1,150,'VENDEDOR FUTURO',
+      '{"canonical_document_kind":"Factura","CHASIS":"CASE-5","MODELO":"LEXION 880"}'
+    );
+    SELECT public.generar_notificacion_venta_maquina(
+      '50000000-0000-0000-0000-000000000007'
+    );
+  `);
+  const futureSellerNotice = await first(`
+    SELECT * FROM public.notificaciones
+    WHERE datos ->> 'facturacion_linea_id' = '50000000-0000-0000-0000-000000000007'
+  `);
+  assert.equal(futureSellerNotice.datos.vendedor, "VENDEDOR FUTURO");
+  await db.query(`SELECT public.confirmar_notificacion_alta_maquina(
+    $1,$2,'CLAAS','COSECHADORAS','LEXION 880','CASE-5',NULL,NULL,NULL,$3,NULL,NULL,'VENTA'
+  )`, [futureSellerNotice.id, "10000000-0000-0000-0000-000000000002", "VENDEDOR FUTURO"]);
+  assert.equal((await first(`
+    SELECT vendedor FROM public.parque_maquinas
+    WHERE id='20000000-0000-0000-0000-000000000005'
+  `)).vendedor, "VENDEDOR FUTURO");
+
+  await db.exec(`
     INSERT INTO public.facturacion_lineas_importadas(
       id,factura,entidad_nombre,cliente_id,fecha_factura,grupo_normalizado,
       marca_normalizada,mercaderia,cod_mercaderia,cantidad,total_venta,raw_data
@@ -327,7 +366,7 @@ try {
     /chasis sigue activo en Parque/,
   );
 
-  console.log("PASS: NC/new invoice review, canonical customer suppression, true transfer, same chassis reuse, reentry and Stock guards");
+  console.log("PASS: NC/new invoice review, canonical customer suppression, future invoice seller, true transfer, same chassis reuse, reentry and Stock guards");
 } finally {
   await db.close();
 }

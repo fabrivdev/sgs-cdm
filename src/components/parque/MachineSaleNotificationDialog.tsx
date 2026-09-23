@@ -96,6 +96,7 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
       serie: data.chasis ?? "",
       anio: "",
       sucursal: data.sucursal ?? "",
+      vendedor: data.vendedor ?? "",
       notas: `${isExistingChassis ? "Movimiento revisado" : "Alta sugerida"} desde la factura ${data.factura ?? "sin número"}`,
     });
 
