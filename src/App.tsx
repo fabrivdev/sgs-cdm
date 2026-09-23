@@ -19,6 +19,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Ventas = lazy(() => import("./pages/Ventas"));
 const Comisiones = lazy(() => import("./pages/Comisiones"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
+const StockProyectado = lazy(() => import("./pages/StockProyectado"));
 const MaquinariaOperaciones = lazy(() => import("./pages/MaquinariaOperaciones"));
 const Trabajos = lazy(() => import("./pages/Trabajos"));
 const Repuestos = lazy(() => import("./pages/Repuestos"));
@@ -106,6 +107,14 @@ const App = () => (
                   element={
                     <ProtectedRoute requireModulo="parque" requireSection="parque.stock">
                       <ParqueClientes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/parque-stock-proyectado"
+                  element={
+                    <ProtectedRoute requireModulo="parque" requireSection="parque.stock">
+                      <StockProyectado />
                     </ProtectedRoute>
                   }
                 />

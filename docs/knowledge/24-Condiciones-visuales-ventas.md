@@ -36,6 +36,16 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - Las variantes HORSCH `MAESTRO <surcos> CF E45/E50` se muestran como `MAESTRO CF <surcos>.45/.50` cuando existe ese modelo canónico de la misma marca y tipo. La regla es exacta y revisada; no autoriza fusionar por similitud difusa ni cambiar números.
 - La corrección actualiza catálogo, alias y referencias/textos operativos existentes de NP, Importaciones, Parque y Stock. Las futuras cargas se resuelven mediante el alias compartido. Requiere aplicar `20260923180000_unify_horsch_maestro_model_notation.sql`; publicar código no demuestra que la base productiva ya la ejecutó.
 
+## Stock proyectado de máquinas nuevas
+
+- Es una sección separada de Stock actual. Su apertura validada es el informe `CDM - Compras_Maquinas vs Vtas.xlsx` al 31/08/2026; no ofrecer cortes anteriores ni presentar la foto vigente como si fuera un saldo histórico.
+- Incluye solo máquinas nuevas. Usadas y máquinas recibidas como parte de pago no forman parte de este informe.
+- Para cada modelo: `A Stock = apertura + arribos - facturas + NC ± ajustes`; `B OC = apertura + pedidos de compra - arribos ± ajustes`; `D Ventas pendientes = apertura + NP nuevas - facturas vinculadas por chasis ± ajustes`; `Stock proyectado = A + B - D`.
+- La factura retira la máquina de A y, cuando coincide por chasis con una NP, también cierra D. Entrega física y el estado “facturada pendiente de entrega” no intervienen ni deben duplicar la salida.
+- Arribos usan ATA real, no ETA. Ventas/NC usan la fuente financiera canónica de Máquinas. Pedidos de cliente usan condición `NUEVA`. Cancelaciones o correcciones sin fecha histórica comprobable deben registrarse como ajuste explícito; no inferir fechas.
+- La tabla de apertura conserva `programa` además de `marca`: el total del programa CLAAS del Excel incluye referencias auxiliares y no debe alterarse para forzar un total por marca.
+- Implementación: `src/pages/StockProyectado.tsx` y migración manual `20260923190000_add_projected_machine_stock.sql`. El código publicado no instala la función en Lovable/Supabase ni valida cifras productivas.
+
 ## Orden y exportación compartidos
 
 - Los importes editables de pedidos de máquinas usan convención local: punto para miles y coma para decimales (`1.500`, `1.500.000`, `1.500.000,50`). Nuevo pedido, edición del pedido y edición rápida del valor comparten el mismo parser; no pasar el texto local directamente a `Number`, porque transforma `1.500` en `1,5` o rechaza múltiples separadores.

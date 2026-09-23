@@ -22,6 +22,7 @@ const moduleByPath: Record<string, string> = {
   "/parque-clientes": "Clientes del parque",
   "/parque-maquinas": "Maquinas del parque",
   "/parque-stock": "Stock de maquinas",
+  "/parque-stock-proyectado": "Stock proyectado de maquinas nuevas",
   "/repuestos": "Catálogo y stock de repuestos",
   "/repuestos/compras": "Compras de repuestos",
   "/repuestos/sugerencias": "Sugerencia de compra de repuestos",
