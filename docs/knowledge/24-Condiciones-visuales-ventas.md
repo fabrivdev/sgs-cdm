@@ -18,6 +18,8 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 
 ## Conciliación de chasis en Ventas de Máquinas
 
+- En Operaciones, adjuntar una factura a una NP no factura el pedido completo ni sus líneas hermanas. Cada unidad queda `Facturada` únicamente si la fuente canónica contiene una venta positiva de maquinaria con el mismo chasis y fecha igual o posterior a la NP. El PDF se conserva como documento, pero no es evidencia suficiente por sí solo.
+- La validación es por unidad física: una NP puede mostrar simultáneamente máquinas facturadas y pendientes. El estado agregado, el número/fecha de factura de cabecera, un valor acordado o la selección manual no deben propagarse a otras máquinas. Los vínculos anteriores sin venta coincidente se retiran sin borrar el PDF. Requiere aplicar `20260923170000_confirm_machine_order_billing_by_chassis.sql`.
 - Una factura positiva de un chasis que ya existe en Parque no se descarta silenciosamente cuando el propietario difiere, la máquina está inactiva o existe una NC anterior del mismo chasis. Genera una revisión administrativa; no mueve Parque ni Stock por sí sola.
 - La revisión distingue `Refacturación` de `Venta`. Refacturación conserva el propietario y el único registro del chasis. Venta reutiliza ese mismo registro, lo reactiva si estaba inactivo y registra reingreso o transferencia según corresponda. Nunca crear un segundo registro para resolver el caso.
 - Al confirmar `Refacturación`, enviar automáticamente el `cliente_id` exacto que la máquina ya tiene en Parque. Una identidad canónica equivalente del catálogo no debe provocar una transferencia ni bloquear la confirmación; el cliente seleccionado se usa únicamente al confirmar una `Venta` real.

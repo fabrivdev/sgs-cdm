@@ -287,22 +287,45 @@ type ImportAssignmentRow = {
 };
 
 function orderBillingState(
-  row: Pick<OrderRow, "estado_operacion" | "estado_fuente" | "factura_venta" | "factura_fecha">,
+  row: Pick<OrderRow, "estado_operacion" | "estado_fuente" | "factura_venta" | "factura_fecha" | "es_historico">,
   unitState?: string | null,
+  hasConfirmedChassisSale = false,
 ): SimpleOrderState {
-  // La NP puede contener lineas facturadas y pendientes al mismo tiempo. La
-  // evidencia de cada linea/unidad siempre tiene prioridad sobre el estado
-  // agregado de la operacion.
-  if (unitState === "CANCELADA") return "CANCELADA";
+  const lineState = simpleOrderState(row.estado_fuente);
+  const operationState = simpleOrderState(row.estado_operacion);
+  if (unitState === "CANCELADA" || lineState === "CANCELADA" || operationState === "CANCELADA") return "CANCELADA";
+
+  // Una NP puede mezclar unidades facturadas y pendientes. Para operaciones
+  // actuales, solo una venta positiva encontrada por el mismo chasis confirma
+  // la facturacion de ESA unidad. El PDF y el estado agregado de la NP no son
+  // evidencia suficiente y no deben propagarse a sus hermanas.
+  if (!row.es_historico) return hasConfirmedChassisSale ? "COMPLETADO" : "PENDIENTE";
+
+  // El historial importado no siempre tiene unidades/chasis reconciliables;
+  // conserva su evidencia documental previa sin afectar pedidos actuales.
   if (
     safeExtractedText(row.factura_venta)
     || row.factura_fecha
     || ["FACTURADA", "EN_PARQUE", "TRANSFERIDA"].includes(unitState ?? "")
   ) return "COMPLETADO";
-
-  const lineState = simpleOrderState(row.estado_fuente);
   if (lineState !== "PENDIENTE") return lineState;
-  return simpleOrderState(row.estado_operacion);
+  return operationState;
+}
+
+async function fetchConfirmedBillingUnitIds(unitIds: string[]) {
+  const confirmed = new Set<string>();
+  for (let i = 0; i < unitIds.length; i += 200) {
+    const chunk = unitIds.slice(i, i + 200);
+    const { data, error } = await db.rpc("maquinaria_unidades_facturadas_confirmadas", { p_unidad_ids: chunk });
+    if (error) {
+      // Compatibilidad durante el despliegue: sin la migracion nueva es mas
+      // seguro mostrar pendiente que heredar una factura de toda la NP.
+      if (["42883", "PGRST202", "PGRST204"].includes(error.code)) return new Set<string>();
+      throw error;
+    }
+    for (const row of data ?? []) if (row.unidad_id) confirmed.add(row.unidad_id);
+  }
+  return confirmed;
 }
 type ImportDraft = {
   marca: string; producto: string; modelo: string;
@@ -937,6 +960,11 @@ export default function MaquinariaOperaciones() {
       return map;
     },
   });
+  const confirmedBillingQuery = useQuery({
+    queryKey: ["machine-operations-confirmed-billing", unitIds],
+    enabled: !importsView && unitIds.length > 0,
+    queryFn: () => fetchConfirmedBillingUnitIds(unitIds),
+  });
 
   // "En stock" exige prueba real: el chasis de la unidad tiene que existir
   // en el inventario fisico (parque_stock_maquinas, el Excel de TOTVS). Se
@@ -990,6 +1018,7 @@ export default function MaquinariaOperaciones() {
   );
 
   const entregaByUnitId = entregaQuery.data;
+  const confirmedBillingUnitIds = confirmedBillingQuery.data;
   const estadoByOperacionId = operacionEstadoQuery.data;
   const stockChasisSet = stockChasisQuery.data;
   const normalizedRows = useMemo(() => (operationsQuery.data ?? []).map(row => normalizeOperationModel(row, modelCatalog.data)), [operationsQuery.data, modelCatalog.data]);
@@ -1002,7 +1031,7 @@ export default function MaquinariaOperaciones() {
       if (situacion !== "TODOS" && importSituationState(importRow) !== situacion) return false;
     } else {
       const orderRow = row as OrderRow;
-      if (orderState !== "TODOS" && orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado) !== orderState) return false;
+      if (orderState !== "TODOS" && orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado, confirmedBillingUnitIds?.has(orderRow.id)) !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
       const unit = entregaByUnitId?.get(orderRow.id);
       if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet, orderRow.es_historico) !== entrega) return false;
@@ -1013,7 +1042,7 @@ export default function MaquinariaOperaciones() {
     const common = [row.np_numero, formatNpCode(row.np_numero), row.cliente_nombre, row.marca, row.producto, row.modelo, row.modelo_original, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [normalizedRows, importsView, search, orderState, marca, modelo, tipoMaquina, vinculoNp, condicion, llegada, situacion, entrega, entregaByUnitId, estadoByOperacionId, stockChasisSet]);
+  }), [normalizedRows, importsView, search, orderState, marca, modelo, tipoMaquina, vinculoNp, condicion, llegada, situacion, entrega, entregaByUnitId, confirmedBillingUnitIds, estadoByOperacionId, stockChasisSet]);
 
   const activeCount = (marca !== "TODOS" ? 1 : 0)
     + (modelo !== "TODOS" ? 1 : 0) + (tipoMaquina !== "TODOS" ? 1 : 0)
@@ -1024,14 +1053,14 @@ export default function MaquinariaOperaciones() {
     const orderRows = rows as OrderRow[];
     return {
       total: orderRows.length,
-      pendientes: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE").length,
-      facturados: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "COMPLETADO").length,
+      pendientes: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado, confirmedBillingUnitIds?.has(row.id)) === "PENDIENTE").length,
+      facturados: orderRows.filter((row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado, confirmedBillingUnitIds?.has(row.id)) === "COMPLETADO").length,
       valorPedidos: orderRows.reduce((totals, row) => addMoney(totals, row.valor_venta, row.moneda_valor), {} as MoneyTotals),
-      valorPendiente: orderRows.reduce((totals, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado) === "PENDIENTE"
+      valorPendiente: orderRows.reduce((totals, row) => orderBillingState(row, entregaByUnitId?.get(row.id)?.estado, confirmedBillingUnitIds?.has(row.id)) === "PENDIENTE"
         ? addMoney(totals, row.valor_venta, row.moneda_valor)
         : totals, {} as MoneyTotals),
     };
-  }, [rows, entregaByUnitId]);
+  }, [rows, entregaByUnitId, confirmedBillingUnitIds]);
   const importTotals = useMemo(() => {
     const importRows = rows as ImportRow[];
     return {
@@ -1065,7 +1094,7 @@ export default function MaquinariaOperaciones() {
     { key: "marca", label: "Marca", kind: "text", value: r => visibleMachineBrand(r.marca) },
     { key: "condicion", label: "Condición", kind: "text", value: r => CONDITION_LABEL[(r as OrderRow).condicion ?? ""] ?? (r as OrderRow).condicion },
     { key: "origen", label: "Origen", kind: "text", value: r => SUPPLY_LABEL[(r as OrderRow).abastecimiento ?? ""] ?? null },
-    { key: "facturacion", label: "Facturación", kind: "text", value: r => SIMPLE_STATE_LABEL[orderBillingState(r as OrderRow, entregaByUnitId?.get(r.id)?.estado)] },
+    { key: "facturacion", label: "Facturación", kind: "text", value: r => SIMPLE_STATE_LABEL[orderBillingState(r as OrderRow, entregaByUnitId?.get(r.id)?.estado, confirmedBillingUnitIds?.has(r.id))] },
     { key: "entrega", label: "Entrega", kind: "text", value: r => { const o = r as OrderRow; const u = entregaByUnitId?.get(o.id); const s = entregaStateFromUnit(u?.estado, u?.chasis, o.marca, estadoByOperacionId?.get(o.operacion_id), stockChasisSet, o.es_historico); return s ? ENTREGA_LABEL[s] : null; } },
     { key: "valor", label: "Valor", kind: "number", align: "right", value: r => (r as OrderRow).valor_venta == null ? null : Number((r as OrderRow).valor_venta) },
   ];
@@ -1170,13 +1199,13 @@ export default function MaquinariaOperaciones() {
         <div className="overflow-hidden">
           {operationsQuery.isLoading ? <div className="p-8 text-center text-[13px] text-muted-foreground">Cargando…</div> :
             importsView ? <ImportsTable rows={list.ordered as ImportRow[]} sort={list.sort} heading={list.heading} onSelect={setSelectedImport} /> :
-              <OrdersTable rows={list.ordered as OrderRow[]} sort={list.sort} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
+              <OrdersTable rows={list.ordered as OrderRow[]} sort={list.sort} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} confirmedBillingUnitIds={confirmedBillingUnitIds} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
         </div>
         {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "líneas"} con estos filtros.</div>}
       </>}
     </Panel>
     <NewOperationDrawer operationId={editingOperationId} open={newOpen} onOpenChange={(open) => { setNewOpen(open); if (!open) setEditingOperationId(null); }} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
-    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onEdit={(id) => { setSelected(null); setEditingOperationId(id); setNewOpen(true); }} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); }} />
+    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onEdit={(id) => { setSelected(null); setEditingOperationId(id); setNewOpen(true); }} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-confirmed-billing"] }); queryClient.invalidateQueries({ queryKey: ["machine-operation-confirmed-billing"] }); }} />
     <ImportFormDrawer
       open={importFormOpen}
       row={editingImport}
@@ -1198,8 +1227,8 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
-  const billing=(row:OrderRow)=>orderBillingState(row,entregaByUnitId?.get(row.id)?.estado);
+export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, confirmedBillingUnitIds, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; confirmedBillingUnitIds?: Set<string>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
+  const billing=(row:OrderRow)=>orderBillingState(row,entregaByUnitId?.get(row.id)?.estado,confirmedBillingUnitIds?.has(row.id));
   const delivery=(row:OrderRow)=>{const unit=entregaByUnitId?.get(row.id);return entregaStateFromUnit(unit?.estado,unit?.chasis,row.marca,estadoByOperacionId?.get(row.operacion_id),stockChasisSet,row.es_historico);};
   const schema: {key:string;label:string;width:string;hiddenBelow?:"md"|"lg"}[]=[
     {key:"np",label:"NP",width:"w-[20%] md:w-[9%] lg:w-[8%]"},
@@ -2121,6 +2150,12 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       return match ? { ...line, modelo: match.nombre, subgrupo: match.subgrupo, producto: match.subgrupo } : line;
     }) };
   }, [detailQuery.data, modelCatalog.data]);
+  const detailUnitIds = useMemo(() => (detail?.units ?? []).map((unit: any) => unit.id).filter(Boolean), [detail?.units]);
+  const detailConfirmedBillingQuery = useQuery({
+    queryKey: ["machine-operation-confirmed-billing", operationId, detailUnitIds],
+    enabled: Boolean(operationId && detailUnitIds.length),
+    queryFn: () => fetchConfirmedBillingUnitIds(detailUnitIds),
+  });
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   useEffect(() => {
     setActiveTab("resumen");
@@ -2184,11 +2219,13 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
       return totals;
     }, {} as MoneyTotals);
   }, [detail]);
-  // Mismo criterio que el badge de la lista (orderBillingState): exige evidencia real de
-  // factura (factura_venta/factura_fecha) o que la unidad ya haya llegado (FACTURADA/EN_PARQUE/
-  // TRANSFERIDA). unit.valor_facturado NO es evidencia de factura -- es el valor acordado de
-  // venta, se carga aunque no exista ninguna factura, y no debe contarse como "facturada".
-  const unitBillingCount = detail?.units.filter((unit: any) => orderBillingState(detail, unit.estado) === "COMPLETADO").length ?? 0;
+  // El resumen usa exactamente la misma comprobacion por chasis que la lista.
+  // El PDF, el valor acordado y el estado agregado del pedido no cuentan.
+  const unitBillingCount = detail?.units.filter((unit: any) => orderBillingState(
+    { ...detail, es_historico: isConcludedHistorical },
+    unit.estado,
+    detailConfirmedBillingQuery.data?.has(unit.id),
+  ) === "COMPLETADO").length ?? 0;
   const totalUnits = Number(detail?.unidades ?? 0);
   const billingComplete = totalUnits > 0 && unitBillingCount >= totalUnits;
   const missingOriginCount = detail?.units.filter((unit: any) => {

@@ -173,6 +173,19 @@ describe("reported production regressions", () => {
     expect(dialog).toContain("p_vendedor: form.vendedor || null");
   });
 
+  it("confirms each ordered machine only from a sale with the same chassis", () => {
+    const sql = read("supabase/migrations/20260923170000_confirm_machine_order_billing_by_chassis.sql");
+    const ui = read("src/pages/MaquinariaOperaciones.tsx");
+    expect(sql).toContain("maquinaria_unidad_tiene_venta_confirmada");
+    expect(sql).toContain("maquinaria_unidades_facturadas_confirmadas");
+    expect(sql).toContain("extraer_chasis_venta_maquina");
+    expect(sql).toContain("venta.fecha_factura::date >= objetivo.np_fecha");
+    expect(sql).toContain("No se encontro una venta positiva con el mismo chasis");
+    expect(sql).toContain("maquinaria_vinculos_factura_invalidos");
+    expect(ui).toContain("hasConfirmedChassisSale");
+    expect(ui).toContain("confirmedBillingUnitIds?.has(row.id)");
+  });
+
   it("does not suggest a transfer for duplicate rows of the same customer", () => {
     const sql = read("supabase/migrations/20260923140000_suppress_same_customer_machine_transfer_alerts.sql");
     expect(sql).toContain("normalizar_cliente_notificacion");
