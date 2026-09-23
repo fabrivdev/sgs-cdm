@@ -157,6 +157,8 @@ describe("reported production regressions", () => {
     expect(sql).not.toContain("PERFORM public.confirmar_notificacion_alta_maquina");
     expect(panel).toContain('notification?.tipo === "venta_maquina_reingreso"');
     expect(dialog).toContain('confirm("REFACTURACION")');
+    expect(dialog).toContain("machineSaleConfirmationClientId(data, form.cliente_id, confirmationType)");
+    expect(dialog).toContain("p_cliente_id: confirmationClientId");
     expect(dialog).toContain("Confirmar venta");
   });
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { machineSaleNotificationData, machineStockReturnNotificationData, type AppNotification } from "./notifications";
+import {
+  machineSaleConfirmationClientId,
+  machineSaleNotificationData,
+  machineStockReturnNotificationData,
+  type AppNotification,
+} from "./notifications";
 
 const notification = (datos: AppNotification["datos"]): AppNotification => ({
   id: "notification-1",
@@ -52,5 +57,21 @@ describe("machine resale notifications", () => {
       nc_factura_original: "0010010000002",
       revision_sugerida: "REFACTURACION_PROBABLE",
     });
+  });
+
+  it("keeps the exact current Park owner when confirming a refacturation", () => {
+    expect(machineSaleConfirmationClientId({
+      cliente_actual_id: "park-owner-id",
+    }, "canonical-catalog-id", "REFACTURACION")).toBe("park-owner-id");
+  });
+
+  it("uses the selected customer only for a sale or transfer", () => {
+    expect(machineSaleConfirmationClientId({
+      cliente_actual_id: "park-owner-id",
+    }, "new-owner-id", "VENTA")).toBe("new-owner-id");
+  });
+
+  it("falls back to the selected customer when a legacy notification lacks the Park owner id", () => {
+    expect(machineSaleConfirmationClientId({}, "selected-owner-id", "REFACTURACION")).toBe("selected-owner-id");
   });
 });

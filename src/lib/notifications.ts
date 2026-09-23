@@ -65,6 +65,17 @@ export function machineSaleNotificationData(notification: AppNotification): Mach
   return notification.datos as MachineSaleNotificationData;
 }
 
+export function machineSaleConfirmationClientId(
+  data: MachineSaleNotificationData,
+  selectedClientId: string | null | undefined,
+  confirmationType: "VENTA" | "REFACTURACION",
+) {
+  if (confirmationType === "REFACTURACION") {
+    return data.cliente_actual_id ?? selectedClientId ?? "";
+  }
+  return selectedClientId ?? "";
+}
+
 export function machineStockReturnNotificationData(notification: AppNotification): MachineStockReturnNotificationData {
   if (!notification.datos || Array.isArray(notification.datos) || typeof notification.datos !== "object") return {};
   return notification.datos as MachineStockReturnNotificationData;

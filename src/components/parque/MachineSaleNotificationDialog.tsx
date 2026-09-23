@@ -4,7 +4,7 @@ import { Check, ChevronsUpDown, FileText, Tractor } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { AppNotification } from "@/lib/notifications";
-import { machineSaleNotificationData } from "@/lib/notifications";
+import { machineSaleConfirmationClientId, machineSaleNotificationData } from "@/lib/notifications";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 import { cn } from "@/lib/utils";
@@ -129,14 +129,15 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
 
   const confirm = async (confirmationType: "VENTA" | "REFACTURACION" = "VENTA") => {
     if (!notification) return;
-    if (!form.cliente_id) return toast.error("Seleccioná el cliente de la máquina");
+    const confirmationClientId = machineSaleConfirmationClientId(data, form.cliente_id, confirmationType);
+    if (!confirmationClientId) return toast.error("Seleccioná el cliente de la máquina");
     if (!form.serie.trim()) return toast.error("Verificá el chasis antes de confirmar");
     if (form.subgrupo === "OTRO" && !form.subgrupo_personalizado.trim()) return toast.error("Escribí el nuevo subgrupo");
     if (!form.modelo_tipo.trim()) return toast.error("Seleccioná o escribí el modelo");
     setSaving(true);
     const { error } = await supabase.rpc("confirmar_notificacion_alta_maquina", {
       p_notificacion_id: notification.id,
-      p_cliente_id: form.cliente_id,
+      p_cliente_id: confirmationClientId,
       p_marca: form.marca,
       p_subgrupo: form.subgrupo as (typeof MACHINE_SUBGROUPS)[number],
       p_subgrupo_personalizado: form.subgrupo === "OTRO" ? form.subgrupo_personalizado.trim() : null,
