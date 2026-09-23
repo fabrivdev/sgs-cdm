@@ -10,4 +10,5 @@ export * from "@/lib/imports/newSystemBundle";
 export * from "@/lib/imports/newSystemPersist";
 export * from "@/lib/imports/persist";
 export * from "@/lib/imports/sucursalMatching";
+export * from "@/lib/imports/totvsFileKind";
 export * from "@/lib/imports/xmlSpreadsheet";

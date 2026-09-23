@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMachineStockXml } from "@/lib/imports";
+import { mapMachineRegistrySheet, parseMachineStockXml, reconcileMachineStockChassis } from "@/lib/imports";
 
 const SAMPLE = `<?xml version="1.0"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
@@ -34,5 +34,85 @@ describe("stock de maquinarias TOTVS", () => {
 
     expect(result.rows).toHaveLength(2);
     expect(result.rows.map((row) => row.chassis)).toEqual(["24491382", "24491383"]);
+  });
+
+  it("completa un chasis-placeholder desde Maquinarias por CODPRO exacto", () => {
+    const stock = parseMachineStockXml(
+      "stock_de_maquinarias.xml",
+      SAMPLE.replace("24491382", "MAESTRO CF 18.45"),
+    ).rows;
+    const registry = mapMachineRegistrySheet("maquinarias.xml", {
+      name: "Maquinarias",
+      headers: ["CODPRO", "Chasis", "MODELO"],
+      rows: [{ CODPRO: " VEIC_000033 ", Chasis: "24491382", MODELO: "MAESTRO CF 18.45" }],
+    }).rows;
+
+    const result = reconcileMachineStockChassis(stock, registry);
+
+    expect(result.rows[0].chassis).toBe("24491382");
+    expect(result.rows[0].raw).toMatchObject({
+      CHASIS_STOCK_ORIGINAL: "MAESTRO CF 18.45",
+      CHASIS_RESPALDO_MAQUINARIAS: "24491382",
+      CHASIS_FUENTE: "maquinarias_por_codpro",
+    });
+    expect(result.filledFromRegistry).toBe(1);
+    expect(result.unresolvedPlaceholders).toBe(0);
+  });
+
+  it("no agrega máquinas ajenas al stock ni pisa un chasis válido en conflicto", () => {
+    const stock = parseMachineStockXml("stock_de_maquinarias.xml", SAMPLE).rows;
+    const registry = mapMachineRegistrySheet("maquinarias.xml", {
+      name: "Maquinarias",
+      headers: ["CODPRO", "Chasis"],
+      rows: [
+        { CODPRO: "VEIC_000033", Chasis: "OTRO-CHASIS" },
+        { CODPRO: "VEIC_999999", Chasis: "NO-DEBE-ENTRAR" },
+      ],
+    }).rows;
+
+    const result = reconcileMachineStockChassis(stock, registry);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].chassis).toBe("24491382");
+    expect(result.validConflicts).toBe(1);
+    expect(result.filledFromRegistry).toBe(0);
+  });
+
+  it("deja visible un placeholder cuando Maquinarias tampoco informa chasis", () => {
+    const stock = parseMachineStockXml(
+      "stock_de_maquinarias.xml",
+      SAMPLE.replace("24491382", "MAESTRO CF 18.45"),
+    ).rows;
+    const registry = mapMachineRegistrySheet("maquinarias.xml", {
+      name: "Maquinarias",
+      headers: ["CODPRO", "Chasis"],
+      rows: [{ CODPRO: "VEIC_000033", Chasis: "" }],
+    }).rows;
+
+    const result = reconcileMachineStockChassis(stock, registry);
+
+    expect(result.rows[0].chassis).toBe("MAESTRO CF 18.45");
+    expect(result.unresolvedPlaceholders).toBe(1);
+  });
+
+  it("no elige entre dos filas de Maquinarias con el mismo CODPRO", () => {
+    const stock = parseMachineStockXml(
+      "stock_de_maquinarias.xml",
+      SAMPLE.replace("24491382", "MAESTRO CF 18.45"),
+    ).rows;
+    const registry = mapMachineRegistrySheet("maquinarias.xml", {
+      name: "Maquinarias",
+      headers: ["CODPRO", "Chasis"],
+      rows: [
+        { CODPRO: "VEIC_000033", Chasis: "24491382" },
+        { CODPRO: "VEIC_000033", Chasis: "24491383" },
+      ],
+    }).rows;
+
+    const result = reconcileMachineStockChassis(stock, registry);
+
+    expect(result.rows[0].chassis).toBe("MAESTRO CF 18.45");
+    expect(result.ambiguousProductCodes).toBe(1);
+    expect(result.unresolvedPlaceholders).toBe(1);
   });
 });

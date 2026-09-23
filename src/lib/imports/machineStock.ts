@@ -1,4 +1,4 @@
-import type { CanonicalImportEnvelope, CanonicalMachineStockRow } from "@/lib/imports/canonical";
+import type { CanonicalImportEnvelope, CanonicalMachineRegistryRow, CanonicalMachineStockRow } from "@/lib/imports/canonical";
 import { normalizeText, normalizeUpper, parseFlexibleNumber } from "@/lib/imports/fiscal";
 import { normalizeStableKey } from "@/lib/imports/mappings";
 import type { SpreadsheetXmlSheet } from "@/lib/imports/xmlSpreadsheet";
@@ -73,6 +73,113 @@ export function mapMachineStockSheet(
     importedAt: new Date().toISOString(),
     rows,
   };
+}
+
+export function mapMachineRegistrySheet(
+  sourceFileName: string,
+  sheet: SpreadsheetXmlSheet,
+): CanonicalImportEnvelope<CanonicalMachineRegistryRow> {
+  const rows: CanonicalMachineRegistryRow[] = [];
+
+  sheet.rows.forEach((raw, index) => {
+    const productCode = text(raw, ["CODPRO", "Producto", "CODIGO", "Código"]);
+    if (!productCode) return;
+    const sourceRow = index + 2;
+    rows.push({
+      rowId: `PRODUCTO-${normalizeStableKey(productCode)}-FILA-${sourceRow}`,
+      sourceRow,
+      productCode: productCode.trim(),
+      chassis: text(raw, ["CHASIS", "CHASSIS", "SERIE"]),
+      machineType: text(raw, ["TIPO"]),
+      brand: text(raw, ["MARCA"]),
+      model: text(raw, ["MODELO"]),
+      raw,
+    });
+  });
+
+  return {
+    sourceSystem: "new_xml_machine_registry",
+    sourceFileName,
+    worksheetName: sheet.name,
+    importedAt: new Date().toISOString(),
+    rows,
+  };
+}
+
+export interface MachineStockChassisReconciliation {
+  rows: CanonicalMachineStockRow[];
+  matched: number;
+  filledFromRegistry: number;
+  unresolvedPlaceholders: number;
+  ambiguousProductCodes: number;
+  validConflicts: number;
+}
+
+const INVALID_CHASSIS_VALUES = new Set(["SINCHASIS", "NOINFORMADO", "PENDIENTE", "N/A", "S/N", "SN"]);
+
+function isPlaceholderChassis(row: CanonicalMachineStockRow) {
+  const chassis = normalizeStableKey(row.chassis);
+  if (!chassis || INVALID_CHASSIS_VALUES.has(chassis)) return true;
+  return [row.model, row.machineType, row.brand, row.productCode]
+    .some((candidate) => candidate && normalizeStableKey(candidate) === chassis);
+}
+
+export function reconcileMachineStockChassis(
+  stockRows: CanonicalMachineStockRow[],
+  registryRows: CanonicalMachineRegistryRow[],
+): MachineStockChassisReconciliation {
+  const registryByProduct = new Map<string, CanonicalMachineRegistryRow[]>();
+  for (const row of registryRows) {
+    const key = normalizeStableKey(row.productCode);
+    if (!key) continue;
+    registryByProduct.set(key, [...(registryByProduct.get(key) ?? []), row]);
+  }
+
+  let matched = 0;
+  let filledFromRegistry = 0;
+  let unresolvedPlaceholders = 0;
+  let ambiguousProductCodes = 0;
+  let validConflicts = 0;
+
+  const rows = stockRows.map((stockRow) => {
+    const candidates = registryByProduct.get(normalizeStableKey(stockRow.productCode)) ?? [];
+    if (!candidates.length) {
+      if (isPlaceholderChassis(stockRow)) unresolvedPlaceholders += 1;
+      return stockRow;
+    }
+    if (candidates.length !== 1) {
+      ambiguousProductCodes += 1;
+      if (isPlaceholderChassis(stockRow)) unresolvedPlaceholders += 1;
+      return stockRow;
+    }
+
+    matched += 1;
+    const registryChassis = normalizeText(candidates[0].chassis) || null;
+    if (isPlaceholderChassis(stockRow)) {
+      if (!registryChassis) {
+        unresolvedPlaceholders += 1;
+        return stockRow;
+      }
+      filledFromRegistry += 1;
+      return {
+        ...stockRow,
+        chassis: registryChassis,
+        raw: {
+          ...stockRow.raw,
+          CHASIS_STOCK_ORIGINAL: stockRow.chassis,
+          CHASIS_RESPALDO_MAQUINARIAS: registryChassis,
+          CHASIS_FUENTE: "maquinarias_por_codpro",
+        },
+      };
+    }
+
+    if (registryChassis && normalizeStableKey(registryChassis) !== normalizeStableKey(stockRow.chassis)) {
+      validConflicts += 1;
+    }
+    return stockRow;
+  });
+
+  return { rows, matched, filledFromRegistry, unresolvedPlaceholders, ambiguousProductCodes, validConflicts };
 }
 
 export function mapCanonicalMachineStockToRow(row: CanonicalMachineStockRow) {

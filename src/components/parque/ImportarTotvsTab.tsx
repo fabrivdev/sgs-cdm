@@ -22,6 +22,7 @@ import {
   mapCanonicalSolicitudCompraToRow,
   mapCanonicalStockToRow,
   mapClienteSheet,
+  mapMachineRegistrySheet,
   mapPedidoCompraSheet,
   mapMachineStockSheet,
   mapProductosSheet,
@@ -30,62 +31,40 @@ import {
   parseSpreadsheetXml,
   prepareNewSystemImportBundle,
   reconcileCanonicalClientes,
+  reconcileMachineStockChassis,
   persistNewSystemBundle,
   actualizarVentasRepuestosPeriodo,
   type CanonicalClienteRow,
   type CanonicalPedidoCompraRow,
   type CanonicalMachineStockRow,
+  type CanonicalMachineRegistryRow,
+  type MachineStockChassisReconciliation,
   type CanonicalProductRow,
   type CanonicalSolicitudCompraRow,
   type CanonicalStockRow,
   type ClienteInsert,
   type ClienteActualizacionImport,
   type ClienteExistenteImport,
+  TOTVS_FILE_KIND_LABELS,
+  detectTotvsFileKind,
+  type TotvsFileKind,
 } from "@/lib/imports";
 import { cn } from "@/lib/utils";
 
-type FileKind = "os" | "facturacion" | "productos" | "stock" | "stock_maquinas" | "pedidos" | "solicitudes" | "clientes";
-
-const KIND_LABELS: Record<FileKind, string> = {
-  os: "Órdenes de servicio",
-  facturacion: "Facturación de ventas",
-  productos: "Maestro de productos",
-  stock: "Reporte de stock",
-  stock_maquinas: "Stock de maquinarias",
-  pedidos: "Pedidos de compra",
-  solicitudes: "Solicitudes de compra",
-  clientes: "Maestro de clientes",
-};
+type FileKind = TotvsFileKind;
+const KIND_LABELS = TOTVS_FILE_KIND_LABELS;
 
 interface DetectedFile {
   file: File;
   kind: FileKind | "ignorar";
 }
 
-function normalizeFileName(name: string) {
-  return name
-    .normalize("NFD")
-    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
-    .toLowerCase();
-}
-
-function detectFileKind(fileName: string): FileKind | "ignorar" {
-  const n = normalizeFileName(fileName);
-  if (n.includes("ordenes_de_servicio") || n.includes("ordenes de servicio")) return "os";
-  if (n.includes("ndc") || n.includes("ncc") || n.includes("ventas")) return "facturacion";
-  if (n.includes("maestro_de_productos") || n.includes("maestro de productos")) return "productos";
-  if (n.includes("stock_de_maquinarias") || n.includes("stock de maquinarias")) return "stock_maquinas";
-  if (n.includes("reporte_de_stock") || n.includes("reporte de stock")) return "stock";
-  if (n.includes("pedidos_de_compra") || n.includes("pedidos de compra")) return "pedidos";
-  if (n.includes("solicitudes_de_compra") || n.includes("solicitudes de compra")) return "solicitudes";
-  if (n.includes("maestro_de_clientes") || n.includes("maestro de clientes")) return "clientes";
-  return "ignorar";
-}
-
 interface Preview {
   productos: CanonicalProductRow[];
   stock: CanonicalStockRow[];
   stockMaquinas: CanonicalMachineStockRow[];
+  machineRegistryRows: CanonicalMachineRegistryRow[];
+  machineStockChassis: MachineStockChassisReconciliation;
   pedidos: CanonicalPedidoCompraRow[];
   solicitudes: CanonicalSolicitudCompraRow[];
   clientesTodos: CanonicalClienteRow[];
@@ -124,7 +103,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const existingNames = new Set(prev.map((d) => d.file.name));
       const nuevos = xmlFiles
         .filter((file) => !existingNames.has(file.name))
-        .map((file) => ({ file, kind: detectFileKind(file.name) }));
+        .map((file) => ({ file, kind: detectTotvsFileKind(file.name) }));
       return [...prev, ...nuevos];
     });
     setPreview(null);
@@ -160,7 +139,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     try {
       const productos: CanonicalProductRow[] = [];
       const stock: CanonicalStockRow[] = [];
-      const stockMaquinas: CanonicalMachineStockRow[] = [];
+      let stockMaquinas: CanonicalMachineStockRow[] = [];
+      const machineRegistryRows: CanonicalMachineRegistryRow[] = [];
       const pedidos: CanonicalPedidoCompraRow[] = [];
       const solicitudes: CanonicalSolicitudCompraRow[] = [];
       let clientesTodos: CanonicalClienteRow[] = [];
@@ -191,6 +171,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           stock.push(...mapStockSheet(file.name, sheet).rows);
         } else if (kind === "stock_maquinas") {
           stockMaquinas.push(...mapMachineStockSheet(file.name, sheet).rows);
+        } else if (kind === "maquinarias") {
+          machineRegistryRows.push(...mapMachineRegistrySheet(file.name, sheet).rows);
         } else if (kind === "pedidos") {
           pedidos.push(...mapPedidoCompraSheet(file.name, sheet).rows);
         } else if (kind === "solicitudes") {
@@ -214,6 +196,18 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           ? { facturacion: facturacionTexto, ordenesServicio: osTexto, productos: productosTexto }
           : null;
 
+      const machineStockChassis = machineRegistryRows.length
+        ? reconcileMachineStockChassis(stockMaquinas, machineRegistryRows)
+        : {
+            rows: stockMaquinas,
+            matched: 0,
+            filledFromRegistry: 0,
+            unresolvedPlaceholders: 0,
+            ambiguousProductCodes: 0,
+            validConflicts: 0,
+          };
+      stockMaquinas = machineStockChassis.rows;
+
       let clientesNuevos: ClienteInsert[] = [];
       let clientesActualizados: ClienteActualizacionImport[] = [];
       if (clientesTodos.length > 0) {
@@ -235,6 +229,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         productos,
         stock,
         stockMaquinas,
+        machineRegistryRows,
+        machineStockChassis,
         pedidos,
         solicitudes,
         clientesTodos,
@@ -249,6 +245,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         productos.length ? `${productos.length} productos` : null,
         stock.length ? `${stock.length} filas de stock` : null,
         stockMaquinas.length ? `${stockMaquinas.length} máquinas en stock` : null,
+        machineRegistryRows.length ? `${machineRegistryRows.length} referencias de chasis` : null,
+        machineStockChassis.filledFromRegistry ? `${machineStockChassis.filledFromRegistry} chasis completados` : null,
         pedidos.length ? `${pedidos.length} líneas de pedido` : null,
         solicitudes.length ? `${solicitudes.length} líneas de solicitud` : null,
         clientesTodos.length ? `${clientesNuevos.length} clientes nuevos y ${clientesActualizados.length} actualizados` : null,
@@ -405,8 +403,15 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           total_filas: machineStockRows.length,
           insertados: machineStockRows.length,
           duplicados: Math.max(preview.stockMaquinas.length - machineStockRows.length, 0),
-          archivo_nombre: usableFiles.filter((d) => d.kind === "stock_maquinas").map((d) => d.file.name).join(", "),
-          metadata: { fuente: "stock_maquinarias_totvs", reemplazo_total: true },
+          archivo_nombre: usableFiles.filter((d) => d.kind === "stock_maquinas" || d.kind === "maquinarias").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "stock_maquinarias_totvs",
+            respaldo_chasis: preview.machineRegistryRows.length ? "maquinarias_por_codpro" : null,
+            chasis_completados: preview.machineStockChassis.filledFromRegistry,
+            chasis_placeholder_sin_resolver: preview.machineStockChassis.unresolvedPlaceholders,
+            conflictos_chasis_validos: preview.machineStockChassis.validConflicts,
+            reemplazo_total: true,
+          },
         } as any);
       }
 
@@ -451,8 +456,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           <div className="text-[13px] font-semibold">Importar datos de TOTVS</div>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Elegí la carpeta completa de exports (o los archivos sueltos) — se detecta automáticamente cada tipo de
-            reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, pedidos,
-            solicitudes y clientes.
+            reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, el reporte
+            general de maquinarias como respaldo de chasis, pedidos, solicitudes y clientes.
           </p>
         </div>
 
@@ -561,6 +566,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
               {preview.stock.length > 0 && <Badge variant="secondary">{preview.stock.length} filas de stock</Badge>}
               {preview.stockMaquinas.length > 0 && <Badge variant="secondary">{preview.stockMaquinas.length} máquinas en stock</Badge>}
+              {preview.machineRegistryRows.length > 0 && <Badge variant="secondary">{preview.machineRegistryRows.length} referencias de maquinarias</Badge>}
+              {preview.machineStockChassis.filledFromRegistry > 0 && <Badge variant="secondary">{preview.machineStockChassis.filledFromRegistry} chasis completados</Badge>}
               {preview.pedidos.length > 0 && <Badge variant="secondary">{preview.pedidos.length} líneas de pedido</Badge>}
               {preview.solicitudes.length > 0 && <Badge variant="secondary">{preview.solicitudes.length} líneas de solicitud</Badge>}
               {preview.clientesTodos.length > 0 && (
@@ -569,9 +576,20 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                 </Badge>
               )}
             </div>
+            {preview.machineStockChassis.unresolvedPlaceholders > 0 && (
+              <p className="text-[11px] text-amber-700">
+                {preview.machineStockChassis.unresolvedPlaceholders} máquinas mantienen un chasis incompleto porque el reporte general no trae uno utilizable.
+              </p>
+            )}
+            {(preview.machineStockChassis.validConflicts > 0 || preview.machineStockChassis.ambiguousProductCodes > 0) && (
+              <p className="text-[11px] text-amber-700">
+                No se reemplazaron {preview.machineStockChassis.validConflicts} chasis válidos en conflicto ni {preview.machineStockChassis.ambiguousProductCodes} códigos ambiguos; revisalos antes de confirmar.
+              </p>
+            )}
             <p className="text-[11px] text-muted-foreground">
-              El stock de repuestos y de máquinas reemplaza por completo lo importado antes (es una foto del momento). Productos, pedidos y
-              solicitudes se actualizan sin duplicar. Clientes agrega los nuevos y corrige los existentes por código/RUC sin cambiar su ID.
+              El stock de repuestos y de máquinas reemplaza por completo lo importado antes (es una foto del momento). El reporte general solo
+              completa chasis faltantes o sustituidos por el modelo mediante CODPRO exacto; no agrega al stock máquinas que no estén en la foto.
+              Productos, pedidos y solicitudes se actualizan sin duplicar. Clientes agrega los nuevos y corrige los existentes por código/RUC sin cambiar su ID.
             </p>
             <Button type="button" size="sm" onClick={confirmar} disabled={busy}>
               Confirmar importación
