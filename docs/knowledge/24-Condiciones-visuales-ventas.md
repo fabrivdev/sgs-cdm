@@ -23,6 +23,7 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - Si el chasis había sido autorizado como parte de pago, confirmar la factura posterior conserva aquel movimiento en el historial, lo marca compensado y bloquea la reserva de la foto vieja de Stock mientras el chasis esté activo en Parque. La siguiente carga real de Stock confirma su salida; no alterar saldos importados para simularla.
 - Registrar en historial `REFACTURACION` y/o `REINGRESO` según la decisión humana. Relacionar la NC por chasis y conservar número de NC/factura original en los datos de la notificación, sin codificar documentos o clientes concretos en código ni documentación.
 - Implementación: `20260923120000_reconcile_machine_credit_notes_and_resales.sql`. Commit/push no aplica esta migración ni acredita producción; entregar siempre el SQL o una instrucción exacta para que Lovable lo despliegue.
+- No sugerir una transferencia por UUID distintos si Parque y factura representan al mismo cliente. Reconciliar primero por ID o RUC y, cuando falta RUC comparable, por nombre normalizado; dos RUC informados y diferentes mantienen la revisión. Las falsas alertas pendientes se descartan sin confirmar venta ni modificar Parque/Stock. Corrección incremental: `20260923140000_suppress_same_customer_machine_transfer_alerts.sql` después de la migración anterior.
 
 ## Orden y exportación compartidos
 

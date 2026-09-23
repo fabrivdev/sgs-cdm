@@ -55,7 +55,8 @@ try {
 
     CREATE TABLE public.clientes(
       id uuid PRIMARY KEY,
-      nombre text NOT NULL
+      nombre text NOT NULL,
+      ruc text
     );
     CREATE TABLE public.maquinaria_operaciones(
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -164,12 +165,15 @@ try {
 
     INSERT INTO public.clientes(id,nombre) VALUES
       ('10000000-0000-0000-0000-000000000001','CLIENTE A'),
-      ('10000000-0000-0000-0000-000000000002','CLIENTE B');
+      ('10000000-0000-0000-0000-000000000002','CLIENTE B'),
+      ('10000000-0000-0000-0000-000000000003','CLIENTE A');
     INSERT INTO public.parque_maquinas(
       id,cliente_id,marca,subgrupo,modelo_tipo,serie,activo
     ) VALUES
       ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','CLAAS','COSECHADORAS','LEXION 750','CASE-1',true),
-      ('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','CLAAS','COSECHADORAS','LEXION 770','CASE-2',false);
+      ('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','CLAAS','COSECHADORAS','LEXION 770','CASE-2',false),
+      ('20000000-0000-0000-0000-000000000003','10000000-0000-0000-0000-000000000001','CLAAS','COSECHADORAS','LEXION 780','CASE-3',true),
+      ('20000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000001','CLAAS','COSECHADORAS','LEXION 790','CASE-4',true);
     INSERT INTO public.parque_stock_maquinas(
       id,chasis,saldo_actual,parque_origen_id,estado,datos_fuente
     ) VALUES (
@@ -199,7 +203,15 @@ try {
       ('50000000-0000-0000-0000-000000000003','F-REENTRY','CLIENTE B',
        '10000000-0000-0000-0000-000000000002','2026-09-22','MAQUINARIAS',
        'CLAAS','LEXION 770','VEIC_2',1,120,
-       '{"canonical_document_kind":"Factura","CHASIS":"CASE-2","MODELO":"LEXION 770"}');
+       '{"canonical_document_kind":"Factura","CHASIS":"CASE-2","MODELO":"LEXION 770"}'),
+      ('50000000-0000-0000-0000-000000000004','F-SAME','CLIENTE A',
+       '10000000-0000-0000-0000-000000000003','2026-09-22','MAQUINARIAS',
+       'CLAAS','LEXION 780','VEIC_3',1,130,
+       '{"canonical_document_kind":"Factura","CHASIS":"CASE-3","MODELO":"LEXION 780"}'),
+      ('50000000-0000-0000-0000-000000000005','F-TRANSFER','CLIENTE B',
+       '10000000-0000-0000-0000-000000000002','2026-09-22','MAQUINARIAS',
+       'CLAAS','LEXION 790','VEIC_4',1,140,
+       '{"canonical_document_kind":"Factura","CHASIS":"CASE-4","MODELO":"LEXION 790"}');
   `);
 
   const migration = await readFile(
@@ -207,6 +219,11 @@ try {
     "utf8",
   );
   await db.exec(migration);
+  const identityMigration = await readFile(
+    new URL("../supabase/migrations/20260923140000_suppress_same_customer_machine_transfer_alerts.sql", import.meta.url),
+    "utf8",
+  );
+  await db.exec(identityMigration);
 
   const refactNotification = await first(`
     SELECT * FROM public.notificaciones
@@ -216,6 +233,67 @@ try {
   assert.equal(refactNotification.datos.revision_sugerida, "REFACTURACION_PROBABLE");
   assert.equal(refactNotification.datos.nc_documento, "NC-1");
   assert.equal(refactNotification.datos.nc_factura_original, "F-ORIGINAL");
+
+  const duplicateIdentityNotice = await first(`
+    SELECT estado, datos FROM public.notificaciones
+    WHERE datos ->> 'facturacion_linea_id' = '50000000-0000-0000-0000-000000000004'
+  `);
+  assert.equal(duplicateIdentityNotice.estado, "descartada");
+  assert.equal(duplicateIdentityNotice.datos.resolucion, "mismo_cliente_canonico");
+
+  assert.equal((await first(`SELECT public.notificacion_venta_mismo_cliente(
+    '20000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000003',
+    'CLIENTE A'
+  ) AS same`)).same, true);
+  await db.exec(`
+    UPDATE public.clientes SET ruc='111-1' WHERE id='10000000-0000-0000-0000-000000000001';
+    UPDATE public.clientes SET ruc='222-2' WHERE id='10000000-0000-0000-0000-000000000003';
+  `);
+  assert.equal((await first(`SELECT public.notificacion_venta_mismo_cliente(
+    '20000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000003',
+    'CLIENTE A'
+  ) AS same`)).same, false);
+  await db.exec(`
+    UPDATE public.clientes SET ruc='111-1', nombre='OTRA GRAFIA' WHERE id='10000000-0000-0000-0000-000000000003';
+  `);
+  assert.equal((await first(`SELECT public.notificacion_venta_mismo_cliente(
+    '20000000-0000-0000-0000-000000000003',
+    '10000000-0000-0000-0000-000000000003',
+    'OTRA GRAFIA'
+  ) AS same`)).same, true);
+  await db.exec(`
+    UPDATE public.clientes SET ruc=NULL, nombre='CLIENTE A' WHERE id='10000000-0000-0000-0000-000000000003';
+    UPDATE public.clientes SET ruc=NULL WHERE id='10000000-0000-0000-0000-000000000001';
+  `);
+
+  const realTransferNotice = await first(`
+    SELECT estado, titulo, datos FROM public.notificaciones
+    WHERE datos ->> 'facturacion_linea_id' = '50000000-0000-0000-0000-000000000005'
+  `);
+  assert.equal(realTransferNotice.estado, "pendiente");
+  assert.equal(realTransferNotice.titulo, "Revisar transferencia de máquina");
+  assert.equal(realTransferNotice.datos.revision_sugerida, "TRANSFERENCIA");
+
+  await db.exec(`
+    INSERT INTO public.facturacion_lineas_importadas(
+      id,factura,entidad_nombre,cliente_id,fecha_factura,grupo_normalizado,
+      marca_normalizada,mercaderia,cod_mercaderia,cantidad,total_venta,raw_data
+    ) VALUES (
+      '50000000-0000-0000-0000-000000000006','F-SAME-LATER','CLIENTE A',
+      '10000000-0000-0000-0000-000000000003','2026-09-23','MAQUINARIAS',
+      'CLAAS','LEXION 780','VEIC_3',1,135,
+      '{"canonical_document_kind":"Factura","CHASIS":"CASE-3","MODELO":"LEXION 780"}'
+    );
+    SELECT public.generar_notificacion_venta_maquina(
+      '50000000-0000-0000-0000-000000000006'
+    );
+  `);
+  assert.equal(Number((await first(`
+    SELECT count(*) AS n FROM public.notificaciones
+    WHERE estado = 'pendiente' AND datos ->> 'facturacion_linea_id' = '50000000-0000-0000-0000-000000000006'
+  `)).n), 0);
 
   await db.query(`SELECT public.confirmar_notificacion_alta_maquina(
     $1,$2,'CLAAS','COSECHADORAS','LEXION 750','CASE-1',NULL,NULL,NULL,NULL,NULL,NULL,'REFACTURACION'
@@ -249,7 +327,7 @@ try {
     /chasis sigue activo en Parque/,
   );
 
-  console.log("PASS: NC/new invoice review, same chassis reuse, refacturation history, reentry, Stock compensation and reservation guard");
+  console.log("PASS: NC/new invoice review, canonical customer suppression, true transfer, same chassis reuse, reentry and Stock guards");
 } finally {
   await db.close();
 }

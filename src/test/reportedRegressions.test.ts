@@ -160,6 +160,19 @@ describe("reported production regressions", () => {
     expect(dialog).toContain("Confirmar venta");
   });
 
+  it("does not suggest a transfer for duplicate rows of the same customer", () => {
+    const sql = read("supabase/migrations/20260923140000_suppress_same_customer_machine_transfer_alerts.sql");
+    expect(sql).toContain("normalizar_cliente_notificacion");
+    expect(sql).toContain("notificacion_venta_mismo_cliente");
+    expect(sql).toContain("v_parque_cliente_id = v_facturado_cliente_id");
+    expect(sql).toContain("v_parque_ruc_norm = v_facturado_ruc_norm");
+    expect(sql).toContain("v_parque_nombre_norm = v_facturado_nombre_norm");
+    expect(sql).toContain("suprimir_transferencia_mismo_cliente_trigger");
+    expect(sql).toContain("NEW.estado <> 'pendiente'");
+    expect(sql).toContain("'resolucion', 'mismo_cliente_canonico'");
+    expect(sql).toContain("No confirma ventas");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");
