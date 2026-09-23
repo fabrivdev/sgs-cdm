@@ -16,6 +16,14 @@ Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ven
 - En la tabla de Catálogo/Stock de Repuestos, Familia se conserva solo al descargar: no mostrar columna ni agregarla al título de Descripción. Las seis sucursales se muestran desde 768 px, no ocultarlas hasta 1024 px. Fabricante tiene columna desde 1024 px y título en Descripción; teléfonos mantienen cuatro campos principales y desglose en ficha/Excel. No borrar Familia ni existencias de la fuente, filtros o exportación.
 - En Detalle de Servicios, usar `Código` en lugar de `Concepto`: código de producto de la línea financiera para repuestos; código operativo documentado como MA01/KM01/SE para servicios. No fabricar códigos por categoría ni tomar el REP de otra línea de la OS. Conservar el componente en el título al pasar el cursor; códigos ausentes o ambiguos quedan `—`.
 
+## Conciliación de chasis en Ventas de Máquinas
+
+- Una factura positiva de un chasis que ya existe en Parque no se descarta silenciosamente cuando el propietario difiere, la máquina está inactiva o existe una NC anterior del mismo chasis. Genera una revisión administrativa; no mueve Parque ni Stock por sí sola.
+- La revisión distingue `Refacturación` de `Venta`. Refacturación conserva el propietario y el único registro del chasis. Venta reutiliza ese mismo registro, lo reactiva si estaba inactivo y registra reingreso o transferencia según corresponda. Nunca crear un segundo registro para resolver el caso.
+- Si el chasis había sido autorizado como parte de pago, confirmar la factura posterior conserva aquel movimiento en el historial, lo marca compensado y bloquea la reserva de la foto vieja de Stock mientras el chasis esté activo en Parque. La siguiente carga real de Stock confirma su salida; no alterar saldos importados para simularla.
+- Registrar en historial `REFACTURACION` y/o `REINGRESO` según la decisión humana. Relacionar la NC por chasis y conservar número de NC/factura original en los datos de la notificación, sin codificar documentos o clientes concretos en código ni documentación.
+- Implementación: `20260923120000_reconcile_machine_credit_notes_and_resales.sql`. Commit/push no aplica esta migración ni acredita producción; entregar siempre el SQL o una instrucción exacta para que Lovable lo despliegue.
+
 ## Orden y exportación compartidos
 
 Dashboard: la facturación conciliada se solicita por trimestres disjuntos, con hasta dos consultas simultáneas. Cada día pertenece a un solo lote; un fallo invalida la carga completa, sin mostrar ceros o importes parciales. Es una partición de lectura: no cambia fuente, filtros, clasificación, GRID, cantidades ni importes. La comprobación local no acredita el tiempo de producción.

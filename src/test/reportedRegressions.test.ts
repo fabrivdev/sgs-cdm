@@ -139,6 +139,27 @@ describe("reported production regressions", () => {
     expect(operations).toContain('row.estado_disponibilidad !== "EN_PARQUE"');
   });
 
+  it("reviews a credit note followed by a new invoice without duplicating the chassis", () => {
+    const sql = read("supabase/migrations/20260923120000_reconcile_machine_credit_notes_and_resales.sql");
+    const panel = read("src/components/NotificationsPanel.tsx");
+    const dialog = read("src/components/parque/MachineSaleNotificationDialog.tsx");
+    expect(sql).toContain("'venta_maquina_reingreso'");
+    expect(sql).toContain("'REFACTURACION_PROBABLE'");
+    expect(sql).toContain("'original_invoice_number'");
+    expect(sql).toContain("p_tipo_confirmacion text DEFAULT 'VENTA'");
+    expect(sql).toContain("p_tipo_confirmacion NOT IN ('VENTA', 'REFACTURACION')");
+    expect(sql).toContain("SET cliente_id = p_cliente_id");
+    expect(sql).toContain("activo = true");
+    expect(sql).toContain("'REINGRESO'");
+    expect(sql).toContain("'REFACTURACION'");
+    expect(sql).toContain("'movimiento_compensado', true");
+    expect(sql).toContain("'salida_pendiente_por_factura', true");
+    expect(sql).not.toContain("PERFORM public.confirmar_notificacion_alta_maquina");
+    expect(panel).toContain('notification?.tipo === "venta_maquina_reingreso"');
+    expect(dialog).toContain('confirm("REFACTURACION")');
+    expect(dialog).toContain("Confirmar venta");
+  });
+
   it("moves the stock export to one RPC and tunes report plans", () => {
     const sql = read("supabase/migrations/20260914123000_optimize_sales_and_parts_reports.sql");
     const hook = read("src/hooks/useRepuestos.ts");

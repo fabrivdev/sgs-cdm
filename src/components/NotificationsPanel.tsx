@@ -86,6 +86,9 @@ export function NotificationsPanel({ count }: { count: number }) {
   const totalItems = serviceItems.length + appItems.length;
   const unseenAppItems = appItems.filter((item) => !(item.visto_por ?? []).includes(user?.id ?? "")).length;
   const unseenItems = serviceItems.length + unseenAppItems;
+  const isMachineSaleAlert = (notification: AppNotification | null) =>
+    notification?.tipo === "venta_maquina_sin_parque"
+    || notification?.tipo === "venta_maquina_reingreso";
 
   return (
     <>
@@ -134,7 +137,11 @@ export function NotificationsPanel({ count }: { count: number }) {
                     </span>
                     {item.mensaje && <span className="mt-0.5 block line-clamp-2 text-[11px] text-muted-foreground">{item.mensaje}</span>}
                     <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-primary">
-                      {item.tipo === "stock_chasis_en_parque" ? "Stock · Autorizar ingreso" : "Parque · Revisar alta"}
+                      {item.tipo === "stock_chasis_en_parque"
+                        ? "Stock · Autorizar ingreso"
+                        : item.tipo === "venta_maquina_reingreso"
+                          ? "Parque · Revisar movimiento"
+                          : "Parque · Revisar alta"}
                     </span>
                   </span>
                 </button>
@@ -160,8 +167,8 @@ export function NotificationsPanel({ count }: { count: number }) {
         </PopoverContent>
       </Popover>
       <MachineSaleNotificationDialog
-        notification={selectedMachineAlert?.tipo === "venta_maquina_sin_parque" ? selectedMachineAlert : null}
-        open={machineDialogOpen && selectedMachineAlert?.tipo === "venta_maquina_sin_parque"}
+        notification={isMachineSaleAlert(selectedMachineAlert) ? selectedMachineAlert : null}
+        open={machineDialogOpen && isMachineSaleAlert(selectedMachineAlert)}
         onOpenChange={setMachineDialogOpen}
         onResolved={() => {
           setSelectedMachineAlert(null);

@@ -14,6 +14,17 @@ export type MachineSaleNotificationData = {
   producto_codigo?: string | null;
   producto?: string | null;
   origen_sistema?: string | null;
+  parque_maquina_id?: string | null;
+  parque_activa?: boolean | null;
+  cliente_actual_id?: string | null;
+  cliente_actual_nombre?: string | null;
+  nc_linea_id?: string | null;
+  nc_documento?: string | null;
+  nc_factura_original?: string | null;
+  nc_fecha?: string | null;
+  nc_cliente_id?: string | null;
+  nc_cliente_nombre?: string | null;
+  revision_sugerida?: "ALTA" | "REINGRESO" | "REFACTURACION_PROBABLE" | "TRANSFERENCIA" | null;
 };
 
 export type MachineStockReturnNotificationData = {

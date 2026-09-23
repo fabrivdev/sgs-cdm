@@ -6477,6 +6477,7 @@ export type Database = {
           p_subgrupo: Database["public"]["Enums"]["subgrupo_maquina"]
           p_subgrupo_personalizado?: string
           p_sucursal?: Database["public"]["Enums"]["sucursal"]
+          p_tipo_confirmacion?: string
           p_vendedor?: string
         }
         Returns: string

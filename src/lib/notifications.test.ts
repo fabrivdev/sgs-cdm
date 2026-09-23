@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { machineStockReturnNotificationData, type AppNotification } from "./notifications";
+import { machineSaleNotificationData, machineStockReturnNotificationData, type AppNotification } from "./notifications";
 
 const notification = (datos: AppNotification["datos"]): AppNotification => ({
   id: "notification-1",
@@ -29,5 +29,28 @@ describe("machine stock return notifications", () => {
 
   it("ignores malformed notification data", () => {
     expect(machineStockReturnNotificationData(notification([]))).toEqual({});
+  });
+});
+
+describe("machine resale notifications", () => {
+  it("preserves the prior Park and credit-note context", () => {
+    expect(machineSaleNotificationData({
+      ...notification({
+        chasis: "ABC123",
+        parque_activa: true,
+        cliente_actual_nombre: "CLIENTE EJEMPLO",
+        nc_documento: "0010010000001",
+        nc_factura_original: "0010010000002",
+        revision_sugerida: "REFACTURACION_PROBABLE",
+      }),
+      tipo: "venta_maquina_reingreso",
+    })).toMatchObject({
+      chasis: "ABC123",
+      parque_activa: true,
+      cliente_actual_nombre: "CLIENTE EJEMPLO",
+      nc_documento: "0010010000001",
+      nc_factura_original: "0010010000002",
+      revision_sugerida: "REFACTURACION_PROBABLE",
+    });
   });
 });

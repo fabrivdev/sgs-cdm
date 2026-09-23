@@ -77,6 +77,8 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
     () => (notification ? machineSaleNotificationData(notification) : {}),
     [notification],
   );
+  const isExistingChassis = notification?.tipo === "venta_maquina_reingreso";
+  const hasCreditNote = Boolean(data.nc_linea_id || data.nc_documento);
 
   useEffect(() => {
     if (!open || !notification) return;
@@ -94,7 +96,7 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
       serie: data.chasis ?? "",
       anio: "",
       sucursal: data.sucursal ?? "",
-      notas: `Alta sugerida desde la factura ${data.factura ?? "sin número"}`,
+      notas: `${isExistingChassis ? "Movimiento revisado" : "Alta sugerida"} desde la factura ${data.factura ?? "sin número"}`,
     });
 
     void (async () => {
@@ -119,13 +121,13 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
       setClientes(options);
       setForm((current) => ({ ...current, cliente_id: canonicalClientId(options, current.cliente_id) }));
     })();
-  }, [data, notification, open]);
+  }, [data, isExistingChassis, notification, open]);
 
   const selectedClient = clientes.find((client) => client.id === form.cliente_id)?.nombre
     ?? data.cliente_nombre
     ?? "";
 
-  const confirm = async () => {
+  const confirm = async (confirmationType: "VENTA" | "REFACTURACION" = "VENTA") => {
     if (!notification) return;
     if (!form.cliente_id) return toast.error("Seleccioná el cliente de la máquina");
     if (!form.serie.trim()) return toast.error("Verificá el chasis antes de confirmar");
@@ -143,12 +145,17 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
       p_anio: form.anio ? Number(form.anio) : null,
       p_sucursal: (form.sucursal || undefined) as Sucursal | undefined,
       p_localidad: form.localidad || null,
+      p_tipo_confirmacion: confirmationType,
       p_vendedor: form.vendedor || null,
       p_notas: form.notas || null,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Máquina incorporada al parque");
+    toast.success(confirmationType === "REFACTURACION"
+      ? "Refacturación confirmada sin duplicar la máquina"
+      : isExistingChassis
+        ? "Venta confirmada y Parque actualizado"
+        : "Máquina incorporada al parque");
     await queryClient.invalidateQueries({ queryKey: ["machine-catalog-review"] });
     onResolved();
     onOpenChange(false);
@@ -175,8 +182,9 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
             <Tractor className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-[14px] font-semibold">Confirmar alta al parque</h2>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">Revisá la precarga obtenida de la venta facturada.</p>
+            <h2 className="text-[14px] font-semibold">
+              {isExistingChassis ? "Revisar movimiento del chasis" : "Confirmar alta al parque"}
+            </h2>
           </div>
         </div>
       </ResponsiveDrawerHeader>
@@ -194,6 +202,25 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
               <span>Producto</span><span className="truncate text-right text-foreground">{data.producto ?? data.producto_codigo ?? "—"}</span>
             </div>
           </section>
+
+          {isExistingChassis && (
+            <section className="rounded-xl border bg-muted/20 p-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                <span>Estado actual</span>
+                <span className="text-right text-foreground">{data.parque_activa ? "Activo en Parque" : "Fuera de Parque"}</span>
+                <span>Propietario actual</span>
+                <span className="truncate text-right text-foreground">{data.cliente_actual_nombre ?? "—"}</span>
+                {hasCreditNote && (
+                  <>
+                    <span>NC anterior</span>
+                    <span className="text-right text-foreground">{data.nc_documento ?? "—"}</span>
+                    <span>Fecha NC</span>
+                    <span className="text-right text-foreground">{formatDate(data.nc_fecha)}</span>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
 
           <section className="grid gap-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Propietario</h3>
@@ -314,7 +341,14 @@ export function MachineSaleNotificationDialog({ notification, open, onOpenChange
         <Button variant="ghost" className="text-muted-foreground" onClick={discard} disabled={saving}>Descartar aviso</Button>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cerrar</Button>
-          <Button onClick={confirm} disabled={saving}>{saving ? "Guardando..." : "Confirmar alta"}</Button>
+          {isExistingChassis && hasCreditNote && (
+            <Button variant="outline" onClick={() => confirm("REFACTURACION")} disabled={saving}>
+              Confirmar refacturación
+            </Button>
+          )}
+          <Button onClick={() => confirm("VENTA")} disabled={saving}>
+            {saving ? "Guardando..." : isExistingChassis ? "Confirmar venta" : "Confirmar alta"}
+          </Button>
         </div>
       </ResponsiveDrawerFooter>
     </ResponsiveDrawer>
