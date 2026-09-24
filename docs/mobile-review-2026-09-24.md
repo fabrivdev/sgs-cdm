@@ -55,6 +55,14 @@ Tres pestañas: Ventas, Stock y Operaciones. Datos ficticios independientes, no 
 
 ## Criterios antes de extender a producción
 
+### Segunda etapa implementada
+
+Operaciones muestra en teléfonos Máquina + Facturación/Entrega + detalle. El selector sólo cambia la columna visible; conserva los cálculos canónicos, la ordenación del origen, todas las columnas de escritorio y el pedido completo al abrir. NP y valor permanecen en detalle y exportación. Verificación con componente real a 320 px: sin desborde, cambio de estado visible y una fila por unidad.
+
+Los períodos de Máquinas, Servicios y Repuestos comienzan plegados bajo 640 px mediante `useMobileDisclosure`. La elección manual persiste al cambiar tamaño; un error fuerza la apertura. Las exportaciones siguen registradas aunque el panel esté plegado: en Servicios la tabla permanece montada dentro de un contenedor oculto; Máquinas/Repuestos conservan su registro de exportación independiente. No cambia el rango seleccionado ni el total del período.
+
+Validación de esta etapa: 35 pruebas pasan en ejecución secuencial; una ejecución concurrente agotó el límite de 5 segundos en una prueba de Repuestos y se repitió sin concurrencia, sin alterar el test ni su timeout. Tipos y build correctos. La revisión de calendarios, Dashboard, formularios y vistas interiores permanece pendiente; no se declara cerrada la auditoría transversal.
+
 1. Aprobar la muestra y la prioridad de campos, no sólo el tamaño del buscador.
 2. Implementar variantes explícitas en componentes compartidos; no reglas CSS globales que alteren formularios o desktop.
 3. Cubrir cada ruta de la matriz, incluyendo estados vacío/cargando/error, filtros activos, selección, permisos, detalle, formularios y exportaciones.

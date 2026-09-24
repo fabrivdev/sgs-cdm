@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { MobileSalesTable } from "./MobileSalesTable";
 import { SalesViewSwitcher } from "./SalesViewSwitcher";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -165,7 +166,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
   selectedPeriod: string | null;
   onSelectPeriod: (period: string | null) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
   const isMobile = useIsMobile(1024);
   const total = Number(data?.resumen.total || 0);
   type Period = MaquinasResumen & { periodo: string };
@@ -177,11 +178,11 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     ...metricColumns<Period>(total).filter(c => ["notas_credito", "netas", "clientes", "facturas", "participacion"].includes(c.key)).map(c => ({ ...c, label: c.key === "notas_credito" ? "Notas de crédito" : c.key === "netas" ? "Unidades netas" : c.label })),
   ];
   const table = useSectionTable({ rows: data?.periodos ?? [], columns, title: "Períodos de Máquinas", fileName: "ventas-maquinas-periodos.xlsx",
-    initialSort: { key: "periodo", direction: "asc" }, disabled: loading || !!error || collapsed,
+    initialSort: { key: "periodo", direction: "asc" }, disabled: loading || !!error,
     footer: data ? { ...data.resumen, periodo: "" } : undefined });
   const grid = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_repeat(4,minmax(0,.75fr))_repeat(2,minmax(0,.7fr))_minmax(0,.8fr)]";
   return <Panel className="p-0 lg:p-3">
-    <button type="button" onClick={() => setCollapsed(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left lg:min-h-0 lg:px-0">
+    <button type="button" aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left lg:min-h-0 lg:px-0">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
       <div className="flex items-center gap-2">
         {selectedPeriod && <span role="button" tabIndex={0} onClick={event => { event.stopPropagation(); onSelectPeriod(null); }} className="rounded-full border bg-accent px-2.5 py-1 text-[10px] font-medium hover:bg-accent/70">Ver período completo ×</span>}

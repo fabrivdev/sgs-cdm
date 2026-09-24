@@ -1221,19 +1221,20 @@ export default function MaquinariaOperaciones() {
 }
 
 export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, confirmedBillingUnitIds, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; confirmedBillingUnitIds?: Set<string>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
+  const [mobileState, setMobileState] = useState("facturacion");
   const billing=(row:OrderRow)=>orderBillingState(row,entregaByUnitId?.get(row.id)?.estado,confirmedBillingUnitIds?.has(row.id));
   const delivery=(row:OrderRow)=>{const unit=entregaByUnitId?.get(row.id);return entregaStateFromUnit(unit?.estado,unit?.chasis,row.marca,estadoByOperacionId?.get(row.operacion_id),stockChasisSet,row.es_historico);};
   const schema: {key:string;label:string;width:string;hiddenBelow?:"md"|"lg"}[]=[
-    {key:"np",label:"NP",width:"w-[20%] md:w-[9%] lg:w-[8%]"},
+    {key:"np",label:"NP",width:"md:w-[9%] lg:w-[8%]",hiddenBelow:"md"},
     {key:"fecha",label:"Fecha",width:"lg:w-[8%]",hiddenBelow:"lg"},
     {key:"cliente",label:"Cliente",width:"md:w-[18%] lg:w-[16%]",hiddenBelow:"md"},
-    {key:"modelo",label:"Máquina",width:"w-[30%] md:w-[22%] lg:w-[17%]"},
+    {key:"modelo",label:"Máquina",width:"w-[48%] md:w-[22%] lg:w-[17%]"},
     {key:"marca",label:"Marca",width:"md:w-[8%] lg:w-[7%]",hiddenBelow:"md"},
     {key:"condicion",label:"Condición",width:"lg:w-[6%]",hiddenBelow:"lg"},
     {key:"origen",label:"Origen",width:"lg:w-[7%]",hiddenBelow:"lg"},
-    {key:"facturacion",label:"Facturación",width:"md:w-[13%] lg:w-[8%]",hiddenBelow:"md"},
-    {key:"entrega",label:"Entrega",width:"md:w-[12%] lg:w-[8%]",hiddenBelow:"md"},
-    {key:"valor",label:"Valor",width:"w-[40%] md:w-[14%] lg:w-[12%]"},
+    {key:"facturacion",label:"Facturación",width:"w-[38%] md:w-[13%] lg:w-[8%]",hiddenBelow:mobileState === "facturacion" ? undefined : "md"},
+    {key:"entrega",label:"Entrega",width:"w-[38%] md:w-[12%] lg:w-[8%]",hiddenBelow:mobileState === "entrega" ? undefined : "md"},
+    {key:"valor",label:"Valor",width:"md:w-[14%] lg:w-[12%]",hiddenBelow:"md"},
   ];
   const value=(key:string,row:OrderRow)=>{
     if(key==="np")return formatNpCode(row.np_numero);
@@ -1253,8 +1254,9 @@ export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, co
     const style=column.key==="marca"?brandClass(r.marca):column.key==="condicion"?conditionClass(r.condicion):column.key==="origen"?supplyClass(r.abastecimiento):column.key==="facturacion"?simpleStateClass(billing(r)):column.key==="entrega"&&deliveryState?entregaClass(deliveryState):"";
     return ["marca","condicion","origen","facturacion","entrega"].includes(column.key)&&text!=="—"?<Badge variant="outline" style={column.key==="marca"?machineBrandStyle(r.marca):undefined} className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",style)}>{text}</Badge>:text;
   }}));
-  return <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Operaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
-    actions={{width:"w-[10%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-7 w-7 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} />;
+  return <><div className="flex items-center justify-between gap-2 px-2 py-1 md:hidden"><span className="text-[12px] font-medium">Líneas de pedido</span><select aria-label="Estado visible" value={mobileState} onChange={event=>setMobileState(event.target.value)} className="h-11 min-w-0 rounded-md border bg-background px-2 text-base"><option value="facturacion">Facturación</option><option value="entrega">Entrega</option></select></div>
+    <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Operaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
+    actions={{width:"w-[14%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-11 w-11 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring md:h-7 md:w-7" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} /></>;
 }
 
 export function ImportsTable({ rows, heading, sort, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: ImportRow) => void }) {

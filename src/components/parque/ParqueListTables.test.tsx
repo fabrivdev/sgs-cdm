@@ -49,6 +49,9 @@ describe("Parque and imports compact lists",()=>{
     const select=vi.fn();setup(<OrdersTable rows={[row]} heading={key=>key} onSelect={select} entregaByUnitId={new Map([[row.id,{estado:"FACTURADA",chasis:machine.serie}]])} estadoByOperacionId={new Map([[row.operacion_id,"FACTURADA"]])} stockChasisSet={new Set([machine.serie])}/>);
     const table=screen.getByRole("table",{name:"Operaciones de máquinas"});const cells=within(within(table).getAllByRole("row")[1]).getAllByRole("cell");
     expect(cells[7]).toHaveTextContent("Pendiente");expect(cells[8]).toHaveTextContent("En stock");expect(cells[9]).toHaveClass("text-right");expect(cells[9]).toHaveTextContent("$ 111.234,56");expect(cells[9]).not.toHaveTextContent("USD");
+    expect(cells[7]).not.toHaveClass("hidden");expect(cells[8]).toHaveClass("hidden");
+    fireEvent.change(screen.getByLabelText("Estado visible"),{target:{value:"entrega"}});
+    expect(cells[7]).toHaveClass("hidden");expect(cells[8]).not.toHaveClass("hidden");
     fireEvent.click(screen.getByRole("button",{name:"Ver NP NP0101"}));expect(select).toHaveBeenCalledExactlyOnceWith(row);expect(table.querySelectorAll("td br,td .flex-col")).toHaveLength(0);
   });
   it("stock keeps centered fractions, full hover and duplicate warnings",async()=>{

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
 import { useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { MobileSalesTable } from "./MobileSalesTable";
 import { SalesViewSwitcher } from "./SalesViewSwitcher";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -138,7 +139,7 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
   data?: PartsOverview; loading: boolean; error: Error | null; retry: () => void; mode: PeriodMode;
   selected: string | null; onSelect: (value: string | null) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
   const isMobile = useIsMobile(1024);
   const columns: SalesColumn<PartsPeriod>[] = [
     { key: "periodo", label: "Período", kind: "text", value: r => r.periodo, exportValue: r => r.periodo || "Total del período" },
@@ -148,7 +149,7 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
     participation(data?.resumen.facturado ?? 0),
   ];
   const table = useSectionTable({ rows: data?.periodos ?? [], columns, title: "Períodos de Repuestos", fileName: "ventas-repuestos-periodos.xlsx", initialSort: { key: "periodo", direction: "asc" },
-    disabled: loading || !!error || collapsed, footer: data ? { ...data.resumen, periodo: "", desde: "", hasta: "", anterior: data.comparacion.facturado, anterior_lineas: data.comparacion.lineas, anio_anterior: data.comparacion_ly.facturado, anio_anterior_lineas: data.comparacion_ly.lineas } : undefined });
+    disabled: loading || !!error, footer: data ? { ...data.resumen, periodo: "", desde: "", hasta: "", anterior: data.comparacion.facturado, anterior_lineas: data.comparacion.lineas, anio_anterior: data.comparacion_ly.facturado, anio_anterior_lineas: data.comparacion_ly.lineas } : undefined });
   return <Panel className="p-0 lg:p-3">
     <div className="flex min-h-11 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
       <button type="button" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed} className="flex flex-1 items-center justify-between text-left text-[13px] font-semibold">Evolución de la facturación{collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
