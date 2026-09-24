@@ -50,4 +50,11 @@ describe("remaining authenticated RLS hardening", () => {
     expect(migration).toContain("regexp_replace(coalesce(qual, '')");
     expect(migration).toContain("regexp_replace(coalesce(with_check, '')");
   });
+
+  it("skips optional tables that do not exist instead of rolling back the transaction", () => {
+    expect(migration).toContain("IF to_regclass('public.app_configuracion') IS NOT NULL THEN");
+    expect(migration).toContain("IF to_regclass('public.profiles') IS NOT NULL THEN");
+    expect(migration).toContain("IF to_regclass('public.parque_factura_os_cliente') IS NOT NULL THEN");
+    expect(migration).toContain("information_schema.columns");
+  });
 });

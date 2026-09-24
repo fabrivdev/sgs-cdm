@@ -1,32 +1,66 @@
--- Cierra las policies que el escaner de seguridad interpreta como acceso
--- irrestricto para cualquier sesion autenticada. La aplicacion conserva sus
--- lecturas mediante permisos reales de modulo/seccion y no por USING (true).
+-- Cierra policies incondicionales sin asumir que todas las tablas opcionales
+-- existen en la instalación. Cada regla se aplica solamente si su tabla está
+-- presente; así una base con migraciones parciales no revierte todo el bloque.
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.is_active_app_user(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-  SELECT _user_id IS NOT NULL
-    AND EXISTS (
+DO $bootstrap$
+BEGIN
+  IF to_regclass('public.profiles') IS NOT NULL THEN
+    IF EXISTS (
       SELECT 1
-      FROM public.profiles p
-      WHERE p.activo = true
-        AND (p.id = _user_id OR p.auth_user_id = _user_id)
-    );
-$$;
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'profiles'
+        AND column_name = 'auth_user_id'
+    ) THEN
+      EXECUTE $function$
+        CREATE OR REPLACE FUNCTION public.is_active_app_user(_user_id uuid)
+        RETURNS boolean
+        LANGUAGE sql
+        STABLE
+        SECURITY DEFINER
+        SET search_path = public, pg_temp
+        AS $body$
+          SELECT _user_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM public.profiles p
+              WHERE p.activo = true
+                AND (p.id = _user_id OR p.auth_user_id = _user_id)
+            );
+        $body$
+      $function$;
+    ELSE
+      EXECUTE $function$
+        CREATE OR REPLACE FUNCTION public.is_active_app_user(_user_id uuid)
+        RETURNS boolean
+        LANGUAGE sql
+        STABLE
+        SECURITY DEFINER
+        SET search_path = public, pg_temp
+        AS $body$
+          SELECT _user_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM public.profiles p
+              WHERE p.activo = true
+                AND p.id = _user_id
+            );
+        $body$
+      $function$;
+    END IF;
 
-REVOKE ALL ON FUNCTION public.is_active_app_user(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.is_active_app_user(uuid) TO authenticated;
+    EXECUTE 'REVOKE ALL ON FUNCTION public.is_active_app_user(uuid) FROM PUBLIC, anon';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.is_active_app_user(uuid) TO authenticated';
+  END IF;
+END;
+$bootstrap$;
 
 -- Algunas instalaciones productivas conservaron policies creadas desde la
--- consola con otros nombres. Se eliminan solamente las condiciones literalmente
--- incondicionales de las tablas auditadas; luego se recrean las reglas canónicas.
-DO $$
+-- consola con otros nombres. Se eliminan únicamente condiciones literalmente
+-- incondicionales de las tablas auditadas que realmente existen.
+DO $cleanup$
 DECLARE
   policy_row record;
 BEGIN
@@ -59,108 +93,180 @@ BEGIN
     );
   END LOOP;
 END;
-$$;
+$cleanup$;
 
-DROP POLICY IF EXISTS "Authenticated users read app settings" ON public.app_configuracion;
-CREATE POLICY "Authenticated users read app settings"
-ON public.app_configuracion
-FOR SELECT TO authenticated
-USING (
-  (
-    clave = 'meta_horas_mensual_tecnico'
-    AND public.has_section_access(auth.uid(), 'servicios.dashboard')
-  )
-  OR public.has_section_access(auth.uid(), 'admin.parametros')
-);
+DO $policies$
+BEGIN
+  IF to_regclass('public.app_configuracion') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Authenticated users read app settings" ON public.app_configuracion';
+    EXECUTE $policy$
+      CREATE POLICY "Authenticated users read app settings"
+      ON public.app_configuracion
+      FOR SELECT TO authenticated
+      USING (
+        (
+          clave = 'meta_horas_mensual_tecnico'
+          AND public.has_section_access(auth.uid(), 'servicios.dashboard')
+        )
+        OR public.has_section_access(auth.uid(), 'admin.parametros')
+      )
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Authenticated read app sections" ON public.app_secciones;
-CREATE POLICY "Authenticated read app sections"
-ON public.app_secciones
-FOR SELECT TO authenticated
-USING (public.has_module_access(auth.uid(), 'admin'));
+  IF to_regclass('public.app_secciones') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Authenticated read app sections" ON public.app_secciones';
+    EXECUTE $policy$
+      CREATE POLICY "Authenticated read app sections"
+      ON public.app_secciones
+      FOR SELECT TO authenticated
+      USING (public.has_module_access(auth.uid(), 'admin'))
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Dias no laborales select authenticated" ON public.dias_no_laborales;
-CREATE POLICY "Dias no laborales select authenticated"
-ON public.dias_no_laborales
-FOR SELECT TO authenticated
-USING (public.has_section_access(auth.uid(), 'servicios.calendario'));
+  IF to_regclass('public.dias_no_laborales') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Dias no laborales select authenticated" ON public.dias_no_laborales';
+    EXECUTE $policy$
+      CREATE POLICY "Dias no laborales select authenticated"
+      ON public.dias_no_laborales
+      FOR SELECT TO authenticated
+      USING (public.has_section_access(auth.uid(), 'servicios.calendario'))
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Catalogo marcas select authenticated" ON public.maquinaria_marcas_catalogo;
-CREATE POLICY "Catalogo marcas select authenticated"
-ON public.maquinaria_marcas_catalogo
-FOR SELECT TO authenticated
-USING (public.has_module_access(auth.uid(), 'parque'));
+  IF to_regclass('public.maquinaria_marcas_catalogo') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Catalogo marcas select authenticated" ON public.maquinaria_marcas_catalogo';
+    EXECUTE $policy$
+      CREATE POLICY "Catalogo marcas select authenticated"
+      ON public.maquinaria_marcas_catalogo
+      FOR SELECT TO authenticated
+      USING (public.has_module_access(auth.uid(), 'parque'))
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Authenticated read modulos" ON public.modulos;
-CREATE POLICY "Authenticated read modulos"
-ON public.modulos
-FOR SELECT TO authenticated
-USING (public.has_module_access(auth.uid(), 'admin'));
+  IF to_regclass('public.modulos') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Authenticated read modulos" ON public.modulos';
+    EXECUTE $policy$
+      CREATE POLICY "Authenticated read modulos"
+      ON public.modulos
+      FOR SELECT TO authenticated
+      USING (public.has_module_access(auth.uid(), 'admin'))
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Ordenes servicio select" ON public.ordenes_servicio_importadas;
-CREATE POLICY "Ordenes servicio select"
-ON public.ordenes_servicio_importadas
-FOR SELECT TO authenticated
-USING (
-  public.has_module_access(auth.uid(), 'servicios')
-  OR public.has_section_access(auth.uid(), 'admin.importaciones')
-);
+  IF to_regclass('public.ordenes_servicio_importadas') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Ordenes servicio select" ON public.ordenes_servicio_importadas';
+    EXECUTE $policy$
+      CREATE POLICY "Ordenes servicio select"
+      ON public.ordenes_servicio_importadas
+      FOR SELECT TO authenticated
+      USING (
+        public.has_module_access(auth.uid(), 'servicios')
+        OR public.has_section_access(auth.uid(), 'admin.importaciones')
+      )
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Catalogo alias select authenticated" ON public.parque_modelos_alias;
-CREATE POLICY "Catalogo alias select authenticated"
-ON public.parque_modelos_alias
-FOR SELECT TO authenticated
-USING (public.has_module_access(auth.uid(), 'parque'));
+  IF to_regclass('public.parque_modelos_alias') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Catalogo alias select authenticated" ON public.parque_modelos_alias';
+    EXECUTE $policy$
+      CREATE POLICY "Catalogo alias select authenticated"
+      ON public.parque_modelos_alias
+      FOR SELECT TO authenticated
+      USING (public.has_module_access(auth.uid(), 'parque'))
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Catalogo modelos select authenticated" ON public.parque_modelos_catalogo;
-CREATE POLICY "Catalogo modelos select authenticated"
-ON public.parque_modelos_catalogo
-FOR SELECT TO authenticated
-USING (public.has_module_access(auth.uid(), 'parque'));
+  IF to_regclass('public.parque_modelos_catalogo') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Catalogo modelos select authenticated" ON public.parque_modelos_catalogo';
+    EXECUTE $policy$
+      CREATE POLICY "Catalogo modelos select authenticated"
+      ON public.parque_modelos_catalogo
+      FOR SELECT TO authenticated
+      USING (public.has_module_access(auth.uid(), 'parque'))
+    $policy$;
+  END IF;
 
-DROP POLICY IF EXISTS "Authenticated can view profiles" ON public.profiles;
-DROP POLICY IF EXISTS profiles_read_authenticated ON public.profiles;
-CREATE POLICY "Authenticated can view profiles"
-ON public.profiles
-FOR SELECT TO authenticated
-USING (
-  public.is_active_app_user(auth.uid())
-  AND (
-    id = auth.uid()
-    OR auth_user_id = auth.uid()
-    OR public.has_module_access(auth.uid(), 'servicios')
-    OR public.has_module_access(auth.uid(), 'parque')
-    OR public.has_module_access(auth.uid(), 'repuestos')
-    OR public.has_module_access(auth.uid(), 'admin')
-  )
-);
+  IF to_regclass('public.profiles') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Authenticated can view profiles" ON public.profiles';
+    EXECUTE 'DROP POLICY IF EXISTS profiles_read_authenticated ON public.profiles';
 
-DROP POLICY IF EXISTS "Historial insert" ON public.trabajo_historial;
-CREATE POLICY "Historial insert"
-ON public.trabajo_historial
-FOR INSERT TO authenticated
-WITH CHECK (
-  (
-    public.has_module_access(auth.uid(), 'servicios')
-    AND EXISTS (
+    IF EXISTS (
       SELECT 1
-      FROM public.trabajos t
-      WHERE t.id = trabajo_historial.trabajo_id
-    )
-  )
-  OR public.has_section_access(auth.uid(), 'admin.importaciones')
-);
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'profiles'
+        AND column_name = 'auth_user_id'
+    ) THEN
+      EXECUTE $policy$
+        CREATE POLICY "Authenticated can view profiles"
+        ON public.profiles
+        FOR SELECT TO authenticated
+        USING (
+          public.is_active_app_user(auth.uid())
+          AND (
+            id = auth.uid()
+            OR auth_user_id = auth.uid()
+            OR public.has_module_access(auth.uid(), 'servicios')
+            OR public.has_module_access(auth.uid(), 'parque')
+            OR public.has_module_access(auth.uid(), 'repuestos')
+            OR public.has_module_access(auth.uid(), 'admin')
+          )
+        )
+      $policy$;
+    ELSE
+      EXECUTE $policy$
+        CREATE POLICY "Authenticated can view profiles"
+        ON public.profiles
+        FOR SELECT TO authenticated
+        USING (
+          public.is_active_app_user(auth.uid())
+          AND (
+            id = auth.uid()
+            OR public.has_module_access(auth.uid(), 'servicios')
+            OR public.has_module_access(auth.uid(), 'parque')
+            OR public.has_module_access(auth.uid(), 'repuestos')
+            OR public.has_module_access(auth.uid(), 'admin')
+          )
+        )
+      $policy$;
+    END IF;
+  END IF;
 
--- Esta tabla ya estaba limitada al modulo Parque, pero el predicado redundante
--- auth.uid() IS NOT NULL tambien es marcado como acceso amplio por el escaner.
-DROP POLICY IF EXISTS parque_factura_os_cliente_select ON public.parque_factura_os_cliente;
-CREATE POLICY parque_factura_os_cliente_select
-ON public.parque_factura_os_cliente
-FOR SELECT TO authenticated
-USING (
-  public.has_module_access(auth.uid(), 'parque')
-  OR public.has_role(auth.uid(), 'admin'::public.app_role)
-  OR public.has_role(auth.uid(), 'superadmin'::public.app_role)
-);
+  IF to_regclass('public.trabajo_historial') IS NOT NULL
+     AND to_regclass('public.trabajos') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "Historial insert" ON public.trabajo_historial';
+    EXECUTE $policy$
+      CREATE POLICY "Historial insert"
+      ON public.trabajo_historial
+      FOR INSERT TO authenticated
+      WITH CHECK (
+        (
+          public.has_module_access(auth.uid(), 'servicios')
+          AND EXISTS (
+            SELECT 1
+            FROM public.trabajos t
+            WHERE t.id = trabajo_historial.trabajo_id
+          )
+        )
+        OR public.has_section_access(auth.uid(), 'admin.importaciones')
+      )
+    $policy$;
+  END IF;
+
+  IF to_regclass('public.parque_factura_os_cliente') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS parque_factura_os_cliente_select ON public.parque_factura_os_cliente';
+    EXECUTE $policy$
+      CREATE POLICY parque_factura_os_cliente_select
+      ON public.parque_factura_os_cliente
+      FOR SELECT TO authenticated
+      USING (
+        public.has_module_access(auth.uid(), 'parque')
+        OR public.has_role(auth.uid(), 'admin'::public.app_role)
+        OR public.has_role(auth.uid(), 'superadmin'::public.app_role)
+      )
+    $policy$;
+  END IF;
+END;
+$policies$;
 
 COMMIT;
