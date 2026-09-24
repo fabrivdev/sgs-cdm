@@ -94,16 +94,16 @@ export function NotificationsPanel({ count }: { count: number }) {
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative" aria-label="Notificaciones">
-            <Bell className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="relative h-[44px] w-[44px] md:h-9 md:w-9 [&_svg]:size-[20px] md:[&_svg]:size-4" aria-label="Notificaciones">
+            <Bell aria-hidden="true" />
             {count > 0 && (
-              <Badge className="absolute -right-1 -top-1 h-5 min-w-5 rounded-full px-1 text-[10px] tabular-nums">
+              <Badge className="absolute right-0 top-0 h-4 min-w-4 rounded-full px-1 text-[10px] tabular-nums md:-right-1 md:-top-1 md:h-5 md:min-w-5">
                 {count > 99 ? "99+" : count}
               </Badge>
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-[360px] p-2">
+        <PopoverContent align="end" collisionPadding={8} className="w-[min(360px,calc(100vw-2rem))] p-2">
           <div className="flex items-center justify-between px-2 py-1.5">
             <span className="text-[13px] font-semibold">Notificaciones</span>
             {totalItems > 0 && (

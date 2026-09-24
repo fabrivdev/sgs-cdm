@@ -126,3 +126,34 @@ Services and Machines were also inspected at 320 px. Machines Resumen, Detalle, 
 - Production build checked separately. Existing large-chunk warnings are not removed by this presentation change.
 - Console inspection found development-only HMR errors during the context-module move. A full reload restored the final components; the screenshots and production build above use the corrected imports.
 - No SQL, migrations, financial formula changes, production writes, or external data checks. Export payloads and permissions were tested; this pass did not re-download every workbook in a browser. Virtual keyboards, real touch hardware and every report's extreme-value combination remain outside this verification.
+
+---
+
+# Design QA — Shared mobile header
+
+Date: 2026-09-24. Scope: the real `AppLayout` header and notification popover, not a new redesign of page contents. User approved grouping the original logo with SIG CDM, removing the visible menu label and balancing the right-side actions.
+
+## Reference comparison
+
+Reference: selected option 2 above (`exec-3bcab9cd-1588-4d43-8402-9b211fc89f2a.png`, 853 × 1843). Final implementation: `C:/Users/Usuario/Documents/Codex/2026-09-08/ad/mobile-design-review-2026-09-24/19-encabezado-390-final.png`. Both were viewed together in one comparison input. State: Machines / Períodos, January–September synthetic fixture, three KPIs, nine month rows and total. Requested browser viewport: 390 × 844 CSS px; Chrome returned a scaled 375 × 811 bitmap. The comparison is structural, not a pixel-diff claim.
+
+Unlike the earlier Sales pilot, this ignored local harness renders the real `AppLayout`, original logo, real notification popover and real menu controls. Auth and financial responses are synthetic; no production session or commercial rows were used. Local URL: `http://127.0.0.1:5177/mobile-review.local/header.html`. Chrome was used after the in-app browser attachment limitation encountered during this design review.
+
+Passed: compact 56 px white header, 28 px logo and adjacent 15 px brand text, icon-only menu, aligned bell and 32 px avatar, subtle separator. Original Inter, logo and Lucide icons retained. All three mobile controls have 44 × 44 px targets. Explicit pixel dimensions prevent the application's existing root-font change at 640 px from shrinking touch targets before the 768 px desktop breakpoint.
+
+## Responsive and interaction checks
+
+Evidence directory: the same `mobile-design-review-2026-09-24` folder outside Git.
+
+- `19-encabezado-390-final.png`: final real header with Machines.
+- `15-encabezado-notificaciones-320-final.png`: Services and open empty-state notification panel; 288 px panel with 8 px left collision margin, within the 305 px document client width (scrollbar excluded).
+- `16-encabezado-767-final.png`: header crop at the upper mobile boundary; measured height 56 px, logo 28 px, all three targets 44 px.
+- `17-encabezado-tablet-768.png` and `18-encabezado-escritorio-1280.png`: desktop header, existing profile text and existing 3rem height (42 px with this app's 14 px desktop root). Mobile branding/menu hidden at desktop breakpoint.
+- Document scrollWidth equaled clientWidth at tested widths. Navigation from Machines to Services through the actual mobile drawer was verified. Account menu opened with Enter, displayed its original actions and closed with Escape. Notifications opened/closed and fitted the narrow viewport. Eight integration tests also cover four routes, restricted sections, Administration visibility and the sign-out callback.
+- Browser screenshot API produced some intermediate cropped/timed-out captures; these are not full-screen evidence. The 767 px capture is intentionally accepted only as header evidence. Final phone captures above were inspected visually. No error/warning entries were returned by the browser console check.
+
+## Checks and limits
+
+19 tests passed across `AppLayout.test.tsx`, `VentasMobile.test.tsx`, `MobileSalesTable.test.tsx`. Changed-file ESLint passed. Type check passed with `--lib ES2021,DOM,DOM.Iterable` (the existing default ES2020 `replaceAll` limitation remains outside this change). Final production build passed with existing large-chunk warnings. No SQL, auth changes, financial logic changes, production verification or physical-device certification. Header QA applies across the shared layout; it does not certify every page's mobile content. No high-severity header mismatch remained in these local checks.
+
+final result: passed

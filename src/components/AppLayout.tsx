@@ -279,36 +279,36 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
 
       <SidebarInset className="min-h-screen min-w-0 overflow-x-hidden bg-background">
         {/* Top header */}
-        <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border/70 bg-card/95 px-3 sm:px-4">
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-40 flex h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-card px-3 md:h-12 md:px-4">
+          <div className="flex min-w-0 items-center gap-1 md:gap-2">
             <Button
               type="button"
               variant="ghost"
-              size="sm"
-              className="h-9 gap-1.5 px-2 md:hidden"
+              size="icon"
+              className="h-[44px] w-[44px] shrink-0 md:hidden [&_svg]:size-[20px]"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Abrir menú de módulos"
+              aria-expanded={mobileMenuOpen}
+              aria-haspopup="dialog"
             >
-              <Menu className="h-5 w-5" />
-              <span className="text-[12px] font-semibold">Menú</span>
+              <Menu aria-hidden="true" />
             </Button>
-            <AppLogo className="h-8 w-8 rounded-md md:hidden" />
-            <div className="hidden sm:block md:hidden">
-              <div className="text-[13px] font-bold leading-tight">{APP_SHORT_NAME}</div>
-              <div className="text-[10px] text-muted-foreground">{APP_NAME}</div>
+            <div className="flex shrink-0 items-center gap-2 md:hidden">
+              <AppLogo className="h-[28px] w-[28px]" />
+              <span className="whitespace-nowrap text-[15px] font-semibold tracking-tight">{APP_SHORT_NAME} <span className="text-primary">CDM</span></span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-0 md:gap-2">
             <NotificationsPanel count={unseen} />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-9 gap-2 px-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                <Button variant="ghost" className="h-[44px] w-[44px] gap-2 p-0 md:h-9 md:w-auto md:px-2" aria-label="Abrir menú de cuenta">
+                  <div className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-semibold text-primary-foreground md:h-7 md:w-7 md:text-[11px]">
                     {initials}
                   </div>
-                  <div className="hidden sm:flex flex-col items-start text-left leading-tight">
+                  <div className="hidden flex-col items-start text-left leading-tight md:flex">
                     <span className="text-[12px] font-medium">{profile?.nombre ?? "—"}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {nivelActual}
