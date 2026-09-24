@@ -57,6 +57,55 @@ BEGIN
 END;
 $bootstrap$;
 
+-- Clientes y Trabajos ya tienen policies funcionales más específicas en el
+-- historial de migraciones. Antes de quitar aliases abiertos creados desde la
+-- consola, se comprueba que cada operación conserve al menos una policy
+-- permisiva con alcance real; si falta, la transacción se revierte sin cortar
+-- el uso de la aplicación.
+DO $preflight$
+DECLARE
+  required_cmd text;
+BEGIN
+  IF to_regclass('public.clientes') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1
+       FROM pg_policies
+       WHERE schemaname = 'public'
+         AND tablename = 'clientes'
+         AND cmd = 'SELECT'
+         AND permissive = 'PERMISSIVE'
+         AND 'authenticated' = ANY (roles)
+         AND lower(regexp_replace(coalesce(qual, ''), '[[:space:]]', '', 'g'))
+           NOT IN ('', 'true', '(true)', 'auth.uid()isnotnull', '(auth.uid()isnotnull)')
+     ) THEN
+    RAISE EXCEPTION 'No se quitó clientes_read_authenticated: falta una policy SELECT restringida para authenticated';
+  END IF;
+
+  IF to_regclass('public.trabajos') IS NOT NULL THEN
+    FOREACH required_cmd IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']
+    LOOP
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'trabajos'
+          AND cmd = required_cmd
+          AND permissive = 'PERMISSIVE'
+          AND 'authenticated' = ANY (roles)
+          AND lower(regexp_replace(
+                coalesce(CASE WHEN required_cmd = 'INSERT' THEN with_check ELSE qual END, ''),
+                '[[:space:]]',
+                '',
+                'g'
+              )) NOT IN ('', 'true', '(true)', 'auth.uid()isnotnull', '(auth.uid()isnotnull)')
+      ) THEN
+        RAISE EXCEPTION 'No se quitaron aliases abiertos de trabajos: falta una policy % restringida para authenticated', required_cmd;
+      END IF;
+    END LOOP;
+  END IF;
+END;
+$preflight$;
+
 -- Algunas instalaciones productivas conservaron policies creadas desde la
 -- consola con otros nombres. Se eliminan únicamente condiciones literalmente
 -- incondicionales de las tablas auditadas que realmente existen.
@@ -71,6 +120,7 @@ BEGIN
       AND tablename = ANY (ARRAY[
         'app_configuracion',
         'app_secciones',
+        'clientes',
         'dias_no_laborales',
         'maquinaria_marcas_catalogo',
         'modulos',
@@ -78,7 +128,8 @@ BEGIN
         'parque_modelos_alias',
         'parque_modelos_catalogo',
         'profiles',
-        'trabajo_historial'
+        'trabajo_historial',
+        'trabajos'
       ])
       AND (
         lower(regexp_replace(coalesce(qual, ''), '[[:space:]]', '', 'g')) IN ('true', '(true)')

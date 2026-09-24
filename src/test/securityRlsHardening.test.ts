@@ -49,6 +49,16 @@ describe("remaining authenticated RLS hardening", () => {
     expect(migration).toContain("DROP POLICY IF EXISTS profiles_read_authenticated");
     expect(migration).toContain("regexp_replace(coalesce(qual, '')");
     expect(migration).toContain("regexp_replace(coalesce(with_check, '')");
+    expect(migration).toContain("'clientes'");
+    expect(migration).toContain("'trabajos'");
+  });
+
+  it("keeps scoped Clientes and Trabajos policies before dropping their open aliases", () => {
+    expect(migration).toContain("DO $preflight$");
+    expect(migration).toContain("tablename = 'clientes'");
+    expect(migration).toContain("tablename = 'trabajos'");
+    expect(migration).toContain("ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']");
+    expect(migration).toContain("falta una policy % restringida para authenticated");
   });
 
   it("skips optional tables that do not exist instead of rolling back the transaction", () => {
