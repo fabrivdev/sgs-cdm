@@ -5,6 +5,10 @@ const migration = readFileSync(
   "supabase/migrations/20260924130000_harden_remaining_authenticated_rls.sql",
   "utf8",
 );
+const trabajosFollowup = readFileSync(
+  "supabase/migrations/20260924143000_restore_scoped_trabajos_rls.sql",
+  "utf8",
+);
 
 describe("remaining authenticated RLS hardening", () => {
   it("replaces every scanner finding with an explicit business permission", () => {
@@ -54,6 +58,14 @@ describe("remaining authenticated RLS hardening", () => {
   });
 
   it("keeps scoped Clientes and Trabajos policies before dropping their open aliases", () => {
+    expect(trabajosFollowup).toContain("DO $trabajos_policies$");
+    expect(trabajosFollowup).toContain("CREATE POLICY trabajos_select_scoped");
+    expect(trabajosFollowup).toContain("CREATE POLICY trabajos_insert_scoped");
+    expect(trabajosFollowup).toContain("CREATE POLICY trabajos_update_scoped");
+    expect(trabajosFollowup).toContain("CREATE POLICY trabajos_delete_scoped");
+    expect(trabajosFollowup).toContain("public.has_module_access(auth.uid(), 'servicios')");
+    expect(trabajosFollowup).not.toMatch(/USING\s*\(\s*true\s*\)/i);
+    expect(trabajosFollowup).not.toMatch(/WITH\s+CHECK\s*\(\s*true\s*\)/i);
     expect(migration).toContain("DO $preflight$");
     expect(migration).toContain("tablename = 'clientes'");
     expect(migration).toContain("tablename = 'trabajos'");
