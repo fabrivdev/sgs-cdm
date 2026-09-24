@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { Children, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { cardLabel, kpiValue, metaText, sectionTitle } from "@/lib/ui-classes";
 
@@ -19,7 +21,19 @@ export function PageHeader({ title, actions, tabs, meta, className }: { title: R
 }
 
 
-export function KpiStrip({ children, className }: { children: ReactNode; className?: string }) {
+export function KpiStrip({ children, className, mobilePrimary }: { children: ReactNode; className?: string; mobilePrimary?: readonly number[] }) {
+  const mobile = useIsMobile(640);
+  const items = Children.toArray(children);
+  if (mobile && mobilePrimary?.length && items.length > mobilePrimary.length) {
+    const primary = new Set(mobilePrimary);
+    return <section aria-label="Indicadores" className="min-w-0">
+      <div className="grid grid-cols-2 border-y bg-card [&>div]:px-1 [&>div]:py-2.5">{items.filter((_, index) => primary.has(index))}</div>
+      <details className="group min-w-0">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-[11px] text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">Más indicadores<ChevronDown className="h-3.5 w-3.5 group-open:rotate-180" /></summary>
+        <div className="grid grid-cols-2 border-b bg-card [&>div]:px-1">{items.filter((_, index) => !primary.has(index))}</div>
+      </details>
+    </section>;
+  }
   return <section className={cn("grid grid-cols-2 min-h-[64px] overflow-hidden rounded-xl border bg-card max-sm:[&>*]:border-b max-sm:[&>*:nth-child(odd)]:border-r max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr sm:divide-x", className)}>{children}</section>;
 }
 

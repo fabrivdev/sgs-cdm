@@ -260,7 +260,7 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, se
   const metrics = overview.data?.resumen;
   const available = metrics && !overview.error;
   return <>
-    <KpiStrip><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>
+    <KpiStrip mobilePrimary={[0, 1]}><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>
     {filters.desde < "2027-07-01" && history.data && (!history.data.cargado || !history.data.notas_credito_verificadas) &&
       <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">
         {!history.data?.cargado ? "Falta cargar el histórico detallado: no se usa el importador agrupado como reemplazo." :

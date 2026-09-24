@@ -113,17 +113,19 @@ export function FiltersBar({
     search?.onChange("");
   };
 
-  const searchInput = (
+  const searchInput = (mobile = false) => (
     <div className="relative min-w-0 flex-1">
       <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
         aria-label={search?.ariaLabel ?? search?.label ?? "Buscar"}
+        aria-description={search?.placeholder}
+        title={search?.placeholder}
         enterKeyHint="search"
         value={searchDraft}
         onChange={(e) => setSearchDraft(e.target.value)}
-        placeholder={search?.placeholder ?? "Buscar…"}
-        className={cn(ctrl, "pl-7 pr-7")}
+        placeholder={mobile ? "Buscar…" : search?.placeholder ?? "Buscar…"}
+        className={cn(ctrl, "pl-7 pr-7", mobile && "h-9 text-base")}
       />
       {searchDraft && (
         <button
@@ -139,31 +141,31 @@ export function FiltersBar({
   );
 
   return (
-    <Card className={cn("min-w-0 px-3 py-2", className)}>
-      <div className="flex min-w-0 flex-nowrap items-end gap-2">
+    <Card className={cn("min-w-0 border-0 bg-transparent p-0 shadow-none sm:border sm:bg-card sm:px-3 sm:py-2", className)}>
+      <div className="flex min-w-0 flex-nowrap items-center gap-1 sm:items-end sm:gap-2">
       {/* Móvil: búsqueda. Los controles de sección se montan una sola vez. */}
       <div className="flex min-w-0 flex-1 gap-2 sm:hidden">
-        {search && searchInput}
+        {search && searchInput(true)}
       </div>
 
       {/* Desktop: una sola fila, sin wrap. Lo que no entra se oculta y queda en el panel. */}
         <div ref={rowRef} className="hidden min-w-0 flex-1 flex-nowrap items-end gap-x-2 overflow-hidden sm:flex">
           {search && (
             <Field label={search.label ?? "Buscar"} className={search.width ?? "w-[240px] min-w-[150px] shrink"}>
-              <div className="flex">{searchInput}</div>
+              <div className="flex">{searchInput()}</div>
             </Field>
           )}
 
           {children}
         </div>
 
-        <div className="flex shrink-0 items-end gap-2 sm:pl-2">
+        <div className="flex shrink-0 items-end gap-0 sm:gap-2 sm:pl-2">
           {hasControls && (
               <Button
                 type="button"
                 variant={activeCount > 0 ? "secondary" : "outline"}
                 size="sm"
-                className={cn(ctrl, "relative shrink-0 gap-1 whitespace-nowrap max-sm:w-11 max-sm:px-0")}
+                className={cn(ctrl, "relative shrink-0 gap-1 whitespace-nowrap max-sm:h-11 max-sm:w-11 max-sm:border-0 max-sm:bg-transparent max-sm:px-0 max-sm:shadow-none")}
                 onClick={() => setPanelOpen(true)}
                 aria-label="Más filtros"
               >

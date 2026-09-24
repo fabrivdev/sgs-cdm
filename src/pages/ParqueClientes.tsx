@@ -93,7 +93,7 @@ export default function ParqueClientes() {
     <div className={pageShell}>
       <PageHeader title={vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"} />
 
-      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
+      <KpiStrip mobilePrimary={vistaParque === "stock" ? [0, 3] : [0, 1]} className="sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
           <KpiItem key={c.label} label={c.label} value={c.value} tone={c.accent.includes("amber") ? "warning" : c.accent.includes("blue") ? "info" : c.accent.includes("emerald") || c.accent.includes("primary") ? "positive" : "danger"} icon={<c.icon className="h-4 w-4" />} />
         ))}

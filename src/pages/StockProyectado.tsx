@@ -120,7 +120,7 @@ export default function StockProyectado() {
   return (
     <div className={pageShell}>
       <PageHeader title="Stock proyectado" />
-      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
+      <KpiStrip mobilePrimary={[0, 3]} className="sm:grid-cols-2 xl:grid-cols-4">
         <KpiItem label="Stock" value={units(totals.stock)} tone="positive" icon={<Boxes className="h-4 w-4" />} />
         <KpiItem label="Órdenes de compra" value={units(totals.pedidosCompra)} tone="info" icon={<ShoppingCart className="h-4 w-4" />} />
         <KpiItem label="Ventas pendientes" value={units(totals.ventasPendientes)} tone="warning" icon={<ClipboardList className="h-4 w-4" />} />

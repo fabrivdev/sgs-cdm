@@ -1102,7 +1102,7 @@ export default function MaquinariaOperaciones() {
         : <Button size="sm" onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="mr-1.5 h-4 w-4" />Nuevo pedido</Button>}
     />
     {importsView ? (
-      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-5">
+      <KpiStrip mobilePrimary={[0, 3]} className="sm:grid-cols-2 xl:grid-cols-5">
         <KpiItem label="Unidades de importación" value={importTotals.total} icon={<Ship />} tone="info" />
         <KpiItem label="Planificadas" value={importTotals.planificadas} icon={<FileText />} />
         <KpiItem label="En tránsito" value={importTotals.transito} icon={<FileText />} tone="info" />
@@ -1110,7 +1110,7 @@ export default function MaquinariaOperaciones() {
         <KpiItem label="Completadas" value={importTotals.completadas} icon={<PackageCheck />} tone="positive" />
       </KpiStrip>
     ) : (
-      <KpiStrip className="sm:grid-cols-2 xl:grid-cols-4">
+      <KpiStrip mobilePrimary={[1, 2]} className="sm:grid-cols-2 xl:grid-cols-4">
         <KpiItem label="Líneas de pedido" value={orderTotals.total} icon={<FileCheck2 />} tone="info" />
         <KpiItem label="Líneas pendientes" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
         <KpiItem label="Líneas facturadas" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
