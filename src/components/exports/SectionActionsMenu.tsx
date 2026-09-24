@@ -32,7 +32,7 @@ export function SectionActionsMenu({ options, busy = false, className }: {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" size="icon" aria-label="Acciones de la sección" title="Acciones de la sección"
-          className={cn("h-8 w-8 shrink-0", className)} disabled={busy || pending || options.every(option => option.disabled)}>
+          className={cn("h-11 w-11 shrink-0 sm:h-8 sm:w-8", className)} disabled={busy || pending || options.every(option => option.disabled)}>
           {busy || pending ? <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" /> : <MoreVertical aria-hidden="true" className="h-4 w-4" />}
         </Button>
       </DropdownMenuTrigger>

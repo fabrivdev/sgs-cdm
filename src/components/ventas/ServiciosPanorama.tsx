@@ -128,8 +128,8 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     periodo:"Total del período",total:data.resumen.total,...components,clientes:data.resumen.clientes,
     facturas:data.resumen.facturas,metodologia:"mixto",variationLm:totalLm,variationLy:totalLy,
   } : undefined;
-  return <Panel className="min-w-0 p-3">
-    <div className="flex min-w-0 items-center justify-between gap-2">
+  return <Panel className="min-w-0 p-0 lg:p-3">
+    <div className="flex min-h-11 min-w-0 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
       <button type="button" onClick={()=>setCollapsed(value=>!value)} className="flex min-w-0 items-center gap-2 text-left">
         <h2 className="truncate text-[13px] font-semibold">Facturación por período</h2>
         {collapsed ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />}
@@ -138,7 +138,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     </div>
     {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
-      : <div className="mt-3 min-w-0"><SalesDataTable title="Períodos" rows={rows} columns={columns}
+      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded title="Períodos" rows={rows} columns={columns}
         initialSort={{key:"periodo",direction:"asc"}} rowKey={row=>row.periodo} footer={footer}
         fileName={`ventas-servicios-periodos-${desde}-${hasta}.xlsx`}
         onRowClick={row=>onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)}

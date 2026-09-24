@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, selectExport } from "./salesSectionExports.test-support";
 import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
 import { waitFor } from "@testing-library/react";
+import { MaquinasPanorama, type MaquinasDashboardResponse } from "./MaquinasVentas";
 
 const { exported } = vi.hoisted(()=>({exported:vi.fn()}));
 vi.mock("@/hooks/use-mobile",()=>({useIsMobile:()=>true}));
@@ -19,6 +20,19 @@ const columns:SalesDisplayColumn<Row>[]=[
 const props={title:"Ventas de prueba",rows,columns,rowKey:(r:Row)=>r.id,initialSort:{key:"total",direction:"desc" as const},fileName:"prueba.xlsx"};
 afterEach(()=>{cleanup();vi.clearAllMocks();});
 describe("mobile sales presentation",()=>{
+  it("embeds periods under one heading and keeps sorting, detail and collapsing",()=>{
+    const resumen={total:1500000.25,facturas:1,clientes:1,vendidas:1,notas_credito:0,netas:1,promedio_unidad:1500000.25,nuevas:1,usadas:0};
+    const data:MaquinasDashboardResponse={resumen,periodos:[{...resumen,periodo:"2026-08-01"}],por_maquina:[],por_modelo:[],lineas:[],dimensiones:{marcas:[],tipos:[]}};
+    render(<MaquinasPanorama data={data} loading={false} error={null} periodMode="mes" selectedPeriod={null} onSelectPeriod={()=>{}}/>);
+    expect(screen.getAllByRole("heading",{name:"Facturación por período"})).toHaveLength(1);
+    expect(screen.queryByRole("heading",{name:"Períodos de Máquinas"})).not.toBeInTheDocument();
+    expect(screen.getByRole("table").closest("section")).not.toHaveClass("border");
+    fireEvent.click(screen.getByRole("button",{name:"Columnas y orden de Facturación por período"}));
+    expect(screen.getByLabelText("Mostrar")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("Mostrar"),{key:"Escape"});
+    fireEvent.click(screen.getByRole("button",{name:/^Facturación por período$/}));
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
   it("shows two data columns and opens all fields without losing full names, nulls or negative amounts",()=>{
     render(<SalesDataTable {...props}/>);
     const table=screen.getByRole("table");

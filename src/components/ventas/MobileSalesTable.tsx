@@ -22,10 +22,11 @@ function mobileSalesValue<T>(column: Column<T>, row: T): ReactNode {
 
 /** Presentation only: sorting, pagination and complete Excel exports stay with the caller. */
 export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggleSort, primaryKey, metricKey,
-  footer, onRowClick, selected, empty = "Sin registros para los filtros seleccionados.",
+  footer, onRowClick, selected, embedded = false, empty = "Sin registros para los filtros seleccionados.",
 }: {
   title: string; rows: readonly T[]; columns: readonly Column<T>[]; rowKey: (row: T) => string;
   sort: SalesSort; toggleSort: (key: string) => void; primaryKey?: string; metricKey?: string;
+  embedded?: boolean;
   footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; empty?: string;
 }) {
   const id = useId();
@@ -44,9 +45,7 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
     <td className={cn("px-1 tabular-nums", amountAlign === "center" ? "text-center" : amountAlign === "right" ? "text-right" : "text-left", amount.kind === "number" ? "whitespace-nowrap" : "truncate")}>{mobileSalesValue(amount, row)}</td>
     <td>{!isFooter && <button type="button" aria-label={`Ver detalle de ${String(primary.value(row) ?? "registro")}`} onClick={() => setDetailKey(rowKey(row))} className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><Eye className="h-4 w-4" /></button>}</td>
   </tr>;
-  return <section aria-label={title} className="min-w-0 overflow-hidden rounded-md border">
-    <div className="flex items-center justify-between gap-2 border-b pl-3"><h3 className="text-[13px] font-semibold">{title}</h3>
-    <Popover><PopoverTrigger asChild><button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md" aria-label={`Columnas y orden de ${title}`}><SlidersHorizontal className="h-4 w-4" /></button></PopoverTrigger>
+  const controls = <Popover><PopoverTrigger asChild><button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md" aria-label={`Columnas y orden de ${title}`}><SlidersHorizontal className="h-4 w-4" /></button></PopoverTrigger>
     <PopoverContent align="end" className="w-[min(360px,calc(100vw-2rem))] p-2">
     <div className="grid grid-cols-2 gap-2 border-b p-2">
       <label htmlFor={`${id}-metric`} className="min-w-0 text-[11px] text-muted-foreground">Mostrar
@@ -63,12 +62,14 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
     <button type="button" aria-label={`Invertir orden: ${sort.direction === "asc" ? "ascendente" : "descendente"}`} onClick={()=>toggleSort(sort.key)} className="flex min-h-11 w-full items-center justify-end gap-2 border-b px-3 text-[12px] text-muted-foreground">
       {sort.direction === "asc" ? "Orden ascendente" : "Orden descendente"}{sort.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
     </button>
-    </PopoverContent></Popover></div>
+    </PopoverContent></Popover>;
+  return <section aria-label={title} className={cn("min-w-0 overflow-hidden", !embedded && "rounded-md border")}>
+    {!embedded && <div className="flex items-center justify-between gap-2 border-b pl-3"><h3 className="text-[13px] font-semibold">{title}</h3>{controls}</div>}
     <table className="w-full table-fixed text-[13px] [&_th_button]:min-h-11 [&_th_span]:whitespace-normal [&_th_span]:overflow-visible" aria-label={title}>
       <colgroup><col /><col className="w-[42%]" /><col className="w-11" /></colgroup>
-      <thead className="bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className="px-2 py-2" aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
+      <thead className="bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className="px-2 py-0" aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
         <SalesSortButton label={c.label} kind={c.kind} align={c === amount ? amountAlign : "left"} active={sort.key === c.key} direction={sort.direction} onClick={() => toggleSort(c.key)} />
-      </th>)}<th><span className="sr-only">Detalle</span></th></tr></thead>
+      </th>)}<th className="p-0"><span className="sr-only">Detalle</span>{embedded && controls}</th></tr></thead>
       <tbody>{rows.length ? rows.map(row => renderRow(row)) : <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">{empty}</td></tr>}</tbody>
       {footer && rows.length > 0 && <tfoot>{renderRow(footer, true)}</tfoot>}
     </table>

@@ -180,8 +180,8 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     initialSort: { key: "periodo", direction: "asc" }, disabled: loading || !!error || collapsed,
     footer: data ? { ...data.resumen, periodo: "" } : undefined });
   const grid = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_repeat(4,minmax(0,.75fr))_repeat(2,minmax(0,.7fr))_minmax(0,.8fr)]";
-  return <Panel className="p-3">
-    <button type="button" onClick={() => setCollapsed(value => !value)} className="flex w-full items-start justify-between gap-2 text-left">
+  return <Panel className="p-0 lg:p-3">
+    <button type="button" onClick={() => setCollapsed(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left lg:min-h-0 lg:px-0">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
       <div className="flex items-center gap-2">
         {selectedPeriod && <span role="button" tabIndex={0} onClick={event => { event.stopPropagation(); onSelectPeriod(null); }} className="rounded-full border bg-accent px-2.5 py-1 text-[10px] font-medium hover:bg-accent/70">Ver período completo ×</span>}
@@ -191,7 +191,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
-      : isMobile ? <div className="mt-3"><MobileSalesTable title="Períodos de Máquinas" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render: (r: Period) => periodLabel(r.periodo, periodMode)} : c)} rowKey={r => r.periodo} sort={table.sort} toggleSort={table.toggleSort} footer={{...data.resumen, periodo:""}} onRowClick={r => onSelectPeriod(selectedPeriod === r.periodo ? null : r.periodo)} selected={r => selectedPeriod === r.periodo} /></div>
+      : isMobile ? <div><MobileSalesTable embedded title="Facturación por período" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render: (r: Period) => periodLabel(r.periodo, periodMode)} : c)} rowKey={r => r.periodo} sort={table.sort} toggleSort={table.toggleSort} footer={{...data.resumen, periodo:""}} onRowClick={r => onSelectPeriod(selectedPeriod === r.periodo ? null : r.periodo)} selected={r => selectedPeriod === r.periodo} /></div>
       : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
         <TableScroll rows={data.periodos.length}>
         <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>

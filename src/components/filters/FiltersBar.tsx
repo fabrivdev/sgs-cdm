@@ -157,18 +157,18 @@ export function FiltersBar({
           {children}
         </div>
 
-        <div className="flex shrink-0 items-end gap-2 pl-2">
+        <div className="flex shrink-0 items-end gap-2 sm:pl-2">
           {hasControls && (
               <Button
                 type="button"
                 variant={activeCount > 0 ? "secondary" : "outline"}
                 size="sm"
-                className={cn(ctrl, "shrink-0 gap-1 whitespace-nowrap")}
+                className={cn(ctrl, "relative shrink-0 gap-1 whitespace-nowrap max-sm:w-11 max-sm:px-0")}
                 onClick={() => setPanelOpen(true)}
                 aria-label="Más filtros"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Más filtros</span>{activeCount > 0 ? ` ${activeCount}` : ""}
+                <span className="hidden sm:inline">Más filtros</span>{activeCount > 0 && <span className="max-sm:absolute max-sm:-right-1 max-sm:-top-1 max-sm:rounded-full max-sm:bg-primary max-sm:px-1 max-sm:text-[10px] max-sm:text-primary-foreground">{activeCount}</span>}
               </Button>
           )}
           {secondaryActions}
