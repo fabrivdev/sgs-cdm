@@ -13,12 +13,13 @@ export type SalesDisplayColumn<T> = SalesColumn<T> & {
 };
 export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, fileName, sheetName = "Ventas Servicios",
   empty = "Sin facturación en el período.", footer, onRowClick, selected, countLabel = "filas",
-  mobileIdentity, mobileEmbedded = false,
+  mobileIdentity, mobileEmbedded = false, mobileCountKey, mobileCountLabel, mobilePrimaryLabel, mobileMetricLabel,
 }: {
   title: string; rows: readonly T[]; columns: readonly SalesDisplayColumn<T>[];
   initialSort: SalesSort; rowKey: (row: T) => string; fileName: string; sheetName?: string;
   empty?: string; footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; countLabel?: string;
   mobileEmbedded?: boolean;
+  mobileCountKey?: string; mobileCountLabel?: string; mobilePrimaryLabel?: string; mobileMetricLabel?: string;
   mobileIdentity?: (row: T) => string;
 }) {
   const { can } = useAuth();
@@ -29,7 +30,7 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
     const { exportSalesTable } = await import("./salesTableExport");
     exportSalesTable({ rows: snapshot, columns, fileName, sheetName });
   } }, can("datos:exportar"));
-  if (isMobile) return <><MobileSalesTable embedded={mobileEmbedded} title={title} rows={ordered} columns={mobileIdentity ? columns.map((c,index)=>index===0?{...c,render:(row:T)=><span className="truncate">{mobileIdentity(row)}</span>}:c) : columns} rowKey={rowKey} sort={sort} toggleSort={toggleSort} footer={footer} onRowClick={onRowClick} selected={selected} empty={empty} /><RowCount rows={ordered.length} label={countLabel} /></>;
+  if (isMobile) return <><MobileSalesTable embedded={mobileEmbedded} countKey={mobileCountKey} countLabel={mobileCountLabel} primaryLabel={mobilePrimaryLabel} metricLabel={mobileMetricLabel} title={title} rows={ordered} columns={mobileIdentity ? columns.map((c,index)=>index===0?{...c,render:(row:T)=><span className="truncate">{mobileIdentity(row)}</span>}:c) : columns} rowKey={rowKey} sort={sort} toggleSort={toggleSort} footer={footer} onRowClick={onRowClick} selected={selected} empty={empty} />{!mobileCountKey && <RowCount rows={ordered.length} label={countLabel} />}</>;
   const grid = { gridTemplateColumns: columns.map(column => `minmax(0,${column.weight ?? 1}fr)`).join(" ") };
   const cells = (row: T, interactive = false) => columns.map((column, index) => {
     const value = column.value(row);

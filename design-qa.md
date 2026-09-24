@@ -78,3 +78,51 @@ final result: passed
 No remaining P0, P1 or P2 visual issues were found in the tested desktop state. The implementation intentionally adapts the reference content to the machine-sales workflow instead of copying service-specific dimensions.
 
 final result: passed
+
+---
+
+# Design QA — Sales mobile option 2
+
+Date: 2026-09-24. Status: **passed for the local Sales pilot**. This is not a production, physical-device, or whole-application certification.
+
+## Reference and implementation
+
+Selected reference: `C:/Users/Usuario/.codex/generated_images/01a081ee-91bf-73f2-ab49-65cbf14fea7c/exec-3bcab9cd-1588-4d43-8402-9b211fc89f2a.png` (853 × 1843 pixels, approximately 390 × 843 CSS-pixel composition).
+
+Latest comparison: `C:/Users/Usuario/Documents/Codex/2026-09-08/ad/mobile-design-review-2026-09-24/07-opcion2-maquinas-390-final.png` (390 × 844). Both images were inspected together in the same comparison call. Same initial state: Machines, Períodos, January–September fixture, three KPIs, nine month rows and total. Data is synthetic; no customer exports or production rows are included.
+
+The local harness renders the real `Ventas` page and report components, with mock auth and RPC responses. Its simple header provides visual context only; this change preserves the production app shell. Browser: Chrome, because the in-app browser could not attach its preview. Local URL: `http://127.0.0.1:5176/mobile-review.local/sales.html`. The ignored harness is not a production route or part of the commit.
+
+## Evidence
+
+All captures below are under the same local `mobile-design-review-2026-09-24` directory, outside Git:
+
+| Capture | Viewport | State |
+| --- | --- | --- |
+| `07-opcion2-maquinas-390-final.png` | 390 × 844 | Machines, periods |
+| `08-opcion2-servicios-390-final.png` | 390 × 844 | Services, periods |
+| `09-opcion2-repuestos-390-final.png` | 390 × 844 | Parts, periods |
+| `10-opcion2-repuestos-resumen.png` | 390 × 844 | Parts, summary and visible analysis navigation |
+| `11-opcion2-repuestos-320.png` | 320 × 780 | Parts, all nine month rows and total |
+| `12-maquinas-escritorio-1280.png` | 1280 × 900 | Existing desktop composition and four KPIs |
+| `13-maquinas-tablet-768.png` | 768 × 900 | Existing intermediate layout |
+
+Services and Machines were also inspected at 320 px. Machines Resumen, Detalle, August selection, field inspection, and filter drawer were exercised. The document's scrollWidth equals clientWidth in final measured phone, tablet and desktop states; period header text has no overflow at 390 px. A visually hidden table-header label had caused 8 px of document overflow; positioning it inside its header cell resolved it. Intermediate malformed browser captures are not used as QA evidence.
+
+## Comparison and decisions
+
+- Passed: flat white surface, compact heading/range, three inline KPIs, search/filter pairing, visible three-way navigation, simple month rows, aligned count/money columns and pale total footer. No nested period cards, mobile accordion, view selector or hidden KPI disclosure in the selected composition.
+- Passed: all three areas use the shared implementation, colors, spacing and typography. At 320 px the fixture amounts and meaningful column labels remain readable without horizontal scrolling.
+- Intentional adaptation: existing Inter, logo and icon set are retained; production global navigation is not replaced. Exact date formatting and accessible sort/column controls are functional UI rather than painted mockup content. The month table uses the source's correct quantity (net units / invoices / documents), not a fabricated common unit.
+- Intentional adaptation: secondary analyses are visible links in Resumen. Full detail and Excel retain original fields; a compact list is not a reduced dataset. Tablet/desktop retain prior layouts.
+- No unresolved high-severity visual mismatch in the pilot. This is a faithful structural implementation, not a claim of pixel-identical reproduction.
+
+## Automated checks and limits
+
+- 136 tests passed across 20 files: `src/components/ventas`, `src/pages/VentasServiceFilters.test.tsx`, `src/pages/VentasMobile.test.tsx` (`--maxWorkers=2 --testTimeout=15000`). Seven new integration cases cover three initial views, explicit analysis navigation, inclusive August, detail/NC/export preservation, export permission and desktop KPIs.
+- ESLint of changed TS/TSX files: no diagnostics after separating the context/hooks module.
+- Type check with `--lib ES2021,DOM,DOM.Iterable`; the repository's default ES2020 library configuration reports existing `String.replaceAll` errors in `localizedAmount.ts`, outside this visual change.
+- An additional broad run encountered two legacy assertions in `src/pages/Ventas.test.tsx` that still expect grouped OS detail and omit the current auth setup. That file was not rewritten as part of the design request; this document does not claim the complete repository suite is green.
+- Production build checked separately. Existing large-chunk warnings are not removed by this presentation change.
+- Console inspection found development-only HMR errors during the context-module move. A full reload restored the final components; the screenshots and production build above use the corrected imports.
+- No SQL, migrations, financial formula changes, production writes, or external data checks. Export payloads and permissions were tested; this pass did not re-download every workbook in a browser. Virtual keyboards, real touch hardware and every report's extreme-value combination remain outside this verification.

@@ -1,10 +1,11 @@
 import { useId, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Eye, SlidersHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Eye, SlidersHorizontal } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
 import { cn } from "@/lib/utils";
 import { salesDate, type SalesColumn, type SalesSort } from "./salesTableInteraction";
 import { SalesSortButton } from "./SalesTableControls";
+import { useSalesMobile } from "./salesMobileContext";
 
 type Column<T> = SalesColumn<T> & { render?: (row: T) => ReactNode };
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
@@ -22,30 +23,36 @@ function mobileSalesValue<T>(column: Column<T>, row: T): ReactNode {
 
 /** Presentation only: sorting, pagination and complete Excel exports stay with the caller. */
 export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggleSort, primaryKey, metricKey,
+  countKey, countLabel, primaryLabel, metricLabel,
   footer, onRowClick, selected, embedded = false, empty = "Sin registros para los filtros seleccionados.",
 }: {
   title: string; rows: readonly T[]; columns: readonly Column<T>[]; rowKey: (row: T) => string;
   sort: SalesSort; toggleSort: (key: string) => void; primaryKey?: string; metricKey?: string;
+  countKey?: string; countLabel?: string; primaryLabel?: string; metricLabel?: string;
   embedded?: boolean;
   footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; empty?: string;
 }) {
   const id = useId();
+  const mobile = useSalesMobile();
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [metric, setMetric] = useState(metricKey ?? ["neto", "total", "facturado", "mo_total"].find(key => columns.some(c => c.key === key)) ?? columns.find(c => c.kind === "number")?.key);
   const primary = columns.find(c => c.key === primaryKey) ?? columns[0];
   const amount = columns.find(c => c.key === metric && c.key !== primary?.key) ?? columns.find(c => c.key !== primary?.key);
   const detail = rows.find(row => rowKey(row) === detailKey);
+  const count = columns.find(c => c.key === countKey);
   if (!primary || !amount) return null;
-  const shown = [primary, amount];
+  const shown = count && count.key !== amount.key ? [primary, count, amount] : [primary, amount];
+  const hasCount = shown.length === 3;
   const amountAlign = amount.align ?? (amount.kind === "number" ? "right" : "left");
   const renderRow = (row: T, isFooter = false) => <tr key={isFooter ? "total" : rowKey(row)} className={cn("border-t", selected?.(row) && "bg-primary/5", isFooter && "bg-muted/30 font-semibold")}>
     <td className="min-w-0 pl-2 text-left">
       {isFooter ? <span>Total</span> : !onRowClick && primary.render ? <div className="flex min-h-11 min-w-0 items-center overflow-hidden">{mobileSalesValue(primary, row)}</div> : <button type="button" className="block min-h-11 w-full truncate text-left font-medium underline-offset-4 focus-visible:underline" onClick={() => onRowClick ? onRowClick(row) : setDetailKey(rowKey(row))} aria-pressed={onRowClick ? selected?.(row) : undefined}>{mobileSalesValue(primary, row)}</button>}
     </td>
+    {hasCount && <td className="px-1 text-center tabular-nums">{mobileSalesValue(count!, row)}</td>}
     <td className={cn("px-1 tabular-nums", amountAlign === "center" ? "text-center" : amountAlign === "right" ? "text-right" : "text-left", amount.kind === "number" ? "whitespace-nowrap" : "truncate")}>{mobileSalesValue(amount, row)}</td>
-    <td>{!isFooter && <button type="button" aria-label={`Ver detalle de ${String(primary.value(row) ?? "registro")}`} onClick={() => setDetailKey(rowKey(row))} className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><Eye className="h-4 w-4" /></button>}</td>
+    <td>{!isFooter && <button type="button" aria-label={`Ver detalle de ${String(primary.value(row) ?? "registro")}`} onClick={() => setDetailKey(rowKey(row))} className={cn("flex h-11 items-center justify-center rounded-md hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", mobile.active ? "w-8" : "w-11")}>{mobile.active ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}</button>}</td>
   </tr>;
-  const controls = <Popover><PopoverTrigger asChild><button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md" aria-label={`Columnas y orden de ${title}`}><SlidersHorizontal className="h-4 w-4" /></button></PopoverTrigger>
+  const controls = <Popover><PopoverTrigger asChild><button type="button" className={cn("flex h-11 shrink-0 items-center justify-center rounded-md", mobile.active ? "w-8" : "w-11")} aria-label={`Columnas y orden de ${title}`}><SlidersHorizontal className="h-3.5 w-3.5" /></button></PopoverTrigger>
     <PopoverContent align="end" className="w-[min(360px,calc(100vw-2rem))] p-2">
     <div className="grid grid-cols-2 gap-2 border-b p-2">
       <label htmlFor={`${id}-metric`} className="min-w-0 text-[11px] text-muted-foreground">Mostrar
@@ -63,14 +70,14 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
       {sort.direction === "asc" ? "Orden ascendente" : "Orden descendente"}{sort.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
     </button>
     </PopoverContent></Popover>;
-  return <section aria-label={title} className={cn("min-w-0 overflow-hidden", !embedded && "rounded-md border")}>
+  return <section aria-label={title} className={cn("min-w-0 overflow-hidden", !embedded && "rounded-md border", mobile.active && "sales-flat-table")}>
     {!embedded && <div className="flex items-center justify-between gap-2 border-b pl-3"><h3 className="text-[13px] font-semibold">{title}</h3>{controls}</div>}
     <table className="w-full table-fixed text-[13px] [&_th_button]:min-h-11 [&_th_span]:whitespace-normal [&_th_span]:overflow-visible" aria-label={title}>
-      <colgroup><col /><col className="w-[42%]" /><col className="w-11" /></colgroup>
-      <thead className="bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className="px-2 py-0" aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
-        <SalesSortButton label={c.label} kind={c.kind} align={c === amount ? amountAlign : "left"} active={sort.key === c.key} direction={sort.direction} onClick={() => toggleSort(c.key)} />
-      </th>)}<th className="p-0"><span className="sr-only">Detalle</span>{embedded && controls}</th></tr></thead>
-      <tbody>{rows.length ? rows.map(row => renderRow(row)) : <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">{empty}</td></tr>}</tbody>
+      <colgroup><col />{hasCount && <col className="w-11" />}<col className={hasCount ? "w-[46%]" : "w-[42%]"} /><col className={mobile.active ? "w-8" : "w-11"} /></colgroup>
+      <thead className="bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className={cn("py-0", c === count ? "px-1" : "px-2")} aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
+        <SalesSortButton label={c === primary ? primaryLabel ?? c.label : c === count ? countLabel ?? c.label : metricLabel && c.key === (metricKey ?? "total") ? metricLabel : c.label} kind={c.kind} align={c === amount ? amountAlign : c === count ? "center" : "left"} active={sort.key === c.key} direction={sort.direction} onClick={() => toggleSort(c.key)} />
+      </th>)}<th className="relative p-0"><span className="sr-only left-0 top-0">Detalle</span>{embedded && controls}</th></tr></thead>
+      <tbody>{rows.length ? rows.map(row => renderRow(row)) : <tr><td colSpan={shown.length + 1} className="p-4 text-center text-muted-foreground">{empty}</td></tr>}</tbody>
       {footer && rows.length > 0 && <tfoot>{renderRow(footer, true)}</tfoot>}
     </table>
     <ResponsiveDrawer open={detail !== undefined} onOpenChange={open => { if (!open) setDetailKey(null); }}>

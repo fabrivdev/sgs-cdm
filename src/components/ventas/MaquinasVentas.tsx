@@ -3,6 +3,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { MobileSalesTable } from "./MobileSalesTable";
 import { SalesViewSwitcher } from "./SalesViewSwitcher";
+import { useSalesMobile, useSalesExplorerView } from "./salesMobileContext";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
@@ -166,6 +167,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
   selectedPeriod: string | null;
   onSelectPeriod: (period: string | null) => void;
 }) {
+  const mobile = useSalesMobile();
   const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
   const isMobile = useIsMobile(1024);
   const total = Number(data?.resumen.total || 0);
@@ -181,18 +183,18 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     initialSort: { key: "periodo", direction: "asc" }, disabled: loading || !!error,
     footer: data ? { ...data.resumen, periodo: "" } : undefined });
   const grid = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_repeat(4,minmax(0,.75fr))_repeat(2,minmax(0,.7fr))_minmax(0,.8fr)]";
-  return <Panel className="p-0 lg:p-3">
-    <button type="button" aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left lg:min-h-0 lg:px-0">
+  return <Panel className={cn("sales-periods p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
+    {!mobile.active && <button type="button" aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left lg:min-h-0 lg:px-0">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
       <div className="flex items-center gap-2">
         {selectedPeriod && <span role="button" tabIndex={0} onClick={event => { event.stopPropagation(); onSelectPeriod(null); }} className="rounded-full border bg-accent px-2.5 py-1 text-[10px] font-medium hover:bg-accent/70">Ver período completo ×</span>}
         {collapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
       </div>
-    </button>
-    {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
+    </button>}
+    {(mobile.active || !collapsed) && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
-      : isMobile ? <div><MobileSalesTable embedded title="Facturación por período" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render: (r: Period) => periodLabel(r.periodo, periodMode)} : c)} rowKey={r => r.periodo} sort={table.sort} toggleSort={table.toggleSort} footer={{...data.resumen, periodo:""}} onRowClick={r => onSelectPeriod(selectedPeriod === r.periodo ? null : r.periodo)} selected={r => selectedPeriod === r.periodo} /></div>
+      : isMobile ? <div><MobileSalesTable embedded countKey={mobile.active ? "netas" : undefined} countLabel="Unid." primaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} metricLabel={mobile.active ? "Facturación" : undefined} title="Facturación por período" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render: (r: Period) => periodLabel(r.periodo, periodMode)} : c)} rowKey={r => r.periodo} sort={table.sort} toggleSort={table.toggleSort} footer={{...data.resumen, periodo:""}} onRowClick={r => { onSelectPeriod(selectedPeriod === r.periodo ? null : r.periodo); if (mobile.active) mobile.setView("detalle"); }} selected={r => selectedPeriod === r.periodo} /></div>
       : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
         <TableScroll rows={data.periodos.length}>
         <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
@@ -367,12 +369,12 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 }
 
 export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedPeriod = null }: { data: MaquinasDashboardResponse | null; loading: boolean; error: string | null; desde: string; hasta: string; selectedPeriod?: string | null }) {
-  const [view, setView] = useState<ExplorerView>("resumen");
+  const [view, setView] = useSalesExplorerView<ExplorerView>("resumen", "detalle");
   const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta).map(line => ({ ...line, cliente_facturado: canonicalClientName(line.cliente_facturado) })), [data, desde, hasta]);
   const summary = useMemo(() => summarize(lines), [lines]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
-  return <Panel className="p-3">
-    <div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<ExplorerView> value={view} onChange={setView} options={tabs} /></div>
+  return <Panel className="sales-explorer p-3">
+    <div className="sales-explorer-heading flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<ExplorerView> value={view} onChange={setView} options={tabs} /></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
       : view === "resumen" ? <SummaryView summary={summary} lines={lines} />

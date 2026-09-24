@@ -12,6 +12,7 @@ import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { pct } from "@/components/dashboard/utils";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
+import { useSalesMobile } from "./salesMobileContext";
 
 export type ServiciosSummary = { total: number; facturas: number; clientes: number; ordenes: number; promedio: number };
 type PeriodoPanorama = {
@@ -47,6 +48,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
   onSummary?: (summary: ServiciosSummary | null) => void; filtros?: ServiceSalesFilters;
 }) {
   const filterKey = serviceFiltersKey(filtros);
+  const mobile = useSalesMobile();
   const [data, setData] = useState<PanoramaResponse | null>(null);
   const [previousPeriod, setPreviousPeriod] = useState<PanoramaResponse | null>(null);
   const [previousYear, setPreviousYear] = useState<PanoramaResponse | null>(null);
@@ -129,20 +131,20 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     periodo:"Total del período",total:data.resumen.total,...components,clientes:data.resumen.clientes,
     facturas:data.resumen.facturas,metodologia:"mixto",variationLm:totalLm,variationLy:totalLy,
   } : undefined;
-  return <Panel className="min-w-0 p-0 lg:p-3">
-    <div className="flex min-h-11 min-w-0 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
+  return <Panel className={cn("sales-periods min-w-0 p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
+    {!mobile.active && <div className="flex min-h-11 min-w-0 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
       <button type="button" aria-expanded={!collapsed} onClick={()=>setCollapsed(value=>!value)} className="flex min-h-11 min-w-0 items-center gap-2 text-left">
         <h2 className="truncate text-[13px] font-semibold">Facturación por período</h2>
         {collapsed ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />}
       </button>
       {selectedPeriod && <button type="button" onClick={()=>onSelectPeriod(null)} className="shrink-0 rounded-full border bg-accent px-2.5 py-1 text-[10px] font-medium hover:bg-accent/70">Ver período completo ×</button>}
-    </div>
-    <div hidden={collapsed}>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
+    </div>}
+    <div hidden={!mobile.active && collapsed}>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
-      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded title="Períodos" rows={rows} columns={columns}
+      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Fact." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? "Facturado" : undefined} title="Períodos" rows={rows} columns={columns}
         initialSort={{key:"periodo",direction:"asc"}} rowKey={row=>row.periodo} footer={footer}
         fileName={`ventas-servicios-periodos-${desde}-${hasta}.xlsx`}
-        onRowClick={row=>onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo)}
+        onRowClick={row=>{ onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo); if (mobile.active) mobile.setView("detalle"); }}
         selected={row=>row.periodo === selectedPeriod} countLabel="períodos" empty="No hay datos para este rango." /></div>}</div>
   </Panel>;
 }

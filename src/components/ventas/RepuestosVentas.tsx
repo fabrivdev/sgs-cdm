@@ -4,6 +4,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { MobileSalesTable } from "./MobileSalesTable";
 import { SalesViewSwitcher } from "./SalesViewSwitcher";
+import { SalesMobileSummary, SalesMobileAverage } from "./SalesMobileWorkspace";
+import { useSalesMobile, useSalesExplorerView } from "./salesMobileContext";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
 import { RowCount, TableScroll, salesHeader } from "./TableScroll";
@@ -139,6 +141,7 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
   data?: PartsOverview; loading: boolean; error: Error | null; retry: () => void; mode: PeriodMode;
   selected: string | null; onSelect: (value: string | null) => void;
 }) {
+  const mobile = useSalesMobile();
   const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
   const isMobile = useIsMobile(1024);
   const columns: SalesColumn<PartsPeriod>[] = [
@@ -150,12 +153,12 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
   ];
   const table = useSectionTable({ rows: data?.periodos ?? [], columns, title: "Períodos de Repuestos", fileName: "ventas-repuestos-periodos.xlsx", initialSort: { key: "periodo", direction: "asc" },
     disabled: loading || !!error, footer: data ? { ...data.resumen, periodo: "", desde: "", hasta: "", anterior: data.comparacion.facturado, anterior_lineas: data.comparacion.lineas, anio_anterior: data.comparacion_ly.facturado, anio_anterior_lineas: data.comparacion_ly.lineas } : undefined });
-  return <Panel className="p-0 lg:p-3">
-    <div className="flex min-h-11 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
+  return <Panel className={cn("sales-periods p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
+    {!mobile.active && <div className="flex min-h-11 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
       <button type="button" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed} className="flex flex-1 items-center justify-between text-left text-[13px] font-semibold">Evolución de la facturación{collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
       {selected && <button type="button" onClick={() => onSelect(null)} className="rounded border px-2 py-1 text-[11px]">Ver período completo</button>}
-    </div>
-    {!collapsed && <div className="lg:mt-3">{loading || error || !data ? <State loading={loading} error={error} retry={retry} /> : isMobile ? <MobileSalesTable embedded title="Períodos de Repuestos" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render:(r:PartsPeriod)=><PeriodLabel value={r.periodo} mode={mode} />} : c)} rowKey={r=>r.periodo} sort={table.sort} toggleSort={table.toggleSort} onRowClick={r=>onSelect(selected===r.periodo?null:r.periodo)} selected={r=>selected===r.periodo} footer={{...data.resumen,periodo:"",desde:"",hasta:"",anterior:data.comparacion.facturado,anterior_lineas:data.comparacion.lineas,anio_anterior:data.comparacion_ly.facturado,anio_anterior_lineas:data.comparacion_ly.lineas}} /> : <Table minWidth="min-w-0">
+    </div>}
+    {(mobile.active || !collapsed) && <div className="lg:mt-3">{loading || error || !data ? <State loading={loading} error={error} retry={retry} /> : isMobile ? <MobileSalesTable embedded countKey={mobile.active ? "documentos" : undefined} countLabel="Doc." primaryLabel={mobile.active && mode === "mes" ? "Mes" : undefined} title="Períodos de Repuestos" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render:(r:PartsPeriod)=><PeriodLabel value={r.periodo} mode={mode} />} : c)} rowKey={r=>r.periodo} sort={table.sort} toggleSort={table.toggleSort} onRowClick={r=>{ onSelect(selected===r.periodo?null:r.periodo); if (mobile.active) mobile.setView("detalle"); }} selected={r=>selected===r.periodo} footer={{...data.resumen,periodo:"",desde:"",hasta:"",anterior:data.comparacion.facturado,anterior_lineas:data.comparacion.lineas,anio_anterior:data.comparacion_ly.facturado,anio_anterior_lineas:data.comparacion_ly.lineas}} /> : <Table minWidth="min-w-0">
       <colgroup><col style={{ width: "13%" }} />{PARTS_HEADERS.map(label => <col key={label} style={{ width: "10%" }} />)}<col /><col /><col /></colgroup>
       <Heads columns={columns} sort={table.sort} toggle={table.toggleSort} />
       <tbody>{table.ordered.map(row => <tr key={row.periodo} className={cn("hover:bg-accent", selected === row.periodo && "bg-primary/5")}>
@@ -251,7 +254,8 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, se
   const focused = { ...filters, ...range };
   const panorama = useOverview(filters, periodMode);
   const overview = useOverview(focused, periodMode); // Misma clave sin selección: React Query comparte la petición.
-  const [view, setView] = useState<View>("resumen");
+  const mobile = useSalesMobile();
+  const [view, setView] = useSalesExplorerView<View>("resumen", "detalle");
   useEffect(() => { onSelectPeriod(null); }, [buscar, onSelectPeriod]);
   const history = useQuery({ queryKey: ["ventas-repuestos-estado-historico"],
     queryFn: ({ signal }) => rpc<{ cargado: boolean; notas_credito_verificadas: boolean }>("ventas_repuestos_estado_historico_v1", {}, signal),
@@ -261,17 +265,19 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, se
   const metrics = overview.data?.resumen;
   const available = metrics && !overview.error;
   return <>
-    <KpiStrip mobilePrimary={[0, 1]}><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>
+    {mobile.active ? <SalesMobileSummary billing={available ? money(metrics.facturado) : "—"} quantityLabel="Doc." quantityTitle="Documentos" quantity={available ? integer.format(metrics.documentos) : "—"} clients={available ? integer.format(metrics.clientes) : "—"} /> :
+      <KpiStrip><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>}
+    <SalesMobileAverage label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} />
     {filters.desde < "2027-07-01" && history.data && (!history.data.cargado || !history.data.notas_credito_verificadas) &&
       <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">
         {!history.data?.cargado ? "Falta cargar el histórico detallado: no se usa el importador agrupado como reemplazo." :
           "Histórico pendiente de conciliar: completá las notas de crédito desde Sugerencias → Historial. Los importes mostrados incluyen solamente las líneas ya cargadas."}
       </p>}
     <Panorama data={panorama.data} loading={panorama.isLoading} error={panorama.error} retry={() => void panorama.refetch()} mode={periodMode} selected={selectedPeriod} onSelect={onSelectPeriod} />
-    <Panel className="p-3"><div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<View> value={view} onChange={setView} options={[["resumen","Resumen"],["vendedores","Vendedores"],["clientes","Clientes"],["repuestos","Repuestos"],["detalle","Detalle"]]} /></div>
+    {(!mobile.active || mobile.view !== "periodos") && <Panel className="sales-explorer p-3"><div className="sales-explorer-heading flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<View> value={view} onChange={setView} options={[["resumen","Resumen"],["vendedores","Vendedores"],["clientes","Clientes"],["repuestos","Repuestos"],["detalle","Detalle"]]} /></div>
       <div className="mt-3" />
       {view === "resumen" ? overview.isLoading || overview.error || !overview.data ? <State loading={overview.isLoading} error={overview.error} retry={() => void overview.refetch()} /> : <Summary data={overview.data} />
         : <Listing key={`${view}:${JSON.stringify(focused)}`} filters={focused} view={view} />}
-    </Panel>
+    </Panel>}
   </>;
 }

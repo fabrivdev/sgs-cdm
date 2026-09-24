@@ -1,4 +1,6 @@
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
+import { SalesMobileProvider, SalesMobileRange, SalesMobileTabs, SalesMobileSummary, SalesMobileAverage } from "@/components/ventas/SalesMobileWorkspace";
+import { useSalesMobile, useSalesExplorerView } from "@/components/ventas/salesMobileContext";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
@@ -103,7 +105,7 @@ function Pager({ page, pages, total, onChange }: { page: number; pages: number; 
 
 export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: { area: VentasArea; data: SalesResponse | null; loading: boolean; desde: string; hasta: string; sucursal: string; buscar: string; tipoTiempo: string; marca?: string; tipoMaquina?: string; filtros?: ServiceSalesFilters }) {
   const copy = AREA_COPY[area];
-  const [view, setView] = useState<ExplorerView>("facturas");
+  const [view, setView] = useSalesExplorerView<ExplorerView>(area === "servicios" ? "resumen" : "facturas", "facturas");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [documentPage, setDocumentPage] = useState(1);
   const [documents, setDocuments] = useState<DocumentsResponse>({ total: 0, pagina: 1, por_pagina: 50, paginas: 1, documentos: [] });
@@ -137,7 +139,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
     return () => { alive = false; };
   }, [area,buscar,desde,hasta,sucursal,view]);
 
-  useEffect(() => { setView(area === "servicios" ? "resumen" : "facturas"); setExpanded(null); setDocumentPage(1); setAnalysisPage(1); setPivotRows(copy.primaryValue); setPivotMetric("usd"); }, [area, copy.primaryValue]);
+  useEffect(() => { setView(area === "servicios" ? "resumen" : "facturas"); setExpanded(null); setDocumentPage(1); setAnalysisPage(1); setPivotRows(copy.primaryValue); setPivotMetric("usd"); }, [area, copy.primaryValue, setView]);
   useEffect(() => { setDocumentPage(1); setAnalysisPage(1); }, [buscar, desde, hasta, sucursal]);
 
   useEffect(() => {
@@ -181,8 +183,8 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
 
 
   return (
-    <Panel className="p-3">
-      <div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
+    <Panel className="sales-explorer p-3">
+      <div className="sales-explorer-heading flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
         <h2 className="text-[13px] font-semibold">{area === "servicios" ? "Indicadores de postventa" : "Ventas"}</h2>
         <SalesViewSwitcher value={view} onChange={value=>{setView(value);setExpanded(null);}} options={area === "servicios"
             ? ([['resumen', 'Resumen'], ['tecnicos', 'Técnicos'], ['clientes', 'Clientes'], ['maquinas', 'Máquinas'], ['facturas', 'Detalle']] as const)
@@ -282,6 +284,11 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
 }
 
 export default function Ventas({ area }: { area: VentasArea }) {
+  return <SalesMobileProvider key={area}><VentasContent area={area} /></SalesMobileProvider>;
+}
+
+function VentasContent({ area }: { area: VentasArea }) {
+  const mobile = useSalesMobile();
   const now = useMemo(() => new Date(), []);
   const [desde, setDesde] = useState(`${now.getFullYear()}-01-01`); const [hasta, setHasta] = useState(isoDate(now));
   const [sucursal, setSucursal] = useState("TODAS"); const [buscar, setBuscar] = useState("");
@@ -375,9 +382,9 @@ export default function Ventas({ area }: { area: VentasArea }) {
     ? { marcas: maquinasData?.dimensiones.marcas ?? [], tipos: maquinasData?.dimensiones.tipos ?? [] }
     : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort() };
   return (
-    <SalesSectionExportsProvider><PageShell>
-      <PageHeader title={copy.title} meta={<span className="sm:hidden">Período: {desde.split("-").reverse().join("/")} – {hasta.split("-").reverse().join("/")}</span>} />
-      <FiltersBar secondaryActions={<SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }}>
+    <SalesSectionExportsProvider><PageShell className="sales-workspace">
+      <PageHeader className="sales-page-header" title={copy.title} actions={mobile.active ? <SalesSectionExportMenu /> : undefined} meta={mobile.active ? <SalesMobileRange desde={desde} hasta={hasta} /> : undefined} />
+      <FiltersBar className="sales-toolbar" secondaryActions={mobile.active ? undefined : <SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }}>
         <FilterCustom label="Período rápido" width="w-[190px]"><select value={activeDatePreset} onChange={(event) => applyDatePreset(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px]"><option value="">Personalizado</option>{datePresets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></FilterCustom>
         <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
         <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
@@ -395,17 +402,20 @@ export default function Ventas({ area }: { area: VentasArea }) {
           <FilterSelect label="Vínculo OS" value={serviceFilters.vinculo || "TODOS"} onChange={v=>changeServiceFilter("vinculo",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"con_os",label:"Con OS"},{value:"sin_os",label:"Sin OS"}]} />
         </>}
       </FiltersBar>
+      <SalesMobileTabs selectedPeriod={selectedPeriod} desde={explorerRange.desde} hasta={explorerRange.hasta} onClear={() => setSelectedPeriod(null)} />
       {area === "servicios" && machineOptionsError && <p role="alert" className="text-xs text-destructive">{machineOptionsError}</p>}
       {area === "repuestos" ? <RepuestosVentas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} /> : error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
-        <KpiStrip mobilePrimary={[0, 1]}><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>
+        {mobile.active ? <SalesMobileSummary billing={loading || !summary ? "—" : usd.format(summary.total)} quantityLabel={area === "servicios" ? "OS" : "Unidades"} quantityTitle={area === "servicios" ? "Órdenes de servicio" : "Unidades netas"} quantity={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : maquinasData?.resumen.netas ?? 0).toLocaleString("es-PY")} clients={loading || !summary ? "—" : summary.clientes.toLocaleString("es-PY")} /> :
+          <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>}
+        <SalesMobileAverage label={area === "servicios" ? "Promedio por OS · rango general" : "Promedio por unidad neta · rango general"} value={loading || !summary ? "—" : usd.format(averageValue)} />
         
         {area === "servicios" && (
           <ServiciosPanorama desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={serviceFilters} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} onSummary={setServiciosSummary} />
         )}
         {area === "maquinas" && <MaquinasPanorama data={maquinasData} loading={loading} error={error} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />}
-        {area === "maquinas"
+        {(!mobile.active || mobile.view !== "periodos") && (area === "maquinas"
           ? <MaquinasExplorer data={maquinasData} loading={loading} error={error} desde={explorerRange.desde} hasta={explorerRange.hasta} selectedPeriod={selectedPeriod} />
-          : <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={serviceFilters} />}
+          : <SalesExplorer area={area} data={data} loading={loading} desde={explorerRange.desde} hasta={explorerRange.hasta} sucursal={sucursal} buscar={buscar} tipoTiempo={tipoTiempo} marca={marca} tipoMaquina={tipoMaquina} filtros={serviceFilters} />)}
       </>}
     </PageShell></SalesSectionExportsProvider>
   );
