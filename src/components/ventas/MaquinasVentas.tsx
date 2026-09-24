@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSalesTable } from "./MobileSalesTable";
+import { SalesViewSwitcher } from "./SalesViewSwitcher";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { money } from "@/components/dashboard/utils";
@@ -163,6 +166,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
   onSelectPeriod: (period: string | null) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile(1024);
   const total = Number(data?.resumen.total || 0);
   type Period = MaquinasResumen & { periodo: string };
   const columns: SalesColumn<Period>[] = [
@@ -187,6 +191,7 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
     {!collapsed && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
       : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
+      : isMobile ? <div className="mt-3"><MobileSalesTable title="Períodos de Máquinas" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render: (r: Period) => periodLabel(r.periodo, periodMode)} : c)} rowKey={r => r.periodo} sort={table.sort} toggleSort={table.toggleSort} footer={{...data.resumen, periodo:""}} onRowClick={r => onSelectPeriod(selectedPeriod === r.periodo ? null : r.periodo)} selected={r => selectedPeriod === r.periodo} /></div>
       : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
         <TableScroll rows={data.periodos.length}>
         <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
@@ -223,10 +228,12 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 const BRAND_ORDER = ["CLAAS", "HORSCH", "Otros"];
 
 function SummaryTable({ label, grid, minWidth, rows, share, total, empty }: { label: string; grid: string; minWidth: string; rows: Array<MaquinasResumen & { key: string }>; share: (value: number) => string; total: number; empty: string }) {
+  const isMobile = useIsMobile(1024);
   const columns: SalesColumn<MaquinasResumen & { key: string }>[] = [
     { key: "key", label, kind: "text", value: r => r.key }, ...metricColumns<MaquinasResumen & { key: string }>(total),
   ];
   const table = useSectionTable({ rows, columns, title: `Máquinas por ${label.toLowerCase()}`, fileName: `ventas-maquinas-${label.toLowerCase()}.xlsx`, initialSort: { key: "total", direction: "desc" } });
+  if (isMobile) return <MobileSalesTable title={`Máquinas por ${label.toLowerCase()}`} rows={table.ordered} columns={columns} rowKey={r => r.key} sort={table.sort} toggleSort={table.toggleSort} empty={empty} />;
   return <div className="overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className={minWidth}>
     <TableScroll rows={rows.length}>
     <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>{columns.map(c => <div key={c.key} className={`min-w-0 ${salesColumnClass(c.label)}`}>{table.heading(c.key)}</div>)}</div>
@@ -256,6 +263,7 @@ function SellersTable({ summary, lines }: { summary: MaquinasResumen; lines: Maq
 }
 
 function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
+  const isMobile = useIsMobile(1024);
   const [expanded, setExpanded] = useState<string | null>(null);
   const total = lines.reduce((sum, line) => sum + Number(line.facturado || 0), 0);
   const rows = useMemo(() => [...group(lines, line => `${line.marca}__${line.tipo_maquina}__${conditionLabel(line.condicion)}`)].map(([key, values]) => {
@@ -271,13 +279,17 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     { key: "tipo", label: "Tipo de máquina", kind: "text", value: r => r.tipo },
     { key: "condicion", label: "Condición", kind: "text", value: r => r.condicion },
     ...metricColumns<SummaryRow>(total).filter(c => c.key !== "participacion"),
-    { key: "promedio", label: "Promedio / unidad neta", kind: "number", align: "right", value: r => r.netas ? r.total / r.netas : null },
+    { key: "promedio", label: "Promedio / unidad neta", kind: "number", align: "right", excelFormat: '"$" #,##0.00', value: r => r.netas ? r.total / r.netas : null },
     { ...metricColumns<SummaryRow>(total).at(-1)!, label: "Participación neta" },
   ];
   const table = useSectionTable({ rows, columns, title: "Máquinas por tipo", fileName: "ventas-maquinas-tipos.xlsx", initialSort: { key: "total", direction: "desc" } });
   // Modelo is a separate export from the same complete filtered population.
   const modelsTable = useSectionTable({ rows: modelRows, columns: [{ key: "modelo", label: "Modelo", kind: "text", value: r => r.modelo }, ...columns],
-    title: "Máquinas por modelo", fileName: "ventas-maquinas-modelos.xlsx", initialSort: table.sort, sortOverride: table.sort });
+    title: "Máquinas por modelo", fileName: "ventas-maquinas-modelos.xlsx", initialSort: table.sort, sortOverride: isMobile ? undefined : table.sort });
+  if (isMobile) return <div className="mt-3 space-y-3">
+    <MobileSalesTable title="Máquinas por tipo" rows={table.ordered} columns={columns} primaryKey="tipo" rowKey={r => r.key} sort={table.sort} toggleSort={table.toggleSort} />
+    <MobileSalesTable title="Máquinas por modelo" rows={modelsTable.ordered} columns={[{key:"modelo",label:"Modelo",kind:"text",value:r=>r.modelo},...columns]} primaryKey="modelo" rowKey={r => r.key} sort={modelsTable.sort} toggleSort={modelsTable.toggleSort} />
+  </div>;
   const grid = "grid-cols-[34px_minmax(0,.8fr)_minmax(0,1.2fr)_minmax(0,.7fr)_repeat(5,minmax(0,.6fr))_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.85fr)]";
   return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
     <TableScroll rows={rows.length}>
@@ -301,18 +313,20 @@ function MachinesTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 }
 
 function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
+  const isMobile = useIsMobile(1024);
   const rows = useMemo(() => [...group(lines, line => line.cliente_facturado)].map(([cliente, values]) => ({ cliente, ultima: values.reduce((max, line) => line.fecha > max ? line.fecha : max, ""), ...summarize(values) })).sort((a, b) => Number(a.cliente.startsWith("Sin ")) - Number(b.cliente.startsWith("Sin ")) || b.total - a.total), [lines]);
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   type Client = typeof rows[number];
   const columns: SalesColumn<Client>[] = [
     { key: "cliente", label: "Cliente", kind: "text", value: r => r.cliente },
     ...metricColumns<Client>(total).filter(c => ["vendidas", "netas", "total"].includes(c.key)).map(c => c.key === "netas" ? { ...c, label: "Unidades netas" } : c),
-    { key: "promedio", label: "Promedio / unidad neta", kind: "number", align: "right", value: r => r.netas ? r.total / r.netas : null },
+    { key: "promedio", label: "Promedio / unidad neta", kind: "number", align: "right", excelFormat: '"$" #,##0.00', value: r => r.netas ? r.total / r.netas : null },
     ...metricColumns<Client>(total).filter(c => c.key === "facturas"),
     { key: "ultima", label: "Última venta", kind: "date", value: r => r.ultima?.slice(0, 10) || null },
     ...metricColumns<Client>(total).filter(c => c.key === "participacion"),
   ];
   const table = useSectionTable({ rows, columns, title: "Clientes de Máquinas", fileName: "ventas-maquinas-clientes.xlsx", initialSort: { key: "total", direction: "desc" } });
+  if (isMobile) return <div className="mt-3"><MobileSalesTable title="Clientes de Máquinas" rows={table.ordered} columns={columns} rowKey={r => r.cliente} sort={table.sort} toggleSort={table.toggleSort} /></div>;
   const grid = "grid-cols-[minmax(0,1.8fr)_repeat(2,minmax(0,.65fr))_minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,.75fr)_minmax(0,.8fr)_minmax(0,.7fr)]";
   return <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
       <TableScroll rows={rows.length}>
@@ -323,6 +337,7 @@ function ClientsTable({ lines }: { lines: MaquinaVentaLinea[] }) {
 }
 
 function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
+  const isMobile = useIsMobile(1024);
   const columns: SalesColumn<MaquinaVentaLinea>[] = [
     { key: "fecha", label: "Fecha", kind: "date", value: r => r.fecha?.slice(0, 10) },
     ...(["factura", "cliente_facturado", "marca", "tipo_maquina", "modelo", "chasis"] as const).map((key, i) => ({ key, label: ["Factura", "Cliente", "Marca", "Tipo", "Modelo", "Chasis"][i], kind: "text" as const, value: (r: MaquinaVentaLinea) => r[key] })),
@@ -331,6 +346,7 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     { key: "facturado", label: "Facturado", kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' },
   ];
   const table = useSectionTable({ rows: lines, columns, title: "Detalle de Máquinas", fileName: "ventas-maquinas-detalle.xlsx", initialSort: { key: "fecha", direction: "desc" } });
+  if (isMobile) return <div className="mt-3"><MobileSalesTable title="Detalle de Máquinas" rows={table.ordered} columns={columns.map(c => c.key === "factura" ? {...c, render:(r:MaquinaVentaLinea)=>`${r.es_nota_credito ? "NC " : ""}${r.factura}`} : c)} primaryKey="cliente_facturado" rowKey={r => r.id} sort={table.sort} toggleSort={table.toggleSort} /></div>;
   return <>
     <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={lines.length}><table className="w-full min-w-0 table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
       <thead className={`bg-muted/60 text-left text-muted-foreground ${scrollHead} ${salesHeader}`}><tr>{columns.map(c => <th key={c.key} className={c.align === "right" ? "text-right" : "text-left"}>{table.heading(c.key)}</th>)}</tr></thead>
@@ -355,7 +371,7 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   const summary = useMemo(() => summarize(lines), [lines]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
   return <Panel className="p-3">
-    <div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 min-w-0 grid-cols-5 overflow-hidden rounded-md border text-[11px] md:shrink-0">{tabs.map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} title={label} onClick={() => setView(key)} className={cn("min-w-0 truncate whitespace-nowrap px-2 hover:bg-accent md:px-3", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
+    <div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<ExplorerView> value={view} onChange={setView} options={tabs} /></div>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
       : view === "resumen" ? <SummaryView summary={summary} lines={lines} />

@@ -31,7 +31,7 @@ export function CompactListTable<T>({ rows, columns, id, label, sort, onSort, he
     <colgroup>{columns.map(column => <col key={column.key} className={cn(column.width, column.hiddenBelow && visibility[column.hiddenBelow][0])} />)}
       {actions && <col className={actions.width} />}</colgroup>
     <TableHeader><TableRow>{columns.map(column => <TableHead key={column.key}
-      className={cn("h-9 overflow-hidden whitespace-nowrap px-1 text-[12px] sm:px-2", axis(column.align), column.hiddenBelow && visibility[column.hiddenBelow][1])}
+      className={cn("h-9 overflow-hidden whitespace-nowrap px-1 text-[12px] sm:px-2 max-md:[&_button]:min-h-11 max-md:[&_span]:whitespace-normal max-md:[&_span]:overflow-visible", axis(column.align), column.hiddenBelow && visibility[column.hiddenBelow][1])}
       aria-sort={sort?.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
       {heading ? heading(column.key) : onSort ? <SalesSortButton label={column.label} kind={column.kind} align={column.align}
         active={sort?.key === column.key} direction={sort?.direction ?? "asc"} onClick={() => onSort(column.key)} /> : column.label}
@@ -50,7 +50,7 @@ export function CompactListInfo({ label, fields, children }: {
   label: string; fields: readonly (readonly [string, string])[]; children?: ReactNode;
 }) {
   return <Popover><PopoverTrigger asChild><button type="button" title={label} aria-label={`Detalle ${label}`}
-    className="block max-w-full truncate rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    className="block min-h-11 max-w-full truncate rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-0"
     onClick={event => event.stopPropagation()}>{label}</button></PopoverTrigger>
     <PopoverContent align="start" className="max-w-[calc(100vw-2rem)] text-[13px]" aria-label={`Detalle ${label}`} onClick={event => event.stopPropagation()}>
       <dl className="space-y-1">{fields.map(([key, value]) => <div key={key} className="grid grid-cols-[90px_1fr] gap-2"><dt className="text-muted-foreground">{key}</dt><dd className="min-w-0 break-words">{value}</dd></div>)}</dl>

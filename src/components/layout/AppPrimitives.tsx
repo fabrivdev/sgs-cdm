@@ -20,20 +20,20 @@ export function PageHeader({ title, actions, tabs, meta, className }: { title: R
 
 
 export function KpiStrip({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("grid min-h-[64px] overflow-hidden rounded-xl border bg-card divide-y sm:grid-flow-col sm:auto-cols-fr sm:divide-x sm:divide-y-0", className)}>{children}</section>;
+  return <section className={cn("grid grid-cols-2 min-h-[64px] overflow-hidden rounded-xl border bg-card max-sm:[&>*]:border-b max-sm:[&>*:nth-child(odd)]:border-r max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr sm:divide-x", className)}>{children}</section>;
 }
 
 export function KpiItem({ label, value, detail, tone = "default", icon, className }: { label: ReactNode; value: ReactNode; detail?: ReactNode; tone?: "default" | "positive" | "info" | "warning" | "danger"; icon?: ReactNode; className?: string }) {
   const tones = { default: "text-foreground", positive: "text-emerald-600", info: "text-blue-600", warning: "text-amber-600", danger: "text-destructive" };
   return <div className={cn("flex min-w-0 flex-col justify-start gap-1 px-3 py-2.5", className)}>
-    <div className={cn("flex h-4 items-center justify-between gap-2", cardLabel)}><span className="truncate">{label}</span>{icon && <span className="shrink-0 text-muted-foreground [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}</div>
-    <div className={cn(kpiValue, tones[tone])}>{value}</div>
-    <div className="h-4 truncate text-[10px] leading-4 text-muted-foreground">{detail ?? <span aria-hidden>&nbsp;</span>}</div>
+    <div className={cn("flex min-h-4 items-center justify-between gap-2 sm:h-4", cardLabel)}><span className="sm:truncate">{label}</span>{icon && <span className="shrink-0 text-muted-foreground [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}</div>
+    <div className={cn(kpiValue, "max-sm:text-[clamp(14px,4.3vw,20px)]", tones[tone])}>{value}</div>
+    <div className={cn("min-h-4 text-[10px] leading-4 text-muted-foreground sm:h-4 sm:truncate", detail == null && "hidden sm:block")}>{detail ?? <span aria-hidden>&nbsp;</span>}</div>
   </div>;
 }
 
 export function CompactToolbar({ children, className }: { children: ReactNode; className?: string }) { return <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>{children}</div>; }
 export function Panel({ children, className }: { children: ReactNode; className?: string }) { return <section className={cn("min-w-0 rounded-xl border bg-card p-3.5", className)}>{children}</section>; }
-export function SectionHeader({ title, actions, meta }: { title: ReactNode; actions?: ReactNode; meta?: ReactNode }) { return <div className="flex min-h-8 items-center justify-between gap-3"><div className="min-w-0"><h2 className={sectionTitle}>{title}</h2>{meta && <div className={metaText}>{meta}</div>}</div>{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}</div>; }
+export function SectionHeader({ title, actions, meta }: { title: ReactNode; actions?: ReactNode; meta?: ReactNode }) { return <div className="flex min-h-8 flex-wrap items-center justify-between gap-3"><div className="min-w-0"><h2 className={sectionTitle}>{title}</h2>{meta && <div className={metaText}>{meta}</div>}</div>{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}</div>; }
 export function TruncatedText({ children, className }: { children: string; className?: string }) { return <span className={cn("block truncate", className)} title={children}>{children}</span>; }
 

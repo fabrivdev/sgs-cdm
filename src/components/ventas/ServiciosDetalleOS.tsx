@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSalesTable } from "./MobileSalesTable";
 import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
 import { matchesServiceSalesSearch, type ServiceSalesSearchLine } from "@/lib/serviceSalesSearch";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +62,7 @@ function quantity(row: InvoiceLine): { label: string; title: string } {
 export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: IndicadoresFiltros) {
   const filterKey = serviceFiltersKey(filtros);
   const { can } = useAuth();
+  const isMobile = useIsMobile(1024);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +110,13 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
     exportSalesTable({rows:snapshot,columns:detailColumns,sheetName:"Detalle Servicios",fileName:`ventas-servicios-detalle-${desde}-${hasta}.xlsx`});
   } }, can("datos:exportar"));
 
+  if (isMobile) return <div className="mt-3">
+    {loading ? <p role="status">Cargando…</p> : error ? <p role="alert" className="text-destructive">{error}</p> : <>
+      <MobileSalesTable title="Detalle de facturación" rows={rows} columns={detailColumns.map(c => c.key === "factura" ? {...c,render:(r:InvoiceLine)=>`${r.es_nota_credito?"NC ":""}${r.factura||"Sin número"}`} : c.key === "chasis" ? {...c,render:(r:InvoiceLine)=>r.chasis?<button type="button" className="min-h-11 text-primary underline" onClick={()=>setDetailTarget({chassis:r.chasis,os:null})}>{r.chasis}</button>:"—"} : c.key === "facturado" ? {...c,render:(r:InvoiceLine)=>usd.format(Number(r.total_venta||0))} : c)} primaryKey="cliente" rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
+      <p className="py-2 text-right text-[11px] text-muted-foreground">{rows.length} líneas · {documents} documentos</p>
+    </>}
+    {detailTarget && <MachineHistorySheet target={detailTarget} onOpenChange={open=>{if(!open)setDetailTarget(null);}} />}
+  </div>;
   return <>
     <section aria-label="Detalle de facturación de Servicios" className="mt-3 min-w-0 max-w-full rounded-md border">
       <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-2">

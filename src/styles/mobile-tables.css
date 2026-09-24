@@ -1,0 +1,22 @@
+/* Operational tables keep their existing selection/editing handlers. Secondary
+   commission fields remain in the OS sheet or technician detail, never dropped. */
+@media (max-width: 1023px) {
+  .commission-order-table th, .commission-order-table td,
+  .commission-days-table th, .commission-days-table td { display: none; }
+  .commission-order-table tr > :first-child,
+  .commission-order-table[data-selectable="true"] tr > :nth-child(2),
+  .commission-order-table tr > :nth-last-child(3),
+  .commission-order-table tr > :last-child,
+  .commission-days-table tr > :nth-child(2),
+  .commission-days-table tr > :nth-child(4),
+  .commission-days-table tr > :nth-child(7),
+  .commission-days-table td[colspan] { display: table-cell; }
+  .commission-order-table th { width: auto; }
+  .commission-order-table[data-selectable="true"] th:first-child { width: 32px; }
+  .commission-order-table th:nth-last-child(3) { width: 64px; }
+  .commission-order-table th:last-child { width: 82px; }
+  .commission-days-table th:nth-child(2) { width: auto; }
+  .commission-days-table th:nth-child(4) { width: 110px; }
+  .commission-days-table th:nth-child(7) { width: 58px; }
+  .commission-order-table button:not([role="checkbox"]), .commission-days-table button { min-height: 44px; }
+}

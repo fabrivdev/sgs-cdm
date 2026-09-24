@@ -20,6 +20,7 @@ export function ServiciosMaquinas(props: IndicadoresFiltros) {
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando máquinas…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
   return <div className="mt-3 min-w-0"><SalesDataTable title="Facturación por máquina" rows={rows} columns={columns}
+    mobileIdentity={row=>`${row.marca} · ${row.tipo_maquina}`}
     initialSort={{ key: "neto", direction: "desc" }} rowKey={row => `${row.marca}__${row.tipo_maquina}`}
     fileName={`ventas-servicios-maquinas-${props.desde}-${props.hasta}.xlsx`} empty="No hay facturación por máquina en el período." /></div>;
 }

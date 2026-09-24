@@ -41,7 +41,7 @@ describe("compact parts stock table", () => {
   it("preserves existing global sorting callbacks without sorting only the page", () => {
     const { onSort } = setup();
     const keys = ["codigo_interno", "descripcion", "santa_rita", "santa_rosa", "campo_9", "misiones", "loma_plata", "katuete", "total"];
-    screen.getAllByRole("button").forEach((button, index) => { fireEvent.click(button); expect(onSort).toHaveBeenLastCalledWith(keys[index]); });
+    screen.getAllByRole("button",{name:/^Ordenar/}).forEach((button, index) => { fireEvent.click(button); expect(onSort).toHaveBeenLastCalledWith(keys[index]); });
     // These fields are displayed separately; extending their server-order
     // contract is a later step, never an apparent order of 50 local rows.
     for (const index of [1, 2]) expect(within(screen.getAllByRole("columnheader")[index]).queryByRole("button")).toBeNull();
@@ -54,10 +54,10 @@ describe("compact parts stock table", () => {
     fireEvent.click(screen.getAllByText(row.descripcion)[0]); expect(onSelect).toHaveBeenCalledWith(row);
     expect(screen.getAllByText("CLAAS")[0].closest("[title=CLAAS]")).toHaveClass("text-marca-claas");
   });
-  it("keeps four readable columns on narrow screens and secondary values in the detail/export", () => {
+  it("keeps three readable columns on narrow screens and secondary values in the detail/export", () => {
     setup(); const heads = screen.getAllByRole("columnheader");
-    expect(heads.filter(head => !head.classList.contains("hidden")).map(head => head.textContent)).toEqual(["Código", "Marca", "Descripción", "Total"]);
-    expect(heads.filter(head => head.classList.contains("hidden"))).toHaveLength(7);
+    expect(heads.filter(head => !head.classList.contains("hidden")).map(head => head.textContent)).toEqual(["Código", "Descripción", "Total"]);
+    expect(heads.filter(head => head.classList.contains("hidden"))).toHaveLength(8);
     expect(screen.getByText("000123").closest("td")).toHaveClass("hidden", "lg:table-cell");
     for (const index of [4,5,6,7,8,9]) expect(heads[index]).toHaveClass("hidden", "md:table-cell");
   });

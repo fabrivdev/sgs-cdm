@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- las tablas/RPC de esta migración aún no están en los tipos generados de Supabase */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSalesTable } from "@/components/ventas/MobileSalesTable";
+import { CompactListInfo } from "@/components/lists/CompactListTable";
 import { format, startOfMonth } from "date-fns";
 import {
   AlertTriangle,
@@ -275,6 +278,7 @@ function SummaryTable({ rows, heading, onTechnician }: { rows: TechnicianSummary
 
 
 export default function Comisiones() {
+  const isCompact = useIsMobile(1024);
   const [initialDateRange] = useState(storedDateRange);
   const [view, setView] = useState<View>("cerradas");
   const [from, setFrom] = useState(initialDateRange.from);
@@ -619,7 +623,7 @@ export default function Comisiones() {
   const resumenPanel = (
     <Panel className="overflow-hidden p-0">
       <div className="border-b px-3 py-2"><SectionHeader title="Horas por técnico y tipo" /></div>
-      <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} heading={summaryTable.heading} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>
+      {isCompact ? <MobileSalesTable title="Horas por técnico" rows={summaryRows} columns={summaryColumns} rowKey={r=>r.key} sort={summaryTable.sort} toggleSort={summaryTable.toggleSort} onRowClick={r=>setTechnicianFilters([r.technician])} /> : <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} heading={summaryTable.heading} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>}
     </Panel>
   );
 
@@ -632,7 +636,7 @@ export default function Comisiones() {
           actions={view === "cerradas" ? <Button size="sm" disabled={busy || selected.size === 0} onClick={() => void markPaid()}><WalletCards className={cn(iconSm, "mr-2")} />Marcar pagadas ({selected.size})</Button> : view === "revisar" ? <Button size="sm" disabled={busy || selected.size === 0} onClick={() => void validateSelected()}><CheckCircle2 className={cn(iconSm, "mr-2")} />Validar cálculo ({selected.size})</Button> : undefined}
         />
       </div>
-      <div className="w-full overflow-x-auto"><div className="max-h-[480px] overflow-y-auto"><Table className={cn("w-full min-w-[860px] table-fixed", tableTextDense)}>
+      <div className="w-full overflow-x-auto"><div className="lg:max-h-[480px] lg:overflow-y-auto"><Table data-selectable={view !== "abiertas"} className={cn("commission-order-table w-full min-w-0 lg:min-w-[860px] table-fixed", tableTextDense)}>
         <TableHeader><TableRow>
           {view !== "abiertas" && <TableHead className="w-8 px-2"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
           <TableHead className={cn(tableHeadText, "w-[104px] whitespace-nowrap px-2")}>{orderTable.heading("os")}</TableHead>
@@ -738,7 +742,7 @@ export default function Comisiones() {
           <TabsContent value="liquidaciones">
             <Panel className="overflow-hidden p-0">
               <div className="border-b px-3 py-2"><SectionHeader title="Liquidaciones registradas" /></div>
-              <Table className={tableText}>
+              {isCompact ? <MobileSalesTable title="Liquidaciones registradas" rows={orderedSettlements} columns={settlementColumns.map(c=>c.key==="periodo"?{...c,render:(r:Settlement)=>`${dateLabel(r.periodo_desde)} — ${dateLabel(r.periodo_hasta)}`}:c.key==="pago"?{...c,render:(r:Settlement)=>r.pagado_en?format(new Date(r.pagado_en),"dd/MM/yyyy HH:mm"):"—"}:c)} rowKey={r=>r.id} sort={settlementTable.sort} toggleSort={settlementTable.toggleSort} metricKey="horas" /> : <Table className={tableText}>
                 <TableHeader><TableRow>
                   <TableHead className={tableHeadText}>{settlementTable.heading("periodo")}</TableHead>
                   <TableHead className={tableHeadText}>{settlementTable.heading("estado")}</TableHead>
@@ -749,7 +753,7 @@ export default function Comisiones() {
                 <TableBody>
                   {settlements.length === 0 ? <TableRow><TableCell colSpan={5} className="h-20 p-0"><EmptyState title="Sin pagos registrados" className="border-0 bg-transparent" /></TableCell></TableRow> : orderedSettlements.map((row) => <TableRow key={row.id}><TableCell>{dateLabel(row.periodo_desde)} — {dateLabel(row.periodo_hasta)}</TableCell><TableCell><Badge variant="outline">{row.estado}</Badge></TableCell><TableCell>{row.pagado_en ? format(new Date(row.pagado_en), "dd/MM/yyyy HH:mm") : "—"}</TableCell><TableCell>{row.observacion ?? "—"}</TableCell><TableCell className="text-right font-semibold tabular-nums">{hours(Number(row.total_horas))}</TableCell></TableRow>)}
                 </TableBody>
-              </Table>
+              </Table>}
             </Panel>
           </TabsContent>
         </>}
@@ -778,7 +782,7 @@ export default function Comisiones() {
                 secondaryActions={<SectionActionsMenu options={dailyExport ? [dailyExport] : []}/>}/>
               <div className="overflow-hidden rounded-md border">
                 <div className="border-b px-3 py-1.5"><SectionHeader title="Desglose por día" /></div>
-                <Table className={cn("w-full table-fixed", tableTextDense)}>
+                <Table className={cn("commission-days-table w-full table-fixed", tableTextDense)}>
                   <TableHeader><TableRow>
                     <TableHead className={cn(tableHeadText, "w-[88px] whitespace-nowrap px-2 pr-3")}>{dailyTable.heading("fecha")}</TableHead>
                     <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{dailyTable.heading("tecnico")}</TableHead>
@@ -793,10 +797,10 @@ export default function Comisiones() {
                       {day.rows.map((row, index) => <TableRow key={row.id} className="h-8">
                         <TableCell className="overflow-hidden px-2 py-1 pr-3 text-muted-foreground"><span className="block truncate tabular-nums" title={day.date === "sin-fecha" ? "Sin fecha" : dateLabel(day.date)}>{index === 0 ? (day.date === "sin-fecha" ? "s/f" : format(new Date(`${day.date}T00:00:00`), "dd/MM/yy")) : ""}</span></TableCell>
                         <TableCell className="min-w-0 overflow-hidden px-2 py-1">
-                          <span className="flex min-w-0 items-center gap-1.5" title={`${row.tecnico_nombre} · ${row.rol_tecnico}${row.motivos_validacion?.length ? ` · ${row.motivos_validacion.join(", ")}` : ""}`}>
+                          {isCompact ? <CompactListInfo label={row.tecnico_nombre} fields={[["Fecha",day.date==="sin-fecha"?"Sin fecha":dateLabel(day.date)],["Horario",`${row.hora_inicio?.slice(0,5)??"—"}–${row.hora_fin?.slice(0,5)??"—"}`],["Rol",row.rol_tecnico],["Estado",row.estado_validacion],["Pago",paidIds.has(row.id)?"Pagada":"Pendiente"],["Revisión",row.motivos_validacion?.join(", ")||"—"]]} /> : <span className="flex min-w-0 items-center gap-1.5" title={`${row.tecnico_nombre} · ${row.rol_tecnico}${row.motivos_validacion?.length ? ` · ${row.motivos_validacion.join(", ")}` : ""}`}>
                             {row.motivos_validacion?.length ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" /> : null}
                             <span className="truncate font-medium">{row.tecnico_nombre}</span>
-                          </span>
+                          </span>}
                         </TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1 tabular-nums">{row.hora_inicio?.slice(0, 5) ?? "—"}–{row.hora_fin?.slice(0, 5) ?? "—"}</TableCell>
                         <TableCell className="px-2 py-1">
@@ -826,7 +830,7 @@ export default function Comisiones() {
                         <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(row.horas_calculadas)}</TableCell>
                       </TableRow>)}
                       <TableRow key={`${day.date}-total`} className="h-7 bg-muted/40 hover:bg-muted/40">
-                        <TableCell colSpan={6} className={cn(metaText, "px-2 py-1")}>Total {day.date === "sin-fecha" ? "sin fecha" : dateLabel(day.date)}</TableCell>
+                        <TableCell colSpan={isCompact ? 2 : 6} className={cn(metaText, "px-2 py-1")}>Total {day.date === "sin-fecha" ? "sin fecha" : dateLabel(day.date)}</TableCell>
                         <TableCell className="whitespace-nowrap px-2 py-1 text-right font-semibold tabular-nums">{hours(day.total)}</TableCell>
                       </TableRow>
                     </Fragment>)}

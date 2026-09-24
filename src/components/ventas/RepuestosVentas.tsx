@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
 import { useEffect, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSalesTable } from "./MobileSalesTable";
+import { SalesViewSwitcher } from "./SalesViewSwitcher";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, FileText, Receipt, Users } from "lucide-react";
 import { RowCount, TableScroll, salesHeader } from "./TableScroll";
@@ -79,7 +82,7 @@ function State({ loading, error, retry }: { loading?: boolean; error?: Error | n
 function metricColumns<T extends Partial<PartsMetrics>>(client = false): SalesColumn<T>[] {
   return [
     ...(["facturado", "ventas", "notas_credito"] as const).map((key, i) => ({ key, label: PARTS_HEADERS[i], kind: "number" as const, align: "right" as const, value: (r: T) => r[key], excelFormat: '"$" #,##0.00' })),
-    { key: client ? "ticket" : "clientes", label: client ? "Ticket Medio" : "Clientes", kind: "number", align: client ? "right" : "center", value: r => client ? r.documentos && r.facturado != null ? r.facturado / r.documentos : null : r.clientes },
+    { key: client ? "ticket" : "clientes", label: client ? "Ticket Medio" : "Clientes", kind: "number", align: client ? "right" : "center", excelFormat: client ? '"$" #,##0.00' : undefined, value: r => client ? r.documentos && r.facturado != null ? r.facturado / r.documentos : null : r.clientes },
     { key: "documentos", label: "Documentos", kind: "number", align: "center", value: r => r.documentos },
     { key: "unidades_netas", label: "Unidades netas", kind: "number", align: "center", value: r => r.unidades_netas },
   ];
@@ -104,7 +107,7 @@ function listingColumns(view: Exclude<View, "resumen">, total: number): SalesCol
   return [view === "clientes" ? text("cliente", "Cliente facturado") : { key: "vendedor", label: "Vendedor", kind: "text", value: r => seller(r.vendedor) },
     ...metricColumns<PartsRow>(view === "clientes"),
     ...(view === "clientes" ? [
-      { key: "anterior", label: "Año anterior", kind: "number" as const, align: "right" as const, value: (r: PartsRow) => r.anterior },
+      { key: "anterior", label: "Año anterior", kind: "number" as const, align: "right" as const, excelFormat: '"$" #,##0.00', value: (r: PartsRow) => r.anterior },
       { key: "variacion", label: "Variación LY", kind: "number" as const, align: "right" as const, value: (r: PartsRow) => r.anterior == null ? null : pct(r.facturado, r.anterior) == null ? null : pct(r.facturado, r.anterior)! / 100, excelFormat: "0%" },
       { key: "ultima", label: "Última compra", kind: "date" as const, value: (r: PartsRow) => r.ultima?.slice(0, 10) },
     ] : []), participation(total)];
@@ -136,6 +139,7 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
   selected: string | null; onSelect: (value: string | null) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile(1024);
   const columns: SalesColumn<PartsPeriod>[] = [
     { key: "periodo", label: "Período", kind: "text", value: r => r.periodo, exportValue: r => r.periodo || "Total del período" },
     ...metricColumns<PartsPeriod>(),
@@ -150,7 +154,7 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
       <button type="button" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed} className="flex flex-1 items-center justify-between text-left text-[13px] font-semibold">Evolución de la facturación{collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
       {selected && <button type="button" onClick={() => onSelect(null)} className="rounded border px-2 py-1 text-[11px]">Ver período completo</button>}
     </div>
-    {!collapsed && <div className="mt-3">{loading || error || !data ? <State loading={loading} error={error} retry={retry} /> : <Table minWidth="min-w-0">
+    {!collapsed && <div className="mt-3">{loading || error || !data ? <State loading={loading} error={error} retry={retry} /> : isMobile ? <MobileSalesTable title="Períodos de Repuestos" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render:(r:PartsPeriod)=><PeriodLabel value={r.periodo} mode={mode} />} : c)} rowKey={r=>r.periodo} sort={table.sort} toggleSort={table.toggleSort} onRowClick={r=>onSelect(selected===r.periodo?null:r.periodo)} selected={r=>selected===r.periodo} footer={{...data.resumen,periodo:"",desde:"",hasta:"",anterior:data.comparacion.facturado,anterior_lineas:data.comparacion.lineas,anio_anterior:data.comparacion_ly.facturado,anio_anterior_lineas:data.comparacion_ly.lineas}} /> : <Table minWidth="min-w-0">
       <colgroup><col style={{ width: "13%" }} />{PARTS_HEADERS.map(label => <col key={label} style={{ width: "10%" }} />)}<col /><col /><col /></colgroup>
       <Heads columns={columns} sort={table.sort} toggle={table.toggleSort} />
       <tbody>{table.ordered.map(row => <tr key={row.periodo} className={cn("hover:bg-accent", selected === row.periodo && "bg-primary/5")}>
@@ -173,14 +177,17 @@ function Summary({ data }: { data: PartsOverview }) {
   </div>;
 }
 function SummaryGroup({ label, rows, total }: { label: string; rows: Array<PartsMetrics & { label: string }>; total: number }) {
+  const isMobile = useIsMobile(1024);
   const columns: SalesColumn<PartsMetrics & { label: string }>[] = [{ key: "label", label, kind: "text", value: r => r.label }, ...metricColumns(), participation(total)];
   const table = useSectionTable({ rows, columns, title: `Repuestos por ${label.toLowerCase()}`, fileName: `ventas-repuestos-${label.toLowerCase()}.xlsx`, initialSort: { key: "facturado", direction: "desc" } });
+  if (isMobile) return <MobileSalesTable title={`Repuestos por ${label.toLowerCase()}`} rows={table.ordered} columns={columns} rowKey={r=>r.label} sort={table.sort} toggleSort={table.toggleSort} />;
   return <Table>
       <colgroup><col style={{ width: "28%" }} />{PARTS_HEADERS.map(head => <col key={head} />)}<col /></colgroup>
       <Heads columns={columns} sort={table.sort} toggle={table.toggleSort} /><tbody>{table.ordered.map(row => <tr key={row.label}><td className="font-medium">{row.label}</td><Metrics row={row} /><td className="text-right">{share(row.facturado, total)}</td></tr>)}</tbody>
     </Table>;
 }
 function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "clientes" | "repuestos" | "detalle" }) {
+  const isMobile = useIsMobile(1024);
   const { can } = useAuth();
   const [sort, setSort] = useState<SalesSort>({ key: view === "detalle" ? "fecha" : "facturado", direction: "desc" });
   const toggleSort = (key: string) => setSort(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
@@ -218,6 +225,10 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
   const data = { ...query.data.pages[0], filas: query.data.pages.flatMap(page => page.filas) };
   if (!data.filas.length) return <State />;
   const labels = columns.map(c => c.label);
+  if (isMobile) return <div className="space-y-2"><MobileSalesTable title={`Ventas de Repuestos · ${view}`} rows={data.filas} columns={listingColumns(view,data.total_periodo).map(c=>c.key==="factura"?{...c,render:(r:PartsRow)=>`${r.es_nota_credito?"NC ":""}${r.factura||"—"}`}:c)} primaryKey={view==="detalle"?"cliente":view==="repuestos"?"descripcion":undefined} rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
+    <RowCount rows={data.total} loaded={data.filas.length} label="registros" />
+    {query.hasNextPage && <button type="button" className="min-h-11 w-full rounded-md border text-sm" disabled={query.isFetchingNextPage} onClick={()=>void fetchNextPage()}>{query.isFetchingNextPage?"Cargando…":"Cargar más registros"}</button>}
+  </div>;
   return <div className="space-y-2"><Table rows={data.filas.length} footer={<RowCount rows={data.total} loaded={data.filas.length} label="registros" />} minWidth={view === "detalle" ? "min-w-0" : view === "repuestos" ? "min-w-0" : "min-w-0"}>
     <colgroup>{columns.map(c => <col key={c.key} style={{ width: `${100 * (c.key === "descripcion" || c.key === "cliente" || c.key === "vendedor" ? 1.8 : 1) / columns.reduce((n, k) => n + (k.key === "descripcion" || k.key === "cliente" || k.key === "vendedor" ? 1.8 : 1), 0)}%` }} />)}</colgroup>
     <Heads columns={columns} sort={sort} toggle={toggleSort} /><tbody>{data.filas.map(row => <tr key={row.id} className="hover:bg-muted/20">
@@ -256,7 +267,7 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, se
           "Histórico pendiente de conciliar: completá las notas de crédito desde Sugerencias → Historial. Los importes mostrados incluyen solamente las líneas ya cargadas."}
       </p>}
     <Panorama data={panorama.data} loading={panorama.isLoading} error={panorama.error} retry={() => void panorama.refetch()} mode={periodMode} selected={selectedPeriod} onSelect={onSelectPeriod} />
-    <Panel className="p-3"><div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><div className="grid h-8 min-w-0 grid-cols-5 overflow-hidden rounded-md border text-[11px] md:shrink-0">{([ ["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["repuestos", "Repuestos"], ["detalle", "Detalle"] ] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} title={label} onClick={() => setView(key)} className={cn("min-w-0 truncate whitespace-nowrap px-2 hover:bg-accent md:px-3", view === key && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}</div></div>
+    <Panel className="p-3"><div className="flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<View> value={view} onChange={setView} options={[["resumen","Resumen"],["vendedores","Vendedores"],["clientes","Clientes"],["repuestos","Repuestos"],["detalle","Detalle"]]} /></div>
       <div className="mt-3" />
       {view === "resumen" ? overview.isLoading || overview.error || !overview.data ? <State loading={overview.isLoading} error={overview.error} retry={() => void overview.refetch()} /> : <Summary data={overview.data} />
         : <Listing key={`${view}:${JSON.stringify(focused)}`} filters={focused} view={view} />}

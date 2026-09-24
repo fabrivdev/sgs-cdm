@@ -30,8 +30,8 @@ export const cardLabel = "text-[10px] leading-3.5 font-medium tracking-[0.02em] 
 export const metaText = "text-[11px] leading-4 text-muted-foreground";
 
 // Densidad de controles (inputs, selects, botones de filtro)
-export const controlHeight = "h-8";
-export const controlText = "text-[12px]";
+export const controlHeight = "h-11 sm:h-8";
+export const controlText = "text-base sm:text-[12px]";
 export const controlClass = `${controlHeight} ${controlText}`;
 
 

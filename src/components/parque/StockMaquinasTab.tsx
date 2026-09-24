@@ -115,15 +115,15 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
 
   const viewColumns: CompactListColumn<StockMaquina>[] = columns.map(column => {
     const layout: Record<string, Pick<CompactListColumn<StockMaquina>, "width" | "hiddenBelow">> = {
-      sucursal: {width:"w-[18%] md:w-[12%] lg:w-[11%]"},
+      sucursal: {width:"md:w-[12%] lg:w-[11%]",hiddenBelow:"md"},
       deposito: {width:"lg:w-[10%]",hiddenBelow:"lg"},
       producto_codigo: {width:"md:w-[14%] lg:w-[12%]",hiddenBelow:"md"},
       tipo: {width:"lg:w-[11%]",hiddenBelow:"lg"},
-      marca: {width:"w-[15%] md:w-[10%] lg:w-[8%]"},
-      modelo: {width:"w-[28%] md:w-[25%] lg:w-[18%]"},
+      marca: {width:"md:w-[10%] lg:w-[8%]",hiddenBelow:"md"},
+      modelo: {width:"w-[43%] md:w-[25%] lg:w-[18%]"},
       estado: {width:"md:w-[12%] lg:w-[8%]",hiddenBelow:"md"},
-      chasis: {width:"w-[25%] md:w-[19%] lg:w-[16%]"},
-      saldo: {width:"w-[14%] md:w-[8%] lg:w-[6%]"},
+      chasis: {width:"w-[40%] md:w-[19%] lg:w-[16%]"},
+      saldo: {width:"w-[17%] md:w-[8%] lg:w-[6%]"},
     };
     return {...column,...layout[column.key], className:["producto_codigo","chasis"].includes(column.key)?"font-mono":undefined,
       render:row=>{

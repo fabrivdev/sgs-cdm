@@ -90,14 +90,14 @@ export default function StockProyectado() {
   });
   const viewColumns: CompactListColumn<ProjectedMachineStockRow>[] = columns.map((column) => {
     const layout: Record<string, Pick<CompactListColumn<ProjectedMachineStockRow>, "width" | "hiddenBelow">> = {
-      marca: { width: "w-[18%] md:w-[13%] lg:w-[11%]" },
+      marca: { width: "md:w-[13%] lg:w-[11%]", hiddenBelow: "md" },
       tipo: { width: "md:w-[19%] lg:w-[17%]", hiddenBelow: "md" },
-      modelo: { width: "w-[40%] md:w-[29%] lg:w-[29%]" },
-      stock: { width: "w-[14%] md:w-[9%] lg:w-[8%]" },
+      modelo: { width: "w-[52%] md:w-[29%] lg:w-[29%]" },
+      stock: { width: "w-[20%] md:w-[9%] lg:w-[8%]" },
       pedidos_compra: { width: "md:w-[8%]", hiddenBelow: "md" },
       disponibilidad: { width: "lg:w-[9%]", hiddenBelow: "lg" },
       ventas_pendientes: { width: "md:w-[11%] lg:w-[10%]", hiddenBelow: "md" },
-      stock_proyectado: { width: "w-[18%] md:w-[11%] lg:w-[8%]" },
+      stock_proyectado: { width: "w-[28%] md:w-[11%] lg:w-[8%]" },
     };
     return {
       ...column,

@@ -168,7 +168,7 @@ export function FiltersBar({
                 aria-label="Más filtros"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                Más filtros{activeCount > 0 ? ` ${activeCount}` : ""}
+                <span className="hidden sm:inline">Más filtros</span>{activeCount > 0 ? ` ${activeCount}` : ""}
               </Button>
           )}
           {secondaryActions}
@@ -185,7 +185,7 @@ export function FiltersBar({
           <SheetHeader className="border-b px-4 py-3 text-left">
             <SheetTitle className="text-[14px]">Filtros</SheetTitle>
           </SheetHeader>
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {children && <div className="flex flex-col gap-3">{children}</div>}
             {expanded && <div className="flex flex-col gap-3">{expanded}</div>}
             {actions && <div className="flex flex-col gap-2 border-t pt-3 sm:hidden">{actions}</div>}

@@ -52,6 +52,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
       fileName={`ventas-servicios-tipos-${props.desde}-${props.hasta}.xlsx`} />
     {!Array.isArray(data.por_marca_tipo) ? <div role="alert" className="py-10 text-center text-[12px] text-destructive">Falta actualizar la consulta del resumen por marca. Aplicá el SQL de corrección.</div>
       : <SalesDataTable title="Facturación por marca y tiempo" rows={marcaRows} columns={brandColumns}
+        mobileIdentity={row=>row.sin_vinculo_historico?historicLabel:`${row.marca} · ${typeLabel(row.tipo_tiempo)}`}
         initialSort={{key:"neto",direction:"desc"}} rowKey={row => `${row.marca}-${row.tipo_tiempo}-${Boolean(row.sin_vinculo_historico)}`}
         fileName={`ventas-servicios-marcas-${props.desde}-${props.hasta}.xlsx`} />}
   </div>;

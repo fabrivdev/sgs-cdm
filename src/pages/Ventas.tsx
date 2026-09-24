@@ -1,3 +1,4 @@
+import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
@@ -183,12 +184,10 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
     <Panel className="p-3">
       <div className="flex flex-col gap-2 border-b pb-3 md:flex-row md:items-center md:justify-between">
         <h2 className="text-[13px] font-semibold">{area === "servicios" ? "Indicadores de postventa" : "Ventas"}</h2>
-        <div className={cn("grid h-8 overflow-hidden rounded-md border text-[11px]", area === "servicios" ? "grid-cols-5" : "grid-cols-3")}>
-          {(area === "servicios"
+        <SalesViewSwitcher value={view} onChange={value=>{setView(value);setExpanded(null);}} options={area === "servicios"
             ? ([['resumen', 'Resumen'], ['tecnicos', 'Técnicos'], ['clientes', 'Clientes'], ['maquinas', 'Máquinas'], ['facturas', 'Detalle']] as const)
             : ([['facturas', 'Facturas'], ['clientes', 'Clientes'], ['analisis', 'Análisis']] as const)
-          ).map(([value, label]) => <button key={value} type="button" onClick={() => { setView(value); setExpanded(null); }} className={cn("px-3 hover:bg-accent", view === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
-        </div>
+          } />
       </div>
 
       {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
