@@ -3454,14 +3454,9 @@ export default function Dashboard() {
           </p>
         )}
 
-        <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
-        <TabsList className="inline-flex h-auto min-w-max">
-          <TabsTrigger value="resumen" className="whitespace-nowrap">Vista general</TabsTrigger>
-          <TabsTrigger value="facturación" className="whitespace-nowrap">Facturación</TabsTrigger>
-          <TabsTrigger value="trabajos" className="whitespace-nowrap">Trabajos</TabsTrigger>
-          <TabsTrigger value="servicios" className="whitespace-nowrap">Servicios</TabsTrigger>
-        </TabsList>
-        </div>
+        <select aria-label="Vista del Dashboard" value={section} onChange={event => goSection(event.target.value)} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base sm:hidden">
+          <option value="resumen">Vista general</option><option value="facturación">Facturación</option><option value="trabajos">Trabajos</option><option value="servicios">Servicios</option>
+        </select>
 
         <TabsContent value="resumen" className="space-y-3">
 

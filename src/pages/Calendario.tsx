@@ -37,6 +37,8 @@ import { MAX_EVENTOS_DIA_CALENDARIO, MAX_DISPONIBILIDADES_DIA } from "@/lib/cons
 import type { Estado, Marca, Sucursal, TipoTrabajo } from "@/lib/constants";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { PageHeader } from "@/components/layout/AppPrimitives";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileAgenda, type AgendaDay } from "@/components/calendar/MobileAgenda";
 
 interface Servicio {
   id: string;
@@ -108,6 +110,7 @@ export default function Calendario() {
   const { isAdmin, isCabecilla } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [vista, setVista] = useState<"mes" | "semana" | "tecnicos">("mes");
+  const isPhone = useIsMobile(640);
   const [cursor, setCursor] = useState(new Date());
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -545,6 +548,7 @@ export default function Calendario() {
           <Button
             variant="outline"
             size="icon"
+            aria-label="Período anterior"
             className="h-9 w-9"
             onClick={() => setCursor(vista === "mes" ? addMonths(cursor, -1) : addWeeks(cursor, -1))}
           >
@@ -570,6 +574,7 @@ export default function Calendario() {
           <Button
             variant="outline"
             size="icon"
+            aria-label="Período siguiente"
             className="h-9 w-9"
             onClick={() => setCursor(vista === "mes" ? addMonths(cursor, 1) : addWeeks(cursor, 1))}
           >
@@ -607,7 +612,26 @@ export default function Calendario() {
 
 
 
-      {vista === "tecnicos" ? (
+      {isPhone && vista !== "mes" ? (() => {
+        const agendaDays = (technicianId?: string): AgendaDay<Servicio>[] => days.map(day => ({
+          key: dateKey(day), label: format(day, "EEE d 'de' MMM", { locale: es }),
+          nonWorking: diasNL.has(dateKey(day)) ? diasNL.get(dateKey(day))?.motivo || "No laboral" : day.getDay() === 0 ? "No laboral" : undefined,
+          events: (technicianId ? eventsForTecnicoDay(technicianId, day) : eventsForDay(day)).map(event => ({
+            key: `${event.jornada_id ?? event.id}-${event.fecha_programada}`,
+            label: `${codigoByServicio.get(event.id) ? `${codigoByServicio.get(event.id)} · ` : ""}${clienteNombre(event.cliente_id)}`,
+            status: event.estado, value: event,
+          })),
+          availability: (technicianId ? disponibilidadForTecnicoDay(technicianId, day) : disponibilidadForDay(day)).map(item => ({
+            key: item.id, label: `${profById[item.tecnico_id] ?? "Técnico"} · ${disponibilidadLabel(item.tipo)}${item.observacion ? ` · ${item.observacion}` : ""}`,
+          })),
+        }));
+        const openDay = (key: string) => setDiaSel(parseISO(key));
+        return vista === "semana" ? <MobileAgenda days={agendaDays()} onDay={openDay} onEvent={setDetalle} />
+          : <div className="space-y-2">{!tecnicosVisibles.length && <p className="p-3 text-sm text-muted-foreground">No hay técnicos activos.</p>}{tecnicosVisibles.map(technician => <details key={technician.id} className="min-w-0 rounded-lg border bg-card">
+            <summary className="min-h-11 cursor-pointer break-words px-3 py-3 text-[13px] font-medium">{technician.nombre}</summary>
+            <MobileAgenda days={agendaDays(technician.id)} onDay={openDay} onEvent={setDetalle} />
+          </details>)}</div>;
+      })() : vista === "tecnicos" ? (
         <div className="relative">
         <Card className="overflow-x-auto">
           {(() => {

@@ -55,6 +55,15 @@ Tres pestañas: Ventas, Stock y Operaciones. Datos ficticios independientes, no 
 
 ## Criterios antes de extender a producción
 
+### Tercera etapa: agenda, navegación gerencial y formularios compartidos
+
+- Calendario: bajo 640 px, Semana usa agenda vertical por día; Por técnico usa desplegables por persona con sus jornadas y disponibilidades. El mes conserva su cuadrícula compacta y escritorio conserva la matriz. Pulsar jornada abre el detalle existente; pulsar día abre la agenda completa de ese día con los filtros de página, también desde un desplegable de técnico. No se cambia automáticamente el filtro ni se reprograma al consultar. La matriz y arrastre de escritorio permanecen intactos.
+- Se conservan las identidades de jornada, los estados, los días no laborales y cada entrada de disponibilidad; una jornada no se deduplica por compartir OS. Sin actividad se informa ausencia de programación, no disponibilidad laboral garantizada.
+- Dashboard: las cuatro pestañas horizontales móviles se sustituyen por un selector que invoca el mismo `goSection`. Escritorio y contenido financiero/operativo no cambian. No se implementa el futuro panel gerencial propuesto en las notas.
+- Dialog/Sheet: cierre de 44 × 44 px en teléfonos, icono pequeño, espacio reservado junto al título. DialogFooter mantiene sus acciones con altura táctil mínima en móvil; no se cambian validaciones ni guardado. `ServicioFormDialog` ya utiliza cuerpo desplazable y pie separado mediante ResponsiveDrawer; se conserva.
+
+Validación: 7 pruebas de agenda, diálogo, filtros y orden del Dashboard; tipos y build correctos. Fixture con componentes reales a 320 px, sin desborde, título largo sin superposición y cierre medido en 44 × 44. No se probó teclado virtual de teléfono físico ni todas las variantes de formularios existentes. Sin SQL ni cambios de fuentes/roles. La matriz general conserva pendientes de verificación en historiales interiores, Administración y formularios particulares; no equivale a cobertura exhaustiva de producción.
+
 ### Segunda etapa implementada
 
 Operaciones muestra en teléfonos Máquina + Facturación/Entrega + detalle. El selector sólo cambia la columna visible; conserva los cálculos canónicos, la ordenación del origen, todas las columnas de escritorio y el pedido completo al abrir. NP y valor permanecen en detalle y exportación. Verificación con componente real a 320 px: sin desborde, cambio de estado visible y una fila por unidad.
