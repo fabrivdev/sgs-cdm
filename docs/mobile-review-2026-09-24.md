@@ -12,6 +12,8 @@ Validación: 23 pruebas de componentes, búsqueda, exportación y permisos; Type
 
 ## Evidencia y límites
 
+Cuarta etapa: Administración sustituye tarjetas móviles extensas por filas de nombre, estado y acceso a ficha. Navegación móvil por selector con las mismas restricciones de sección; escritorio intacto. Alta con altura máxima dinámica y cuerpo desplazable; credenciales con desplazamiento. Diez pruebas focalizadas pasan, incluyendo altas autorizadas/rechazadas y selector restringido. No se afirma validación visual de esta etapa en navegador ni teclado físico. Los historiales interiores y las previsualizaciones de importación siguen pendientes; sin cambios de SQL o autorizaciones.
+
 Se contrastaron rutas y componentes del código con capturas móviles actuales de Stock de máquinas, Operaciones y Repuestos, además de las capturas proporcionadas de Ventas. La versión abierta en producción todavía mostraba indicadores apilados y columnas diferentes de la versión local: no atribuir toda esa presentación al último código sin verificar despliegue.
 
 En Operaciones la tabla de la versión abierta empezaba aproximadamente a 546 px desde el borde superior a un viewport solicitado de 390 px. La prioridad del rediseño es reducir bloques anteriores al contenido, no reducir indiscriminadamente tipografías ni áreas táctiles.

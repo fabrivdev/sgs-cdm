@@ -586,7 +586,14 @@ export default function Admin() {
       />
 
       <Tabs value={adminTab} onValueChange={(value) => { setAdminTab(value); setTableSearch(""); }}>
-        <TabsList>
+        <select aria-label="Sección de Administración" value={adminTab}
+          onChange={(event) => { setAdminTab(event.target.value); setTableSearch(""); }}
+          className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base sm:hidden">
+          {hasSectionAccess("admin.usuarios") && <option value="equipo">Equipo y accesos</option>}
+          {hasSectionAccess("admin.importaciones") && <option value="importar">Datos</option>}
+          {hasSectionAccess("admin.parametros") && <option value="parametros">Configuración</option>}
+        </select>
+        <TabsList className="hidden sm:inline-flex">
           {hasSectionAccess("admin.usuarios") && <TabsTrigger value="equipo">
             <Users className="mr-2 h-4 w-4" />
             Equipo y accesos
@@ -676,38 +683,19 @@ export default function Admin() {
             </Table>
           </Card>
 
-          <div className="space-y-2 md:hidden">
+          <div className="divide-y overflow-hidden rounded-md border md:hidden">
             {filteredProfiles.map((profile) => (
-              <Card key={profile.id} className="space-y-3 p-3">
-                <div className="flex items-start justify-between gap-2">
+              <div key={profile.id} className="px-3 py-1">
+                <div className="flex min-w-0 items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold">{profile.nombre}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">
-                      {emailByProfile(profile) || "Sin acceso"}
-                    </div>
+                    <div className="truncate text-sm font-medium" title={profile.nombre}>{profile.nombre}</div>
                   </div>
-                  <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setSectionUser(profile)}>
-                    {canManageAdmin && !isProtectedProfile(profile) ? "Configurar" : "Ver"}
+                  <span className="shrink-0 text-xs text-muted-foreground">{profile.activo ? "Activo" : "Inactivo"}</span>
+                  <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Ver ficha de ${profile.nombre}`} onClick={() => setSectionUser(profile)}>
+                    <Eye className="h-4 w-4" />
                   </Button>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3 text-[12px]">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Sucursal</Label>
-                    <div className="mt-1">{profile.sucursal ?? "—"}</div>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Nivel</Label>
-                    <div className="mt-1">{nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile))}</div>
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-[10px] text-muted-foreground">Áreas</Label>
-                    <div className="mt-1 text-muted-foreground">
-                      {modulesForProfile(profile).length ? modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(" · ") : "Sin áreas"}
-                    </div>
-                  </div>
-                </div>
-              </Card>
+              </div>
             ))}
           </div>
         </TabsContent>
@@ -921,11 +909,11 @@ export default function Admin() {
       </Tabs>
 
       <Dialog open={createOpen} onOpenChange={(open) => { if (!busy) setCreateOpen(open); }}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent className="flex max-h-[90dvh] max-w-lg flex-col" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{createWithAccess ? "Nuevo usuario" : "Nuevo operativo de Servicios"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <div className="grid min-h-0 gap-4 overflow-y-auto py-2 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="new-person-name" className="text-[12px]">Nombre y apellido</Label>
               <Input id="new-person-name" value={nombre} onChange={(event) => setNombre(event.target.value)} disabled={busy} autoFocus />
@@ -974,7 +962,7 @@ export default function Admin() {
       </Dialog>
 
       <Dialog open={!!credUser} onOpenChange={(open) => !open && setCredUser(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{credUser && emailByProfile(credUser) ? "Editar acceso" : "Agregar acceso"} — {credUser?.nombre}</DialogTitle>
           </DialogHeader>

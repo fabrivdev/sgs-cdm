@@ -28,6 +28,21 @@ async function openCreation() {
 }
 
 describe("Administración: alta de operativos sin acceso", () => {
+  it("limita el selector móvil a las secciones autorizadas", async () => {
+    render(<Admin />);
+    const navigation = await screen.findByRole("combobox", { name: "Sección de Administración" });
+    expect(navigation).toHaveValue("equipo");
+    expect(navigation.querySelectorAll("option")).toHaveLength(1);
+    expect(navigation).toHaveTextContent("Equipo y accesos");
+    expect(navigation).not.toHaveTextContent("Configuración");
+  });
+  it("mantiene el alta dentro del viewport con cuerpo desplazable", async () => {
+    await openCreation();
+    fireEvent.click(screen.getByRole("switch", { name: "Acceso al sistema" }));
+    expect(screen.getByRole("dialog")).toHaveClass("max-h-[90dvh]", "flex-col");
+    expect(screen.getByLabelText("Nombre y apellido").parentElement?.parentElement).toHaveClass("min-h-0", "overflow-y-auto");
+    expect(screen.getByRole("button", { name: "Crear usuario" })).toBeVisible();
+  });
   it("abre por defecto sin correo ni contraseña y con nivel Operativo", async () => {
     await openCreation();
     expect(screen.getByRole("heading", { name: "Nuevo operativo de Servicios" })).toBeInTheDocument();
