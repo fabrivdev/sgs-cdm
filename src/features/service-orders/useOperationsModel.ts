@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { importedOrderModel } from "./orderMetrics";
+import { matchesTechnicianStatus, type TechnicianStatus } from "./productivityStatus";
 import { addDays, addMonths, addWeeks, addYears, differenceInCalendarDays, endOfMonth, endOfWeek, endOfYear, format, getDay, getISOWeek, getISOWeekYear, parseISO, startOfMonth, startOfWeek, startOfYear, subYears } from "date-fns";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
@@ -365,7 +366,7 @@ export const emptyOperationsData: OperationsData = {
 /** Operational selectors extracted from Dashboard 7a377f9. No financial queries or writes.
  * Closed OS use closure date; open OS use opening date. This is not a worked-hours ledger.
  */
-export function useOperationsModel(data: OperationsData, filters: OperationsFilters, matrixMetric: "trabajos" | "horas" = "trabajos", today = new Date()) {
+export function useOperationsModel(data: OperationsData, filters: OperationsFilters, matrixMetric: "trabajos" | "horas" = "trabajos", today = new Date(), technicianStatus: TechnicianStatus = "todos") {
   const { servicios, jornadas, trabajos, clientes, profiles, servicioTecnicos, ordenesServicio, disponibilidades, metaHorasMensual } = data;
   const { dateFrom, dateTo, periodMode, q, fSucursales, fMarcas, fTiposTiempo, fEstadosTrabajo, fTécnicos, fResponsablesOS, fEstadosOS, fOSRubros } = filters;
   const todayStr = format(today, "yyyy-MM-dd");
@@ -525,6 +526,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
     });
 
     for (const profile of technicianOptions) {
+      if (!matchesTechnicianStatus({ profileId: profile.id, activo: true }, technicianStatus)) continue;
       const profileSucursal = profileById.get(profile.id)?.sucursal ?? null;
       if (fSucursales.length > 0 && (!profileSucursal || !fSucursales.includes(profileSucursal))) continue;
       if (responsablesSeleccionados.size > 0 && !responsablesSeleccionados.has(profile.nombre)) continue;
@@ -690,9 +692,10 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       const tercerosValor = Number(row.terceros_valor || 0);
       const valorOS = serviciosValor + repuestosValor + kilometrajeValor + tercerosValor;
       const totalsByTechnician = (rawData.totales_por_tecnico ?? {}) as Record<string, Record<string, unknown>>;
-      const participantsForMetrics = responsablesSeleccionados.size > 0
+      const participantsForMetrics = (responsablesSeleccionados.size > 0
         ? participants.filter((participant) => responsablesSeleccionados.has(participant.tecnico))
-        : participants;
+        : participants).filter(participant => matchesTechnicianStatus(participant, technicianStatus));
+      if (technicianStatus !== "todos" && !participantsForMetrics.length) return [];
       const participantMetrics = attributeServiceOrderMetrics(
         participantsForMetrics.map((participant) => ({
           key: participant.tecnico,
@@ -951,7 +954,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       evolucion,
       sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
-  }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, trabajoById]);
+  }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById]);
 
 const jornadasRealizadasPrev = useMemo(
     () =>

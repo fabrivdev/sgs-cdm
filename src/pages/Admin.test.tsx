@@ -2,12 +2,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Admin from "./Admin";
 
-const { createPerson, canManage, success, errorToast, invalidateQueries } = vi.hoisted(() => ({ createPerson: vi.fn(), canManage: { value: true }, success: vi.fn(), errorToast: vi.fn(), invalidateQueries: vi.fn() }));
+const { createPerson, canManage, success, errorToast, invalidateQueries, goalRead, goalSave, parametersAccess } = vi.hoisted(() => ({ createPerson: vi.fn(), canManage: { value: true }, success: vi.fn(), errorToast: vi.fn(), invalidateQueries: vi.fn(), goalRead: vi.fn(), goalSave: vi.fn(), parametersAccess: { value: false } }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries }) }));
 vi.mock("@/lib/admin-create-person", () => ({ createAdminPerson: createPerson }));
 vi.mock("sonner", () => ({ toast: { success, error: errorToast } }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => canManage.value, isSuperAdmin: false, hasSectionAccess: (section: string) => section === "admin.usuarios" }) }));
-vi.mock("@/lib/appSettings", () => ({ DEFAULT_MONTHLY_PRODUCTIVITY_GOAL: 160, loadMonthlyProductivityGoal: async () => 160, saveMonthlyProductivityGoal: vi.fn() }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => canManage.value, isSuperAdmin: false, hasSectionAccess: (section: string) => section === "admin.usuarios" || (parametersAccess.value && section === "admin.parametros") }) }));
+vi.mock("@/lib/appSettings", () => ({ loadProductivityGoalSetting: goalRead, saveMonthlyProductivityGoal: goalSave }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   from: () => {
     const query = { select: () => query, order: () => query, eq: () => query, range: () => query, then: (resolve: (result: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve) };
@@ -20,7 +20,7 @@ vi.mock("@/components/parque/ImportarTotvsTab", () => ({ ImportarTotvsTab: () =>
 vi.mock("@/components/exports/TableExportButton", () => ({ TableExportButton: () => null }));
 vi.mock("@/components/filters/FiltersBar", () => ({ FiltersBar: () => null }));
 
-beforeEach(() => { vi.clearAllMocks(); canManage.value = true; createPerson.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); canManage.value = true; parametersAccess.value = false; createPerson.mockResolvedValue(undefined); goalRead.mockResolvedValue({ value: 160, warning: null }); goalSave.mockResolvedValue(undefined); });
 afterEach(cleanup);
 async function openCreation() {
   render(<Admin />);
@@ -28,6 +28,30 @@ async function openCreation() {
 }
 
 describe("Administración: alta de operativos sin acceso", () => {
+  async function openParameters() {
+    parametersAccess.value = true;
+    render(<Admin />);
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Configuración" }), { button: 0, ctrlKey: false });
+    return screen.findByLabelText("Meta mensual por técnico");
+  }
+  it("shows the persisted goal, saves it and invalidates productivity", async () => {
+    const input = await openParameters();
+    await waitFor(() => expect(input).toHaveValue(160));
+    fireEvent.change(input, { target: { value: "144" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar parámetro" }));
+    await waitFor(() => expect(goalSave).toHaveBeenCalledWith(144));
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["service-orders"] });
+  });
+  it("does not fabricate a saved goal when it cannot be read, and supports retry", async () => {
+    goalRead.mockResolvedValueOnce({ value: null, warning: "Sin permiso para leer la meta de productividad." });
+    const input = await openParameters();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sin permiso");
+    expect(input).toHaveValue(null);
+    expect(screen.getByRole("button", { name: "Guardar parámetro" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(input).toHaveValue(160));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("limita las pestañas visibles a las secciones autorizadas", async () => {
     render(<Admin />);
     const navigation = await screen.findByRole("tablist", { name: "Sección de Administración" });

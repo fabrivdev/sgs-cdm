@@ -1,23 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCTIVITY_GOAL_KEY, readProductivityGoal } from "./productivityGoal";
 
-export const PRODUCTIVITY_GOAL_KEY = "meta_horas_mensual_tecnico";
-export const DEFAULT_MONTHLY_PRODUCTIVITY_GOAL = 132;
+export { PRODUCTIVITY_GOAL_KEY } from "./productivityGoal";
+export const loadProductivityGoalSetting = () => readProductivityGoal(supabase);
 
 export async function loadMonthlyProductivityGoal(): Promise<number> {
-  // This table is introduced by the matching migration and is not yet in generated Supabase types.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from("app_configuracion")
-    .select("valor_numero")
-    .eq("clave", PRODUCTIVITY_GOAL_KEY)
-    .maybeSingle();
-
-  if (error) return DEFAULT_MONTHLY_PRODUCTIVITY_GOAL;
-  const value = Number(data?.valor_numero);
-  return Number.isFinite(value) && value > 0 ? value : DEFAULT_MONTHLY_PRODUCTIVITY_GOAL;
+  return (await loadProductivityGoalSetting()).value ?? 0;
 }
 
 export async function saveMonthlyProductivityGoal(value: number): Promise<void> {
+  if (!Number.isFinite(value) || value <= 0) throw new Error("La meta mensual debe ser mayor que cero");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase as any).from("app_configuracion").upsert({
     clave: PRODUCTIVITY_GOAL_KEY,

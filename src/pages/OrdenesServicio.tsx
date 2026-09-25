@@ -21,6 +21,7 @@ import { validOperationsRange } from "@/features/service-orders/data";
 import { emptyOperationsData, useOperationsModel, type OperationsFilters, type OperationsModel } from "@/features/service-orders/useOperationsModel";
 import { OrdersTable } from "@/features/service-orders/OrdersTable";
 import { ProductivityTable } from "@/features/service-orders/ProductivityTable";
+import type { TechnicianStatus } from "@/features/service-orders/productivityStatus";
 import { ActivityTable } from "@/features/service-orders/ActivityTable";
 import { OperationalEvolution } from "@/features/service-orders/OperationalSummary";
 import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
@@ -69,6 +70,7 @@ export function OrdersWorkspace() {
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [today] = useState(() => new Date());
   const [tab, setTab] = useState("ordenes");
+  const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("todos");
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const defaults = useMemo<OperationsFilters>(() => ({ dateFrom: format(startOfMonth(today), "yyyy-MM-dd"), dateTo: format(today, "yyyy-MM-dd"), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
   const [filters, setFilters] = useState(defaults);
@@ -78,7 +80,7 @@ export function OrdersWorkspace() {
   // Never render cached figures/exports while refreshing or when a required source failed.
   const blocked = !valid || query.isPending || query.isFetching || query.isError;
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
-    valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today);
+    valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
   const data = model.serviciosDashboardData;
   const closure = useMemo(() => orderClosureMetrics(data.ordenes), [data.ordenes]);
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
@@ -88,9 +90,10 @@ export function OrdersWorkspace() {
       sucursales: filters.fSucursales, marcas: filters.fMarcas,
       tecnicos: tab === "cumplimiento" ? filters.fTécnicos : filters.fResponsablesOS,
       estados: tab === "cumplimiento" ? filters.fEstadosTrabajo : filters.fEstadosOS,
-      tipo_tiempo: tab === "cumplimiento" ? undefined : filters.fTiposTiempo, rubros: tab === "cumplimiento" ? undefined : filters.fOSRubros });
+      tipo_tiempo: tab === "cumplimiento" ? undefined : filters.fTiposTiempo, rubros: tab === "cumplimiento" ? undefined : filters.fOSRubros,
+      estado_tecnicos: tab === "productividad" ? technicianStatus : undefined });
     return clearPageFilters;
-  }, [filters, tab, setPageFilters, clearPageFilters]);
+  }, [filters, tab, technicianStatus, setPageFilters, clearPageFilters]);
   const selectTechnician = (name: string) => { change("fResponsablesOS", [name]); setTab("ordenes"); };
   const openJob = (id: string) => { if (hasSectionAccess("servicios.trabajos")) navigate(`/trabajos?trabajo=${encodeURIComponent(id)}`); };
 
@@ -137,8 +140,8 @@ export function OrdersWorkspace() {
           <OrdersTable rows={data.ordenes} />
         </TabsContent>
         <TabsContent value="productividad" className="min-w-0 space-y-3">
-          {query.data?.capacityWarning && <p role="alert" title={query.data.capacityWarning} className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5" />Meta de productividad no disponible.</p>}
-          <ProductivityTable rows={data.tecnicos} onSelect={selectTechnician} />
+          {query.data?.capacityWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.capacityWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}
+          <ProductivityTable rows={data.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
           <OperationalEvolution rows={data.evolucion} onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0 space-y-4">

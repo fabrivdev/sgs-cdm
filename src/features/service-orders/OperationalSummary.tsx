@@ -3,6 +3,7 @@ import { useSectionTable } from "@/components/exports/useSectionTable";
 import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { MobileRecord } from "@/components/lists/MobileRecord";
 import { OperationsPanel } from "./OperationsPresentation";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 /** Presentational, dataset-driven summaries: usable later outside the Services route. */
@@ -10,6 +11,7 @@ export function OperationalEvolution({ rows, onPeriod }: {
   rows: ServiciosDashboardData["evolucion"];
   onPeriod: (from: string, to: string) => void;
 }) {
+  const compact = useIsMobile(1024);
   type Row = typeof rows[number];
   const columns: CompactListColumn<Row>[] = [
     { key: "periodo", label: "Período", kind: "date", width: "w-[25%]", value: r => r.dateFrom,
@@ -23,10 +25,10 @@ export function OperationalEvolution({ rows, onPeriod }: {
     { key: "porcentaje", label: "% meta", kind: "number", value: r => r.horasDisponibles > 0 ? r.utilizacion / 100 : null, excelFormat: "0.0%", width: "w-auto" },
   ];
   const table = useSectionTable({ rows, columns, initialSort: { key: "periodo", direction: "asc" }, title: "Evolución de OS", fileName: "evolucion-os.xlsx" });
-  return <OperationsPanel title="Por período"><CompactListTable rows={table.ordered} columns={columns.slice(0, 6)} mobileColumns={[
+  return <OperationsPanel title="Por período"><CompactListTable rows={table.ordered} columns={columns.slice(0, 6).map(column => compact && column.key === "persona" ? { ...column, label: "Horas-pers." } : column)} mobileColumns={[
     { ...columns[0], width: "w-[68%]", render: r => <button className="min-h-11 w-full text-left" onClick={() => onPeriod(r.dateFrom, r.dateTo)}><MobileRecord primary={r.label} secondary={`${r.cerradas} cerradas · ${r.abiertas} abiertas · ${r.otras} anuladas`} context={`${number.format(r.horasOS)} h OS`} /></button> },
     { ...columns[5], label: "Horas", width: "w-[32%]" },
-  ]} id={r => r.key} label="Evolución de OS" heading={table.heading} sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin órdenes en el período." : undefined} /></OperationsPanel>;
+  ]} id={r => r.key} label="Evolución de OS" sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin órdenes en el período." : undefined} /></OperationsPanel>;
 }
 
 export function OperationalDistribution({ data }: { data: ServiciosDashboardData }) {

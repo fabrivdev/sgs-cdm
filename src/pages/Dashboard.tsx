@@ -54,7 +54,7 @@ import { esPostventaDashboard } from "@/components/dashboard/facturacionSource";
 import { cargarFacturacionDashboard, type LoteFacturacion } from "@/components/dashboard/cargarFacturacion";
 import { cn } from "@/lib/utils";
 import { cardLabel, metaText } from "@/lib/ui-classes";
-import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal } from "@/lib/appSettings";
+import { loadMonthlyProductivityGoal } from "@/lib/appSettings";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import {
   displayImportedTechnicianName,
@@ -627,7 +627,7 @@ export default function Dashboard() {
   const [facturacionError, setFacturacionError] = useState<string | null>(null);
   const [facturacionReintento, setFacturacionReintento] = useState(0);
   const [ordenesLoading, setOrdenesLoading] = useState(true);
-  const [metaHorasMensual, setMetaHorasMensual] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
+  const [metaHorasMensual, setMetaHorasMensual] = useState(0);
 
   const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
   const [dateTo, setDateTo] = useState(initialFilters.dateTo);

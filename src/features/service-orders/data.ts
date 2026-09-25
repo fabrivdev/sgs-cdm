@@ -1,6 +1,7 @@
 import { addDays, format, parseISO, subYears } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import type { OperationsData, Profile } from "./useOperationsModel";
+import { readProductivityGoal } from "@/lib/productivityGoal";
 
 // Queries are intentionally operational. No invoice ledger, dashboard RPC or writes.
 const PAGE = 1000;
@@ -59,12 +60,6 @@ export async function loadOperationsData(client: any, from: string, to: string, 
     if (error) throw error;
     return data ?? [];
   };
-  const goal = async () => {
-    const request = client.from("app_configuracion").select("valor_numero").eq("clave", "meta_horas_mensual_tecnico").maybeSingle();
-    const { data, error } = await (signal ? request.abortSignal(signal) : request);
-    const value = Number(data?.valor_numero);
-    return !error && Number.isFinite(value) && value > 0 ? value : null;
-  };
   const [servicios, trabajos, clientes, profileRows, jornadas, disponibilidades, ordenesServicio, servicioTecnicos, meta] = await Promise.all([
     all<OperationsData["servicios"][number]>(client.from("servicios").select("id,fecha_programada,tecnico_responsable_id,auxiliares,sucursal,marca,cliente_id,trabajo_descripcion").order("id")),
     all<OperationsData["trabajos"][number]>(client.from("trabajos").select("id,codigo,estado_general,legacy_servicio_id,sucursal,marca,cliente_id,descripcion_problema,motivo_bloqueo,creado_en,actualizado_en").order("id")),
@@ -72,9 +67,9 @@ export async function loadOperationsData(client: any, from: string, to: string, 
     profiles(),
     all<OperationsData["jornadas"][number]>(client.from("servicio_jornadas").select("id,servicio_id,fecha,estado,horas_trabajadas,tecnico_responsable_id,auxiliares").gte("fecha", start).lte("fecha", end).order("id")),
     all<OperationsData["disponibilidades"][number]>(client.from("tecnico_disponibilidad").select("id,tecnico_id,fecha_inicio,fecha_fin,tipo,observacion,bloquea_agenda").lte("fecha_inicio", to).gte("fecha_fin", from).order("id")),
-    orders(), technicians(), goal(),
+    orders(), technicians(), readProductivityGoal(client, signal),
   ]);
   signal?.throwIfAborted();
-  return { data: { servicios, trabajos, clientes, profiles: profileRows, jornadas, disponibilidades, ordenesServicio, servicioTecnicos, metaHorasMensual: meta ?? 0 },
-    capacityWarning: meta == null ? "Meta de productividad no disponible. Revisá la configuración y los permisos; no se calcula el porcentaje." : null };
+  return { data: { servicios, trabajos, clientes, profiles: profileRows, jornadas, disponibilidades, ordenesServicio, servicioTecnicos, metaHorasMensual: meta.value ?? 0 },
+    capacityWarning: meta.warning };
 }

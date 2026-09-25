@@ -2,6 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(path, "utf8");
 describe("service orders integration contract", () => {
+  it("repairs goal access without replacing saved values or granting public access", () => {
+    const sql = read("supabase/migrations/20260925180000_repair_productivity_goal_access.sql");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.app_configuracion");
+    expect(sql).toContain("ENABLE ROW LEVEL SECURITY");
+    expect(sql).toContain("public.has_section_access(auth.uid(), 'servicios.ordenes')");
+    expect(sql).toContain("public.has_section_access(auth.uid(), 'admin.parametros')");
+    expect(sql).toContain("TO authenticated");
+    expect(sql).not.toMatch(/USING\s*\(\s*true|FOR ALL|INSERT INTO|UPDATE public|DELETE FROM|TRUNCATE|DROP TABLE/i);
+    expect(sql).toMatch(/BEGIN;[\s\S]+COMMIT;/);
+  });
   it("copies existing grants once without automatic regrant or expanded write policies", () => {
     const sql = read("supabase/migrations/20260925150000_service_orders_section.sql");
     expect(sql).toContain("IF nueva THEN");

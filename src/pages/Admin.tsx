@@ -29,7 +29,7 @@ import { ImportarTab } from "@/components/parque/ImportarTab";
 import { ImportarTotvsTab } from "@/components/parque/ImportarTotvsTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
-import { DEFAULT_MONTHLY_PRODUCTIVITY_GOAL, loadMonthlyProductivityGoal, saveMonthlyProductivityGoal } from "@/lib/appSettings";
+import { loadProductivityGoalSetting, saveMonthlyProductivityGoal } from "@/lib/appSettings";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { cargarTodo } from "@/hooks/useCatalogos";
@@ -146,7 +146,9 @@ export default function Admin() {
   const [toggleActivoPending, setToggleActivoPending] = useState<Profile | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showCredPassword, setShowCredPassword] = useState(false);
-  const [monthlyProductivityGoal, setMonthlyProductivityGoal] = useState(DEFAULT_MONTHLY_PRODUCTIVITY_GOAL);
+  const [monthlyProductivityGoal, setMonthlyProductivityGoal] = useState<number | "">("");
+  const [goalLoading, setGoalLoading] = useState(true);
+  const [goalWarning, setGoalWarning] = useState<string | null>(null);
   const [savingParameters, setSavingParameters] = useState(false);
   const [adminTab, setAdminTab] = useState("equipo");
   const [tableSearch, setTableSearch] = useState("");
@@ -345,21 +347,32 @@ export default function Admin() {
 
   useEffect(() => {
     load();
-    loadMonthlyProductivityGoal().then(setMonthlyProductivityGoal);
+    void reloadProductivityGoal();
   }, []);
+
+  async function reloadProductivityGoal() {
+    setGoalLoading(true);
+    const result = await loadProductivityGoalSetting();
+    setMonthlyProductivityGoal(result.value ?? "");
+    setGoalWarning(result.warning);
+    setGoalLoading(false);
+  }
 
   useEffect(() => {
     if (availableAdminTabs.length && !availableAdminTabs.includes(adminTab)) setAdminTab(availableAdminTabs[0]);
   }, [adminTab, availableAdminTabs]);
 
   const saveParameters = async () => {
-    if (!Number.isFinite(monthlyProductivityGoal) || monthlyProductivityGoal <= 0) {
+    if (!canManageAdmin || savingParameters || goalLoading) return;
+    if (monthlyProductivityGoal === "" || !Number.isFinite(monthlyProductivityGoal) || monthlyProductivityGoal <= 0) {
       toast.error("La meta mensual debe ser mayor que cero");
       return;
     }
     setSavingParameters(true);
     try {
       await saveMonthlyProductivityGoal(monthlyProductivityGoal);
+      setGoalWarning(null);
+      void queryClient.invalidateQueries({ queryKey: ["service-orders"] });
       toast.success("Parámetros guardados");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron guardar los parámetros");
@@ -864,9 +877,6 @@ export default function Admin() {
           <Card className="max-w-2xl p-4">
             <div className="mb-4">
               <h2 className="text-[13px] font-semibold leading-5">Productividad técnica</h2>
-              <p className="mt-1 text-[12px] text-muted-foreground">
-                Define la meta mensual usada para calcular la productividad en el Dashboard de Servicios.
-              </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,260px)_1fr] sm:items-end">
               <div className="space-y-1.5">
@@ -878,19 +888,18 @@ export default function Admin() {
                     min="1"
                     step="1"
                     value={monthlyProductivityGoal}
-                    onChange={(event) => setMonthlyProductivityGoal(Number(event.target.value))}
-                    disabled={!canManageAdmin}
+                    onChange={(event) => setMonthlyProductivityGoal(event.target.value === "" ? "" : Number(event.target.value))}
+                    disabled={!canManageAdmin || goalLoading || savingParameters}
                     className="pr-12"
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground">hs</span>
                 </div>
               </div>
-              <div className="text-[12px] text-muted-foreground">
-                Para rangos parciales, la aplicación prorratea esta meta por días calendario. Un mes completo siempre usa la meta indicada.
-              </div>
             </div>
+            {goalLoading && <p role="status" className="mt-3 text-[12px] text-muted-foreground">Cargando meta…</p>}
+            {goalWarning && <div className="mt-3 flex flex-wrap items-center gap-2"><p role="alert" className="text-[12px] text-amber-700">{goalWarning}</p><Button variant="ghost" size="sm" onClick={reloadProductivityGoal} disabled={goalLoading}>Reintentar</Button></div>}
             {canManageAdmin ? (
-              <Button className="mt-4" onClick={saveParameters} disabled={savingParameters}>
+              <Button className="mt-4" onClick={saveParameters} disabled={savingParameters || goalLoading || monthlyProductivityGoal === ""}>
                 <Save className="mr-2 h-4 w-4" />
                 {savingParameters ? "Guardando..." : "Guardar parámetro"}
               </Button>
