@@ -19,9 +19,9 @@ describe("service orders integration contract", () => {
     expect(app.match(/requireRoles=\{\["admin", "gerencia"\]\} requireModulo="servicios" requireSection="servicios.ordenes"/g)).toHaveLength(2);
     expect(app).toContain('<Navigate to="/servicios/ordenes" replace />');
   });
-  it("keeps reusable financial chart modules and maps source ID for details", () => {
+  it("keeps reusable financial chart modules and maps the source primary key for details", () => {
     expect(read("src/components/dashboard/DashboardCharts.tsx")).toContain("export function WeeklyBars");
-    expect(read("src/features/service-orders/useOperationsModel.ts")).toContain("key: row.id");
+    expect(read("src/features/service-orders/useOperationsModel.ts")).toContain("key: row.os_numero");
     expect(read("src/pages/Trabajos.tsx")).toContain('trabajos.some(trabajo => trabajo.id === requested)');
   });
 });

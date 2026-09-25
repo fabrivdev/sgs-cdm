@@ -100,6 +100,8 @@ Date: 2026-09-25. New operational workspace: Órdenes / Productividad / Cumplimi
 - 93 targeted tests pass across 11 files, including source completeness, date identity, zero/negative values, inactive technicians, full export payloads, permissions, responsive order columns, Sales mobile and Planner regressions. Type check passes with ES2021 libraries, new-file lint passes, and production build succeeds with existing large-chunk warnings. Full repository suite, live downloads in every view, production permissions/data and physical touch devices were not certified.
 - SQL is delivered separately for manual execution. This local implementation and its Git publication do not prove that Lovable has applied the migration or that Obsidian was synchronized.
 
+Loading regression follow-up, 2026-09-25: the original loader fixture incorrectly supplied an `id` absent from the imported OS table. This invalidated its database-schema coverage, despite the passing visual/component checks above. A migration-backed query double reproduced the missing-column failure; the loader now selects/orders/unions by the actual `os_numero` primary key and preserves that identity in details and exports. All 60 targeted tests in eight files pass after the fix, including pagination beyond 1,000 OS, overlap of both date queries, branch prefixes and leading zeros. No visual layout, permissions or database data changed. This follow-up does not certify live production loading.
+
 ---
 
 # Design QA — Ventas de Máquinas

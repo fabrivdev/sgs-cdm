@@ -55,7 +55,6 @@ export interface DisponibilidadTecnico {
 }
 
 export interface OrdenServicioImportada {
-  id: string;
   os_numero: string;
   trabajo_id: string | null;
   cliente_nombre: string | null;
@@ -779,7 +778,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       });
 
       return [{
-        key: row.id,
+        key: row.os_numero,
         os: row.os_numero,
         tecnico,
         tecnicoProfileId: responsibleMatch?.id ?? null,

@@ -50,7 +50,7 @@ describe("orders workspace", () => {
     await waitFor(() => expect(mocks.export).toHaveBeenCalled());
     const payload = mocks.export.mock.calls[0][0];
     expect(payload.fileName).toBe("ordenes-de-servicio.xlsx");
-    expect(payload.rows).toHaveLength(1); expect(payload.rows[0].key).toBe("O2");
+    expect(payload.rows).toHaveLength(1); expect(payload.rows[0].key).toBe("01-00000002");
     expect(payload.columns).toHaveLength(21);
   });
   it("shows productivity and drills into the selected technician's orders", () => {

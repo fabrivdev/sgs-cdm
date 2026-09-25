@@ -8,16 +8,17 @@ const today = new Date("2026-09-25T12:00:00");
 describe("operational extraction", () => {
   it("uses closure for closed OS and opening for open OS, never invoice dates", () => {
     const data = operationsFixture();
-    data.ordenesServicio.push(demoOrder({ id: "outside", fecha_abierta_os: "2026-09-01", fecha_cierre_os: "2026-10-01", fecha_emision_factura: "2026-09-20" }));
+    data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", fecha_abierta_os: "2026-09-01", fecha_cierre_os: "2026-10-01", fecha_emision_factura: "2026-09-20" }));
     const { result } = renderHook(() => useOperationsModel(data, operationsFilters, "trabajos", today));
     expect(result.current.serviciosDashboardData).toMatchObject({ totalOS: 2, cerradas: 1, abiertas: 1, horas: 10, horasPersona: 10 });
-    expect(result.current.serviciosDashboardData.ordenes.map(r => r.key)).toEqual(["O2", "O1"]);
+    expect(result.current.serviciosDashboardData.ordenes.map(r => r.key)).toEqual(["01-00000002", "01-00000001"]);
   });
-  it("does not merge source identities with the same OS number", () => {
-    const data = operationsFixture(); data.ordenesServicio = [demoOrder(), demoOrder({ id: "OTHER-BRANCH" })];
+  it("preserves complete source OS keys, including branch prefixes and leading zeros", () => {
+    const data = operationsFixture(); data.ordenesServicio = [demoOrder(), demoOrder({ os_numero: "02-00000001" })];
     const { result } = renderHook(() => useOperationsModel(data, operationsFilters, "trabajos", today));
     expect(result.current.serviciosDashboardData.totalOS).toBe(2);
     expect(new Set(result.current.serviciosDashboardData.ordenes.map(r => r.key)).size).toBe(2);
+    expect(result.current.serviciosDashboardData.ordenes.map(r => r.key)).toEqual(["01-00000001", "02-00000001"]);
   });
   it("uses individual hours and retains inactive participants without duplicating OS", () => {
     const data = operationsFixture(); data.ordenesServicio = [demoOrder({ raw_data: { tecnicos_participantes: ["TECNICO UNO", "TECNICO DOS"], totales_por_tecnico: { "TECNICO UNO": { horas: 6 }, "TECNICO DOS": { horas: 4 } } } })];
