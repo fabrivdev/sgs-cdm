@@ -14,6 +14,7 @@ import { MobileRecord } from "@/components/lists/MobileRecord";
 import { MARCAS, SUCURSALES } from "@/lib/constants";
 import { ESTADOS_TRABAJO } from "@/lib/trabajos";
 import { useAuth } from "@/hooks/useAuth";
+import { displayImportedTechnicianName, matchTechnicianProfile } from "@/lib/technicianMatching";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { useServiceOrders } from "@/features/service-orders/useServiceOrders";
@@ -27,6 +28,10 @@ import { OperationalEvolution } from "@/features/service-orders/OperationalSumma
 import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
 import { billingEfficiency, billingKey, billingWarning } from "@/features/service-orders/billing";
 import { useOrdersBilling } from "@/features/service-orders/useOrdersBilling";
+import { useWorkLog } from "@/features/service-orders/useWorkLog";
+import { workedProductivity } from "@/features/service-orders/workedProductivity";
+import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
+import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
 import { TecnicosNoRealizadosRanking, MatrizTécnicosDías, EstadoCompacto, CargaSucursalTabla, DistribucionMarca, TrabajosAbiertosList } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
 import { ComplianceOverview } from "@/features/service-orders/ComplianceOverview";
@@ -73,6 +78,7 @@ export function OrdersWorkspace() {
   const [today] = useState(() => new Date());
   const [tab, setTab] = useState("ordenes");
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("todos");
+  const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const defaults = useMemo<OperationsFilters>(() => ({ dateFrom: format(startOfMonth(today), "yyyy-MM-dd"), dateTo: format(today, "yyyy-MM-dd"), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
   const [filters, setFilters] = useState(defaults);
@@ -84,6 +90,17 @@ export function OrdersWorkspace() {
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
     valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
   const data = model.serviciosDashboardData;
+  const work = useWorkLog(filters.dateFrom, filters.dateTo, !blocked && tab === "productividad");
+  const workReady = !blocked && !work.isPending && !work.isFetching && !work.isError;
+  const productivity = useMemo(() => workedProductivity(workReady ? work.data ?? [] : [], query.data?.data ?? emptyOperationsData,
+    valid ? filters : defaults, technicianStatus), [workReady, work.data, query.data, valid, filters, defaults, technicianStatus]);
+  const productivityKnown = workReady && productivity.issues.length === 0;
+  const workTechnicianOptions = useMemo(() => {
+    const profiles = query.data?.data.profiles ?? [];
+    const names = (work.data ?? []).flatMap(log => log.entries.map(entry => profiles.find(profile => profile.id === entry.tecnico_profile_id)?.nombre
+      ?? matchTechnicianProfile(entry.tecnico_nombre, profiles)?.nombre ?? displayImportedTechnicianName(entry.tecnico_nombre)));
+    return [...new Set([...profiles.map(profile => profile.nombre), ...names].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }, [query.data, work.data]);
   const billingEnabled = !blocked && tab !== "cumplimiento" && data.ordenes.length > 0;
   const financial = useOrdersBilling(data.ordenes.map(row => row.os), filters.dateTo, billingEnabled);
   const billingLoading = billingEnabled && (financial.isPending || financial.isFetching);
@@ -103,7 +120,7 @@ export function OrdersWorkspace() {
       estado_tecnicos: tab === "productividad" ? technicianStatus : undefined });
     return clearPageFilters;
   }, [filters, tab, technicianStatus, setPageFilters, clearPageFilters]);
-  const selectTechnician = (name: string) => { change("fResponsablesOS", [name]); setTab("ordenes"); };
+  const selectTechnician = (name: string) => setSelectedTechnician(name);
   const openJob = (id: string) => { if (hasSectionAccess("servicios.trabajos")) navigate(`/trabajos?trabajo=${encodeURIComponent(id)}`); };
 
   return <PageShell className="service-orders-workspace">
@@ -118,9 +135,9 @@ export function OrdersWorkspace() {
           <KpiItem key="cierre" label="% de cierre" value={closure.percentage === null ? "—" : `${decimal.format(closure.percentage)}%`} tone="positive" icon={<Percent />} />,
           <KpiItem key="dias" label={compact && !phone ? "Días prom." : "Días de cierre (prom.)"} value={closure.averageDays === null ? "—" : decimal.format(closure.averageDays)} icon={<CalendarDays />} />,
         ] : tab === "productividad" ? [
-          <KpiItem key="horas" label="Horas-persona" value={decimal.format(data.horasPersona)} icon={<Clock3 />} />,
-          <KpiItem key="meta" label="Meta disponible" value={data.capacidad.horasDisponibles > 0 ? decimal.format(data.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
-          <KpiItem key="porcentaje" label="Productividad" value={data.capacidad.horasDisponibles > 0 ? `${decimal.format(data.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
+          <KpiItem key="horas" label="Horas-persona" value={productivityKnown ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} />,
+          <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
+          <KpiItem key="porcentaje" label="Productividad" value={productivityKnown && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
             detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : [
@@ -137,7 +154,7 @@ export function OrdersWorkspace() {
           <FilterMultiSelect label="Técnico" values={filters.fTécnicos} onChange={v => change("fTécnicos", v)} options={(query.data?.data.profiles ?? []).map(p => ({ value: p.id, label: p.nombre }))} />
         </> : <>
           <FilterMultiSelect label="Estado OS" values={filters.fEstadosOS} onChange={v => change("fEstadosOS", v as OperationsFilters["fEstadosOS"])} options={[{ value: "abierta", label: "Abiertas / sin cierre" }, { value: "cerrada", label: "Cerradas" }, { value: "otra", label: "Anuladas / canceladas" }]} />
-          <FilterMultiSelect label="Técnico" values={filters.fResponsablesOS} onChange={v => change("fResponsablesOS", v)} options={model.responsablesOSOptions.map(value => ({ value, label: value }))} />
+          <FilterMultiSelect label="Técnico" values={filters.fResponsablesOS} onChange={v => change("fResponsablesOS", v)} options={(tab === "productividad" ? workTechnicianOptions : model.responsablesOSOptions).map(value => ({ value, label: value }))} />
           <FilterMultiSelect label="Tipo de tiempo" values={filters.fTiposTiempo} onChange={v => change("fTiposTiempo", v)} options={["Cliente", "Garantia", "Interno", "Mixto", "Sin tipo"].map(value => ({ value, label: value === "Garantia" ? "Garantía" : value }))} />
           <FilterMultiSelect label="Rubro OS" values={filters.fOSRubros} onChange={v => change("fOSRubros", v as OperationsFilters["fOSRubros"])} options={["Servicio", "Repuestos", "Kilometraje"].map(value => ({ value, label: value }))} />
         </>}
@@ -149,12 +166,17 @@ export function OrdersWorkspace() {
       {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná un rango de fechas válido.</p> : query.isError ? <div role="alert" className="space-y-2 text-sm"><p>No se pudieron cargar todas las fuentes. No se muestran resultados parciales.</p><Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div> : blocked ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando órdenes y actividad…</p> : <>
         {billingEnabled && financial.isError && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{billingWarning(financial.error)}</p><Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button></div>}
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
-          <OrdersTable rows={financialRows} billingLoading={billingLoading} />
+          <OrdersTable rows={financialRows} billingLoading={billingLoading} from={filters.dateFrom} to={filters.dateTo} />
         </TabsContent>
         <TabsContent value="productividad" className="min-w-0 space-y-3">
           {query.data?.capacityWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.capacityWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}
-          <ProductivityTable rows={data.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
-          <OperationalEvolution rows={data.evolucion} onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
+          {work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
+            : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
+              : <>
+                {productivity.issues.length > 0 && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} registros pendientes de revisión. Productividad sin calcular.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Ver registros</Button></div>}
+                <ProductivityTable rows={productivity.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} incomplete={!productivityKnown} />
+                <OperationalEvolution rows={productivity.evolucion} worked incomplete={!productivityKnown} onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
+              </>}
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0 space-y-4">
           <div className="grid min-w-0 items-start gap-3 xl:grid-cols-2"><ComplianceOverview model={model} /><Block title="No realizadas por técnico"><TecnicosNoRealizadosRanking rows={model.tecnicosNoRealizados} onSelect={id => change("fTécnicos", [id])} /></Block></div>
@@ -168,5 +190,9 @@ export function OrdersWorkspace() {
         </TabsContent>
       </>}
     </Tabs>
+    <ResponsiveDrawer open={Boolean(selectedTechnician) && tab === "productividad" && workReady} onOpenChange={open => !open && setSelectedTechnician(null)}>
+      <ResponsiveDrawerHeader><h2 className="text-[14px] font-semibold">{selectedTechnician === "__issues__" ? "Registros pendientes" : selectedTechnician}</h2></ResponsiveDrawerHeader>
+      <ResponsiveDrawerBody><WorkLogTable showOS rows={selectedTechnician === "__issues__" ? productivity.issues.map(row => ({ ...row, start: null, end: null, hours: null, inherited: false, type: row.reason })) : productivity.records.filter(row => row.technician === selectedTechnician)} /></ResponsiveDrawerBody>
+    </ResponsiveDrawer>
   </PageShell>;
 }

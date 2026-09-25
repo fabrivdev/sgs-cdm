@@ -4,15 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrdenesServicio from "./OrdenesServicio";
 import { demoOrder, demoBilling, operationsFixture } from "@/test/serviceOrdersFixture";
 import { machineBrandClass } from "@/lib/machineBrands";
-const mocks = vi.hoisted(() => ({ width: 390, query: vi.fn(), billing: vi.fn(), billingRetry: vi.fn(), can: vi.fn(), set: vi.fn(), clear: vi.fn(), refetch: vi.fn(), export: vi.fn() }));
+import { demoWorkEntry, demoWorkLog } from "@/test/workLogFixture";
+import type { OrderWorkLog } from "@/features/service-orders/workLog";
+const mocks = vi.hoisted(() => ({ width: 390, query: vi.fn(), billing: vi.fn(), work: vi.fn(), workRetry: vi.fn(), billingRetry: vi.fn(), can: vi.fn(), set: vi.fn(), clear: vi.fn(), refetch: vi.fn(), export: vi.fn() }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: (breakpoint = 768) => mocks.width < breakpoint }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: mocks.can, hasSectionAccess: () => true }) }));
 vi.mock("@/contexts/AssistantPageContext", () => ({ useAssistantPageContext: () => ({ setPageFilters: mocks.set, clearPageFilters: mocks.clear }) }));
 vi.mock("@/features/service-orders/useServiceOrders", () => ({ useServiceOrders: mocks.query }));
 vi.mock("@/features/service-orders/useOrdersBilling", () => ({ useOrdersBilling: mocks.billing }));
+vi.mock("@/features/service-orders/useWorkLog", () => ({ useWorkLog: mocks.work }));
 vi.mock("@/components/ventas/salesTableExport", () => ({ exportSalesTable: mocks.export }));
 let response: { data: { data: ReturnType<typeof operationsFixture>; capacityWarning: string | null }; isPending: boolean; isFetching: boolean; isError: boolean; refetch: typeof mocks.refetch };
 let billingState: { isPending: boolean; isFetching: boolean; isError: boolean; error: unknown };
+let workLogs: OrderWorkLog[];
+let workState: { isPending: boolean; isFetching: boolean; isError: boolean };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.width = 390; mocks.can.mockReturnValue(true);
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-09-25T12:00:00"));
@@ -21,12 +26,61 @@ beforeEach(() => {
   mocks.query.mockImplementation(() => response);
   billingState = { isPending: false, isFetching: false, isError: false, error: null };
   mocks.billing.mockImplementation(() => ({ ...billingState, data: response.data.data.billing, refetch: mocks.billingRetry }));
+  workLogs = [demoWorkLog(), demoWorkLog([demoWorkEntry({ id: "TWO", tecnico_nombre: "TECNICO DOS", tecnico_profile_id: "T2", hora_fin: "09:00" })], "01-00000002")];
+  workState = { isPending: false, isFetching: false, isError: false };
+  mocks.work.mockImplementation((_from, _to, _enabled, os) => ({ ...workState, data: os ? workLogs.filter(row => row.os === os) : workLogs, refetch: mocks.workRetry }));
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 const technicianStatus = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Estado de técnicos" })).getByRole("button", { name }));
 describe("orders workspace", () => {
+  it("uses work dates for productivity while keeping the order list and efficiency on their original cohort", () => {
+    workLogs = [demoWorkLog([demoWorkEntry({ fecha_inicio: "2026-08-15", fecha_fin: "2026-08-15" }),
+      demoWorkEntry({ id: "SEPT", hora_fin: "11:00" })], "01-00000099")];
+    workLogs[0].order_data.fecha_cierre_os = "2026-10-01";
+    setup(); tab("Productividad");
+    expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("3");
+    expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("3%");
+    fireEvent.click(screen.getByRole("button", { name: /TECNICO UNO.*OS/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("01-00000099");
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("15/08/2026");
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cerrar" }));
+    tab("Órdenes");
+    expect(screen.queryByRole("button", { name: "Ver OS 01-00000099" })).not.toBeInTheDocument();
+  });
+  it.each([320, 768, 1280])("shows the complete dated OS work history, not just the current month, at %i px", width => {
+    mocks.width = width;
+    workLogs[0].entries.push(demoWorkEntry({ id: "AUGUST", fecha_inicio: "2026-08-15", fecha_fin: "2026-08-15", hora_fin: "12:00" }));
+    setup();
+    expect(mocks.work.mock.calls.every(call => call[2] === false)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000001" }));
+    const table = within(screen.getByRole("dialog")).getByRole("table", { name: "Jornadas trabajadas" });
+    expect(table).toHaveTextContent("15/08/2026"); expect(table).toHaveTextContent("10/09/2026");
+    expect(table).toHaveTextContent("08:00"); expect(table).toHaveTextContent("12:00");
+    expect(mocks.work).toHaveBeenLastCalledWith("2026-09-01", "2026-09-25", true, "01-00000001");
+  });
+  it("keeps operational views usable while work is loading or fails and never substitutes closure hours", () => {
+    workState.isPending = true; const rendered = setup();
+    expect(screen.getByRole("table", { name: "Órdenes de servicio" })).toBeVisible();
+    tab("Productividad");
+    expect(screen.getByText("Cargando jornadas trabajadas…")).toBeVisible();
+    expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
+    workState.isPending = false; workState.isError = true;
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(screen.queryByRole("table", { name: "Productividad por técnico" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" })); expect(mocks.workRetry).toHaveBeenCalled();
+    tab("Cumplimiento"); expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
+  });
+  it("leaves productivity unknown and exposes unassignable records instead of inventing work dates", () => {
+    workLogs[0].entries[0].fecha_inicio = null;
+    setup(); tab("Productividad");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 registros pendientes");
+    expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
+    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ver registros" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("01-00000001");
+  });
   it.each([320, 768, 1280])("uses the shared brand palette in every list presentation and drawer at %i px", width => {
     mocks.width = width;
     const brands = ["CLAAS", "HORSCH", "OTROS"];
@@ -81,12 +135,13 @@ describe("orders workspace", () => {
     expect(payload.columns.find((c: { key: string }) => c.key === "nombresTecnicos").value(payload.rows[0])).toBe("TECNICO DOS");
     expect(payload.columns.find((c: { key: string }) => c.key === "diasCierre").value(payload.rows[0])).toBeNull();
   });
-  it("shows productivity and drills into the selected technician's orders", () => {
+  it("drills into dated work, not the technician's closure cohort", () => {
     setup(); tab("Productividad");
     expect(screen.getByRole("table", { name: "Productividad por técnico" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /TECNICO DOS.*OS/ }));
-    expect(screen.getByRole("tab", { name: "Órdenes" })).toHaveAttribute("aria-selected", "true");
-    expect(within(screen.getByRole("table", { name: "Órdenes de servicio" })).getAllByRole("row")).toHaveLength(2);
+    expect(within(screen.getByRole("dialog")).getByRole("table", { name: "Jornadas trabajadas" })).toHaveTextContent("01-00000002");
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cerrar" }));
+    expect(screen.getByRole("tab", { name: "Productividad" })).toHaveAttribute("aria-selected", "true");
   });
   it("warns when capacity is missing and still shows known hours", () => {
     response.data.data.metaHorasMensual = 0; response.data.capacityWarning = "Meta de productividad no disponible.";
@@ -100,12 +155,13 @@ describe("orders workspace", () => {
   it.each([320, 768, 1280])("shows exact goal progress, including above 100 percent, at %i px", width => {
     mocks.width = width;
     response.data.data.ordenesServicio[0].servicios_cantidad = 150;
+    workLogs[0].entries = Array.from({ length: 15 }, (_, i) => demoWorkEntry({ id: String(i), fecha_inicio: `2026-09-${String(i + 1).padStart(2, "0")}`, fecha_fin: `2026-09-${String(i + 1).padStart(2, "0")}` }));
     setup(); tab("Productividad");
     const meter = screen.getByRole("meter", { name: "Meta de TECNICO UNO" });
     expect(meter).toHaveAttribute("aria-valuenow", "150"); // 120 × 25/30 = 100 h target
     expect(meter).toHaveAttribute("aria-valuetext", "150 de 100 horas; 150% de meta");
     expect(meter.firstElementChild).toHaveStyle({ width: "100%" });
-    expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toHaveAttribute("aria-valuenow", "1.6666666666666667");
   });
   it.each([320, 768, 1280])("uses a single compact technician header, not another navigation row, at %i px", width => {
     mocks.width = width;
@@ -123,6 +179,8 @@ describe("orders workspace", () => {
     mocks.width = 390;
     response.data.data.ordenesServicio[0].raw_data = { tecnicos_participantes: ["TECNICO UNO", "TECNICO DOS"] };
     response.data.data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", responsable: "TECNICO SIN FICHA", servicios_cantidad: 7 }));
+    workLogs[1].entries[0].hora_fin = "18:00";
+    workLogs.push(demoWorkLog([demoWorkEntry({ id: "UNKNOWN", tecnico_profile_id: null, tecnico_nombre: "TECNICO SIN FICHA", hora_fin: "15:00" })], "01-00000003"));
     setup(); tab("Productividad"); technicianStatus("Activos");
     let table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(table.getAllByRole("row")).toHaveLength(2);
@@ -131,7 +189,7 @@ describe("orders workspace", () => {
     expect(kpis.getByText("10", { exact: true })).toBeVisible();
     expect(kpis.getByText("100", { exact: true })).toBeVisible();
     expect(kpis.getByText("10%", { exact: true })).toBeVisible();
-    expect(screen.getByRole("table", { name: "Evolución de OS" })).toHaveTextContent("10");
+    expect(screen.getByRole("table", { name: "Horas por período" })).toHaveTextContent("10");
     technicianStatus("Inactivos");
     table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(table.getAllByRole("row")).toHaveLength(2);
@@ -161,7 +219,7 @@ describe("orders workspace", () => {
       expect(detail.getByRole("heading", { name })).toBeVisible();
     }
     for (const text of ["10/08/2026", "10/09/2026", "20/09/2026", "41", "TRION 740", "TECNICO UNO", "300", "000000000001; 000000000002"]) {
-      expect(detail.getByText(text, { exact: true })).toBeVisible();
+      expect(detail.getAllByText(text, { exact: true })[0]).toBeVisible();
     }
     expect(detail.queryByText("$ 0,00")).not.toBeInTheDocument();
     expect(detail.queryByText("Situación de facturación")).not.toBeInTheDocument();
@@ -310,7 +368,7 @@ describe("orders workspace", () => {
     await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
     const payload = mocks.export.mock.calls[0][0];
     expect(payload.fileName).toBe("productividad-tecnicos.xlsx");
-    expect(payload.columns).toHaveLength(13);
+    expect(payload.columns).toHaveLength(11);
     expect(payload.columns.find((c: { key: string }) => c.key === "meta").value(payload.rows[0])).toBeNull();
   });
   it("separates absence rows from journeys without collapsing same-day journeys or excluding them from Excel", async () => {

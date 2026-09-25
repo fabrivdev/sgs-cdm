@@ -7,9 +7,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 /** Presentational, dataset-driven summaries: usable later outside the Services route. */
-export function OperationalEvolution({ rows, onPeriod }: {
+export function OperationalEvolution({ rows, onPeriod, worked = false, incomplete = false }: {
   rows: ServiciosDashboardData["evolucion"];
   onPeriod: (from: string, to: string) => void;
+  worked?: boolean; incomplete?: boolean;
 }) {
   const compact = useIsMobile(1024);
   type Row = typeof rows[number];
@@ -22,13 +23,16 @@ export function OperationalEvolution({ rows, onPeriod }: {
     { key: "horas", label: "Horas OS", kind: "number", align: "center", width: "w-[15%]", value: r => r.horasOS, render: r => number.format(r.horasOS) },
     { key: "persona", label: "Horas-persona", kind: "number", align: "center", width: "w-[15%]", value: r => r.horasPersona, render: r => number.format(r.horasPersona) },
     { key: "meta", label: "Meta disponible", kind: "number", value: r => r.horasDisponibles || null, width: "w-auto" },
-    { key: "porcentaje", label: "% meta", kind: "number", value: r => r.horasDisponibles > 0 ? r.utilizacion / 100 : null, excelFormat: "0.0%", width: "w-auto" },
+    { key: "porcentaje", label: "Productividad", kind: "number", value: r => !incomplete && r.horasDisponibles > 0 ? r.utilizacion / 100 : null, excelFormat: "0.0%", width: "w-auto" },
   ];
-  const table = useSectionTable({ rows, columns, initialSort: { key: "periodo", direction: "asc" }, title: "Evolución de OS", fileName: "evolucion-os.xlsx" });
-  return <OperationsPanel title="Por período"><CompactListTable rows={table.ordered} columns={columns.slice(0, 6).map(column => compact && column.key === "persona" ? { ...column, label: "Horas-pers." } : column)} mobileColumns={[
-    { ...columns[0], width: "w-[68%]", render: r => <button className="min-h-11 w-full text-left" onClick={() => onPeriod(r.dateFrom, r.dateTo)}><MobileRecord primary={r.label} secondary={`${r.cerradas} cerradas · ${r.abiertas} abiertas · ${r.otras} anuladas`} context={`${number.format(r.horasOS)} h OS`} /></button> },
+  const exportColumns = worked ? columns.filter(column => !["cerradas", "abiertas", "otras"].includes(column.key)) : columns;
+  const table = useSectionTable({ rows, columns: exportColumns, initialSort: { key: "periodo", direction: "asc" }, title: worked ? "Horas por período" : "Evolución de OS", fileName: worked ? "horas-por-periodo.xlsx" : "evolucion-os.xlsx", disabled: incomplete });
+  const visible = worked ? [columns[0], columns[4], columns[5], { ...columns[6], width: "w-[20%]", align: "center" as const, render: (r: Row) => r.horasDisponibles > 0 ? number.format(r.horasDisponibles) : "—" },
+    { ...columns[7], width: "w-[25%]", align: "right" as const, render: (r: Row) => !incomplete && r.horasDisponibles > 0 ? `${number.format(r.utilizacion)}%` : "—" }] : columns.slice(0, 6);
+  return <OperationsPanel title="Por período"><CompactListTable rows={table.ordered} columns={visible.map(column => compact && column.key === "persona" ? { ...column, label: "Horas-pers." } : column)} mobileColumns={[
+    { ...columns[0], width: "w-[68%]", render: r => <button className="min-h-11 w-full text-left" onClick={() => onPeriod(r.dateFrom, r.dateTo)}><MobileRecord primary={r.label} secondary={worked ? `${number.format(r.horasOS)} h OS` : `${r.cerradas} cerradas · ${r.abiertas} abiertas · ${r.otras} anuladas`} context={worked ? undefined : `${number.format(r.horasOS)} h OS`} /></button> },
     { ...columns[5], label: "Horas", width: "w-[32%]" },
-  ]} id={r => r.key} label="Evolución de OS" sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin órdenes en el período." : undefined} /></OperationsPanel>;
+  ]} id={r => r.key} label={worked ? "Horas por período" : "Evolución de OS"} sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin órdenes en el período." : undefined} /></OperationsPanel>;
 }
 
 export function OperationalDistribution({ data }: { data: ServiciosDashboardData }) {

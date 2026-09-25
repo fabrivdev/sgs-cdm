@@ -14,6 +14,7 @@ import { orderClosingDays } from "./orderMetrics";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { billingEfficiency } from "./billing";
+import { WorkLogDetails } from "./WorkLogDetails";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const columns: SalesColumn<ServicioOSRow>[] = [
@@ -52,7 +53,7 @@ const columns: SalesColumn<ServicioOSRow>[] = [
   { key: "horasFacturadas", label: "Horas facturadas equivalentes", kind: "number", value: r => r.billing?.billedHours ?? null },
   { key: "eficiencia", label: "Eficiencia de facturación", kind: "number", excelFormat: "0.0%", value: r => { const value = billingEfficiency([r]).percentage; return value === null ? null : value / 100; } },
 ];
-export function OrdersTable({ rows, billingLoading = false }: { rows: ServicioOSRow[]; billingLoading?: boolean }) {
+export function OrdersTable({ rows, billingLoading = false, from = "1900-01-01", to = "2999-12-31" }: { rows: ServicioOSRow[]; billingLoading?: boolean; from?: string; to?: string }) {
   const compact = useIsMobile(1024);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = rows.find(row => row.key === selectedKey) ?? null;
@@ -95,6 +96,7 @@ export function OrdersTable({ rows, billingLoading = false }: { rows: ServicioOS
           <dl className="my-3"><KeyValueItem label="Técnicos" value={selected.tecnicos.join(", ")} /></dl>
           <KeyValueGrid><KeyValueItem label="Horas OS" value={number.format(selected.horas)} /><KeyValueItem label="Horas-persona" value={number.format(selected.horasPersona)} /><KeyValueItem label="Km recorridos" value={number.format(selected.km)} /></KeyValueGrid>
         </DetailSection>
+        <WorkLogDetails os={selected.os} from={from} to={to} />
         <DetailSection card title="Facturación e importes" icon={<FileText className="h-3.5 w-3.5" />}>
           <dl className="space-y-3 border-b pb-3"><KeyValueItem label={bill?.matched ? "Documentos vinculados" : "Factura informada en OS"} value={bill?.matched ? bill.documents.join("; ") : selected.factura} mono /><KeyValueItem label={bill?.matched ? "Fecha de facturación" : "Fecha informada en OS"} value={operationsDate(bill?.matched ? bill.date : selected.fechaFacturacion ?? null)} empty="—" /><KeyValueItem label="Días de cierre" value={selectedDays === null ? "—" : number.format(selectedDays)} empty="—" /></dl>
           {!bill?.matched && <p role="status" className="pt-3 text-[12px] text-muted-foreground">{billingLoading ? "Cargando facturación…" : !bill ? "Facturación no disponible." : bill.ambiguous ? "Vínculo de facturación ambiguo." : "Sin facturación vinculada al corte."}</p>}
