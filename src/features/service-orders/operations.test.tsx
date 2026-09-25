@@ -60,6 +60,27 @@ describe("operational extraction", () => {
     const absence = { id: "A", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "Ausencia", observacion: null, bloquea_agenda: true };
     expect(technicianGoalForRange(parseISO("2026-09-01"), parseISO("2026-09-30"), 120, "T1", false, "2026-09-16", [absence, absence])).toBe(52);
   });
+  it("uses the agreed 132-hour monthly base and subtracts unavailable calendar days once", () => {
+    const from = parseISO("2026-09-01"), to = parseISO("2026-09-30");
+    const absence = { id: "A", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "No disponible", observacion: null, bloquea_agenda: true };
+    expect(technicianGoalForRange(from, to, 132, "T1", true, null, [])).toBe(132);
+    // Septiembre tiene 30 días: 132 - (132 / 30 × 2) = 123,2.
+    expect(technicianGoalForRange(from, to, 132, "T1", true, null, [absence, absence])).toBeCloseTo(123.2);
+    expect(technicianGoalForRange(from, to, 132, "T1", true, null, [{ ...absence, bloquea_agenda: false }])).toBe(132);
+    expect(technicianGoalForRange(from, parseISO("2026-09-15"), 132, "T1", true, null, [absence])).toBeCloseTo(57.2);
+    expect(technicianGoalForRange(from, to, 132, "T1", true, null, [{ ...absence, fecha_inicio: "2026-08-01", fecha_fin: "2026-10-01" }])).toBeCloseTo(0);
+  });
+  it("applies availability deductions to technician, KPI and period targets with a 132-hour base", () => {
+    const data = operationsFixture(); data.metaHorasMensual = 132;
+    data.disponibilidades = [{ id: "A", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "No disponible", observacion: null, bloquea_agenda: true }];
+    const { result } = renderHook(() => useOperationsModel(data, operationsFilters, "trabajos", today, "activos"));
+    const summary = result.current.serviciosDashboardData;
+    expect(summary.tecnicos).toHaveLength(1);
+    expect(summary.tecnicos[0].horasDisponibles).toBeCloseTo(123.2);
+    expect(summary.capacidad.horasDisponibles).toBeCloseTo(123.2);
+    expect(summary.evolucion[0].horasDisponibles).toBeCloseTo(123.2);
+    expect(summary.tecnicos[0].productividad).toBeCloseTo(10 / 123.2 * 100);
+  });
   it("keeps an inactive technician's journey when explicitly filtering historical compliance", () => {
     const { result } = renderHook(() => useOperationsModel(operationsFixture(), { ...operationsFilters, fTécnicos: ["T2"] }, "trabajos", today));
     expect(result.current.jornadasResultadoResumen).toMatchObject({ programadas: 1, noRealizadas: 1 });

@@ -21,7 +21,7 @@ export async function readProductivityGoal(client: any, signal?: AbortSignal): P
       return { value: null, reason: "read-error", warning: "No se pudo leer la meta de productividad." };
     }
     // RLS may hide a row without an error. Do not assert it was never configured.
-    if (!data) return { value: null, reason: "not-visible", warning: "Meta de productividad no disponible para este usuario." };
+    if (!data) return { value: null, reason: "not-visible", warning: "No se encontró una meta de productividad accesible." };
     const value = typeof data.valor_numero === "number" || typeof data.valor_numero === "string" ? Number(data.valor_numero) : NaN;
     if (!Number.isFinite(value) || value <= 0) return { value: null, reason: "invalid", warning: "La meta guardada no es válida." };
     return { value, reason: "ready", warning: null };

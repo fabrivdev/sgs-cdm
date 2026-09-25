@@ -18,4 +18,9 @@ export async function saveMonthlyProductivityGoal(value: number): Promise<void> 
     actualizado_en: new Date().toISOString(),
   });
   if (error) throw error;
+  // Confirm through the same reader used by Orders; a successful write alone
+  // does not prove the setting is visible to this session.
+  const saved = await loadProductivityGoalSetting();
+  if (saved.value === null) throw new Error("No se pudo verificar la meta guardada. Reintentá la lectura.");
+  if (saved.value !== value) throw new Error("La meta leída no coincide con la guardada. Reintentá la lectura.");
 }

@@ -52,6 +52,26 @@ describe("Administración: alta de operativos sin acceso", () => {
     await waitFor(() => expect(input).toHaveValue(160));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+  it("lets an administrator enter the missing goal without a seeded default", async () => {
+    goalRead.mockResolvedValue({ value: null, warning: "No se encontró una meta de productividad accesible." });
+    const input = await openParameters();
+    await screen.findByRole("alert");
+    expect(input).toHaveValue(null);
+    fireEvent.change(input, { target: { value: "144" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar parámetro" }));
+    await waitFor(() => expect(goalSave).toHaveBeenCalledWith(144));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["service-orders"] });
+  });
+  it("does not claim a verified save when readback fails", async () => {
+    goalSave.mockRejectedValue(new Error("No se pudo verificar la meta guardada. Reintentá la lectura."));
+    const input = await openParameters();
+    await waitFor(() => expect(input).toHaveValue(160));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar parámetro" }));
+    await waitFor(() => expect(errorToast).toHaveBeenCalledWith(expect.stringContaining("No se pudo verificar")));
+    expect(success).not.toHaveBeenCalled();
+    expect(invalidateQueries).not.toHaveBeenCalled();
+  });
   it("limita las pestañas visibles a las secciones autorizadas", async () => {
     render(<Admin />);
     const navigation = await screen.findByRole("tablist", { name: "Sección de Administración" });

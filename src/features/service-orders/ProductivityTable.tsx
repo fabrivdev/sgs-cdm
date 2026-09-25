@@ -3,14 +3,16 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { MobileRecord } from "@/components/lists/MobileRecord";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { OperationsPanel } from "./OperationsPresentation";
 import { ProductivityProgress } from "./ProductivityProgress";
 import type { TechnicianStatus } from "./productivityStatus";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
+const statuses = [["todos", "Todos"], ["activos", "Activos"], ["inactivos", "Inactivos"], ["sin-ficha", "Sin ficha"]] as const;
 export function ProductivityTable({ rows, onSelect, status, onStatusChange }: { rows: ServicioTecnicoRow[]; onSelect: (name: string) => void; status: TechnicianStatus; onStatusChange: (status: TechnicianStatus) => void }) {
   const compact = useIsMobile(1024);
+  const phone = useIsMobile(640);
   const technicianState = (r: ServicioTecnicoRow) => !r.profileId ? "Sin ficha" : !r.activo ? "Inactivo" : undefined;
   const columns: CompactListColumn<ServicioTecnicoRow>[] = [
     { key: "tecnico", label: "Técnico", kind: "text", width: "w-[36%]", value: r => r.tecnico,
@@ -36,10 +38,12 @@ export function ProductivityTable({ rows, onSelect, status, onStatusChange }: { 
     { ...columns[0], width: "w-[60%]", render: r => <button type="button" className="min-h-11 w-full text-left" onClick={() => onSelect(r.tecnico)}><MobileRecord primary={r.tecnico} secondary={`${r.totalOS} OS${technicianState(r) ? ` · ${technicianState(r)}` : ""}`} /></button> },
     { ...columns[2], label: "Horas / meta", align: "right", width: "w-[40%]", render: r => <div className="space-y-1.5 text-right text-[12px]"><span>{number.format(r.horas)}<span className="text-muted-foreground"> / {r.horasDisponibles > 0 ? number.format(r.horasDisponibles) : "—"} h</span></span><ProductivityProgress hours={r.horas} target={r.horasDisponibles} label={`Meta de ${r.tecnico}`} /></div> },
   ];
-  return <OperationsPanel title="Por técnico"><Tabs value={status} onValueChange={value => onStatusChange(value as TechnicianStatus)}>
-    <TabsList aria-label="Estado de técnicos" className="flex w-full justify-start overflow-hidden rounded-none px-2 sm:justify-start"><TabsTrigger value="todos">Todos</TabsTrigger><TabsTrigger value="activos">Activos</TabsTrigger><TabsTrigger value="inactivos">Inactivos</TabsTrigger><TabsTrigger value="sin-ficha">Sin ficha</TabsTrigger></TabsList>
-    <TabsContent value={status} className="mt-0">
-      <CompactListTable rows={table.ordered} columns={visible} mobileColumns={mobile} id={r => r.tecnico} label="Productividad por técnico" sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin técnicos para estos filtros." : undefined} />
-    </TabsContent>
-  </Tabs></OperationsPanel>;
+  return <OperationsPanel title={phone ? undefined : "Por técnico"} actions={
+    <div role="group" aria-label="Estado de técnicos" className="inline-flex min-w-0 overflow-hidden rounded-md border text-[11px] max-sm:w-full sm:shrink-0">
+      {statuses.map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => onStatusChange(value)}
+        className={cn("h-8 px-3 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring max-sm:min-h-11 max-sm:min-w-0 max-sm:flex-1 max-sm:px-1 max-sm:text-[12px]", status === value && "bg-primary text-primary-foreground hover:bg-primary")}>{label}</button>)}
+    </div>
+  }>
+    <CompactListTable rows={table.ordered} columns={visible} mobileColumns={mobile} id={r => r.tecnico} label="Productividad por técnico" sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin técnicos para estos filtros." : undefined} />
+  </OperationsPanel>;
 }

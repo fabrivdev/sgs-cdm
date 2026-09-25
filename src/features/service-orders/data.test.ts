@@ -66,7 +66,7 @@ describe("operational source loader", () => {
   });
   it("returns unknown goal with warning, not the old silent default", async () => {
     const result = await loadOperationsData(clientFixture({ missingGoal: true }).client, "2026-09-01", "2026-09-30");
-    expect(result.data.metaHorasMensual).toBe(0); expect(result.capacityWarning).toMatch(/no disponible/);
+    expect(result.data.metaHorasMensual).toBe(0); expect(result.capacityWarning).toMatch(/No se encontró.*accesible/);
   });
   it("rejects invalid/reversed dates and aborted requests", async () => {
     expect(validOperationsRange("2026-02-30", "2026-09-30")).toBe(false);
