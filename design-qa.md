@@ -1,3 +1,13 @@
+# Design QA — ajuste específico del Planificador móvil
+
+25/09/2026, base `79555bb55534a437f176e2d7c4b9405e44c57966`. Sólo cambia Planificador bajo 640 px: agenda plana, fecha lateral, cliente prioritario, descripción secundaria de dos líneas, referencia/estado/continuidad y navegación de semana compacta. Sin horas ni total al pie en teléfono por indicación del usuario. Escritorio/tablet, detalle, fuentes y exportación conservan horas y comportamiento; las otras secciones aprobadas no cambian.
+
+Comprobación visual con componentes reales y fixtures ficticias locales de sólo lectura: 320 y 390 px sin desbordamiento horizontal (ancho del documento igual a su área útil: 305 y 375 px, respectivamente). Se verificaron textos largos, estados, horas ausentes y cargadas que no se muestran, cambio de semana y estado vacío. A 768 px se conserva la tabla y su total. Evidencia fuera de Git: `C:/Users/Usuario/Documents/Codex/2026-09-08/ad/planner-mobile-2026-09-25/planificador-320.png`, `planificador-390.png` y `planificador-768.png`.
+
+26 pruebas correctas en cuatro archivos: `ServiceLists`, `MobilePresentation`, `FiltersBar.mobile` y `MobileAgenda`. Ocho regresiones nuevas comprueban fronteras 639/640, identidad de jornadas del mismo día, apertura con horas originales, exportación completa/orden, navegación y fallo/reintento. TypeScript correcto con librería ES2021 por `replaceAll` preexistente; compilación correcta con advertencias previas de chunks grandes. No se ejecutó SQL ni se escribió en datos productivos. No se afirma comprobación en teléfono físico o despliegue. Sin `obsidian-sync.local`: se actualiza la nota curada del repositorio, no se acredita sincronización de la bóveda.
+
+---
+
 # Design QA — revisión móvil transversal y excepción multilínea
 
 Fecha: 24/09/2026. Base: `10701175fa72edfc370900251fe35168f4d58403`. Solicitud: corregir la revisión general, permitiendo agrupar identidad en teléfono y conservando columnas de escritorio/tablet. La auditoría anterior cubrió 18 rutas principales con capturas de lectura; no se modificaron datos productivos.

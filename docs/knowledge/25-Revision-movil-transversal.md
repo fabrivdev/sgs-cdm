@@ -2,6 +2,14 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Ajuste posterior del Planificador — 25/09/2026
+
+Sólo en teléfono (menos de 640 px), Planificador usa `PlannerMobileAgenda.tsx`: lista continua con día/fecha a la izquierda, cliente prioritario, tarea de hasta dos líneas y referencia/estado/continuidad. No muestra horas por jornada ni total de horas al pie, aunque existan datos. Las horas se conservan en el detalle, exportación y tabla de tablet/escritorio; no se borra ni recalcula nada. Semana, navegación y orden quedan en una sola franja, sin encabezados de tabla móvil ni columna vacía. La acción de programar es visualmente discreta y conserva su área táctil y permisos.
+
+Se mantienen el orden filtrado recibido, identidad por jornada (también para un servicio con varias jornadas el mismo día), cuadrilla, continuidad, resaltado de pendientes/no vistos, exportador completo y callback original de detalle. No agrupar ni deduplicar por cliente o fecha. El menú de orden conserva los campos originales desplazados al detalle. No se modifican otras secciones ni componentes visuales compartidos.
+
+Fuentes: `src/pages/Planificador.tsx`, `src/components/calendar/PlannerMobileAgenda.tsx` y `src/components/lists/ServiceLists.test.tsx`. Validación local: 26 pruebas de listas, filtros y agenda; tipos y compilación; navegador con datos ficticios a 320/390 px y comprobación de tabla a 768 px. Límites/evidencia en `design-qa.md`; no certifica producción ni sincronización de Obsidian. Esta sección prevalece sobre la descripción anterior de «jornada frente a horas» para el Planificador móvil.
+
 ## Regla más reciente: teléfono distinto de escritorio/tablet
 
 Esta sección reemplaza las indicaciones históricas de selectores para pocas pestañas, indicadores plegados y una sola línea rígida en celular. Bajo 640 px se usan filas continuas con identidad agrupada, tipografía proporcionada y navegación visible. Desde 640 px se conservan columnas y comportamiento previo. No convertir todas las pantallas a tarjetas ni reducir indiscriminadamente los controles de formularios.

@@ -5,6 +5,8 @@ import Planificador from "@/pages/Planificador";
 import { TrabajosOSTab } from "@/components/trabajos/TrabajosOSTab";
 
 const mocks=vi.hoisted(()=>({tables:{} as Record<string,Record<string,unknown>[]>,errorTable:"",can:vi.fn(),detail:vi.fn(),work:vi.fn(),update:vi.fn(),setFilters:vi.fn(),clearFilters:vi.fn(),sheet:vi.fn((rows:unknown[][])=>({rows})),json:vi.fn((rows:Record<string,unknown>[])=>({rows})),write:vi.fn()}));
+const viewport = vi.hoisted(() => ({ width: 1280 }));
+vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: (breakpoint = 768) => viewport.width < breakpoint }));
 vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({can:mocks.can,isAdmin:true,isCabecilla:false,user:{id:"ADMIN"},profile:null})}));
 vi.mock("@/hooks/useServicioTecnicos",()=>({useServicioTecnicos:()=>({data:[{id:"T1",nombre:"TÉCNICO UNO",sucursal:"Santa Rita"}]})}));
 vi.mock("@/contexts/AssistantPageContext",()=>({useAssistantPageContext:()=>({setPageFilters:mocks.setFilters,clearPageFilters:mocks.clearFilters})}));
@@ -21,6 +23,7 @@ const client={id:"C1",nombre:"CLIENTE CON NOMBRE EXTENSO",sucursal:"Santa Rita" 
 const service={id:"S1",fecha_programada:"2026-09-18",dia_semana:"Viernes",semana:38,tecnico_responsable_id:"T1",auxiliares:["T2"],sucursal:"Santa Rita",cliente_id:"C1",marca:"CLAAS",tipo_trabajo:"Visita de campo",trabajo_descripcion:"DESCRIPCIÓN COMPLETA DEL TRABAJO",estado:"Pendiente",observaciones:null,horas_trabajadas:0,visto_por:["ADMIN"]};
 const order={os_numero:"01-00000001",trabajo_id:"W1",cliente_nombre:client.nombre,fecha_abierta_os:"2026-09-18",fecha_emision_factura:"2026-09-18",factura:"00000123",marca:"CLAAS",nro_chasis:"0000ABC",responsable:"TÉCNICO COMPLETO",cod_mecanico:"MA01",problema:"PROBLEMA COMPLETO",tipo_tiempo:"Cliente",servicios_cantidad:2.5,servicios_valor:null,repuesto_valor:10.55,kilometro_valor:-1.25,terceros_valor:0,situacion_os:"Cerrada",situacion_facturacion:"CRÉDITO 30 DÍAS"};
 beforeEach(()=>{
+  viewport.width = 1280;
   vi.clearAllMocks();mocks.can.mockReturnValue(true);mocks.errorTable="";
   vi.stubGlobal("ResizeObserver",class{observe(){}disconnect(){}});
   mocks.tables={servicios:[service],profiles:[{id:"T1",nombre:"TÉCNICO UNO",sucursal:"Santa Rita"},{id:"T2",nombre:"TÉCNICO DOS",sucursal:"Katuete"}],clientes:[client],servicio_jornadas:[
@@ -38,6 +41,60 @@ async function exportRows(label:string){
   await waitFor(()=>expect(mocks.write).toHaveBeenCalled());
 }
 describe("compact operational services lists",()=>{
+  it.each([320, 390, 639])("uses a phone agenda without hours or total at %i px and opens the exact journey", async width => {
+    viewport.width = width;
+    plan();
+    const agenda = await screen.findByRole("list", {name: "Jornadas del Planificador"});
+    expect(screen.queryByRole("table", {name: "Jornadas del Planificador"})).not.toBeInTheDocument();
+    expect(screen.queryByText(/Total horas/)).not.toBeInTheDocument();
+    expect(agenda).not.toHaveTextContent(/2,5|0 h|Horas|—/);
+    expect(within(agenda).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(agenda).getByText("Jornada 1/2")).toBeInTheDocument();
+    expect(within(agenda).getByText("Jornada 2/2")).toBeInTheDocument();
+    const second = within(agenda).getByRole("button", {name: /Abrir jornada.*Jornada 2\/2/});
+    fireEvent.click(second);
+    expect(mocks.detail.mock.calls.at(-1)?.[0]).toMatchObject({servicio:{id:"S1",jornada_id:"J2",auxiliares:[],horas_trabajadas:0}});
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it.each([640, 768])("keeps the original table and hour total at %i px", async width => {
+    viewport.width = width;
+    plan();
+    await screen.findAllByRole("button", {name: `Detalle ${service.trabajo_descripcion}`});
+    expect(screen.getByRole("table", {name:"Jornadas del Planificador"})).toBeInTheDocument();
+    expect(screen.getByText(/Total horas/)).toBeInTheDocument();
+    expect(screen.queryByRole("list", {name:"Jornadas del Planificador"})).not.toBeInTheDocument();
+  });
+  it("phone retains hidden-field sorting, full export and journey hours without displaying them", async () => {
+    viewport.width = 390;
+    plan(); await screen.findByRole("list", {name:"Jornadas del Planificador"});
+    fireEvent.click(screen.getByRole("button", {name:"Ordenar jornadas"}));
+    const sort = await screen.findByRole("button", {name:/Ordenar Horas:/});
+    fireEvent.click(sort); fireEvent.click(sort);
+    fireEvent.keyDown(sort, {key:"Escape"});
+    await exportRows("Exportar Planificador");
+    expect(mocks.json.mock.calls[0][0]).toEqual([
+      expect.objectContaining({"ID Jornada":"J1", Horas:2.5}),
+      expect.objectContaining({"ID Jornada":"J2", Horas:0}),
+    ]);
+  });
+  it("phone navigates weeks and shows a true empty state, keeping failures distinct", async () => {
+    viewport.width = 390;
+    render(<MemoryRouter initialEntries={["/planificador?semana=38"]}><Planificador/></MemoryRouter>);
+    await screen.findByRole("list", {name:"Jornadas del Planificador"});
+    const agenda = within(screen.getByRole("region", {name:"Agenda del Planificador"}));
+    fireEvent.click(agenda.getByRole("button", {name:"Semana siguiente"}));
+    expect(agenda.getByText(/Semana 39/)).toBeInTheDocument();
+    expect(screen.getByText("No hay jornadas con estos filtros.")).toBeInTheDocument();
+    fireEvent.click(agenda.getByRole("button", {name:"Semana anterior"}));
+    expect(await screen.findByRole("list", {name:"Jornadas del Planificador"})).toBeInTheDocument();
+  });
+  it("phone does not hide a failed load behind an empty agenda", async () => {
+    viewport.width = 390; mocks.errorTable = "servicio_jornadas";
+    plan(); await screen.findByRole("alert");
+    expect(screen.queryByText("No hay jornadas con estos filtros.")).not.toBeInTheDocument();
+    mocks.errorTable = ""; fireEvent.click(screen.getByRole("button", {name:"Reintentar"}));
+    await screen.findByRole("list", {name:"Jornadas del Planificador"});
+  });
   it("keeps same-day journeys separate, numeric hours and continuity under demand",async()=>{
     plan();await screen.findAllByRole("button",{name:`Detalle ${service.trabajo_descripcion}`});
     const table=screen.getByRole("table",{name:"Jornadas del Planificador"});expect(table).toHaveClass("table-fixed");expect(within(table).getAllByRole("row")).toHaveLength(3);expect(within(table).getByRole("img",{name:"Jornada 1/2"})).toBeInTheDocument();expect(within(table).getByRole("img",{name:"Jornada 2/2"})).toBeInTheDocument();

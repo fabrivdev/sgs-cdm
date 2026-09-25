@@ -9,7 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { Button } from "@/components/ui/button";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
-import { MobileRecord } from "@/components/lists/MobileRecord";
+import { PlannerMobileAgenda } from "@/components/calendar/PlannerMobileAgenda";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
@@ -102,6 +103,7 @@ async function cargarTodosLosClientes() {
 }
 
 export default function Planificador() {
+  const phone = useIsMobile(640);
   const { user, profile, isAdmin, isCabecilla, can } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [searchParams] = useSearchParams();
@@ -583,16 +585,20 @@ export default function Planificador() {
   if (fDatos === "sin_horas") activeChips.push({ label: "Sin horas", clear: () => setFDatos("all") });
   if (soloPrincipalesSemana && fSemana !== "all") activeChips.push({ label: "Solo principales", clear: () => setSoloPrincipalesSemana(false) });
 
+  const listStatus = loading ? "Cargando…" : loadError
+    ? <span role="alert" className="text-destructive">No se pudieron cargar las jornadas. <Button variant="outline" size="sm" onClick={load}>Reintentar</Button></span>
+    : !displayed.length ? "No hay jornadas con estos filtros." : undefined;
+  const journeyClass = (s: Servicio) => cn(rowClassByEstado(s.estado), user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id)) && "ring-2 ring-inset ring-primary/40");
+
   return (
-    <div className={pageShellWide}>
+    <div className={cn(pageShellWide, "max-sm:space-y-2")}>
       <PageHeader title="Planificador" actions={canCreate ? <>
-            <Button size="sm" aria-label="Programar jornada" className="max-sm:w-11 max-sm:px-0" onClick={() => setOpenProgramar(true)}>
+            <Button size="sm" aria-label="Programar jornada" className="max-sm:w-11 max-sm:bg-transparent max-sm:px-0 max-sm:text-primary max-sm:hover:bg-accent" onClick={() => setOpenProgramar(true)}>
               <CalendarPlus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Programar jornada</span>
             </Button>
       </> : undefined} />
 
       <FiltersBar
-        mobileContext={<div className="flex items-center justify-between gap-2"><Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana anterior" onClick={() => moverSemana(-1)} disabled={fSemana !== "all" && Number(fSemana) <= 1}><ChevronLeft className="h-4 w-4" /></Button><span className="text-[12px] font-medium text-foreground">{fSemana === "all" ? "Todas las semanas" : `Semana ${fSemana}${fSemana === currentWeek ? " · actual" : ""}`}</span><Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana siguiente" onClick={() => moverSemana(1)} disabled={fSemana !== "all" && Number(fSemana) >= 53}><ChevronRight className="h-4 w-4" /></Button></div>}
         search={{ value: fCliente, onChange: setFCliente, placeholder: "Cliente, OS o folio…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
@@ -655,7 +661,19 @@ export default function Planificador() {
 
 
 
-      <Card className="overflow-hidden">
+      {phone ? <PlannerMobileAgenda rows={displayed} columns={columns} sort={list.sort} onSort={list.toggleSort}
+        navigation={<div className="flex min-w-0 items-center justify-between gap-1">
+          <span className="text-[12px] font-medium" aria-live="polite">{fSemana === "all" ? "Todas las semanas" : `Semana ${fSemana}${fSemana === currentWeek ? " · actual" : ""}`}</span>
+          <div className="flex shrink-0">
+            <Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana anterior" onClick={() => moverSemana(-1)} disabled={fSemana !== "all" && Number(fSemana) <= 1}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana siguiente" onClick={() => moverSemana(1)} disabled={fSemana !== "all" && Number(fSemana) >= 53}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </div>}
+        client={s => s.cliente_id ? cliById[s.cliente_id]?.nombre || "Sin cliente" : "Sin cliente"}
+        reference={s => { const ref = refByServicio.get(s.id); return ref?.os ? `OS ${ref.os}` : ref?.ref || "Sin referencia"; }}
+        continuity={s => continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`)}
+        onSelect={openDetalle} rowClassName={journeyClass} status={listStatus}
+      /> : <Card className="overflow-hidden">
         <CompactListTable rows={displayed} columns={columns.map(column => {
           const layout: Record<string, Pick<CompactListColumn<Servicio>, "width" | "hiddenBelow">> = {
             fecha: { width: "w-[18%] md:w-[13%] xl:w-[9%]" },
@@ -688,16 +706,12 @@ export default function Planificador() {
             ]}><Button size="sm" variant="outline" onClick={() => openDetalle(s)}>Ver jornada</Button></CompactListInfo>;
             return String(column.value(s) ?? "—");
           }};
-        })} mobileColumns={[
-          { key: "trabajo", label: "Jornada", kind: "text", width: "w-auto", value: s => s.trabajo_descripcion, render: s => <button type="button" className="block min-h-11 w-full text-left" onClick={event => { event.stopPropagation(); openDetalle(s); }}><MobileRecord primary={s.trabajo_descripcion || "Sin descripción"} secondary={String(columns.find(c => c.key === "cliente")?.value(s) ?? "Sin cliente")} context={<><span>{format(parseISO(s.fecha_programada), "dd/MM")} · {refByServicio.get(s.id)?.os || refByServicio.get(s.id)?.ref || "Sin referencia"}</span><EstadoBadge estado={s.estado} className="max-w-full whitespace-normal px-1.5 text-[10px]" />{(() => { const c = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`); return c && c.total > 1 ? <span>Jornada {c.orden}/{c.total}</span> : null; })()}</>} /></button> },
-          { key: "horas", label: "Horas", kind: "number", align: "right", width: "w-[60px]", value: s => s.horas_trabajadas, render: s => s.horas_trabajadas == null ? "—" : s.horas_trabajadas.toLocaleString("es-PY", { maximumFractionDigits: 6 }) },
-        ]} id={s => `${s.id}-${s.jornada_id ?? s.fecha_programada}`} label="Jornadas del Planificador"
+        })} id={s => `${s.id}-${s.jornada_id ?? s.fecha_programada}`} label="Jornadas del Planificador"
           sort={list.sort} heading={list.heading} onSort={list.toggleSort} onSelect={openDetalle}
-          rowClassName={s => cn(rowClassByEstado(s.estado), user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id)) && "ring-2 ring-inset ring-primary/40")}
-          status={loading ? "Cargando…" : loadError ? <span role="alert" className="text-destructive">No se pudieron cargar las jornadas. <Button variant="outline" size="sm" onClick={load}>Reintentar</Button></span> : !displayed.length ? "No hay jornadas con estos filtros." : undefined} />
-      </Card>
+          rowClassName={journeyClass} status={listStatus} />
+      </Card>}
 
-      <Card className="p-3">
+      {!phone && <Card className="p-3">
         <div className="flex flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Clock className="h-4 w-4" />
@@ -708,7 +722,7 @@ export default function Planificador() {
             <span className="ml-1 text-[13px] font-normal text-muted-foreground">hs</span>
           </div>
         </div>
-      </Card>
+      </Card>}
 
       <ServicioFormDialog
 
