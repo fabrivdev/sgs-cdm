@@ -38,6 +38,18 @@ describe("operational extraction", () => {
     expect(result.current.serviciosDashboardData.ordenes).toHaveLength(1);
     expect(result.current.serviciosDashboardData.ordenes[0]).toMatchObject({ horas: 0, valorOS: 0 });
   });
+  it("retains equipment model and invoice date without changing operational filters or participant identity", () => {
+    const data = operationsFixture();
+    data.ordenesServicio[0] = demoOrder({ fecha_emision_factura: "2026-09-20", raw_data: { canonical_model: "TRION 740", tecnicos_participantes: ["TECNICO UNO", "TECNICO UNO", "TECNICO DOS"] } });
+    const { result } = renderHook(() => useOperationsModel(data, { ...operationsFilters, q: "trion 740" }, "trabajos", today));
+    expect(result.current.serviciosDashboardData.ordenes).toHaveLength(1);
+    expect(result.current.serviciosDashboardData.ordenes[0]).toMatchObject({ modelo: "TRION 740", fechaFacturacion: "2026-09-20", fechaCierre: "2026-09-10", tecnicos: ["TECNICO UNO", "TECNICO DOS"] });
+  });
+  it("does not count a missing technician or invent a model", () => {
+    const data = operationsFixture(); data.ordenesServicio = [demoOrder({ responsable: null })];
+    const { result } = renderHook(() => useOperationsModel(data, operationsFilters, "trabajos", today));
+    expect(result.current.serviciosDashboardData.ordenes[0]).toMatchObject({ modelo: null, tecnicos: [], fechaFacturacion: null });
+  });
   it("counts journeys without an imported OS and keeps pending distinct from cancelled", () => {
     const data = operationsFixture(); data.ordenesServicio = [];
     const { result } = renderHook(() => useOperationsModel(data, operationsFilters, "trabajos", today));

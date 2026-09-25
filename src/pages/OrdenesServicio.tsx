@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { format, startOfMonth } from "date-fns";
-import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target } from "lucide-react";
+import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target, Percent, CalendarDays } from "lucide-react";
 import { PageHeader, PageShell, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
@@ -22,7 +22,8 @@ import { emptyOperationsData, useOperationsModel, type OperationsFilters, type O
 import { OrdersTable } from "@/features/service-orders/OrdersTable";
 import { ProductivityTable } from "@/features/service-orders/ProductivityTable";
 import { ActivityTable } from "@/features/service-orders/ActivityTable";
-import { OperationalDistribution, OperationalEvolution } from "@/features/service-orders/OperationalSummary";
+import { OperationalEvolution } from "@/features/service-orders/OperationalSummary";
+import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
 import { TecnicosNoRealizadosRanking, MatrizTécnicosDías, EstadoCompacto, CargaSucursalTabla, DistribucionMarca, TrabajosAbiertosList } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
 import { ComplianceOverview } from "@/features/service-orders/ComplianceOverview";
@@ -62,6 +63,7 @@ export default function OrdenesServicio() {
 
 export function OrdersWorkspace() {
   const phone = useIsMobile(640);
+  const compact = useIsMobile(1024);
   const navigate = useNavigate();
   const { hasSectionAccess } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
@@ -78,7 +80,7 @@ export function OrdersWorkspace() {
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
     valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today);
   const data = model.serviciosDashboardData;
-  const dates = valid ? `${format(new Date(`${filters.dateFrom}T12:00:00`), "dd/MM/yyyy")} — ${format(new Date(`${filters.dateTo}T12:00:00`), "dd/MM/yyyy")}` : "Período inválido";
+  const closure = useMemo(() => orderClosureMetrics(data.ordenes), [data.ordenes]);
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
@@ -93,14 +95,16 @@ export function OrdersWorkspace() {
   const openJob = (id: string) => { if (hasSectionAccess("servicios.trabajos")) navigate(`/trabajos?trabajo=${encodeURIComponent(id)}`); };
 
   return <PageShell className="service-orders-workspace">
-    <PageHeader title="Órdenes de servicio" meta={dates} actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined} />
+    <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined} />
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
       <TabsList className="flex w-full justify-start overflow-hidden sm:justify-start" aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>
       {!blocked && <KpiStrip>
         {tab === "ordenes" ? [
           <KpiItem key="total" label="Órdenes" value={data.totalOS} icon={<ClipboardList />} />,
-          <KpiItem key="abiertas" label={phone ? "Abiertas" : "Abiertas / sin cierre"} value={data.abiertas} tone="info" icon={<Clock3 />} />,
+          <KpiItem key="abiertas" label={compact ? "Abiertas" : "Abiertas / sin cierre"} value={data.abiertas} tone="info" icon={<Clock3 />} />,
           <KpiItem key="cerradas" label="Cerradas" value={data.cerradas} tone="positive" icon={<CircleCheck />} />,
+          <KpiItem key="cierre" label="% de cierre" value={closure.percentage === null ? "—" : `${decimal.format(closure.percentage)}%`} tone="positive" icon={<Percent />} />,
+          <KpiItem key="dias" label={compact && !phone ? "Días prom." : "Días de cierre (prom.)"} value={closure.averageDays === null ? "—" : decimal.format(closure.averageDays)} icon={<CalendarDays />} />,
         ] : tab === "productividad" ? [
           <KpiItem key="horas" label="Horas-persona" value={decimal.format(data.horasPersona)} icon={<Clock3 />} />,
           <KpiItem key="meta" label="Meta disponible" value={data.capacidad.horasDisponibles > 0 ? decimal.format(data.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
@@ -131,7 +135,6 @@ export function OrdersWorkspace() {
       {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná un rango de fechas válido.</p> : query.isError ? <div role="alert" className="space-y-2 text-sm"><p>No se pudieron cargar todas las fuentes. No se muestran resultados parciales.</p><Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div> : blocked ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando órdenes y actividad…</p> : <>
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
           <OrdersTable rows={data.ordenes} />
-          <OperationalDistribution data={data} />
         </TabsContent>
         <TabsContent value="productividad" className="min-w-0 space-y-3">
           {query.data?.capacityWarning && <p role="alert" title={query.data.capacityWarning} className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5" />Meta de productividad no disponible.</p>}

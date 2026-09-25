@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { importedOrderModel } from "./orderMetrics";
 import { addDays, addMonths, addWeeks, addYears, differenceInCalendarDays, endOfMonth, endOfWeek, endOfYear, format, getDay, getISOWeek, getISOWeekYear, parseISO, startOfMonth, startOfWeek, startOfYear, subYears } from "date-fns";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
 import { estadoTrabajoDesdeJornadas, estadoTrabajoLabel, type EstadoTrabajo } from "@/lib/trabajos";
@@ -551,6 +552,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       const cliente = String(clienteTrabajo ?? row.cliente_nombre ?? "Sin cliente").trim() || "Sin cliente";
       const clienteMatched = clienteByName.get(normalizeClienteKey(cliente));
       const rawData = row.raw_data ?? {};
+      const modelo = importedOrderModel(rawData);
       const marca = (trabajo?.marca ?? marcaDesdeOS(row.marca)) as Marca;
       const origen = String(
         rawData.canonical_origin ?? rawData.ORIGEN ?? rawData.Origen ?? "",
@@ -673,7 +675,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
         if (!matchesRubro) return [];
       }
       if (query) {
-        const searchable = [row.os_numero, row.factura, realChassisOS(row), ...participantNames, cliente, row.problema, estadoOS, tipoTiempo, origen]
+        const searchable = [row.os_numero, row.factura, realChassisOS(row), marca, modelo, ...participantNames, cliente, row.problema, estadoOS, tipoTiempo, origen]
           .map((value) => String(value ?? ""))
           .join(" ")
           .toLowerCase();
@@ -785,11 +787,13 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
         tecnicos: participantNames,
         cliente,
         chasis: realChassisOS(row),
+        modelo,
         sucursal,
         marca,
         tipoTiempo,
         fechaApertura: row.fecha_abierta_os ? String(row.fecha_abierta_os).slice(0, 10) : null,
         fechaCierre: row.fecha_cierre_os ? String(row.fecha_cierre_os).slice(0, 10) : null,
+        fechaFacturacion: row.fecha_emision_factura ? String(row.fecha_emision_factura).slice(0, 10) : null,
         fechaOperacion: fechaAnalisis,
         estadoOS,
         estadoFacturacion: canonicalSituacion(row.situacion_facturacion),

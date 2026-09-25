@@ -251,3 +251,20 @@ Some first screenshots immediately after viewport changes were stale/cropped; fi
 - Knowledge note 26 records the reusable visual decisions. This checkout has no Obsidian sync configuration/scripts; no vault synchronization is claimed.
 
 Result: corrected and verified locally within this scope; user/production acceptance remains separate.
+
+---
+
+# Design QA — OS information and closure indicators
+
+Date: 2026-09-25. Follow-up scope: the user's two OS screenshots and explicit changes to title, cards, equipment/technician/distance columns, drawer and lower summary. Existing visual primitives remain in use; no global restyling or new dashboard.
+
+- Removed the page date subtitle and lower State/type/branch distribution. Date filters remain available.
+- Five Order KPIs, in one desktop strip and two phone rows (3 + 2). Other tabs retain three. Closure percentage uses closed / all filtered orders. Average days use valid opening-to-invoice pairs, including true zero days, never the operational closing date as a substitute.
+- Desktop list: OS, client, brand, model, technician count, status, OS hours, distance. At 640–1023 px brand/model share a single line and technician names/count stay in the complete drawer/export, as secondary columns are reduced. Short Hours/Km and Days average labels avoid clipped narrow headings. Phone records expose count, hours and distance without technician names; names remain in the drawer and complete export.
+- The drawer adds imported equipment model, invoice date and individual closure days. It removes the ambiguous imported billing-status display. No data is deleted; the 25-column export retains that original field with an explicit source label.
+
+Browser: existing ignored synthetic harness at `http://127.0.0.1:5181/mobile-review.local/orders.html`, real AppLayout and section components. Inspected screenshots at 1280×860, 390×844, 320×780, 640×860 and 768×860, including the 320 px drawer. At 320, the five KPI values occupy two aligned rows, and document width remains 305 px excluding scrollbar. At 640/768, scrollWidth equals clientWidth (625/753 px); rows remain 44 px at 768. Long synthetic customer names wrap only on phones. Some captures retain a prior vertical scroll position after resizing; they are not treated as full-page/header evidence. No production data or physical-device certification.
+
+Verification: 100 tests in 12 files; changed TypeScript lint, ES2021 typecheck and production build. Existing router future warnings and large build chunks remain. Source-error, permission, pagination, original OS metrics and Sales-mobile regressions still pass. Pure tests cover absent/invalid/reversed dates, same-day zero, leap/year boundaries and model source precedence; integration checks cover all six widths 320/390/639/640/768/1280, list filtering, new KPI population, names hidden in list and complete export. No SQL or changed access rules. Knowledge note 26 updated; this checkout still lacks Obsidian sync configuration/scripts.
+
+Result: implemented and verified locally; deployment and live source-date quality are not certified by these checks.

@@ -114,11 +114,14 @@ export interface ServicioOSRow {
   tecnicos: string[];
   cliente: string;
   chasis: string;
+  /** Optional for legacy dashboard producers; the OS workspace supplies imported identity. */
+  modelo?: string | null;
   sucursal: Sucursal | null;
   marca: Marca;
   tipoTiempo: string;
   fechaApertura: string | null;
   fechaCierre: string | null;
+  fechaFacturacion?: string | null;
   fechaOperacion: string;
   estadoOS: string;
   estadoFacturacion: string;

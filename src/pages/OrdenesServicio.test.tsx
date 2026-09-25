@@ -34,8 +34,11 @@ describe("orders workspace", () => {
     mocks.width = width; setup();
     const table = screen.getByRole("table", { name: "Órdenes de servicio" });
     expect(within(table).getAllByRole("row")).toHaveLength(3);
-    expect(within(table).getAllByRole("columnheader")).toHaveLength(width < 640 ? 2 : 6);
-    expect(screen.getByText("01/09/2026 — 25/09/2026")).toBeVisible();
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(width < 640 ? 2 : 8);
+    expect(screen.queryByText("01/09/2026 — 25/09/2026")).not.toBeInTheDocument();
+    expect(screen.queryByText("Estado, tipo y sucursal")).not.toBeInTheDocument();
+    expect(within(table).queryByText("TECNICO UNO")).not.toBeInTheDocument();
+    expect(within(table).queryByText("TECNICO DOS")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000002" }));
     const detail = within(screen.getByRole("dialog"));
     expect(detail.getByText("OS 01-00000002")).toBeVisible();
@@ -51,7 +54,10 @@ describe("orders workspace", () => {
     const payload = mocks.export.mock.calls[0][0];
     expect(payload.fileName).toBe("ordenes-de-servicio.xlsx");
     expect(payload.rows).toHaveLength(1); expect(payload.rows[0].key).toBe("01-00000002");
-    expect(payload.columns).toHaveLength(21);
+    expect(payload.columns).toHaveLength(25);
+    expect(payload.columns.find((c: { key: string }) => c.key === "tecnicos").value(payload.rows[0])).toBe(1);
+    expect(payload.columns.find((c: { key: string }) => c.key === "nombresTecnicos").value(payload.rows[0])).toBe("TECNICO DOS");
+    expect(payload.columns.find((c: { key: string }) => c.key === "diasCierre").value(payload.rows[0])).toBeNull();
   });
   it("shows productivity and drills into the selected technician's orders", () => {
     setup(); tab("Productividad");
@@ -69,24 +75,51 @@ describe("orders workspace", () => {
   it("groups the OS detail without losing dates, invoice identity, zero or signed amounts", () => {
     Object.assign(response.data.data.ordenesServicio[0], {
       factura: "000000000001; 000000000002", servicios_valor: 1240.25, repuesto_valor: -18.7,
+      fecha_emision_factura: "2026-09-20", km_cantidad: 300, raw_data: { canonical_model: "TRION 740" },
     });
     setup(); fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000001" }));
     const detail = within(screen.getByRole("dialog"));
     for (const name of ["Orden de servicio", "Trabajo y técnicos", "Facturación e importes"]) {
       expect(detail.getByRole("heading", { name })).toBeVisible();
     }
-    for (const text of ["10/08/2026", "10/09/2026", "000000000001; 000000000002", "$ 1.240,25", "$ -18,70", "$ 1.221,55"]) {
+    for (const text of ["10/08/2026", "10/09/2026", "20/09/2026", "41", "TRION 740", "TECNICO UNO", "300", "000000000001; 000000000002", "$ 1.240,25", "$ -18,70", "$ 1.221,55"]) {
       expect(detail.getByText(text, { exact: true })).toBeVisible();
     }
     expect(detail.getAllByText("$ 0,00")).toHaveLength(2);
+    expect(detail.queryByText("Situación de facturación")).not.toBeInTheDocument();
   });
-  it("keeps one set of three KPIs and one export menu in every view", () => {
+  it("keeps five order KPIs, three in other views and one export menu", () => {
     setup();
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
       tab(name);
       expect(screen.getAllByRole("region", { name: "Indicadores" })).toHaveLength(1);
-      expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(3);
+      expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(name === "Órdenes" ? 5 : 3);
       expect(screen.getAllByRole("button", { name: "Acciones de la sección" })).toHaveLength(1);
+    }
+  });
+  it("shows invoice-based closure days and recalculates both indicators with the list filters", async () => {
+    response.data.data.ordenesServicio[0].fecha_emision_factura = "2026-09-20";
+    setup();
+    const kpis = within(screen.getByRole("region", { name: "Indicadores" }));
+    expect(kpis.getByText("50%")).toBeVisible();
+    expect(kpis.getByText("41", { exact: true })).toBeVisible();
+    fireEvent.change(screen.getByPlaceholderText("Buscar…"), { target: { value: "00000002" } });
+    await waitFor(() => expect(kpis.getByText("0%")).toBeVisible());
+    expect(kpis.getByText("—")).toBeVisible();
+    expect(kpis.queryByText("41", { exact: true })).not.toBeInTheDocument();
+  });
+  it.each([390, 1280])("shows equipment, technician count, hours and distance in the list at %i px", width => {
+    mocks.width = width;
+    Object.assign(response.data.data.ordenesServicio[0], { km_cantidad: 300, raw_data: { canonical_model: "TRION 740", tecnicos_participantes: ["TECNICO UNO", "TECNICO DOS"] } });
+    setup();
+    const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
+    expect(table.getByText(/TRION 740/)).toBeVisible();
+    expect(table.queryByText(/TECNICO UNO/)).not.toBeInTheDocument();
+    if (width < 640) expect(table.getByText("2 técnicos · 10 h · 300 km")).toBeVisible();
+    else {
+      expect(table.getByText("2", { exact: true })).toBeVisible();
+      expect(table.getByText("300", { exact: true })).toBeVisible();
+      expect(table.getByRole("columnheader", { name: /Km recorridos/ })).toBeVisible();
     }
   });
   it("does not display empty goal columns but keeps them in the complete productivity export", async () => {

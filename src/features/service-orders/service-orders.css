@@ -15,4 +15,15 @@
   .service-orders-workspace {
     background: hsl(var(--card));
   }
+
+  /* Five OS indicators form two balanced rows; other views keep three. */
+  .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) > div {
+    grid-column: span 2;
+  }
+  .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) > div:nth-child(n + 4) {
+    grid-column: span 3;
+  }
 }
