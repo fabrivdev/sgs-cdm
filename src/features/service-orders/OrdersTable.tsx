@@ -12,6 +12,7 @@ import { OperationsPanel, OperationsStatus } from "./OperationsPresentation";
 import { operationsDate, operationsMoney } from "./format";
 import { orderClosingDays } from "./orderMetrics";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { MarcaBadge } from "@/components/StatusBadges";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const columns: SalesColumn<ServicioOSRow>[] = [
@@ -50,7 +51,8 @@ export function OrdersTable({ rows }: { rows: ServicioOSRow[] }) {
   const visible = ["os", "cliente", "marca", "modelo", "tecnicos", "estado", "horas", "km"].map((key, index) => ({ ...columns.find(c => c.key === key)!, width: widths[index],
     hiddenBelow: ["marca", "tecnicos"].includes(key) ? "lg" : undefined })) as CompactListColumn<ServicioOSRow>[];
   visible[0].render = row => <button type="button" className="min-h-11 max-w-full truncate text-left font-mono text-[12px] hover:text-primary focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}>{row.os}</button>;
-  visible[3].render = row => <><span className="lg:hidden">{row.marca} · </span>{row.modelo || "—"}</>;
+  visible[2].render = row => <MarcaBadge marca={row.marca} className="px-1.5 text-[10px]" />;
+  visible[3].render = row => <span className="flex min-w-0 items-center gap-1.5"><MarcaBadge marca={row.marca} className="shrink-0 px-1.5 text-[10px] lg:hidden" /><span className="truncate">{row.modelo || "—"}</span></span>;
   visible[3].title = row => `${row.marca} · ${row.modelo || "Sin modelo"}`;
   visible[5].render = row => <OperationsStatus value={row.estadoOS} />;
   visible[6].render = row => number.format(row.horas);
@@ -59,7 +61,7 @@ export function OrdersTable({ rows }: { rows: ServicioOSRow[] }) {
     ? <SalesSortButton label={key === "horas" ? "Horas" : "Km"} kind="number" align="center" active={table.sort.key === key} direction={table.sort.direction} onClick={() => table.toggleSort(key)} />
     : table.heading(key);
   const mobile: CompactListColumn<ServicioOSRow>[] = [
-    { ...visible[0], width: "w-[72%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={row.cliente} secondary={`${row.marca} · ${row.modelo || "Sin modelo"}`} context={<><span className="block">OS {row.os}</span><span>{row.tecnicos.length} {row.tecnicos.length === 1 ? "técnico" : "técnicos"} · {number.format(row.horas)} h · {number.format(row.km)} km</span></>} /></button> },
+    { ...visible[0], width: "w-[72%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={row.cliente} secondary={<span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5"><MarcaBadge marca={row.marca} className="px-1.5 text-[10px]" /><span>{row.modelo || "Sin modelo"}</span></span>} context={<><span className="block">OS {row.os}</span><span>{row.tecnicos.length} {row.tecnicos.length === 1 ? "técnico" : "técnicos"} · {number.format(row.horas)} h · {number.format(row.km)} km</span></>} /></button> },
     { ...visible[5], width: "w-[28%]" },
   ];
   return <>
@@ -71,7 +73,7 @@ export function OrdersTable({ rows }: { rows: ServicioOSRow[] }) {
       <ResponsiveDrawerHeader><div className="flex flex-wrap items-center gap-2"><h2 className="text-[14px] font-semibold">OS {selected?.os}</h2>{selected && <OperationsStatus value={selected.estadoOS} />}</div><p className="mt-1 text-[12px] text-muted-foreground">{selected?.cliente}</p></ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>{selected && <div className="space-y-3">
         <DetailSection card title="Orden de servicio" icon={<ClipboardList className="h-3.5 w-3.5" />}>
-          <KeyValueGrid><KeyValueItem label="Marca" value={selected.marca} /><KeyValueItem label="Modelo" value={selected.modelo} /><KeyValueItem label="Chasis" value={selected.chasis} mono /><KeyValueItem label="Sucursal" value={selected.sucursal} /><KeyValueItem label="Apertura" value={operationsDate(selected.fechaApertura)} empty="—" /><KeyValueItem label="Cierre OS" value={operationsDate(selected.fechaCierre)} empty="—" /><KeyValueItem label="Tipo de tiempo" value={selected.tipoTiempo} /></KeyValueGrid>
+          <KeyValueGrid><KeyValueItem label="Marca" value={<MarcaBadge marca={selected.marca} className="text-[10px]" />} /><KeyValueItem label="Modelo" value={selected.modelo} /><KeyValueItem label="Chasis" value={selected.chasis} mono /><KeyValueItem label="Sucursal" value={selected.sucursal} /><KeyValueItem label="Apertura" value={operationsDate(selected.fechaApertura)} empty="—" /><KeyValueItem label="Cierre OS" value={operationsDate(selected.fechaCierre)} empty="—" /><KeyValueItem label="Tipo de tiempo" value={selected.tipoTiempo} /></KeyValueGrid>
         </DetailSection>
         <DetailSection card title="Trabajo y técnicos" icon={<Wrench className="h-3.5 w-3.5" />}>
           <p className="text-[12px] leading-relaxed">{selected.problema || "Sin descripción"}</p>

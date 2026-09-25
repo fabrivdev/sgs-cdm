@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrdenesServicio from "./OrdenesServicio";
-import { operationsFixture } from "@/test/serviceOrdersFixture";
+import { demoOrder, operationsFixture } from "@/test/serviceOrdersFixture";
+import { machineBrandClass } from "@/lib/machineBrands";
 const mocks = vi.hoisted(() => ({ width: 390, query: vi.fn(), can: vi.fn(), set: vi.fn(), clear: vi.fn(), refetch: vi.fn(), export: vi.fn() }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: (breakpoint = 768) => mocks.width < breakpoint }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: mocks.can, hasSectionAccess: () => true }) }));
@@ -21,6 +22,22 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 describe("orders workspace", () => {
+  it.each([320, 768, 1280])("uses the shared brand palette in every list presentation and drawer at %i px", width => {
+    mocks.width = width;
+    const brands = ["CLAAS", "HORSCH", "OTROS"];
+    response.data.data.ordenesServicio = brands.map((marca, index) => demoOrder({ os_numero: `01-0000000${index + 1}`, trabajo_id: null, marca }));
+    setup();
+    const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
+    for (const [index, marca] of brands.entries()) {
+      for (const text of table.getAllByText(marca, { exact: true })) {
+        expect(text.parentElement).toHaveClass(...machineBrandClass(marca).split(" "));
+      }
+      fireEvent.click(screen.getByRole("button", { name: `Ver OS 01-0000000${index + 1}` }));
+      const detail = within(screen.getByRole("dialog"));
+      expect(detail.getByText(marca, { exact: true }).parentElement).toHaveClass(...machineBrandClass(marca).split(" "));
+      fireEvent.click(detail.getByRole("button", { name: "Cerrar" }));
+    }
+  });
   it("respects the guide: no permanent explanatory paragraphs in the three views or OS detail", () => {
     mocks.width = 1280; setup();
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
