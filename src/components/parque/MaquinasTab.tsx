@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 import { ArrowRightLeft, Plus } from "lucide-react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
@@ -365,6 +366,12 @@ export function MaquinasTab({
 
       <div className="overflow-hidden rounded-md border bg-card">
         <CompactListTable rows={ordenadas} id={m=>m.id} label="Máquinas del parque" sort={{key:sortKey,direction:sortDir}} onSort={key=>toggleSort(key as SortKey)}
+          mobileColumns={[{ key: "modelo", label: "Máquina", kind: "text", value: m => m.modelo_tipo, width: "w-auto", render: m => <CompactListInfo label={m.modelo_tipo || "Sin modelo"}
+            summary={<MobileRecord primary={m.modelo_tipo || "Sin modelo"} secondary={<><span className="font-mono">{m.serie || "Sin chasis"}</span><span className="block">{m.cliente_id ? cliById.get(m.cliente_id)?.nombre || "Sin cliente" : "Sin cliente"}</span></>}
+              context={<><MarcaBadge marca={m.marca} className="px-1.5 text-[10px]" />{m.activo === false && <span>Inactiva</span>}</>} />}
+            fields={columns.map(c => [c.label, String(c.value(m) ?? "—")] as const)}>
+            {m.cliente_id && onOpenCliente && <Button size="sm" variant="outline" onClick={() => onOpenCliente(m.cliente_id!)}>Ver cliente</Button>}
+          </CompactListInfo> }]}
           status={loading?"Cargando…":loadError?<span className="text-destructive">No se pudieron cargar las máquinas.</span>:!ordenadas.length?"Sin máquinas.":undefined}
           onSelect={onOpenCliente?m=>m.cliente_id&&onOpenCliente(m.cliente_id):undefined} rowClassName={m=>m.activo===false?"opacity-60":""}
           columns={columns.map(column=>{
@@ -385,14 +392,14 @@ export function MaquinasTab({
                 return String(column.value(m)??"—");
               }};
           })}
-          actions={{width:"w-[8%] md:w-[4%] lg:w-[3%]",render:m=>{
+          actions={{width:"w-11 sm:w-[8%] md:w-[4%] lg:w-[3%]",render:m=>{
             const activa=m.activo!==false;
             return <>                      {activa && canManagePark && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 max-w-full"
+                          className="h-7 w-7 max-w-full max-sm:h-11 max-sm:w-11"
                           title="Transferir a otro cliente"
                           aria-label={`Transferir ${m.serie}`}
                           onClick={(event) => {

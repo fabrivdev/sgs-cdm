@@ -7,6 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { tableHeadText } from "@/lib/ui-classes";
 import { AlertTriangle } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { CompactListTable } from "@/components/lists/CompactListTable";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -37,6 +40,21 @@ export function PurchaseSuggestionTable({ rows, sort, onSort, onSelect, leadTime
   onSelect: (row: ResultadoSugerencia) => void;
   leadTimeMonths: number;
 }) {
+  const phone = useIsMobile(640);
+  if (phone) return <CompactListTable rows={rows} id={row => row.producto_codigo} label="Sugerencia de compra" sort={sort} onSort={onSort} onSelect={onSelect}
+    columns={suggestionColumns.map(column => ({ ...column, width: "" }))}
+    status={!rows.length ? "No hay piezas que coincidan con los filtros." : undefined}
+    mobileColumns={[
+      { key: "descripcion", label: "Repuesto", kind: "text", value: row => row.descripcion, width: "w-auto", render: row => {
+        const warnings = qualityWarnings(row);
+        return <button type="button" className="block min-h-11 w-full text-left" aria-label={`Ver sugerencia ${row.producto_codigo}`} onClick={event => { event.stopPropagation(); onSelect(row); }}>
+          <MobileRecord primary={<span>{row.descripcion || "Sin descripción"}{warnings.length > 0 && <AlertTriangle role="img" aria-label={warnings.join(" · ")} className="ml-1 inline h-3.5 w-3.5 text-amber-600" />}</span>}
+            secondary={<span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5"><span className="font-mono">{row.producto_codigo}</span><MarcaBadge marca={row.marca} className="px-1 text-[10px]" /></span>} />
+        </button>;
+      } },
+      { key: "stock_global", label: "Stock", kind: "number", align: "right", width: "w-[60px]", value: row => row.stock_global, render: row => decimal.format(row.stock_global) },
+      { key: "sugerencia_unidades", label: "Sug.", kind: "number", align: "right", width: "w-[60px]", value: row => row.sugerencia_unidades, render: row => <span className={row.sugerencia_unidades > 0 ? "font-semibold text-primary" : undefined}>{integer.format(row.sugerencia_unidades)}</span> },
+    ]} />;
   return <Table className="table-fixed" aria-label="Sugerencia de compra">
     <colgroup>{suggestionColumns.map((column, index) => <col key={column.key} className={widthClasses[index]} />)}</colgroup>
     <TableHeader><TableRow>{suggestionColumns.map(column => <TableHead key={column.key}

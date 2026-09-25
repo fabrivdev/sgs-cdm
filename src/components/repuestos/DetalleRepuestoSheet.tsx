@@ -659,7 +659,7 @@ export function DetalleRepuestoSheet({
             <SheetHeader className="border-b px-5 py-3 pr-12 text-left">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <SheetTitle className="truncate text-[14px]" title={producto.descripcion}>{producto.descripcion}</SheetTitle>
+                  <SheetTitle className="truncate text-[14px] max-sm:whitespace-normal max-sm:break-words max-sm:leading-5" title={producto.descripcion}>{producto.descripcion}</SheetTitle>
                   <SheetDescription className="mt-0.5 flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px]">
                     <span className="truncate font-mono" title={producto.codigo_interno}>{producto.codigo_interno}</span>
                     {producto.codigo_fabricante && <span className="min-w-0 truncate" title={`Fabricante: ${producto.codigo_fabricante}`}>Fab. {producto.codigo_fabricante}</span>}

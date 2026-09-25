@@ -20,3 +20,11 @@
   .commission-days-table th:nth-child(7) { width: 58px; }
   .commission-order-table button:not([role="checkbox"]), .commission-days-table button { min-height: 44px; }
 }
+
+/* Phones group OS/client/payment; tablets keep their existing separate fields. */
+@media (max-width: 639px) {
+  .commission-order-table tr > :last-child { display: none; }
+  .commission-order-table td[colspan] { display: table-cell; }
+  .commission-order-table th:nth-last-child(3) { width: 72px; }
+  .commission-order-table td { vertical-align: middle; }
+}

@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex max-w-full h-11 sm:h-9 items-center justify-start sm:justify-center gap-1 overflow-x-auto border-b bg-transparent p-0 text-muted-foreground",
+      "inline-flex max-w-full h-11 sm:h-9 items-center justify-start sm:justify-center gap-1 overflow-x-auto border-b bg-transparent p-0 text-muted-foreground max-sm:h-auto max-sm:min-h-11 max-sm:w-full max-sm:gap-0 max-sm:overflow-x-hidden",
       className,
     )}
     {...props}
@@ -27,7 +27,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center whitespace-nowrap border-b-2 border-transparent px-3 py-1.5 text-sm font-medium ring-offset-background transition-[color,border-color,transform] duration-150 ease-spring active:scale-[0.98] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      "inline-flex h-9 items-center justify-center whitespace-nowrap border-b-2 border-transparent px-3 py-1.5 text-sm font-medium ring-offset-background transition-[color,border-color,transform] duration-150 ease-spring active:scale-[0.98] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 max-sm:h-auto max-sm:min-h-11 max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-normal max-sm:break-words max-sm:px-1 max-sm:text-[12px] max-sm:leading-4",
       className,
     )}
     {...props}

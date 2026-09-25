@@ -68,6 +68,8 @@ export function FiltersBar({
   activeCount = 0,
   onClear,
   meta,
+  mobileContext,
+  mobileLeading,
   actions,
   secondaryActions,
   expanded,
@@ -86,6 +88,10 @@ export function FiltersBar({
   onClear?: () => void;
   /** @deprecated El contador/meta ya no se renderiza junto al botón Filtros. */
   meta?: ReactNode;
+  /** Essential context stays visible on phones, independently of the filter drawer. */
+  mobileContext?: ReactNode;
+  /** Navigation in the search slot for phone views without search (e.g. Calendar). */
+  mobileLeading?: ReactNode;
   actions?: ReactNode;
   /** Section menu, immediately after Más filtros; never duplicated in the drawer. */
   secondaryActions?: ReactNode;
@@ -142,10 +148,12 @@ export function FiltersBar({
 
   return (
     <Card className={cn("min-w-0 border-0 bg-transparent p-0 shadow-none sm:border sm:bg-card sm:px-3 sm:py-2", className)}>
+      {mobileContext && <div className="mb-1 min-w-0 text-[11px] leading-4 text-muted-foreground sm:hidden">{mobileContext}</div>}
       <div className="flex min-w-0 flex-nowrap items-center gap-1 sm:items-end sm:gap-2">
       {/* Móvil: búsqueda. Los controles de sección se montan una sola vez. */}
       <div className="flex min-w-0 flex-1 gap-2 sm:hidden">
         {search && searchInput(true)}
+        {!search && mobileLeading}
       </div>
 
       {/* Desktop: una sola fila, sin wrap. Lo que no entra se oculta y queda en el panel. */}

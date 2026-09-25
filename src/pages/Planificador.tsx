@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { Button } from "@/components/ui/button";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EstadoBadge, MarcaBadge, rowClassByEstado } from "@/components/StatusBadges";
@@ -585,12 +586,13 @@ export default function Planificador() {
   return (
     <div className={pageShellWide}>
       <PageHeader title="Planificador" actions={canCreate ? <>
-            <Button size="sm" onClick={() => setOpenProgramar(true)}>
-              <CalendarPlus className="mr-2 h-4 w-4" /> Programar jornada
+            <Button size="sm" aria-label="Programar jornada" className="max-sm:w-11 max-sm:px-0" onClick={() => setOpenProgramar(true)}>
+              <CalendarPlus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Programar jornada</span>
             </Button>
       </> : undefined} />
 
       <FiltersBar
+        mobileContext={<div className="flex items-center justify-between gap-2"><Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana anterior" onClick={() => moverSemana(-1)} disabled={fSemana !== "all" && Number(fSemana) <= 1}><ChevronLeft className="h-4 w-4" /></Button><span className="text-[12px] font-medium text-foreground">{fSemana === "all" ? "Todas las semanas" : `Semana ${fSemana}${fSemana === currentWeek ? " · actual" : ""}`}</span><Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana siguiente" onClick={() => moverSemana(1)} disabled={fSemana !== "all" && Number(fSemana) >= 53}><ChevronRight className="h-4 w-4" /></Button></div>}
         search={{ value: fCliente, onChange: setFCliente, placeholder: "Cliente, OS o folio…" }}
         activeCount={activeChips.length}
         onClear={limpiarFiltros}
@@ -686,19 +688,22 @@ export default function Planificador() {
             ]}><Button size="sm" variant="outline" onClick={() => openDetalle(s)}>Ver jornada</Button></CompactListInfo>;
             return String(column.value(s) ?? "—");
           }};
-        })} id={s => `${s.id}-${s.jornada_id ?? s.fecha_programada}`} label="Jornadas del Planificador"
-          sort={list.sort} heading={list.heading} onSelect={openDetalle}
+        })} mobileColumns={[
+          { key: "trabajo", label: "Jornada", kind: "text", width: "w-auto", value: s => s.trabajo_descripcion, render: s => <button type="button" className="block min-h-11 w-full text-left" onClick={event => { event.stopPropagation(); openDetalle(s); }}><MobileRecord primary={s.trabajo_descripcion || "Sin descripción"} secondary={String(columns.find(c => c.key === "cliente")?.value(s) ?? "Sin cliente")} context={<><span>{format(parseISO(s.fecha_programada), "dd/MM")} · {refByServicio.get(s.id)?.os || refByServicio.get(s.id)?.ref || "Sin referencia"}</span><EstadoBadge estado={s.estado} className="max-w-full whitespace-normal px-1.5 text-[10px]" />{(() => { const c = continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`); return c && c.total > 1 ? <span>Jornada {c.orden}/{c.total}</span> : null; })()}</>} /></button> },
+          { key: "horas", label: "Horas", kind: "number", align: "right", width: "w-[60px]", value: s => s.horas_trabajadas, render: s => s.horas_trabajadas == null ? "—" : s.horas_trabajadas.toLocaleString("es-PY", { maximumFractionDigits: 6 }) },
+        ]} id={s => `${s.id}-${s.jornada_id ?? s.fecha_programada}`} label="Jornadas del Planificador"
+          sort={list.sort} heading={list.heading} onSort={list.toggleSort} onSelect={openDetalle}
           rowClassName={s => cn(rowClassByEstado(s.estado), user && !s.visto_por.includes(user.id) && (s.tecnico_responsable_id === user.id || s.auxiliares.includes(user.id)) && "ring-2 ring-inset ring-primary/40")}
           status={loading ? "Cargando…" : loadError ? <span role="alert" className="text-destructive">No se pudieron cargar las jornadas. <Button variant="outline" size="sm" onClick={load}>Reintentar</Button></span> : !displayed.length ? "No hay jornadas con estos filtros." : undefined} />
       </Card>
 
       <Card className="p-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span>Total horas · {displayed.length} jornada{displayed.length !== 1 ? "s" : ""} filtrada{displayed.length !== 1 ? "s" : ""}</span>
           </div>
-          <div className="text-[22px] font-semibold tabular-nums">
+          <div className="text-[22px] font-semibold tabular-nums max-sm:shrink-0 max-sm:text-[18px]">
             {totalHoras.toFixed(totalHoras % 1 === 0 ? 0 : 1)}
             <span className="ml-1 text-[13px] font-normal text-muted-foreground">hs</span>
           </div>

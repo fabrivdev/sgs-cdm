@@ -1,5 +1,17 @@
 # Revisión móvil transversal — primera muestra
 
+## Revisión final del patrón móvil — 24/09/2026
+
+El usuario autorizó la corrección transversal tras una auditoría de 18 rutas principales. Regla posterior y vigente: no apilar sigue aplicando a escritorio/tablet; bajo 640 px se permite identidad en varias líneas cuando mejora lectura. Las etapas y matriz originales que siguen son historial, no el estado vigente.
+
+Implementado: escala menor de búsqueda/pestañas en Ventas; encabezados, indicadores y pestañas compartidos; filas agrupadas en Máquinas/Stock, Operaciones/Importaciones, Stock proyectado, Repuestos/Sugerencias, Compras/Solicitudes e ítems; semana y contexto del Planificador, lista móvil de Trabajos, vistas visibles del Calendario, pestañas de Administración/Dashboard y OS agrupadas en Comisiones. Se preservan columnas de 640 px en adelante, orden original, paginación, permisos, fórmulas, negativos y exportadores completos. Ficha de repuesto recibe pestañas táctiles y título envolvente; no se reducen todos sus controles indiscriminadamente.
+
+Ver `docs/knowledge/25-Revision-movil-transversal.md` para reglas, consumidores y dependencias. Implementación y regresiones registradas en `design-qa.md`. Evidencia local fuera de Git: `C:/Users/Usuario/Documents/Codex/2026-09-08/ad/mobile-implementation-2026-09-24`. Las capturas usan fixtures ficticias y componentes reales; no son producción. La auditoría inicial está en `mobile-audit-2026-09-24` junto a ese directorio.
+
+Límite: comprobación representativa, no todas las combinaciones de reportes/formularios, teclado virtual o teléfonos físicos. Dashboard local se comprobó también en error de fuente incompleta, sin presentar importes parciales; esa fixture no valida sus cálculos financieros. La elipsis previa de tablet se conserva, no se declara lectura completa de todas sus columnas simultáneamente. No se requiere ni se ejecuta SQL. Sin sincronización de Obsidian en este clon sin configuración local.
+
+## Historial de la primera muestra
+
 Estado: muestra aprobada; primera implementación compartida. No modifica SQL, permisos ni reglas de negocio. Base de código: `8341cfde2e6de21d4a184a4a26d4001e0b10b4d4`.
 
 ## Primera implementación después de aprobar la muestra

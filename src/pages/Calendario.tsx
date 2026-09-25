@@ -549,7 +549,7 @@ export default function Calendario() {
             variant="outline"
             size="icon"
             aria-label="Período anterior"
-            className="h-9 w-9"
+            className="h-9 w-9 max-sm:w-11 max-sm:border-0 max-sm:px-0"
             onClick={() => setCursor(vista === "mes" ? addMonths(cursor, -1) : addWeeks(cursor, -1))}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -561,21 +561,22 @@ export default function Calendario() {
             <Button
               variant="outline"
               size="sm"
-              className="h-9 gap-2"
+              className="h-9 gap-2 max-sm:w-11 max-sm:border-0 max-sm:px-0"
+              aria-label="Disponibilidad"
               onClick={() => {
                 setDiaDisponibilidad(undefined);
                 setOpenDisponibilidad(true);
               }}
             >
               <CalendarOff className="h-4 w-4" />
-              Disponibilidad
+              <span className="hidden sm:inline">Disponibilidad</span>
             </Button>
           )}
           <Button
             variant="outline"
             size="icon"
             aria-label="Período siguiente"
-            className="h-9 w-9"
+            className="h-9 w-9 max-sm:w-11 max-sm:border-0 max-sm:px-0"
             onClick={() => setCursor(vista === "mes" ? addMonths(cursor, 1) : addWeeks(cursor, 1))}
           >
             <ChevronRight className="h-4 w-4" />
@@ -584,6 +585,7 @@ export default function Calendario() {
       />
 
       <FiltersBar
+        mobileLeading={<nav aria-label="Vista del calendario" className="flex min-w-0 flex-1 border-b">{([['mes', 'Mes'], ['semana', 'Semana'], ['tecnicos', 'Técnicos']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={vista === value} onClick={() => setVista(value)} className={cn("min-h-11 min-w-0 flex-1 border-b-2 px-1 text-[12px]", vista === value ? "border-primary font-semibold text-foreground" : "border-transparent text-muted-foreground")}>{label}</button>)}</nav>}
         activeCount={fTecnicos.length > 0 ? 1 : 0}
         onClear={() => setFTecnicos([])}
         secondaryActions={<SectionActionsMenu options={[{ id: "excel", label: "Exportar Calendario", onSelect: exportarExcel }]} />}

@@ -3,6 +3,9 @@ import { MarcaBadge } from "@/components/StatusBadges";
 import { SalesSortButton } from "@/components/ventas/SalesTableControls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { CompactListTable } from "@/components/lists/CompactListTable";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 
 const branches: { key: StockSortKey & keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "S. Rita" },
@@ -33,6 +36,16 @@ export function PartsStockTable({ rows, sortKey, sortDir, onSort, onSelect }: {
   onSort: (key: StockSortKey) => void;
   onSelect: (row: StockMatrizRow) => void;
 }) {
+  const phone = useIsMobile(640);
+  if (phone) return <CompactListTable<StockMatrizRow> rows={rows} id={row => row.codigo_interno} label="Stock de repuestos"
+    sort={{ key: sortKey, direction: sortDir }} onSort={key => onSort(key as StockSortKey)} onSelect={onSelect}
+    columns={columns.filter(c => c.sortKey).map(c => ({ key: c.sortKey!, label: c.label, kind: c.numeric ? "number" : "text", value: row => row[c.key], width: c.width }))}
+    mobileColumns={[
+      { key: "descripcion", label: "Repuesto", kind: "text", value: row => row.descripcion, width: "w-[76%]", render: row => <button type="button" className="block min-h-11 w-full text-left" aria-label={`Ver repuesto ${row.codigo_interno}`} onClick={event => { event.stopPropagation(); onSelect(row); }}>
+        <MobileRecord primary={row.descripcion || "Sin descripción"} secondary={<span className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span className="font-mono">{row.codigo_interno}</span><MarcaBadge marca={row.marca} className="px-1.5 text-[10px]" /></span>} />
+      </button> },
+      { key: "total", label: "Total", kind: "number", align: "right", value: row => row.total, width: "w-[24%]", render: row => <span className="font-medium">{row.total == null ? "—" : Number(row.total).toLocaleString("es-PY")}</span> },
+    ]} />;
   return <Table className="table-fixed" aria-label="Stock de repuestos">
     <colgroup>{columns.map(column => <col key={column.key} className={column.width} />)}</colgroup>
     <TableHeader><TableRow>{columns.map(column => <TableHead key={column.key}

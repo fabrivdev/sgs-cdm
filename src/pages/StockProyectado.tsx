@@ -9,6 +9,7 @@ import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageShell } from "@/lib/ui-classes";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 import {
   PROJECTED_STOCK_START,
   parseProjectedMachineStock,
@@ -119,7 +120,7 @@ export default function StockProyectado() {
 
   return (
     <div className={pageShell}>
-      <PageHeader title="Stock proyectado" />
+      <PageHeader title="Stock proyectado" meta={<span className="sm:hidden">Corte: {shortDate(cutoff)} · Máquinas nuevas</span>} />
       <KpiStrip mobilePrimary={[0, 3]} className="sm:grid-cols-2 xl:grid-cols-4">
         <KpiItem label="Stock" value={units(totals.stock)} tone="positive" icon={<Boxes className="h-4 w-4" />} />
         <KpiItem label="Órdenes de compra" value={units(totals.pedidosCompra)} tone="info" icon={<ShoppingCart className="h-4 w-4" />} />
@@ -143,9 +144,17 @@ export default function StockProyectado() {
           <CompactListTable
             rows={table.ordered}
             columns={viewColumns}
+            mobileColumns={[
+              { ...viewColumns.find(c => c.key === "modelo")!, width: "w-[56%]", render: row => <CompactListInfo label={row.modelo}
+                summary={<MobileRecord primary={row.modelo} secondary={row.marca} />}
+                fields={[["Marca", row.marca], ["Tipo", row.tipo], ["Stock", units(row.stock)], ["OC", units(row.pedidos_compra)], ["Disponible", units(row.disponibilidad)], ["Ventas pendientes", units(row.ventas_pendientes)], ["Proyectado", units(row.stock_proyectado)], ["Arribos", units(row.arribos_periodo)], ["Facturas/NC", units(row.ventas_netas_periodo)]]} /> },
+              { ...viewColumns.find(c => c.key === "stock")!, width: "w-[22%]", align: "right" },
+              { ...viewColumns.find(c => c.key === "stock_proyectado")!, label: "Proy.", width: "w-[22%]", align: "right" },
+            ]}
             id={(row) => `${row.programa}:${row.marca}:${row.modelo}`}
             label="Stock proyectado de máquinas nuevas"
             sort={table.sort}
+            onSort={table.toggleSort}
             heading={table.heading}
             status={loading ? "Calculando…" : loadError ? <span className="text-destructive">{loadError}</span> : !filtered.length ? `Sin movimientos al ${shortDate(cutoff)}.` : undefined}
           />

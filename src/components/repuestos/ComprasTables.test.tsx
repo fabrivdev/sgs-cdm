@@ -39,6 +39,16 @@ async function exportItems(name:string) {
   await waitFor(()=>expect(mocks.write).toHaveBeenCalled()); return mocks.sheet.mock.calls[0][0];
 }
 describe("purchase table presentation",()=>{
+  it("groups phone item identity and keeps the full detail and hidden-field ordering", async()=>{
+    vi.stubGlobal("innerWidth",320);
+    setup(); fireEvent.click(screen.getByRole("button",{name:"Ítems del pedido 000010 (Santa Rita)"}));
+    const identity=screen.getByRole("button",{name:"Detalle REPIN000001"});
+    expect(identity).toHaveTextContent(order.descripcion!);
+    expect(identity).toHaveTextContent(order.productoCodigo);
+    fireEvent.click(screen.getByRole("button",{name:"Ordenar ítems del pedido 000010"}));
+    const ordering=await screen.findByRole("dialog");
+    expect(within(ordering).getByRole("button",{name:/Ordenar Pendiente/})).toBeInTheDocument();
+  });
   it("keeps order lines numeric-only, fractions, money and matching axes",()=>{
     setup(); fireEvent.click(screen.getByRole("button",{name:"Ítems del pedido 000010 (Santa Rita)"}));
     const rows=itemRows("Ítems del pedido 000010");

@@ -1,3 +1,31 @@
+# Design QA — revisión móvil transversal y excepción multilínea
+
+Fecha: 24/09/2026. Base: `10701175fa72edfc370900251fe35168f4d58403`. Solicitud: corregir la revisión general, permitiendo agrupar identidad en teléfono y conservando columnas de escritorio/tablet. La auditoría anterior cubrió 18 rutas principales con capturas de lectura; no se modificaron datos productivos.
+
+## Resultado de implementación
+
+Menos contenedores y desplegables principales, título de 18 px, búsqueda visual de 36 px y pestañas discretas de 12 px/44 px táctiles. `MobileRecord` agrupa identidad bajo 640 px y `CompactListTable.mobileColumns` conserva el orden por los campos secundarios. Modelo/chasis/cliente, NP/cliente, descripción/código y jornada/referencia pueden envolver; no se agrupan registros ni se alteran cálculos. Compras conserva detalle completo de ítems, Comisiones conserva selección y pago explícito, Operaciones conserva facturación y entrega como estados distintos. Guía funcional actualizada en `docs/knowledge/24-Condiciones-visuales-ventas.md` y `25-Revision-movil-transversal.md`.
+
+## Comprobación visual local
+
+Navegador Chrome, componentes reales, backend sustituido por fixtures ficticias de sólo lectura en `mobile-review.local` (ignorado por Git). No se ejecutaron pagos, transferencias ni escrituras remotas. Evidencia fuera del repositorio: `C:/Users/Usuario/Documents/Codex/2026-09-08/ad/mobile-implementation-2026-09-24`.
+
+- 320 px: revisión de Stock proyectado (incluido negativo y términos de fórmula en detalle), Ventas de Servicios, Planificador, Calendario Mes/Semana, Trabajos, Administración, Comisiones, pedidos/importaciones, sugerencias, pestañas de ficha y compras/solicitudes con ítems. Se corrigieron encabezados estrechos de Proyectado, Cantidad de ítems y el colspan del estado vacío de Comisiones. Capturas representativas: `admin-320.png`, `planificador-320.png`, `comisiones-320.png`, `pedidos-320.png`, `importaciones-320.png`, `sugerencias-320.png`, `solicitudes-320.png`.
+- 390 px: Stock de Repuestos y composición final de Ventas de Servicios (`ventas-servicios-390.png`). Medición DOM: buscador 36 px/entrada 16 px; pestañas 44 px/texto 12 px; ancho del documento 375 px con viewport de 390 px y scrollbar, sin desbordamiento horizontal.
+- 768/1280 px: Stock de Repuestos y Compras, respectivamente (`stock-tablet-768.png`, `compras-escritorio-1280.png`). Sin `MobileRecord` montado y sin desbordamiento del documento; se conserva la elipsis previa en columnas estrechas de tablet, no se acredita lectura simultánea íntegra de todos sus valores.
+- Dashboard: fechas consultadas y cuatro pestañas visibles a 320 px. La fixture fuerza fuente financiera incompleta y conserva el error sin cifras parciales; no valida el cálculo financiero del Dashboard.
+- El viewport temporal se restauró. Algunas capturas de página completa agotaron el tiempo del navegador; se utilizaron capturas de viewport verificadas, no se presentan esos intentos como evidencia.
+
+## Pruebas y límites
+
+Pasada final secuencial: **33 archivos / 212 pruebas correctas**, incluyendo Ventas, exportaciones, permisos, callbacks, calendario, Administración, Comisiones, Compras y listas de Parque. Pruebas nuevas verifican fronteras 320/390/639 frente a 640/768/1280 px, identidad, orden oculto y que seleccionar/inspeccionar una OS no ejecute una liquidación. Dos pasadas concurrentes agotaron los 5 segundos de una prueba de Repuestos; la misma prueba y suite pasaron secuencialmente sin aumentar su límite ni cambiar sus aserciones.
+
+TypeScript correcto con `--lib ES2021,DOM,DOM.Iterable` por la limitación preexistente de `replaceAll` en ES2020. Compilación de producción correcta; conserva advertencias previas de chunks grandes. ESLint comparado con HEAD no añade diagnósticos en archivos modificados; archivos nuevos comprobados aparte. `git diff --check` sin errores. No se afirma que toda la suite histórica del repositorio esté verde.
+
+No requiere SQL, no cambia fuentes/cálculos/permisos ni acredita despliegue productivo. No se comprobó cada combinación de formulario, teclado virtual, teléfono físico o importe extremo. El atlas no se sincronizó: faltan su índice/mapa y `obsidian-sync.local` en este clon; se consultó el contexto del repositorio principal sin modificarlo. Las notas curadas no equivalen a adelantar su checkpoint.
+
+---
+
 # Design QA — historial de máquina y detalle de OS
 
 - Source visual truth: `C:\Users\Usuario\AppData\Local\Temp\codex-clipboard-f880f7ff-a3f6-404b-a129-a843107a6e73.png`

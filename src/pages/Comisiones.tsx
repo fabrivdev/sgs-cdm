@@ -2,7 +2,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileSalesTable } from "@/components/ventas/MobileSalesTable";
-import { CompactListInfo } from "@/components/lists/CompactListTable";
+import { CompactListInfo, CompactListOrderMenu } from "@/components/lists/CompactListTable";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 import { format, startOfMonth } from "date-fns";
 import {
   AlertTriangle,
@@ -279,6 +280,7 @@ function SummaryTable({ rows, heading, onTechnician }: { rows: TechnicianSummary
 
 export default function Comisiones() {
   const isCompact = useIsMobile(1024);
+  const isPhone = useIsMobile(640);
   const [initialDateRange] = useState(storedDateRange);
   const [view, setView] = useState<View>("cerradas");
   const [from, setFrom] = useState(initialDateRange.from);
@@ -623,7 +625,7 @@ export default function Comisiones() {
   const resumenPanel = (
     <Panel className="overflow-hidden p-0">
       <div className="border-b px-3 py-2"><SectionHeader title="Horas por técnico y tipo" /></div>
-      {isCompact ? <MobileSalesTable title="Horas por técnico" rows={summaryRows} columns={summaryColumns} rowKey={r=>r.key} sort={summaryTable.sort} toggleSort={summaryTable.toggleSort} onRowClick={r=>setTechnicianFilters([r.technician])} /> : <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} heading={summaryTable.heading} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>}
+      {isCompact ? <MobileSalesTable embedded={isPhone} title="Horas por técnico" rows={summaryRows} columns={summaryColumns} rowKey={r=>r.key} sort={summaryTable.sort} toggleSort={summaryTable.toggleSort} onRowClick={r=>setTechnicianFilters([r.technician])} /> : <div className="max-h-[320px] overflow-auto"><SummaryTable rows={summaryRows} heading={summaryTable.heading} onTechnician={(technician) => setTechnicianFilters([technician])} /></div>}
     </Panel>
   );
 
@@ -638,8 +640,8 @@ export default function Comisiones() {
       </div>
       <div className="w-full overflow-x-auto"><div className="lg:max-h-[480px] lg:overflow-y-auto"><Table data-selectable={view !== "abiertas"} className={cn("commission-order-table w-full min-w-0 lg:min-w-[860px] table-fixed", tableTextDense)}>
         <TableHeader><TableRow>
-          {view !== "abiertas" && <TableHead className="w-8 px-2"><Checkbox checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></TableHead>}
-          <TableHead className={cn(tableHeadText, "w-[104px] whitespace-nowrap px-2")}>{orderTable.heading("os")}</TableHead>
+          {view !== "abiertas" && <TableHead className="w-8 px-2"><label className="flex min-h-11 items-center justify-center sm:min-h-0"><Checkbox aria-label="Seleccionar todas las OS" checked={allSelected} onCheckedChange={(checked) => setSelected(checked ? new Set(selectableIds) : new Set())} /></label></TableHead>}
+          <TableHead className={cn(tableHeadText, "w-[104px] whitespace-nowrap px-2")}><div className="flex items-center justify-between">{orderTable.heading("os")}{isPhone && <CompactListOrderMenu label="órdenes de comisiones" columns={orderColumns} sort={orderTable.sort} onSort={orderTable.toggleSort} />}</div></TableHead>
           <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{orderTable.heading("cliente")}</TableHead>
           <TableHead className={cn(tableHeadText, "w-auto whitespace-nowrap px-2")}>{orderTable.heading("equipo")}</TableHead>
           <TableHead className={cn(tableHeadText, "w-[68px] whitespace-nowrap px-2")}>{orderTable.heading("sucursal")}</TableHead>
@@ -651,15 +653,15 @@ export default function Comisiones() {
           <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>{orderTable.heading("pago")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>
-          {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 11 : 10} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={11} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
+          {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 11 : 10} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={(isPhone ? 2 : isCompact ? 3 : 10) + (view !== "abiertas" ? 1 : 0)} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
             const orderIds = order.rows.filter((row) => selectableIdSet.has(row.id)).map((row) => row.id);
             const orderSelected = orderIds.length > 0 && orderIds.every((id) => selected.has(id));
             const inactiveTechnician = order.rows.some((row) => !isActiveTechnician(row));
             const period = periodLabel(order.dateFrom, order.dateTo);
             const payment = order.paidCount === order.rows.length ? "Pagada" : order.paidCount > 0 ? "Parcial" : "Pendiente";
             return <TableRow key={order.key} className="h-8" data-state={orderSelected ? "selected" : undefined}>
-              {view !== "abiertas" && <TableCell className="px-2 py-1"><Checkbox disabled={orderIds.length === 0} checked={orderSelected} onCheckedChange={(checked) => toggleOrder(order, Boolean(checked))} /></TableCell>}
-              <TableCell className="min-w-0 overflow-hidden px-2 py-1"><button type="button" title={`OS ${order.osNumber}`} className="block w-full truncate text-left font-semibold tabular-nums hover:text-primary hover:underline" onClick={() => setSelectedOsKey(order.key)}>{order.osNumber}</button></TableCell>
+              {view !== "abiertas" && <TableCell className="px-2 py-1"><label className="flex min-h-11 items-center justify-center sm:min-h-0"><Checkbox aria-label={`Seleccionar OS ${order.osNumber}`} disabled={orderIds.length === 0} checked={orderSelected} onCheckedChange={(checked) => toggleOrder(order, Boolean(checked))} /></label></TableCell>}
+              <TableCell className="min-w-0 overflow-hidden px-2 py-1"><button type="button" title={`OS ${order.osNumber}`} className="block w-full truncate text-left font-semibold tabular-nums hover:text-primary hover:underline max-sm:whitespace-normal" onClick={() => setSelectedOsKey(order.key)}>{isPhone ? <MobileRecord primary={`OS ${order.osNumber}`} secondary={order.client} context={<><span>{payment}</span><span>{order.validation === "VALIDA" ? "Válida" : order.validation === "INVALIDA" ? "Inválida" : "Revisar"}</span>{inactiveTechnician && <span className="text-amber-700">Técnico inactivo</span>}</>} /> : order.osNumber}</button></TableCell>
               <TableCell className="px-2 py-1"><span className="block truncate" title={`${order.client}${order.chassis ? ` · Chasis ${order.chassis}` : ""}`}>{order.client}</span></TableCell>
               <TableCell className="px-2 py-1"><span className="flex min-w-0 items-center gap-1.5" title={order.technicians.join(", ")}>{inactiveTechnician && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="Incluye técnico inactivo" />}<span className="truncate">{order.technicians[0]}{order.technicians.length > 1 ? ` +${order.technicians.length - 1}` : ""}</span></span></TableCell>
               <TableCell className="px-2 py-1"><span className="block truncate" title={order.branches.join(", ")}>{order.branches.map(branchInitials).join(" ")}</span></TableCell>

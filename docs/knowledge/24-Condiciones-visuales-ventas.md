@@ -2,9 +2,17 @@
 
 Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ventas de Servicios, Máquinas o Repuestos. Estas condiciones son requisitos de presentación, no preferencias opcionales ni cambios de cálculo.
 
-## Reglas
+## Regla vigente de teléfono — revisión transversal del 24/09/2026
 
-- Cada registro ocupa una sola línea visual. No apilar sucursal bajo factura, propietario bajo cliente, chasis bajo OS ni concepto sobre descripción. Si son necesarios, usar columnas separadas.
+La prohibición de apilar datos aplica a escritorio/tablet, no de forma rígida al celular. Bajo 640 px se permite agrupar identidad y contexto en varias líneas cuando evita ocultar lo esencial: modelo/chasis/cliente, descripción/código o NP/cliente. No fusionar registros, alterar valores ni convertir cada fila en una tarjeta grande. Importes y cantidades conservan sus ejes y formatos. Desde 640 px se mantiene la presentación previa por columnas.
+
+Ventas conserva la composición continua de la opción 2: tres indicadores, rango visible, Períodos/Resumen/Detalle y un solo menú de acciones. Ajuste de escala vigente: título de 18 px, buscador visual de 36 px con entrada de 16 px y pestañas de 12 px, subrayadas y con 44 px de altura táctil. No volver a plegar los períodos ni los indicadores por defecto. Las reglas anteriores de una línea por fila o título móvil de 20 px quedan reemplazadas exclusivamente en teléfonos.
+
+`MobileSalesTable.tsx` permite envolver identidad en teléfono; `sales-mobile-workspace.css` limita los cambios visuales a menos de 640 px. `MobileRecord.tsx` y `CompactListTable.mobileColumns` extienden el patrón a las listas operativas sin modificar sus orígenes ni exportaciones. La revisión transversal y sus límites están en [[25-Revision-movil-transversal]] y `design-qa.md`.
+
+## Reglas generales (con la excepción móvil anterior)
+
+- En escritorio y tablet cada registro ocupa una sola línea visual. No apilar sucursal bajo factura, propietario bajo cliente, chasis bajo OS ni concepto sobre descripción. En teléfono, aplicar la agrupación explícita descrita arriba cuando mejore la lectura.
 - No agregar párrafos explicativos, subtítulos didácticos ni leyendas redundantes dentro del panel. Conservar mensajes necesarios de carga, error o ausencia de datos; no esconder fallos para cumplir el diseño.
 - Importes con `$`, nunca con `USD` como prefijo visible. Es solo formato: no convertir moneda, alterar importe, signo de NC o precisión acordada. Detalle de Servicios conserva dos decimales.
 - La celda de cantidad contiene solo el número: `4,25`, `76`, `0`; nunca `4,25 h`, `76 km`, `hs` o `unid.`. La unidad/contexto se identifica por concepto, encabezado o título al pasar el cursor, no como sufijo del valor. Cantidad desconocida: `—`, no cero inventado.

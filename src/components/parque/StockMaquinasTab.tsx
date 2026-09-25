@@ -12,6 +12,7 @@ import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/com
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 import type { Json } from "@/integrations/supabase/types";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 
 type StockMaquina = {
   carga_id: string;
@@ -146,7 +147,7 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
         search={{ value: q, onChange: setQ, placeholder: "Código, modelo o chasis…", label: "Buscar", width: "w-[210px]" }}
         activeCount={activeCount}
         onClear={clear}
-        meta={`${filtered.length} referencia${filtered.length === 1 ? "" : "s"}${lastImport ? ` · Actualizado ${new Date(lastImport).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })}` : ""}`}
+        mobileContext={lastImport ? `Actualizado ${new Date(lastImport).toLocaleString("es-PY", { dateStyle: "short", timeStyle: "short" })}` : undefined}
         secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={list.action ? [list.action] : []} /> : undefined}
         expanded={
           <FilterSelect label="Condición" value={condition} onChange={setCondition} placeholder="Condición" width="w-full" options={[{ value: "all", label: "Todas" }, { value: "Nuevo", label: "Nuevas" }, { value: "Usado", label: "Usadas" }]} />
@@ -160,6 +161,12 @@ export function StockMaquinasTab({ onResumenChange }: { onResumenChange?: (value
 
       <div className="overflow-hidden rounded-md border bg-card">
         <CompactListTable rows={list.ordered} columns={viewColumns} id={row=>row.id} label="Stock de máquinas" sort={list.sort} heading={list.heading}
+          mobileColumns={[
+            { ...viewColumns.find(c => c.key === "modelo")!, width: "w-[78%]", render: row => <CompactListInfo label={row.modelo ?? "—"}
+              summary={<MobileRecord primary={row.modelo ?? "Sin modelo"} secondary={<span className="font-mono">{row.chasis || "Sin chasis"}</span>} context={<>{row.marca && <MarcaBadge marca={row.marca} className="px-1 text-[10px]" />}{(pendingParkTransfer(row) || (!!row.chasis && duplicateChassis.has(row.chasis.trim().toUpperCase()))) && <span className="inline-flex items-center gap-1 text-amber-700"><AlertTriangle className="h-3 w-3" />{pendingParkTransfer(row) ? "Ingreso pendiente de autorizar" : "Chasis repetido"}</span>}</>} />}
+              fields={columns.map(c => [c.label, String(c.value(row) ?? "—")] as const).concat([["Ingreso desde Parque", pendingParkTransfer(row) ? "Pendiente de autorizar" : "No"]])} /> },
+            { ...viewColumns.find(c => c.key === "saldo")!, width: "w-[22%]", align: "right" },
+          ]}
           status={loading?"Cargando stock…":loadError?<span className="text-destructive">{loadError}</span>:!filtered.length?<><PackageOpen className="mx-auto mb-2 h-6 w-6" />Sin máquinas en stock.</>:undefined} />
       </div>
     </div>

@@ -18,6 +18,7 @@ import { parseISO, format } from "date-fns";
 import { pageShellWide } from "@/lib/ui-classes";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null; ruc: string | null; cod_entidad: string | null }
@@ -40,6 +41,8 @@ async function cargarTodo<T>(qb: any): Promise<T[]> {
 const MAX_VISIBLES = 5;
 
 export default function Trabajos() {
+  const isPhone = useIsMobile(640);
+  const [phoneState, setPhoneState] = useState<string>("todos");
   const { isAdmin, isTecnico, profile } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [trabajos, setTrabajos] = useState<any[]>([]);
@@ -165,8 +168,8 @@ export default function Trabajos() {
   return (
     <div className={pageShellWide}>
       <PageHeader title="Trabajos" actions={
-          <Button size="sm" onClick={() => setOpenNuevo(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> Nuevo trabajo
+          <Button size="sm" aria-label="Nuevo trabajo" className="max-sm:w-11 max-sm:px-0" onClick={() => setOpenNuevo(true)}>
+            <Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo trabajo</span>
           </Button>
       } />
 
@@ -189,13 +192,17 @@ export default function Trabajos() {
 
 
 
+      <nav aria-label="Estado de los trabajos" className="grid grid-cols-3 gap-x-2 sm:hidden">
+        {[{ key: "todos", label: "Todos" }, ...ESTADOS_TRABAJO].map(state => <button key={state.key} type="button" aria-pressed={phoneState === state.key} onClick={() => setPhoneState(state.key)} className={cn("min-h-11 border-b-2 text-[12px]", phoneState === state.key ? "border-primary font-semibold" : "border-transparent text-muted-foreground")}>{state.label} <span className="tabular-nums">{state.key === "todos" ? filtered.length : filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === state.key).length}</span></button>)}
+      </nav>
+
       {loading ? (
         <KanbanSkeleton columns={ESTADOS_TRABAJO.length} />
       ) : filtered.length === 0 ? (
         <EmptyState title="Sin trabajos" description="No hay trabajos que coincidan con los filtros actuales." />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {ESTADOS_TRABAJO.map(col => {
+          {ESTADOS_TRABAJO.filter(col => !isPhone || phoneState === "todos" || phoneState === col.key).map(col => {
             let items = filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === col.key);
             if (col.key === "completado") {
               const ultimaFecha = (id: string) => {
@@ -210,20 +217,21 @@ export default function Trabajos() {
               items = [...items].sort((a, b) => ultimaFecha(b.id).localeCompare(ultimaFecha(a.id)));
             }
             const expandida = expandidas.has(col.key);
-            const visibles = expandida ? items : items.slice(0, MAX_VISIBLES);
+            if (isPhone && phoneState === "todos" && !items.length) return null;
+            const visibles = expandida || isPhone ? items : items.slice(0, MAX_VISIBLES);
             const restantes = items.length - visibles.length;
 
             return (
               <div key={col.key} className="min-w-0">
-                <Card className="p-2 bg-muted/30 min-h-[180px]">
+                <Card className="p-2 bg-muted/30 min-h-[180px] max-sm:min-h-0 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none">
                   <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
                     <h2 className="text-[11px] font-semibold uppercase tracking-wide">{col.label}</h2>
                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{items.length}</Badge>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 max-sm:space-y-0 max-sm:divide-y">
                     {items.length === 0 && (
-                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">-</p>
+                      <p className="text-[11px] text-muted-foreground/70 text-center py-4">{isPhone ? "No hay trabajos en este estado." : "-"}</p>
                     )}
 
                     {visibles.map(t => {
@@ -255,19 +263,19 @@ export default function Trabajos() {
                           key={t.id}
                           onClick={() => setDetalleId(t.id)}
                           className={cn(
-                            "w-full rounded-md border bg-card px-2 py-1.5 text-left transition-[border-color,background-color] hover:border-primary/40 hover:bg-accent/25",
+                            "w-full rounded-md border bg-card px-2 py-1.5 text-left transition-[border-color,background-color] hover:border-primary/40 hover:bg-accent/25 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:px-0 max-sm:py-3",
                             col.color,
                           )}
                         >
                           <div className="flex items-center gap-1.5">
-                            <span className="rounded bg-muted px-1 py-0 text-[9px] font-mono font-semibold text-muted-foreground tabular-nums">
+                            <span className="rounded bg-muted px-1 py-0 text-[9px] font-mono font-semibold text-muted-foreground tabular-nums max-sm:text-[11px]">
                               {trabajoReferencia(t)}
                             </span>
-                            <Badge className={cn("h-4 shrink-0 px-1 text-[9px] font-medium ml-auto", prioridadBadge(t.prioridad))}>
-                              {prioLabel.charAt(0)}
+                            <Badge aria-label={`Prioridad ${prioLabel}`} title={`Prioridad ${prioLabel}`} className={cn("h-4 shrink-0 px-1 text-[9px] font-medium ml-auto max-sm:text-[11px]", prioridadBadge(t.prioridad))}>
+                              {isPhone ? prioLabel : prioLabel.charAt(0)}
                             </Badge>
                           </div>
-                          <div className="mt-0.5 truncate text-[12px] font-medium leading-tight">
+                          <div className="mt-0.5 truncate text-[12px] font-medium leading-tight max-sm:whitespace-normal max-sm:break-words max-sm:text-[13px] max-sm:leading-5">
                             {cli?.nombre ?? "Sin cliente"}
                           </div>
                           {pausado && (
@@ -275,7 +283,7 @@ export default function Trabajos() {
                               Pausado: {t.motivo_bloqueo ?? "sin motivo cargado"}
                             </div>
                           )}
-                          <div className="mt-0.5 line-clamp-1 text-[11px] text-foreground/75 leading-snug">
+                          <div className="mt-0.5 line-clamp-1 text-[11px] text-foreground/75 leading-snug max-sm:line-clamp-2 max-sm:text-[12px]">
                             {t.descripcion_problema}
                           </div>
 
@@ -321,7 +329,7 @@ export default function Trabajos() {
                       </button>
                     )}
 
-                    {expandida && items.length > MAX_VISIBLES && (
+                    {!isPhone && expandida && items.length > MAX_VISIBLES && (
                       <button
                         onClick={() => {
                           const next = new Set(expandidas);

@@ -3288,7 +3288,7 @@ export default function Dashboard() {
     <SalesSectionExportsProvider><PageShell className="overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
       <div className="space-y-2.5 sm:space-y-3">
       <Tabs value={section} onValueChange={goSection} className="space-y-3">
-      <PageHeader title="Dashboard ejecutivo" tabs={<TabsList className="hidden h-9 min-w-max grid-cols-4 sm:grid">
+      <PageHeader title="Dashboard ejecutivo" meta={<span className="sm:hidden">{format(periodStart, "dd/MM/yyyy")} – {format(periodEnd, "dd/MM/yyyy")}</span>} tabs={<TabsList aria-label="Vista del Dashboard" className="grid h-9 grid-cols-4 sm:min-w-max">
           <TabsTrigger value="resumen" className="h-7 whitespace-nowrap px-3 text-[12px]">Vista general</TabsTrigger>
           <TabsTrigger value="facturación" className="h-7 whitespace-nowrap px-3 text-[12px]">Facturación</TabsTrigger>
           <TabsTrigger value="trabajos" className="h-7 whitespace-nowrap px-3 text-[12px]">Trabajos</TabsTrigger>
@@ -3453,10 +3453,6 @@ export default function Dashboard() {
             guaraníes (no se suman ni se convierten).
           </p>
         )}
-
-        <select aria-label="Vista del Dashboard" value={section} onChange={event => goSection(event.target.value)} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base sm:hidden">
-          <option value="resumen">Vista general</option><option value="facturación">Facturación</option><option value="trabajos">Trabajos</option><option value="servicios">Servicios</option>
-        </select>
 
         <TabsContent value="resumen" className="space-y-3">
 

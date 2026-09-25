@@ -2,6 +2,30 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Regla más reciente: teléfono distinto de escritorio/tablet
+
+Esta sección reemplaza las indicaciones históricas de selectores para pocas pestañas, indicadores plegados y una sola línea rígida en celular. Bajo 640 px se usan filas continuas con identidad agrupada, tipografía proporcionada y navegación visible. Desde 640 px se conservan columnas y comportamiento previo. No convertir todas las pantallas a tarjetas ni reducir indiscriminadamente los controles de formularios.
+
+Implementación local:
+
+- `AppPrimitives.tsx`: encabezado móvil de 18 px; indicadores visibles en grilla plana, sin «Más indicadores». Las alertas externas no se ocultan.
+- `FiltersBar.tsx`: búsqueda visual de 36 px, contexto móvil explícito y navegación principal opcional. Corte de Proyectado, frescura de Stock y semana de Planificador no dependen de abrir filtros.
+- `ui/tabs.tsx`, `dialog.tsx`, `responsive-drawer.tsx`: pestañas compactas con objetivos táctiles, títulos envolventes y acciones de pie en fila cuando caben. Los formularios conservan payloads y validación.
+- `CompactListTable.tsx` / `MobileRecord.tsx`: columnas móviles explícitas, sin mezclar entidades; campos desplazados al detalle siguen disponibles para ordenar mediante el menú y permanecen en el exportador original.
+- `MaquinasTab.tsx`, `StockMaquinasTab.tsx`: modelo, chasis y propietario/contexto legibles; se conserva la alerta de chasis repetido, cantidad fraccionaria y revisión de transferencias.
+- `MaquinariaOperaciones.tsx`: pedidos muestran NP/cliente y facturación/entrega independientes. Importaciones muestran llave/chasis y llegada/situación. Abrir sigue identificando la unidad original; no crea movimientos ni factura por adjuntos.
+- `StockProyectado.tsx`: corte visible y columnas modelo/stock/proyectado; los otros términos de la fórmula siguen en detalle y Excel. No se recalculan ni se ocultan negativos.
+- `PartsStockTable.tsx`, `PurchaseSuggestionTable.tsx`: descripción/código/marca agrupados; total o stock/sugerencia aparte. Permanecen avisos de calidad, paginación y orden del servidor.
+- Compras y Solicitudes: documento/sucursal/estado o solicitante agrupados; sus ítems agrupan descripción/código con cantidades e importes separados. Contexto, edición/vinculación autorizada, órdenes ocultos y exportación completa permanecen disponibles.
+- `Planificador.tsx`: semana visible y filas jornada/cliente/fecha/referencia/estado frente a horas; mantiene continuidad e identidad de jornadas. `Trabajos.tsx`: navegación por estado con conteos y filas planas en teléfono; no cinco paneles altos ni botón «Ver más» por cada estado. Escritorio conserva su tablero.
+- `Calendario.tsx`: Mes/Semana/Técnicos visibles en móvil; conserva agenda, disponibilidades y callbacks. No se reprograma al consultar.
+- `Admin.tsx`, `Dashboard.tsx`: pestañas visibles con los mismos permisos y handlers. Dashboard muestra el rango consultado, no sólo su agrupación temporal.
+- `Comisiones.tsx`: teléfono agrupa OS/cliente/pago/validación, separa horas y conserva selección. Abrir o seleccionar no ejecuta liquidaciones. Las columnas de tablet/escritorio siguen separadas; el estado vacío utiliza el número de columnas visibles.
+
+Validación: pruebas de presentación, permisos, selección, orden y exportación; navegador local con componentes reales y datos sintéticos. Capturas/mediciones representativas a 320/390 px y comprobaciones a 768/1280 px; pruebas de frontera 639/640 px. No hay SQL nuevo, cambios de datos comerciales, consultas productivas ni certificación de todos los formularios en hardware táctil. `design-qa.md` registra resultados y limitaciones. Este worktree carece de `obsidian-sync.local`, del índice y del mapa de conocimiento: se consultaron sus equivalentes del repositorio principal como contexto, sin copiar ni adelantar el checkpoint del atlas y sin acreditar sincronización de la bóveda.
+
+## Historial de etapas anteriores
+
 ## Calendario
 
 `Calendario.tsx` consume `MobileAgenda` en Semana y Por técnico bajo 640 px. Mantiene los filtros y callbacks existentes, identifica jornadas por su identidad propia cuando está disponible y conserva indisponibilidades/días no laborales. Abrir un día muestra su detalle completo conforme a los filtros de página; abrir una jornada consulta ese servicio. No cambia fechas al consultar ni deduplica jornadas por OS. El mes y la matriz de escritorio se conservan. No interpretar `Sin actividades programadas` como prueba de disponibilidad de un técnico.

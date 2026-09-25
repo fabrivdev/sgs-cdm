@@ -578,22 +578,15 @@ export default function Admin() {
       <PageHeader
         title="Administración"
         actions={adminTab === "equipo" && canManageAdmin ? (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Nuevo usuario
+          <Button size="sm" aria-label="Nuevo usuario" onClick={() => setCreateOpen(true)} className="max-sm:w-11 max-sm:px-0">
+            <UserPlus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo usuario</span>
           </Button>
         ) : undefined}
       />
 
       <Tabs value={adminTab} onValueChange={(value) => { setAdminTab(value); setTableSearch(""); }}>
-        <select aria-label="Sección de Administración" value={adminTab}
-          onChange={(event) => { setAdminTab(event.target.value); setTableSearch(""); }}
-          className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base sm:hidden">
-          {hasSectionAccess("admin.usuarios") && <option value="equipo">Equipo y accesos</option>}
-          {hasSectionAccess("admin.importaciones") && <option value="importar">Datos</option>}
-          {hasSectionAccess("admin.parametros") && <option value="parametros">Configuración</option>}
-        </select>
-        <TabsList className="hidden sm:inline-flex">
+        <TabsList aria-label="Sección de Administración" className="max-sm:[&_svg]:hidden">
           {hasSectionAccess("admin.usuarios") && <TabsTrigger value="equipo">
             <Users className="mr-2 h-4 w-4" />
             Equipo y accesos
@@ -688,7 +681,7 @@ export default function Admin() {
               <div key={profile.id} className="px-3 py-1">
                 <div className="flex min-w-0 items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium" title={profile.nombre}>{profile.nombre}</div>
+                    <div className="truncate text-sm font-medium max-sm:whitespace-normal max-sm:break-words max-sm:text-[13px] max-sm:leading-5" title={profile.nombre}>{profile.nombre}</div>
                   </div>
                   <span className="shrink-0 text-xs text-muted-foreground">{profile.activo ? "Activo" : "Inactivo"}</span>
                   <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Ver ficha de ${profile.nombre}`} onClick={() => setSectionUser(profile)}>

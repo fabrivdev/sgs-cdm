@@ -77,7 +77,7 @@ export function ResponsiveDrawerHeader({ className, children }: { className?: st
   return (
     <div
       className={cn(
-        "sticky top-0 z-10 shrink-0 border-b bg-background/95 backdrop-blur px-5 py-4 pr-12",
+        "sticky top-0 z-10 shrink-0 border-b bg-background/95 backdrop-blur px-5 py-4 pr-12 max-sm:pl-4 max-sm:py-3",
         className,
       )}
     >
@@ -95,7 +95,7 @@ export function ResponsiveDrawerFooter({ className, children }: { className?: st
     <div
       className={cn(
         "sticky bottom-0 z-10 shrink-0 border-t bg-background/95 backdrop-blur px-5 py-3",
-        "flex flex-wrap items-center justify-end gap-2 pb-[max(.75rem,env(safe-area-inset-bottom))]",
+        "flex flex-wrap items-center justify-end gap-2 pb-[max(.75rem,env(safe-area-inset-bottom))] max-sm:px-4 max-sm:[&_button]:min-h-11",
         className,
       )}
     >

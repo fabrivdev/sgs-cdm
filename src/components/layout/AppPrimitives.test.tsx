@@ -10,8 +10,8 @@ describe('explicit mobile KPI hierarchy', () => {
   const {container} = render(<KpiStrip mobilePrimary={[0,3]}>{items}</KpiStrip>);
   expect(screen.getByText('-1').closest('details')).toBeNull();
   expect(screen.getByText('5').closest('details')).toBeNull();
-  expect(screen.getByText('OC').closest('details')).not.toHaveAttribute('open');
-  expect(container.querySelectorAll('details')).toHaveLength(1);
+  expect(screen.getByText('OC').closest('details')).toBeNull();
+  expect(container.querySelectorAll('details')).toHaveLength(0);
   expect(screen.getByText('Pendientes')).toBeInTheDocument();
  });
  it('does not collapse callers that have not chosen a mobile hierarchy', () => {

@@ -28,11 +28,11 @@ async function openCreation() {
 }
 
 describe("Administración: alta de operativos sin acceso", () => {
-  it("limita el selector móvil a las secciones autorizadas", async () => {
+  it("limita las pestañas visibles a las secciones autorizadas", async () => {
     render(<Admin />);
-    const navigation = await screen.findByRole("combobox", { name: "Sección de Administración" });
-    expect(navigation).toHaveValue("equipo");
-    expect(navigation.querySelectorAll("option")).toHaveLength(1);
+    const navigation = await screen.findByRole("tablist", { name: "Sección de Administración" });
+    expect(screen.getByRole("tab", { name: "Equipo y accesos" })).toHaveAttribute("aria-selected", "true");
+    expect(navigation.querySelectorAll('[role="tab"]')).toHaveLength(1);
     expect(navigation).toHaveTextContent("Equipo y accesos");
     expect(navigation).not.toHaveTextContent("Configuración");
   });

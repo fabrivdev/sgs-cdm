@@ -26,6 +26,7 @@ const machine={id:"M1",cliente_id:"C1",anio:2020,marca:"CLAAS",marca_nombre:null
 const stock={carga_id:"LOAD",id:"S1",producto_codigo:"000001",sucursal:"Santa Rita",filial_original:null,deposito:"DEPÓSITO CON NOMBRE LARGO",tipo:"COSECHADORAS",marca:"CLAAS",modelo:machine.modelo_tipo,estado:"Nuevo",chasis:"000123456789",saldo_actual:1.25,importado_en:"2026-09-18"};
 const imported={id:"I1",numero_unidad:1,cantidad_lote:3,importacion_linea_id:"IL1",operacion_id:null,linea_id:null,unidad_id:null,np_numero:null,np_fecha:null,cliente_nombre:null,comercial:null,marca:"CLAAS",producto:"COSECHADORAS",modelo:machine.modelo_tipo,cantidad:1,estado_fuente:"Arribado",oc:"000111",po:null,fecha_pedido:"2026-01-21",eta:"2026-12-17",ata:"2026-08-28",llave_interna:"CLA111-1",proveedor:"CLAAS",invoice_supplier:null,factura_proveedor_fecha:null,factura_proveedor_moneda:null,precio_oc:500,costo_final_sin_iva:null,costo_final:null,chasis:machine.serie,venta_facturada:null,valor_venta:null,situacion_vinculo:null,estado_disponibilidad:"RESERVADO",disponibilidad_detalle:null,stock_sucursal:"Santa Rita",stock_deposito:null,stock_saldo:1,vinculo_manual:false,detalle_manual:false,alcance_valor_oc:"UNITARIO",moneda_oc:"USD",costo_stock_habilitado:true,stock_fisico_confirmado:true};
 beforeEach(()=>{
+  vi.stubGlobal("innerWidth", 1024);
   vi.clearAllMocks();mocks.errorTable="";mocks.can.mockReturnValue(true);
   vi.stubGlobal("ResizeObserver",class{observe(){}disconnect(){}});
   vi.stubGlobal("matchMedia",vi.fn().mockReturnValue({matches:false,addListener:vi.fn(),removeListener:vi.fn(),addEventListener:vi.fn(),removeEventListener:vi.fn()}));
@@ -44,6 +45,30 @@ async function exportTable(label:string){
   await waitFor(()=>expect(mocks.write).toHaveBeenCalled());
 }
 describe("Parque and imports compact lists",()=>{
+  it("phone park rows identify the chassis and owner without merging records or authorizing a transfer",async()=>{
+    vi.stubGlobal("innerWidth", 390);
+    const open=vi.fn(); setup(<MaquinasTab onOpenCliente={open}/>);
+    const detail=await screen.findByRole("button", {name:`Detalle ${machine.modelo_tipo}`});
+    expect(detail).toHaveTextContent(machine.serie);
+    expect(detail).toHaveTextContent("CLIENTE CON NOMBRE MUY LARGO");
+    const row=detail.closest("tr")!;
+    expect(within(row).getAllByRole("cell")).toHaveLength(2);
+    fireEvent.click(detail);
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button",{name:"Ver cliente"}));
+    expect(open).toHaveBeenCalledExactlyOnceWith("C1");
+    expect(mocks.transfer.mock.calls.at(-1)?.[0]).not.toMatchObject({maquina:{id:machine.id}});
+  });
+  it("phone stock preserves fractional quantities, duplicate warning and full chassis",async()=>{
+    vi.stubGlobal("innerWidth", 320); setup(<StockMaquinasTab/>);
+    const details=await screen.findAllByRole("button", {name:`Detalle ${machine.modelo_tipo}`});
+    expect(details[0]).toHaveTextContent(machine.serie);
+    expect(details[0]).toHaveTextContent(/repetido/i);
+    const cells=within(details[0].closest("tr")!).getAllByRole("cell");
+    expect(cells).toHaveLength(2); expect(cells[1]).toHaveTextContent("1,25");
+    fireEvent.click(screen.getByRole("button",{name:"Ordenar Stock de máquinas"}));
+    expect(await screen.findByRole("button",{name:/Ordenar Chasis:/})).toBeInTheDocument();
+  });
   it("orders preserves billing, delivery, money and the original selection",()=>{
     const row={id:"U1",operacion_id:"OP1",np_numero:"000101",np_fecha:"2026-09-17",cliente_nombre:"CLIENTE CON NOMBRE MUY LARGO",comercial:null,marca:"CLAAS",producto:"COSECHADORAS",modelo:machine.modelo_tipo,cantidad:1,condicion:"NUEVA",abastecimiento:"STOCK",estado_fuente:"FACTURADA",estado_operacion:"FACTURADA",chasis:machine.serie,estado_disponibilidad:"DISPONIBLE",disponibilidad_detalle:null,estado_importacion_fuente:null,eta:null,ata:null,proveedor:null,factura_venta:"FACT 5106",factura_fecha:"2026-09-22",costo_producto:null,valor_venta:111234.56,moneda_valor:"USD",observaciones:null,actualizado_en:"2026-09-18",es_historico:false};
     const select=vi.fn();setup(<OrdersTable rows={[row]} heading={key=>key} onSelect={select} entregaByUnitId={new Map([[row.id,{estado:"FACTURADA",chasis:machine.serie}]])} estadoByOperacionId={new Map([[row.operacion_id,"FACTURADA"]])} stockChasisSet={new Set([machine.serie])}/>);

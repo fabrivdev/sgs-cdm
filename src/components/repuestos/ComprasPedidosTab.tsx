@@ -1,5 +1,8 @@
 import { sortSalesRows, type SalesColumn, type SalesSort } from "@/components/ventas/salesTableInteraction";
 import { PurchaseInfo, PurchaseTableHeading } from "./PurchaseTableHeading";
+import { CompactListOrderMenu } from "@/components/lists/CompactListTable";
+import { MobileRecord } from "@/components/lists/MobileRecord";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { purchaseCell, purchaseHead, purchaseMoney, purchaseQuantity } from "./purchaseTableFormat";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import { Fragment, useMemo, useState } from "react";
@@ -115,6 +118,7 @@ function usePedidosResumen() {
 }
 
 export function ComprasPedidosTab() {
+  const isPhone = useIsMobile(640);
   const { user, can } = useAuth();
   const canManageParts = can("repuestos:gestionar");
   const queryClient = useQueryClient();
@@ -339,21 +343,21 @@ export function ComprasPedidosTab() {
 
         <div className="overflow-hidden rounded-md border">
           <Table className="table-fixed" aria-label="Pedidos de compra">
-            <colgroup><col className="w-[5%] sm:w-[3%]" /><col className="w-[20%] sm:w-[12%]" /><col className="w-[20%] sm:w-[12%]" />
+            <colgroup><col className="w-11 sm:w-[3%]" /><col className="hidden sm:table-column sm:w-[12%]" /><col className="w-auto sm:w-[12%]" />
               <col className="hidden sm:table-column sm:w-[11%]" /><col className="hidden sm:table-column sm:w-[23%]" />
-              <col className="hidden sm:table-column sm:w-[6%]" /><col className="w-[30%] sm:w-[14%]" /><col className="w-[20%] sm:w-[14%]" /><col className="w-[5%]" /></colgroup>
+              <col className="hidden sm:table-column sm:w-[6%]" /><col className="w-[100px] sm:w-[14%]" /><col className="hidden sm:table-column sm:w-[14%]" /><col className="w-11 sm:w-[5%]" /></colgroup>
             <TableHeader>
               <TableRow>
-                <TableHead className={purchaseHead} />
+                <TableHead className={cn(purchaseHead, "max-sm:px-0")}><span className="sm:hidden"><CompactListOrderMenu label="pedidos de compra" columns={columns} sort={{key:sortKey,direction:sortDir}} onSort={key => toggleSort(key as PedidoSortKey)} /></span></TableHead>
                 {columns.map(column => <PurchaseTableHeading key={column.key} column={column} sort={{key:sortKey,direction:sortDir}}
-                  onSort={key=>toggleSort(key as PedidoSortKey)} className={["fecha_emision","proveedor_nombre","cantidad_items"].includes(column.key)?"hidden sm:table-cell":undefined} />)}
+                  onSort={key=>toggleSort(key as PedidoSortKey)} className={["sucursal","estado_seguimiento","fecha_emision","proveedor_nombre","cantidad_items"].includes(column.key)?"hidden sm:table-cell":undefined} />)}
                 <TableHead className={purchaseHead} />
               </TableRow>
             </TableHeader>
             <TableBody>
               {filasOrdenadas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className={cn(metaText, "p-4 text-center")}>
+                  <TableCell colSpan={isPhone ? 4 : 9} className={cn(metaText, "p-4 text-center")}>
                     Sin pedidos para este filtro.
                   </TableCell>
                 </TableRow>
@@ -383,7 +387,7 @@ export function ComprasPedidosTab() {
                       }}
                     >
                       <TableCell className={cn(purchaseCell,"px-0 sm:px-0")}>
-                        <button type="button" className="flex w-full justify-center" aria-expanded={isOpen} disabled={filtrosActivos}
+                        <button type="button" className="flex w-full justify-center max-sm:min-h-11 max-sm:items-center" aria-expanded={isOpen} disabled={filtrosActivos}
                           aria-label={`Ítems del pedido ${row.nro_pedido} (${row.sucursal})`}>
                         {isOpen ? (
                           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -392,9 +396,9 @@ export function ComprasPedidosTab() {
                         )}
                         </button>
                       </TableCell>
-                      <TableCell className={purchaseCell} title={row.sucursal ?? "—"}>{row.sucursal ?? "—"}</TableCell>
+                      <TableCell className={cn(purchaseCell, "hidden sm:table-cell")} title={row.sucursal ?? "—"}>{row.sucursal ?? "—"}</TableCell>
                       <TableCell className={cn(purchaseCell,"font-mono")} title={`${row.nro_pedido} · ${row.fecha_emision ?? "—"}`}>
-                        <PurchaseInfo label={row.nro_pedido} fields={[["Sucursal",row.sucursal??"—"],["Fecha",row.fecha_emision??"—"],["Proveedor",row.proveedor_nombre??"—"],["Ítems",String(row.cantidad_items)],["Estado",row.estado_seguimiento],["Total",purchaseMoney(row.valor_total,row.moneda)],["Moneda",row.moneda??"No informada"]]} />
+                        <PurchaseInfo label={row.nro_pedido} mobileSummary={<MobileRecord primary={row.nro_pedido} secondary={row.sucursal} context={row.estado_seguimiento} />} fields={[["Sucursal",row.sucursal??"—"],["Fecha",row.fecha_emision??"—"],["Proveedor",row.proveedor_nombre??"—"],["Ítems",String(row.cantidad_items)],["Estado",row.estado_seguimiento],["Total",purchaseMoney(row.valor_total,row.moneda)],["Moneda",row.moneda??"No informada"]]} />
                       </TableCell>
                       <TableCell className={cn(purchaseCell,"hidden text-muted-foreground sm:table-cell")} title={row.fecha_emision ?? "—"}>
                         {row.fecha_emision ?? "—"}
@@ -406,7 +410,7 @@ export function ComprasPedidosTab() {
                       <TableCell className={cn(purchaseCell,"text-right font-medium tabular-nums")} title={`${row.moneda ?? ""} ${row.valor_total}`}>
                         {purchaseMoney(Number(row.valor_total ?? 0),row.moneda)}
                       </TableCell>
-                      <TableCell className={purchaseCell} title={row.estado_seguimiento}>
+                      <TableCell className={cn(purchaseCell, "hidden sm:table-cell")} title={row.estado_seguimiento}>
                         <Badge
                           variant="outline"
                           className={cn(
@@ -423,7 +427,7 @@ export function ComprasPedidosTab() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-7 max-w-full overflow-hidden px-1 text-[12px]"
+                          className="h-7 max-w-full overflow-hidden px-1 text-[12px] max-sm:h-11 max-sm:w-11"
                           title={`Editar pedido ${row.nro_pedido}`}
                           aria-label="Editar"
                           onClick={(e) => {
@@ -438,15 +442,16 @@ export function ComprasPedidosTab() {
 
                     {isOpen && (
                       <TableRow>
-                        <TableCell colSpan={9} className="bg-muted/30 p-0">
+                        <TableCell colSpan={isPhone ? 4 : 9} className="bg-muted/30 p-0">
                           {lineas.length === 0 && <p className={cn(metaText, "p-3")}>Sin ítems para este pedido.</p>}
                           {lineas.length > 0 && (
                             <Table className="table-fixed" aria-label={`Ítems del pedido ${row.nro_pedido}`}>
-                              <colgroup>{["hidden sm:table-column sm:w-[5%]","w-[28%] sm:w-[16%]","w-[32%] sm:w-[26%]","w-[15%] sm:w-[8%]","hidden sm:table-column sm:w-[11%]","w-[25%] sm:w-[12%]","hidden sm:table-column sm:w-[10%]","hidden sm:table-column sm:w-[12%]"].map((width,index)=><col key={index} className={width} />)}</colgroup>
+                              <colgroup>{["hidden sm:table-column sm:w-[5%]","w-auto sm:w-[16%]","hidden sm:table-column sm:w-[26%]","w-[60px] sm:w-[8%]","hidden sm:table-column sm:w-[11%]","w-[92px] sm:w-[12%]","hidden sm:table-column sm:w-[10%]","hidden sm:table-column sm:w-[12%]"].map((width,index)=><col key={index} className={width} />)}</colgroup>
                               <TableHeader>
                                 <TableRow>
                                   {itemColumns.map(column=><PurchaseTableHeading key={column.key} column={column} sort={itemSort} onSort={toggleItemSort}
-                                    className={["item","precio","pendiente","solicitud"].includes(column.key)?"hidden sm:table-cell":undefined} />)}
+                                    actions={isPhone && column.key === "producto" ? <CompactListOrderMenu label={`ítems del pedido ${row.nro_pedido}`} columns={itemColumns} sort={itemSort} onSort={toggleItemSort} /> : undefined}
+                                    className={["item","descripcion","precio","pendiente","solicitud"].includes(column.key)?"hidden sm:table-cell":undefined} />)}
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -459,9 +464,9 @@ export function ComprasPedidosTab() {
                                     <TableRow key={linea.item}>
                                       <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={linea.item}>{linea.item}</TableCell>
                                       <TableCell className={cn(purchaseCell,"font-mono")} title={linea.productoCodigo}>
-                                        <PurchaseInfo label={linea.productoCodigo} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["Unidad",linea.unidad??"—"],["P. unit.",purchaseMoney(linea.precioUnitario,linea.moneda)],["Total",purchaseMoney(linea.valorTotal,linea.moneda)],["Pendiente",purchaseQuantity.format(linea.cantidadPendiente)],["Solicitudes",(solicitudes??[]).map(s=>`${s.sucursal}-${s.nroSolicitud}${s.esManual?"":" (probable)"}`).join(", ")||"—"],["Moneda",linea.moneda??"No informada"]]} />
+                                        <PurchaseInfo label={linea.productoCodigo} mobileSummary={<MobileRecord primary={linea.descripcion || "Sin descripción"} secondary={linea.productoCodigo} />} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["Unidad",linea.unidad??"—"],["P. unit.",purchaseMoney(linea.precioUnitario,linea.moneda)],["Total",purchaseMoney(linea.valorTotal,linea.moneda)],["Pendiente",purchaseQuantity.format(linea.cantidadPendiente)],["Solicitudes",(solicitudes??[]).map(s=>`${s.sucursal}-${s.nroSolicitud}${s.esManual?"":" (probable)"}`).join(", ")||"—"],["Moneda",linea.moneda??"No informada"]]} />
                                       </TableCell>
-                                      <TableCell className={purchaseCell} title={linea.descripcion ?? "—"}>{linea.descripcion ?? "—"}</TableCell>
+                                      <TableCell className={cn(purchaseCell, "hidden sm:table-cell")} title={linea.descripcion ?? "—"}>{linea.descripcion ?? "—"}</TableCell>
                                       <TableCell className={cn(purchaseCell,"text-center tabular-nums")} title={`${linea.cantidad} ${linea.unidad ?? ""}`}>
                                         {purchaseQuantity.format(linea.cantidad)}
                                       </TableCell>

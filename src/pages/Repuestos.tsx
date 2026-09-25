@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PartsStockTable } from "@/components/repuestos/PartsStockTable";
 import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSortable } from "@/hooks/useSortable";
 import {
@@ -43,6 +44,7 @@ type ExportMode = "sucursales" | "historico";
 
 
 export default function Repuestos() {
+  const isPhone = useIsMobile(640);
   const [busquedaInput, setBusquedaInput] = useState("");
   const debouncedBusqueda = useDebouncedValue(busquedaInput, 300);
   const [filtros, setFiltros] = useState<StockFiltros>(STOCK_FILTROS_VACIOS);
@@ -140,10 +142,11 @@ export default function Repuestos() {
       <KpiStrip className="sm:grid-cols-3">
         <KpiItem label="Con stock" value={matrizQuery.isLoading ? "…" : (kpis?.conStock ?? 0).toLocaleString("es-PY")} detail={`${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")} productos`} icon={<Package className="h-4 w-4 text-primary" />} tone="positive" />
         <KpiItem label="Sin stock" value={matrizQuery.isLoading ? "…" : (kpis?.enCero ?? 0).toLocaleString("es-PY")} icon={<AlertTriangle className="h-4 w-4 text-amber-600" />} tone="warning" />
-        <KpiItem label="Actualizado" value={matrizQuery.isLoading ? "…" : ultimaImportacionTexto} icon={<Clock className="h-4 w-4" />} />
+        {!isPhone && <KpiItem label="Actualizado" value={matrizQuery.isLoading ? "…" : ultimaImportacionTexto} icon={<Clock className="h-4 w-4" />} />}
       </KpiStrip>
 
       <FiltersBar
+        mobileContext={`Actualizado: ${matrizQuery.isLoading ? "…" : ultimaImportacionTexto}`}
         search={{ value: busquedaInput, onChange: setBusquedaInput, placeholder: "REPIN003187, 06673230, casquillo…", label: "Buscar", width: "w-[min(420px,32vw)]" }}
         activeCount={filtrosActivos}
         onClear={limpiarFiltros}

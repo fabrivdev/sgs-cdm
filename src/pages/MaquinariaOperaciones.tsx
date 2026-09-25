@@ -31,6 +31,7 @@ import {
   ResponsiveDrawerHeader,
 } from "@/components/ui/responsive-drawer";
 import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPrimitives";
+import { MobileRecord } from "@/components/lists/MobileRecord";
 import { ModeloMaquinaSelect } from "@/components/parque/ModeloMaquinaSelect";
 import { MarcaMaquinaSelect } from "@/components/parque/MarcaMaquinaSelect";
 import { MachineCatalogLineReview } from "@/components/parque/MachineCatalogLineReview";
@@ -1098,8 +1099,8 @@ export default function MaquinariaOperaciones() {
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
       actions={importsView
-        ? <Button size="sm" onClick={() => { setEditingImport(null); setImportFormOpen(true); }}><Plus className="mr-1.5 h-4 w-4" />Nueva importación</Button>
-        : <Button size="sm" onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="mr-1.5 h-4 w-4" />Nuevo pedido</Button>}
+        ? <Button size="sm" aria-label="Nueva importación" className="max-sm:w-11 max-sm:px-0" onClick={() => { setEditingImport(null); setImportFormOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nueva importación</span></Button>
+        : <Button size="sm" aria-label="Nuevo pedido" className="max-sm:w-11 max-sm:px-0" onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo pedido</span></Button>}
     />
     {importsView ? (
       <KpiStrip mobilePrimary={[0, 3]} className="sm:grid-cols-2 xl:grid-cols-5">
@@ -1254,9 +1255,10 @@ export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, co
     const style=column.key==="marca"?brandClass(r.marca):column.key==="condicion"?conditionClass(r.condicion):column.key==="origen"?supplyClass(r.abastecimiento):column.key==="facturacion"?simpleStateClass(billing(r)):column.key==="entrega"&&deliveryState?entregaClass(deliveryState):"";
     return ["marca","condicion","origen","facturacion","entrega"].includes(column.key)&&text!=="—"?<Badge variant="outline" style={column.key==="marca"?machineBrandStyle(r.marca):undefined} className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",style)}>{text}</Badge>:text;
   }}));
-  return <><div className="flex items-center justify-between gap-2 px-2 py-1 md:hidden"><span className="text-[12px] font-medium">Líneas de pedido</span><select aria-label="Estado visible" value={mobileState} onChange={event=>setMobileState(event.target.value)} className="h-11 min-w-0 rounded-md border bg-background px-2 text-base"><option value="facturacion">Facturación</option><option value="entrega">Entrega</option></select></div>
+  return <><div className="hidden items-center justify-between gap-2 px-2 py-1 sm:flex md:hidden"><span className="text-[12px] font-medium">Líneas de pedido</span><select aria-label="Estado visible" value={mobileState} onChange={event=>setMobileState(event.target.value)} className="h-11 min-w-0 rounded-md border bg-background px-2 text-base"><option value="facturacion">Facturación</option><option value="entrega">Entrega</option></select></div>
     <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Operaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
-    actions={{width:"w-[14%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-11 w-11 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring md:h-7 md:w-7" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} /></>;
+    mobileColumns={[{ key: "modelo", label: "Pedido", kind: "text", width: "w-auto", value: r => r.modelo, render: r => <MobileRecord primary={r.modelo || r.producto || "Sin modelo"} secondary={<>{formatNpCode(r.np_numero)} · {r.cliente_nombre || "Sin cliente"}</>} context={<><span aria-label={`Facturación: ${value("facturacion", r)}`} className={cn("rounded border px-1.5 py-0.5 text-[10px]", simpleStateClass(billing(r)))}>{value("facturacion", r)}</span><span aria-label={`Entrega: ${value("entrega", r)}`}>{value("entrega", r)}</span></>} /> }]}
+    actions={{width:"w-11 sm:w-[14%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-11 w-11 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring md:h-7 md:w-7" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} /></>;
 }
 
 export function ImportsTable({ rows, heading, sort, onSelect }: { rows: ImportRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: ImportRow) => void }) {
@@ -1295,7 +1297,8 @@ export function ImportsTable({ rows, heading, sort, onSelect }: { rows: ImportRo
     return value(column.key,r);
   }}));
   return <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Importaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
-    actions={{width:"w-[10%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver importación ${r.llave_interna||r.oc||r.id}`} title="Ver importación" className="flex h-7 w-7 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} />;
+    mobileColumns={[{ key: "modelo", label: "Máquina", kind: "text", width: "w-auto", value: r => r.modelo, render: r => <MobileRecord primary={r.modelo || "Sin modelo"} secondary={<>{r.llave_interna || "Sin llave"} · {r.chasis || "Sin chasis"}</>} context={<><Badge variant="outline" className={cn("px-1.5 text-[10px]", arrivalClass(arrivalState(r)))}>{ARRIVAL_LABEL[arrivalState(r)]}</Badge><span>{importSituationLabel(r)}</span></>} /> }]}
+    actions={{width:"w-11 sm:w-[10%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver importación ${r.llave_interna||r.oc||r.id}`} title="Ver importación" className="flex h-7 w-7 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring max-sm:h-11 max-sm:w-11" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} />;
 }
 
 /** Adjunta un documento comercial con un tipo explicito a un pedido. */
