@@ -5,7 +5,6 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
-  LayoutDashboard,
   ListChecks,
   Users,
   LogOut,
@@ -77,7 +76,7 @@ const navGroups: NavGroup[] = [
       { to: "/", label: "Planificador", icon: ListChecks, section: "servicios.planificador", end: true },
       { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
       { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, section: "servicios.dashboard", managementOnly: true },
+      { to: "/servicios/ordenes", label: "Órdenes de servicio", icon: ListChecks, section: "servicios.ordenes", managementOnly: true },
       { to: "/comisiones", label: "Comisiones", icon: HandCoins, section: "servicios.comisiones", adminOnly: true },
     ],
   },
@@ -194,7 +193,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
     .filter((group) => hasModuloAccess(group.modulo))
     .map((group) => ({
       ...group,
-      items: group.items.filter((it) => hasSectionAccess(it.section) && !(it.managementOnly && !can("dashboard:ver")) && !(it.adminOnly && !isAdmin)),
+      items: group.items.filter((it) => hasSectionAccess(it.section) && !(it.managementOnly && !can("servicios:analizar")) && !(it.adminOnly && !isAdmin)),
     }))
     .filter((group) => group.items.length > 0);
 

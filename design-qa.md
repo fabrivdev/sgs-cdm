@@ -90,6 +90,18 @@ final result: passed
 
 ---
 
+# Design QA — Órdenes de servicio
+
+Date: 2026-09-25. New operational workspace: Órdenes / Productividad / Cumplimiento. Ventas, Planificador and Comisiones remain outside the functional change. Charts are retained for future cross-module reuse; no future analytics destination is published now.
+
+- Uses the shared compact header, filters, tabs and lists. No permanent explanatory paragraphs in the new views or order drawer. The reused compliance chart's concise mode removes redundant explanations while retaining values and its color legend; existing consumers keep their default presentation.
+- Browser inspection used real components and synthetic data at `http://127.0.0.1:5181/mobile-review.local/orders.html`, never production rows. Órdenes and Productividad were visually checked at 390 px, Cumplimiento at 320 px, and Órdenes at 1280 px. Screenshots were inspected inline, not saved as repository artifacts.
+- Document scrollWidth equaled clientWidth in measured states at 320/390/639/640/768/1280 px. The 639/640/768 checks are width measurements, not complete visual certification. A browser interruption affected one intermediate batch and the final compliance screenshot; its final text removal was verified with a DOM snapshot and regression tests.
+- 93 targeted tests pass across 11 files, including source completeness, date identity, zero/negative values, inactive technicians, full export payloads, permissions, responsive order columns, Sales mobile and Planner regressions. Type check passes with ES2021 libraries, new-file lint passes, and production build succeeds with existing large-chunk warnings. Full repository suite, live downloads in every view, production permissions/data and physical touch devices were not certified.
+- SQL is delivered separately for manual execution. This local implementation and its Git publication do not prove that Lovable has applied the migration or that Obsidian was synchronized.
+
+---
+
 # Design QA — Ventas de Máquinas
 
 ## Reference and scope

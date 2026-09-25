@@ -5,7 +5,7 @@ export const SECTION_ROUTES = [
   { id: "servicios.planificador", module: "servicios", route: "/" },
   { id: "servicios.trabajos", module: "servicios", route: "/trabajos" },
   { id: "servicios.calendario", module: "servicios", route: "/calendario" },
-  { id: "servicios.dashboard", module: "servicios", route: "/dashboard" },
+  { id: "servicios.ordenes", module: "servicios", route: "/servicios/ordenes" },
   { id: "servicios.comisiones", module: "servicios", route: "/comisiones" },
   { id: "parque.ventas", module: "parque", route: "/parque-ventas" },
   { id: "parque.clientes", module: "parque", route: "/parque-clientes" },
@@ -38,6 +38,7 @@ export function sectionsFromLegacyModules(modules: readonly string[], roles: rea
 export type Capability =
   | "administracion:gestionar"
   | "dashboard:ver"
+  | "servicios:analizar"
   | "servicios:gestionar"
   | "servicios:ejecutar"
   | "parque:gestionar"
@@ -49,6 +50,7 @@ const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
   superadmin: [
     "administracion:gestionar",
     "dashboard:ver",
+    "servicios:analizar",
     "servicios:gestionar",
     "servicios:ejecutar",
     "parque:gestionar",
@@ -59,6 +61,7 @@ const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
   admin: [
     "administracion:gestionar",
     "dashboard:ver",
+    "servicios:analizar",
     "servicios:gestionar",
     "servicios:ejecutar",
     "parque:gestionar",
@@ -66,7 +69,7 @@ const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     "repuestos:gestionar",
     "datos:exportar",
   ],
-  gerencia: ["dashboard:ver", "datos:exportar"],
+  gerencia: ["dashboard:ver", "servicios:analizar", "datos:exportar"],
   jefatura: [
     "servicios:gestionar",
     "servicios:ejecutar",
@@ -89,7 +92,8 @@ export function firstAccessibleRoute(
 ) {
   if (isSuperAdmin || roles.includes("superadmin")) return "/";
   const effectiveSections = sectionAccess.length ? sectionAccess : sectionsFromLegacyModules(moduloAccess, roles);
-  const first = SECTION_ROUTES.find((section) => effectiveSections.includes(section.id));
+  const first = SECTION_ROUTES.find((section) => effectiveSections.includes(section.id)
+    && (section.id !== "servicios.ordenes" || roleHasCapability(roles, "servicios:analizar")));
   if (first) return first.route;
   return "/sin-acceso";
 }

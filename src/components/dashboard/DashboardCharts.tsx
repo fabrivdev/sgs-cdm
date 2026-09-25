@@ -583,7 +583,9 @@ export function WeeklyBars({
 export function CumplimientoAgendaChart({
   rows,
   insights,
+  concise = false,
 }: {
+  concise?: boolean;
   rows: Array<{
     key: string;
     label: string;
@@ -765,9 +767,9 @@ export function CumplimientoAgendaChart({
             <div className="mt-1 truncate text-[18px] font-extrabold tabular-nums">
               {insights.efectividad === null ? "—" : `${insights.efectividad}%`}
             </div>
-            <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
+            {!concise && <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
               Solo resultados registrados
-            </div>
+            </div>}
           </div>
           <div className="min-w-0 border-l px-2 sm:px-3">
             <div className={cardLabel}>
@@ -780,22 +782,22 @@ export function CumplimientoAgendaChart({
                 insights.tendencia && insights.tendencia.delta < 0 && "text-red-600",
               )}
             >
-              {tendenciaLabel}
+              {concise && !insights.tendencia ? "—" : tendenciaLabel}
             </div>
-            <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]" title={tendenciaDetail}>
+            {(!concise || insights.tendencia) && <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]" title={tendenciaDetail}>
               {tendenciaDetail}
-            </div>
+            </div>}
           </div>
           <div className="min-w-0 border-l pl-2 sm:pl-3">
             <div className={cardLabel}>
               Mayor desvío
             </div>
             <div className="mt-1 truncate text-[18px] font-extrabold tabular-nums">
-              {insights.mayorDesvio?.label ?? "Sin desvíos"}
+              {insights.mayorDesvio?.label ?? (concise ? "—" : "Sin desvíos")}
             </div>
-            <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
+            {(!concise || insights.mayorDesvio) && <div className="truncate text-[9px] text-muted-foreground sm:text-[10px]">
               {insights.mayorDesvio ? `${insights.mayorDesvio.porcentaje}% no realizadas` : "Sin desvíos cerrados"}
-            </div>
+            </div>}
           </div>
         </div>
       </div>

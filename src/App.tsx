@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,7 +15,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+const OrdenesServicio = lazy(() => import("./pages/OrdenesServicio"));
 const Ventas = lazy(() => import("./pages/Ventas"));
 const Comisiones = lazy(() => import("./pages/Comisiones"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
@@ -63,12 +63,16 @@ const App = () => (
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
                 <Route path="/servicios/ventas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.ventas"><Ventas area="servicios" /></ProtectedRoute>} />
                 <Route
-                  path="/dashboard"
+                  path="/servicios/ordenes"
                   element={
-                    <ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios" requireSection="servicios.dashboard">
-                      <Dashboard />
+                    <ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios" requireSection="servicios.ordenes">
+                      <OrdenesServicio />
                     </ProtectedRoute>
                   }
+                />
+                <Route
+                  path="/dashboard"
+                  element={<ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios" requireSection="servicios.ordenes"><Navigate to="/servicios/ordenes" replace /></ProtectedRoute>}
                 />
                 <Route
                   path="/comisiones"

@@ -15,7 +15,7 @@ const moduleByPath: Record<string, string> = {
   "/": "Planificador",
   "/trabajos": "Trabajos",
   "/calendario": "Calendario",
-  "/dashboard": "Dashboard",
+  "/servicios/ordenes": "Órdenes de servicio",
   "/servicios/ventas": "Ventas de Servicios",
   "/parque-ventas": "Ventas de Máquinas",
   "/repuestos/ventas": "Ventas de Repuestos",
@@ -29,19 +29,6 @@ const moduleByPath: Record<string, string> = {
   "/admin": "Administracion",
 };
 
-function dashboardStoredFilters() {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem("sgs-cdm.dashboard.filters.v1") ?? "{}");
-    return {
-      fecha_desde: saved.dateFrom,
-      fecha_hasta: saved.dateTo,
-      agrupacion: saved.periodMode,
-    };
-  } catch {
-    return {};
-  }
-}
-
 export function AssistantPageProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [filters, setFilters] = useState<AssistantPageFilters>({});
@@ -50,8 +37,7 @@ export function AssistantPageProvider({ children }: { children: ReactNode }) {
   const clearPageFilters = useCallback(() => setFilters({}), []);
   const context = useMemo(() => {
     const module = moduleByPath[location.pathname] ?? "Aplicacion";
-    const inferred = location.pathname === "/dashboard" ? dashboardStoredFilters() : {};
-    return { module, path: location.pathname, filters: { ...inferred, ...filters } };
+    return { module, path: location.pathname, filters };
   }, [filters, location.pathname]);
 
   return <Context.Provider value={{ context, setPageFilters, clearPageFilters }}>{children}</Context.Provider>;

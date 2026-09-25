@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ async function cargarTodo<T>(qb: any): Promise<T[]> {
 const MAX_VISIBLES = 5;
 
 export default function Trabajos() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPhone = useIsMobile(640);
   const [phoneState, setPhoneState] = useState<string>("todos");
   const { isAdmin, isTecnico, profile } = useAuth();
@@ -62,6 +64,17 @@ export default function Trabajos() {
 
   const [openNuevo, setOpenNuevo] = useState(false);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const requested = searchParams.get("trabajo");
+    if (loading || !requested) return;
+    // Open only an identity returned by the user's existing RLS-protected query.
+    if (trabajos.some(trabajo => trabajo.id === requested)) setDetalleId(requested);
+    else toast.error("El trabajo no está disponible con tus permisos actuales.");
+    const next = new URLSearchParams(searchParams);
+    next.delete("trabajo");
+    setSearchParams(next, { replace: true });
+  }, [loading, trabajos, searchParams, setSearchParams]);
 
   useEffect(() => {
     setPageFilters({
