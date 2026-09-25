@@ -191,7 +191,11 @@ describe("orders workspace", () => {
     fireEvent.click(detail.getByRole("button", { name: "Cerrar" }));
     tab("Productividad");
     const card = screen.getByText("Eficiencia").closest(".kpi-item")!;
-    expect(card).toHaveTextContent("57,1%"); expect(card).toHaveTextContent("1 OS");
+    expect(card).toHaveTextContent("57,1%");
+    expect(card).not.toHaveTextContent(/\d+ OS/);
+    expect(screen.getByText("Productividad", { selector: ".kpi-item span", exact: true })).toBeVisible();
+    expect(screen.queryByText("% de meta", { selector: ".kpi-item span" })).not.toBeInTheDocument();
+    expect(screen.getByText("Meta disponible", { selector: ".kpi-item span" })).toBeVisible();
   });
   it("exports financial values separately from reported OS amounts and preserves unknowns", async () => {
     response.data.data.ordenesServicio[0].servicios_valor = 1.66;

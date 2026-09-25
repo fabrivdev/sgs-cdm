@@ -120,9 +120,9 @@ export function OrdersWorkspace() {
         ] : tab === "productividad" ? [
           <KpiItem key="horas" label="Horas-persona" value={decimal.format(data.horasPersona)} icon={<Clock3 />} />,
           <KpiItem key="meta" label="Meta disponible" value={data.capacidad.horasDisponibles > 0 ? decimal.format(data.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
-          <KpiItem key="porcentaje" label="% de meta" value={data.capacidad.horasDisponibles > 0 ? `${decimal.format(data.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
+          <KpiItem key="porcentaje" label="Productividad" value={data.capacidad.horasDisponibles > 0 ? `${decimal.format(data.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
-            detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : efficiency.orders ? `${efficiency.orders} OS` : undefined} />,
+            detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : [
           <KpiItem key="realizadas" label="Realizadas" value={model.jornadasResultadoResumen.realizadas} tone="positive" icon={<CircleCheck />} />,
           <KpiItem key="no-realizadas" label="No realizadas" value={model.jornadasResultadoResumen.noRealizadas} tone="warning" icon={<CircleAlert />} />,
