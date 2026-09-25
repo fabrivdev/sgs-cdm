@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrdenesServicio from "./OrdenesServicio";
-import { demoOrder, operationsFixture } from "@/test/serviceOrdersFixture";
+import { demoOrder, demoBilling, operationsFixture } from "@/test/serviceOrdersFixture";
 import { machineBrandClass } from "@/lib/machineBrands";
 const mocks = vi.hoisted(() => ({ width: 390, query: vi.fn(), can: vi.fn(), set: vi.fn(), clear: vi.fn(), refetch: vi.fn(), export: vi.fn() }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: (breakpoint = 768) => mocks.width < breakpoint }));
@@ -10,7 +10,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: mocks.can, hasSection
 vi.mock("@/contexts/AssistantPageContext", () => ({ useAssistantPageContext: () => ({ setPageFilters: mocks.set, clearPageFilters: mocks.clear }) }));
 vi.mock("@/features/service-orders/useServiceOrders", () => ({ useServiceOrders: mocks.query }));
 vi.mock("@/components/ventas/salesTableExport", () => ({ exportSalesTable: mocks.export }));
-let response: { data: { data: ReturnType<typeof operationsFixture>; capacityWarning: string | null }; isPending: boolean; isFetching: boolean; isError: boolean; refetch: typeof mocks.refetch };
+let response: { data: { data: ReturnType<typeof operationsFixture>; capacityWarning: string | null; billingWarning?: string | null }; isPending: boolean; isFetching: boolean; isError: boolean; refetch: typeof mocks.refetch };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.width = 390; mocks.can.mockReturnValue(true);
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-09-25T12:00:00"));
@@ -72,7 +72,7 @@ describe("orders workspace", () => {
     const payload = mocks.export.mock.calls[0][0];
     expect(payload.fileName).toBe("ordenes-de-servicio.xlsx");
     expect(payload.rows).toHaveLength(1); expect(payload.rows[0].key).toBe("01-00000002");
-    expect(payload.columns).toHaveLength(25);
+    expect(payload.columns).toHaveLength(34);
     expect(payload.columns.find((c: { key: string }) => c.key === "tecnicos").value(payload.rows[0])).toBe(1);
     expect(payload.columns.find((c: { key: string }) => c.key === "nombresTecnicos").value(payload.rows[0])).toBe("TECNICO DOS");
     expect(payload.columns.find((c: { key: string }) => c.key === "diasCierre").value(payload.rows[0])).toBeNull();
@@ -146,7 +146,7 @@ describe("orders workspace", () => {
     tab("Órdenes");
     expect(within(screen.getByRole("table", { name: "Órdenes de servicio" })).getAllByRole("row")).toHaveLength(4);
   });
-  it("groups the OS detail without losing dates, invoice identity, zero or signed amounts", () => {
+  it("preserves OS identity but never presents operational money as billing when unavailable", () => {
     Object.assign(response.data.data.ordenesServicio[0], {
       factura: "000000000001; 000000000002", servicios_valor: 1240.25, repuesto_valor: -18.7,
       fecha_emision_factura: "2026-09-20", km_cantidad: 300, raw_data: { canonical_model: "TRION 740" },
@@ -156,20 +156,76 @@ describe("orders workspace", () => {
     for (const name of ["Orden de servicio", "Trabajo y técnicos", "Facturación e importes"]) {
       expect(detail.getByRole("heading", { name })).toBeVisible();
     }
-    for (const text of ["10/08/2026", "10/09/2026", "20/09/2026", "41", "TRION 740", "TECNICO UNO", "300", "000000000001; 000000000002", "$ 1.240,25", "$ -18,70", "$ 1.221,55"]) {
+    for (const text of ["10/08/2026", "10/09/2026", "20/09/2026", "41", "TRION 740", "TECNICO UNO", "300", "000000000001; 000000000002"]) {
       expect(detail.getByText(text, { exact: true })).toBeVisible();
     }
-    expect(detail.getAllByText("$ 0,00")).toHaveLength(2);
+    expect(detail.queryByText("$ 0,00")).not.toBeInTheDocument();
     expect(detail.queryByText("Situación de facturación")).not.toBeInTheDocument();
+    expect(detail.queryByText("$ 1.240,25")).not.toBeInTheDocument();
+    expect(detail.getByText("Facturación no disponible.")).toBeVisible();
   });
-  it("keeps five order KPIs, three in other views and one export menu", () => {
+  it("keeps five order KPIs, four in productivity, three in compliance and one export menu", () => {
     setup();
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
       tab(name);
       expect(screen.getAllByRole("region", { name: "Indicadores" })).toHaveLength(1);
-      expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(name === "Órdenes" ? 5 : 3);
+      expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(name === "Órdenes" ? 5 : name === "Productividad" ? 4 : 3);
       expect(screen.getAllByRole("button", { name: "Acciones de la sección" })).toHaveLength(1);
     }
+  });
+  it.each([320, 768, 1280])("shows reconciled Sales money and efficiency based on OS hours at %i px", width => {
+    mocks.width = width;
+    Object.assign(response.data.data.ordenesServicio[0], { servicios_valor: 1.66, servicios_cantidad: 35,
+      raw_data: { canonical_auxiliary_technicians: ["TECNICO DOS"] } });
+    response.data.data.billing = { "01-00000001": demoBilling({ labor: 1000, total: 1161.3, parts: -18.7, billedHours: 20, date: "2026-09-22" }) };
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000001" }));
+    const detail = within(screen.getByRole("dialog"));
+    expect(detail.queryByText("$ 1,66")).not.toBeInTheDocument();
+    expect(detail.getByText("22/09/2026")).toBeVisible();
+    expect(detail.getByText("43", { exact: true })).toBeVisible();
+    for (const text of ["$ 1.000,00", "$ -18,70", "$ 180,00", "$ 0,00", "$ 1.161,30", "57,14%", "Horas facturadas", "Total facturado"]) expect(detail.getByText(text)).toBeVisible();
+    fireEvent.click(detail.getByRole("button", { name: "Cerrar" }));
+    tab("Productividad");
+    const card = screen.getByText("Eficiencia").closest(".kpi-item")!;
+    expect(card).toHaveTextContent("57,1%"); expect(card).toHaveTextContent("1 OS");
+  });
+  it("exports financial values separately from reported OS amounts and preserves unknowns", async () => {
+    response.data.data.ordenesServicio[0].servicios_valor = 1.66;
+    response.data.data.billing = { "01-00000001": demoBilling({ labor: 1000, total: 1161.3, parts: -18.7, billedHours: 5 }) };
+    setup();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Órdenes de servicio" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    const row = payload.rows.find((r: { os: string }) => r.os === "01-00000001");
+    const value = (key: string, selected = row) => payload.columns.find((c: { key: string }) => c.key === key).value(selected);
+    expect(value("servicios")).toBe(1.66);
+    expect(value("moFacturada")).toBe(1000); expect(value("repuestosFacturados")).toBe(-18.7);
+    expect(value("tercerosFacturados")).toBe(0); expect(value("totalFacturado")).toBe(1161.3);
+    expect(value("horasFacturadas")).toBe(5); expect(value("eficiencia")).toBe(0.5);
+    expect(value("documentos")).toBe("000000000001");
+    expect(value("totalFacturado", payload.rows.find((r: { os: string }) => r.os === "01-00000002"))).toBeNull();
+  });
+  it("recalculates efficiency with technician status and search without duplicating an OS", async () => {
+    Object.assign(response.data.data.ordenesServicio[0], { servicios_cantidad: 20 });
+    Object.assign(response.data.data.ordenesServicio[1], { servicios_cantidad: 10, situacion_os: "Cerrada", fecha_cierre_os: "2026-09-15" });
+    response.data.data.billing = { "01-00000001": demoBilling({ billedHours: 10 }), "01-00000002": demoBilling({ os: "01-00000002", billedHours: 10 }) };
+    setup(); tab("Productividad");
+    const card = () => screen.getByText("Eficiencia").closest(".kpi-item")!;
+    expect(card()).toHaveTextContent("66,7%");
+    technicianStatus("Activos"); expect(card()).toHaveTextContent("50%");
+    technicianStatus("Inactivos"); expect(card()).toHaveTextContent("100%");
+    technicianStatus("Todos");
+    fireEvent.change(screen.getByPlaceholderText("Buscar…"), { target: { value: "00000001" } });
+    await waitFor(() => expect(card()).toHaveTextContent("50%"));
+  });
+  it("exposes billing failures with retry and no invented efficiency or stale money", () => {
+    response.data.billingWarning = "Facturación de OS pendiente de actualizar en la base.";
+    setup(); tab("Productividad");
+    expect(screen.getByRole("alert")).toHaveTextContent("actualizar en la base");
+    expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("—");
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(mocks.refetch).toHaveBeenCalled();
   });
   it("shows invoice-based closure days and recalculates both indicators with the list filters", async () => {
     response.data.data.ordenesServicio[0].fecha_emision_factura = "2026-09-20";

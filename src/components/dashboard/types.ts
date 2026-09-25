@@ -1,5 +1,7 @@
 ﻿import type { Marca, Sucursal } from "@/lib/constants";
 
+import type { OrderBilling } from "@/features/service-orders/billing";
+
 export type Tone = "neutral" | "good" | "warn" | "bad";
 export type PeriodMode = "dia" | "semana" | "mes" | "anio";
 export type FactMetric = "usd" | "horasServicio" | "kmFacturados";
@@ -107,6 +109,8 @@ export interface ServicioTecnicoRow {
 }
 
 export interface ServicioOSRow {
+  /** Read-only Sales reconciliation; never an operational-value fallback. */
+  billing?: OrderBilling | null;
   key: string;
   os: string;
   tecnico: string;

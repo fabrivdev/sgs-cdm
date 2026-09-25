@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { importedOrderModel } from "./orderMetrics";
+import { billingKey, type OrderBilling } from "./billing";
 import { matchesTechnicianStatus, type TechnicianStatus } from "./productivityStatus";
 import { addDays, addMonths, addWeeks, addYears, differenceInCalendarDays, endOfMonth, endOfWeek, endOfYear, format, getDay, getISOWeek, getISOWeekYear, parseISO, startOfMonth, startOfWeek, startOfYear, subYears } from "date-fns";
 import { MARCAS, SUCURSALES, type Marca, type Sucursal } from "@/lib/constants";
@@ -349,6 +350,7 @@ export function technicianGoalForRange(
 export interface Cliente { id: string; nombre: string; sucursal: Sucursal | null }
 export interface Profile { id: string; nombre: string; sucursal: Sucursal | null; activo: boolean | null; actualizado_en: string | null; desactivado_en: string | null }
 export interface OperationsData {
+  billing?: Record<string, OrderBilling>;
   servicios: Servicio[]; jornadas: Jornada[]; trabajos: Trabajo[]; clientes: Cliente[];
   profiles: Profile[]; servicioTecnicos: ServicioTecnico[]; ordenesServicio: OrdenServicioImportada[];
   disponibilidades: DisponibilidadTecnico[]; metaHorasMensual: number;
@@ -367,7 +369,7 @@ export const emptyOperationsData: OperationsData = {
  * Closed OS use closure date; open OS use opening date. This is not a worked-hours ledger.
  */
 export function useOperationsModel(data: OperationsData, filters: OperationsFilters, matrixMetric: "trabajos" | "horas" = "trabajos", today = new Date(), technicianStatus: TechnicianStatus = "todos") {
-  const { servicios, jornadas, trabajos, clientes, profiles, servicioTecnicos, ordenesServicio, disponibilidades, metaHorasMensual } = data;
+  const { servicios, jornadas, trabajos, clientes, profiles, servicioTecnicos, ordenesServicio, disponibilidades, metaHorasMensual, billing } = data;
   const { dateFrom, dateTo, periodMode, q, fSucursales, fMarcas, fTiposTiempo, fEstadosTrabajo, fTécnicos, fResponsablesOS, fEstadosOS, fOSRubros } = filters;
   const todayStr = format(today, "yyyy-MM-dd");
 
@@ -784,6 +786,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
 
       return [{
         key: row.os_numero,
+        billing: billing?.[billingKey(row.os_numero)] ?? null,
         os: row.os_numero,
         tecnico,
         tecnicoProfileId: responsibleMatch?.id ?? null,
@@ -954,7 +957,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       evolucion,
       sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
-  }, [activeTechnicianIds, allTechnicianProfiles, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById]);
+  }, [activeTechnicianIds, allTechnicianProfiles, billing, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById]);
 
 const jornadasRealizadasPrev = useMemo(
     () =>

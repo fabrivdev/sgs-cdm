@@ -1,5 +1,10 @@
 import { emptyOperationsData, type OperationsData, type OperationsFilters, type OrdenServicioImportada } from "@/features/service-orders/useOperationsModel";
 
+import type { OrderBilling } from "@/features/service-orders/billing";
+export function demoBilling(extra: Partial<OrderBilling> = {}): OrderBilling {
+  return { os: "01-00000001", matched: true, ambiguous: false, documents: ["000000000001"], date: "2026-09-10",
+    labor: 600, parts: 0, travel: 180, thirdParty: 0, total: 780, laborLines: 1, missingRates: 0, billedHours: 12, ...extra };
+}
 export const operationsFilters: OperationsFilters = { dateFrom: "2026-09-01", dateTo: "2026-09-30", periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] };
 export function demoOrder(extra: Partial<OrdenServicioImportada> = {}): OrdenServicioImportada {
   return { os_numero: "01-00000001", trabajo_id: "W1", cliente_nombre: "CLIENTE DEMOSTRACIÓN", fecha_abierta_os: "2026-08-10", fecha_cierre_os: "2026-09-10", fecha_emision_factura: null, factura: null,

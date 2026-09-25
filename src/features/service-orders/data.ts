@@ -2,8 +2,9 @@ import { addDays, format, parseISO, subYears } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import type { OperationsData, Profile } from "./useOperationsModel";
 import { readProductivityGoal } from "@/lib/productivityGoal";
+import { loadOrderBilling, billingWarning } from "./billing";
 
-// Queries are intentionally operational. No invoice ledger, dashboard RPC or writes.
+// Operational sources plus a separately guarded, read-only Sales reconciliation.
 const PAGE = 1000;
 export function validOperationsRange(from: string, to: string) {
   const valid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -13,7 +14,7 @@ export function validOperationsRange(from: string, to: string) {
 
 // Supabase imported tables have not all been regenerated in the database types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadOperationsData(client: any, from: string, to: string, signal?: AbortSignal): Promise<{ data: OperationsData; capacityWarning: string | null }> {
+export async function loadOperationsData(client: any, from: string, to: string, signal?: AbortSignal): Promise<{ data: OperationsData; capacityWarning: string | null; billingWarning: string | null }> {
   if (!validOperationsRange(from, to)) throw new Error("Seleccioná un rango de fechas válido.");
   const start = format(subYears(parseISO(from), 1), "yyyy-MM-dd");
   const end = format(addDays(parseISO(to), 90), "yyyy-MM-dd");
@@ -70,6 +71,16 @@ export async function loadOperationsData(client: any, from: string, to: string, 
     orders(), technicians(), readProductivityGoal(client, signal),
   ]);
   signal?.throwIfAborted();
-  return { data: { servicios, trabajos, clientes, profiles: profileRows, jornadas, disponibilidades, ordenesServicio, servicioTecnicos, metaHorasMensual: meta.value ?? 0 },
-    capacityWarning: meta.warning };
+  let billing: OperationsData["billing"];
+  let invoiceWarning: string | null = null;
+  try {
+    billing = await loadOrderBilling(client, ordenesServicio.map(row => row.os_numero), to, signal);
+  } catch (error) {
+    signal?.throwIfAborted();
+    // Keep known operational work visible, but never substitute OS money or show
+    // a partial financial snapshot when a batch, permission or migration fails.
+    invoiceWarning = billingWarning(error);
+  }
+  return { data: { servicios, trabajos, clientes, profiles: profileRows, jornadas, disponibilidades, ordenesServicio, servicioTecnicos, metaHorasMensual: meta.value ?? 0, billing },
+    capacityWarning: meta.warning, billingWarning: invoiceWarning };
 }

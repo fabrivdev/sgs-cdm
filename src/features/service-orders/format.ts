@@ -17,4 +17,4 @@ export function operationsPeriod(value: string) {
 }
 
 const money = new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export const operationsMoney = (value: number) => `$ ${money.format(value)}`;
+export const operationsMoney = (value: number | null | undefined) => value == null ? "—" : `$ ${money.format(value)}`;
