@@ -16,6 +16,9 @@ export interface OrderBilling {
   billedHours: number | null;
 }
 export const billingKey = (os: string) => os.trim().toUpperCase();
+function checkAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw signal.reason ?? new DOMException("Cancelled", "AbortError");
+}
 
 /** Compare complete, billed, closed orders, not technicians or invoice rows. */
 export function billingEfficiency(rows: ServicioOSRow[]) {
@@ -54,10 +57,29 @@ function validBilling(value: unknown): value is OrderBilling {
 // JSON avoids PostgREST's row cap. Batches are disjoint and validated before publishing.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadOrderBilling(client: any, orders: string[], cutoff: string, signal?: AbortSignal): Promise<Record<string, OrderBilling>> {
+  checkAborted(signal);
+  if (!orders.length) return {};
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal?.reason);
+  signal?.addEventListener("abort", cancel, { once: true });
+  const timeout = setTimeout(() => controller.abort(Object.assign(new Error("Facturación demoró demasiado."), { code: "BILLING_TIMEOUT" })), 25_000);
+  try {
+    return await Promise.race([
+      loadBillingBatches(client, orders, cutoff, controller.signal),
+      new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true })),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadBillingBatches(client: any, orders: string[], cutoff: string, signal: AbortSignal): Promise<Record<string, OrderBilling>> {
   const keys = [...new Set(orders.map(billingKey))].sort();
   const result: Record<string, OrderBilling> = {};
   for (let offset = 0; offset < keys.length; offset += 250) {
-    signal?.throwIfAborted();
+    checkAborted(signal);
     const batch = keys.slice(offset, offset + 250);
     const request = client.rpc("service_orders_billing_v1", { p_os_numeros: batch, p_hasta: cutoff });
     const { data, error } = await (signal ? request.abortSignal(signal) : request);
@@ -69,7 +91,7 @@ export async function loadOrderBilling(client: any, orders: string[], cutoff: st
       result[billingKey(row.os)] = row;
     }
   }
-  signal?.throwIfAborted();
+  checkAborted(signal);
   return result;
 }
 
@@ -77,5 +99,6 @@ export function billingWarning(error: unknown) {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   if (["42883", "PGRST202"].includes(code)) return "Facturación de OS pendiente de actualizar en la base.";
   if (code === "42501") return "Facturación de OS no disponible con estos permisos.";
+  if (code === "BILLING_TIMEOUT" || code === "57014") return "La facturación está demorando. Podés reintentar.";
   return "No se pudo cargar la facturación de OS.";
 }

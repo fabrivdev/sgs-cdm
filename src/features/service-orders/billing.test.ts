@@ -69,4 +69,26 @@ describe("complete billing loader", () => {
     expect(billingWarning({ code: "PGRST202" })).toContain("actualizar en la base");
     expect(billingWarning({ code: "42501" })).toContain("permisos");
   });
+  it("aborts slow requests after the deadline rather than leaving an infinite loader", async () => {
+    vi.useFakeTimers();
+    let usedSignal: AbortSignal | undefined;
+    try {
+      const source = { rpc: () => ({ abortSignal: (signal: AbortSignal) => { usedSignal = signal; return new Promise(() => {}); } }) };
+      const request = loadOrderBilling(source, ["01-A"], "2026-09-25");
+      const rejected = expect(request).rejects.toMatchObject({ code: "BILLING_TIMEOUT" });
+      await vi.advanceTimersByTimeAsync(25_000);
+      await rejected;
+      expect(usedSignal?.aborted).toBe(true);
+      expect(billingWarning({ code: "BILLING_TIMEOUT" })).toContain("demorando");
+    } finally { vi.useRealTimers(); }
+  });
+  it("cancels an in-flight request when filters change", async () => {
+    const cancel = new AbortController();
+    let usedSignal: AbortSignal | undefined;
+    const source = { rpc: () => ({ abortSignal: (signal: AbortSignal) => { usedSignal = signal; return new Promise(() => {}); } }) };
+    const request = loadOrderBilling(source, ["01-A"], "2026-09-25", cancel.signal);
+    const rejected = expect(request).rejects.toBeDefined();
+    cancel.abort(); await rejected;
+    expect(usedSignal?.aborted).toBe(true);
+  });
 });

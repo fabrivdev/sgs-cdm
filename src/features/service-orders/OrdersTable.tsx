@@ -52,14 +52,16 @@ const columns: SalesColumn<ServicioOSRow>[] = [
   { key: "horasFacturadas", label: "Horas facturadas equivalentes", kind: "number", value: r => r.billing?.billedHours ?? null },
   { key: "eficiencia", label: "Eficiencia de facturación", kind: "number", excelFormat: "0.0%", value: r => { const value = billingEfficiency([r]).percentage; return value === null ? null : value / 100; } },
 ];
-export function OrdersTable({ rows }: { rows: ServicioOSRow[] }) {
+export function OrdersTable({ rows, billingLoading = false }: { rows: ServicioOSRow[]; billingLoading?: boolean }) {
   const compact = useIsMobile(1024);
-  const [selected, setSelected] = useState<ServicioOSRow | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const selected = rows.find(row => row.key === selectedKey) ?? null;
+  const setSelected = (row: ServicioOSRow | null) => setSelectedKey(row?.key ?? null);
   const bill = selected?.billing;
   const efficiency = selected ? billingEfficiency([selected]).percentage : null;
   const selectedDays = selected ? orderClosingDays({ ...selected,
     fechaFacturacion: bill?.matched ? bill.date : selected.fechaFacturacion }) : null;
-  const table = useSectionTable({ rows, columns, initialSort: { key: "cierre", direction: "desc" }, title: "Órdenes de servicio", fileName: "ordenes-de-servicio.xlsx" });
+  const table = useSectionTable({ rows, columns, initialSort: { key: "cierre", direction: "desc" }, title: "Órdenes de servicio", fileName: "ordenes-de-servicio.xlsx", disabled: billingLoading });
   const widths = ["w-[12%]", "w-[22%]", "w-[8%]", "w-[20%]", "w-[8%]", "w-[10%]", "w-[10%]", "w-[10%]"];
   const visible = ["os", "cliente", "marca", "modelo", "tecnicos", "estado", "horas", "km"].map((key, index) => ({ ...columns.find(c => c.key === key)!, width: widths[index],
     hiddenBelow: ["marca", "tecnicos"].includes(key) ? "lg" : undefined })) as CompactListColumn<ServicioOSRow>[];
@@ -95,7 +97,7 @@ export function OrdersTable({ rows }: { rows: ServicioOSRow[] }) {
         </DetailSection>
         <DetailSection card title="Facturación e importes" icon={<FileText className="h-3.5 w-3.5" />}>
           <dl className="space-y-3 border-b pb-3"><KeyValueItem label={bill?.matched ? "Documentos vinculados" : "Factura informada en OS"} value={bill?.matched ? bill.documents.join("; ") : selected.factura} mono /><KeyValueItem label={bill?.matched ? "Fecha de facturación" : "Fecha informada en OS"} value={operationsDate(bill?.matched ? bill.date : selected.fechaFacturacion ?? null)} empty="—" /><KeyValueItem label="Días de cierre" value={selectedDays === null ? "—" : number.format(selectedDays)} empty="—" /></dl>
-          {!bill?.matched && <p role="status" className="pt-3 text-[12px] text-muted-foreground">{!bill ? "Facturación no disponible." : bill.ambiguous ? "Vínculo de facturación ambiguo." : "Sin facturación vinculada al corte."}</p>}
+          {!bill?.matched && <p role="status" className="pt-3 text-[12px] text-muted-foreground">{billingLoading ? "Cargando facturación…" : !bill ? "Facturación no disponible." : bill.ambiguous ? "Vínculo de facturación ambiguo." : "Sin facturación vinculada al corte."}</p>}
           <KeyValueGrid className="py-3"><KeyValueItem label="Mano de obra" value={operationsMoney(bill?.labor)} /><KeyValueItem label="Repuestos" value={operationsMoney(bill?.parts)} /><KeyValueItem label="Kilometraje" value={operationsMoney(bill?.travel)} /><KeyValueItem label="Terceros" value={operationsMoney(bill?.thirdParty)} /><KeyValueItem label="Horas facturadas" value={bill?.billedHours == null ? "—" : number.format(bill.billedHours)} /><KeyValueItem label="Eficiencia" value={efficiency === null ? "—" : `${number.format(efficiency)}%`} /></KeyValueGrid>
           <div className="flex items-center justify-between border-t pt-3 text-[12px]"><span className="text-muted-foreground">Total facturado</span><strong className="tabular-nums">{operationsMoney(bill?.total)}</strong></div>
         </DetailSection>

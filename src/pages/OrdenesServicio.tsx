@@ -25,7 +25,8 @@ import type { TechnicianStatus } from "@/features/service-orders/productivitySta
 import { ActivityTable } from "@/features/service-orders/ActivityTable";
 import { OperationalEvolution } from "@/features/service-orders/OperationalSummary";
 import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
-import { billingEfficiency } from "@/features/service-orders/billing";
+import { billingEfficiency, billingKey, billingWarning } from "@/features/service-orders/billing";
+import { useOrdersBilling } from "@/features/service-orders/useOrdersBilling";
 import { TecnicosNoRealizadosRanking, MatrizTécnicosDías, EstadoCompacto, CargaSucursalTabla, DistribucionMarca, TrabajosAbiertosList } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
 import { ComplianceOverview } from "@/features/service-orders/ComplianceOverview";
@@ -83,8 +84,14 @@ export function OrdersWorkspace() {
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
     valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
   const data = model.serviciosDashboardData;
+  const billingEnabled = !blocked && tab !== "cumplimiento" && data.ordenes.length > 0;
+  const financial = useOrdersBilling(data.ordenes.map(row => row.os), filters.dateTo, billingEnabled);
+  const billingLoading = billingEnabled && (financial.isPending || financial.isFetching);
+  const financialRows = useMemo(() => data.ordenes.map(row => ({ ...row,
+    billing: billingEnabled && !billingLoading && !financial.isError ? financial.data?.[billingKey(row.os)] ?? null : null,
+  })), [data.ordenes, billingEnabled, billingLoading, financial.isError, financial.data]);
   const closure = useMemo(() => orderClosureMetrics(data.ordenes), [data.ordenes]);
-  const efficiency = useMemo(() => billingEfficiency(data.ordenes), [data.ordenes]);
+  const efficiency = useMemo(() => billingEfficiency(financialRows), [financialRows]);
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
@@ -115,7 +122,7 @@ export function OrdersWorkspace() {
           <KpiItem key="meta" label="Meta disponible" value={data.capacidad.horasDisponibles > 0 ? decimal.format(data.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
           <KpiItem key="porcentaje" label="% de meta" value={data.capacidad.horasDisponibles > 0 ? `${decimal.format(data.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
-            detail={efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : efficiency.orders ? `${efficiency.orders} OS` : undefined} />,
+            detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : efficiency.orders ? `${efficiency.orders} OS` : undefined} />,
         ] : [
           <KpiItem key="realizadas" label="Realizadas" value={model.jornadasResultadoResumen.realizadas} tone="positive" icon={<CircleCheck />} />,
           <KpiItem key="no-realizadas" label="No realizadas" value={model.jornadasResultadoResumen.noRealizadas} tone="warning" icon={<CircleAlert />} />,
@@ -140,9 +147,9 @@ export function OrdersWorkspace() {
         <FilterMultiSelect label="Sucursal" values={filters.fSucursales} onChange={v => change("fSucursales", v)} options={SUCURSALES.map(value => ({ value, label: value }))} />
       </FiltersBar>
       {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná un rango de fechas válido.</p> : query.isError ? <div role="alert" className="space-y-2 text-sm"><p>No se pudieron cargar todas las fuentes. No se muestran resultados parciales.</p><Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div> : blocked ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando órdenes y actividad…</p> : <>
-        {tab !== "cumplimiento" && query.data?.billingWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.billingWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}
+        {billingEnabled && financial.isError && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{billingWarning(financial.error)}</p><Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button></div>}
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
-          <OrdersTable rows={data.ordenes} />
+          <OrdersTable rows={financialRows} billingLoading={billingLoading} />
         </TabsContent>
         <TabsContent value="productividad" className="min-w-0 space-y-3">
           {query.data?.capacityWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.capacityWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}

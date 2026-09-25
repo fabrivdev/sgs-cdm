@@ -4,19 +4,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrdenesServicio from "./OrdenesServicio";
 import { demoOrder, demoBilling, operationsFixture } from "@/test/serviceOrdersFixture";
 import { machineBrandClass } from "@/lib/machineBrands";
-const mocks = vi.hoisted(() => ({ width: 390, query: vi.fn(), can: vi.fn(), set: vi.fn(), clear: vi.fn(), refetch: vi.fn(), export: vi.fn() }));
+const mocks = vi.hoisted(() => ({ width: 390, query: vi.fn(), billing: vi.fn(), billingRetry: vi.fn(), can: vi.fn(), set: vi.fn(), clear: vi.fn(), refetch: vi.fn(), export: vi.fn() }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: (breakpoint = 768) => mocks.width < breakpoint }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: mocks.can, hasSectionAccess: () => true }) }));
 vi.mock("@/contexts/AssistantPageContext", () => ({ useAssistantPageContext: () => ({ setPageFilters: mocks.set, clearPageFilters: mocks.clear }) }));
 vi.mock("@/features/service-orders/useServiceOrders", () => ({ useServiceOrders: mocks.query }));
+vi.mock("@/features/service-orders/useOrdersBilling", () => ({ useOrdersBilling: mocks.billing }));
 vi.mock("@/components/ventas/salesTableExport", () => ({ exportSalesTable: mocks.export }));
-let response: { data: { data: ReturnType<typeof operationsFixture>; capacityWarning: string | null; billingWarning?: string | null }; isPending: boolean; isFetching: boolean; isError: boolean; refetch: typeof mocks.refetch };
+let response: { data: { data: ReturnType<typeof operationsFixture>; capacityWarning: string | null }; isPending: boolean; isFetching: boolean; isError: boolean; refetch: typeof mocks.refetch };
+let billingState: { isPending: boolean; isFetching: boolean; isError: boolean; error: unknown };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.width = 390; mocks.can.mockReturnValue(true);
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-09-25T12:00:00"));
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   response = { data: { data: operationsFixture(), capacityWarning: null }, isPending: false, isFetching: false, isError: false, refetch: mocks.refetch };
   mocks.query.mockImplementation(() => response);
+  billingState = { isPending: false, isFetching: false, isError: false, error: null };
+  mocks.billing.mockImplementation(() => ({ ...billingState, data: response.data.data.billing, refetch: mocks.billingRetry }));
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
@@ -220,12 +224,50 @@ describe("orders workspace", () => {
     await waitFor(() => expect(card()).toHaveTextContent("50%"));
   });
   it("exposes billing failures with retry and no invented efficiency or stale money", () => {
-    response.data.billingWarning = "Facturación de OS pendiente de actualizar en la base.";
+    billingState.isError = true; billingState.error = { code: "PGRST202" };
     setup(); tab("Productividad");
     expect(screen.getByRole("alert")).toHaveTextContent("actualizar en la base");
     expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("—");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
-    expect(mocks.refetch).toHaveBeenCalled();
+    expect(mocks.billingRetry).toHaveBeenCalledOnce();
+    expect(mocks.refetch).not.toHaveBeenCalled();
+  });
+  it("keeps the list, operational KPIs and compliance usable while billing waits", async () => {
+    billingState.isPending = true; billingState.isFetching = true;
+    setup();
+    expect(screen.getByRole("table", { name: "Órdenes de servicio" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(5);
+    expect(screen.queryByText("Cargando órdenes y actividad…")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    expect(await screen.findByRole("menuitem", { name: "Exportar Órdenes de servicio" })).toHaveAttribute("aria-disabled", "true");
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    tab("Productividad");
+    expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("Calculando…");
+    expect(screen.getByRole("table", { name: "Productividad por técnico" })).toBeVisible();
+    tab("Cumplimiento");
+    expect(mocks.billing).toHaveBeenLastCalledWith(expect.any(Array), "2026-09-25", false);
+    expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
+  });
+  it("requests only filtered OS, not the one-year operational lookback", async () => {
+    setup();
+    expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000002", "01-00000001"], "2026-09-25", true);
+    fireEvent.change(screen.getByPlaceholderText("Buscar…"), { target: { value: "00000002" } });
+    await waitFor(() => expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000002"], "2026-09-25", true));
+  });
+  it("updates an open drawer when billing arrives and clears it during refresh", () => {
+    billingState.isPending = true; billingState.isFetching = true;
+    const rendered = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000001" }));
+    const detail = () => within(screen.getByRole("dialog"));
+    expect(detail().getByText("Cargando facturación…")).toBeVisible();
+    response.data.data.billing = { "01-00000001": demoBilling() };
+    billingState.isPending = false; billingState.isFetching = false;
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(detail().getByText("$ 780,00")).toBeVisible();
+    billingState.isFetching = true;
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(detail().queryByText("$ 780,00")).not.toBeInTheDocument();
+    expect(detail().getByText("Cargando facturación…")).toBeVisible();
   });
   it("shows invoice-based closure days and recalculates both indicators with the list filters", async () => {
     response.data.data.ordenesServicio[0].fecha_emision_factura = "2026-09-20";
