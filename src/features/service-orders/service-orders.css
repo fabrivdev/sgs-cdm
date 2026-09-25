@@ -1,0 +1,18 @@
+/* Scoped to this workspace: do not restyle the previously approved modules. */
+.service-orders-workspace .compact-list-table thead {
+  background: hsl(var(--muted) / 0.35);
+}
+
+@media (min-width: 640px) {
+  .service-orders-workspace .compact-list-table td {
+    height: var(--table-row-height);
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+@media (max-width: 639px) {
+  .service-orders-workspace {
+    background: hsl(var(--card));
+  }
+}

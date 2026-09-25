@@ -1586,6 +1586,7 @@ export function MatrizTécnicosDías({
   onSelectSucursal,
   metric,
   onMetricChange,
+  concise = false,
 }: {
   data: {
     buckets: string[];
@@ -1599,6 +1600,7 @@ export function MatrizTécnicosDías({
   onSelectSucursal: (sucursal: string) => void;
   metric: "trabajos" | "horas";
   onMetricChange: (metric: "trabajos" | "horas") => void;
+  concise?: boolean;
 }) {
   const { buckets, blocks, bucketLabels, bucketMode, overLimit } = data;
   const [leftWidth, setLeftWidth] = useState(320);
@@ -1776,7 +1778,7 @@ export function MatrizTécnicosDías({
             <span className="inline-flex items-center gap-1"><span className="font-bold text-sky-700">○</span> Trabajo programado</span>
             <span className="inline-flex items-center gap-1"><span className="font-bold text-violet-700">ND</span> No disponible</span>
             <span className="inline-flex items-center gap-1"><span className="font-bold"><span className="text-emerald-700">●</span><span className="text-amber-700">▲</span></span> Estados combinados</span>
-            <span className="dashboard-matrix-legend-note">El número indica {metric === "horas" ? "horas" : "cantidad de trabajos"}.</span>
+            {!concise && <span className="dashboard-matrix-legend-note">El número indica {metric === "horas" ? "horas" : "cantidad de trabajos"}.</span>}
           </div>
 
           <div className="dashboard-matrix-actions flex items-center gap-2">

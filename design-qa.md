@@ -209,3 +209,45 @@ Evidence directory: the same `mobile-design-review-2026-09-24` folder outside Gi
 19 tests passed across `AppLayout.test.tsx`, `VentasMobile.test.tsx`, `MobileSalesTable.test.tsx`. Changed-file ESLint passed. Type check passed with `--lib ES2021,DOM,DOM.Iterable` (the existing default ES2020 `replaceAll` limitation remains outside this change). Final production build passed with existing large-chunk warnings. No SQL, auth changes, financial logic changes, production verification or physical-device certification. Header QA applies across the shared layout; it does not certify every page's mobile content. No high-severity header mismatch remained in these local checks.
 
 final result: passed
+
+---
+
+# Design QA — Service orders visual alignment
+
+Date: 2026-09-25. Scope: Orders, OS drawer, Productivity, Compliance and Activity in `/servicios/ordenes`. Reference: the user's five supplied screenshots, the existing SIG CDM operational tables/import detail, and knowledge notes 24/25/26. The Product Design audit identified inconsistent composition, not a need for a new brand or global redesign.
+
+## Five-step review and correction
+
+| Step | Evidence and finding | Implemented correction |
+| --- | --- | --- |
+| Orders list | Supplied image 1 and local baseline: bare table, oversized row buttons, detached count/sort toolbar and vertical overflow arrows on the tab strip | Existing bordered table surface, 44 px desktop rows, neutral OS references, restrained state badges, aligned KPIs/filters and full-width tab strip |
+| OS detail | Image 2: long ungrouped key/value list, raw ISO dates and amounts without currency | Three groups using existing import-detail primitives; localized dates, currency/decimals and preserved negative/zero/full invoice values |
+| Productivity | Image 3: oversized rows, native select, empty goal columns and long warning competing with the table | Shared Select, contained compact tables, short missing-goal alert; unknown goal remains unknown and complete export retains its fields |
+| Compliance | Image 4: a large single-bar legacy chart and disconnected blocks | Compact period summary using the original model counts/insights, complete period export, common panel treatment. Original chart implementation remains reusable |
+| Activity | Image 5: absence rows visually resembling incomplete journeys, blank customer/TR | Separate availability table with technician, period and reason; complete activity export still includes absence rows and distinct same-day journeys |
+
+General health: the corrected section now reuses app typography, neutral surfaces, separators, shared controls and import-detail grouping. Compact phone identity/context rows are intentional; tablet/desktop body cells remain columnar. No data models, source queries, access policy or financial population changed. This is a focused visual/code review, not a complete accessibility, production-data or whole-app audit.
+
+## Local browser evidence
+
+Real `AppLayout` and page/components with an ignored, synthetic local harness: `http://127.0.0.1:5181/mobile-review.local/orders.html`. Sources and auth are mocked; no customer exports or production session are used. `?missing-goal` exercises unknown capacity. Browser: in-app browser. Screenshots were inspected inline during this run; user commercial screenshots were not copied into the repository.
+
+- 1280 × 900: Orders, grouped drawer, Productivity, missing goal, Compliance summary/matrix and Activity composition.
+- 768 × 900: Orders with intermediate columns, 44 px body rows, no horizontal document overflow; tab clientHeight equals scrollHeight (31 px).
+- 640 × 900: Productivity with capacity, all summary columns and one-line table values; narrow headings can wrap. Document scrollWidth equals clientWidth.
+- 390 × 844: all three views, grouped drawer, Activity/Availability and compact period summary. No wide matrix on phones. Data still available through existing list/detail paths.
+- 320 × 780: Productivity and Orders, including a long synthetic customer name. The name uses multiple lines; state stays in its own column. Three KPI values share the same baseline after shortening the mobile open-order label; document width is 305 px excluding the scrollbar, with no horizontal overflow.
+- 639 × 844: breakpoint measurement, no horizontal document overflow, tab clientHeight equals scrollHeight (44 px). React resize rendering was allowed to settle before treating captures as evidence.
+
+Some first screenshots immediately after viewport changes were stale/cropped; final settled screenshots and DOM measurements were used instead. Returning to desktop also required a clean reload to restore the matrix after the viewport override; its final desktop state was verified after reload, not treated as proof of live device rotation. Full-page stitching repeated content in one capture; row identity/count were verified in the DOM and tests rather than inferred from that bitmap. Moving formatting helpers caused transient HMR import errors; subsequent clean navigation and final builds use the corrected imports. No pixel-perfect or physical-device claim.
+
+## Checks and boundaries
+
+- 77 tests passed in 11 files: service-orders sources/model/formats, page integration, access, OS metrics/branch identity/technician matching, legacy table ordering, shared export and mobile Sales.
+- New assertions cover grouped fields and signed currency, one set of three KPIs, unknown-capacity columns/export, absence separation without same-day deduplication, original compliance counts/export and no permanent explanatory paragraphs.
+- Type checking passes with `--lib es2021,dom,dom.iterable`; the repository's default ES2020 `replaceAll` limitation is unchanged.
+- ESLint passes for the edited/new section files. `DashboardCharts.tsx` still has its existing four errors and four warnings; running ESLint against `git show HEAD:...` confirmed the same diagnostics before this change. The only shared-component change is an optional `concise` prop; no hook behavior was rewritten here. This is not a clean whole-repository lint claim.
+- Production build passes with existing large-chunk warnings. No SQL, migration, configuration or production writes. Excel payloads are tested; not every workbook was downloaded manually.
+- Knowledge note 26 records the reusable visual decisions. This checkout has no Obsidian sync configuration/scripts; no vault synchronization is claimed.
+
+Result: corrected and verified locally within this scope; user/production acceptance remains separate.

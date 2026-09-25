@@ -22,10 +22,10 @@ const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 describe("orders workspace", () => {
   it("respects the guide: no permanent explanatory paragraphs in the three views or OS detail", () => {
-    setup();
+    mocks.width = 1280; setup();
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
       tab(name);
-      expect(screen.queryByText(/Cerradas por fecha|Horas de las OS seleccionadas|Por fecha de jornada|Cada agrupación representa|Detalle de la matriz|Solo resultados registrados|Se requieren dos periodos cerrados|Sin desvíos cerrados/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Cerradas por fecha|Horas de las OS seleccionadas|Por fecha de jornada|Cada agrupación representa|Detalle de la matriz|Solo resultados registrados|Se requieren dos periodos cerrados|Sin desvíos cerrados|El número indica/)).not.toBeInTheDocument();
     }
     tab("Órdenes"); fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000002" }));
     expect(screen.queryByText(/Los importes corresponden|Sin factura identificada no significa/)).not.toBeInTheDocument();
@@ -65,6 +65,77 @@ describe("orders workspace", () => {
     setup(); tab("Productividad");
     expect(screen.getByRole("alert")).toHaveTextContent("no disponible");
     expect(screen.getByRole("table", { name: "Productividad por técnico" })).not.toHaveTextContent("0%");
+  });
+  it("groups the OS detail without losing dates, invoice identity, zero or signed amounts", () => {
+    Object.assign(response.data.data.ordenesServicio[0], {
+      factura: "000000000001; 000000000002", servicios_valor: 1240.25, repuesto_valor: -18.7,
+    });
+    setup(); fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000001" }));
+    const detail = within(screen.getByRole("dialog"));
+    for (const name of ["Orden de servicio", "Trabajo y técnicos", "Facturación e importes"]) {
+      expect(detail.getByRole("heading", { name })).toBeVisible();
+    }
+    for (const text of ["10/08/2026", "10/09/2026", "000000000001; 000000000002", "$ 1.240,25", "$ -18,70", "$ 1.221,55"]) {
+      expect(detail.getByText(text, { exact: true })).toBeVisible();
+    }
+    expect(detail.getAllByText("$ 0,00")).toHaveLength(2);
+  });
+  it("keeps one set of three KPIs and one export menu in every view", () => {
+    setup();
+    for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
+      tab(name);
+      expect(screen.getAllByRole("region", { name: "Indicadores" })).toHaveLength(1);
+      expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(3);
+      expect(screen.getAllByRole("button", { name: "Acciones de la sección" })).toHaveLength(1);
+    }
+  });
+  it("does not display empty goal columns but keeps them in the complete productivity export", async () => {
+    mocks.width = 1280;
+    response.data.data.metaHorasMensual = 0; response.data.capacityWarning = "Meta de productividad no disponible.";
+    setup(); tab("Productividad");
+    const table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
+    expect(table.getAllByRole("columnheader")).toHaveLength(3);
+    expect(table.queryByRole("columnheader", { name: /Meta disponible/ })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    expect(payload.fileName).toBe("productividad-tecnicos.xlsx");
+    expect(payload.columns).toHaveLength(13);
+    expect(payload.columns.find((c: { key: string }) => c.key === "meta").value(payload.rows[0])).toBeNull();
+  });
+  it("separates absence rows from journeys without collapsing same-day journeys or excluding them from Excel", async () => {
+    response.data.data.disponibilidades = [{ id: "ABS1", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "Capacitación", observacion: null, bloquea_agenda: true }];
+    response.data.data.jornadas.push({ ...response.data.data.jornadas[0], id: "J4" });
+    setup(); tab("Cumplimiento");
+    const activity = within(screen.getByRole("table", { name: "Actividad por técnico" }));
+    expect(activity.getAllByRole("row")).toHaveLength(5);
+    expect(activity.queryByText("Capacitación")).not.toBeInTheDocument();
+    const availability = within(screen.getByRole("table", { name: "Disponibilidad de técnicos" }));
+    expect(availability.getByText("Capacitación")).toBeVisible();
+    expect(availability.getByText("sept. 2026")).toBeVisible();
+    expect(availability.queryByText("TR")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Actividad por técnico" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    expect(payload.rows).toHaveLength(5);
+    expect(new Set(payload.rows.map((row: { key: string }) => row.key)).size).toBe(5);
+    expect(payload.rows.find((row: { estado: string }) => row.estado === "No disponible").trabajo).toBe("Capacitación");
+  });
+  it("uses the original compliance counts and exposes complete period export", async () => {
+    setup(); tab("Cumplimiento");
+    const table = screen.getByRole("table", { name: "Cumplimiento por período" });
+    expect(table).toHaveTextContent("1 de 3 realizadas");
+    expect(table).toHaveTextContent("33%");
+    expect(screen.getByText("50%", { exact: true })).toBeVisible();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Cumplimiento por período" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    expect(payload.fileName).toBe("cumplimiento-periodos.xlsx");
+    expect(payload.columns).toHaveLength(7);
+    expect(payload.rows[0]).toMatchObject({ programadas: 3, realizadas: 1, noRealizadas: 1, pendientes: 1, porcentaje: 33 });
   });
   it("keeps compliance visible on phones without a wide matrix", () => {
     setup(); tab("Cumplimiento");
