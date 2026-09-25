@@ -234,6 +234,15 @@ export function mapOrdenesServicioSheet(
     });
     const quantity = quantityNumber(row, ["CANTIDAD", "CNTFAC"]);
     const lineTotal = number(row, ["TOTAL"]);
+    const isLabor = [productCode, productName].some(value =>
+      String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === "MA01");
+    // PRECIO is the OS hourly tariff, not VALFAC (the billed service package).
+    // Preserve every labor line before aggregation, including missing/zero rates.
+    const laborNumber = (key: string) => {
+      const value = firstValue(row, [key]);
+      return value !== null && /^[+-]?\d+(?:[.,]\d+)*$/.test(String(value).trim())
+        ? parseFlexibleNumber(value) : null;
+    };
     const canonicalStartDate = normalizeDateLike(firstValue(row, ["Fch. Inicial"]));
     const canonicalStartTime = text(row, ["Hora Inicial"]);
     const canonicalEndDate = normalizeDateLike(firstValue(row, ["Fch. Final"]));
@@ -301,6 +310,8 @@ export function mapOrdenesServicioSheet(
       raw: {
         ...row,
         canonical_internal_number: text(row, ["Nro. Interno"]),
+        canonical_labor_unit_rate: isLabor ? laborNumber("PRECIO") : null,
+        canonical_labor_billed_amount: isLabor ? laborNumber("TOTFAC") : null,
         canonical_start_date: canonicalStartDate,
         canonical_start_time: canonicalStartTime,
         canonical_end_date: canonicalEndDate,

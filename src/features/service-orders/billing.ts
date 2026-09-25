@@ -81,7 +81,9 @@ async function loadBillingBatches(client: any, orders: string[], cutoff: string,
   for (let offset = 0; offset < keys.length; offset += 250) {
     checkAborted(signal);
     const batch = keys.slice(offset, offset + 250);
-    const request = client.rpc("service_orders_billing_v1", { p_os_numeros: batch, p_hasta: cutoff });
+    // Never fall back to v1: invoice unit prices can represent a whole job,
+    // so that version's hours are not a valid efficiency denominator/numerator.
+    const request = client.rpc("service_orders_billing_v2", { p_os_numeros: batch, p_hasta: cutoff });
     const { data, error } = await (signal ? request.abortSignal(signal) : request);
     if (error) throw error;
     if (!Array.isArray(data) || data.length !== batch.length) throw new Error("Facturación incompleta.");

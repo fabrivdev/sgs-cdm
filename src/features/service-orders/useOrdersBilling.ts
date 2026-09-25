@@ -8,7 +8,7 @@ export function useOrdersBilling(orders: readonly string[], cutoff: string, enab
   const { user } = useAuth();
   const keys = [...new Set(orders.map(billingKey))].sort();
   return useQuery({
-    queryKey: ["service-orders-billing", user?.id, cutoff, keys],
+    queryKey: ["service-orders-billing", "os-tariffs-v2", user?.id, cutoff, keys],
     enabled: Boolean(user) && enabled && keys.length > 0,
     queryFn: ({ signal }) => loadOrderBilling(supabase, keys, cutoff, signal),
     retry: false, staleTime: 60_000, refetchOnWindowFocus: false,

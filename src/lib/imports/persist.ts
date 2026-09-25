@@ -754,8 +754,28 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
       : null;
 
     current.responsable = responsablePorHoras;
+    const laborRateLines = new Map<string, Record<string, unknown>>();
+    sourceRows.forEach((row, index) => {
+      if (!isLaborParticipantRow(row)) return;
+      const raw = (row.raw_data ?? {}) as Record<string, unknown>;
+      const line = {
+        invoice: String(row.factura ?? "").trim().toUpperCase(),
+        timeType: row.tipo_tiempo ?? "Desconocido",
+        currency: raw.canonical_currency ?? "UNKNOWN",
+        rate: raw.canonical_labor_unit_rate ?? null,
+        billedAmount: raw.canonical_labor_billed_amount ?? null,
+      };
+      // Repeated participants in the same source block must not duplicate its
+      // billed allocation. Without an item/clock identity retain the ambiguity.
+      const block = laborTimeBlockKey(row, index);
+      const item = String(raw.ITEM ?? "").trim();
+      const identity = item ? `${item}|${block.startsWith("SIN_RELOJ|") ? "" : block}` : block;
+      laborRateLines.set(JSON.stringify([identity, line]), line);
+    });
     current.raw_data = {
       ...(current.raw_data ?? {}),
+      canonical_labor_rates_version: 1,
+      canonical_labor_rates: Array.from(laborRateLines.values()),
       tecnicos_responsables: laborPrincipals,
       tecnicos_auxiliares: commissionAuxiliaries,
       tecnicos_participantes: commissionParticipants,

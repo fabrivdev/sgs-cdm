@@ -47,7 +47,7 @@ describe("operational source loader", () => {
       expect(query.fields?.split(",")).not.toContain("id");
       expect(query.order).toBe("os_numero");
     }
-    for (const forbidden of ["facturacion", "dashboard_financiero", "facturas", "service_orders_billing_v1"]) {
+    for (const forbidden of ["facturacion", "dashboard_financiero", "facturas", "service_orders_billing_v1", "service_orders_billing_v2"]) {
       expect(calls.map(c => c.table)).not.toContain(forbidden);
     }
   });

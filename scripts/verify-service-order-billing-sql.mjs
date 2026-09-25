@@ -145,5 +145,75 @@ for (const section of ['servicios.ordenes','servicios.ventas']) {
  await db.query("SELECT set_config('fixture.denied_section',$1,false)",[section]);
  await assert.rejects(()=>call(['CANONICAL']),/Sin acceso/);
 }
+// Corrected tariff contract: invoice unit=entire job, OS PRECIO=hourly rate.
+await db.exec("SELECT set_config('fixture.denied_section','',false); ALTER TABLE ordenes_servicio_importadas ADD COLUMN raw_data jsonb;");
+const ratesSql=readFileSync('supabase/migrations/20260925220000_service_order_time_type_rates.sql','utf8');
+await db.exec(ratesSql); await db.exec(ratesSql);
+const callV2=async(keys,cutoff='2026-10-01')=>(await db.query('SELECT service_orders_billing_v2($1::text[],$2::date) AS result',[keys,cutoff])).rows[0].result;
+const rate=(invoice,timeType,price,amount,extra={})=>({invoice,timeType,rate:price,billedAmount:amount,currency:'USD',...extra});
+const fixture=async(key,rates,ledger)=>{
+  await db.query('INSERT INTO ordenes_servicio_importadas(os_numero,raw_data) VALUES ($1,$2)',[key,JSON.stringify({canonical_labor_rates_version:1,canonical_labor_rates:rates})]);
+  for (const [i,l] of ledger.entries()) {
+    await db.query(`INSERT INTO facturacion_lineas_importadas(id,fecha_factura,factura,codigo_interno_factura,raw_data,grupo_normalizado,total_venta,valor_unitario,moneda)
+      VALUES ($1,$2,$3,$3,$4,'Servicio',$5,$5,'USD')`,[`${key}-${i}`,l.date??'2026-09-01',l.doc,
+      JSON.stringify({linked_service_order:key,DOCUMENTO:l.doc,original_invoice_number:l.original,canonical_document_kind:l.credit?'NotaCredito':'Factura'}),l.amount]);
+  }
+  return (await callV2([key]))[0];
+};
+const job=await fixture('RATE-JOB',[rate('F1','Garantia',60,0),rate('F1','Garantia',60,0),rate('F1','Garantia',60,0),rate('F1','Garantia',60,2100)],[{doc:'F1',amount:2100}]);
+assert.equal(job.billedHours,35); // not one billed service-package unit
+assert.equal(job.labor,2100); assert.equal(job.missingRates,0);
+// Different time types and even two rates for the SAME type in one invoice.
+const mixed=await fixture('RATE-MIXED',[rate('F2','Cliente',70,210),rate('F2','Garantia',60,120),rate('F2','Interno',56,56),rate('F2','Garantia',56,112)],[{doc:'F2',amount:498}]);
+assert.equal(mixed.billedHours,8);
+const docs=await fixture('RATE-DOCS',[rate('A','Cliente',70,140),rate('B','Garantia',60,180)],[{doc:'A',amount:140},{doc:'B',amount:180}]);
+assert.equal(docs.billedHours,5); // never total/one arbitrarily selected tariff
+const discount=await fixture('RATE-DISCOUNT',[rate('D','Cliente',70,140)],[{doc:'D',amount:140}]);
+assert.equal(discount.billedHours,2); // if 4 worked hours, efficiency is 50%
+// Split invoice rows do not duplicate OS allocation; unit prices are ignored.
+const split=await fixture('RATE-SPLIT',[rate('S','Cliente',70,210)],[{doc:'S',amount:70},{doc:'S',amount:140}]);
+assert.equal(split.billedHours,3); assert.equal(split.laborLines,2);
+const credit=await fixture('RATE-CREDIT',[rate('O','Interno',56,112)],[{doc:'O',amount:112},{doc:'NC',original:'O',amount:-28,credit:true,date:'2026-09-02'}]);
+assert.equal(credit.billedHours,1.5); assert.equal(credit.labor,84); assert.equal(credit.date,'2026-09-01');
+assert.equal((await callV2(['RATE-CREDIT'],'2026-09-01'))[0].billedHours,2);
+// No implicit matching by customer, approximate document or first time type.
+for (const [key,rates,ledger] of [
+  ['NO-PRICE',[rate('F','Cliente',null,140)],[{doc:'F',amount:140}]],
+  ['ZERO-PRICE',[rate('F','Cliente',0,140)],[{doc:'F',amount:140}]],
+  ['NO-CURRENCY',[rate('F','Cliente',70,140,{currency:'UNKNOWN'})],[{doc:'F',amount:140}]],
+  ['GS-CURRENCY',[rate('F','Cliente',70,140,{currency:'GS'})],[{doc:'F',amount:140}]],
+  ['NO-TYPE',[rate('F','Desconocido',70,140)],[{doc:'F',amount:140}]],
+  ['NO-ALLOCATION',[rate('F','Cliente',70,null)],[{doc:'F',amount:140}]],
+  ['MISMATCH',[rate('F','Cliente',70,210)],[{doc:'F',amount:140}]],
+  ['NO-DOCUMENT',[rate('00F','Cliente',70,140)],[{doc:'F',amount:140}]],
+  ['PARTIAL',[rate('F','Cliente',70,140),rate('G','Garantia',null,60)],[{doc:'F',amount:140},{doc:'G',amount:60}]],
+  ['NC-NO-ORIGINAL',[rate('F','Cliente',70,140)],[{doc:'F',amount:140},{doc:'NC',amount:-70,credit:true}]],
+  ['NC-MIXED',[rate('F','Cliente',70,140),rate('F','Garantia',60,60)],[{doc:'F',amount:200},{doc:'NC',original:'F',amount:-100,credit:true}]],
+  ['WRONG-BASIS',[rate('F','Cliente',70,140)],[{doc:'F',amount:154}]],
+]) {
+  const invalid=await fixture(key,rates,ledger);
+  assert.equal(invalid.billedHours,null,key); assert.ok(invalid.missingRates>0,key);
+  assert.equal(invalid.labor,ledger.reduce((sum,l)=>sum+l.amount,0),key);
+}
+assert.equal((await fixture('RATE-ZERO',[rate('Z','Cliente',70,0)],[{doc:'Z',amount:0}])).billedHours,0);
+// Legacy import without a complete rate snapshot must NOT use first raw PRECIO
+// or invoice unit price. Money remains readable before reimporting OS.
+const old=(await callV2(['01-A','LEGACY','COLLISION','EMPTY']));
+assert.equal(old.find(r=>r.os==='01-A').total,430); assert.equal(old.find(r=>r.os==='01-A').billedHours,null);
+assert.equal(old.find(r=>r.os==='LEGACY').billedHours,null);
+assert.equal(old.find(r=>r.os==='COLLISION').ambiguous,true);
+assert.equal(old.find(r=>r.os==='EMPTY').matched,false);
+assert.deepEqual(await callV2([]),[]);
+const correctedCanonical=(await callV2(['CANONICAL']))[0];
+for(const field of ['labor','parts','travel','thirdParty','total','documents','date']) assert.deepEqual(correctedCanonical[field],fast[field]);
+await assert.rejects(()=>callV2(Array.from({length:251},(_,i)=>String(i))),/Parametros/);
+for (const section of ['servicios.ordenes','servicios.ventas']) {
+ await db.query("SELECT set_config('fixture.denied_section',$1,false)",[section]);
+ await assert.rejects(()=>callV2(['RATE-JOB']),/Sin acceso/);
+}
+await db.exec("SELECT set_config('fixture.denied_section','',false); SELECT set_config('fixture.logged_out','on',false)");
+await assert.rejects(()=>callV2(['RATE-JOB']),/Sin acceso/);
+assert.equal((await db.query("SELECT has_function_privilege('anon','service_orders_billing_v2(text[],date)','EXECUTE') AS allowed")).rows[0].allowed,false);
+assert.equal((await db.query("SELECT has_function_privilege('authenticated','service_order_labor_hours_v1(jsonb,text,numeric,numeric,boolean)','EXECUTE') AS allowed")).rows[0].allowed,false);
 await db.close();
-console.log('PASS: original and optimized billing SQL — canonical Sales equivalence, exact indexed OS lookup, no current Sales rebuild, rates/credits/cutoff, legacy links, ambiguity, idempotence and access. Synthetic ledger includes 25,000 unrelated lines.');
+console.log('PASS: billing SQL v1/optimized/v2 — exact indexed OS lookup, Sales money unchanged, OS rates by document/time type, mixed allocations, credits/cutoff, missing imports and denied access. Synthetic ledger includes 25,000 unrelated lines.');

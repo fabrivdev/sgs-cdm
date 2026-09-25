@@ -50,7 +50,7 @@ describe("complete billing loader", () => {
     const result = await loadOrderBilling(source, [...keys, ` ${keys[0]} `, "02-00000000"], "2026-09-25");
     expect(Object.keys(result)).toHaveLength(502);
     expect(source.rpc.mock.calls.map(call => call[1].p_os_numeros.length)).toEqual([250, 250, 2]);
-    expect(source.rpc).toHaveBeenCalledWith("service_orders_billing_v1", expect.objectContaining({ p_hasta: "2026-09-25" }));
+    expect(source.rpc).toHaveBeenCalledWith("service_orders_billing_v2", expect.objectContaining({ p_hasta: "2026-09-25" }));
   });
   it.each([[], [bill({ os: "OTHER" })], [bill({ total: null })], [bill({ billedHours: Infinity })]])("rejects missing, foreign or malformed replies %j", reply => {
     return expect(loadOrderBilling(client(() => reply), ["01-00000001"], "2026-09-25")).rejects.toThrow();
@@ -68,6 +68,13 @@ describe("complete billing loader", () => {
   it("distinguishes missing migration from denied access", () => {
     expect(billingWarning({ code: "PGRST202" })).toContain("actualizar en la base");
     expect(billingWarning({ code: "42501" })).toContain("permisos");
+  });
+  it("never retries the known-invalid invoice-unit calculation if the new RPC is missing", async () => {
+    const failure = Object.assign(new Error("missing RPC"), { code: "PGRST202" });
+    const source = client(() => failure);
+    await expect(loadOrderBilling(source, ["01-00000001"], "2026-09-25")).rejects.toBe(failure);
+    expect(source.rpc).toHaveBeenCalledTimes(1);
+    expect(source.rpc.mock.calls[0][0]).toBe("service_orders_billing_v2");
   });
   it("aborts slow requests after the deadline rather than leaving an infinite loader", async () => {
     vi.useFakeTimers();
