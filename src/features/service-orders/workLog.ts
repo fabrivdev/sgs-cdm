@@ -20,13 +20,31 @@ function stamp(date: string | null, time: string | null) {
   const value = Date.parse(`${date}T${normalized}Z`);
   return Number.isFinite(value) && new Date(value).toISOString().slice(0, 10) === date ? value : null;
 }
-/** Only recorded clock intervals; never OS dates, invoiced quantity or commission-payment overrides. */
-export function workedDays(entry: WorkEntry): WorkedDay[] | null {
+/** Preserve the source values; validation describes why a clock cannot be counted. */
+export function inspectWorkInterval(entry: WorkEntry) {
   const start = stamp(entry.fecha_inicio, entry.hora_inicio);
   let end = stamp(entry.fecha_fin, entry.hora_fin);
-  if (start === null || end === null || entry.estado_validacion === "INVALIDA") return null;
-  if (end < start && entry.fecha_inicio === entry.fecha_fin) end += DAY;
-  if (end <= start || end - start > 16 * 3_600_000) return null;
+  if (start !== null && end !== null && end < start && entry.fecha_inicio === entry.fecha_fin) end += DAY;
+  const hours = start !== null && end !== null ? (end - start) / 3_600_000 : null;
+  const reason = !entry.fecha_inicio ? "Falta fecha de inicio"
+    : !entry.fecha_fin ? "Falta fecha de fin"
+    : stamp(entry.fecha_inicio, "00:00") === null ? "Fecha de inicio inválida"
+    : stamp(entry.fecha_fin, "00:00") === null ? "Fecha de fin inválida"
+    : !entry.hora_inicio ? "Falta hora de inicio"
+    : !entry.hora_fin ? "Falta hora de fin"
+    : start === null ? "Hora de inicio inválida"
+    : end === null ? "Hora de fin inválida"
+    : hours === 0 ? "Inicio y fin iguales"
+    : hours! < 0 ? "Fin anterior al inicio"
+    : hours! > 16 ? "Duración mayor a 16 horas"
+    : entry.estado_validacion === "INVALIDA" ? "Registro marcado como inválido en origen"
+    : null;
+  return { start, end, hours, reason };
+}
+/** Only recorded clock intervals; never OS dates, invoiced quantity or commission-payment overrides. */
+export function workedDays(entry: WorkEntry): WorkedDay[] | null {
+  const { start, end, reason } = inspectWorkInterval(entry);
+  if (reason || start === null || end === null) return null;
   const result: WorkedDay[] = [];
   for (let cursor = start; cursor < end;) {
     const next = Math.min(end, (Math.floor(cursor / DAY) + 1) * DAY);

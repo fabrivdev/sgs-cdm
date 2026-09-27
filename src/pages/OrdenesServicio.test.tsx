@@ -72,14 +72,52 @@ describe("orders workspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" })); expect(mocks.workRetry).toHaveBeenCalled();
     tab("Cumplimiento"); expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
   });
-  it("leaves productivity unknown and exposes unassignable records instead of inventing work dates", () => {
+  it.each([320, 768, 1280])("shows source evidence and preserves unaffected technician productivity at %i px", width => {
+    mocks.width = width;
     workLogs[0].entries[0].fecha_inicio = null;
     setup(); tab("Productividad");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 registros pendientes");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Total general incompleto");
+    expect(screen.queryByText(/registros pendientes|Productividad sin calcular/)).not.toBeInTheDocument();
     expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
-    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Ver registros" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("01-00000001");
+    expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toBeVisible();
+    expect(screen.queryByRole("meter", { name: "Meta de TECNICO UNO" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Revisar jornadas de TECNICO UNO" }));
+    const drawer = screen.getByRole("dialog");
+    expect(drawer).toHaveTextContent("01-00000001");
+    expect(drawer).toHaveTextContent("Falta fecha de inicio");
+    expect(drawer).toHaveTextContent("TECNICO UNO");
+    expect(drawer).toHaveTextContent("Sin fecha · 08:00:00");
+    expect(drawer).toHaveTextContent("10/09/2026 · 18:00:00");
+    expect(drawer).toHaveTextContent("No calculable");
+    expect(drawer).not.toHaveTextContent("TECNICO DOS");
+  });
+  it("shows both original clocks when different orders overlap, not empty artificial hours", () => {
+    workLogs.push(demoWorkLog([demoWorkEntry({ id: "OVERLAP", hora_inicio: "09:30", hora_fin: "11:15" })], "02-00000003"));
+    setup(); tab("Productividad");
+    fireEvent.click(screen.getByRole("button", { name: "Revisar jornadas" }));
+    const drawer = screen.getByRole("dialog");
+    expect(drawer).toHaveTextContent("Incidencias de jornadas");
+    expect(drawer).toHaveTextContent("Horarios superpuestos");
+    expect(drawer).toHaveTextContent("01-00000001"); expect(drawer).toHaveTextContent("02-00000003");
+    expect(drawer).toHaveTextContent("10/09/2026 · 09:30"); expect(drawer).toHaveTextContent("10/09/2026 · 11:15");
+    expect(drawer).toHaveTextContent("1,75 h");
+  });
+  it("exports unaffected values and explicit unknowns for affected rows, then restores the complete total after filtering", async () => {
+    workLogs[0].entries[0].hora_inicio = null;
+    setup(); tab("Productividad");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    const affected = payload.rows.find((r: { tecnico: string }) => r.tecnico === "TECNICO UNO");
+    const valid = payload.rows.find((r: { tecnico: string }) => r.tecnico === "TECNICO DOS");
+    const value = (key: string, row: unknown) => payload.columns.find((c: { key: string }) => c.key === key).value(row);
+    expect(value("horas", affected)).toBeNull(); expect(value("porcentaje", affected)).toBeNull();
+    expect(value("calculo", affected)).toBe("Jornadas por revisar");
+    expect(value("horas", valid)).toBe(1); expect(value("porcentaje", valid)).toBeGreaterThan(0);
+    technicianStatus("Inactivos");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("1");
   });
   it.each([320, 768, 1280])("uses the shared brand palette in every list presentation and drawer at %i px", width => {
     mocks.width = width;
@@ -368,7 +406,7 @@ describe("orders workspace", () => {
     await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
     const payload = mocks.export.mock.calls[0][0];
     expect(payload.fileName).toBe("productividad-tecnicos.xlsx");
-    expect(payload.columns).toHaveLength(11);
+    expect(payload.columns).toHaveLength(12);
     expect(payload.columns.find((c: { key: string }) => c.key === "meta").value(payload.rows[0])).toBeNull();
   });
   it("separates absence rows from journeys without collapsing same-day journeys or excluding them from Excel", async () => {

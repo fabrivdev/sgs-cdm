@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { operationsFilters, operationsFixture } from "@/test/serviceOrdersFixture";
 import { demoWorkEntry, demoWorkLog } from "@/test/workLogFixture";
-import { workedDays, loadWorkLog } from "./workLog";
+import { workedDays, loadWorkLog, inspectWorkInterval } from "./workLog";
 import { workedProductivity } from "./workedProductivity";
 
 const fixture = operationsFixture();
@@ -71,6 +71,52 @@ describe("productivity by actual work date", () => {
     const logs = [demoWorkLog(), demoWorkLog([demoWorkEntry({ id: "OVERLAP", hora_inicio: "09:00", hora_fin: "10:00" })], "02-00000001")];
     expect(workedProductivity(logs, fixture, operationsFilters).issues[0].reason).toBe("Horarios superpuestos");
     expect(workedProductivity([demoWorkLog([demoWorkEntry(), demoWorkEntry({ id: "CONFLICT", tipo_tiempo: "Interno" })])], fixture, operationsFilters).issues[0].reason).toBe("Tipo de tiempo contradictorio");
+  });
+  it("keeps both original conflicting blocks, including their OS identities and types", () => {
+    const first = demoWorkEntry(), second = demoWorkEntry({ id: "OVERLAP", hora_inicio: "09:00", hora_fin: "10:00" });
+    const logs = [demoWorkLog([first]), demoWorkLog([second], "02-00000001")];
+    const before = JSON.stringify(logs);
+    const result = workedProductivity(logs, fixture, operationsFilters);
+    expect(result.issues[0].sources).toEqual([{ os: "01-00000001", entry: first }, { os: "02-00000001", entry: second }]);
+    expect(result.tecnicos[0]).toMatchObject({ incomplete: true, issueCount: 1 });
+    expect(JSON.stringify(logs)).toBe(before);
+    const conflict = workedProductivity([demoWorkLog([first, { ...first, id: "TYPE", tipo_tiempo: "Interno" }])], fixture, operationsFilters);
+    expect(conflict.issues[0].sources.map(source => source.entry.tipo_tiempo)).toEqual(["Cliente", "Interno"]);
+  });
+  it("isolates incomplete technicians and retains invalid-only inactive participants", () => {
+    const entry = demoWorkEntry({ id: "BAD", tecnico_nombre: "TECNICO DOS", tecnico_profile_id: "T2", hora_inicio: null });
+    const result = workedProductivity([demoWorkLog([demoWorkEntry(), entry])], fixture, operationsFilters);
+    expect(result.tecnicos.find(row => row.profileId === "T1")).toMatchObject({ incomplete: false, horas: 10, issueCount: 0 });
+    expect(result.tecnicos.find(row => row.profileId === "T2")).toMatchObject({ incomplete: true, totalOS: 1, issueCount: 1 });
+    expect(result.issues[0]).toMatchObject({ reason: "Falta hora de inicio", sources: [{ entry }] });
+    expect(workedProductivity([demoWorkLog([entry])], fixture, operationsFilters, "inactivos").tecnicos).toHaveLength(1);
+  });
+  it("does not attribute an unidentified participant's missing work to one arbitrary technician", () => {
+    const entry = demoWorkEntry({ tecnico_nombre: "", tecnico_profile_id: null });
+    const result = workedProductivity([demoWorkLog([demoWorkEntry(), { ...entry, id: "UNKNOWN" }])], fixture, operationsFilters);
+    expect(result.issues[0].reason).toBe("Sin técnico identificado");
+    expect(result.tecnicos.every(row => row.incomplete)).toBe(true);
+  });
+  it("scopes known incident dates to their period and clears them when the affected technician is filtered out", () => {
+    const entries = [demoWorkEntry(), demoWorkEntry({ id: "BAD", fecha_inicio: "2026-08-10", fecha_fin: "2026-08-10", hora_fin: null,
+      tecnico_nombre: "TECNICO DOS", tecnico_profile_id: "T2" })];
+    const result = workedProductivity([demoWorkLog(entries)], fixture, { ...operationsFilters, dateFrom: "2026-08-01" });
+    expect(result.evolucion.map(row => row.incomplete)).toEqual([true, false]);
+    const filtered = workedProductivity([demoWorkLog(entries)], fixture, { ...operationsFilters, dateFrom: "2026-08-01", fResponsablesOS: ["TECNICO UNO"] });
+    expect(filtered.issues).toHaveLength(0);
+    expect(filtered.tecnicos[0].incomplete).toBe(false);
+    expect(workedProductivity([demoWorkLog(entries)], fixture, operationsFilters).issues).toHaveLength(0);
+  });
+  it.each([
+    [{ fecha_inicio: null }, "Falta fecha de inicio"], [{ fecha_fin: null }, "Falta fecha de fin"],
+    [{ hora_inicio: null }, "Falta hora de inicio"], [{ hora_fin: null }, "Falta hora de fin"],
+    [{ fecha_inicio: "2026-02-30" }, "Fecha de inicio inválida"], [{ hora_fin: "25:00" }, "Hora de fin inválida"],
+    [{ hora_fin: "08:00" }, "Inicio y fin iguales"], [{ fecha_fin: "2026-09-09" }, "Fin anterior al inicio"],
+    [{ fecha_fin: "2026-09-11" }, "Duración mayor a 16 horas"], [{ estado_validacion: "INVALIDA" }, "Registro marcado como inválido en origen"],
+  ])("describes the exact clock validation failure without erasing its source: %j", (extra, reason) => {
+    const entry = demoWorkEntry(extra);
+    expect(inspectWorkInterval(entry).reason).toBe(reason);
+    expect(workedDays(entry)).toBeNull();
   });
 });
 describe("work log loader", () => {

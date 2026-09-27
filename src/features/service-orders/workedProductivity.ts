@@ -1,22 +1,37 @@
 import { parseISO } from "date-fns";
 import type { ServicioTecnicoRow, ServiciosDashboardData } from "@/components/dashboard/types";
-import { displayImportedTechnicianName, matchTechnicianProfile } from "@/lib/technicianMatching";
+import { normalizeTechnicianName, matchTechnicianProfile } from "@/lib/technicianMatching";
 import { resolveDashboardServiceOrderBranch } from "@/lib/serviceOrderBranch";
 import { importedOrderModel } from "./orderMetrics";
 import { matchesTechnicianStatus, type TechnicianStatus } from "./productivityStatus";
 import { agendaBucketKey, canonicalSituacion, canonicalTipoTiempo, marcaDesdeOS, servicePeriodBuckets, technicianGoalForRange, type OperationsData, type OperationsFilters } from "./useOperationsModel";
-import { workedDays, type OrderWorkLog } from "./workLog";
+import { inspectWorkInterval, workedDays, type OrderWorkLog, type WorkEntry } from "./workLog";
 
 export interface WorkedRecord {
   key: string; os: string; date: string; start: string; end: string; hours: number;
   technician: string; profileId: string | null; activo: boolean; desactivadoEn: string | null;
-  type: string; inherited: boolean; state: string;
+  type: string; inherited: boolean; state: string; source: WorkEntry;
 }
-export interface WorkIssue { key: string; os: string; technician: string; date: string | null; reason: string }
+export interface WorkIssue {
+  key: string; os: string; technician: string; date: string | null; reason: string;
+  dateTo: string | null; state: string;
+  sources: { os: string; entry: WorkEntry }[];
+}
+export type ProductivityTechnicianRow = ServicioTecnicoRow & { incomplete: boolean; issueCount: number };
+export type ProductivityPeriodRow = ServiciosDashboardData["evolucion"][number] & { incomplete: boolean };
+
+function issueInPeriod(issue: WorkIssue, from: string, to: string) {
+  // An unknown/invalid date cannot safely be assigned to a single period.
+  const valid = (value: string | null) => value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  return !valid(issue.date) || !valid(issue.dateTo) || issue.dateTo! < issue.date!
+    || (issue.date! <= to && issue.dateTo! >= from);
+}
 
 /** Work ledger only. Operational closure cohorts and financial efficiency stay independent. */
 export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, filters: OperationsFilters, status: TechnicianStatus = "todos") {
   const records: WorkedRecord[] = [], issues: WorkIssue[] = [];
+  const names = new Map<string, Pick<WorkedRecord, "technician" | "profileId" | "activo" | "desactivadoEn">>();
   const active = new Set(data.servicioTecnicos.map(row => row.id));
   const profiles = data.profiles.filter(row => !row.nombre.toLowerCase().includes("pasante"));
   const seen = new Map<string, WorkedRecord>();
@@ -42,13 +57,13 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
     if (query && ![log.os, client, order.nro_chasis, brand, importedOrderModel(order.raw_data), order.problema, order.factura,
       ...log.entries.map(row => row.tecnico_nombre)].join(" ").toLowerCase().includes(query)) continue;
     if (!log.entries.length && Number(order.servicios_cantidad || 0) > 0) {
-      issues.push({ key: log.os, os: log.os, technician: "", date: null, reason: "Sin jornadas importadas" });
+      issues.push({ key: log.os, os: log.os, technician: "", date: null, dateTo: null, state, sources: [], reason: "Sin jornadas importadas" });
     }
     for (const entry of log.entries) {
       const profile = profiles.find(row => row.id === entry.tecnico_profile_id)
         ?? matchTechnicianProfile(entry.tecnico_nombre, profiles);
       const fullProfile = profiles.find(row => row.id === profile?.id);
-      const technician = profile?.nombre ?? displayImportedTechnicianName(entry.tecnico_nombre);
+      const technician = profile?.nombre ?? normalizeTechnicianName(entry.tecnico_nombre);
       const participant = { profileId: profile?.id ?? null, activo: profile ? active.has(profile.id) : false,
         desactivadoEn: fullProfile?.desactivado_en ?? (fullProfile?.activo === false ? fullProfile.actualizado_en : null) ?? null };
       if (!matchesTechnicianStatus(participant, status)) continue;
@@ -57,11 +72,12 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
       if (filters.fTiposTiempo.length && !filters.fTiposTiempo.map(canonicalTipoTiempo).includes(type)) continue;
       const days = workedDays(entry);
       if (!days || !technician) {
-        // Complete intervals known to fall outside this window cannot pollute its warning.
-        if (entry.fecha_inicio && entry.fecha_fin && entry.fecha_inicio <= entry.fecha_fin
-          && (entry.fecha_inicio > filters.dateTo || entry.fecha_fin < filters.dateFrom)) continue;
-        issues.push({ key: entry.id, os: log.os, technician, date: entry.fecha_inicio,
-          reason: !technician ? "Sin técnico" : "Fecha u horario sin validar" });
+        const issue: WorkIssue = { key: `${log.os}:${entry.id}`, os: log.os, technician, date: entry.fecha_inicio,
+          dateTo: entry.fecha_fin, state, sources: [{ os: log.os, entry }],
+          reason: !technician ? "Sin técnico identificado" : inspectWorkInterval(entry).reason! };
+        if (!issueInPeriod(issue, filters.dateFrom, filters.dateTo)) continue;
+        issues.push(issue);
+        if (technician) names.set(technician, { technician, ...participant });
         continue;
       }
       for (const day of days) {
@@ -69,10 +85,11 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
         const key = JSON.stringify([log.os, participant.profileId ?? technician, day.date, day.start, day.end]);
         const previous = seen.get(key);
         if (previous) {
-          if (previous.type !== type) issues.push({ key, os: log.os, technician, date: day.date, reason: "Tipo de tiempo contradictorio" });
+          if (previous.type !== type) issues.push({ key: `${key}:${entry.id}`, os: log.os, technician, date: day.date, dateTo: day.date, state,
+            sources: [{ os: log.os, entry: previous.source }, { os: log.os, entry }], reason: "Tipo de tiempo contradictorio" });
           continue;
         }
-        const record = { key, os: log.os, ...day, technician, ...participant, type, inherited: entry.heredado, state };
+        const record = { key, os: log.os, ...day, technician, ...participant, type, inherited: entry.heredado, state, source: entry };
         seen.set(key, record); records.push(record);
       }
     }
@@ -82,12 +99,13 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
   for (const row of records) {
     const key = `${row.profileId ?? row.technician}:${row.date}`;
     const peers = byTechnicianDay.get(key) ?? [];
-    if (peers.some(peer => row.start < peer.end && row.end > peer.start)) {
-      issues.push({ key: row.key, os: row.os, technician: row.technician, date: row.date, reason: "Horarios superpuestos" });
+    const conflicts = peers.filter(peer => row.start < peer.end && row.end > peer.start);
+    if (conflicts.length) {
+      issues.push({ key: row.key, os: row.os, technician: row.technician, date: row.date, dateTo: row.date, state: row.state,
+        sources: [...conflicts, row].map(block => ({ os: block.os, entry: block.source })), reason: "Horarios superpuestos" });
     }
     peers.push(row); byTechnicianDay.set(key, peers);
   }
-  const names = new Map<string, Pick<WorkedRecord, "technician" | "profileId" | "activo" | "desactivadoEn">>();
   for (const record of records) names.set(record.technician, record);
   // Keep active technicians with no work in the denominator, just as before.
   if (!restricted) for (const profile of profiles) {
@@ -99,16 +117,18 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
   const goal = (participant: Pick<WorkedRecord, "profileId" | "activo" | "desactivadoEn">, start = from, end = to) =>
     technicianGoalForRange(start, end, data.metaHorasMensual, participant.profileId, participant.activo, participant.desactivadoEn,
       data.disponibilidades.filter(row => row.tecnico_id === participant.profileId));
-  const counts = (rows: WorkedRecord[]) => {
+  const counts = (rows: { os: string; state: string }[]) => {
     const orders = [...new Map(rows.map(row => [row.os, row.state])).values()];
     return { totalOS: orders.length, cerradas: orders.filter(state => state === "Cerrada").length,
       otras: orders.filter(state => ["Cancelada", "Anulada"].includes(state)).length,
       abiertas: orders.filter(state => !["Cerrada", "Cancelada", "Anulada"].includes(state)).length };
   };
-  const tecnicos: ServicioTecnicoRow[] = [...names.values()].map(participant => {
+  const tecnicos: ProductivityTechnicianRow[] = [...names.values()].map(participant => {
     const rows = records.filter(row => row.technician === participant.technician);
+    const affected = issues.filter(issue => !issue.technician || issue.technician === participant.technician);
     const horas = rows.reduce((sum, row) => sum + row.hours, 0), horasDisponibles = goal(participant);
-    return { ...participant, tecnico: participant.technician, ...counts(rows), horas, horasDisponibles,
+    return { ...participant, tecnico: participant.technician, ...counts([...rows, ...affected.filter(issue => issue.technician)]), horas, horasDisponibles,
+      incomplete: affected.length > 0, issueCount: affected.length,
       horasDesdeDetalle: rows.filter(row => !row.inherited).reduce((sum, row) => sum + row.hours, 0),
       horasDesdeOS: rows.filter(row => row.inherited).reduce((sum, row) => sum + row.hours, 0),
       km: 0, valorOS: 0, productividad: horasDisponibles > 0 ? horas / horasDisponibles * 100 : 0,
@@ -120,14 +140,16 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
   });
   const horasPersona = records.reduce((sum, row) => sum + row.hours, 0);
   const available = tecnicos.reduce((sum, row) => sum + row.horasDisponibles, 0);
-  const evolucion: ServiciosDashboardData["evolucion"] = periods.map(period => {
+  const evolucion: ProductivityPeriodRow[] = periods.map(period => {
     const rows = records.filter(row => agendaBucketKey(row.date, filters.periodMode) === period.key);
     const hours = rows.reduce((sum, row) => sum + row.hours, 0);
     const uniqueBlocks = [...new Map(rows.map(row => [JSON.stringify([row.os, row.date, row.start, row.end]), row.hours])).values()];
-    const targets = [...names.values()].filter(participant => !restricted || rows.some(row => row.technician === participant.technician))
+    const targets = [...names.values()].filter(participant => !restricted || rows.some(row => row.technician === participant.technician)
+      || issues.some(issue => issue.technician === participant.technician && issueInPeriod(issue, period.dateFrom, period.dateTo)))
       .map(participant => goal(participant, parseISO(period.dateFrom), parseISO(period.dateTo)));
     const target = targets.reduce((sum, value) => sum + value, 0);
-    return { ...period, ...counts(rows), horasOS: uniqueBlocks.reduce((sum, value) => sum + value, 0), horasPersona: hours,
+    return { ...period, ...counts(rows), incomplete: issues.some(issue => issueInPeriod(issue, period.dateFrom, period.dateTo)),
+      horasOS: uniqueBlocks.reduce((sum, value) => sum + value, 0), horasPersona: hours,
       tecnicosBase: targets.filter(value => value > 0).length, horasDisponibles: target, utilizacion: target > 0 ? hours / target * 100 : 0 };
   });
   return { records: records.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.technician.localeCompare(b.technician)),

@@ -31,6 +31,7 @@ import { useOrdersBilling } from "@/features/service-orders/useOrdersBilling";
 import { useWorkLog } from "@/features/service-orders/useWorkLog";
 import { workedProductivity } from "@/features/service-orders/workedProductivity";
 import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
+import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
 import { TecnicosNoRealizadosRanking, MatrizTécnicosDías, EstadoCompacto, CargaSucursalTabla, DistribucionMarca, TrabajosAbiertosList } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
@@ -173,9 +174,9 @@ export function OrdersWorkspace() {
           {work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
-                {productivity.issues.length > 0 && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} registros pendientes de revisión. Productividad sin calcular.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Ver registros</Button></div>}
-                <ProductivityTable rows={productivity.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} incomplete={!productivityKnown} />
-                <OperationalEvolution rows={productivity.evolucion} worked incomplete={!productivityKnown} onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
+                {productivity.issues.length > 0 && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia en jornadas" : "incidencias en jornadas"} · Total general incompleto.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Revisar jornadas</Button></div>}
+                <ProductivityTable rows={productivity.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
+                <OperationalEvolution rows={productivity.evolucion} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0 space-y-4">
@@ -191,8 +192,12 @@ export function OrdersWorkspace() {
       </>}
     </Tabs>
     <ResponsiveDrawer open={Boolean(selectedTechnician) && tab === "productividad" && workReady} onOpenChange={open => !open && setSelectedTechnician(null)}>
-      <ResponsiveDrawerHeader><h2 className="text-[14px] font-semibold">{selectedTechnician === "__issues__" ? "Registros pendientes" : selectedTechnician}</h2></ResponsiveDrawerHeader>
-      <ResponsiveDrawerBody><WorkLogTable showOS rows={selectedTechnician === "__issues__" ? productivity.issues.map(row => ({ ...row, start: null, end: null, hours: null, inherited: false, type: row.reason })) : productivity.records.filter(row => row.technician === selectedTechnician)} /></ResponsiveDrawerBody>
+      <ResponsiveDrawerHeader><h2 className="text-[14px] font-semibold">{selectedTechnician === "__issues__" ? "Incidencias de jornadas" : selectedTechnician}</h2></ResponsiveDrawerHeader>
+      <ResponsiveDrawerBody>
+        <WorkIssuesList issues={selectedTechnician === "__issues__" ? productivity.issues : productivity.issues.filter(row => !row.technician || row.technician === selectedTechnician)} />
+        {selectedTechnician && selectedTechnician !== "__issues__" && <WorkLogTable showOS rows={productivity.records.filter(row => row.technician === selectedTechnician
+          && !productivity.issues.some(issue => issue.sources.some(source => source.os === row.os && source.entry.id === row.source.id)))} />}
+      </ResponsiveDrawerBody>
     </ResponsiveDrawer>
   </PageShell>;
 }
