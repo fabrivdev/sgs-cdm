@@ -83,6 +83,63 @@ describe("productivity by actual work date", () => {
     const conflict = workedProductivity([demoWorkLog([first, { ...first, id: "TYPE", tipo_tiempo: "Interno" }])], fixture, operationsFilters);
     expect(conflict.issues[0].sources.map(source => source.entry.tipo_tiempo)).toEqual(["Cliente", "Interno"]);
   });
+  it("calculates valid hours despite a missing clock, with unchanged capacity and independent payment fields", () => {
+    const data = operationsFixture();
+    data.disponibilidades = [{ id: "ABS", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "Ausencia", observacion: null, bloquea_agenda: true }];
+    const entry = { ...demoWorkEntry({ id: "BAD", hora_inicio: null }), horas_validas: 500, horas_reportadas: 100 };
+    const base = workedProductivity([demoWorkLog()], data, operationsFilters);
+    const logs = [demoWorkLog([demoWorkEntry(), entry])];
+    const before = JSON.stringify(logs);
+    const partial = workedProductivity(logs, data, operationsFilters);
+    expect(partial.horasPersona).toBe(10);
+    expect(partial.capacidad).toEqual(base.capacidad);
+    expect(partial.tecnicos[0]).toMatchObject({ horas: 10, incomplete: true, issueCount: 1 });
+    expect(partial.evolucion[0]).toMatchObject({ horasPersona: 10, incomplete: true });
+    expect(partial.records.map(row => row.source.id)).toEqual(["J1"]);
+    expect(JSON.stringify(logs)).toBe(before);
+  });
+  it("excludes all conflicting blocks from every numerator, independent of source order", () => {
+    const entries = [demoWorkEntry({ hora_inicio: "08:00", hora_fin: "10:00" }),
+      demoWorkEntry({ id: "B", hora_inicio: "09:00", hora_fin: "12:00" }),
+      demoWorkEntry({ id: "C", hora_inicio: "11:00", hora_fin: "13:00" }),
+      demoWorkEntry({ id: "VALID", hora_inicio: "13:00", hora_fin: "15:00", heredado: true })];
+    for (const ordered of [entries, [...entries].reverse()]) {
+      const result = workedProductivity(ordered.map((entry, i) => demoWorkLog([entry], `OS-${i}`)), fixture, operationsFilters);
+      expect(result.horasPersona).toBe(2);
+      expect(result.records.map(row => row.source.id)).toEqual(["VALID"]);
+      expect(result.tecnicos[0]).toMatchObject({ horas: 2, horasDesdeDetalle: 0, horasDesdeOS: 2, horasDisponibles: 120, totalOS: 4, incomplete: true });
+      expect(result.evolucion[0]).toMatchObject({ horasOS: 2, horasPersona: 2, horasDisponibles: 120, incomplete: true });
+      expect(result.capacidad.porcentaje).toBeCloseTo(2 / 120 * 100);
+    }
+  });
+  it("excludes contradictory types but retains reliable blocks and their participants", () => {
+    const entries = [demoWorkEntry(), demoWorkEntry({ id: "TYPE", tipo_tiempo: "Interno" }),
+      demoWorkEntry({ id: "NEXT", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11" })];
+    const result = workedProductivity([demoWorkLog(entries)], fixture, operationsFilters);
+    expect(result.horasPersona).toBe(10);
+    expect(result.records.map(row => row.source.id)).toEqual(["NEXT"]);
+    expect(result.tecnicos[0].evolucion[0].horas).toBe(10);
+  });
+  it("retains the unaffected day of an overnight interval in both detail and totals", () => {
+    const log = demoWorkLog([demoWorkEntry({ hora_inicio: "22:00", hora_fin: "02:00", fecha_fin: "2026-09-11" }),
+      demoWorkEntry({ id: "OVERLAP", hora_inicio: "23:00", hora_fin: "23:30" })]);
+    const result = workedProductivity([log], fixture, { ...operationsFilters, periodMode: "dia" });
+    expect(result.records.map(row => [row.date, row.hours])).toEqual([["2026-09-11", 2]]);
+    expect(result.horasPersona).toBe(2);
+    expect(result.evolucion.find(row => row.dateFrom === "2026-09-10")).toMatchObject({ horasPersona: 0, incomplete: true });
+    expect(result.evolucion.find(row => row.dateFrom === "2026-09-11")).toMatchObject({ horasPersona: 2, incomplete: false });
+  });
+  it("does not exclude a reliable clock merely because commission validation is REVISAR", () => {
+    const result = workedProductivity([demoWorkLog([demoWorkEntry({ estado_validacion: "REVISAR" })])], fixture, operationsFilters);
+    expect(result.horasPersona).toBe(10); expect(result.issues).toEqual([]);
+  });
+  it("retains capacity and explicit partial status even when no hours can be counted", () => {
+    const result = workedProductivity([demoWorkLog([demoWorkEntry({ hora_inicio: null })])], fixture, operationsFilters);
+    expect(result.horasPersona).toBe(0);
+    expect(result.capacidad).toEqual({ horasDisponibles: 120, porcentaje: 0 });
+    expect(result.tecnicos[0]).toMatchObject({ horas: 0, productividad: 0, incomplete: true });
+    expect(result.evolucion[0]).toMatchObject({ horasPersona: 0, utilizacion: 0, incomplete: true });
+  });
   it("isolates incomplete technicians and retains invalid-only inactive participants", () => {
     const entry = demoWorkEntry({ id: "BAD", tecnico_nombre: "TECNICO DOS", tecnico_profile_id: "T2", hora_inicio: null });
     const result = workedProductivity([demoWorkLog([demoWorkEntry(), entry])], fixture, operationsFilters);

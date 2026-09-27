@@ -76,12 +76,12 @@ describe("orders workspace", () => {
     mocks.width = width;
     workLogs[0].entries[0].fecha_inicio = null;
     setup(); tab("Productividad");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Total general incompleto");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Cálculo con horas válidas");
     expect(screen.queryByText(/registros pendientes|Productividad sin calcular/)).not.toBeInTheDocument();
-    expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
+    expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent(/%Parcial/);
     expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toBeVisible();
-    expect(screen.queryByRole("meter", { name: "Meta de TECNICO UNO" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Revisar jornadas de TECNICO UNO" }));
+    expect(screen.getByRole("meter", { name: "Meta de TECNICO UNO" })).toHaveAttribute("aria-valuetext", expect.stringContaining("Parcial: solo horas válidas"));
+    fireEvent.click(screen.getByRole("button", { name: /TECNICO UNO.*Parcial/ }));
     const drawer = screen.getByRole("dialog");
     expect(drawer).toHaveTextContent("01-00000001");
     expect(drawer).toHaveTextContent("Falta fecha de inicio");
@@ -102,8 +102,9 @@ describe("orders workspace", () => {
     expect(drawer).toHaveTextContent("10/09/2026 · 09:30"); expect(drawer).toHaveTextContent("10/09/2026 · 11:15");
     expect(drawer).toHaveTextContent("1,75 h");
   });
-  it("exports unaffected values and explicit unknowns for affected rows, then restores the complete total after filtering", async () => {
+  it("exports partial numeric values with their status and clears the alert after filtering", async () => {
     workLogs[0].entries[0].hora_inicio = null;
+    workLogs[0].entries.push(demoWorkEntry({ id: "VALID", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11" }));
     setup(); tab("Productividad");
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
@@ -112,12 +113,44 @@ describe("orders workspace", () => {
     const affected = payload.rows.find((r: { tecnico: string }) => r.tecnico === "TECNICO UNO");
     const valid = payload.rows.find((r: { tecnico: string }) => r.tecnico === "TECNICO DOS");
     const value = (key: string, row: unknown) => payload.columns.find((c: { key: string }) => c.key === key).value(row);
-    expect(value("horas", affected)).toBeNull(); expect(value("porcentaje", affected)).toBeNull();
-    expect(value("calculo", affected)).toBe("Jornadas por revisar");
+    expect(value("horas", affected)).toBe(10); expect(value("porcentaje", affected)).toBeCloseTo(0.1);
+    expect(value("detalle", affected)).toBe(10); expect(value("heredadas", affected)).toBe(0);
+    expect(value("calculo", affected)).toBe("Parcial · solo horas válidas");
     expect(value("horas", valid)).toBe(1); expect(value("porcentaje", valid)).toBeGreaterThan(0);
     technicianStatus("Inactivos");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("1");
+  });
+  it("alerts automatically when refreshed work introduces an incident without removing valid productivity", () => {
+    const rendered = setup(); tab("Productividad");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const productivityCard = () => screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item");
+    const before = productivityCard()!.textContent!.trim();
+    workLogs = [...workLogs, demoWorkLog([demoWorkEntry({ id: "NEW_BAD", hora_fin: null })], "OS-NEW")];
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas");
+    expect(productivityCard()).toHaveTextContent(`${before}Parcial`);
+    expect(screen.getByRole("meter", { name: "Meta de TECNICO UNO" })).toHaveAttribute("aria-valuenow", "10");
+    workLogs = workLogs.slice(0, 2);
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(productivityCard()!.textContent!.trim()).toBe(before);
+  });
+  it("keeps partial period exports numeric and excludes conflicts from technician detail", async () => {
+    workLogs[0].entries.push(demoWorkEntry({ id: "BAD", hora_inicio: "09:00", hora_fin: "11:00" }),
+      demoWorkEntry({ id: "VALID", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11", hora_fin: "12:00" }));
+    setup(); tab("Productividad");
+    expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("5Parcial");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Horas por período" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    const value = (key: string) => payload.columns.find((c: { key: string }) => c.key === key).value(payload.rows[0]);
+    expect(value("persona")).toBe(5); expect(value("porcentaje")).toBeGreaterThan(0);
+    expect(value("calculo")).toBe("Parcial · solo horas válidas");
+    fireEvent.click(screen.getByRole("button", { name: /TECNICO UNO.*Parcial/ }));
+    const rows = within(screen.getByRole("dialog")).getByRole("table", { name: "Jornadas trabajadas" });
+    expect(rows).toHaveTextContent("11/09/2026"); expect(rows).not.toHaveTextContent("10/09/2026");
   });
   it.each([320, 768, 1280])("uses the shared brand palette in every list presentation and drawer at %i px", width => {
     mocks.width = width;

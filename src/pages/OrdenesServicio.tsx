@@ -95,7 +95,7 @@ export function OrdersWorkspace() {
   const workReady = !blocked && !work.isPending && !work.isFetching && !work.isError;
   const productivity = useMemo(() => workedProductivity(workReady ? work.data ?? [] : [], query.data?.data ?? emptyOperationsData,
     valid ? filters : defaults, technicianStatus), [workReady, work.data, query.data, valid, filters, defaults, technicianStatus]);
-  const productivityKnown = workReady && productivity.issues.length === 0;
+  const productivityPartial = workReady && productivity.issues.length > 0;
   const workTechnicianOptions = useMemo(() => {
     const profiles = query.data?.data.profiles ?? [];
     const names = (work.data ?? []).flatMap(log => log.entries.map(entry => profiles.find(profile => profile.id === entry.tecnico_profile_id)?.nombre
@@ -136,9 +136,9 @@ export function OrdersWorkspace() {
           <KpiItem key="cierre" label="% de cierre" value={closure.percentage === null ? "—" : `${decimal.format(closure.percentage)}%`} tone="positive" icon={<Percent />} />,
           <KpiItem key="dias" label={compact && !phone ? "Días prom." : "Días de cierre (prom.)"} value={closure.averageDays === null ? "—" : decimal.format(closure.averageDays)} icon={<CalendarDays />} />,
         ] : tab === "productividad" ? [
-          <KpiItem key="horas" label="Horas-persona" value={productivityKnown ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} />,
+          <KpiItem key="horas" label="Horas-persona" value={workReady ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} detail={productivityPartial ? "Parcial" : undefined} />,
           <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
-          <KpiItem key="porcentaje" label="Productividad" value={productivityKnown && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
+          <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} detail={productivityPartial ? "Parcial" : undefined} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
             detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : [
@@ -174,7 +174,7 @@ export function OrdersWorkspace() {
           {work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
-                {productivity.issues.length > 0 && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia en jornadas" : "incidencias en jornadas"} · Total general incompleto.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Revisar jornadas</Button></div>}
+                {productivityPartial && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia en jornadas" : "incidencias en jornadas"} · Cálculo con horas válidas.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Revisar jornadas</Button></div>}
                 <ProductivityTable rows={productivity.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
                 <OperationalEvolution rows={productivity.evolucion} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
@@ -195,8 +195,7 @@ export function OrdersWorkspace() {
       <ResponsiveDrawerHeader><h2 className="text-[14px] font-semibold">{selectedTechnician === "__issues__" ? "Incidencias de jornadas" : selectedTechnician}</h2></ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
         <WorkIssuesList issues={selectedTechnician === "__issues__" ? productivity.issues : productivity.issues.filter(row => !row.technician || row.technician === selectedTechnician)} />
-        {selectedTechnician && selectedTechnician !== "__issues__" && <WorkLogTable showOS rows={productivity.records.filter(row => row.technician === selectedTechnician
-          && !productivity.issues.some(issue => issue.sources.some(source => source.os === row.os && source.entry.id === row.source.id)))} />}
+        {selectedTechnician && selectedTechnician !== "__issues__" && <WorkLogTable showOS rows={productivity.records.filter(row => row.technician === selectedTechnician)} />}
       </ResponsiveDrawerBody>
     </ResponsiveDrawer>
   </PageShell>;

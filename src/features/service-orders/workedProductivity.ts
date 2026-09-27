@@ -30,7 +30,8 @@ function issueInPeriod(issue: WorkIssue, from: string, to: string) {
 
 /** Work ledger only. Operational closure cohorts and financial efficiency stay independent. */
 export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, filters: OperationsFilters, status: TechnicianStatus = "todos") {
-  const records: WorkedRecord[] = [], issues: WorkIssue[] = [];
+  const candidates: WorkedRecord[] = [], issues: WorkIssue[] = [];
+  const excluded = new Set<string>();
   const names = new Map<string, Pick<WorkedRecord, "technician" | "profileId" | "activo" | "desactivadoEn">>();
   const active = new Set(data.servicioTecnicos.map(row => row.id));
   const profiles = data.profiles.filter(row => !row.nombre.toLowerCase().includes("pasante"));
@@ -85,28 +86,35 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
         const key = JSON.stringify([log.os, participant.profileId ?? technician, day.date, day.start, day.end]);
         const previous = seen.get(key);
         if (previous) {
-          if (previous.type !== type) issues.push({ key: `${key}:${entry.id}`, os: log.os, technician, date: day.date, dateTo: day.date, state,
-            sources: [{ os: log.os, entry: previous.source }, { os: log.os, entry }], reason: "Tipo de tiempo contradictorio" });
+          if (previous.type !== type) {
+            excluded.add(key);
+            issues.push({ key: `${key}:${entry.id}`, os: log.os, technician, date: day.date, dateTo: day.date, state,
+              sources: [{ os: log.os, entry: previous.source }, { os: log.os, entry }], reason: "Tipo de tiempo contradictorio" });
+          }
           continue;
         }
         const record = { key, os: log.os, ...day, technician, ...participant, type, inherited: entry.heredado, state, source: entry };
-        seen.set(key, record); records.push(record);
+        seen.set(key, record); candidates.push(record);
       }
     }
   }
   // Different OS cannot silently double-book one person's same clock time.
   const byTechnicianDay = new Map<string, WorkedRecord[]>();
-  for (const row of records) {
+  for (const row of candidates) {
     const key = `${row.profileId ?? row.technician}:${row.date}`;
     const peers = byTechnicianDay.get(key) ?? [];
     const conflicts = peers.filter(peer => row.start < peer.end && row.end > peer.start);
     if (conflicts.length) {
+      for (const block of [...conflicts, row]) excluded.add(block.key);
       issues.push({ key: row.key, os: row.os, technician: row.technician, date: row.date, dateTo: row.date, state: row.state,
         sources: [...conflicts, row].map(block => ({ os: block.os, entry: block.source })), reason: "Horarios superpuestos" });
     }
     peers.push(row); byTechnicianDay.set(key, peers);
   }
-  for (const record of records) names.set(record.technician, record);
+  // Retain participants/capacity, but never count an ambiguous block or pick a winner.
+  // Exclusions are per worked day, so an unaffected day of an overnight entry survives.
+  for (const record of candidates) names.set(record.technician, record);
+  const records = candidates.filter(record => !excluded.has(record.key));
   // Keep active technicians with no work in the denominator, just as before.
   if (!restricted) for (const profile of profiles) {
     const participant = { profileId: profile.id, activo: active.has(profile.id), desactivadoEn: profile.desactivado_en };
@@ -127,7 +135,7 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
     const rows = records.filter(row => row.technician === participant.technician);
     const affected = issues.filter(issue => !issue.technician || issue.technician === participant.technician);
     const horas = rows.reduce((sum, row) => sum + row.hours, 0), horasDisponibles = goal(participant);
-    return { ...participant, tecnico: participant.technician, ...counts([...rows, ...affected.filter(issue => issue.technician)]), horas, horasDisponibles,
+    return { ...participant, tecnico: participant.technician, ...counts([...candidates.filter(row => row.technician === participant.technician), ...affected.filter(issue => issue.technician)]), horas, horasDisponibles,
       incomplete: affected.length > 0, issueCount: affected.length,
       horasDesdeDetalle: rows.filter(row => !row.inherited).reduce((sum, row) => sum + row.hours, 0),
       horasDesdeOS: rows.filter(row => row.inherited).reduce((sum, row) => sum + row.hours, 0),
