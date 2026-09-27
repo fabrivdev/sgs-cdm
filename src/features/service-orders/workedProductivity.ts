@@ -6,6 +6,9 @@ import { importedOrderModel } from "./orderMetrics";
 import { matchesTechnicianStatus, type TechnicianStatus } from "./productivityStatus";
 import { agendaBucketKey, canonicalSituacion, canonicalTipoTiempo, marcaDesdeOS, servicePeriodBuckets, technicianGoalForRange, type OperationsData, type OperationsFilters } from "./useOperationsModel";
 import { inspectWorkInterval, workedDays, type OrderWorkLog, type WorkEntry } from "./workLog";
+import { productivityPeriod } from "./productivityPeriod";
+import { NEW_SYSTEM_START } from "@/lib/imports/cutoff";
+import { validOperationsRange } from "./data";
 
 export interface WorkedRecord {
   key: string; os: string; date: string; start: string; end: string; hours: number;
@@ -30,6 +33,14 @@ function issueInPeriod(issue: WorkIssue, from: string, to: string) {
 
 /** Work ledger only. Operational closure cohorts and financial efficiency stay independent. */
 export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, filters: OperationsFilters, status: TechnicianStatus = "todos") {
+  const period = productivityPeriod(filters.dateFrom, filters.dateTo);
+  if (!period.from || !period.to) return {
+    period, records: [] as WorkedRecord[], issues: [] as WorkIssue[], tecnicos: [] as ProductivityTechnicianRow[],
+    evolucion: [] as ProductivityPeriodRow[], horasPersona: 0, capacidad: { horasDisponibles: 0, porcentaje: 0 },
+  };
+  // The same explicit era boundary governs work, targets, periods and exports.
+  // Do not infer coverage from first/last observed work or from OS lifecycle dates.
+  filters = { ...filters, dateFrom: period.from, dateTo: period.to };
   const candidates: WorkedRecord[] = [], issues: WorkIssue[] = [];
   const excluded = new Set<string>();
   const names = new Map<string, Pick<WorkedRecord, "technician" | "profileId" | "activo" | "desactivadoEn">>();
@@ -42,6 +53,11 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
   const query = filters.q.trim().toLowerCase();
   for (const log of logs) {
     const order = log.order_data;
+    // Defensive guard for callers with an unbounded snapshot. Migrated OS with
+    // actual work remain eligible even if they were opened before July.
+    const lifecycleEnd = (order.fecha_cierre_os || order.fecha_abierta_os)?.slice(0, 10);
+    if (!log.entries.length && lifecycleEnd && validOperationsRange(lifecycleEnd, lifecycleEnd)
+      && lifecycleEnd < NEW_SYSTEM_START) continue;
     const job = data.trabajos.find(row => row.id === order.trabajo_id);
     const client = data.clientes.find(row => row.id === job?.cliente_id)?.nombre ?? order.cliente_nombre ?? "";
     const brand = job?.marca ?? marcaDesdeOS(order.marca);
@@ -160,6 +176,6 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
       horasOS: uniqueBlocks.reduce((sum, value) => sum + value, 0), horasPersona: hours,
       tecnicosBase: targets.filter(value => value > 0).length, horasDisponibles: target, utilizacion: target > 0 ? hours / target * 100 : 0 };
   });
-  return { records: records.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.technician.localeCompare(b.technician)),
+  return { period, records: records.sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.technician.localeCompare(b.technician)),
     issues, tecnicos, evolucion, horasPersona, capacidad: { horasDisponibles: available, porcentaje: available > 0 ? horasPersona / available * 100 : 0 } };
 }

@@ -25,7 +25,8 @@ export function OperationalEvolution({ rows, onPeriod, worked = false }: {
     { key: "meta", label: "Meta disponible", kind: "number", value: r => r.horasDisponibles || null, width: "w-auto" },
     { key: "porcentaje", label: "Productividad", kind: "number", value: r => r.horasDisponibles > 0 ? r.utilizacion / 100 : null, excelFormat: "0.0%", width: "w-auto" },
   ];
-  const exportColumns = worked ? [...columns.filter(column => !["cerradas", "abiertas", "otras"].includes(column.key)),
+  const exportColumns = worked ? [...columns.filter(column => !["cerradas", "abiertas", "otras"].includes(column.key)).map(column => column.key === "periodo" ? { ...column, label: "Desde cálculo" } : column),
+    { key: "hasta", label: "Hasta cálculo", kind: "date" as const, width: "w-auto", value: (r: Row) => r.dateTo },
     { key: "calculo", label: "Estado del cálculo", kind: "text" as const, width: "w-auto", value: (r: Row) => r.incomplete ? "Parcial · solo horas válidas" : "Completo" }] : columns;
   const table = useSectionTable({ rows, columns: exportColumns, initialSort: { key: "periodo", direction: "asc" }, title: worked ? "Horas por período" : "Evolución de OS", fileName: worked ? "horas-por-periodo.xlsx" : "evolucion-os.xlsx" });
   const visible = worked ? [columns[0], columns[4], columns[5], { ...columns[6], width: "w-[20%]", align: "center" as const, render: (r: Row) => r.horasDisponibles > 0 ? number.format(r.horasDisponibles) : "—" },

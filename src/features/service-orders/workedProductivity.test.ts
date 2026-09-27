@@ -5,6 +5,69 @@ import { workedDays, loadWorkLog, inspectWorkInterval } from "./workLog";
 import { workedProductivity } from "./workedProductivity";
 
 const fixture = operationsFixture();
+describe("legacy and dated-work eras", () => {
+  it("uses the same July boundary for hours, capacity, periods and incidents without mutating inputs", () => {
+    const legacy = demoWorkLog([], "LEGACY");
+    Object.assign(legacy.order_data, { fecha_abierta_os: "2026-02-01", fecha_cierre_os: null, servicios_cantidad: 500 });
+    const modern = demoWorkLog([demoWorkEntry(), demoWorkEntry({ id: "JUL", fecha_inicio: "2026-07-10", fecha_fin: "2026-07-10" }),
+      demoWorkEntry({ id: "OLD_BAD", fecha_inicio: "2026-06-10", fecha_fin: "2026-06-10", hora_inicio: null }),
+      demoWorkEntry({ id: "NEW_BAD", fecha_inicio: "2026-08-10", fecha_fin: "2026-08-10", hora_inicio: null })]);
+    const filters = { ...operationsFilters, dateFrom: "2026-01-01" };
+    const before = JSON.stringify({ filters, legacy, modern, fixture });
+    const year = workedProductivity([legacy, modern], fixture, filters);
+    const july = workedProductivity([modern], fixture, { ...filters, dateFrom: "2026-07-01" });
+    expect(year).toEqual({ ...july, period: { ...july.period, requestedFrom: "2026-01-01", includesLegacy: true } });
+    expect(year.period).toMatchObject({ from: "2026-07-01", to: "2026-09-30" });
+    expect(year.horasPersona).toBe(20);
+    expect(year.capacidad.horasDisponibles).toBe(360);
+    expect(year.issues).toHaveLength(1);
+    expect(year.evolucion.map(row => row.dateFrom)).toEqual(["2026-07-01", "2026-08-01", "2026-09-01"]);
+    expect(year.evolucion.reduce((total, row) => total + row.horasDisponibles, 0)).toBe(360);
+    expect(JSON.stringify({ filters, legacy, modern, fixture })).toBe(before);
+  });
+  it("returns no measurable productivity or false incidents for a legacy-only range", () => {
+    const result = workedProductivity([demoWorkLog([])], fixture, { ...operationsFilters, dateFrom: "2026-01-01", dateTo: "2026-06-30" });
+    expect(result).toMatchObject({ period: { from: null, to: null, includesLegacy: true }, records: [], issues: [], tecnicos: [], evolucion: [], horasPersona: 0 });
+    expect(result.capacidad.horasDisponibles).toBe(0);
+  });
+  it("retains post-cutover work on OS opened before July and clips overnight work to July only", () => {
+    const log = demoWorkLog([demoWorkEntry({ fecha_inicio: "2026-06-30", fecha_fin: "2026-07-01", hora_inicio: "22:00", hora_fin: "02:00" })]);
+    Object.assign(log.order_data, { fecha_abierta_os: "2026-04-01", fecha_cierre_os: null });
+    const result = workedProductivity([log], fixture, { ...operationsFilters, dateFrom: "2026-06-30", dateTo: "2026-07-01", periodMode: "anio" });
+    expect(result.horasPersona).toBe(2);
+    expect(result.capacidad.horasDisponibles).toBeCloseTo(120 / 31);
+    expect(result.evolucion[0]).toMatchObject({ dateFrom: "2026-07-01", dateTo: "2026-07-01", horasPersona: 2 });
+  });
+  it("does not shorten coverage to the last observed work or remove absence/deactivation rules", () => {
+    const data = operationsFixture();
+    data.metaHorasMensual = 132;
+    const absence = { id: "ABS", tecnico_id: "T1", fecha_inicio: "2026-06-29", fecha_fin: "2026-07-02", tipo: "Ausencia", observacion: null, bloquea_agenda: true };
+    data.disponibilidades = [absence, absence];
+    const log = demoWorkLog([demoWorkEntry({ fecha_inicio: "2026-07-10", fecha_fin: "2026-07-10" }),
+      demoWorkEntry({ id: "T2", fecha_inicio: "2026-09-10", fecha_fin: "2026-09-10", tecnico_nombre: "TECNICO DOS", tecnico_profile_id: "T2" })]);
+    const result = workedProductivity([log], data, { ...operationsFilters, dateFrom: "2026-01-01", dateTo: "2026-09-27" });
+    expect(result.tecnicos.find(row => row.profileId === "T1")?.horasDisponibles).toBeCloseTo(132 * (2 + 27 / 30 - 2 / 31));
+    expect(result.tecnicos.find(row => row.profileId === "T2")?.horasDisponibles).toBeCloseTo(132 * 2.5);
+    expect(result.period.to).toBe("2026-09-27");
+  });
+  it("keeps genuine new-system missing journals as incidents, including unknown-era records", () => {
+    const missing = demoWorkLog([]);
+    const unknown = demoWorkLog([], "UNKNOWN");
+    Object.assign(unknown.order_data, { fecha_abierta_os: null, fecha_cierre_os: null });
+    const invalidDate = demoWorkLog([], "INVALID_DATE");
+    Object.assign(invalidDate.order_data, { fecha_abierta_os: "2026-02-30", fecha_cierre_os: null });
+    const result = workedProductivity([missing, unknown, invalidDate], fixture, { ...operationsFilters, dateFrom: "2026-01-01" });
+    expect(result.issues).toHaveLength(3);
+    expect(result.capacidad.horasDisponibles).toBe(360);
+  });
+  it("does not reset the boundary to July in future years", () => {
+    const log = demoWorkLog([demoWorkEntry({ fecha_inicio: "2027-01-10", fecha_fin: "2027-01-10" })]);
+    const result = workedProductivity([log], fixture, { ...operationsFilters, dateFrom: "2027-01-01", dateTo: "2027-01-31" });
+    expect(result.period).toMatchObject({ from: "2027-01-01", includesLegacy: false });
+    expect(result.horasPersona).toBe(10);
+    expect(result.capacidad.horasDisponibles).toBe(120);
+  });
+});
 describe("productivity by actual work date", () => {
   it("counts only September work, regardless of opening, closing, invoicing or accumulated OS hours", () => {
     const log = demoWorkLog([demoWorkEntry(), demoWorkEntry({ id: "AUG", fecha_inicio: "2026-08-15", fecha_fin: "2026-08-15" })]);
@@ -177,6 +240,16 @@ describe("productivity by actual work date", () => {
   });
 });
 describe("work log loader", () => {
+  it("bounds only list queries, never the complete OS detail", async () => {
+    const rpc = vi.fn(() => ({ range: () => ({ abortSignal: async () => ({ data: [], error: null }) }) }));
+    const client = { rpc };
+    expect(await loadWorkLog(client, "2026-01-01", "2026-06-30", null)).toEqual([]);
+    expect(rpc).not.toHaveBeenCalled();
+    await loadWorkLog(client, "2026-01-01", "2026-09-27", null);
+    expect(rpc).toHaveBeenLastCalledWith("service_orders_work_log_v1", expect.objectContaining({ p_desde: "2026-07-01", p_hasta: "2026-09-27", p_os: null }));
+    await loadWorkLog(client, "2026-01-01", "2026-06-30", "01-A");
+    expect(rpc).toHaveBeenLastCalledWith("service_orders_work_log_v1", expect.objectContaining({ p_desde: "2026-01-01", p_hasta: "2026-06-30", p_os: "01-A" }));
+  });
   it("cancels hanging requests and enforces its timeout", async () => {
     const client = { rpc: () => ({ range: () => ({ abortSignal: () => new Promise(() => {}) }) }) };
     const controller = new AbortController();

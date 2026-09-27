@@ -15,6 +15,25 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); cache.clear(); });
 describe("dated work query", () => {
+  it("does not query legacy-only periods, even on manual refetch", async () => {
+    const { result } = renderHook(() => useWorkLog("2026-01-01", "2026-06-30", true), { wrapper });
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(mocks.load).not.toHaveBeenCalled();
+    await result.current.refetch();
+    expect(mocks.load).not.toHaveBeenCalled();
+  });
+  it("keys list cache by effective dates and retains the full requested range for OS detail", async () => {
+    const { result, rerender } = renderHook(({ from, os }) => useWorkLog(from, "2026-09-27", true, os), {
+      wrapper, initialProps: { from: "2026-01-01", os: null as string | null },
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mocks.load).toHaveBeenLastCalledWith({}, "2026-07-01", "2026-09-27", null, expect.any(AbortSignal));
+    rerender({ from: "2026-06-01", os: null });
+    expect(mocks.load).toHaveBeenCalledOnce();
+    rerender({ from: "2026-06-01", os: "01-A" });
+    await waitFor(() => expect(mocks.load).toHaveBeenCalledTimes(2));
+    expect(mocks.load).toHaveBeenLastCalledWith({}, "2026-06-01", "2026-09-27", "01-A", expect.any(AbortSignal));
+  });
   it("stays lazy outside productivity or the drawer and refuses invalid ranges", async () => {
     const { rerender, result } = renderHook(({ enabled, from }) => useWorkLog(from, "2026-09-25", enabled), {
       wrapper, initialProps: { enabled: false, from: "2026-09-01" },

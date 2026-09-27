@@ -35,6 +35,59 @@ const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 const technicianStatus = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Estado de técnicos" })).getByRole("button", { name }));
 describe("orders workspace", () => {
+  it.each([320, 768, 1280])("labels the effective productivity range without changing other views at %i px", width => {
+    mocks.width = 1280;
+    response.data.data.billing = { "01-00000001": demoBilling() };
+    const legacy = demoWorkLog([], "LEGACY");
+    Object.assign(legacy.order_data, { fecha_abierta_os: "2026-02-01", fecha_cierre_os: null });
+    workLogs.push(legacy);
+    const rendered = setup(); tab("Productividad");
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
+    expect(screen.getByText("Meta disponible", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("640");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ fecha_desde: "2026-01-01", productividad_desde: "2026-07-01", productividad_hasta: "2026-09-25" }));
+    mocks.width = width;
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(screen.getByText("Productividad · 01/07/2026 — 25/09/2026")).toBeVisible();
+    expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("01/01/2026 — 25/09/2026");
+    fireEvent.click(screen.getByRole("button", { name: "Histórico en Órdenes" }));
+    expect(screen.getByRole("tab", { name: "Órdenes" })).toHaveAttribute("aria-selected", "true");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-09-25");
+    expect(screen.queryByText(/Productividad ·/)).not.toBeInTheDocument();
+  });
+  it("shows legacy-only productivity as unavailable, not zero, pending or missing work", () => {
+    mocks.width = 1280;
+    workState.isPending = true;
+    setup(); tab("Productividad");
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[1], { target: { value: "2026-06-30" } });
+    expect(screen.getByRole("status")).toHaveTextContent("Histórico sin jornadas · hasta 30/06/2026");
+    for (const name of ["Horas-persona", "Meta disponible", "Productividad"]) {
+      expect(screen.getByText(name, { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
+    }
+    expect(screen.queryByText(/Cargando jornadas/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Productividad por técnico" })).not.toBeInTheDocument();
+    expect(mocks.work).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30", false);
+    fireEvent.click(screen.getByRole("button", { name: "Ver órdenes" }));
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30");
+  });
+  it("exports requested and actual calculation dates with the same numeric productivity", async () => {
+    mocks.width = 1280;
+    setup(); tab("Productividad");
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    const value = (key: string) => payload.columns.find((column: { key: string }) => column.key === key).value(payload.rows[0]);
+    expect(value("desde_calculo")).toBe("2026-07-01");
+    expect(value("hasta_calculo")).toBe("2026-09-25");
+    expect(value("desde_solicitado")).toBe("2026-01-01");
+    expect(value("hasta_solicitado")).toBe("2026-09-25");
+    expect(value("horas")).toBe(10);
+    expect(value("meta")).toBe(340);
+    expect(value("porcentaje")).toBeCloseTo(10 / 340);
+  });
   it("uses work dates for productivity while keeping the order list and efficiency on their original cohort", () => {
     workLogs = [demoWorkLog([demoWorkEntry({ fecha_inicio: "2026-08-15", fecha_fin: "2026-08-15" }),
       demoWorkEntry({ id: "SEPT", hora_fin: "11:00" })], "01-00000099")];
@@ -439,7 +492,7 @@ describe("orders workspace", () => {
     await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
     const payload = mocks.export.mock.calls[0][0];
     expect(payload.fileName).toBe("productividad-tecnicos.xlsx");
-    expect(payload.columns).toHaveLength(12);
+    expect(payload.columns).toHaveLength(16);
     expect(payload.columns.find((c: { key: string }) => c.key === "meta").value(payload.rows[0])).toBeNull();
   });
   it("separates absence rows from journeys without collapsing same-day journeys or excluding them from Excel", async () => {

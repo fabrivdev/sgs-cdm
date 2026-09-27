@@ -30,6 +30,9 @@ import { billingEfficiency, billingKey, billingWarning } from "@/features/servic
 import { useOrdersBilling } from "@/features/service-orders/useOrdersBilling";
 import { useWorkLog } from "@/features/service-orders/useWorkLog";
 import { workedProductivity } from "@/features/service-orders/workedProductivity";
+import { productivityPeriod } from "@/features/service-orders/productivityPeriod";
+import { operationsDate } from "@/features/service-orders/format";
+import { LEGACY_IMPORT_CUTOFF } from "@/lib/imports/cutoff";
 import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
 import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
@@ -91,8 +94,10 @@ export function OrdersWorkspace() {
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
     valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
   const data = model.serviciosDashboardData;
-  const work = useWorkLog(filters.dateFrom, filters.dateTo, !blocked && tab === "productividad");
-  const workReady = !blocked && !work.isPending && !work.isFetching && !work.isError;
+  const workPeriod = productivityPeriod(filters.dateFrom, filters.dateTo);
+  const workEligible = Boolean(workPeriod.from && workPeriod.to);
+  const work = useWorkLog(filters.dateFrom, filters.dateTo, !blocked && tab === "productividad" && workEligible);
+  const workReady = !blocked && workEligible && !work.isPending && !work.isFetching && !work.isError;
   const productivity = useMemo(() => workedProductivity(workReady ? work.data ?? [] : [], query.data?.data ?? emptyOperationsData,
     valid ? filters : defaults, technicianStatus), [workReady, work.data, query.data, valid, filters, defaults, technicianStatus]);
   const productivityPartial = workReady && productivity.issues.length > 0;
@@ -118,9 +123,11 @@ export function OrdersWorkspace() {
       tecnicos: tab === "cumplimiento" ? filters.fTécnicos : filters.fResponsablesOS,
       estados: tab === "cumplimiento" ? filters.fEstadosTrabajo : filters.fEstadosOS,
       tipo_tiempo: tab === "cumplimiento" ? undefined : filters.fTiposTiempo, rubros: tab === "cumplimiento" ? undefined : filters.fOSRubros,
+      productividad_desde: tab === "productividad" ? workPeriod.from : undefined,
+      productividad_hasta: tab === "productividad" ? workPeriod.to : undefined,
       estado_tecnicos: tab === "productividad" ? technicianStatus : undefined });
     return clearPageFilters;
-  }, [filters, tab, technicianStatus, setPageFilters, clearPageFilters]);
+  }, [filters, tab, technicianStatus, workPeriod.from, workPeriod.to, setPageFilters, clearPageFilters]);
   const selectTechnician = (name: string) => setSelectedTechnician(name);
   const openJob = (id: string) => { if (hasSectionAccess("servicios.trabajos")) navigate(`/trabajos?trabajo=${encodeURIComponent(id)}`); };
 
@@ -128,6 +135,10 @@ export function OrdersWorkspace() {
     <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined} />
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
       <TabsList className="flex w-full justify-start overflow-hidden sm:justify-start" aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>
+      {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
+        <span>Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
+        <button type="button" onClick={() => setTab("ordenes")} className="min-h-11 text-primary hover:underline sm:min-h-0">Histórico en Órdenes</button>
+      </div>}
       {!blocked && <KpiStrip>
         {tab === "ordenes" ? [
           <KpiItem key="total" label="Órdenes" value={data.totalOS} icon={<ClipboardList />} />,
@@ -140,7 +151,7 @@ export function OrdersWorkspace() {
           <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
           <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} detail={productivityPartial ? "Parcial" : undefined} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
-            detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
+            detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : workPeriod.includesLegacy ? `${operationsDate(filters.dateFrom)} — ${operationsDate(filters.dateTo)}` : undefined} />,
         ] : [
           <KpiItem key="realizadas" label="Realizadas" value={model.jornadasResultadoResumen.realizadas} tone="positive" icon={<CircleCheck />} />,
           <KpiItem key="no-realizadas" label="No realizadas" value={model.jornadasResultadoResumen.noRealizadas} tone="warning" icon={<CircleAlert />} />,
@@ -170,12 +181,13 @@ export function OrdersWorkspace() {
           <OrdersTable rows={financialRows} billingLoading={billingLoading} from={filters.dateFrom} to={filters.dateTo} />
         </TabsContent>
         <TabsContent value="productividad" className="min-w-0 space-y-3">
-          {query.data?.capacityWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.capacityWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}
-          {work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
+          {workEligible && query.data?.capacityWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.capacityWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}
+          {!workEligible ? <div role="status" className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">Histórico sin jornadas · hasta {operationsDate(LEGACY_IMPORT_CUTOFF)}<Button variant="ghost" size="sm" onClick={() => setTab("ordenes")}>Ver órdenes</Button></div>
+            : work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
                 {productivityPartial && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia en jornadas" : "incidencias en jornadas"} · Cálculo con horas válidas.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Revisar jornadas</Button></div>}
-                <ProductivityTable rows={productivity.tecnicos} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
+                <ProductivityTable rows={productivity.tecnicos} period={productivity.period} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
                 <OperationalEvolution rows={productivity.evolucion} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
         </TabsContent>

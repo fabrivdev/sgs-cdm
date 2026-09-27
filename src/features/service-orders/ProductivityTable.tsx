@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils";
 import { OperationsPanel } from "./OperationsPresentation";
 import { ProductivityProgress } from "./ProductivityProgress";
 import type { TechnicianStatus } from "./productivityStatus";
+import type { ProductivityPeriod } from "./productivityPeriod";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const statuses = [["todos", "Todos"], ["activos", "Activos"], ["inactivos", "Inactivos"], ["sin-ficha", "Sin ficha"]] as const;
-export function ProductivityTable({ rows, onSelect, status, onStatusChange }: { rows: ProductivityTechnicianRow[]; onSelect: (name: string) => void; status: TechnicianStatus; onStatusChange: (status: TechnicianStatus) => void }) {
+export function ProductivityTable({ rows, onSelect, status, onStatusChange, period }: { rows: ProductivityTechnicianRow[]; onSelect: (name: string) => void; status: TechnicianStatus; onStatusChange: (status: TechnicianStatus) => void; period?: ProductivityPeriod }) {
   const compact = useIsMobile(1024);
   const phone = useIsMobile(640);
   const technicianState = (r: ProductivityTechnicianRow) => !r.profileId ? "Sin ficha" : !r.activo ? "Inactivo" : undefined;
@@ -29,6 +30,10 @@ export function ProductivityTable({ rows, onSelect, status, onStatusChange }: { 
     { key: "detalle", label: "Horas con detalle individual", kind: "number", width: "w-auto", value: r => r.horasDesdeDetalle },
     { key: "heredadas", label: "Horas con participación heredada", kind: "number", width: "w-auto", value: r => r.horasDesdeOS },
     { key: "calculo", label: "Estado del cálculo", kind: "text", width: "w-auto", value: r => r.incomplete ? "Parcial · solo horas válidas" : "Completo" },
+    { key: "desde_calculo", label: "Desde cálculo", kind: "date", width: "w-auto", value: () => period?.from ?? null },
+    { key: "hasta_calculo", label: "Hasta cálculo", kind: "date", width: "w-auto", value: () => period?.to ?? null },
+    { key: "desde_solicitado", label: "Desde solicitado", kind: "date", width: "w-auto", value: () => period?.requestedFrom ?? null },
+    { key: "hasta_solicitado", label: "Hasta solicitado", kind: "date", width: "w-auto", value: () => period?.requestedTo ?? null },
   ];
   const table = useSectionTable({ rows, columns, initialSort: { key: "horas", direction: "desc" }, title: "Productividad por técnico", fileName: "productividad-tecnicos.xlsx" });
   const hasGoal = rows.some(row => row.horasDisponibles > 0 || row.incomplete);

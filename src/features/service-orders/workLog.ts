@@ -1,5 +1,6 @@
 import { normalizeCommissionTime } from "@/lib/imports/workDuration";
 import type { OrdenServicioImportada } from "./useOperationsModel";
+import { productivityPeriod } from "./productivityPeriod";
 
 export interface WorkEntry {
   id: string;
@@ -61,6 +62,12 @@ export function workedDays(entry: WorkEntry): WorkedDay[] | null {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadWorkLog(client: any, from: string, to: string, os: string | null, signal?: AbortSignal): Promise<OrderWorkLog[]> {
   if (signal?.aborted) throw signal.reason ?? new Error("Consulta cancelada.");
+  if (os === null) {
+    const period = productivityPeriod(from, to);
+    if (!period.from || !period.to) return [];
+    from = period.from;
+    to = period.to;
+  }
   const controller = new AbortController();
   const cancel = () => controller.abort(signal?.reason);
   signal?.addEventListener("abort", cancel, { once: true });
