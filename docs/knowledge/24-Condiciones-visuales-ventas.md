@@ -25,6 +25,10 @@ Ventas conserva la composición continua de la opción 2: tres indicadores, rang
 - La foto `Stock de Maquinarias` determina qué máquinas existen en stock. El reporte general `Maquinarias` puede completar un chasis faltante o sustituido por el nombre del modelo únicamente mediante `Producto = CODPRO` exacto y único. No agregar al stock máquinas que aparezcan solo en el reporte general, no pisar dos chasis válidos en conflicto y conservar en la evidencia el valor original y la fuente del respaldo.
 - En Detalle de Servicios, usar `Código` en lugar de `Concepto`: código de producto de la línea financiera para repuestos; código operativo documentado como MA01/KM01/SE para servicios. No fabricar códigos por categoría ni tomar el REP de otra línea de la OS. Conservar el componente en el título al pasar el cursor; códigos ausentes o ambiguos quedan `—`.
 
+## Técnicos de Servicios — revisión del 28/09
+
+Conservar las nueve columnas, sin párrafos adicionales. Las horas principales corresponden a OS/tipos con MO en los filtros actuales; las demás horas se conservan al abrir el técnico y en la descarga por OS. Ceros facturados y ausencias no son equivalentes. Regla funcional, excepciones y SQL manual en [[27-Tecnicos-horas-y-facturacion]].
+
 ## Conciliación de chasis en Ventas de Máquinas
 
 - En Operaciones, adjuntar una factura a una NP no factura el pedido completo ni sus líneas hermanas. Cada unidad queda `Facturada` únicamente si la fuente canónica contiene una venta positiva de maquinaria con el mismo chasis y fecha igual o posterior a la NP. El PDF se conserva como documento, pero no es evidencia suficiente por sí solo.

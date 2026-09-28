@@ -24,12 +24,12 @@ function mobileSalesValue<T>(column: Column<T>, row: T): ReactNode {
 /** Presentation only: sorting, pagination and complete Excel exports stay with the caller. */
 export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggleSort, primaryKey, metricKey,
   countKey, countLabel, primaryLabel, metricLabel,
-  footer, onRowClick, selected, embedded = false, empty = "Sin registros para los filtros seleccionados.",
+  footer, onRowClick, onDetailClick, selected, embedded = false, empty = "Sin registros para los filtros seleccionados.",
 }: {
   title: string; rows: readonly T[]; columns: readonly Column<T>[]; rowKey: (row: T) => string;
   sort: SalesSort; toggleSort: (key: string) => void; primaryKey?: string; metricKey?: string;
   countKey?: string; countLabel?: string; primaryLabel?: string; metricLabel?: string;
-  embedded?: boolean;
+  embedded?: boolean; onDetailClick?: (row: T) => void;
   footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; empty?: string;
 }) {
   const id = useId();
@@ -50,7 +50,7 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
     </td>
     {hasCount && <td className="px-1 text-center tabular-nums">{mobileSalesValue(count!, row)}</td>}
     <td className={cn("px-1 tabular-nums", amountAlign === "center" ? "text-center" : amountAlign === "right" ? "text-right" : "text-left", amount.kind === "number" ? "whitespace-nowrap" : "truncate max-sm:whitespace-normal max-sm:break-words max-sm:py-2 max-sm:leading-5")}>{mobileSalesValue(amount, row)}</td>
-    <td>{!isFooter && <button type="button" aria-label={`Ver detalle de ${String(primary.value(row) ?? "registro")}`} onClick={() => setDetailKey(rowKey(row))} className={cn("flex h-11 items-center justify-center rounded-md hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", mobile.active ? "w-8" : "w-11")}>{mobile.active ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}</button>}</td>
+    <td>{!isFooter && <button type="button" aria-label={`Ver detalle de ${String(primary.value(row) ?? "registro")}`} onClick={() => onDetailClick ? onDetailClick(row) : setDetailKey(rowKey(row))} className={cn("flex h-11 items-center justify-center rounded-md hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", mobile.active ? "w-8" : "w-11")}>{mobile.active ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}</button>}</td>
   </tr>;
   const controls = <Popover><PopoverTrigger asChild><button type="button" className={cn("flex h-11 shrink-0 items-center justify-center rounded-md", mobile.active ? "w-8" : "w-11")} aria-label={`Columnas y orden de ${title}`}><SlidersHorizontal className="h-3.5 w-3.5" /></button></PopoverTrigger>
     <PopoverContent align="end" className="w-[min(360px,calc(100vw-2rem))] p-2">

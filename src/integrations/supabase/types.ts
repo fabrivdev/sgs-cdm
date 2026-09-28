@@ -7705,6 +7705,19 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_servicios_tecnicos_v2: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_filtros?: Json
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_tipo_tiempo?: string
+        }
+        Returns: Json
+      }
       ventas_servicios_terceros_auditoria: {
         Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
         Returns: {

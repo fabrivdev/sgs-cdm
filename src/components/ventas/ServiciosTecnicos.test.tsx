@@ -1,16 +1,23 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { render, selectExport } from "./salesSectionExports.test-support";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { render } from "./salesSectionExports.test-support";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiciosTecnicos } from "./ServiciosTecnicos";
 import { displayImportedTechnicianName } from "@/lib/technicianMatching";
-const { rpc, exportTable }=vi.hoisted(()=>({rpc:vi.fn(),exportTable:vi.fn()}));
+const { rpc, exportTable, device }=vi.hoisted(()=>({rpc:vi.fn(),exportTable:vi.fn(),device:{mobile:false}}));
 vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc}}));
 vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({can:()=>true})}));
 vi.mock("@/hooks/useServicioTecnicos",()=>({useServicioTecnicos:()=>({data:[]})}));
 vi.mock("./salesTableExport",()=>({exportSalesTable:exportTable}));
+vi.mock("@/hooks/use-mobile",()=>({useIsMobile:()=>device.mobile}));
 const props={desde:"2026-08-01",hasta:"2026-08-31",sucursal:"TODAS",buscar:"",tipoTiempo:"TODOS"};
-const row={tecnico_clave:"a",tecnico:"Técnico Á",horas_cliente:3,horas_garantia:2,horas_interno:0,horas_otros:1,total_horas:6,mo_cliente:75,mo_garantia:20,mo_interno:0,mo_otros:5,mo_total:100};
-afterEach(()=>{cleanup();vi.clearAllMocks();});
+const row={tecnico_clave:"a",tecnico:"Técnico Á",horas_cliente:3,horas_garantia:2,horas_interno:0,horas_otros:1,total_horas:6,mo_cliente:75,mo_garantia:20,mo_interno:0,mo_otros:5,mo_total:100,detalle_os:[]};
+const detail={os_numero:"01-00000001",tipo_tiempo:"Garantia",horas_os:35,horas_mo:null,mo_periodo:null,tiene_mo:false};
+const contextRow={...row,horas_cliente:null,horas_garantia:null,horas_interno:null,horas_otros:null,total_horas:null,mo_cliente:0,mo_garantia:0,mo_interno:0,mo_otros:0,mo_total:0,detalle_os:[detail]};
+async function selectExport(name="Exportar Facturación por técnico") {
+  fireEvent.keyDown(screen.getByRole("button",{name:"Acciones de la sección"}),{key:"Enter"});
+  fireEvent.click(await screen.findByRole("menuitem",{name}));
+}
+afterEach(()=>{cleanup();vi.clearAllMocks();device.mobile=false;});
 describe("service technician table",()=>{
   it("uses nine concise columns and filters only this table without recalculating participation",async()=>{
     rpc.mockResolvedValue({data:[row,{...row,tecnico_clave:"b",tecnico:"Técnico B",mo_total:200,total_horas:9}],error:null});
@@ -28,7 +35,7 @@ describe("service technician table",()=>{
     expect(exportTable.mock.calls[0][0].rows).toEqual([{...row,tecnico:displayImportedTechnicianName(row.tecnico)}]);
     expect(exportTable.mock.calls[0][0].columns.map((column:{label:string})=>column.label)).toEqual(labels);
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith("ventas_servicios_tecnicos_v1_filtrado",expect.objectContaining({p_filtros:{documento:"nc"}}));
+    expect(rpc).toHaveBeenCalledWith("ventas_servicios_tecnicos_v2",expect.objectContaining({p_filtros:{documento:"nc"}}));
   });
   it("does not show a warning for classified rows and preserves totals, zeros and NC",async()=>{
     const classified={...row,horas_otros:0,mo_otros:0,total_horas:5,mo_cliente:-10.25,mo_garantia:0,mo_total:-10.25};
@@ -48,5 +55,43 @@ describe("service technician table",()=>{
     expect(await screen.findByRole("alert")).toHaveTextContent("Network offline");
     expect(screen.queryByText("Cargando técnicos…")).not.toBeInTheDocument();
     expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
+  });
+  it.each([false,true])("keeps hours outside the MO cohort in accessible detail and Excel (mobile=%s)",async mobile=>{
+    device.mobile=mobile;
+    rpc.mockResolvedValue({data:[contextRow],error:null});
+    render(<ServiciosTecnicos {...props} />);
+    const name=displayImportedTechnicianName(row.tecnico);
+    await screen.findByText(name);
+    expect(screen.queryByText("35")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:mobile?`Ver detalle de ${name}`:name}));
+    const panel=screen.getByRole("dialog");
+    expect(within(panel).getByText("35")).toBeInTheDocument();
+    expect(within(panel).getByText("Sin MO en los filtros actuales")).toBeInTheDocument();
+    expect(within(panel).getByText("—")).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button",{name:"Cerrar"}));
+    await selectExport("Exportar horas y MO por OS");
+    await waitFor(()=>expect(exportTable).toHaveBeenCalled());
+    expect(exportTable.mock.calls[0][0].rows).toEqual([{...detail,tecnico:name}]);
+    expect(exportTable.mock.calls[0][0].columns.find((c:{key:string})=>c.key==='mo').value(detail)).toBeNull();
+  });
+  it("merges aliases without losing detail, nulls or negative amounts",async()=>{
+    rpc.mockResolvedValue({data:[contextRow,{...contextRow,tecnico_clave:'alias',detalle_os:[{...detail,horas_os:2}]}],error:null});
+    render(<ServiciosTecnicos {...props} />);
+    await screen.findByText(displayImportedTechnicianName(row.tecnico));
+    await selectExport("Exportar horas y MO por OS");
+    await waitFor(()=>expect(exportTable).toHaveBeenCalled());
+    expect(exportTable.mock.calls[0][0].rows).toHaveLength(1);
+    expect(exportTable.mock.calls[0][0].rows[0]).toMatchObject({horas_os:37,horas_mo:null,mo_periodo:null});
+  });
+  it("closes old detail and removes exports on new filters and reports missing SQL without fallback",async()=>{
+    rpc.mockResolvedValueOnce({data:[contextRow],error:null}).mockResolvedValueOnce({data:null,error:{code:'PGRST202'}});
+    const view=render(<ServiciosTecnicos {...props} />);
+    fireEvent.click(await screen.findByRole("button",{name:displayImportedTechnicianName(row.tecnico)}));
+    view.rerender(<ServiciosTecnicos {...props} desde="2026-08-20" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("20260928150000");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls.every(call=>call[0]==='ventas_servicios_tecnicos_v2')).toBe(true);
   });
 });

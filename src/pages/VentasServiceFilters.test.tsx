@@ -42,7 +42,7 @@ describe('Ventas Servicios global filter routing',()=>{
     fireEvent.click(screen.getByRole('button',{name:'Clientes'}));
     await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2_filtrado',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
     fireEvent.click(screen.getByRole('button',{name:'Técnicos'}));
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_tecnicos_v1_filtrado',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_tecnicos_v2',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
     fireEvent.click(screen.getByRole('button',{name:'Máquinas'}));
     await screen.findByText('No hay facturación por máquina en el período.');
     fireEvent.click(screen.getByRole('button',{name:'Detalle'}));
