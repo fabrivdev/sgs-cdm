@@ -2,6 +2,10 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Ubicación y desbordamiento de pestañas — 29/09/2026
+
+`src/components/ui/tabs.tsx` oculta el desbordamiento nativo de la lista: el scroll automático producía flechas verticales junto a pestañas que ya cabían, como en Comisiones. El disparador de escritorio mide 32 px dentro de una lista de 36 px para dejar sitio al subrayado; en teléfono conserva un mínimo táctil de 44 px. Las secciones principales Órdenes (`src/pages/OrdenesServicio.tsx`), Administración (`src/pages/Admin.tsx`) y Compras (`src/pages/RepuestosCompras.tsx`) pasan sus pestañas a `PageHeader`, como ya hacen Comisiones y Dashboard. Desde 640 px se ubican a la derecha del título cuando caben; el encabezado puede envolverlas en anchos intermedios sin recortar el título. Bajo 640 px siguen visibles debajo del título, con acciones principales en la primera fila. No mover las pestañas internas de fichas o paneles al encabezado de página. Se conservan selección, permisos y contenido; sólo cambia la presentación. Pruebas locales de estructura y navegación, no comprobación del despliegue ni de todos los navegadores.
+
 ## Ajuste posterior del Planificador — 25/09/2026
 
 Sólo en teléfono (menos de 640 px), Planificador usa `PlannerMobileAgenda.tsx`: lista continua con día/fecha a la izquierda, cliente prioritario, tarea de hasta dos líneas y referencia/estado/continuidad. No muestra horas por jornada ni total de horas al pie, aunque existan datos. Las horas se conservan en el detalle, exportación y tabla de tablet/escritorio; no se borra ni recalcula nada. Semana, navegación y orden quedan en una sola franja, sin encabezados de tabla móvil ni columna vacía. La acción de programar es visualmente discreta y conserva su área táctil y permisos.

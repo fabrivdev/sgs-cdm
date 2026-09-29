@@ -18,12 +18,12 @@ export function PageHeader({ title, actions, tabs, meta, className }: { title: R
     {tabs}
   </header>;
   return <header className={cn("flex min-h-8 min-w-0 flex-col justify-center gap-1", className)}>
-    <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
+    <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3">
+      <div className="min-w-0 sm:min-w-32 sm:flex-1">
         <h1 className="truncate text-[18px] font-semibold leading-6 tracking-[-0.02em]">{title}</h1>
         {meta && <div className={metaText}>{meta}</div>}
       </div>
-      {(tabs || actions) && <div className="flex shrink-0 items-center gap-2">{tabs}{actions}</div>}
+      {(tabs || actions) && <div className="ml-auto flex max-w-full shrink-0 items-center gap-2">{tabs}{actions}</div>}
     </div>
   </header>;
 }

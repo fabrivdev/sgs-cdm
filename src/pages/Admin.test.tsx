@@ -75,6 +75,7 @@ describe("Administración: alta de operativos sin acceso", () => {
   it("limita las pestañas visibles a las secciones autorizadas", async () => {
     render(<Admin />);
     const navigation = await screen.findByRole("tablist", { name: "Sección de Administración" });
+    expect(screen.getByRole("heading", { name: "Administración" }).closest("header")).toContainElement(navigation);
     expect(screen.getByRole("tab", { name: "Equipo y accesos" })).toHaveAttribute("aria-selected", "true");
     expect(navigation.querySelectorAll('[role="tab"]')).toHaveLength(1);
     expect(navigation).toHaveTextContent("Equipo y accesos");

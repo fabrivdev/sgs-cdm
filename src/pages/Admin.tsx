@@ -589,31 +589,30 @@ export default function Admin() {
 
   return (
     <PageShell>
-      <PageHeader
-        title="Administración"
-        actions={adminTab === "equipo" && canManageAdmin ? (
-          <Button size="sm" aria-label="Nuevo usuario" onClick={() => setCreateOpen(true)} className="max-sm:w-11 max-sm:px-0">
-            <UserPlus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Nuevo usuario</span>
-          </Button>
-        ) : undefined}
-      />
-
       <Tabs value={adminTab} onValueChange={(value) => { setAdminTab(value); setTableSearch(""); }}>
-        <TabsList aria-label="Sección de Administración" className="max-sm:[&_svg]:hidden">
-          {hasSectionAccess("admin.usuarios") && <TabsTrigger value="equipo">
-            <Users className="mr-2 h-4 w-4" />
-            Equipo y accesos
-          </TabsTrigger>}
-          {hasSectionAccess("admin.importaciones") && <TabsTrigger value="importar">
-            <Database className="mr-2 h-4 w-4" />
-            Datos
-          </TabsTrigger>}
-          {hasSectionAccess("admin.parametros") && <TabsTrigger value="parametros">
-            <Settings2 className="mr-2 h-4 w-4" />
-            Configuración
-          </TabsTrigger>}
-        </TabsList>
+        <PageHeader
+          title="Administración"
+          actions={adminTab === "equipo" && canManageAdmin ? (
+            <Button size="sm" aria-label="Nuevo usuario" onClick={() => setCreateOpen(true)} className="max-sm:w-11 max-sm:px-0">
+              <UserPlus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Nuevo usuario</span>
+            </Button>
+          ) : undefined}
+          tabs={<TabsList aria-label="Sección de Administración" className="max-sm:[&_svg]:hidden">
+            {hasSectionAccess("admin.usuarios") && <TabsTrigger value="equipo">
+              <Users className="mr-2 h-4 w-4" />
+              Equipo y accesos
+            </TabsTrigger>}
+            {hasSectionAccess("admin.importaciones") && <TabsTrigger value="importar">
+              <Database className="mr-2 h-4 w-4" />
+              Datos
+            </TabsTrigger>}
+            {hasSectionAccess("admin.parametros") && <TabsTrigger value="parametros">
+              <Settings2 className="mr-2 h-4 w-4" />
+              Configuración
+            </TabsTrigger>}
+          </TabsList>}
+        />
 
         {adminTab === "equipo" && (
           <FiltersBar

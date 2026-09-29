@@ -7,13 +7,11 @@ import { PageHeader } from "@/components/layout/AppPrimitives";
 export default function RepuestosCompras() {
   return (
     <div className={pageShell}>
-      <PageHeader title="Compras" />
-
       <Tabs defaultValue="pedidos">
-        <TabsList>
+        <PageHeader title="Compras" tabs={<TabsList aria-label="Vistas de compras">
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
           <TabsTrigger value="solicitudes">Solicitudes</TabsTrigger>
-        </TabsList>
+        </TabsList>} />
 
         <TabsContent value="pedidos" className="space-y-3">
           <ComprasPedidosTab />

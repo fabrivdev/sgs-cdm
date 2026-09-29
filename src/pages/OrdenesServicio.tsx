@@ -145,9 +145,9 @@ export function OrdersWorkspace() {
   const openJob = (id: string) => { if (hasSectionAccess("servicios.trabajos")) navigate(`/trabajos?trabajo=${encodeURIComponent(id)}`); };
 
   return <PageShell className="service-orders-workspace">
-    <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined} />
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
-      <TabsList className="flex w-full justify-start overflow-hidden sm:justify-start" aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>
+      <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined}
+        tabs={<TabsList aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>} />
       {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
         <span>Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
         <button type="button" onClick={() => setTab("ordenes")} className="min-h-11 text-primary hover:underline sm:min-h-0">Histórico en Órdenes</button>

@@ -35,6 +35,12 @@ const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 const technicianStatus = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Estado de técnicos" })).getByRole("button", { name }));
 describe("orders workspace", () => {
+  it.each([390, 1280])("keeps its view tabs inside the page header at %i px", width => {
+    mocks.width = width;
+    setup();
+    const heading = screen.getByRole("heading", { name: "Órdenes de servicio" });
+    expect(heading.closest("header")).toContainElement(screen.getByRole("tablist", { name: "Vistas de órdenes de servicio" }));
+  });
   it.each([320, 768, 1280])("labels the effective productivity range without changing other views at %i px", width => {
     mocks.width = 1280;
     response.data.data.billing = { "01-00000001": demoBilling() };
