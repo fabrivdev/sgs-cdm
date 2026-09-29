@@ -561,60 +561,43 @@ describe("orders workspace", () => {
     expect(payload.columns).toHaveLength(16);
     expect(payload.columns.find((c: { key: string }) => c.key === "meta").value(payload.rows[0])).toBeNull();
   });
-  it("separates absence rows from journeys without collapsing same-day journeys or excluding them from Excel", async () => {
-    response.data.data.disponibilidades = [{ id: "ABS1", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "Capacitación", observacion: null, bloquea_agenda: true }];
+  it("keeps same-day journeys and unavailability distinct in the mobile matrix detail", () => {
+    response.data.data.disponibilidades = [{ id: "ABS1", tecnico_id: "T1", fecha_inicio: "2026-09-10", fecha_fin: "2026-09-10", tipo: "Capacitación", observacion: null, bloquea_agenda: true }];
     response.data.data.jornadas.push({ ...response.data.data.jornadas[0], id: "J4" });
     setup(); tab("Cumplimiento");
-    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
-    const activity = within(screen.getByRole("table", { name: "Actividad por técnico" }));
-    expect(activity.getAllByRole("row")).toHaveLength(5);
-    expect(activity.queryByText("Capacitación")).not.toBeInTheDocument();
-    const availability = within(screen.getByRole("table", { name: "Disponibilidad de técnicos" }));
-    expect(availability.getByText("Capacitación")).toBeVisible();
-    expect(availability.getByText("sept. 2026")).toBeVisible();
-    expect(availability.queryByText("TR")).not.toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Actividad por técnico" }));
-    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
-    const payload = mocks.export.mock.calls[0][0];
-    expect(payload.rows).toHaveLength(5);
-    expect(new Set(payload.rows.map((row: { key: string }) => row.key)).size).toBe(5);
-    expect(payload.rows.find((row: { estado: string }) => row.estado === "No disponible").trabajo).toBe("Capacitación");
-  });
-  it("uses the original compliance counts and exposes complete period export", async () => {
-    setup(); tab("Cumplimiento");
-    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
-    const table = screen.getByRole("table", { name: "Cumplimiento por período" });
-    expect(table).toHaveTextContent("1 de 3 realizadas");
-    expect(table).toHaveTextContent("33%");
-    expect(screen.getByText("50%", { exact: true })).toBeVisible();
-    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Cumplimiento por período" }));
-    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
-    const payload = mocks.export.mock.calls[0][0];
-    expect(payload.fileName).toBe("cumplimiento-periodos.xlsx");
-    expect(payload.columns).toHaveLength(7);
-    expect(payload.rows[0]).toMatchObject({ programadas: 3, realizadas: 1, noRealizadas: 1, pendientes: 1, porcentaje: 33 });
-  });
-  it("keeps the technician matrix first on phones, with other reports available on demand", () => {
-    setup(); tab("Cumplimiento");
-    expect(screen.getByRole("table", { name: "Matriz de técnicos por período" })).toBeVisible();
-    expect(screen.queryByRole("table", { name: "Actividad por técnico" })).not.toBeInTheDocument();
+    const dates = document.querySelectorAll('input[type="date"]');
+    fireEvent.change(dates[0], { target: { value: "2026-09-10" } });
+    fireEvent.change(dates[1], { target: { value: "2026-09-10" } });
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "dia" }));
     fireEvent.click(screen.getByRole("button", { name: "TECNICO UNO" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("TR-DEMO1");
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cerrar" }));
-    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
-    expect(screen.getByRole("table", { name: "Seguimiento OS y TR" })).toHaveTextContent("TR-DEMO1");
+    const detail = within(screen.getByRole("dialog"));
+    expect(detail.getAllByText(/TR-DEMO1/)).toHaveLength(2);
+    expect(detail.getByText("ND · Capacitación")).toBeVisible();
   });
-  it("shows only the matrix and compact filters by default on desktop", () => {
+  it("uses complete week columns for a month and day columns for a selected week", () => {
     mocks.width = 1280;
     setup(); tab("Cumplimiento");
-    expect(screen.getByRole("heading", { name: "Matriz de técnicos por período" })).toBeVisible();
-    expect(screen.getByText("Trabajo realizado")).toBeVisible();
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "semana" }));
+    expect(screen.getByText("Sem 36 · 26")).toBeVisible();
+    expect(screen.getByText("Sem 39 · 26")).toBeVisible();
+    const dates = document.querySelectorAll('input[type="date"]');
+    fireEvent.change(dates[0], { target: { value: "2026-09-07" } });
+    fireEvent.change(dates[1], { target: { value: "2026-09-13" } });
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "dia" }));
+    expect(screen.getByText("Lun 07/09")).toBeVisible();
+    expect(screen.getByText("Dom 13/09")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Más análisis" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Acciones de la sección" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Agrupar")).not.toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Actividad por técnico" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Indicadores" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
-    expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
+  });
+  it("presents a whole year by month without dropping empty months", () => {
+    mocks.width = 1280;
+    setup(); tab("Cumplimiento");
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "mes" }));
+    expect(screen.getByText("Ene 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+    expect(screen.getByText("Sep 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
   });
   it("never exposes stale figures or exports after source errors", () => {
     response.isError = true; setup();

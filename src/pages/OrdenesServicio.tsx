@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth } from "date-fns";
 import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target, Percent, CalendarDays } from "lucide-react";
 import { PageHeader, PageShell, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
@@ -9,22 +8,18 @@ import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Button } from "@/components/ui/button";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
-import { useSectionTable } from "@/components/exports/useSectionTable";
-import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
-import { MobileRecord } from "@/components/lists/MobileRecord";
 import { MARCAS, SUCURSALES } from "@/lib/constants";
 import { ESTADOS_TRABAJO } from "@/lib/trabajos";
-import { useAuth } from "@/hooks/useAuth";
 import { displayImportedTechnicianName, matchTechnicianProfile } from "@/lib/technicianMatching";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { useServiceOrders } from "@/features/service-orders/useServiceOrders";
 import { validOperationsRange } from "@/features/service-orders/data";
-import { emptyOperationsData, useOperationsModel, type OperationsFilters, type OperationsModel } from "@/features/service-orders/useOperationsModel";
+import { emptyOperationsData, useOperationsModel, type OperationsFilters } from "@/features/service-orders/useOperationsModel";
 import { OrdersTable } from "@/features/service-orders/OrdersTable";
 import { ProductivityTable } from "@/features/service-orders/ProductivityTable";
 import type { TechnicianStatus } from "@/features/service-orders/productivityStatus";
-import { ActivityTable } from "@/features/service-orders/ActivityTable";
+import { compliancePeriodMode } from "@/features/service-orders/compliancePeriod";
 import { OperationalEvolution } from "@/features/service-orders/OperationalSummary";
 import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
 import { billingEfficiency, billingEfficiencyByPeriod, billingKey, billingWarning, efficiencyBillingOrders } from "@/features/service-orders/billing";
@@ -38,38 +33,11 @@ import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
 import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
 import { MobileTechnicianMatrix } from "@/features/service-orders/MobileTechnicianMatrix";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
-import { TecnicosNoRealizadosRanking, MatrizTécnicosDías, EstadoCompacto, CargaSucursalTabla, DistribucionMarca, TrabajosAbiertosList } from "@/components/analytics/OperationalCharts";
+import { MatrizTécnicosDías } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
-import { ComplianceOverview } from "@/features/service-orders/ComplianceOverview";
 import "@/features/service-orders/service-orders.css";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
-function Block({ title, children }: { title: string; children: ReactNode }) {
-  return <OperationsPanel title={title} padded>{children}</OperationsPanel>;
-}
-function JobFollowup({ model }: { model: OperationsModel }) {
-  const navigate = useNavigate();
-  const { hasSectionAccess } = useAuth();
-  type Row = OperationsModel["trabajosResumen"][number];
-  const columns: CompactListColumn<Row>[] = [
-    { key: "ref", label: "OS/TR", kind: "text", width: "w-[15%]", value: r => r.ref, render: r => hasSectionAccess("servicios.trabajos") ? <button type="button" className="min-h-11 text-left hover:text-primary sm:min-h-0" onClick={() => navigate(`/trabajos?trabajo=${encodeURIComponent(r.id)}`)}>{r.ref}</button> : r.ref },
-    { key: "cliente", label: "Cliente", kind: "text", width: "w-[30%]", value: r => r.cliente },
-    { key: "trabajo", label: "Trabajo", kind: "text", width: "w-[25%]", value: r => r.descripcion },
-    { key: "sucursal", label: "Sucursal", kind: "text", width: "w-[15%]", value: r => r.sucursal },
-    { key: "estado", label: "Estado", kind: "text", width: "w-[15%]", value: r => r.estado },
-    { key: "marca", label: "Marca", kind: "text", width: "w-auto", value: r => r.marca },
-    { key: "realizadas", label: "Jornadas realizadas en período", kind: "number", width: "w-auto", value: r => r.realizadasPeriodo },
-    { key: "pendientes", label: "Jornadas pendientes en período", kind: "number", width: "w-auto", value: r => r.pendientesPeriodo },
-    { key: "total", label: "Jornadas en período", kind: "number", width: "w-auto", value: r => r.totalJornadasPeriodo },
-    { key: "horas", label: "Horas realizadas en período", kind: "number", width: "w-auto", value: r => r.horasPeriodo },
-    { key: "ultima", label: "Última jornada en período", kind: "date", width: "w-auto", value: r => r.ultimaFechaPeriodo || null },
-  ];
-  const table = useSectionTable({ rows: model.trabajosResumen, columns, initialSort: { key: "cliente", direction: "asc" }, title: "Seguimiento OS y TR", fileName: "seguimiento-os-tr.xlsx" });
-  return <CompactListTable rows={table.ordered} columns={columns.slice(0, 5)} mobileColumns={[
-    { ...columns[0], width: "w-[75%]", render: r => <MobileRecord primary={r.cliente} secondary={r.descripcion} context={columns[0].render?.(r)} /> },
-    { ...columns[4], width: "w-[25%]" },
-  ]} id={r => r.id} label="Seguimiento OS y TR" heading={table.heading} sort={table.sort} status={!table.ordered.length ? "Sin trabajos." : undefined} />;
-}
 
 export default function OrdenesServicio() {
   return <SalesSectionExportsProvider><OrdersWorkspace /></SalesSectionExportsProvider>;
@@ -78,24 +46,23 @@ export default function OrdenesServicio() {
 export function OrdersWorkspace() {
   const phone = useIsMobile(640);
   const compact = useIsMobile(1024);
-  const navigate = useNavigate();
-  const { hasSectionAccess } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [today] = useState(() => new Date());
   const [tab, setTab] = useState("ordenes");
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
-  const [showComplianceAnalysis, setShowComplianceAnalysis] = useState(false);
   const defaults = useMemo<OperationsFilters>(() => ({ dateFrom: format(startOfMonth(today), "yyyy-MM-dd"), dateTo: format(today, "yyyy-MM-dd"), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
   const valid = validOperationsRange(filters.dateFrom, filters.dateTo);
+  const complianceMode = compliancePeriodMode(filters.dateFrom, filters.dateTo, today);
+  const modelFilters = useMemo(() => tab === "cumplimiento" ? { ...filters, periodMode: complianceMode } : filters, [tab, filters, complianceMode]);
   const query = useServiceOrders(filters.dateFrom, filters.dateTo);
   // Never render cached figures/exports while refreshing or when a required source failed.
   const blocked = !valid || query.isPending || query.isFetching || query.isError;
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
-    valid ? filters : { ...filters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
+    valid ? modelFilters : { ...modelFilters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
   const data = model.serviciosDashboardData;
   const workPeriod = productivityPeriod(filters.dateFrom, filters.dateTo);
   const workEligible = Boolean(workPeriod.from && workPeriod.to);
@@ -133,7 +100,7 @@ export function OrdersWorkspace() {
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
-    setPageFilters({ seccion: tab, fecha_desde: filters.dateFrom, fecha_hasta: filters.dateTo, agrupacion: filters.periodMode, busqueda: filters.q,
+    setPageFilters({ seccion: tab, fecha_desde: filters.dateFrom, fecha_hasta: filters.dateTo, agrupacion: modelFilters.periodMode, busqueda: filters.q,
       sucursales: filters.fSucursales, marcas: filters.fMarcas,
       tecnicos: tab === "cumplimiento" ? filters.fTécnicos : filters.fResponsablesOS,
       estados: tab === "cumplimiento" ? filters.fEstadosTrabajo : filters.fEstadosOS,
@@ -142,13 +109,12 @@ export function OrdersWorkspace() {
       productividad_hasta: tab === "productividad" ? workPeriod.to : undefined,
       estado_tecnicos: tab === "productividad" ? technicianStatus : undefined });
     return clearPageFilters;
-  }, [filters, tab, technicianStatus, workPeriod.from, workPeriod.to, setPageFilters, clearPageFilters]);
+  }, [filters, modelFilters.periodMode, tab, technicianStatus, workPeriod.from, workPeriod.to, setPageFilters, clearPageFilters]);
   const selectTechnician = (name: string) => setSelectedTechnician(name);
-  const openJob = (id: string) => { if (hasSectionAccess("servicios.trabajos")) navigate(`/trabajos?trabajo=${encodeURIComponent(id)}`); };
 
   return <PageShell className="service-orders-workspace">
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
-      <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined}
+      <PageHeader title="Órdenes de servicio" actions={phone && !blocked && tab !== "cumplimiento" ? <SalesSectionExportMenu /> : undefined}
         tabs={<TabsList aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>} />
       {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
         <span>Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
@@ -169,9 +135,9 @@ export function OrdersWorkspace() {
             detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : null}
       </KpiStrip>}
-      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!phone ? <SalesSectionExportMenu /> : undefined} expanded={<>
+      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!phone && tab !== "cumplimiento" ? <SalesSectionExportMenu /> : undefined} expanded={<>
         <FilterMultiSelect label="Marca" values={filters.fMarcas} onChange={v => change("fMarcas", v)} options={MARCAS.map(value => ({ value, label: value }))} />
-        <FilterSelect label="Agrupar" placeholder="Período" value={filters.periodMode} onChange={v => change("periodMode", v as OperationsFilters["periodMode"])} options={[{ value: "dia", label: "Día" }, { value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }]} />
+        {tab !== "cumplimiento" && <FilterSelect label="Agrupar" placeholder="Período" value={filters.periodMode} onChange={v => change("periodMode", v as OperationsFilters["periodMode"])} options={[{ value: "dia", label: "Día" }, { value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }]} />}
         {tab === "cumplimiento" ? <>
           <FilterMultiSelect label="Estado del trabajo" values={filters.fEstadosTrabajo} onChange={v => change("fEstadosTrabajo", v)} options={ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))} />
           <FilterMultiSelect label="Técnico" values={filters.fTécnicos} onChange={v => change("fTécnicos", v)} options={(query.data?.data.profiles ?? []).map(p => ({ value: p.id, label: p.nombre }))} />
@@ -212,20 +178,11 @@ export function OrdersWorkspace() {
                 <OperationalEvolution rows={productivityPeriods} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
         </TabsContent>
-        <TabsContent value="cumplimiento" className="min-w-0 space-y-4">
-          <OperationsPanel title="Matriz de técnicos por período" padded={!phone} actions={<Button variant="ghost" size="sm" onClick={() => setShowComplianceAnalysis(value => !value)}>{showComplianceAnalysis ? "Ocultar análisis" : "Más análisis"}</Button>}>
-            {phone ? <MobileTechnicianMatrix key={`${filters.dateFrom}:${filters.dateTo}:${filters.periodMode}`} data={model.matrizTécnicosDías} metric={matrixMetric} onMetricChange={setMatrixMetric} />
-              : <MatrizTécnicosDías concise key={`${filters.dateFrom}:${filters.dateTo}:${filters.periodMode}:${model.matrizTécnicosDías.overLimit}:${model.matrizTécnicosDías.blocks.length}`} data={model.matrizTécnicosDías} currentBucketKey={model.matrizTécnicosDías.currentBucketKey} metric={matrixMetric} onMetricChange={setMatrixMetric} onSelectTecnico={id => change("fTécnicos", [id])} onSelectSucursal={s => change("fSucursales", [s])} />}
+        <TabsContent value="cumplimiento" className="min-w-0">
+          <OperationsPanel title="Matriz de técnicos por período" padded={!phone}>
+            {phone ? <MobileTechnicianMatrix key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}`} data={model.matrizTécnicosDías} metric={matrixMetric} onMetricChange={setMatrixMetric} />
+              : <MatrizTécnicosDías concise key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}:${model.matrizTécnicosDías.overLimit}:${model.matrizTécnicosDías.blocks.length}`} data={model.matrizTécnicosDías} currentBucketKey={model.matrizTécnicosDías.currentBucketKey} metric={matrixMetric} onMetricChange={setMatrixMetric} onSelectTecnico={id => change("fTécnicos", [id])} onSelectSucursal={s => change("fSucursales", [s])} />}
           </OperationsPanel>
-          {showComplianceAnalysis && <>
-            <div className="grid min-w-0 items-start gap-3 xl:grid-cols-2"><ComplianceOverview model={model} /><Block title="No realizadas por técnico"><TecnicosNoRealizadosRanking rows={model.tecnicosNoRealizados} onSelect={id => change("fTécnicos", [id])} /></Block></div>
-            <ActivityTable model={model} />
-            <div className="grid min-w-0 gap-4 lg:grid-cols-2"><Block title="Estado de trabajos"><EstadoCompacto flujo={model.flujo} onSelect={s => change("fEstadosTrabajo", s === "all" ? [] : [s])} planificados={model.trabajosPlanificadosPróximoPeriodo} técnicosAsignados={model.técnicosPróximoPeriodo} jornadasPlanificadas={model.jornadasPlanificacion.length} planificacionRango={model.planificacionRango} jornadasPrev={model.jornadasRealizadasPrev.length} horasPrev={model.horasPrev} tecnicosCierreAnterior={model.tecnicosCierreAnterior} cierreAnteriorRango={model.cierreAnteriorRango} /></Block><Block title="Carga por sucursal"><CargaSucursalTabla rows={model.cargaSucursal} onSelect={s => change("fSucursales", [s])} /></Block></div>
-            <Block title="Seguimiento OS/TR"><JobFollowup model={model} /></Block>
-            <Block title="Trabajos abiertos sin cierre"><TrabajosAbiertosList rows={model.trabajosAbiertosSinCierre} onSelect={row => openJob(row.id)} /></Block>
-            <Block title="Distribución por marca"><DistribucionMarca data={model.cargaMarca} selected={filters.fMarcas} onSelect={m => change("fMarcas", [m])} /></Block>
-            {hasSectionAccess("servicios.trabajos") && <Link className="inline-flex min-h-11 items-center text-[13px] text-primary" to="/trabajos">Abrir Trabajos</Link>}
-          </>}
         </TabsContent>
       </>}
     </Tabs>

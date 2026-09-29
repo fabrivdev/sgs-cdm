@@ -1112,28 +1112,8 @@ const matrizTécnicosDías = useMemo(() => {
       if (bucketMode === "anio") return format(d, "yyyy");
       return `${getISOWeekYear(d)}-W${String(getISOWeek(d)).padStart(2, "0")}`;
     };
-    const bucketLabel = (key: string) => {
-      if (bucketMode === "dia") {
-        const d = parseISO(key);
-        return `${["D", "L", "M", "X", "J", "V", "S"][getDay(d)]} ${format(d, "dd")}`;
-      }
-      if (bucketMode === "mes") {
-        const [y, m] = key.split("-");
-        return format(new Date(Number(y), Number(m) - 1, 1), "MMM yy");
-      }
-      if (bucketMode === "anio") return key;
-      const w = key.split("-W")[1];
-      return `Sem ${Number(w)}`;
-    };
-
-    const bucketsSet = new Set<string>();
-    if (bucketMode === "dia") {
-      let cursor = periodStart;
-      while (cursor <= periodEnd) {
-        bucketsSet.add(format(cursor, "yyyy-MM-dd"));
-        cursor = addDays(cursor, 1);
-      }
-    }
+    // Preserve empty periods as columns: activity must not determine the timeline.
+    const bucketsSet = new Set(agendaBuckets(periodStart, periodEnd, bucketMode));
 
     const visibleTrabajoIds = new Set(trabajosResumen.map((row) => row.id));
     const trabajoById = new Map(trabajos.map((trabajo) => [trabajo.id, trabajo]));
@@ -1274,41 +1254,9 @@ const matrizTécnicosDías = useMemo(() => {
       }
     }
 
-    if (bucketsSet.size === 0) {
-      if (bucketMode === "dia") {
-        let cursor = periodStart;
-        while (cursor <= periodEnd) {
-          bucketsSet.add(format(cursor, "yyyy-MM-dd"));
-          cursor = addDays(cursor, 1);
-        }
-      } else if (bucketMode === "semana") {
-        const start = startOfWeek(periodStart, { weekStartsOn: 1 });
-        const end = endOfWeek(periodEnd, { weekStartsOn: 1 });
-        let cursor = start;
-        while (cursor <= end) {
-          bucketsSet.add(`${getISOWeekYear(cursor)}-W${String(getISOWeek(cursor)).padStart(2, "0")}`);
-          cursor = addWeeks(cursor, 1);
-        }
-      } else if (bucketMode === "mes") {
-        let cursor = startOfMonth(periodStart);
-        const end = startOfMonth(periodEnd);
-        while (cursor <= end) {
-          bucketsSet.add(format(cursor, "yyyy-MM"));
-          cursor = addMonths(cursor, 1);
-        }
-      } else {
-        let cursor = startOfYear(periodStart);
-        const end = startOfYear(periodEnd);
-        while (cursor <= end) {
-          bucketsSet.add(format(cursor, "yyyy"));
-          cursor = addYears(cursor, 1);
-        }
-      }
-    }
-
     const buckets = Array.from(bucketsSet).sort();
     const overLimit = buckets.length > 31;
-    const bucketLabels = Object.fromEntries(buckets.map((key) => [key, bucketLabel(key)]));
+    const bucketLabels = Object.fromEntries(buckets.map((key) => [key, agendaBucketLabel(key, bucketMode)]));
     const currentBucketKey = inRange(todayStr, periodStart, periodEnd) ? bucketKey(todayStr) : null;
 
     const blocks = Array.from(rowsBySucursal.entries())
