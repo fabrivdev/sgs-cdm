@@ -10,6 +10,7 @@ import { AlertTriangle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CompactListTable } from "@/components/lists/CompactListTable";
 import { MobileRecord } from "@/components/lists/MobileRecord";
+import { scrollTableClass } from "@/components/ventas/TableScroll";
 
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
@@ -55,9 +56,9 @@ export function PurchaseSuggestionTable({ rows, sort, onSort, onSelect, leadTime
       { key: "stock_global", label: "Stock", kind: "number", align: "right", width: "w-[60px]", value: row => row.stock_global, render: row => decimal.format(row.stock_global) },
       { key: "sugerencia_unidades", label: "Sug.", kind: "number", align: "right", width: "w-[60px]", value: row => row.sugerencia_unidades, render: row => <span className={row.sugerencia_unidades > 0 ? "font-semibold text-primary" : undefined}>{integer.format(row.sugerencia_unidades)}</span> },
     ]} />;
-  return <Table className="table-fixed" aria-label="Sugerencia de compra">
+  return <Table className="table-fixed" aria-label="Sugerencia de compra" containerClassName={scrollTableClass(rows.length)}>
     <colgroup>{suggestionColumns.map((column, index) => <col key={column.key} className={widthClasses[index]} />)}</colgroup>
-    <TableHeader><TableRow>{suggestionColumns.map(column => <TableHead key={column.key}
+    <TableHeader className="sticky top-0 z-10 bg-card"><TableRow>{suggestionColumns.map(column => <TableHead key={column.key}
       className={cn(tableHeadText, "h-8 whitespace-nowrap px-1 md:px-2", !phoneColumns.has(column.key) && "hidden md:table-cell", column.align === "center" ? "text-center" : "text-left")}
       aria-sort={sort.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
       <SalesSortButton label={column.label} kind={column.kind} align={column.align} active={sort.key === column.key}

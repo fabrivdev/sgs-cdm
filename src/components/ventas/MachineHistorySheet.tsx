@@ -4,6 +4,7 @@ import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/com
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import type { SalesColumn } from "./salesTableInteraction";
 import { serviceSalesError } from "@/lib/serviceSalesError";
 import { supabase } from "@/integrations/supabase/client";
@@ -314,8 +315,9 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
           <FilterSelect label="Tipo de tiempo" value={timeType} onChange={setTimeType} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantía", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "Por confirmar", label: "Por confirmar" }, { value: "Sin desglose", label: "Sin desglose" }]} />
           <FilterSelect label="Estado" value={status} onChange={setStatus} placeholder="Todos" options={statusOptions} />
           <FilterSelect label="Factura" value={invoiceStatus} onChange={setInvoiceStatus} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, { value: "CON", label: "Con factura" }, { value: "SIN", label: "Sin factura" }]} />
-          <Input aria-label="Desde" type="date" value={from} onChange={event => setFrom(event.target.value)} />
-          <Input aria-label="Hasta" type="date" value={to} onChange={event => setTo(event.target.value)} />
+          <QuickPeriodFilter from={from} to={to} onChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }} />
+          <Input aria-label="Desde" type="date" value={from} max={to || undefined} onChange={event => setFrom(event.target.value)} />
+          <Input aria-label="Hasta" type="date" value={to} min={from || undefined} onChange={event => setTo(event.target.value)} />
         </>}
         secondaryActions={<SectionActionsMenu options={table.action ? [table.action] : []} />} />
       {machineError && <p role="alert" className="text-xs text-destructive">{machineError}</p>}

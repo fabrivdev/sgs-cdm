@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { scrollTableClass } from "@/components/ventas/TableScroll";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MODULOS, MODULO_LABELS, ROLES, ROLE_LABELS, SUCURSALES, nivelLabel, type AssignableRole, type Modulo, type Role, type Sucursal } from "@/lib/constants";
@@ -644,8 +645,8 @@ export default function Admin() {
           )}
 
           <Card className="hidden overflow-hidden md:block">
-            <Table>
-              <TableHeader>
+            <Table containerClassName={scrollTableClass(filteredProfiles.length)}>
+              <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead>{equipoTable.heading("persona")}</TableHead>
                   <TableHead>{equipoTable.heading("cuenta")}</TableHead>
@@ -773,8 +774,8 @@ export default function Admin() {
               <Badge variant="outline">{profilesConAcceso.length} accesos</Badge>
             </div>
             <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
+              <Table containerClassName={scrollTableClass(filteredProfilesConAcceso.length)}>
+                <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
                     <TableHead>{accessTable.heading("persona")}</TableHead>
                     <TableHead>{accessTable.heading("cuenta")}</TableHead>

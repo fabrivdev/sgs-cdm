@@ -6,6 +6,7 @@ import type { SalesColumn, SalesSort } from "@/components/ventas/salesTableInter
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SlidersHorizontal } from "lucide-react";
+import { scrollTableClass } from "@/components/ventas/TableScroll";
 
 export type CompactListColumn<T> = SalesColumn<T> & {
   width: string;
@@ -32,10 +33,11 @@ export function CompactListTable<T>({ rows, columns, mobileColumns, id, label, s
 }) {
   const phone = useIsMobile(640);
   const displayedColumns = phone && mobileColumns ? mobileColumns : columns;
-  return <Table className="compact-list-table table-fixed" aria-label={label}>
+  return <Table className="compact-list-table table-fixed" aria-label={label}
+    containerClassName={scrollTableClass(rows.length)}>
     <colgroup>{displayedColumns.map(column => <col key={column.key} className={cn(column.width, column.hiddenBelow && visibility[column.hiddenBelow][0])} />)}
       {actions && <col className={actions.width} />}</colgroup>
-    <TableHeader><TableRow>{displayedColumns.map((column, index) => <TableHead key={column.key}
+    <TableHeader className="sticky top-0 z-10 bg-card"><TableRow>{displayedColumns.map((column, index) => <TableHead key={column.key}
       className={cn("h-9 overflow-hidden whitespace-nowrap px-1 text-[12px] sm:px-2 max-md:[&_button]:min-h-11 max-md:[&_span]:whitespace-normal max-md:[&_span]:overflow-visible", axis(column.align), column.hiddenBelow && visibility[column.hiddenBelow][1])}
       aria-sort={sort?.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
       <div className="flex min-w-0 items-center gap-1">

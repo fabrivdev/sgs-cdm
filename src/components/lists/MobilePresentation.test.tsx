@@ -25,6 +25,15 @@ function setup() {
   return {sort, select};
 }
 describe("phone-specific record presentation", () => {
+  it("caps long lists at the same scroll height as Sales without dropping rows", () => {
+    const rows = Array.from({ length: 21 }, (_, index) => ({ ...row, id: String(index) }));
+    const view = render(<CompactListTable rows={rows} columns={columns} id={item => item.id} label="Lista larga" />);
+    const table = screen.getByRole("table", { name: "Lista larga" });
+    expect(within(table).getAllByRole("row")).toHaveLength(22);
+    expect(table.parentElement).toHaveClass("max-h-[56vh]", "md:max-h-[480px]");
+    view.rerender(<CompactListTable rows={rows.slice(0, 20)} columns={columns} id={item => item.id} label="Lista larga" />);
+    expect(table.parentElement).not.toHaveClass("max-h-[56vh]");
+  });
   it.each([320, 390, 639])("shows grouped identity only on a phone (%i px)", width => {
     viewport.width = width; setup();
     const cells = within(screen.getAllByRole("row")[1]).getAllByRole("cell");

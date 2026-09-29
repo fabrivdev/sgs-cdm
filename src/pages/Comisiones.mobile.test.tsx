@@ -51,4 +51,14 @@ describe("Comisiones: presentación del teléfono", () => {
     const empty = await screen.findByText("Sin órdenes para mostrar");
     expect(empty.closest("td")).toHaveAttribute("colspan", "3");
   });
+  it("pagina de a veinte OS sin ocultar las siguientes", async () => {
+    const base = mocks.rows[0];
+    mocks.rows = Array.from({ length: 21 }, (_, index) => ({ ...base, id: `journey-${index + 1}`, os_numero: String(index + 1).padStart(9, "0") }));
+    render(<Comisiones />);
+    expect(await screen.findByText("1 de 2 · 21 OS")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^OS 0{0,8}\d+ Cliente de prueba/ })).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(screen.getByText("2 de 2 · 21 OS")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^OS 0{0,8}\d+ Cliente de prueba/ })).toHaveLength(1);
+  });
 });

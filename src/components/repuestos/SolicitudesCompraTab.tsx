@@ -1,6 +1,7 @@
 import { sortSalesRows, type SalesColumn, type SalesSort } from "@/components/ventas/salesTableInteraction";
 import { PurchaseInfo, PurchaseTableHeading } from "./PurchaseTableHeading";
 import { CompactListOrderMenu } from "@/components/lists/CompactListTable";
+import { scrollTableClass } from "@/components/ventas/TableScroll";
 import { MobileRecord } from "@/components/lists/MobileRecord";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { purchaseCell, purchaseHead, purchaseMoney, purchaseQuantity } from "./purchaseTableFormat";
@@ -301,10 +302,10 @@ export function SolicitudesCompraTab() {
         )}
 
         <div className="overflow-hidden rounded-md border">
-          <Table className="table-fixed" aria-label="Solicitudes de compra">
+          <Table className="table-fixed" aria-label="Solicitudes de compra" containerClassName={scrollTableClass(gruposFiltrados.length)}>
             <colgroup><col className="w-11 sm:w-[4%]" /><col className="hidden sm:table-column sm:w-[15%]" /><col className="w-auto sm:w-[16%]" />
               <col className="hidden sm:table-column sm:w-[15%]" /><col className="hidden sm:table-column sm:w-[42%]" /><col className="w-[58px] sm:w-[8%]" /></colgroup>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead className={cn(purchaseHead, "max-sm:px-0")}><span className="sm:hidden"><CompactListOrderMenu label="solicitudes de compra" columns={columns} sort={{key:sortKey,direction:sortDir}} onSort={key=>toggleSort(key as SolicitudSortKey)} /></span></TableHead>
                 {columns.map(column=><PurchaseTableHeading key={column.key} column={column} sort={{key:sortKey,direction:sortDir}}
@@ -365,9 +366,9 @@ export function SolicitudesCompraTab() {
                     {isOpen && (
                       <TableRow>
                         <TableCell colSpan={isPhone ? 3 : 6} className="bg-muted/30 p-0">
-                          <Table className="table-fixed" aria-label={`Ítems de la solicitud ${grupo.nroSolicitud}`}>
+                          <Table className="table-fixed" aria-label={`Ítems de la solicitud ${grupo.nroSolicitud}`} containerClassName={scrollTableClass(lineasVisibles.length)}>
                             <colgroup>{["hidden sm:table-column sm:w-[5%]","w-auto sm:w-[18%]","hidden sm:table-column sm:w-[29%]","w-[60px] sm:w-[8%]","w-[92px] sm:w-[12%]","hidden sm:table-column sm:w-[14%]","hidden sm:table-column sm:w-[14%]"].map((width,index)=><col key={index} className={width} />)}</colgroup>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 z-10 bg-card">
                               <TableRow>
                                 {itemColumns.map(column=><PurchaseTableHeading key={column.key} column={column} sort={itemSort} onSort={toggleItemSort}
                                   actions={isPhone && column.key === "producto" ? <CompactListOrderMenu label={`ítems de la solicitud ${grupo.nroSolicitud}`} columns={itemColumns} sort={itemSort} onSort={toggleItemSort} /> : undefined}

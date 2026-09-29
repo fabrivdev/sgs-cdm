@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { salesHeader } from "./TableScroll";
+import { salesHeader, scrollTableClass } from "./TableScroll";
 import { salesColumnClass } from "./salesTableFormat";
 
 describe("sales column alignment", () => {
+  it("caps the viewport after twenty rows without truncating the dataset", () => {
+    expect(scrollTableClass(20)).toBeUndefined();
+    expect(scrollTableClass(21)).toContain("md:max-h-[480px]");
+  });
   it.each(["Marca", "Condición", "Cliente facturado", "Vendedor", "Descripción", "Factura", "Chasis", "Código", "Última venta"])("left-aligns text: %s", label => {
     expect(salesColumnClass(label)).toBe("text-left");
   });

@@ -9,6 +9,7 @@ import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { trabajoReferencia } from "@/lib/trabajos";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMultiSelect";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
 import { format, parseISO } from "date-fns";
@@ -225,6 +226,7 @@ export function TrabajosOSTab({
         onClear={limpiar}
         meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} · ${fmtNum(totales.horas)} h`}
       >
+        <QuickPeriodFilter from={fDesde} to={fHasta} onChange={(nextFrom, nextTo) => { setFDesde(nextFrom); setFHasta(nextTo); }} />
         <FilterMultiSelect
           label="Sucursal" values={fSucursales} onChange={setFSucursales} placeholder="Todas" width="w-[150px]"
           options={SUCURSALES.map(s => ({ value: s, label: s }))}
@@ -237,8 +239,8 @@ export function TrabajosOSTab({
           label="Sit. Fact." values={fSitFac} onChange={setFSitFac} placeholder="Todas" width="w-[150px]"
           options={sitFacOpts.map(s => ({ value: s, label: s }))}
         />
-        <FilterDate label="Desde" value={fDesde} onChange={setFDesde} title="Fecha apertura OS desde" />
-        <FilterDate label="Hasta" value={fHasta} onChange={setFHasta} title="Fecha apertura OS hasta" />
+        <FilterDate label="Desde" value={fDesde} onChange={setFDesde} title="Fecha apertura OS desde" max={fHasta || undefined} />
+        <FilterDate label="Hasta" value={fHasta} onChange={setFHasta} title="Fecha apertura OS hasta" min={fDesde || undefined} />
       </FiltersBar>
 
       {loading ? (

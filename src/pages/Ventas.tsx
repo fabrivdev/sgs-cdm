@@ -4,7 +4,7 @@ import { useSalesMobile, useSalesExplorerView } from "@/components/ventas/salesM
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { salesHeader } from "@/components/ventas/TableScroll";
+import { salesHeader, TableScroll } from "@/components/ventas/TableScroll";
 import { AlertTriangle, ChevronDown, FileText, Receipt, Users } from "lucide-react";
 import { differenceInCalendarDays, endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, startOfMonth, startOfWeek, startOfYear, subMonths, subWeeks } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,8 +85,9 @@ function formatMetric(value: number, metric: PivotMetric) {
 
 function SalesLines({area,lines}:{area:VentasArea;lines:SalesLine[]}) {
   return <div className="border-b bg-muted/15 px-5 py-2">
+    <TableScroll rows={lines.length}>
     <table className="w-full table-fixed text-[11px] [&_th]:py-2 [&_th]:pr-3 [&_th]:font-medium [&_td]:py-2 [&_td]:pr-3 [&_td]:align-top">
-      <thead className={`text-left text-muted-foreground ${salesHeader}`}><tr>
+      <thead className={`sticky top-0 z-10 bg-muted text-left text-muted-foreground ${salesHeader}`}><tr>
         {area === "servicios" && <><th className="w-[150px] text-left">Factura</th><th className="w-[90px] text-left">Fecha</th><th className="w-[110px] text-left">Componente</th></>}
         <th className="w-[135px] text-left">{area === "maquinas" ? "Modelo" : "Cód. repuesto"}</th><th className="w-[145px] text-left">{area === "maquinas" ? "Chasis" : "Cód. fabricante"}</th><th className="text-left">Descripción</th><th className="w-[80px] text-center">Cantidad</th><th className="w-[120px] text-right">Importe</th>
       </tr></thead>
@@ -95,6 +96,7 @@ function SalesLines({area,lines}:{area:VentasArea;lines:SalesLine[]}) {
         <td className="break-all font-mono text-foreground">{area === "maquinas" ? cleanModel(line.modelo) : line.codigo || "—"}</td><td className="break-all font-mono text-foreground">{area === "maquinas" ? line.chasis || "—" : line.codigo_fabricante || "—"}</td><td className="break-words">{line.descripcion || (line.metodologia==="historico"?"Histórico sin detalle de artículo":"—")}{line.es_nota_credito && <span className="ml-2 text-muted-foreground">Nota de crédito</span>}</td><td className="text-center tabular-nums">{quantity.format(Number(line.cantidad))}</td><td className="text-right tabular-nums">{money.format(Number(line.total_venta))}</td>
       </tr>)}</tbody>
     </table>
+    </TableScroll>
   </div>;
 }
 
@@ -253,11 +255,11 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[1050px] text-xs [&_th]:px-3 [&_th]:py-3 [&_th]:font-medium [&_td]:px-3 [&_td]:py-3">
               <thead className={`border-b bg-muted/50 text-left text-muted-foreground ${salesHeader}`}><tr><th className="text-left">#</th><th className="w-[24%] text-left">Cliente</th><th className="text-left">Sucursal</th><th className="text-left">Última compra</th>{area === "servicios" && <th className="text-center">OS identificadas</th>}<th className="text-center">Facturas</th><th className="text-right">Promedio / factura</th><th className="text-right">Año anterior</th><th className="text-right">Variación</th><th className="text-right">Actual</th><th className="w-[130px] text-right">Participación</th></tr></thead>
-              <tbody>{clients.slice((clientPage-1)*25,clientPage*25).map((client,i)=>{
+              <tbody>{clients.slice((clientPage-1)*20,clientPage*20).map((client,i)=>{
                 const share = (data?.total ?? 0)>0 ? Number(client.importe)/Number(data!.total)*100 : null;
                 const change = clientData?.comparable && client.importe_anterior != null && Number(client.importe_anterior)>0 ? (Number(client.importe)/Number(client.importe_anterior)-1)*100 : null;
                 return <tr key={client.nombre} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="text-muted-foreground">{(clientPage-1)*25+i+1}</td><td className="font-medium">{client.nombre}</td><td className="text-muted-foreground">{client.sucursales || "—"}</td><td className="whitespace-nowrap">{client.ultima ? shortDate.format(new Date(client.ultima+"T00:00:00")) : "—"}</td>
+                  <td className="text-muted-foreground">{(clientPage-1)*20+i+1}</td><td className="font-medium">{client.nombre}</td><td className="text-muted-foreground">{client.sucursales || "—"}</td><td className="whitespace-nowrap">{client.ultima ? shortDate.format(new Date(client.ultima+"T00:00:00")) : "—"}</td>
                   {area === "servicios" && <td className="text-center tabular-nums">{client.ordenes}</td>}<td className="text-center tabular-nums">{client.facturas}</td><td className="text-right tabular-nums">{client.facturas ? money.format(Number(client.importe)/client.facturas) : "—"}</td>
                   <td className="text-right tabular-nums">{client.importe_anterior == null ? "—" : money.format(Number(client.importe_anterior))}</td>
                   <td className={cn("text-right tabular-nums whitespace-nowrap",change != null && (change<0 ? "text-red-700" : "text-green-700"))} title={!clientData?.comparable ? "La clasificación histórica no permite comparar el porcentaje de forma homogénea." : undefined}>{change == null ? "—" : (change>0 ? "+" : "")+change.toFixed(1)+"%"}</td>
@@ -265,7 +267,7 @@ export function SalesExplorer({ area, data, loading, desde, hasta, sucursal, bus
                 </tr>;
               })}</tbody>
             </table>{!clients.length && <div className="py-10 text-center text-muted-foreground">{copy.empty}</div>}
-            <Pager page={clientPage} pages={Math.max(1,Math.ceil(clients.length/25))} total={clients.length} onChange={setClientPage}/>
+            <Pager page={clientPage} pages={Math.max(1,Math.ceil(clients.length/20))} total={clients.length} onChange={setClientPage}/>
           </div>)}
         </div>
       ) : (

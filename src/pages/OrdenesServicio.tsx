@@ -5,6 +5,7 @@ import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target, Percent, Calen
 import { PageHeader, PageShell, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Button } from "@/components/ui/button";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
@@ -183,6 +184,8 @@ export function OrdersWorkspace() {
           <FilterMultiSelect label="Rubro OS" values={filters.fOSRubros} onChange={v => change("fOSRubros", v as OperationsFilters["fOSRubros"])} options={["Servicio", "Repuestos", "Kilometraje"].map(value => ({ value, label: value }))} />
         </>}
       </>}>
+        <QuickPeriodFilter from={filters.dateFrom} to={filters.dateTo} endAtToday
+          onChange={(dateFrom, dateTo, periodMode) => setFilters(previous => ({ ...previous, dateFrom, dateTo, periodMode }))} />
         <FilterDate label="Desde" value={filters.dateFrom} onChange={v => change("dateFrom", v)} max={filters.dateTo} />
         <FilterDate label="Hasta" value={filters.dateTo} onChange={v => change("dateTo", v)} min={filters.dateFrom} />
         <FilterMultiSelect label="Sucursal" values={filters.fSucursales} onChange={v => change("fSucursales", v)} options={SUCURSALES.map(value => ({ value, label: value }))} />

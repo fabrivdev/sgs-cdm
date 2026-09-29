@@ -34,6 +34,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 import { useSectionTable } from "@/components/exports/useSectionTable";
@@ -283,6 +284,7 @@ export default function Comisiones() {
   const isPhone = useIsMobile(640);
   const [initialDateRange] = useState(storedDateRange);
   const [view, setView] = useState<View>("cerradas");
+  const [orderPage, setOrderPage] = useState(1);
   const [from, setFrom] = useState(initialDateRange.from);
   const [to, setTo] = useState(initialDateRange.to);
   const [rows, setRows] = useState<CommissionRow[]>([]);
@@ -536,6 +538,9 @@ export default function Comisiones() {
   ];
   const orderTable = useSectionTable({ rows: detailSource, columns: orderColumns, title: "OS de Comisiones", fileName: "comisiones-os.xlsx", initialSort: { key: "periodo", direction: "desc" } });
   const detailOrders = orderTable.ordered;
+  const orderPages = Math.max(1, Math.ceil(detailOrders.length / 20));
+  const visibleOrderPage = Math.min(orderPage, orderPages);
+  useEffect(() => setOrderPage(1), [from, to, searchFilter, view, osStateFilters, technicianFilters]);
   const exportOptions = useMemo<TableExportOption[]>(() => {
     if (view === "liquidaciones") {
       return [{
@@ -653,7 +658,7 @@ export default function Comisiones() {
           <TableHead className={cn(tableHeadText, "w-[86px] whitespace-nowrap px-2")}>{orderTable.heading("pago")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>
-          {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 11 : 10} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={(isPhone ? 2 : isCompact ? 3 : 10) + (view !== "abiertas" ? 1 : 0)} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice(0, 500).map((order) => {
+          {loading ? <TableSkeletonRows columns={view !== "abiertas" ? 11 : 10} rows={6} /> : detailOrders.length === 0 ? <TableRow><TableCell colSpan={(isPhone ? 2 : isCompact ? 3 : 10) + (view !== "abiertas" ? 1 : 0)} className="h-20 p-0"><EmptyState title="Sin órdenes para mostrar" className="border-0 bg-transparent" /></TableCell></TableRow> : detailOrders.slice((visibleOrderPage - 1) * 20, visibleOrderPage * 20).map((order) => {
             const orderIds = order.rows.filter((row) => selectableIdSet.has(row.id)).map((row) => row.id);
             const orderSelected = orderIds.length > 0 && orderIds.every((id) => selected.has(id));
             const inactiveTechnician = order.rows.some((row) => !isActiveTechnician(row));
@@ -676,7 +681,11 @@ export default function Comisiones() {
         </TableBody>
       </Table></div></div>
 
-      {detailOrders.length > 500 && <div className={cn(metaText, "border-t px-3 py-2")}>Se muestran las primeras 500 OS.</div>}
+      {detailOrders.length > 20 && <div className="flex items-center justify-end gap-2 border-t px-3 py-2 text-[12px] text-muted-foreground">
+        <span>{visibleOrderPage} de {orderPages} · {detailOrders.length} OS</span>
+        <Button type="button" variant="outline" size="sm" disabled={visibleOrderPage === 1} onClick={() => setOrderPage(page => page - 1)}>Anterior</Button>
+        <Button type="button" variant="outline" size="sm" disabled={visibleOrderPage === orderPages} onClick={() => setOrderPage(page => page + 1)}>Siguiente</Button>
+      </div>}
     </Panel>
   );
 
@@ -718,8 +727,9 @@ export default function Comisiones() {
             meta={`${detailOrders.length} OS`}
             secondaryActions={orderTable.action && !loading && !loadError && !schemaMissing ? <TableExportButton options={exportOptions} /> : undefined}
           >
-            <FilterDate label="Desde" value={from} onChange={setFrom} />
-            <FilterDate label="Hasta" value={to} onChange={setTo} />
+            <QuickPeriodFilter from={from} to={to} onChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }} />
+            <FilterDate label="Desde" value={from} onChange={setFrom} max={to} />
+            <FilterDate label="Hasta" value={to} onChange={setTo} min={from} />
             <FilterMultiSelect
               label="Estado OS"
               values={osStateFilters}

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { salesDate, type SalesColumn, type SalesSort } from "./salesTableInteraction";
 import { SalesSortButton } from "./SalesTableControls";
 import { useSalesMobile } from "./salesMobileContext";
+import { TableScroll } from "./TableScroll";
 
 type Column<T> = SalesColumn<T> & { render?: (row: T) => ReactNode };
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
@@ -72,14 +73,16 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
     </PopoverContent></Popover>;
   return <section aria-label={title} className={cn("min-w-0 overflow-hidden", !embedded && "rounded-md border", mobile.active && "sales-flat-table")}>
     {!embedded && <div className="flex items-center justify-between gap-2 border-b pl-3"><h3 className="text-[13px] font-semibold">{title}</h3>{controls}</div>}
+    <TableScroll rows={rows.length}>
     <table className="w-full table-fixed text-[13px] [&_th_button]:min-h-11 [&_th_span]:whitespace-normal [&_th_span]:overflow-visible" aria-label={title}>
       <colgroup><col />{hasCount && <col className="w-11" />}<col className={hasCount ? "w-[46%]" : "w-[42%]"} /><col className={mobile.active ? "w-8" : "w-11"} /></colgroup>
-      <thead className="bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className={cn("py-0", c === count ? "px-1" : "px-2")} aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
+      <thead className="sticky top-0 z-10 bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className={cn("py-0", c === count ? "px-1" : "px-2")} aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
         <SalesSortButton label={c === primary ? primaryLabel ?? c.label : c === count ? countLabel ?? c.label : metricLabel && c.key === (metricKey ?? "total") ? metricLabel : c.label} kind={c.kind} align={c === amount ? amountAlign : c === count ? "center" : "left"} active={sort.key === c.key} direction={sort.direction} onClick={() => toggleSort(c.key)} />
       </th>)}<th className="relative p-0"><span className="sr-only left-0 top-0">Detalle</span>{embedded && controls}</th></tr></thead>
       <tbody>{rows.length ? rows.map(row => renderRow(row)) : <tr><td colSpan={shown.length + 1} className="p-4 text-center text-muted-foreground">{empty}</td></tr>}</tbody>
       {footer && rows.length > 0 && <tfoot>{renderRow(footer, true)}</tfoot>}
     </table>
+    </TableScroll>
     <ResponsiveDrawer open={detail !== undefined} onOpenChange={open => { if (!open) setDetailKey(null); }}>
       <ResponsiveDrawerHeader><h2 className="text-base font-semibold">{title} · detalle</h2></ResponsiveDrawerHeader>
       <ResponsiveDrawerBody><dl className="divide-y">{detail && columns.map(c => <div key={c.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3 py-3 text-[13px]">

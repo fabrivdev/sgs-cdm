@@ -72,6 +72,8 @@ Validación local: 35 pruebas de Detalle, tabla móvil y filtros/navegación de 
 
 ## Orden y exportación compartidos
 
+Actualización local del 29/09/2026: `TableScroll.tsx` mantiene el umbral de 20 registros; `MobileSalesTable.tsx` ahora limita también el alto de listas largas sin recortar filas ni Excel. En el explorador heredado de Ventas, Clientes pagina de a 20 (antes 25) y el detalle de líneas de un documento usa scroll si supera 20. No cambia totales, orden, permisos ni fuentes. La verificación es local; no acredita despliegue productivo.
+
 - Los importes editables de pedidos de máquinas usan convención local: punto para miles y coma para decimales (`1.500`, `1.500.000`, `1.500.000,50`). Nuevo pedido, edición del pedido y edición rápida del valor comparten el mismo parser; no pasar el texto local directamente a `Number`, porque transforma `1.500` en `1,5` o rechaza múltiples separadores.
 - Toda descarga Excel debe salir con extensión `.xlsx` explícita, incluso si la pantalla entrega solo un nombre base. La normalización se aplica en el límite compartido de exportación para cubrir Dashboard, historial de OS/repuestos de máquina y futuras tablas sin depender de cada llamador.
 

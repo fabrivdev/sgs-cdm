@@ -4,13 +4,14 @@ import { cn } from "@/lib/utils";
 /** Listas de ventas: mismo comportamiento en todas las secciones. */
 export const SCROLL_THRESHOLD = 20;
 export const scrollHead = "sticky top-0 z-10";
+export const scrollTableClass = (rows: number) => rows > SCROLL_THRESHOLD
+  ? "max-h-[56vh] overflow-y-auto [scrollbar-gutter:stable] md:max-h-[480px]" : undefined;
 /** Same alignment and subtle column boundaries in all sales reports. */
 export const salesHeader = "text-left [&_th]:align-middle [&>div]:self-center [&_th:not(:first-child)]:border-l [&_th]:border-border/40 [&>div:not(:first-child)]:border-l [&>div]:border-border/40";
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 
 export function TableScroll({ rows, children, className }: { rows: number; children: ReactNode; className?: string }) {
-  const scrolls = rows > SCROLL_THRESHOLD;
-  return <div className={cn(scrolls && "max-h-[56vh] overflow-y-auto [scrollbar-gutter:stable] md:max-h-[480px]", className)}>{children}</div>;
+  return <div className={cn(scrollTableClass(rows), className)}>{children}</div>;
 }
 
 export function RowCount({ rows, loaded, label = "registros", className }: { rows: number; loaded?: number; label?: string; className?: string }) {

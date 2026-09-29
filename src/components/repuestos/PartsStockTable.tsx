@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CompactListTable } from "@/components/lists/CompactListTable";
 import { MobileRecord } from "@/components/lists/MobileRecord";
+import { scrollTableClass } from "@/components/ventas/TableScroll";
 
 const branches: { key: StockSortKey & keyof StockMatrizRow; label: string }[] = [
   { key: "santa_rita", label: "S. Rita" },
@@ -46,9 +47,9 @@ export function PartsStockTable({ rows, sortKey, sortDir, onSort, onSelect }: {
       </button> },
       { key: "total", label: "Total", kind: "number", align: "right", value: row => row.total, width: "w-[24%]", render: row => <span className="font-medium">{row.total == null ? "—" : Number(row.total).toLocaleString("es-PY")}</span> },
     ]} />;
-  return <Table className="table-fixed" aria-label="Stock de repuestos">
+  return <Table className="table-fixed" aria-label="Stock de repuestos" containerClassName={scrollTableClass(rows.length)}>
     <colgroup>{columns.map(column => <col key={column.key} className={column.width} />)}</colgroup>
-    <TableHeader><TableRow>{columns.map(column => <TableHead key={column.key}
+    <TableHeader className="sticky top-0 z-10 bg-card"><TableRow>{columns.map(column => <TableHead key={column.key}
       className={cn("h-9 overflow-hidden whitespace-nowrap px-1 lg:px-2 max-lg:[&_span]:whitespace-normal max-lg:[&_span]:break-words max-lg:[&_span]:overflow-visible", responsiveColumn(column.key), column.numeric ? "text-center" : "text-left")}
       aria-sort={column.sortKey ? sortKey === column.sortKey ? sortDir === "asc" ? "ascending" : "descending" : "none" : undefined}>
       {column.sortKey ? <SalesSortButton label={column.label} kind={column.numeric ? "number" : "text"}
