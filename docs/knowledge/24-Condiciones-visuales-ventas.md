@@ -29,6 +29,14 @@ Ventas conserva la composición continua de la opción 2: tres indicadores, rang
 
 Conservar las nueve columnas, sin párrafos adicionales. Las horas principales corresponden a OS/tipos con MO en los filtros actuales; las demás horas se conservan al abrir el técnico y en la descarga por OS. Ceros facturados y ausencias no son equivalentes. Regla funcional, excepciones y SQL manual en [[27-Tecnicos-horas-y-facturacion]].
 
+## Detalle de Servicios — propietario visible (29/09)
+
+En `ServiciosDetalleOS.tsx`, ocultar `Cliente facturado` y mantener `Propietario`: once columnas en escritorio y propietario como identidad principal en móvil. Tampoco ofrecer el facturado en el selector o la ficha móvil de este detalle. Si falta propietario, mantener la ausencia; no sustituirlo por el receptor de la factura ni por el propietario histórico de la OS.
+
+Es un cambio de presentación limitado a esta vista: conservar cliente facturado en la fuente, búsqueda, filtros, identidad de documentos y Excel completo. Esta conservación en Excel es deliberada aunque la columna no esté visible; las otras secciones no cambian. Preservar líneas repetidas, NC, importes, cantidades y orden. La indicación anterior de doce columnas visibles queda reemplazada. Pruebas de regresión: `ServiciosDetalleOS.test.tsx`. No requiere SQL ni acredita despliegue productivo. Este worktree no contiene índice/mapa de conocimiento ni `obsidian-sync.local`; se consultó el contexto del repositorio principal, sin modificarlo ni afirmar sincronización de la bóveda.
+
+Validación local: 35 pruebas de Detalle, tabla móvil y filtros/navegación de Ventas, tipos y ESLint correctos. Navegador con datos ficticios a 320/390/1024/1280 px: sin desbordamiento horizontal, propietario como identidad móvil y sin facturado en la ficha. Se redistribuyó el ancho liberado para evitar encabezados cortados en escritorio, incluyendo espacio para la barra lateral. Compilación correcta con avisos existentes de tamaño de paquetes; sin consulta ni validación de producción.
+
 ## Conciliación de chasis en Ventas de Máquinas
 
 - En Operaciones, adjuntar una factura a una NP no factura el pedido completo ni sus líneas hermanas. Cada unidad queda `Facturada` únicamente si la fuente canónica contiene una venta positiva de maquinaria con el mismo chasis y fecha igual o posterior a la NP. El PDF se conserva como documento, pero no es evidencia suficiente por sí solo.

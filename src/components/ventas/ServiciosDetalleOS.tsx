@@ -29,7 +29,7 @@ const moneyAmount = new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, m
 const usd = { format: (value: number) => `$ ${moneyAmount.format(value)}` };
 // One visual line per financial line: no stacked metadata, wrapping or forced
 // minimum width. Native titles preserve full values when a column truncates.
-const columns = "grid-cols-[minmax(0,.65fr)_minmax(0,1.15fr)_minmax(0,.6fr)_minmax(0,1.35fr)_minmax(0,1.35fr)_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.65fr)_minmax(0,.75fr)_minmax(0,1.75fr)_minmax(0,.45fr)_minmax(0,1fr)]";
+const columns = "grid-cols-[minmax(0,.65fr)_minmax(0,1.15fr)_minmax(0,.8fr)_minmax(0,1.35fr)_minmax(0,.9fr)_minmax(0,1fr)_minmax(0,.8fr)_minmax(0,.75fr)_minmax(0,1.75fr)_minmax(0,.6fr)_minmax(0,1fr)]";
 const cell = "min-w-0 truncate";
 const quantityValue = (row: InvoiceLine) => row.componente === "Mano de obra" || row.componente === "Kilometraje" ? row.cantidad_os : row.cantidad;
 const owner = (row: InvoiceLine) => row.propietario && row.propietario !== "Propietario no informado" ? row.propietario : null;
@@ -48,6 +48,8 @@ const detailColumns: readonly SalesColumn<InvoiceLine>[] = [
   {key:"cantidad",label:"Cant.",kind:"number",value:quantityValue,align:"center"},
   {key:"facturado",label:"Facturado",kind:"number",value:row=>Number(row.total_venta || 0),align:"right",excelFormat:'"$" #,##0.00;"$" -#,##0.00'},
 ];
+// Hide the invoice recipient only in this view; retain it in search, document identity and Excel.
+const visibleColumns = detailColumns.filter(column => column.key !== "cliente");
 function quantity(row: InvoiceLine): { label: string; title: string } {
   const operational = row.componente === "Mano de obra" || row.componente === "Kilometraje";
   const value = quantityValue(row);
@@ -98,7 +100,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
   }, [desde, hasta, sucursal, tipoTiempo, marca, tipoMaquina, filterKey]);
 
   const filtered = useMemo(() => lines.filter(line => matchesServiceSalesSearch(line, buscar)), [lines, buscar]);
-  const { ordered: rows, sort, toggleSort } = useSalesTableSort(filtered, detailColumns, { key:"fecha", direction:"desc" });
+  const { ordered: rows, sort, toggleSort } = useSalesTableSort(filtered, visibleColumns, { key:"fecha", direction:"desc" });
   const documents = useMemo(() => new Set(rows.map(row => JSON.stringify([
     row.factura, row.fecha, row.cliente, row.sucursal, Boolean(row.es_nota_credito),
     !row.factura || row.factura === "Sin numero" ? row.id : null,
@@ -112,7 +114,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
 
   if (isMobile) return <div className="mt-3">
     {loading ? <p role="status">Cargando…</p> : error ? <p role="alert" className="text-destructive">{error}</p> : <>
-      <MobileSalesTable title="Detalle de facturación" rows={rows} columns={detailColumns.map(c => c.key === "factura" ? {...c,render:(r:InvoiceLine)=>`${r.es_nota_credito?"NC ":""}${r.factura||"Sin número"}`} : c.key === "chasis" ? {...c,render:(r:InvoiceLine)=>r.chasis?<button type="button" className="min-h-11 text-primary underline" onClick={()=>setDetailTarget({chassis:r.chasis,os:null})}>{r.chasis}</button>:"—"} : c.key === "facturado" ? {...c,render:(r:InvoiceLine)=>usd.format(Number(r.total_venta||0))} : c)} primaryKey="cliente" rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
+      <MobileSalesTable title="Detalle de facturación" rows={rows} columns={visibleColumns.map(c => c.key === "factura" ? {...c,render:(r:InvoiceLine)=>`${r.es_nota_credito?"NC ":""}${r.factura||"Sin número"}`} : c.key === "chasis" ? {...c,render:(r:InvoiceLine)=>r.chasis?<button type="button" className="min-h-11 text-primary underline" onClick={()=>setDetailTarget({chassis:r.chasis,os:null})}>{r.chasis}</button>:"—"} : c.key === "facturado" ? {...c,render:(r:InvoiceLine)=>usd.format(Number(r.total_venta||0))} : c)} primaryKey="propietario" rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
       <p className="py-2 text-right text-[11px] text-muted-foreground">{rows.length} líneas · {documents} documentos</p>
     </>}
     {detailTarget && <MachineHistorySheet target={detailTarget} onOpenChange={open=>{if(!open)setDetailTarget(null);}} />}
@@ -122,10 +124,10 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
       <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-2">
         <h3 className="truncate text-[12px] font-semibold">Detalle de facturación</h3>
       </div>
-      <div role="table" aria-label="Líneas facturadas de Servicios" aria-colcount={detailColumns.length}>
+      <div role="table" aria-label="Líneas facturadas de Servicios" aria-colcount={visibleColumns.length}>
       <TableScroll rows={rows.length} className="min-w-0 max-w-full">
         <div role="row" className={`grid ${columns} ${scrollHead} gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          {detailColumns.map(column => <div role="columnheader" key={column.key} aria-sort={sort.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"} className={cell}>
+          {visibleColumns.map(column => <div role="columnheader" key={column.key} aria-sort={sort.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"} className={cell}>
             <SalesSortButton label={column.label} kind={column.kind} align={column.align} active={sort.key === column.key} direction={sort.direction} onClick={()=>toggleSort(column.key)} />
           </div>)}
         </div>
@@ -136,7 +138,6 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
             <div role="cell" className={`${cell} text-muted-foreground`} title={row.fecha}>{row.fecha ? shortDate.format(new Date(`${row.fecha}T00:00:00`)) : "—"}</div>
             <div role="cell" className={`${cell} font-mono font-semibold`} title={`${row.es_nota_credito ? "Nota de crédito: " : ""}${row.factura || "Sin número"}`}>{row.es_nota_credito ? "NC " : ""}{row.factura || "Sin número"}</div>
             <div role="cell" className={`${cell} text-muted-foreground`} title={row.sucursal || "Sin sucursal"}>{row.sucursal || "—"}</div>
-            <div role="cell" className={`${cell} font-medium`} title={row.cliente || "Sin cliente"}>{row.cliente || "—"}</div>
             <div role="cell" className={cell} title={`Propietario actual: ${row.propietario || "No informado"}${row.propietario_os ? ` · En la OS: ${row.propietario_os}` : ""}`}>{row.propietario && row.propietario !== "Propietario no informado" ? row.propietario : "No informado"}</div>
             <div role="cell" className={`${cell} font-mono`} title={row.os || "Sin OS vinculada"}>{row.os || "Sin OS vinculada"}</div>
             <div role="cell" className={cell}>{row.chasis ? <button type="button" className="block w-full truncate text-left font-mono text-[11px] text-primary hover:underline" onClick={() => setDetailTarget({ chassis: row.chasis, os: null })} title={`${row.chasis} · Ver historial de esta máquina`}>{row.chasis}</button> : "—"}</div>

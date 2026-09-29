@@ -3,12 +3,13 @@ import { render, selectExport } from "./salesSectionExports.test-support";
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiciosDetalleOS } from './ServiciosDetalleOS';
 
-const { rpc, can, exportSalesTable } = vi.hoisted(() => ({ rpc: vi.fn(), can: vi.fn(()=>true), exportSalesTable: vi.fn() }));
+const { rpc, can, exportSalesTable, viewport } = vi.hoisted(() => ({ rpc: vi.fn(), can: vi.fn(()=>true), exportSalesTable: vi.fn(), viewport: {mobile:false} }));
+vi.mock('@/hooks/use-mobile', () => ({useIsMobile:()=>viewport.mobile}));
 vi.mock('@/hooks/useAuth', () => ({useAuth:()=>({can})}));
 vi.mock('./salesTableExport',()=>({exportSalesTable}));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
 vi.mock('@/components/ventas/MachineHistorySheet', () => ({ MachineHistorySheet: ({target}: {target:{chassis:string}}) => <div>Historial: {target.chassis}</div> }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); can.mockReturnValue(true); exportSalesTable.mockReset(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); can.mockReturnValue(true); exportSalesTable.mockReset(); viewport.mobile=false; });
 const props = { desde: '2026-01-01', hasta: '2026-09-11', sucursal: 'TODAS', buscar: '', tipoTiempo: 'TODOS' };
 const line = { id: 'line-1', fecha: '2026-05-11', factura: '001-003-54', os: '5734', chasis: 'C7501463',
   cliente: 'Pagador tercero', propietario: 'Propietario no informado', propietario_os: 'VALDECIR MOHR',
@@ -36,7 +37,9 @@ describe('invoice line detail', () => {
       fireEvent.click(within(header).getByRole('button'));
       fireEvent.click(within(header).getByRole('button'));
     }
-    expect(screen.getAllByRole('columnheader')).toHaveLength(12);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(11);
+    expect(screen.getByRole('table')).toHaveAttribute('aria-colcount','11');
+    expect(screen.queryByRole('columnheader',{name:'Cliente facturado'})).not.toBeInTheDocument();
     expect(rpc).toHaveBeenCalledTimes(1);
   });
   it('exports every filtered row in screen order, not only rows inside the vertical scroll viewport', async () => {
@@ -119,9 +122,9 @@ describe('invoice line detail', () => {
     expect(screen.queryByText('Mano de obra')).not.toBeInTheDocument();
     for (const [id,code] of [['line-1','MA01'],['part-code','REPIN004178'],['km-code','KM01'],['third-code','SE'],['missing-code','—'],['old-code','—'],['blank-code','—']]) {
       const row=container.querySelector(`[data-invoice-line="${id}"]`) as HTMLElement;
-      expect(row.children[8].textContent).toBe(code);
-      expect(row.children[8]).toHaveClass('truncate');
-      expect(row.children[8].getAttribute('title')).toContain(id==='part-code'?'Repuestos':id==='km-code'?'Kilometraje':id==='third-code'?'Terceros':'Mano de obra');
+      expect(row.children[7].textContent).toBe(code);
+      expect(row.children[7]).toHaveClass('truncate');
+      expect(row.children[7].getAttribute('title')).toContain(id==='part-code'?'Repuestos':id==='km-code'?'Kilometraje':id==='third-code'?'Terceros':'Mano de obra');
     }
     expect(container.querySelectorAll('[data-invoice-line]')).toHaveLength(7);
   });
@@ -143,11 +146,12 @@ describe('invoice line detail', () => {
     expect(screen.getByTitle('Horas de la OS: 0')).toHaveTextContent(/^0$/);
     expect(screen.getByTitle(/requiere SQL de cantidad operacional/)).toHaveTextContent('—');
   });
-  it('keeps recipient and owners distinct; opens machine history only on demand', async () => {
+  it('hides the recipient without substituting it for an unknown owner; opens machine history only on demand', async () => {
     rpc.mockResolvedValue({ error: null, data: [line] });
     render(<ServiciosDetalleOS {...props} buscar="valdecir mohr" />);
     expect(await screen.findByTitle('Propietario actual: Propietario no informado · En la OS: VALDECIR MOHR')).toHaveTextContent('No informado');
-    expect(screen.getByText('Pagador tercero')).toBeInTheDocument();
+    expect(screen.queryByText('Pagador tercero')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cliente facturado')).not.toBeInTheDocument();
     expect(screen.queryByText('Historial: C7501463')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name:'C7501463'}));
     expect(screen.getByText('Historial: C7501463')).toBeInTheDocument();
@@ -182,8 +186,8 @@ describe('invoice line detail', () => {
     expect(screen.getByTitle('Horas de la OS: 4,25')).toHaveTextContent(/^4,25$/);
     expect(screen.getByTitle('Kilómetros de la OS: 76')).toHaveTextContent(/^76$/);
     for(const row of container.querySelectorAll('[data-invoice-line]')){
-      expect(row.children[10].textContent).toMatch(/^\d+(?:[.,]\d+)*$/);
-      expect(row.children[11].textContent).toMatch(/^\$ /);
+      expect(row.children[9].textContent).toMatch(/^\d+(?:[.,]\d+)*$/);
+      expect(row.children[10].textContent).toMatch(/^\$ /);
     }
     expect(container.textContent).not.toMatch(/USD|\d\s*(?:h|hs|km)\b|Total facturado/);
     expect(screen.getByText('2 líneas · 1 documentos')).toBeInTheDocument();
@@ -191,10 +195,10 @@ describe('invoice line detail', () => {
   it('uses one visual line with separate columns, without explanatory text or stacked metadata', async () => {
     rpc.mockResolvedValue({data:[line],error:null});
     const {container}=render(<ServiciosDetalleOS {...props} />);
-    await screen.findByText('Pagador tercero');
+    await screen.findByText('1 líneas · 1 documentos');
     const row=container.querySelector('[data-invoice-line]') as HTMLElement;
     expect(row).toHaveClass('h-9');
-    expect(row.children).toHaveLength(12);
+    expect(row.children).toHaveLength(11);
     for (const column of Array.from(row.children)) {
       expect(column).toHaveClass('truncate');
       expect(column.querySelectorAll('div, p, br')).toHaveLength(0);
@@ -204,6 +208,46 @@ describe('invoice line detail', () => {
     expect(screen.getByText('Sucursal')).toBeInTheDocument();
     expect(screen.getByText('Chasis')).toBeInTheDocument();
     expect(screen.getByText('Propietario')).toBeInTheDocument();
+  });
+  it('retains distinct recipients for document counts, search and Excel while displaying only the owner', async () => {
+    rpc.mockResolvedValue({data:[{...line,propietario:'Dueño actual'},
+      {...line,id:'second-recipient',cliente:'Otro pagador',propietario:'Dueño actual'}],error:null});
+    const {rerender}=render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('2 líneas · 2 documentos');
+    expect(screen.getAllByText('Dueño actual')).toHaveLength(2);
+    expect(screen.queryByText('Pagador tercero')).not.toBeInTheDocument();
+    expect(screen.queryByText('Otro pagador')).not.toBeInTheDocument();
+    rerender(<ServiciosDetalleOS {...props} buscar="Otro pagador" />);
+    expect(screen.getByText('1 líneas · 1 documentos')).toBeInTheDocument();
+    await selectExport();
+    await waitFor(()=>expect(exportSalesTable).toHaveBeenCalled());
+    const exported=exportSalesTable.mock.calls[0][0];
+    expect(exported.rows).toHaveLength(1);
+    expect(exported.rows[0]).toMatchObject({id:'second-recipient',cliente:'Otro pagador',propietario:'Dueño actual',total_venta:200});
+    expect(exported.columns.find((column:{key:string})=>column.key==='cliente').value(exported.rows[0])).toBe('Otro pagador');
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('uses the owner on mobile and omits the recipient from its drawer and column controls', async () => {
+    viewport.mobile=true;
+    rpc.mockResolvedValue({data:[{...line,propietario:'Dueño actual'},
+      {...line,id:'unknown-owner',propietario:undefined}],error:null});
+    render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('2 líneas · 1 documentos');
+    expect(screen.getByRole('columnheader',{name:'Propietario'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Dueño actual'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Ver detalle de registro'})).toBeInTheDocument();
+    expect(screen.queryByText('Pagador tercero')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Ver detalle de Dueño actual'}));
+    const detail=screen.getByRole('dialog');
+    expect(within(detail).getByText('Propietario')).toBeInTheDocument();
+    expect(within(detail).getByText('Dueño actual')).toBeInTheDocument();
+    expect(within(detail).queryByText('Cliente facturado')).not.toBeInTheDocument();
+    expect(within(detail).queryByText('Pagador tercero')).not.toBeInTheDocument();
+    fireEvent.click(within(detail).getByRole('button',{name:'Cerrar'}));
+    fireEvent.click(screen.getByRole('button',{name:'Columnas y orden de Detalle de facturación'}));
+    for(const label of ['Mostrar','Ordenar']){
+      expect(within(screen.getByLabelText(label)).queryByRole('option',{name:'Cliente facturado'})).not.toBeInTheDocument();
+    }
   });
   it('shares normalized search with Clients and updates without refetching', async () => {
     rpc.mockResolvedValue({data:[line,{...line,id:'other',cliente:'Otro',propietario_os:'Otro',os:'99',factura:'99',descripcion:'Otro'}],error:null});
