@@ -26,13 +26,13 @@ import type { TechnicianStatus } from "@/features/service-orders/productivitySta
 import { ActivityTable } from "@/features/service-orders/ActivityTable";
 import { OperationalEvolution } from "@/features/service-orders/OperationalSummary";
 import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
-import { billingEfficiency, billingKey, billingWarning } from "@/features/service-orders/billing";
+import { billingEfficiency, billingKey, billingWarning, efficiencyBillingOrders } from "@/features/service-orders/billing";
 import { useOrdersBilling } from "@/features/service-orders/useOrdersBilling";
 import { useWorkLog } from "@/features/service-orders/useWorkLog";
 import { workedProductivity } from "@/features/service-orders/workedProductivity";
 import { productivityPeriod } from "@/features/service-orders/productivityPeriod";
 import { operationsDate } from "@/features/service-orders/format";
-import { LEGACY_IMPORT_CUTOFF } from "@/lib/imports/cutoff";
+import { LEGACY_IMPORT_CUTOFF, NEW_SYSTEM_START } from "@/lib/imports/cutoff";
 import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
 import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
@@ -107,8 +107,11 @@ export function OrdersWorkspace() {
       ?? matchTechnicianProfile(entry.tecnico_nombre, profiles)?.nombre ?? displayImportedTechnicianName(entry.tecnico_nombre)));
     return [...new Set([...profiles.map(profile => profile.nombre), ...names].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   }, [query.data, work.data]);
-  const billingEnabled = !blocked && tab !== "cumplimiento" && data.ordenes.length > 0;
-  const financial = useOrdersBilling(data.ordenes.map(row => row.os), filters.dateTo, billingEnabled);
+  const efficiencyOrders = useMemo(() => efficiencyBillingOrders(data.ordenes, NEW_SYSTEM_START), [data.ordenes]);
+  const efficiencyKeys = useMemo(() => new Set(efficiencyOrders.map(row => billingKey(row.os))), [efficiencyOrders]);
+  const billingOrders = tab === "productividad" ? efficiencyOrders : data.ordenes;
+  const billingEnabled = !blocked && tab !== "cumplimiento" && billingOrders.length > 0;
+  const financial = useOrdersBilling(billingOrders.map(row => row.os), filters.dateTo, billingEnabled);
   const billingLoading = billingEnabled && (financial.isPending || financial.isFetching);
   const billingFailed = billingEnabled && financial.isError;
   const financialRows = useMemo(() => data.ordenes.map(row => ({ ...row,
@@ -116,7 +119,8 @@ export function OrdersWorkspace() {
   })), [data.ordenes, billingEnabled, billingLoading, financial.isError, financial.data]);
   const closure = useMemo(() => orderClosureMetrics(data.ordenes), [data.ordenes]);
   const efficiency = useMemo(() => billingFailed || billingLoading
-    ? { percentage: null, incomplete: 0 } : billingEfficiency(financialRows), [financialRows, billingFailed, billingLoading]);
+    ? { percentage: null, incomplete: 0 } : billingEfficiency(financialRows.filter(row => efficiencyKeys.has(billingKey(row.os)))),
+    [financialRows, efficiencyKeys, billingFailed, billingLoading]);
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
@@ -149,11 +153,11 @@ export function OrdersWorkspace() {
           <KpiItem key="cierre" label="% de cierre" value={closure.percentage === null ? "—" : `${decimal.format(closure.percentage)}%`} tone="positive" icon={<Percent />} />,
           <KpiItem key="dias" label={compact && !phone ? "Días prom." : "Días de cierre (prom.)"} value={closure.averageDays === null ? "—" : decimal.format(closure.averageDays)} icon={<CalendarDays />} />,
         ] : tab === "productividad" ? [
-          <KpiItem key="horas" label="Horas-persona" value={workReady ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} detail={productivityPartial ? "Parcial" : undefined} />,
+          <KpiItem key="horas" label="Horas-persona" value={workReady ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} />,
           <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
-          <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} detail={productivityPartial ? "Parcial" : undefined} />,
+          <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
-            detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : workPeriod.includesLegacy ? `${operationsDate(filters.dateFrom)} — ${operationsDate(filters.dateTo)}` : undefined} />,
+            detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : [
           <KpiItem key="realizadas" label="Realizadas" value={model.jornadasResultadoResumen.realizadas} tone="positive" icon={<CircleCheck />} />,
           <KpiItem key="no-realizadas" label="No realizadas" value={model.jornadasResultadoResumen.noRealizadas} tone="warning" icon={<CircleAlert />} />,
@@ -178,11 +182,15 @@ export function OrdersWorkspace() {
         <FilterMultiSelect label="Sucursal" values={filters.fSucursales} onChange={v => change("fSucursales", v)} options={SUCURSALES.map(value => ({ value, label: value }))} />
       </FiltersBar>
       {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná un rango de fechas válido.</p> : query.isError ? <div role="alert" className="space-y-2 text-sm"><p>No se pudieron cargar todas las fuentes. No se muestran resultados parciales.</p><Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div> : blocked ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando órdenes y actividad…</p> : <>
-        {(billingFailed || (tab === "productividad" && productivityPartial)) && <div role="alert" className="flex min-h-9 flex-wrap items-center gap-x-2 rounded-md border border-amber-200 bg-amber-50/40 px-2 text-[12px] text-amber-800">
-          <CircleAlert className="h-3.5 w-3.5 shrink-0" />
-          {billingFailed && <><span>{billingWarning(financial.error)}</span><Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button></>}
-          {billingFailed && tab === "productividad" && productivityPartial && <span aria-hidden="true">·</span>}
-          {tab === "productividad" && productivityPartial && <Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} en jornadas · Revisar</Button>}
+        {(billingFailed || (tab === "productividad" && productivityPartial)) && <div role="alert" className="flex flex-wrap gap-2 text-[12px] text-amber-800">
+          {billingFailed && <div className="inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-50 px-2.5">
+            <CircleAlert className="h-3.5 w-3.5 shrink-0" /><span>{billingWarning(financial.error)}</span>
+            <Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button>
+          </div>}
+          {tab === "productividad" && productivityPartial && <div className="inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-50 px-2.5">
+            <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+            <Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar</Button>
+          </div>}
         </div>}
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
           <OrdersTable rows={financialRows} billingLoading={billingLoading} billingFailed={billingFailed} from={filters.dateFrom} to={filters.dateTo} />

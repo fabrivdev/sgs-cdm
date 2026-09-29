@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ServicioOSRow } from "@/components/dashboard/types";
-import { billingEfficiency, billingWarning, loadOrderBilling, type OrderBilling } from "./billing";
+import { billingEfficiency, billingWarning, efficiencyBillingOrders, loadOrderBilling, type OrderBilling } from "./billing";
 
 export const bill = (extra: Partial<OrderBilling> = {}): OrderBilling => ({ os: "01-00000001", matched: true, ambiguous: false,
   documents: ["0001"], date: "2026-09-10", labor: 600, parts: 0, travel: 180, thirdParty: 0, total: 780,
@@ -9,6 +9,13 @@ const order = (extra: Partial<ServicioOSRow> = {}) => ({ os: "01-00000001", esta
   horasPersona: 40, billing: bill(), ...extra }) as ServicioOSRow;
 
 describe("OS billing efficiency", () => {
+  it("requests only closed OS with a date in the detailed system, not legacy annual history", () => {
+    const rows = [order({ os: "LEGACY", fechaApertura: "2026-01-10", fechaCierre: null, fechaFacturacion: "2026-06-30" }),
+      order({ os: "CURRENT", fechaApertura: "2026-07-01" }),
+      order({ os: "LATE-INVOICE", fechaApertura: "2026-06-20", fechaFacturacion: "2026-09-25" }),
+      order({ os: "OPEN", estadoOS: "Abierta", fechaApertura: "2026-09-01" })];
+    expect(efficiencyBillingOrders(rows, "2026-07-01").map(row => row.os)).toEqual(["CURRENT", "LATE-INVOICE"]);
+  });
   it("uses OS hours once, never person-hours, and a ratio of sums instead of averaging percentages", () => {
     const rows = [order(), order(), order({ os: "02-00000001", horas: 10, billing: bill({ billedHours: 9 }) })];
     expect(billingEfficiency(rows)).toEqual({ orders: 2, incomplete: 0, billedHours: 21, workedHours: 30, percentage: 70 });

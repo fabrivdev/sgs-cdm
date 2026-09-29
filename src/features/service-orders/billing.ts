@@ -16,6 +16,11 @@ export interface OrderBilling {
   billedHours: number | null;
 }
 export const billingKey = (os: string) => os.trim().toUpperCase();
+/** Historical OS have no verifiable billed-hour tariff; never fetch them for efficiency. */
+export function efficiencyBillingOrders(rows: readonly ServicioOSRow[], firstDetailedDay: string) {
+  return rows.filter(row => row.estadoOS === "Cerrada" &&
+    [row.fechaApertura, row.fechaCierre, row.fechaFacturacion].some(date => date && date >= firstDetailedDay));
+}
 function checkAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw signal.reason ?? new DOMException("Cancelled", "AbortError");
 }

@@ -49,7 +49,7 @@ describe("orders workspace", () => {
     mocks.width = width;
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
     expect(screen.getByText("Productividad · 01/07/2026 — 25/09/2026")).toBeVisible();
-    expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("01/01/2026 — 25/09/2026");
+    expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000001"], "2026-09-25", true);
     fireEvent.click(screen.getByRole("button", { name: "Histórico en Órdenes" }));
     expect(screen.getByRole("tab", { name: "Órdenes" })).toHaveAttribute("aria-selected", "true");
     expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-09-25");
@@ -70,6 +70,21 @@ describe("orders workspace", () => {
     expect(mocks.work).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30", false);
     fireEvent.click(screen.getByRole("button", { name: "Ver órdenes" }));
     expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30");
+  });
+  it("does not send pre-July historical OS or open OS to the annual efficiency billing query", () => {
+    mocks.width = 1280;
+    response.data.data.billing = { "01-00000001": demoBilling() };
+    response.data.data.ordenesServicio.push(demoOrder({ os_numero: "01-LEGACY", fecha_abierta_os: "2026-03-01",
+      fecha_cierre_os: null, fecha_emision_factura: "2026-06-20", situacion_os: "Cerrada" }));
+    mocks.billing.mockImplementation((keys: string[]) => ({ ...billingState, isError: keys.includes("01-LEGACY"),
+      error: { code: "57014" }, data: response.data.data.billing, refetch: mocks.billingRetry }));
+    setup(); tab("Productividad");
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
+    expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000001"], "2026-09-25", true);
+    expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("120%");
+    expect(screen.queryByText("Facturación demorada.")).not.toBeInTheDocument();
+    tab("Órdenes");
+    expect(mocks.billing).toHaveBeenLastCalledWith(expect.arrayContaining(["01-LEGACY", "01-00000001", "01-00000002"]), "2026-09-25", true);
   });
   it("exports requested and actual calculation dates with the same numeric productivity", async () => {
     mocks.width = 1280;
@@ -128,10 +143,10 @@ describe("orders workspace", () => {
   it.each([320, 768, 1280])("shows source evidence and preserves unaffected technician productivity at %i px", width => {
     mocks.width = width;
     workLogs[0].entries[0].fecha_inicio = null;
-    setup(); tab("Productividad");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Revisar");
+    setup(); tab("Productividad"); technicianStatus("Todos");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
     expect(screen.queryByText(/registros pendientes|Productividad sin calcular/)).not.toBeInTheDocument();
-    expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent(/%Parcial/);
+    expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).not.toHaveTextContent("Parcial");
     expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toBeVisible();
     expect(screen.getByRole("meter", { name: "Meta de TECNICO UNO" })).toHaveAttribute("aria-valuetext", expect.stringContaining("Parcial: solo horas válidas"));
     fireEvent.click(screen.getByRole("button", { name: /TECNICO UNO.*Parcial/ }));
@@ -147,7 +162,7 @@ describe("orders workspace", () => {
   it("shows both original clocks when different orders overlap, not empty artificial hours", () => {
     workLogs.push(demoWorkLog([demoWorkEntry({ id: "OVERLAP", hora_inicio: "09:30", hora_fin: "11:15" })], "02-00000003"));
     setup(); tab("Productividad");
-    fireEvent.click(screen.getByRole("button", { name: /incidencia.*en jornadas · Revisar/ }));
+    fireEvent.click(screen.getByRole("button", { name: /incidencia · Revisar/ }));
     const drawer = screen.getByRole("dialog");
     expect(drawer).toHaveTextContent("Incidencias de jornadas");
     expect(drawer).toHaveTextContent("Horarios superpuestos");
@@ -181,8 +196,8 @@ describe("orders workspace", () => {
     const before = productivityCard()!.textContent!.trim();
     workLogs = [...workLogs, demoWorkLog([demoWorkEntry({ id: "NEW_BAD", hora_fin: null })], "OS-NEW")];
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas");
-    expect(productivityCard()).toHaveTextContent(`${before}Parcial`);
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
+    expect(productivityCard()!.textContent!.trim()).toBe(before);
     expect(screen.getByRole("meter", { name: "Meta de TECNICO UNO" })).toHaveAttribute("aria-valuenow", "10");
     workLogs = workLogs.slice(0, 2);
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
@@ -192,8 +207,8 @@ describe("orders workspace", () => {
   it("keeps partial period exports numeric and excludes conflicts from technician detail", async () => {
     workLogs[0].entries.push(demoWorkEntry({ id: "BAD", hora_inicio: "09:00", hora_fin: "11:00" }),
       demoWorkEntry({ id: "VALID", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11", hora_fin: "12:00" }));
-    setup(); tab("Productividad");
-    expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("5Parcial");
+    setup(); tab("Productividad"); technicianStatus("Todos");
+    expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("5");
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Horas por período" }));
     await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
@@ -415,7 +430,7 @@ describe("orders workspace", () => {
     setup(); tab("Productividad");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("alert")).toHaveTextContent("actualización");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Revisar");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
     expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("—");
     expect(screen.getByText("Eficiencia").closest(".kpi-item")).not.toHaveTextContent("OS sin cálculo");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
