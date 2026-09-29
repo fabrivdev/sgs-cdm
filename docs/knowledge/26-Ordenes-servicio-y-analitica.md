@@ -235,6 +235,14 @@ Regresiones locales: 189 pruebas en 14 archivos, incluyendo incidencias nuevas a
 
 Validación local: 198 pruebas en 12 archivos, tipos ES2021, lint específico y build. Casos de cambio de era, medianoche junio/julio, ausencias duplicadas, bajas, rango sólo legacy, incidentes reales/fecha inválida, años posteriores, caché, detalle completo y exportaciones. Inspección de componentes reales con datos ficticios a 320 y 1280 px, sin desbordamiento horizontal; estado legacy verificado en navegador. No se ejecutó SQL, importó datos ni cambió permisos. No requiere SQL nuevo. La nota no acredita sincronización de Obsidian; este clon sigue sin configuración de sincronización.
 
+## Productividad: activos por defecto y sin ficha como inactivos — 27/09/2026
+
+Regla vigente que reemplaza el selector histórico de cuatro opciones: **Todos / Activos / Inactivos**, con **Activos** seleccionado al abrir la sección. Una selección manual se conserva mientras la sección sigue montada. No reiniciar ese estado al cambiar entre sus pestañas.
+
+`productivityStatus.ts` considera activo únicamente al participante con perfil identificado y estado activo; sin ficha se integra en Inactivos. La misma clasificación se usa en jornadas, población de OS para Eficiencia, indicadores, períodos, tabla y Excel. `ProductivityTable.tsx` muestra «Inactivo» y exporta `Activo = No` también para participantes sin ficha; no existe un cuarto botón. Esta agrupación no crea perfiles, modifica cuentas ni inventa fecha de baja o meta para identidades desconocidas. Órdenes y Cumplimiento conservan sus poblaciones, sin aplicarles por defecto el filtro de Productividad.
+
+Comprobaciones locales: pruebas de clasificación complementaria (Activos + Inactivos = Todos), estado inicial en 320/768/1280, indicadores/exportación con ambos tipos de inactivos, ausencia de meta inventada y población financiera consistente. Revisión en navegador a 320 px con componentes reales y datos ficticios: tres botones compactos, Activos inicial, cambio a Inactivos sin desbordamiento. No requiere SQL ni acredita despliegue o sincronización de Obsidian.
+
 ## Aplicación del SQL inicial y despliegue
 
 El archivo `supabase/migrations/20260925150000_service_orders_section.sql` se entrega completo para copiar/pegar en Lovable Cloud → SQL editor. Crea la sección y copia una sola vez las asignaciones del Dashboard (sin conceder nuevos roles); desactiva la sección anterior y adapta la lectura restringida de la meta. Repetirlo no repone permisos revocados. Su ejecución correcta fue informada por el usuario el 25/09/2026, no comprobada mediante una consulta remota del agente. No modifica órdenes ni facturas y no ha sido ejecutado por el agente: un push no aplica SQL ni valida producción. La corrección de la consulta requiere incorporar el frontend actualizado, no repetir la migración.

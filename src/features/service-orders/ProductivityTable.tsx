@@ -6,15 +6,15 @@ import { MobileRecord } from "@/components/lists/MobileRecord";
 import { cn } from "@/lib/utils";
 import { OperationsPanel } from "./OperationsPresentation";
 import { ProductivityProgress } from "./ProductivityProgress";
-import type { TechnicianStatus } from "./productivityStatus";
+import { matchesTechnicianStatus, type TechnicianStatus } from "./productivityStatus";
 import type { ProductivityPeriod } from "./productivityPeriod";
 
 const number = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
-const statuses = [["todos", "Todos"], ["activos", "Activos"], ["inactivos", "Inactivos"], ["sin-ficha", "Sin ficha"]] as const;
+const statuses = [["todos", "Todos"], ["activos", "Activos"], ["inactivos", "Inactivos"]] as const;
 export function ProductivityTable({ rows, onSelect, status, onStatusChange, period }: { rows: ProductivityTechnicianRow[]; onSelect: (name: string) => void; status: TechnicianStatus; onStatusChange: (status: TechnicianStatus) => void; period?: ProductivityPeriod }) {
   const compact = useIsMobile(1024);
   const phone = useIsMobile(640);
-  const technicianState = (r: ProductivityTechnicianRow) => !r.profileId ? "Sin ficha" : !r.activo ? "Inactivo" : undefined;
+  const technicianState = (r: ProductivityTechnicianRow) => matchesTechnicianStatus(r, "inactivos") ? "Inactivo" : undefined;
   const progress = (r: ProductivityTechnicianRow) => <ProductivityProgress hours={r.horas} target={r.horasDisponibles} label={`Meta de ${r.tecnico}`} partial={r.incomplete} />;
   const columns: CompactListColumn<ProductivityTechnicianRow>[] = [
     { key: "tecnico", label: "Técnico", kind: "text", width: "w-[36%]", value: r => r.tecnico,
@@ -23,7 +23,7 @@ export function ProductivityTable({ rows, onSelect, status, onStatusChange, peri
     { key: "horas", label: "Horas-persona", kind: "number", align: "center", width: "w-[17%]", value: r => r.horas, render: r => number.format(r.horas) },
     { key: "meta", label: "Meta disponible", kind: "number", align: "center", width: "w-[17%]", value: r => r.horasDisponibles > 0 ? r.horasDisponibles : null, render: r => r.horasDisponibles > 0 ? number.format(r.horasDisponibles) : "—" },
     { key: "porcentaje", label: "Productividad", kind: "number", align: "right", width: "w-[22%]", value: r => r.horasDisponibles > 0 ? r.productividad / 100 : null, excelFormat: "0.0%", render: progress },
-    { key: "activo", label: "Activo", kind: "text", width: "w-auto", value: r => !r.profileId ? "Sin ficha" : r.activo ? "Sí" : "No" },
+    { key: "activo", label: "Activo", kind: "text", width: "w-auto", value: r => matchesTechnicianStatus(r, "activos") ? "Sí" : "No" },
     { key: "cerradas", label: "Cerradas", kind: "number", width: "w-auto", value: r => r.cerradas },
     { key: "abiertas", label: "Abiertas", kind: "number", width: "w-auto", value: r => r.abiertas },
     { key: "otras", label: "Anuladas / canceladas", kind: "number", width: "w-auto", value: r => r.otras },

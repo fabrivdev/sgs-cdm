@@ -6,6 +6,19 @@ import { useOperationsModel, technicianGoalForRange } from "./useOperationsModel
 afterEach(cleanup);
 const today = new Date("2026-09-25T12:00:00");
 describe("operational extraction", () => {
+  it("includes unmatched technicians with inactive participants in the financial OS cohort", () => {
+    const data = operationsFixture();
+    data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", responsable: "TECNICO EXTERNO", servicios_cantidad: 7 }));
+    const before = JSON.stringify(data);
+    const { result, rerender } = renderHook(({ status }: { status: "activos" | "inactivos" }) => useOperationsModel(data, operationsFilters, "trabajos", today, status), {
+      initialProps: { status: "activos" },
+    });
+    expect(result.current.serviciosDashboardData.ordenes.map(row => row.key)).toEqual(["01-00000001"]);
+    rerender({ status: "inactivos" });
+    expect(result.current.serviciosDashboardData.ordenes.map(row => row.key).sort()).toEqual(["01-00000002", "01-00000003"]);
+    expect(result.current.serviciosDashboardData.tecnicos.find(row => row.tecnico === "TECNICO EXTERNO")).toMatchObject({ profileId: null, activo: false, horasDisponibles: 0 });
+    expect(JSON.stringify(data)).toBe(before);
+  });
   it("uses closure for closed OS and opening for open OS, never invoice dates", () => {
     const data = operationsFixture();
     data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", fecha_abierta_os: "2026-09-01", fecha_cierre_os: "2026-10-01", fecha_emision_factura: "2026-09-20" }));

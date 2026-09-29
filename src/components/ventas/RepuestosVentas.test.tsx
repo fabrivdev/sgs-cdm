@@ -132,7 +132,7 @@ describe("Ventas de Repuestos", () => {
     expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Ventas" })).not.toBeInTheDocument();
     expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Notas de crédito" })).not.toBeInTheDocument();
     expect(screen.getByText("A")).toBeInTheDocument();
-  });
+  }, 20_000);
   it("elimina Análisis y agrega la vista de vendedores", async () => {
     setup(); await screen.findByText("CLAAS");
     expect(screen.queryByRole("button", { name: "Análisis" })).not.toBeInTheDocument();

@@ -6,11 +6,12 @@ import {SalesExplorer} from "./Ventas";
 import {documentsFixture,clientsFixture} from "@/test/sales-fixtures";
 const {rpc,from}=vi.hoisted(()=>({rpc:vi.fn(),from:vi.fn()}));
 vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc,from}}));
+vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({can:()=>true})}));
 afterEach(()=>{cleanup();rpc.mockReset();from.mockReset();});
 function setup(area:"servicios"|"repuestos"="servicios"){
  const currentLines=[
-  {id:"l1",factura:"001000000082",os:"01-00000104",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Mano de obra",total_venta:480},
-  {id:"l2",factura:"001001005035",os:"01-00000104",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Repuestos",total_venta:39},
+  {id:"l1",factura:"001000000082",os:"01-00000104",chasis:"24491421",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Mano de obra",total_venta:480},
+  {id:"l2",factura:"001001005035",os:"01-00000104",chasis:"24491421",propietario:"Dueño A",cliente:"Campos del Mañana S.A.",componente:"Repuestos",total_venta:39},
   {id:"l3",factura:"001000000090",os:"01-00000105",propietario:"Dueño B",cliente:"Ganadera El Fogón S.A.",componente:"Mano de obra",total_venta:250},
  ];
  const previousLines=[
@@ -34,14 +35,14 @@ function setup(area:"servicios"|"repuestos"="servicios"){
  return render(<QueryClientProvider client={client}><SalesExplorer area={area} data={null} loading={false} desde="2026-07-01" hasta="2026-09-10" sucursal="TODAS" buscar="" tipoTiempo="TODOS"/></QueryClientProvider>);
 }
 describe("Ventas por negocio",()=>{
- it("agrupa dos facturas por OS sin abrir un detalle duplicado",async()=>{
+ it("conserva las dos líneas facturadas de una misma OS",async()=>{
   setup();
   fireEvent.click(screen.getByRole("button",{name:"Detalle"}));
-  expect(await screen.findByText("01-00000104")).toBeInTheDocument();
-  expect(rpc).toHaveBeenCalledWith("ventas_servicios_detalle_os_v2",expect.objectContaining({p_marca:null,p_tipo_maquina:null}));
-  expect(screen.getByText("Dueño A")).toBeInTheDocument();
+  expect(await screen.findAllByText("01-00000104")).toHaveLength(2);
+  expect(rpc).toHaveBeenCalledWith("ventas_servicios_lineas_v2",expect.objectContaining({p_marca:null,p_tipo_maquina:null}));
+  expect(screen.getAllByText("Dueño A")).toHaveLength(2);
   expect(screen.queryByRole("button",{name:"01-00000104"})).not.toBeInTheDocument();
-  expect(screen.getByRole("button",{name:"24491421"})).toBeInTheDocument();
+  expect(screen.getAllByRole("button",{name:"24491421"})).toHaveLength(2);
  });
  it("muestra ambos códigos del repuesto sin abrir la factura",async()=>{
   setup("repuestos");

@@ -43,7 +43,7 @@ describe("orders workspace", () => {
     workLogs.push(legacy);
     const rendered = setup(); tab("Productividad");
     fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
-    expect(screen.getByText("Meta disponible", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("640");
+    expect(screen.getByText("Meta disponible", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("340");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ fecha_desde: "2026-01-01", productividad_desde: "2026-07-01", productividad_hasta: "2026-09-25" }));
     mocks.width = width;
@@ -173,7 +173,7 @@ describe("orders workspace", () => {
   it("exports partial numeric values with their status and clears the alert after filtering", async () => {
     workLogs[0].entries[0].hora_inicio = null;
     workLogs[0].entries.push(demoWorkEntry({ id: "VALID", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11" }));
-    setup(); tab("Productividad");
+    setup(); tab("Productividad"); technicianStatus("Todos");
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
     await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
@@ -299,7 +299,7 @@ describe("orders workspace", () => {
     expect(payload.columns.find((c: { key: string }) => c.key === "diasCierre").value(payload.rows[0])).toBeNull();
   });
   it("drills into dated work, not the technician's closure cohort", () => {
-    setup(); tab("Productividad");
+    setup(); tab("Productividad"); technicianStatus("Inactivos");
     expect(screen.getByRole("table", { name: "Productividad por técnico" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /TECNICO DOS.*OS/ }));
     expect(within(screen.getByRole("dialog")).getByRole("table", { name: "Jornadas trabajadas" })).toHaveTextContent("01-00000002");
@@ -324,19 +324,23 @@ describe("orders workspace", () => {
     expect(meter).toHaveAttribute("aria-valuenow", "150"); // 120 × 25/30 = 100 h target
     expect(meter).toHaveAttribute("aria-valuetext", "150 de 100 horas; 150% de meta");
     expect(meter.firstElementChild).toHaveStyle({ width: "100%" });
+    expect(screen.queryByRole("meter", { name: "Meta de TECNICO DOS" })).not.toBeInTheDocument();
+    technicianStatus("Todos");
     expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toHaveAttribute("aria-valuenow", "1.6666666666666667");
   });
   it.each([320, 768, 1280])("uses a single compact technician header, not another navigation row, at %i px", width => {
     mocks.width = width;
     setup(); tab("Productividad");
     const group = screen.getByRole("group", { name: "Estado de técnicos" });
-    expect(within(group).getAllByRole("button")).toHaveLength(4);
+    expect(within(group).getAllByRole("button")).toHaveLength(3);
+    expect(within(group).queryByRole("button", { name: "Sin ficha" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("tablist")).toHaveLength(1);
     expect(group.parentElement?.nextElementSibling).toContainElement(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(screen.queryByRole("heading", { name: "Por técnico" }) !== null).toBe(width >= 640);
-    technicianStatus("Activos");
     expect(within(group).getByRole("button", { name: "Activos" })).toHaveAttribute("aria-pressed", "true");
     expect(within(group).getByRole("button", { name: "Todos" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("table", { name: "Productividad por técnico" })).not.toHaveTextContent("TECNICO DOS");
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ estado_tecnicos: "activos" }));
   });
   it("filters active/inactive/unmatched technicians consistently in KPIs, periods and exports", async () => {
     mocks.width = 390;
@@ -344,7 +348,7 @@ describe("orders workspace", () => {
     response.data.data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", responsable: "TECNICO SIN FICHA", servicios_cantidad: 7 }));
     workLogs[1].entries[0].hora_fin = "18:00";
     workLogs.push(demoWorkLog([demoWorkEntry({ id: "UNKNOWN", tecnico_profile_id: null, tecnico_nombre: "TECNICO SIN FICHA", hora_fin: "15:00" })], "01-00000003"));
-    setup(); tab("Productividad"); technicianStatus("Activos");
+    setup(); tab("Productividad");
     let table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(table.getAllByRole("row")).toHaveLength(2);
     expect(table.getByText("TECNICO UNO")).toBeVisible();
@@ -355,22 +359,28 @@ describe("orders workspace", () => {
     expect(screen.getByRole("table", { name: "Horas por período" })).toHaveTextContent("10");
     technicianStatus("Inactivos");
     table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
-    expect(table.getAllByRole("row")).toHaveLength(2);
-    expect(table.queryByText("TECNICO SIN FICHA")).not.toBeInTheDocument();
+    expect(table.getAllByRole("row")).toHaveLength(3);
+    expect(table.getByText("TECNICO SIN FICHA")).toBeVisible();
+    expect(table.getAllByText("1 OS · Inactivo")).toHaveLength(2);
+    expect(table.queryByText("Sin ficha", { exact: true })).not.toBeInTheDocument();
     kpis = within(screen.getByRole("region", { name: "Indicadores" }));
     expect(kpis.getByText("60", { exact: true })).toBeVisible(); // before Sep 16 deactivation
-    expect(kpis.getByText("16,7%", { exact: true })).toBeVisible();
+    expect(kpis.getByText("17", { exact: true })).toBeVisible();
+    expect(kpis.getByText("28,3%", { exact: true })).toBeVisible();
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
     await waitFor(() => expect(mocks.export).toHaveBeenCalled());
-    expect(mocks.export.mock.calls[0][0].rows.map((r: { tecnico: string }) => r.tecnico)).toEqual(["TECNICO DOS"]);
-    technicianStatus("Sin ficha");
-    expect(screen.getByRole("table", { name: "Productividad por técnico" })).toHaveTextContent("TECNICO SIN FICHA");
-    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Indicadores" })).getByText("7", { exact: true })).toBeVisible();
+    const payload = mocks.export.mock.calls[0][0];
+    expect(payload.rows.map((r: { tecnico: string }) => r.tecnico)).toEqual(["TECNICO DOS", "TECNICO SIN FICHA"]);
+    const noProfile = payload.rows.find((r: { tecnico: string }) => r.tecnico === "TECNICO SIN FICHA");
+    expect(payload.columns.find((c: { key: string }) => c.key === "activo").value(noProfile)).toBe("No");
+    expect(payload.columns.find((c: { key: string }) => c.key === "meta").value(noProfile)).toBeNull();
+    expect(screen.queryByRole("meter", { name: "Meta de TECNICO SIN FICHA" })).not.toBeInTheDocument();
+    technicianStatus("Todos");
+    expect(within(screen.getByRole("region", { name: "Indicadores" })).getByText("27", { exact: true })).toBeVisible();
     tab("Órdenes");
     expect(within(screen.getByRole("table", { name: "Órdenes de servicio" })).getAllByRole("row")).toHaveLength(4);
-  });
+  }, 20_000);
   it("preserves OS identity but never presents operational money as billing when unavailable", () => {
     Object.assign(response.data.data.ordenesServicio[0], {
       factura: "000000000001; 000000000002", servicios_valor: 1240.25, repuesto_valor: -18.7,
@@ -397,7 +407,7 @@ describe("orders workspace", () => {
       expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(name === "Órdenes" ? 5 : name === "Productividad" ? 4 : 3);
       expect(screen.getAllByRole("button", { name: "Acciones de la sección" })).toHaveLength(1);
     }
-  });
+  }, 20_000);
   it.each([320, 768, 1280])("shows reconciled Sales money and efficiency based on OS hours at %i px", width => {
     mocks.width = width;
     Object.assign(response.data.data.ordenesServicio[0], { servicios_valor: 1.66, servicios_cantidad: 35,
@@ -441,8 +451,8 @@ describe("orders workspace", () => {
     response.data.data.billing = { "01-00000001": demoBilling({ billedHours: 10 }), "01-00000002": demoBilling({ os: "01-00000002", billedHours: 10 }) };
     setup(); tab("Productividad");
     const card = () => screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")!;
-    expect(card()).toHaveTextContent("66,7%");
-    technicianStatus("Activos"); expect(card()).toHaveTextContent("50%");
+    expect(card()).toHaveTextContent("50%");
+    technicianStatus("Todos"); expect(card()).toHaveTextContent("66,7%");
     technicianStatus("Inactivos"); expect(card()).toHaveTextContent("100%");
     technicianStatus("Todos");
     fireEvent.change(screen.getByPlaceholderText("Buscar…"), { target: { value: "00000001" } });

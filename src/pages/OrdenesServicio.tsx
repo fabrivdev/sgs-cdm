@@ -81,7 +81,7 @@ export function OrdersWorkspace() {
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [today] = useState(() => new Date());
   const [tab, setTab] = useState("ordenes");
-  const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("todos");
+  const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const defaults = useMemo<OperationsFilters>(() => ({ dateFrom: format(startOfMonth(today), "yyyy-MM-dd"), dateTo: format(today, "yyyy-MM-dd"), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
