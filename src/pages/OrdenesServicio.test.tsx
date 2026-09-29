@@ -129,7 +129,7 @@ describe("orders workspace", () => {
     mocks.width = width;
     workLogs[0].entries[0].fecha_inicio = null;
     setup(); tab("Productividad");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Cálculo con horas válidas");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Revisar");
     expect(screen.queryByText(/registros pendientes|Productividad sin calcular/)).not.toBeInTheDocument();
     expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent(/%Parcial/);
     expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toBeVisible();
@@ -147,7 +147,7 @@ describe("orders workspace", () => {
   it("shows both original clocks when different orders overlap, not empty artificial hours", () => {
     workLogs.push(demoWorkLog([demoWorkEntry({ id: "OVERLAP", hora_inicio: "09:30", hora_fin: "11:15" })], "02-00000003"));
     setup(); tab("Productividad");
-    fireEvent.click(screen.getByRole("button", { name: "Revisar jornadas" }));
+    fireEvent.click(screen.getByRole("button", { name: /incidencia.*en jornadas · Revisar/ }));
     const drawer = screen.getByRole("dialog");
     expect(drawer).toHaveTextContent("Incidencias de jornadas");
     expect(drawer).toHaveTextContent("Horarios superpuestos");
@@ -411,12 +411,19 @@ describe("orders workspace", () => {
   });
   it("exposes billing failures with retry and no invented efficiency or stale money", () => {
     billingState.isError = true; billingState.error = { code: "PGRST202" };
+    workLogs[0].entries[0].hora_inicio = null;
     setup(); tab("Productividad");
-    expect(screen.getByRole("alert")).toHaveTextContent("actualizar en la base");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("actualización");
+    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia en jornadas · Revisar");
     expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("—");
+    expect(screen.getByText("Eficiencia").closest(".kpi-item")).not.toHaveTextContent("OS sin cálculo");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(mocks.billingRetry).toHaveBeenCalledOnce();
     expect(mocks.refetch).not.toHaveBeenCalled();
+    tab("Órdenes");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    expect(screen.getByRole("menuitem", { name: "Exportar Órdenes de servicio" })).toHaveAttribute("aria-disabled", "true");
   });
   it("keeps the list, operational KPIs and compliance usable while billing waits", async () => {
     billingState.isPending = true; billingState.isFetching = true;

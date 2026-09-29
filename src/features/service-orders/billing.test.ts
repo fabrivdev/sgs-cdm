@@ -52,6 +52,21 @@ describe("complete billing loader", () => {
     expect(source.rpc.mock.calls.map(call => call[1].p_os_numeros.length)).toEqual([250, 250, 2]);
     expect(source.rpc).toHaveBeenCalledWith("service_orders_billing_v2", expect.objectContaining({ p_hasta: "2026-09-25" }));
   });
+  it("overlaps at most two batches without publishing a partial financial result", async () => {
+    const pending: { batch: string[]; resolve: (reply: { data: OrderBilling[]; error: null }) => void }[] = [];
+    const source = { rpc: vi.fn((_name: string, args: { p_os_numeros: string[] }) => ({ abortSignal: () =>
+      new Promise<{ data: OrderBilling[]; error: null }>(resolve => pending.push({ batch: args.p_os_numeros, resolve })) })) };
+    const keys = Array.from({ length: 501 }, (_, i) => `01-${String(i).padStart(8, "0")}`);
+    const request = loadOrderBilling(source, keys, "2026-09-25");
+    expect(pending).toHaveLength(2);
+    expect(pending.map(item => item.batch.length)).toEqual([250, 250]);
+    pending[1].resolve({ data: pending[1].batch.map(os => bill({ os })), error: null });
+    await vi.waitFor(() => expect(pending).toHaveLength(3));
+    expect(pending[2].batch).toEqual([keys[500]]);
+    pending[2].resolve({ data: pending[2].batch.map(os => bill({ os })), error: null });
+    pending[0].resolve({ data: pending[0].batch.map(os => bill({ os })), error: null });
+    expect(Object.keys(await request)).toHaveLength(501);
+  });
   it.each([[], [bill({ os: "OTHER" })], [bill({ total: null })], [bill({ billedHours: Infinity })]])("rejects missing, foreign or malformed replies %j", reply => {
     return expect(loadOrderBilling(client(() => reply), ["01-00000001"], "2026-09-25")).rejects.toThrow();
   });
@@ -66,7 +81,7 @@ describe("complete billing loader", () => {
     await expect(loadOrderBilling(source, ["A"], "2026-09-25", AbortSignal.abort())).rejects.toThrow();
   });
   it("distinguishes missing migration from denied access", () => {
-    expect(billingWarning({ code: "PGRST202" })).toContain("actualizar en la base");
+    expect(billingWarning({ code: "PGRST202" })).toContain("actualización");
     expect(billingWarning({ code: "42501" })).toContain("permisos");
   });
   it("never retries the known-invalid invoice-unit calculation if the new RPC is missing", async () => {
@@ -86,7 +101,7 @@ describe("complete billing loader", () => {
       await vi.advanceTimersByTimeAsync(25_000);
       await rejected;
       expect(usedSignal?.aborted).toBe(true);
-      expect(billingWarning({ code: "BILLING_TIMEOUT" })).toContain("demorando");
+      expect(billingWarning({ code: "BILLING_TIMEOUT" })).toContain("demorada");
     } finally { vi.useRealTimers(); }
   });
   it("cancels an in-flight request when filters change", async () => {

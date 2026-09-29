@@ -64,8 +64,10 @@ export async function loadOrderBilling(client: any, orders: string[], cutoff: st
   signal?.addEventListener("abort", cancel, { once: true });
   const timeout = setTimeout(() => controller.abort(Object.assign(new Error("Facturación demoró demasiado."), { code: "BILLING_TIMEOUT" })), 25_000);
   try {
+    const batches = loadBillingBatches(client, orders, cutoff, controller.signal);
+    void batches.catch(error => controller.abort(error));
     return await Promise.race([
-      loadBillingBatches(client, orders, cutoff, controller.signal),
+      batches,
       new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true })),
     ]);
   } finally {
@@ -78,29 +80,34 @@ export async function loadOrderBilling(client: any, orders: string[], cutoff: st
 async function loadBillingBatches(client: any, orders: string[], cutoff: string, signal: AbortSignal): Promise<Record<string, OrderBilling>> {
   const keys = [...new Set(orders.map(billingKey))].sort();
   const result: Record<string, OrderBilling> = {};
-  for (let offset = 0; offset < keys.length; offset += 250) {
-    checkAborted(signal);
-    const batch = keys.slice(offset, offset + 250);
-    // Never fall back to v1: invoice unit prices can represent a whole job,
-    // so that version's hours are not a valid efficiency denominator/numerator.
-    const request = client.rpc("service_orders_billing_v2", { p_os_numeros: batch, p_hasta: cutoff });
-    const { data, error } = await (signal ? request.abortSignal(signal) : request);
-    if (error) throw error;
-    if (!Array.isArray(data) || data.length !== batch.length) throw new Error("Facturación incompleta.");
-    const expected = new Set(batch);
-    for (const row of data) {
-      if (!validBilling(row) || !expected.delete(billingKey(row.os))) throw new Error("Facturación no válida.");
-      result[billingKey(row.os)] = row;
+  const batches: string[][] = [];
+  for (let offset = 0; offset < keys.length; offset += 250) batches.push(keys.slice(offset, offset + 250));
+  let next = 0;
+  // At most two database calls at once. Publish only after every batch succeeds.
+  await Promise.all(Array.from({ length: Math.min(2, batches.length) }, async () => {
+    while (next < batches.length) {
+      checkAborted(signal);
+      const batch = batches[next++];
+      // Never fall back to v1: invoice unit prices can represent a whole job.
+      const request = client.rpc("service_orders_billing_v2", { p_os_numeros: batch, p_hasta: cutoff });
+      const { data, error } = await request.abortSignal(signal);
+      if (error) throw error;
+      if (!Array.isArray(data) || data.length !== batch.length) throw new Error("Facturación incompleta.");
+      const expected = new Set(batch);
+      for (const row of data) {
+        if (!validBilling(row) || !expected.delete(billingKey(row.os))) throw new Error("Facturación no válida.");
+        result[billingKey(row.os)] = row;
+      }
     }
-  }
+  }));
   checkAborted(signal);
   return result;
 }
 
 export function billingWarning(error: unknown) {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-  if (["42883", "PGRST202"].includes(code)) return "Facturación de OS pendiente de actualizar en la base.";
-  if (code === "42501") return "Facturación de OS no disponible con estos permisos.";
-  if (code === "BILLING_TIMEOUT" || code === "57014") return "La facturación está demorando. Podés reintentar.";
-  return "No se pudo cargar la facturación de OS.";
+  if (["42883", "PGRST202"].includes(code)) return "Facturación pendiente de actualización.";
+  if (code === "42501") return "Facturación sin permisos.";
+  if (code === "BILLING_TIMEOUT" || code === "57014") return "Facturación demorada.";
+  return "Facturación no disponible.";
 }

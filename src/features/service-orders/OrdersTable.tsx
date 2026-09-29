@@ -53,7 +53,7 @@ const columns: SalesColumn<ServicioOSRow>[] = [
   { key: "horasFacturadas", label: "Horas facturadas equivalentes", kind: "number", value: r => r.billing?.billedHours ?? null },
   { key: "eficiencia", label: "Eficiencia de facturación", kind: "number", excelFormat: "0.0%", value: r => { const value = billingEfficiency([r]).percentage; return value === null ? null : value / 100; } },
 ];
-export function OrdersTable({ rows, billingLoading = false, from = "1900-01-01", to = "2999-12-31" }: { rows: ServicioOSRow[]; billingLoading?: boolean; from?: string; to?: string }) {
+export function OrdersTable({ rows, billingLoading = false, billingFailed = false, from = "1900-01-01", to = "2999-12-31" }: { rows: ServicioOSRow[]; billingLoading?: boolean; billingFailed?: boolean; from?: string; to?: string }) {
   const compact = useIsMobile(1024);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = rows.find(row => row.key === selectedKey) ?? null;
@@ -62,7 +62,7 @@ export function OrdersTable({ rows, billingLoading = false, from = "1900-01-01",
   const efficiency = selected ? billingEfficiency([selected]).percentage : null;
   const selectedDays = selected ? orderClosingDays({ ...selected,
     fechaFacturacion: bill?.matched ? bill.date : selected.fechaFacturacion }) : null;
-  const table = useSectionTable({ rows, columns, initialSort: { key: "cierre", direction: "desc" }, title: "Órdenes de servicio", fileName: "ordenes-de-servicio.xlsx", disabled: billingLoading });
+  const table = useSectionTable({ rows, columns, initialSort: { key: "cierre", direction: "desc" }, title: "Órdenes de servicio", fileName: "ordenes-de-servicio.xlsx", disabled: billingLoading || billingFailed });
   const widths = ["w-[12%]", "w-[22%]", "w-[8%]", "w-[20%]", "w-[8%]", "w-[10%]", "w-[10%]", "w-[10%]"];
   const visible = ["os", "cliente", "marca", "modelo", "tecnicos", "estado", "horas", "km"].map((key, index) => ({ ...columns.find(c => c.key === key)!, width: widths[index],
     hiddenBelow: ["marca", "tecnicos"].includes(key) ? "lg" : undefined })) as CompactListColumn<ServicioOSRow>[];

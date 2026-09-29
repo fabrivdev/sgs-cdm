@@ -110,11 +110,13 @@ export function OrdersWorkspace() {
   const billingEnabled = !blocked && tab !== "cumplimiento" && data.ordenes.length > 0;
   const financial = useOrdersBilling(data.ordenes.map(row => row.os), filters.dateTo, billingEnabled);
   const billingLoading = billingEnabled && (financial.isPending || financial.isFetching);
+  const billingFailed = billingEnabled && financial.isError;
   const financialRows = useMemo(() => data.ordenes.map(row => ({ ...row,
     billing: billingEnabled && !billingLoading && !financial.isError ? financial.data?.[billingKey(row.os)] ?? null : null,
   })), [data.ordenes, billingEnabled, billingLoading, financial.isError, financial.data]);
   const closure = useMemo(() => orderClosureMetrics(data.ordenes), [data.ordenes]);
-  const efficiency = useMemo(() => billingEfficiency(financialRows), [financialRows]);
+  const efficiency = useMemo(() => billingFailed || billingLoading
+    ? { percentage: null, incomplete: 0 } : billingEfficiency(financialRows), [financialRows, billingFailed, billingLoading]);
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
@@ -151,7 +153,7 @@ export function OrdersWorkspace() {
           <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
           <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} detail={productivityPartial ? "Parcial" : undefined} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
-            detail={billingLoading ? "Calculando…" : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : workPeriod.includesLegacy ? `${operationsDate(filters.dateFrom)} — ${operationsDate(filters.dateTo)}` : undefined} />,
+            detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : workPeriod.includesLegacy ? `${operationsDate(filters.dateFrom)} — ${operationsDate(filters.dateTo)}` : undefined} />,
         ] : [
           <KpiItem key="realizadas" label="Realizadas" value={model.jornadasResultadoResumen.realizadas} tone="positive" icon={<CircleCheck />} />,
           <KpiItem key="no-realizadas" label="No realizadas" value={model.jornadasResultadoResumen.noRealizadas} tone="warning" icon={<CircleAlert />} />,
@@ -176,9 +178,14 @@ export function OrdersWorkspace() {
         <FilterMultiSelect label="Sucursal" values={filters.fSucursales} onChange={v => change("fSucursales", v)} options={SUCURSALES.map(value => ({ value, label: value }))} />
       </FiltersBar>
       {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná un rango de fechas válido.</p> : query.isError ? <div role="alert" className="space-y-2 text-sm"><p>No se pudieron cargar todas las fuentes. No se muestran resultados parciales.</p><Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div> : blocked ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando órdenes y actividad…</p> : <>
-        {billingEnabled && financial.isError && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{billingWarning(financial.error)}</p><Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button></div>}
+        {(billingFailed || (tab === "productividad" && productivityPartial)) && <div role="alert" className="flex min-h-9 flex-wrap items-center gap-x-2 rounded-md border border-amber-200 bg-amber-50/40 px-2 text-[12px] text-amber-800">
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+          {billingFailed && <><span>{billingWarning(financial.error)}</span><Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button></>}
+          {billingFailed && tab === "productividad" && productivityPartial && <span aria-hidden="true">·</span>}
+          {tab === "productividad" && productivityPartial && <Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} en jornadas · Revisar</Button>}
+        </div>}
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
-          <OrdersTable rows={financialRows} billingLoading={billingLoading} from={filters.dateFrom} to={filters.dateTo} />
+          <OrdersTable rows={financialRows} billingLoading={billingLoading} billingFailed={billingFailed} from={filters.dateFrom} to={filters.dateTo} />
         </TabsContent>
         <TabsContent value="productividad" className="min-w-0 space-y-3">
           {workEligible && query.data?.capacityWarning && <div className="flex flex-wrap items-center gap-2"><p role="alert" className="flex items-center gap-2 text-[12px] text-amber-700"><CircleAlert className="h-3.5 w-3.5 shrink-0" />{query.data.capacityWarning}</p><Button variant="ghost" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div>}
@@ -186,7 +193,6 @@ export function OrdersWorkspace() {
             : work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
-                {productivityPartial && <div role="alert" className="text-[12px] text-amber-700">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia en jornadas" : "incidencias en jornadas"} · Cálculo con horas válidas.<Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>Revisar jornadas</Button></div>}
                 <ProductivityTable rows={productivity.tecnicos} period={productivity.period} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
                 <OperationalEvolution rows={productivity.evolucion} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
