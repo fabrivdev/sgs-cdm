@@ -63,11 +63,11 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
     const brand = job?.marca ?? marcaDesdeOS(order.marca);
     const branch = resolveDashboardServiceOrderBranch({ jobBranch: job?.sucursal, rawData: order.raw_data, orderNumber: log.os,
       technicianBranch: log.entries[0]?.sucursal });
-    const state = canonicalSituacion(order.situacion_os);
-    const group = state === "Cerrada" ? "cerrada" : ["Cancelada", "Anulada"].includes(state) ? "otra" : "abierta";
+    const state = log.missingOrder ? "OS no importada" : canonicalSituacion(order.situacion_os);
+    const group = log.missingOrder ? null : state === "Cerrada" ? "cerrada" : ["Cancelada", "Anulada"].includes(state) ? "otra" : "abierta";
     if (filters.fSucursales.length && !filters.fSucursales.includes(branch ?? "")) continue;
     if (filters.fMarcas.length && !filters.fMarcas.includes(brand)) continue;
-    if (filters.fEstadosOS.length && !filters.fEstadosOS.includes(group)) continue;
+    if (filters.fEstadosOS.length && (!group || !filters.fEstadosOS.includes(group))) continue;
     if (filters.fOSRubros.length && !filters.fOSRubros.some(rubro => rubro === "Servicio"
       ? Number(order.servicios_cantidad || 0) > 0 || Number(order.servicios_valor || 0) > 0
       : rubro === "Repuestos" ? Number(order.repuesto_valor || 0) > 0 : Number(order.km_cantidad || 0) > 0 || Number(order.kilometro_valor || 0) > 0)) continue;
@@ -91,11 +91,16 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
       if (!days || !technician) {
         const issue: WorkIssue = { key: `${log.os}:${entry.id}`, os: log.os, technician, date: entry.fecha_inicio,
           dateTo: entry.fecha_fin, state, sources: [{ os: log.os, entry }],
-          reason: !technician ? "Sin técnico identificado" : inspectWorkInterval(entry).reason! };
+          reason: [log.missingOrder && "OS no importada", !technician ? "Sin técnico identificado" : inspectWorkInterval(entry).reason]
+            .filter(Boolean).join(" · ") };
         if (!issueInPeriod(issue, filters.dateFrom, filters.dateTo)) continue;
         issues.push(issue);
         if (technician) names.set(technician, { technician, ...participant });
         continue;
+      }
+      if (log.missingOrder && days.some(day => day.date >= filters.dateFrom && day.date <= filters.dateTo)) {
+        issues.push({ key: `${log.os}:${entry.id}:missing-order`, os: log.os, technician, date: entry.fecha_inicio,
+          dateTo: entry.fecha_fin, state, sources: [{ os: log.os, entry }], reason: "OS no importada" });
       }
       for (const day of days) {
         if (day.date < filters.dateFrom || day.date > filters.dateTo) continue;
@@ -145,7 +150,7 @@ export function workedProductivity(logs: OrderWorkLog[], data: OperationsData, f
     const orders = [...new Map(rows.map(row => [row.os, row.state])).values()];
     return { totalOS: orders.length, cerradas: orders.filter(state => state === "Cerrada").length,
       otras: orders.filter(state => ["Cancelada", "Anulada"].includes(state)).length,
-      abiertas: orders.filter(state => !["Cerrada", "Cancelada", "Anulada"].includes(state)).length };
+      abiertas: orders.filter(state => !["Cerrada", "Cancelada", "Anulada", "OS no importada"].includes(state)).length };
   };
   const tecnicos: ProductivityTechnicianRow[] = [...names.values()].map(participant => {
     const rows = records.filter(row => row.technician === participant.technician);

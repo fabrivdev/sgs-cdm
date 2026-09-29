@@ -10,8 +10,14 @@ export interface WorkEntry {
   sucursal: string | null; tipo_tiempo: string;
   estado_validacion: string; heredado: boolean;
 }
-export interface OrderWorkLog { os: string; order_data: OrdenServicioImportada; entries: WorkEntry[] }
+export interface OrderWorkLog { os: string; order_data: OrdenServicioImportada; entries: WorkEntry[]; missingOrder?: boolean }
 export interface WorkedDay { date: string; start: string; end: string; hours: number }
+function unknownOrder(os: string): OrdenServicioImportada {
+  return { os_numero: os, trabajo_id: null, cliente_nombre: null, fecha_abierta_os: null, fecha_cierre_os: null,
+    fecha_emision_factura: null, factura: null, nro_chasis: null, responsable: null, marca: null, problema: null,
+    tipo_tiempo: null, servicios_cantidad: null, servicios_valor: null, repuesto_valor: null, km_cantidad: null,
+    kilometro_valor: null, terceros_valor: null, situacion_os: null, situacion_facturacion: null, raw_data: null };
+}
 const DAY = 86_400_000;
 function stamp(date: string | null, time: string | null) {
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
@@ -89,7 +95,9 @@ async function loadPages(client: any, from: string, to: string, os: string | nul
     const query = client.rpc("service_orders_work_log_v1", { p_desde: from, p_hasta: to, p_os: os }).range(offset, offset + 499);
     const { data, error } = await (signal ? query.abortSignal(signal) : query);
     if (error) throw error;
-    if (!Array.isArray(data) || data.some(row => !row?.order_data || row.os !== row.order_data.os_numero || !Array.isArray(row.entries)
+    if (!Array.isArray(data) || data.some(row => typeof row?.os !== "string" || !row.os.trim()
+      || (row.order_data === null ? !Array.isArray(row.entries) || !row.entries.length : !row.order_data || row.os !== row.order_data.os_numero)
+      || !Array.isArray(row.entries)
       || row.entries.some((entry: WorkEntry) => !entry || typeof entry.id !== "string" || typeof entry.tecnico_nombre !== "string"))) {
       throw new Error("Detalle de trabajo incompleto.");
     }
@@ -97,7 +105,9 @@ async function loadPages(client: any, from: string, to: string, os: string | nul
       if (seen.has(row.os) || (os !== null && row.os !== os)) throw new Error("Identidad de jornadas inconsistente.");
       seen.add(row.os);
     }
-    result.push(...data);
+    result.push(...data.map(row => row.order_data === null
+      ? { os: row.os, order_data: unknownOrder(row.os), entries: row.entries, missingOrder: true }
+      : row));
     if (data.length < 500) {
       if (signal.aborted) throw signal.reason ?? new Error("Consulta cancelada.");
       return result;

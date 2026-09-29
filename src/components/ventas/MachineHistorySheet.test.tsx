@@ -151,6 +151,7 @@ describe("complete machine history", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Historial completo de la máquina" }));
     await waitFor(() => expect(write).toHaveBeenCalled());
+    expect(write).toHaveBeenCalledWith(expect.anything(), "historial-completo-maquina.xlsx", { bookType: "xlsx" });
     const exported = sheet.mock.calls[0][0] as unknown[][];
     expect(exported).toHaveLength(4);
     expect(exported[0]).toEqual(["Fecha", "Tipo", "OS", "Estado", "Técnicos", "Código", "Cód. fabr.", "Descripción", "Cant.", "Factura", "Facturado"]);

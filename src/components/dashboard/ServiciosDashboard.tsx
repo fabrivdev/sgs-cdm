@@ -132,7 +132,7 @@ export function ServiciosDashboard({
     {key:"total",label:"Total",kind:"number",align:"right",value:r=>r.valorOS,excelFormat:'"$" #,##0.00'},
   ];
   const orderTable = useSectionTable({rows:data.ordenes,columns,initialSort:{key:"inicio",direction:"desc"},
-    title:"Órdenes de servicio",fileName:"dashboard-ordenes-servicio",disabled:loading});
+    title:"Órdenes de servicio",fileName:"dashboard-ordenes-servicio.xlsx",disabled:loading});
 
   if (loading) {
     return (

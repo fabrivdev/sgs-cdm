@@ -283,4 +283,22 @@ describe("work log loader", () => {
     const incomplete = { rpc: () => ({ range: () => ({ abortSignal: async () => ({ data: [{ os: "A", order_data: null, entries: [] }], error: null }) }) }) };
     await expect(loadWorkLog(incomplete, "2026-09-01", "2026-09-30", null)).rejects.toThrow("incompleto");
   });
+  it("keeps valid work when its imported OS is missing, without inventing an order state", async () => {
+    const orphan = { os: "01-00000099", order_data: null, entries: [demoWorkEntry({ id: "ORPHAN", fecha_inicio: "2026-09-11",
+      fecha_fin: "2026-09-11", tecnico_nombre: "TECNICO DOS", tecnico_profile_id: "T2" })] };
+    const client = { rpc: () => ({ range: () => ({ abortSignal: async () => ({ data: [demoWorkLog(), orphan], error: null }) }) }) };
+    const logs = await loadWorkLog(client, "2026-09-01", "2026-09-30", null);
+    expect(logs[1]).toMatchObject({ os: orphan.os, missingOrder: true, order_data: {
+      os_numero: orphan.os, situacion_os: null, fecha_abierta_os: null, servicios_cantidad: null,
+    } });
+    const result = workedProductivity(logs, fixture, operationsFilters);
+    expect(result.horasPersona).toBe(20);
+    expect(result.records.find(row => row.os === orphan.os)).toMatchObject({ hours: 10, state: "OS no importada" });
+    expect(result.issues).toEqual([expect.objectContaining({ os: orphan.os, technician: "TECNICO DOS", reason: "OS no importada" })]);
+    expect(result.tecnicos.find(row => row.profileId === "T1")).toMatchObject({ horas: 10, incomplete: false });
+    expect(result.tecnicos.find(row => row.profileId === "T2")).toMatchObject({ horas: 10, incomplete: true });
+    expect(result.evolucion[0]).toMatchObject({ totalOS: 2, cerradas: 1, abiertas: 0, incomplete: true });
+    expect(workedProductivity(logs, fixture, operationsFilters, "activos")).toMatchObject({ horasPersona: 10, issues: [] });
+    expect(workedProductivity(logs, fixture, { ...operationsFilters, fEstadosOS: ["abierta"] }).horasPersona).toBe(0);
+  });
 });

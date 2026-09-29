@@ -35,6 +35,12 @@ describe("section actions", () => {
     expect(xlsx.utils.json_to_sheet).toHaveBeenCalledWith(rows);
     expect(xlsx.utils.book_append_sheet).toHaveBeenCalledWith(expect.anything(), expect.anything(), "Detalle");
   });
+  it("adds .xlsx to a Dashboard OS export even if a caller passes only the base name", async () => {
+    render(<TableExportButton options={[{ label: "Órdenes de servicio", filename: "dashboard-ordenes-servicio-2026-09",
+      sheetName: "Órdenes de servicio", rows: [{ OS: "01-00000001" }] }]} />);
+    open(); fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Órdenes de servicio" }));
+    await waitFor(() => expect(xlsx.writeFile).toHaveBeenCalledWith(expect.anything(), "dashboard-ordenes-servicio-2026-09.xlsx"));
+  });
   it("blocks unavailable exports, prevents overlapping exports, and supports retry after failure", async () => {
     let reject!: (error: Error) => void;
     const exporter = vi.fn().mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; })).mockResolvedValue(undefined);

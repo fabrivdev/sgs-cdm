@@ -3222,7 +3222,7 @@ export default function Dashboard() {
       return [
         {
           label: "Órdenes de servicio",
-          filename: `dashboard-ordenes-servicio-${suffix}`,
+          filename: `dashboard-ordenes-servicio-${suffix}.xlsx`,
           sheetName: "Órdenes de servicio",
           rowCount: serviciosDashboardData.ordenes.length,
           rows: () => serviciosDashboardData.ordenes.map((row) => ({
