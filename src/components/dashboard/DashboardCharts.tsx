@@ -1,9 +1,11 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { format, getDay, parseISO } from "date-fns";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Activity, Building2, CalendarDays, Clock3, FileText, Printer, Receipt, Route, Users, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { matrixCompletion, matrixCompletionText } from "@/lib/matrixCompletion";
 import { cardLabel, filterLabel, metaText, tableHeadText } from "@/lib/ui-classes";
 import type { Marca, Sucursal } from "@/lib/constants";
 import type { WeekRow, OSImpactRow, OSRubro, FactMetric, OSMetric, PeriodMode, Facturacion, ServiciosDashboardData } from "./types";
@@ -1519,64 +1521,24 @@ function MatrizCellVisual({
   isSunday: boolean;
   metric: "trabajos" | "horas";
 }) {
-  const totalJornadas = (cell?.realizadas ?? 0) + (cell?.noRealizadas ?? 0) + (cell?.programadas ?? 0);
-  const hasNoDisponibilidad = (cell?.noDisponibilidad?.length ?? 0) > 0;
-  const labelValue = metric === "horas"
-    ? ((cell?.horas ?? 0) > 0 ? `${Number(cell?.horas ?? 0).toFixed(1)}` : "")
-    : (totalJornadas > 1 ? String(totalJornadas) : "");
-
-  if (!cell || (totalJornadas === 0 && !hasNoDisponibilidad)) {
-    return <div className={cn("h-9 rounded-md border border-transparent", isSunday && "bg-muted/45", isCurrent && "ring-1 ring-primary/10")} />;
+  const result = matrixCompletion(cell);
+  const base = cn("flex h-9 flex-col justify-center rounded-md border px-1.5 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-muted/40");
+  if (!cell || (!result.decided && !result.scheduled && !result.unavailable)) {
+    return <div className={cn(base, "border-transparent")} />;
   }
-
-  const hasRealizadas = (cell.realizadas ?? 0) > 0;
-  const hasNoRealizadas = (cell.noRealizadas ?? 0) > 0;
-  const hasProgramadas = (cell.programadas ?? 0) > 0;
-
-  if (hasRealizadas && hasNoRealizadas) {
-    return (
-      <div className={cn("relative flex h-9 items-center justify-center gap-1 overflow-hidden rounded-md border border-border/60 px-1 text-[11px] font-semibold tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-muted/40")}>
-        <div className="absolute inset-y-0 left-0 w-1/2 bg-emerald-500/18" />
-        <div className="absolute inset-y-0 right-0 w-1/2 bg-amber-400/25" />
-        {hasNoDisponibilidad ? <div className="absolute inset-x-1 bottom-1 h-1 rounded-full bg-violet-400/75" /> : null}
-        <span className="relative z-10 whitespace-nowrap text-[9px]"><span className="text-emerald-700">●</span><span className="text-amber-700">▲</span></span>
-        {labelValue ? <span className="relative z-10 text-foreground">{labelValue}</span> : null}
+  if (result.percent !== null) {
+    return <div className={cn(base, "gap-1 border-border/70 bg-background")}>
+      <div className="flex items-center justify-between gap-1 whitespace-nowrap text-[10px] leading-none">
+        <strong className={cn("font-semibold", result.percent === 100 ? "text-emerald-700" : "text-foreground")}>{result.percent}%</strong>
+        <span className="text-muted-foreground">{metric === "horas" ? `${Number(cell.horas || 0).toLocaleString("es-PY", { maximumFractionDigits: 1 })} h` : `${result.completed}/${result.decided}`}</span>
       </div>
-    );
-  }
-
-  if (hasRealizadas) {
-    return (
-      <div className={cn("flex h-9 items-center justify-center gap-1 rounded-md border border-emerald-200 bg-emerald-500/12 px-1 text-[11px] font-semibold text-emerald-700 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-emerald-500/8")}>
-        <span className="text-[10px] leading-none">●</span>
-        {labelValue ? <span>{labelValue}</span> : null}
+      <div role="meter" aria-label="Trabajos cumplidos" aria-valuemin={0} aria-valuemax={100} aria-valuenow={result.percent} aria-valuetext={matrixCompletionText(result)} className="flex h-1 overflow-hidden rounded-full bg-amber-300/80">
+        <span className="h-full bg-emerald-600" style={{ width: `${result.percent}%` }} />
       </div>
-    );
+      {(result.scheduled || result.unavailable) ? <div className="dashboard-matrix-cell-extra flex gap-1 whitespace-nowrap text-[8px] leading-none"><span className="text-sky-700">{result.scheduled ? `${result.scheduled} prog.` : ""}</span><span className="text-violet-700">{result.unavailable ? "ND" : ""}</span></div> : null}
+    </div>;
   }
-
-  if (hasNoRealizadas) {
-    return (
-      <div className={cn("flex h-9 items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-400/12 px-1 text-[11px] font-semibold text-amber-700 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-amber-400/10")}>
-        <span className="text-[10px] leading-none">▲</span>
-        {labelValue ? <span>{labelValue}</span> : null}
-      </div>
-    );
-  }
-
-  if (hasProgramadas) {
-    return (
-      <div className={cn("flex h-9 items-center justify-center gap-1 rounded-md border border-sky-300 bg-sky-500/5 px-1 text-[11px] font-semibold text-sky-700 tabular-nums", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-sky-500/5")}>
-        <span className="text-[10px] leading-none">○</span>
-        {labelValue ? <span>{labelValue}</span> : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("flex h-9 items-center justify-center rounded-md border border-violet-200 bg-violet-500/10 px-1 text-[10px] font-semibold text-violet-700", isCurrent && "ring-1 ring-primary/10", isSunday && "bg-violet-500/8")}>
-      ND
-    </div>
-  );
+  return <div className={cn(base, "items-center border-border/70 bg-muted/20 text-[10px] font-medium")}>{result.scheduled ? <span className="whitespace-nowrap text-sky-700">{result.scheduled} prog.</span> : null}{result.unavailable ? <span className="text-violet-700">ND</span> : null}</div>;
 }
 
 export function MatrizTécnicosDías({
@@ -1605,18 +1567,8 @@ export function MatrizTécnicosDías({
   const { buckets, blocks, bucketLabels, bucketMode, overLimit } = data;
   const [leftWidth, setLeftWidth] = useState(320);
 
-  if (overLimit) {
-    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Disponible para rangos de hasta 31 columnas visibles.</div>;
-  }
-
-  if (blocks.length === 0 || buckets.length === 0) {
-    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin actividad técnica para los filtros actuales.</div>;
-  }
-
-  const dayWidth = buckets.length <= 7 ? 1 : buckets.length <= 14 ? 76 : 58;
-  const gridTemplateColumns = buckets.length <= 7
-    ? `${leftWidth}px repeat(${buckets.length}, minmax(120px, 1fr))`
-    : `${leftWidth}px repeat(${buckets.length}, ${dayWidth}px)`;
+  const minBucketWidth = buckets.length <= 7 ? 120 : buckets.length <= 14 ? 96 : 76;
+  const gridTemplateColumns = `${leftWidth}px repeat(${buckets.length}, minmax(${minBucketWidth}px, 1fr))`;
 
   const printDetailRows = useMemo(() => {
     const activity = new Map<string, {
@@ -1736,12 +1688,12 @@ export function MatrizTécnicosDías({
     };
   }, []);
 
-  const startResize = (event: any) => {
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     const startX = event.clientX;
     const initialWidth = leftWidth;
 
-    const onMove = (moveEvent: any) => {
+    const onMove = (moveEvent: PointerEvent) => {
       const next = Math.max(260, Math.min(520, initialWidth + (moveEvent.clientX - startX)));
       setLeftWidth(next);
     };
@@ -1754,6 +1706,14 @@ export function MatrizTécnicosDías({
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
+
+  if (overLimit) {
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Disponible para rangos de hasta 31 columnas visibles.</div>;
+  }
+
+  if (blocks.length === 0 || buckets.length === 0) {
+    return <div className="rounded-md border px-3 py-6 text-center text-[12px] text-muted-foreground">Sin actividad técnica para los filtros actuales.</div>;
+  }
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -1773,12 +1733,11 @@ export function MatrizTécnicosDías({
 
         <div className="dashboard-matrix-print-toolbar flex flex-wrap items-center justify-between gap-3">
           <div className="dashboard-matrix-legend flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground" aria-label="Leyenda de la matriz">
-            <span className="inline-flex items-center gap-1"><span className="font-bold text-emerald-700">●</span> Trabajo realizado</span>
-            <span className="inline-flex items-center gap-1"><span className="font-bold text-amber-700">▲</span> No realizado o vencido</span>
-            <span className="inline-flex items-center gap-1"><span className="font-bold text-sky-700">○</span> Trabajo programado</span>
-            <span className="inline-flex items-center gap-1"><span className="font-bold text-violet-700">ND</span> No disponible</span>
-            <span className="inline-flex items-center gap-1"><span className="font-bold"><span className="text-emerald-700">●</span><span className="text-amber-700">▲</span></span> Estados combinados</span>
-            {!concise && <span className="dashboard-matrix-legend-note">El número indica {metric === "horas" ? "horas" : "cantidad de trabajos"}.</span>}
+            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-4 rounded-full bg-emerald-600" /> Cumplidos (n/total)</span>
+            <span className="inline-flex items-center gap-1"><span className="h-1.5 w-4 rounded-full bg-amber-400" /> No cumplidos / vencidos</span>
+            <span className="inline-flex items-center gap-1 text-sky-700">Prog. · pendientes</span>
+            <span className="inline-flex items-center gap-1 text-violet-700">ND · no disponible</span>
+            {!concise && <span className="dashboard-matrix-legend-note">% sobre trabajos con resultado.</span>}
           </div>
 
           <div className="dashboard-matrix-actions flex items-center gap-2">
@@ -1810,17 +1769,17 @@ export function MatrizTécnicosDías({
           {blocks.map((block) => (
             <div key={block.sucursal} className="dashboard-matrix-block rounded-lg border bg-background">
               <div
-                className="dashboard-matrix-grid grid min-w-max border-b bg-muted/25"
+                className="dashboard-matrix-grid grid min-w-full border-b bg-muted/25"
                 style={{ gridTemplateColumns, "--matrix-days": buckets.length } as { [key: string]: string | number }}
               >
                 <div className="dashboard-matrix-left sticky left-0 z-20 border-r bg-muted/25">
                   <button
                     type="button"
                     onClick={() => onSelectSucursal(block.sucursal)}
-                    className="dashboard-matrix-sucursal flex h-11 w-full flex-col items-start justify-center px-3 text-left hover:bg-accent/60"
+                    className="dashboard-matrix-sucursal flex h-11 w-full items-center gap-2 overflow-hidden px-3 text-left hover:bg-accent/60"
                   >
-                    <span className="text-[13px] font-semibold">{block.sucursal}</span>
-                    <span className="text-[11px] text-muted-foreground">{block.totalTécnicos} técnicos · {block.totalActividad} {metric === "horas" ? "hs" : "registros"}</span>
+                    <span className="min-w-0 truncate text-[13px] font-semibold">{block.sucursal}</span>
+                    <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">{block.totalTécnicos} técnicos · {block.totalActividad} {metric === "horas" ? "hs" : "registros"}</span>
                   </button>
                   <button
                     type="button"
@@ -1850,29 +1809,29 @@ export function MatrizTécnicosDías({
               {block.técnicos.map((row) => (
                 <div
                   key={`${block.sucursal}-${row.id}`}
-                  className="dashboard-matrix-grid grid min-w-max"
+                  className="dashboard-matrix-grid grid min-w-full"
                   style={{ gridTemplateColumns, "--matrix-days": buckets.length } as { [key: string]: string | number }}
                 >
                   <button
                     type="button"
                     onClick={() => onSelectTecnico(row.id)}
+                    title={row.sinAsignacion ? `${row.nombre} · Sin asignación` : row.tieneNoDisponibilidad ? `${row.nombre} · Con no disponibilidad` : row.nombre}
                     className={cn(
-                      "dashboard-matrix-tech sticky left-0 z-10 flex h-12 flex-col items-start justify-center border-r border-t px-3 text-left hover:bg-accent/60",
+                      "dashboard-matrix-tech sticky left-0 z-10 flex h-12 min-w-0 items-center border-r border-t px-3 text-left hover:bg-accent/60",
                       row.sinAsignacion ? "bg-red-50" : "bg-background"
                     )}
                   >
-                    <span className="truncate text-[13px] font-medium">{row.nombre}</span>
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {row.sinAsignacion ? "Sin asignación" : row.tieneNoDisponibilidad ? "Con no disponibilidad" : row.sucursal}
-                    </span>
+                    <span className="block min-w-0 w-full truncate whitespace-nowrap text-[13px] font-medium">{row.nombre}</span>
                   </button>
 
                   {buckets.map((bucket) => {
                     const cell = row.cells[bucket];
                     const isCurrent = currentBucketKey === bucket;
                     const isSunday = matrixBucketIsSunday(bucket, bucketMode);
+                    const result = matrixCompletion(cell);
+                    const summary = result.decided ? `${result.percent}% de cumplimiento · ${matrixCompletionText(result)} · ${result.notCompleted} sin cumplir` : "Sin trabajos con resultado";
                     const title = cell?.refs?.length
-                      ? cell.refs.map((item) => `${item.ref} · ${item.cliente} · ${item.estado}${item.motivo ? ` · ${item.motivo}` : ""}`).join("\n")
+                      ? [summary, cell.refs.map((item) => `${item.ref} · ${item.cliente} · ${item.estado}${item.motivo ? ` · ${item.motivo}` : ""}`).join("\n")].join("\n")
                       : cell?.noDisponibilidad?.length
                         ? cell.noDisponibilidad.join("\n")
                         : "Sin actividad";
@@ -1882,13 +1841,14 @@ export function MatrizTécnicosDías({
                         {(cell?.refs?.length || cell?.noDisponibilidad?.length) ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <button type="button" className="block w-full text-left" title={title}>
+                              <button type="button" className="block w-full text-left" title={title} aria-label={`${row.nombre} · ${bucketLabels[bucket] ?? bucket} · ${summary}${result.scheduled ? ` · ${result.scheduled} programados` : ""}${result.unavailable ? " · no disponible" : ""}`}>
                                 <MatrizCellVisual cell={cell} isCurrent={isCurrent} isSunday={isSunday} metric={metric} />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-[280px] p-2">
                               <div className="space-y-1">
                                 <div className="text-[11px] font-semibold">{row.nombre} · {bucketLabels[bucket] ?? bucket}</div>
+                                <div className="text-[11px] text-muted-foreground">{summary}{result.scheduled ? ` · ${result.scheduled} programados` : ""}</div>
                                 {cell?.refs?.map((item, index) => (
                                   <div key={`${item.ref}-${item.estado}-${index}`} className="text-[11px] leading-tight">
                                     <div className="font-medium">{item.ref} · {item.cliente}</div>

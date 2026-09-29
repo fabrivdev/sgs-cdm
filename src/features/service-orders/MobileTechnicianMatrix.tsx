@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
 import { operationsDate } from "./format";
+import { matrixCompletion, matrixCompletionText } from "@/lib/matrixCompletion";
 import type { OperationsModel } from "./useOperationsModel";
 
 type Matrix = OperationsModel["matrizTécnicosDías"];
@@ -38,7 +39,7 @@ export function MobileTechnicianMatrix({ data, metric, onMetricChange }: {
       </div>
     </div>
     <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-3 py-2 text-[10px] text-muted-foreground">
-      <span><span className="text-emerald-700">●</span> Realizado</span><span><span className="text-amber-700">▲</span> No realizado</span><span><span className="text-sky-700">○</span> Programado</span><span><span className="text-violet-700">ND</span> No disponible</span>
+      <span className="text-emerald-700">Cumplidos (n/total)</span><span className="text-amber-700">No cumplidos / vencidos</span><span className="text-sky-700">Prog. · pendientes</span><span className="text-violet-700">ND · no disponible</span>
     </div>
     <div role="table" aria-label="Matriz de técnicos por período" className="divide-y">
       <div role="row" className="sr-only"><span role="columnheader">Técnico</span><span role="columnheader">Actividad</span></div>
@@ -46,17 +47,16 @@ export function MobileTechnicianMatrix({ data, metric, onMetricChange }: {
         <div role="row" className="bg-muted/30 px-3 py-2 text-[12px] font-semibold"><span role="cell">{block.sucursal}</span></div>
         {block.técnicos.map(technician => {
           const cell = technician.cells[bucket];
-          const count = (cell?.realizadas ?? 0) + (cell?.noRealizadas ?? 0) + (cell?.programadas ?? 0);
-          const availability = cell?.noDisponibilidad.length ?? 0;
+          const result = matrixCompletion(cell);
           return <div role="row" key={technician.id} className="flex min-h-12 items-center justify-between gap-3 border-t px-3 py-2">
             <span role="cell" className="min-w-0 flex-1"><button type="button" onClick={() => setSelected({ technician, bucket })} className="min-h-11 w-full break-words text-left text-[12px] font-medium leading-snug">{technician.nombre}</button></span>
-            <span role="cell" className="flex shrink-0 items-center gap-1.5 text-[11px] tabular-nums">
-              {cell?.realizadas ? <span className="text-emerald-700">● {cell.realizadas}</span> : null}
-              {cell?.noRealizadas ? <span className="text-amber-700">▲ {cell.noRealizadas}</span> : null}
-              {cell?.programadas ? <span className="text-sky-700">○ {cell.programadas}</span> : null}
-              {availability ? <span className="text-violet-700">ND</span> : null}
-              {metric === "horas" && cell?.horas ? <span className="font-semibold">{cell.horas.toLocaleString("es-PY", { maximumFractionDigits: 1 })} h</span> : null}
-              {!count && !availability ? <span className="text-muted-foreground">—</span> : null}
+            <span role="cell" className="flex w-[106px] shrink-0 flex-col gap-1 text-[10px] tabular-nums">
+              {result.percent !== null ? <>
+                <span className="flex items-center justify-between whitespace-nowrap"><strong className="text-[12px]">{result.percent}%</strong><span className="text-muted-foreground">{metric === "horas" ? `${Number(cell?.horas || 0).toLocaleString("es-PY", { maximumFractionDigits: 1 })} h` : `${result.completed}/${result.decided}`}</span></span>
+                <span role="meter" aria-label={`Trabajos cumplidos de ${technician.nombre}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={result.percent} aria-valuetext={matrixCompletionText(result)} className="flex h-1.5 overflow-hidden rounded-full bg-amber-300/80"><span className="bg-emerald-600" style={{ width: `${result.percent}%` }} /></span>
+              </> : <span className="text-right text-muted-foreground">{result.scheduled ? `${result.scheduled} prog.` : result.unavailable ? "ND" : "—"}</span>}
+              {(result.percent !== null && (result.scheduled || result.unavailable)) ? <span className="text-right text-muted-foreground">{result.scheduled ? `${result.scheduled} prog.` : ""}{result.unavailable ? " · ND" : ""}</span> : null}
+              {result.percent === null && result.scheduled > 0 && result.unavailable > 0 ? <span className="text-right text-violet-700">ND</span> : null}
             </span>
           </div>;
         })}

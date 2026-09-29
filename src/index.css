@@ -489,7 +489,7 @@
   }
 
   body.printing-dashboard-matrix .dashboard-matrix-tech span:last-child {
-    font-size: 6px !important;
+    font-size: 7px !important;
     line-height: 1.05 !important;
   }
 
@@ -508,6 +508,14 @@
     border-radius: 3px !important;
     font-size: 7px !important;
     line-height: 1 !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-cell-extra {
+    display: none !important;
+  }
+
+  body.printing-dashboard-matrix .dashboard-matrix-cell [role="meter"] {
+    height: 2px !important;
   }
 
   body.printing-dashboard-matrix button[aria-label="Ajustar ancho de nombres"],

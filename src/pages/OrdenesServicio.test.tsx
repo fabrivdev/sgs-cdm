@@ -599,6 +599,37 @@ describe("orders workspace", () => {
     expect(screen.getByText("Ene 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
     expect(screen.getByText("Sep 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
   });
+  it("shows a compact completion ratio on daily, weekly and monthly desktop buckets", () => {
+    mocks.width = 1280;
+    response.data.data.jornadas[2].fecha = "2026-09-25";
+    response.data.data.jornadas.push({ ...response.data.data.jornadas[0], id: "J4", estado: "Cancelada", horas_trabajadas: 0 });
+    setup(); tab("Cumplimiento");
+    const completion = () => screen.getAllByRole("meter", { name: "Trabajos cumplidos" }).find(meter => meter.getAttribute("aria-valuetext") === "1 de 2 trabajos cumplidos");
+    expect(screen.getByText("Sem 37 · 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+    expect(completion()?.closest(".dashboard-matrix-cell")).toHaveTextContent("1/2");
+    const dates = document.querySelectorAll('input[type="date"]');
+    fireEvent.change(dates[0], { target: { value: "2026-09-10" } });
+    fireEvent.change(dates[1], { target: { value: "2026-09-10" } });
+    expect(screen.getByText("Jue 10/09", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+    expect(completion()?.closest(".dashboard-matrix-cell")).toHaveTextContent("1/2");
+    fireEvent.change(dates[0], { target: { value: "2026-01-01" } });
+    fireEvent.change(dates[1], { target: { value: "2026-09-25" } });
+    expect(screen.getByText("Sep 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+    expect(completion()?.closest(".dashboard-matrix-cell")).toHaveTextContent("1/2");
+    expect(screen.getByRole("button", { name: "TECNICO UNO" }).querySelectorAll("span")).toHaveLength(1);
+  });
+  it("keeps the same completion definition on phone and separates scheduled work", () => {
+    response.data.data.jornadas[2].fecha = "2026-09-25";
+    response.data.data.jornadas.push({ ...response.data.data.jornadas[0], id: "J4", estado: "Cancelada", horas_trabajadas: 0 });
+    setup(); tab("Cumplimiento");
+    const dates = document.querySelectorAll('input[type="date"]');
+    fireEvent.change(dates[0], { target: { value: "2026-09-10" } });
+    fireEvent.change(dates[1], { target: { value: "2026-09-25" } });
+    expect(screen.getByText("1 prog.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+    fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+    expect(screen.getByRole("meter", { name: "Trabajos cumplidos de TECNICO UNO" })).toHaveAttribute("aria-valuetext", "1 de 2 trabajos cumplidos");
+  });
   it("never exposes stale figures or exports after source errors", () => {
     response.isError = true; setup();
     expect(screen.getByRole("alert")).toHaveTextContent("No se muestran resultados parciales");
