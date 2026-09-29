@@ -36,6 +36,7 @@ import { operationsDate } from "@/features/service-orders/format";
 import { LEGACY_IMPORT_CUTOFF, NEW_SYSTEM_START } from "@/lib/imports/cutoff";
 import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
 import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
+import { MobileTechnicianMatrix } from "@/features/service-orders/MobileTechnicianMatrix";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
 import { TecnicosNoRealizadosRanking, MatrizTécnicosDías, EstadoCompacto, CargaSucursalTabla, DistribucionMarca, TrabajosAbiertosList } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
@@ -85,6 +86,7 @@ export function OrdersWorkspace() {
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
+  const [showComplianceAnalysis, setShowComplianceAnalysis] = useState(false);
   const defaults = useMemo<OperationsFilters>(() => ({ dateFrom: format(startOfMonth(today), "yyyy-MM-dd"), dateTo: format(today, "yyyy-MM-dd"), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
@@ -152,7 +154,7 @@ export function OrdersWorkspace() {
         <span>Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
         <button type="button" onClick={() => setTab("ordenes")} className="min-h-11 text-primary hover:underline sm:min-h-0">Histórico en Órdenes</button>
       </div>}
-      {!blocked && <KpiStrip>
+      {!blocked && tab !== "cumplimiento" && <KpiStrip>
         {tab === "ordenes" ? [
           <KpiItem key="total" label="Órdenes" value={data.totalOS} icon={<ClipboardList />} />,
           <KpiItem key="abiertas" label={compact ? "Abiertas" : "Abiertas / sin cierre"} value={data.abiertas} tone="info" icon={<Clock3 />} />,
@@ -165,11 +167,7 @@ export function OrdersWorkspace() {
           <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
           <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
             detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
-        ] : [
-          <KpiItem key="realizadas" label="Realizadas" value={model.jornadasResultadoResumen.realizadas} tone="positive" icon={<CircleCheck />} />,
-          <KpiItem key="no-realizadas" label="No realizadas" value={model.jornadasResultadoResumen.noRealizadas} tone="warning" icon={<CircleAlert />} />,
-          <KpiItem key="pendientes" label="Pendientes" value={model.jornadasResultadoResumen.pendientes} icon={<Clock3 />} />,
-        ]}
+        ] : null}
       </KpiStrip>}
       <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!phone ? <SalesSectionExportMenu /> : undefined} expanded={<>
         <FilterMultiSelect label="Marca" values={filters.fMarcas} onChange={v => change("fMarcas", v)} options={MARCAS.map(value => ({ value, label: value }))} />
@@ -215,14 +213,19 @@ export function OrdersWorkspace() {
               </>}
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0 space-y-4">
-          <div className="grid min-w-0 items-start gap-3 xl:grid-cols-2"><ComplianceOverview model={model} /><Block title="No realizadas por técnico"><TecnicosNoRealizadosRanking rows={model.tecnicosNoRealizados} onSelect={id => change("fTécnicos", [id])} /></Block></div>
-          {!phone && <Block title="Matriz de técnicos por período"><MatrizTécnicosDías concise key={`${filters.dateFrom}:${filters.dateTo}:${filters.periodMode}:${model.matrizTécnicosDías.overLimit}:${model.matrizTécnicosDías.blocks.length}`} data={model.matrizTécnicosDías} currentBucketKey={model.matrizTécnicosDías.currentBucketKey} metric={matrixMetric} onMetricChange={setMatrixMetric} onSelectTecnico={id => change("fTécnicos", [id])} onSelectSucursal={s => change("fSucursales", [s])} /></Block>}
-          <ActivityTable model={model} />
-          <div className="grid min-w-0 gap-4 lg:grid-cols-2"><Block title="Estado de trabajos"><EstadoCompacto flujo={model.flujo} onSelect={s => change("fEstadosTrabajo", s === "all" ? [] : [s])} planificados={model.trabajosPlanificadosPróximoPeriodo} técnicosAsignados={model.técnicosPróximoPeriodo} jornadasPlanificadas={model.jornadasPlanificacion.length} planificacionRango={model.planificacionRango} jornadasPrev={model.jornadasRealizadasPrev.length} horasPrev={model.horasPrev} tecnicosCierreAnterior={model.tecnicosCierreAnterior} cierreAnteriorRango={model.cierreAnteriorRango} /></Block><Block title="Carga por sucursal"><CargaSucursalTabla rows={model.cargaSucursal} onSelect={s => change("fSucursales", [s])} /></Block></div>
-          <Block title="Seguimiento OS/TR"><JobFollowup model={model} /></Block>
-          <Block title="Trabajos abiertos sin cierre"><TrabajosAbiertosList rows={model.trabajosAbiertosSinCierre} onSelect={row => openJob(row.id)} /></Block>
-          <Block title="Distribución por marca"><DistribucionMarca data={model.cargaMarca} selected={filters.fMarcas} onSelect={m => change("fMarcas", [m])} /></Block>
-          {hasSectionAccess("servicios.trabajos") && <Link className="inline-flex min-h-11 items-center text-[13px] text-primary" to="/trabajos">Abrir Trabajos</Link>}
+          <OperationsPanel title="Matriz de técnicos por período" padded={!phone} actions={<Button variant="ghost" size="sm" onClick={() => setShowComplianceAnalysis(value => !value)}>{showComplianceAnalysis ? "Ocultar análisis" : "Más análisis"}</Button>}>
+            {phone ? <MobileTechnicianMatrix key={`${filters.dateFrom}:${filters.dateTo}:${filters.periodMode}`} data={model.matrizTécnicosDías} metric={matrixMetric} onMetricChange={setMatrixMetric} />
+              : <MatrizTécnicosDías concise key={`${filters.dateFrom}:${filters.dateTo}:${filters.periodMode}:${model.matrizTécnicosDías.overLimit}:${model.matrizTécnicosDías.blocks.length}`} data={model.matrizTécnicosDías} currentBucketKey={model.matrizTécnicosDías.currentBucketKey} metric={matrixMetric} onMetricChange={setMatrixMetric} onSelectTecnico={id => change("fTécnicos", [id])} onSelectSucursal={s => change("fSucursales", [s])} />}
+          </OperationsPanel>
+          {showComplianceAnalysis && <>
+            <div className="grid min-w-0 items-start gap-3 xl:grid-cols-2"><ComplianceOverview model={model} /><Block title="No realizadas por técnico"><TecnicosNoRealizadosRanking rows={model.tecnicosNoRealizados} onSelect={id => change("fTécnicos", [id])} /></Block></div>
+            <ActivityTable model={model} />
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2"><Block title="Estado de trabajos"><EstadoCompacto flujo={model.flujo} onSelect={s => change("fEstadosTrabajo", s === "all" ? [] : [s])} planificados={model.trabajosPlanificadosPróximoPeriodo} técnicosAsignados={model.técnicosPróximoPeriodo} jornadasPlanificadas={model.jornadasPlanificacion.length} planificacionRango={model.planificacionRango} jornadasPrev={model.jornadasRealizadasPrev.length} horasPrev={model.horasPrev} tecnicosCierreAnterior={model.tecnicosCierreAnterior} cierreAnteriorRango={model.cierreAnteriorRango} /></Block><Block title="Carga por sucursal"><CargaSucursalTabla rows={model.cargaSucursal} onSelect={s => change("fSucursales", [s])} /></Block></div>
+            <Block title="Seguimiento OS/TR"><JobFollowup model={model} /></Block>
+            <Block title="Trabajos abiertos sin cierre"><TrabajosAbiertosList rows={model.trabajosAbiertosSinCierre} onSelect={row => openJob(row.id)} /></Block>
+            <Block title="Distribución por marca"><DistribucionMarca data={model.cargaMarca} selected={filters.fMarcas} onSelect={m => change("fMarcas", [m])} /></Block>
+            {hasSectionAccess("servicios.trabajos") && <Link className="inline-flex min-h-11 items-center text-[13px] text-primary" to="/trabajos">Abrir Trabajos</Link>}
+          </>}
         </TabsContent>
       </>}
     </Tabs>

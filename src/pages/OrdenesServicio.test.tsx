@@ -144,7 +144,7 @@ describe("orders workspace", () => {
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
     expect(screen.queryByRole("table", { name: "Productividad por técnico" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" })); expect(mocks.workRetry).toHaveBeenCalled();
-    tab("Cumplimiento"); expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
+    tab("Cumplimiento"); expect(screen.getByRole("table", { name: "Matriz de técnicos por período" })).toBeVisible();
   });
   it.each([320, 768, 1280])("shows source evidence and preserves unaffected technician productivity at %i px", width => {
     mocks.width = width;
@@ -405,13 +405,17 @@ describe("orders workspace", () => {
     expect(detail.queryByText("$ 1.240,25")).not.toBeInTheDocument();
     expect(detail.getByText("Facturación no disponible.")).toBeVisible();
   });
-  it("keeps five order KPIs, four in productivity, three in compliance and one export menu", () => {
+  it("keeps KPI strips in orders and productivity while compliance focuses on the matrix", () => {
     setup();
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
       tab(name);
-      expect(screen.getAllByRole("region", { name: "Indicadores" })).toHaveLength(1);
-      expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(name === "Órdenes" ? 5 : name === "Productividad" ? 4 : 3);
-      expect(screen.getAllByRole("button", { name: "Acciones de la sección" })).toHaveLength(1);
+      if (name === "Cumplimiento") {
+        expect(screen.queryByRole("region", { name: "Indicadores" })).not.toBeInTheDocument();
+        expect(screen.getByRole("table", { name: "Matriz de técnicos por período" })).toBeVisible();
+      } else {
+        expect(screen.getByRole("region", { name: "Indicadores" }).children).toHaveLength(name === "Órdenes" ? 5 : 4);
+        expect(screen.getAllByRole("button", { name: "Acciones de la sección" })).toHaveLength(1);
+      }
     }
   }, 20_000);
   it.each([320, 768, 1280])("shows reconciled Sales money and efficiency based on OS hours at %i px", width => {
@@ -494,7 +498,7 @@ describe("orders workspace", () => {
     expect(screen.getByRole("table", { name: "Productividad por técnico" })).toBeVisible();
     tab("Cumplimiento");
     expect(mocks.billing).toHaveBeenLastCalledWith(expect.any(Array), "2026-09-25", false);
-    expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
+    expect(screen.getByRole("table", { name: "Matriz de técnicos por período" })).toBeVisible();
   });
   it("requests only filtered OS, not the one-year operational lookback", async () => {
     setup();
@@ -561,6 +565,7 @@ describe("orders workspace", () => {
     response.data.data.disponibilidades = [{ id: "ABS1", tecnico_id: "T1", fecha_inicio: "2026-09-02", fecha_fin: "2026-09-03", tipo: "Capacitación", observacion: null, bloquea_agenda: true }];
     response.data.data.jornadas.push({ ...response.data.data.jornadas[0], id: "J4" });
     setup(); tab("Cumplimiento");
+    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
     const activity = within(screen.getByRole("table", { name: "Actividad por técnico" }));
     expect(activity.getAllByRole("row")).toHaveLength(5);
     expect(activity.queryByText("Capacitación")).not.toBeInTheDocument();
@@ -578,6 +583,7 @@ describe("orders workspace", () => {
   });
   it("uses the original compliance counts and exposes complete period export", async () => {
     setup(); tab("Cumplimiento");
+    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
     const table = screen.getByRole("table", { name: "Cumplimiento por período" });
     expect(table).toHaveTextContent("1 de 3 realizadas");
     expect(table).toHaveTextContent("33%");
@@ -590,11 +596,25 @@ describe("orders workspace", () => {
     expect(payload.columns).toHaveLength(7);
     expect(payload.rows[0]).toMatchObject({ programadas: 3, realizadas: 1, noRealizadas: 1, pendientes: 1, porcentaje: 33 });
   });
-  it("keeps compliance visible on phones without a wide matrix", () => {
+  it("keeps the technician matrix first on phones, with other reports available on demand", () => {
     setup(); tab("Cumplimiento");
-    expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
-    expect(screen.queryByText("Matriz de técnicos por período")).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Matriz de técnicos por período" })).toBeVisible();
+    expect(screen.queryByRole("table", { name: "Actividad por técnico" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "TECNICO UNO" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("TR-DEMO1");
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
     expect(screen.getByRole("table", { name: "Seguimiento OS y TR" })).toHaveTextContent("TR-DEMO1");
+  });
+  it("shows only the matrix and compact filters by default on desktop", () => {
+    mocks.width = 1280;
+    setup(); tab("Cumplimiento");
+    expect(screen.getByRole("heading", { name: "Matriz de técnicos por período" })).toBeVisible();
+    expect(screen.getByText("Trabajo realizado")).toBeVisible();
+    expect(screen.queryByRole("table", { name: "Actividad por técnico" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Indicadores" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Más análisis" }));
+    expect(screen.getByRole("table", { name: "Actividad por técnico" })).toBeVisible();
   });
   it("never exposes stale figures or exports after source errors", () => {
     response.isError = true; setup();
