@@ -2117,7 +2117,6 @@ export default function Dashboard() {
   const horasPrev = jornadasRealizadasPrev.reduce((acc, row) => acc + Number(row.horas_trabajadas || 0), 0);
   const sinHorasPrev = jornadasRealizadasPrev.filter((row) => !Number(row.horas_trabajadas)).length;
   const técnicosPróximoPeriodo = new Set(jornadasPlanificacion.flatMap((j) => validJornadaCrew(j))).size;
-  const tecnicosCierreAnterior = new Set(jornadasRealizadasPrev.flatMap((j) => validJornadaCrew(j))).size;
   const jornadasOperativasPeriodo = useMemo(
     () =>
       jornadas.filter((jornada) => {
@@ -3549,7 +3548,6 @@ export default function Dashboard() {
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                tecnicosCierreAnterior={tecnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>
@@ -3780,7 +3778,6 @@ export default function Dashboard() {
                 planificacionRango={planificacionRango}
                 jornadasPrev={jornadasRealizadasPrev.length}
                 horasPrev={horasPrev}
-                tecnicosCierreAnterior={tecnicosCierreAnterior}
                 cierreAnteriorRango={cierreAnteriorRango}
               />
             </Card>

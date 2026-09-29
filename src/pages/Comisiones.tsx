@@ -427,9 +427,6 @@ export default function Comisiones() {
   const totalOpen = totalUniqueCommissionOrderHours(openAll);
   const totalPendingPayment = closedAll.filter((row) => !paidIds.has(row.id) && row.estado_validacion === "VALIDA").reduce((sum, row) => sum + Number(row.horas_validas ?? 0), 0);
   const totalReview = filteredRows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).length;
-  const closedOrderCount = new Set(closedAll.map((row) => row.os_numero)).size;
-  const openOrderCount = new Set(openAll.map((row) => row.os_numero)).size;
-  const reviewOrderCount = new Set(filteredRows.filter((row) => !paidIds.has(row.id) && (!isActiveTechnician(row) || row.estado_validacion !== "VALIDA")).map((row) => row.os_numero)).size;
   const selectedOsRows = useMemo(
     () => selectedOsKey ? rows.filter((row) => `${row.sucursal ?? ""}|${row.os_numero}` === selectedOsKey) : [],
     [rows, selectedOsKey],
@@ -708,10 +705,10 @@ export default function Comisiones() {
           </Panel>
         ) : <>
           <KpiStrip>
-            <KpiItem label="Horas cerradas" value={hours(totalClosed)} detail={`${closedOrderCount} OS · duración sin multiplicar técnicos`} tone="info" icon={<CheckCircle2 />} />
-            <KpiItem label="Horas a liquidar" value={hours(totalPendingPayment)} detail="Horas-persona validadas sin liquidar" tone="positive" icon={<WalletCards />} />
-            <KpiItem label="Horas abiertas" value={hours(totalOpen)} detail={`${openOrderCount} OS · duración sin multiplicar técnicos`} tone="warning" icon={<Clock3 />} />
-            <KpiItem label="Requieren revisión" value={number.format(totalReview)} detail={`${reviewOrderCount} OS`} tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
+            <KpiItem label="Horas cerradas" value={hours(totalClosed)} tone="info" icon={<CheckCircle2 />} />
+            <KpiItem label="Horas a liquidar" value={hours(totalPendingPayment)} tone="positive" icon={<WalletCards />} />
+            <KpiItem label="Horas abiertas" value={hours(totalOpen)} tone="warning" icon={<Clock3 />} />
+            <KpiItem label="Requieren revisión" value={number.format(totalReview)} tone={totalReview ? "danger" : "default"} icon={<AlertTriangle />} />
           </KpiStrip>
 
           <FiltersBar

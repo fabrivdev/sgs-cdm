@@ -496,35 +496,30 @@ export function AgendaTab({
         <AgendaMetricCard
           title="Para contactar"
           value={agendaKpis.pendientes.toLocaleString()}
-          detail="Sin servicio ni contacto vigente"
           icon={AlertTriangle}
           accent={agendaKpis.pendientes > 0 ? "text-destructive" : "text-muted-foreground"}
         />
         <AgendaMetricCard
           title="Con TR asociado"
           value={agendaKpis.serviciosAsociados.toLocaleString()}
-          detail="Ya tienen trabajo abierto"
           icon={CalendarCheck2}
           accent="text-emerald-600"
         />
         <AgendaMetricCard
           title="Contactados 90d"
           value={agendaKpis.gestionados90.toLocaleString()}
-          detail="Seguimientos recientes"
           icon={PhoneCall}
           accent="text-blue-600"
         />
         <AgendaMetricCard
           title="Facturación 90d"
           value={agendaKpis.facturados90.toLocaleString()}
-          detail="Clientes del parque"
           icon={ReceiptText}
           accent="text-emerald-600"
         />
         <AgendaMetricCard
           title="Sin gestión registrada"
           value={agendaKpis.sinHistorial.toLocaleString()}
-          detail="Nunca contactados"
           icon={Clock3}
           accent="text-amber-600"
         />
@@ -752,13 +747,11 @@ export function AgendaTab({
 function AgendaMetricCard({
   title,
   value,
-  detail,
   icon: Icon,
   accent,
 }: {
   title: string;
   value: string;
-  detail: string;
   icon: ElementType;
   accent: string;
 }) {
@@ -771,7 +764,6 @@ function AgendaMetricCard({
               {title}
             </div>
             <div className={cn("mt-1 text-[18px] font-bold tabular-nums", accent)}>{value}</div>
-            <div className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</div>
           </div>
           <Icon className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground", accent)} />
         </div>

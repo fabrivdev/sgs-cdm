@@ -45,7 +45,7 @@ export function KpiItem({ label, value, detail, tone = "default", icon, classNam
   return <div className={cn("kpi-item flex min-w-0 flex-col justify-start gap-1 px-3 py-2.5", className)}>
     <div className={cn("flex min-h-4 items-center justify-between gap-2 sm:h-4", cardLabel)}><span className="sm:truncate">{label}</span>{icon && <span className="hidden shrink-0 text-muted-foreground sm:inline [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>}</div>
     <div className={cn(kpiValue, "max-sm:text-[clamp(14px,4.3vw,20px)]", tones[tone])}>{value}</div>
-    <div className={cn("min-h-4 text-[10px] leading-4 text-muted-foreground sm:h-4 sm:truncate", detail == null && "hidden sm:block")}>{detail ?? <span aria-hidden>&nbsp;</span>}</div>
+    {detail != null && <div className="min-h-4 text-[10px] leading-4 text-muted-foreground sm:h-4 sm:truncate">{detail}</div>}
   </div>;
 }
 

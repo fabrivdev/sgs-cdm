@@ -1148,7 +1148,6 @@ export function EstadoCompacto({
   planificacionRango,
   jornadasPrev,
   horasPrev,
-  tecnicosCierreAnterior,
   cierreAnteriorRango,
 }: {
   flujo: { total: number; culminados: number; abiertos: number; pausados: number; pendiente: number; programado: number; iniciado: number; pct: (n: number) => number };
@@ -1159,7 +1158,6 @@ export function EstadoCompacto({
   planificacionRango?: string;
   jornadasPrev?: number;
   horasPrev?: number;
-  tecnicosCierreAnterior?: number;
   cierreAnteriorRango?: string;
 }) {
   if (flujo.total === 0) {
@@ -1267,7 +1265,6 @@ export function EstadoCompacto({
             icon={Activity}
             title="Cierre anterior"
             value={jornadasPrev ? `${jornadasPrev} jornadas · ${(horasPrev ?? 0).toFixed(0)} hs` : "Sin cierre anterior disponible"}
-            detail={jornadasPrev && tecnicosCierreAnterior ? `${tecnicosCierreAnterior} técnicos activos` : ""}
           />
         </div>
       </div>
@@ -1278,18 +1275,14 @@ export function EstadoCompacto({
 function EstadoMiniCard({
   icon: Icon,
   title,
-  subtitle,
   value,
-  detail,
   titleClassName,
   iconClassName,
   onClick,
 }: {
   icon: React.ElementType;
   title: string;
-  subtitle?: string;
   value: string;
-  detail?: string;
   titleClassName?: string;
   iconClassName?: string;
   onClick?: () => void;
@@ -1303,7 +1296,6 @@ function EstadoMiniCard({
         </div>
       </div>
       <div className="text-[14px] font-semibold leading-5 tabular-nums">{value}</div>
-      <div className={cn("mt-1 h-4 leading-4", metaText)}>{detail || <span aria-hidden>&nbsp;</span>}</div>
     </div>
   );
 

@@ -25,6 +25,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); });
 
 describe("Comisiones: presentación del teléfono", () => {
+  it.each([320, 1280])("shows only label and value in the four commission KPIs at %i px", async width => {
+    vi.stubGlobal("innerWidth", width);
+    const { container } = render(<Comisiones />);
+    await screen.findByText("Horas cerradas");
+    expect(container.querySelectorAll(".kpi-item")).toHaveLength(4);
+    for (const card of container.querySelectorAll(".kpi-item")) expect(card.children).toHaveLength(2);
+    expect(screen.queryByText(/duración sin multiplicar técnicos|Horas-persona validadas sin liquidar/)).not.toBeInTheDocument();
+  });
   it("agrupa la identidad, conserva selección y no liquida al seleccionar o inspeccionar", async () => {
     render(<Comisiones />);
     const order = await screen.findByRole("button", { name: /OS 000012345 Cliente de prueba/ });
