@@ -14,7 +14,7 @@ const aggregate = (rows: Record<string, unknown>[]) => {
 };
 const rawOf = (rows: Record<string, unknown>[]) => aggregate(rows).raw_data as {
   canonical_labor_rates_version: number;
-  canonical_labor_rates: Array<{ invoice: string; timeType: string; rate: number | null; currency: string; billedAmount: number | null }>;
+  canonical_labor_rates: Array<{ invoice: string; timeType: string; rate: number | null; currency: string; billedAmount: number | null; billedQuantity: number | null; sourceWorkHours: number | null; sourceTotal: number | null }>;
 };
 
 describe("complete imported OS hourly tariff snapshot", () => {
@@ -48,7 +48,19 @@ describe("complete imported OS hourly tariff snapshot", () => {
   });
   it("parses monetary decimals without interpreting prices as duration and preserves currency", () => {
     const raw = rawOf([line({ PRECIO: "56,50", TOTFAC: "113,00", MONEDA: "GS" })]);
-    expect(raw.canonical_labor_rates[0]).toMatchObject({ rate: 56.5, billedAmount: 113, currency: "GS" });
+    expect(raw.canonical_labor_rates[0]).toMatchObject({ rate: 56.5, billedAmount: 113, currency: "GS", sourceWorkHours: 2, sourceTotal: 140 });
+  });
+  it("keeps each invoiced GS work block and its source price × hours, not the converted invoice cents", () => {
+    const raw = rawOf([
+      line({ MONEDA: "1 - Guaranies", PRECIO: "56", CANTIDAD: "4:00 Hs.", TOTAL: "224", TOTFAC: "0.15",
+        "Fch. Inicial": "2026-07-17", "Fch. Final": "2026-07-17", "Hora Inicial": "0800", "Hora Final": "1200" }),
+      line({ MONEDA: "1 - Guaranies", PRECIO: "56", CANTIDAD: "4:00 Hs.", TOTAL: "224", TOTFAC: "0.15",
+        "Fch. Inicial": "2026-07-17", "Fch. Final": "2026-07-17", "Hora Inicial": "1300", "Hora Final": "1700" }),
+    ]);
+    expect(raw.canonical_labor_rates).toHaveLength(2);
+    expect(raw.canonical_labor_rates.map(row => [row.sourceWorkHours, row.sourceTotal, row.billedQuantity, row.billedAmount])).toEqual([
+      [4, 224, 1, 0.15], [4, 224, 1, 0.15],
+    ]);
   });
   it.each(["", "no disponible", "1:00 Hs."])("marks invalid money %s unknown, never zero or a default tariff", value => {
     expect(rawOf([line({ PRECIO: value, TOTFAC: value })]).canonical_labor_rates[0]).toMatchObject({ rate: null, billedAmount: null });

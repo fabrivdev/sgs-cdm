@@ -764,6 +764,11 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
         currency: raw.canonical_currency ?? "UNKNOWN",
         rate: raw.canonical_labor_unit_rate ?? null,
         billedAmount: raw.canonical_labor_billed_amount ?? null,
+        billedQuantity: raw.canonical_labor_billed_quantity ?? null,
+        // Preserve the OS work value independently of the invoice currency.
+        // Some GS-issued invoices converted the billed amount to a few USD cents.
+        sourceWorkHours: raw.canonical_reported_service_hours ?? null,
+        sourceTotal: row.servicios_valor ?? null,
       };
       // Repeated participants in the same source block must not duplicate its
       // billed allocation. Without an item/clock identity retain the ambiguity.

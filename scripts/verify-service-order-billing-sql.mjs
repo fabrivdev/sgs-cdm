@@ -149,6 +149,8 @@ for (const section of ['servicios.ordenes','servicios.ventas']) {
 await db.exec("SELECT set_config('fixture.denied_section','',false); ALTER TABLE ordenes_servicio_importadas ADD COLUMN raw_data jsonb;");
 const ratesSql=readFileSync('supabase/migrations/20260925220000_service_order_time_type_rates.sql','utf8');
 await db.exec(ratesSql); await db.exec(ratesSql);
+const wrongGsSql=readFileSync('supabase/migrations/20260929140000_service_order_wrong_gs_efficiency.sql','utf8');
+await db.exec(wrongGsSql); await db.exec(wrongGsSql);
 const callV2=async(keys,cutoff='2026-10-01')=>(await db.query('SELECT service_orders_billing_v2($1::text[],$2::date) AS result',[keys,cutoff])).rows[0].result;
 const rate=(invoice,timeType,price,amount,extra={})=>({invoice,timeType,rate:price,billedAmount:amount,currency:'USD',...extra});
 const fixture=async(key,rates,ledger)=>{
@@ -196,6 +198,35 @@ for (const [key,rates,ledger] of [
   assert.equal(invalid.labor,ledger.reduce((sum,l)=>sum+l.amount,0),key);
 }
 assert.equal((await fixture('RATE-ZERO',[rate('Z','Cliente',70,0)],[{doc:'Z',amount:0}])).billedHours,0);
+const wronglyGs=await fixture('WRONG-GS',[
+  rate('G','Interno',56,0.15,{currency:'GS',billedQuantity:1,sourceWorkHours:4,sourceTotal:224}),
+  rate('G','Interno',56,0.15,{currency:'GS',billedQuantity:1,sourceWorkHours:4,sourceTotal:224}),
+  rate('G','Interno',56,0,{currency:'GS',billedQuantity:0,sourceWorkHours:4,sourceTotal:224}),
+],[{doc:'G',amount:0.15}]);
+assert.equal(wronglyGs.billedHours,8); // two billed OS work blocks, not 0.15/56
+assert.equal(wronglyGs.labor,0.15); // actual Sales amount must remain unchanged
+assert.equal(wronglyGs.total,0.15);
+assert.equal((await fixture('WRONG-GS-ONE',[
+  rate('G1','Interno',56,0.01,{currency:'GS',billedQuantity:1,sourceWorkHours:1,sourceTotal:56}),
+],[{doc:'G1',amount:0.01}])).billedHours,1);
+assert.equal((await fixture('WRONG-GS-ROUNDED-ZERO',[
+  rate('G0','Interno',56,0,{currency:'GS',billedQuantity:1,sourceWorkHours:1,sourceTotal:56}),
+],[{doc:'G0',amount:0}])).billedHours,1);
+assert.equal((await fixture('WRONG-GS-NO-HOURS',[
+  rate('G2','Interno',56,0.01,{currency:'GS',billedQuantity:1,sourceTotal:56}),
+],[{doc:'G2',amount:0.01}])).billedHours,null);
+assert.equal((await fixture('WRONG-GS-MISMATCH',[
+  rate('G3','Interno',56,0.01,{currency:'GS',billedQuantity:1,sourceWorkHours:1,sourceTotal:60}),
+],[{doc:'G3',amount:0.01}])).billedHours,null);
+assert.equal((await fixture('WRONG-GS-MIXED',[
+  rate('G4','Interno',56,0.01,{currency:'GS',billedQuantity:1,sourceWorkHours:1,sourceTotal:56}),
+  rate('G4','Cliente',70,70),
+],[{doc:'G4',amount:70.01}])).billedHours,null);
+const repeatedInvoice=await fixture('REPEATED-INVOICE',[
+  rate('DUP','Cliente',70,1120),rate('DUP','Cliente',70,1120),rate('DUP','Cliente',70,0),
+],[{doc:'DUP',amount:1120}]);
+assert.equal(repeatedInvoice.billedHours,16);
+assert.equal(repeatedInvoice.labor,1120);
 // Legacy import without a complete rate snapshot must NOT use first raw PRECIO
 // or invoice unit price. Money remains readable before reimporting OS.
 const old=(await callV2(['01-A','LEGACY','COLLISION','EMPTY']));

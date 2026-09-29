@@ -312,6 +312,7 @@ export function mapOrdenesServicioSheet(
         canonical_internal_number: text(row, ["Nro. Interno"]),
         canonical_labor_unit_rate: isLabor ? laborNumber("PRECIO") : null,
         canonical_labor_billed_amount: isLabor ? laborNumber("TOTFAC") : null,
+        canonical_labor_billed_quantity: isLabor ? laborNumber("CNTFAC") : null,
         canonical_start_date: canonicalStartDate,
         canonical_start_time: canonicalStartTime,
         canonical_end_date: canonicalEndDate,
