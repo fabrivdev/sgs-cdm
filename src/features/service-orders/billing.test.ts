@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ServicioOSRow } from "@/components/dashboard/types";
-import { billingEfficiency, billingWarning, efficiencyBillingOrders, loadOrderBilling, type OrderBilling } from "./billing";
+import { billingEfficiency, billingEfficiencyByPeriod, billingWarning, efficiencyBillingOrders, loadOrderBilling, type OrderBilling } from "./billing";
 
 export const bill = (extra: Partial<OrderBilling> = {}): OrderBilling => ({ os: "01-00000001", matched: true, ambiguous: false,
   documents: ["0001"], date: "2026-09-10", labor: 600, parts: 0, travel: 180, thirdParty: 0, total: 780,
@@ -38,6 +38,15 @@ describe("OS billing efficiency", () => {
     for (const [hours, percentage] of [[0, 0], [-2, -10], [24, 120]]) {
       expect(billingEfficiency([order({ billing: bill({ billedHours: hours }) })]).percentage).toBe(percentage);
     }
+  });
+  it("groups closed OS by operational closure period, independently of worked person-hours", () => {
+    const rows = [order({ fechaOperacion: "2026-07-31", horasPersona: 200 }),
+      order({ os: "AUG", fechaOperacion: "2026-08-01", horas: 10, billing: bill({ billedHours: 9 }) }),
+      order({ os: "AUG-UNKNOWN", fechaOperacion: "2026-08-12", billing: null })];
+    const periods = [{ dateFrom: "2026-07-01", dateTo: "2026-07-31" }, { dateFrom: "2026-08-01", dateTo: "2026-08-31" },
+      { dateFrom: "2026-09-01", dateTo: "2026-09-30" }];
+    expect(billingEfficiencyByPeriod(rows, periods)).toEqual([60, null, null]);
+    expect(billingEfficiencyByPeriod(rows.slice(0, 2), periods)).toEqual([60, 90, null]);
   });
 });
 

@@ -26,7 +26,7 @@ import type { TechnicianStatus } from "@/features/service-orders/productivitySta
 import { ActivityTable } from "@/features/service-orders/ActivityTable";
 import { OperationalEvolution } from "@/features/service-orders/OperationalSummary";
 import { orderClosureMetrics } from "@/features/service-orders/orderMetrics";
-import { billingEfficiency, billingKey, billingWarning, efficiencyBillingOrders } from "@/features/service-orders/billing";
+import { billingEfficiency, billingEfficiencyByPeriod, billingKey, billingWarning, efficiencyBillingOrders } from "@/features/service-orders/billing";
 import { useOrdersBilling } from "@/features/service-orders/useOrdersBilling";
 import { useWorkLog } from "@/features/service-orders/useWorkLog";
 import { workedProductivity } from "@/features/service-orders/workedProductivity";
@@ -121,6 +121,12 @@ export function OrdersWorkspace() {
   const efficiency = useMemo(() => billingFailed || billingLoading
     ? { percentage: null, incomplete: 0 } : billingEfficiency(financialRows.filter(row => efficiencyKeys.has(billingKey(row.os)))),
     [financialRows, efficiencyKeys, billingFailed, billingLoading]);
+  const periodEfficiency = useMemo(() => billingFailed || billingLoading
+    ? productivity.evolucion.map(() => null)
+    : billingEfficiencyByPeriod(financialRows.filter(row => efficiencyKeys.has(billingKey(row.os))), productivity.evolucion),
+    [financialRows, efficiencyKeys, productivity.evolucion, billingFailed, billingLoading]);
+  const productivityPeriods = useMemo(() => productivity.evolucion.map((row, index) => ({ ...row, eficiencia: periodEfficiency[index] })),
+    [productivity.evolucion, periodEfficiency]);
   const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
@@ -202,7 +208,7 @@ export function OrdersWorkspace() {
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
                 <ProductivityTable rows={productivity.tecnicos} period={productivity.period} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
-                <OperationalEvolution rows={productivity.evolucion} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
+                <OperationalEvolution rows={productivityPeriods} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0 space-y-4">

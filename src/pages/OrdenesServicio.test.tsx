@@ -81,7 +81,7 @@ describe("orders workspace", () => {
     setup(); tab("Productividad");
     fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-01-01" } });
     expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000001"], "2026-09-25", true);
-    expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("120%");
+    expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("120%");
     expect(screen.queryByText("Facturación demorada.")).not.toBeInTheDocument();
     tab("Órdenes");
     expect(mocks.billing).toHaveBeenLastCalledWith(expect.arrayContaining(["01-LEGACY", "01-00000001", "01-00000002"]), "2026-09-25", true);
@@ -219,6 +219,30 @@ describe("orders workspace", () => {
     fireEvent.click(screen.getByRole("button", { name: /TECNICO UNO.*Parcial/ }));
     const rows = within(screen.getByRole("dialog")).getByRole("table", { name: "Jornadas trabajadas" });
     expect(rows).toHaveTextContent("11/09/2026"); expect(rows).not.toHaveTextContent("10/09/2026");
+  });
+  it("shows and exports efficiency by OS closure month without changing worked-hour periods", async () => {
+    mocks.width = 1280;
+    response.data.data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", fecha_cierre_os: "2026-07-20", servicios_cantidad: 20 }));
+    response.data.data.billing = { "01-00000001": demoBilling({ billedHours: 12 }),
+      "01-00000003": demoBilling({ os: "01-00000003", billedHours: 10 }) };
+    const rendered = setup(); tab("Productividad");
+    fireEvent.change(document.querySelectorAll('input[type="date"]')[0], { target: { value: "2026-07-01" } });
+    const table = screen.getByRole("table", { name: "Horas por período" });
+    expect(within(table).getByText("Eficiencia")).toBeVisible();
+    const rows = within(table).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("50%");
+    expect(rows[2]).toHaveTextContent("—");
+    expect(rows[3]).toHaveTextContent("120%");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Horas por período" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    const column = payload.columns.find((item: { key: string }) => item.key === "eficiencia");
+    expect(column.excelFormat).toBe("0.0%");
+    expect(payload.rows.map((row: object) => column.value(row))).toEqual([0.5, null, 1.2]);
+    mocks.width = 390;
+    rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
+    expect(screen.getByRole("table", { name: "Horas por período" })).toHaveTextContent("Efic. 50%");
   });
   it.each([320, 768, 1280])("uses the shared brand palette in every list presentation and drawer at %i px", width => {
     mocks.width = width;
@@ -387,7 +411,7 @@ describe("orders workspace", () => {
     for (const text of ["$ 1.000,00", "$ -18,70", "$ 180,00", "$ 0,00", "$ 1.161,30", "57,14%", "Horas facturadas", "Total facturado"]) expect(detail.getByText(text)).toBeVisible();
     fireEvent.click(detail.getByRole("button", { name: "Cerrar" }));
     tab("Productividad");
-    const card = screen.getByText("Eficiencia").closest(".kpi-item")!;
+    const card = screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")!;
     expect(card).toHaveTextContent("57,1%");
     expect(card).not.toHaveTextContent(/\d+ OS/);
     expect(screen.getByText("Productividad", { selector: ".kpi-item span", exact: true })).toBeVisible();
@@ -416,7 +440,7 @@ describe("orders workspace", () => {
     Object.assign(response.data.data.ordenesServicio[1], { servicios_cantidad: 10, situacion_os: "Cerrada", fecha_cierre_os: "2026-09-15" });
     response.data.data.billing = { "01-00000001": demoBilling({ billedHours: 10 }), "01-00000002": demoBilling({ os: "01-00000002", billedHours: 10 }) };
     setup(); tab("Productividad");
-    const card = () => screen.getByText("Eficiencia").closest(".kpi-item")!;
+    const card = () => screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")!;
     expect(card()).toHaveTextContent("66,7%");
     technicianStatus("Activos"); expect(card()).toHaveTextContent("50%");
     technicianStatus("Inactivos"); expect(card()).toHaveTextContent("100%");
@@ -431,8 +455,8 @@ describe("orders workspace", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("alert")).toHaveTextContent("actualización");
     expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
-    expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("—");
-    expect(screen.getByText("Eficiencia").closest(".kpi-item")).not.toHaveTextContent("OS sin cálculo");
+    expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
+    expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).not.toHaveTextContent("OS sin cálculo");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(mocks.billingRetry).toHaveBeenCalledOnce();
     expect(mocks.refetch).not.toHaveBeenCalled();
@@ -450,7 +474,7 @@ describe("orders workspace", () => {
     expect(await screen.findByRole("menuitem", { name: "Exportar Órdenes de servicio" })).toHaveAttribute("aria-disabled", "true");
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
     tab("Productividad");
-    expect(screen.getByText("Eficiencia").closest(".kpi-item")).toHaveTextContent("Calculando…");
+    expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("Calculando…");
     expect(screen.getByRole("table", { name: "Productividad por técnico" })).toBeVisible();
     tab("Cumplimiento");
     expect(mocks.billing).toHaveBeenLastCalledWith(expect.any(Array), "2026-09-25", false);

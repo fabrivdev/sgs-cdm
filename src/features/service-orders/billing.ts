@@ -47,6 +47,11 @@ export function billingEfficiency(rows: ServicioOSRow[]) {
     percentage: incomplete === 0 && workedHours > 0 ? billedHours / workedHours * 100 : null };
 }
 
+/** Attribute billed OS to their operational period (closure date), never to work-log dates. */
+export function billingEfficiencyByPeriod(rows: ServicioOSRow[], periods: readonly { dateFrom: string; dateTo: string }[]) {
+  return periods.map(period => billingEfficiency(rows.filter(row => row.fechaOperacion >= period.dateFrom && row.fechaOperacion <= period.dateTo)).percentage);
+}
+
 function validBilling(value: unknown): value is OrderBilling {
   if (!value || typeof value !== "object") return false;
   const row = value as OrderBilling;
