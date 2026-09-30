@@ -291,8 +291,8 @@ type ImportAssignmentRow = {
 function orderBillingState(
   row: Pick<OrderRow, "estado_operacion" | "estado_fuente" | "factura_venta" | "factura_fecha" | "es_historico">,
   unitState?: string | null,
-  hasConfirmedChassisSale = false,
-): SimpleOrderState {
+  hasConfirmedChassisSale?: boolean,
+): SimpleOrderState | null {
   const lineState = simpleOrderState(row.estado_fuente);
   const operationState = simpleOrderState(row.estado_operacion);
   if (unitState === "CANCELADA" || lineState === "CANCELADA" || operationState === "CANCELADA") return "CANCELADA";
@@ -301,7 +301,12 @@ function orderBillingState(
   // actuales, solo una venta positiva encontrada por el mismo chasis confirma
   // la facturacion de ESA unidad. El PDF y el estado agregado de la NP no son
   // evidencia suficiente y no deben propagarse a sus hermanas.
-  if (!row.es_historico) return hasConfirmedChassisSale ? "COMPLETADO" : "PENDIENTE";
+  if (!row.es_historico) {
+    // `undefined` significa que la comprobacion por chasis no termino. No se
+    // debe transformar un timeout o error de permisos en "Pendiente".
+    if (hasConfirmedChassisSale === undefined) return null;
+    return hasConfirmedChassisSale ? "COMPLETADO" : "PENDIENTE";
+  }
 
   // El historial importado no siempre tiene unidades/chasis reconciliables;
   // conserva su evidencia documental previa sin afectar pedidos actuales.
@@ -320,15 +325,24 @@ async function fetchConfirmedBillingUnitIds(unitIds: string[]) {
     const chunk = unitIds.slice(i, i + 200);
     const { data, error } = await db.rpc("maquinaria_unidades_facturadas_confirmadas", { p_unidad_ids: chunk });
     if (error) {
-      // Compatibilidad durante el despliegue: sin la migracion nueva es mas
-      // seguro mostrar pendiente que heredar una factura de toda la NP.
-      if (["42883", "PGRST202", "PGRST204"].includes(error.code)) return new Set<string>();
+      // Una funcion ausente, un timeout o un error de permisos dejan la
+      // facturacion sin clasificar. El consumidor muestra el fallo y nunca
+      // interpreta la ausencia de respuesta como "Pendiente".
       throw error;
     }
     for (const row of data ?? []) if (row.unidad_id) confirmed.add(row.unidad_id);
   }
   return confirmed;
 }
+
+type BillingLookupStatus = "loading" | "ready" | "error";
+type BillingSnapshot = { coveredUnitIds: Set<string>; confirmedUnitIds: Set<string> };
+const billingStateLabel = (state: SimpleOrderState | null, status: BillingLookupStatus) =>
+  state ? SIMPLE_STATE_LABEL[state] : status === "loading" ? "Consultando..." : "No disponible";
+const billingStateClass = (state: SimpleOrderState | null, status: BillingLookupStatus) =>
+  state ? simpleStateClass(state) : status === "error"
+    ? "border-red-200 bg-red-50 text-red-700"
+    : "border-slate-200 bg-slate-50 text-slate-600";
 type ImportDraft = {
   marca: string; producto: string; modelo: string;
   cantidad: number; estado_fuente: string; linea_id: string; np_numero: string; llave_interna: string;
@@ -958,6 +972,7 @@ export default function MaquinariaOperaciones() {
     queryKey: ["machine-operations-confirmed-billing", unitIds],
     enabled: !importsView && unitIds.length > 0,
     queryFn: () => fetchConfirmedBillingUnitIds(unitIds),
+    retry: false,
   });
 
   // "En stock" exige prueba real: el chasis de la unidad tiene que existir
@@ -1013,6 +1028,12 @@ export default function MaquinariaOperaciones() {
 
   const entregaByUnitId = entregaQuery.data;
   const confirmedBillingUnitIds = confirmedBillingQuery.data;
+  const billingLookupStatus: BillingLookupStatus = confirmedBillingQuery.isError
+    ? "error"
+    : confirmedBillingQuery.isSuccess || importsView || unitIds.length === 0 ? "ready" : "loading";
+  const billingSnapshot = useMemo<BillingSnapshot | undefined>(() => billingLookupStatus === "ready" && !importsView
+    ? { coveredUnitIds: new Set(unitIds), confirmedUnitIds: confirmedBillingUnitIds ?? new Set<string>() }
+    : undefined, [billingLookupStatus, importsView, unitIds, confirmedBillingUnitIds]);
   const estadoByOperacionId = operacionEstadoQuery.data;
   const stockChasisSet = stockChasisQuery.data;
   const normalizedRows = useMemo(() => (operationsQuery.data ?? []).map(row => normalizeOperationModel(row, modelCatalog.data)), [operationsQuery.data, modelCatalog.data]);
@@ -1025,7 +1046,11 @@ export default function MaquinariaOperaciones() {
       if (situacion !== "TODOS" && importSituationState(importRow) !== situacion) return false;
     } else {
       const orderRow = row as OrderRow;
-      if (orderState !== "TODOS" && orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado, confirmedBillingUnitIds?.has(orderRow.id)) !== orderState) return false;
+      const billingState = orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado, confirmedBillingUnitIds?.has(orderRow.id));
+      // Si la fuente canonica no respondio, conservar las filas visibles. El
+      // warning y la celda "No disponible" evitan presentar el fallo como un
+      // pedido pendiente real.
+      if (orderState !== "TODOS" && billingState && billingState !== orderState) return false;
       if (condicion !== "TODOS" && orderRow.condicion !== condicion) return false;
       const unit = entregaByUnitId?.get(orderRow.id);
       if (entrega !== "TODOS" && entregaStateFromUnit(unit?.estado, unit?.chasis, orderRow.marca, estadoByOperacionId?.get(orderRow.operacion_id), stockChasisSet, orderRow.es_historico) !== entrega) return false;
@@ -1088,13 +1113,13 @@ export default function MaquinariaOperaciones() {
     { key: "marca", label: "Marca", kind: "text", value: r => visibleMachineBrand(r.marca) },
     { key: "condicion", label: "Condición", kind: "text", value: r => CONDITION_LABEL[(r as OrderRow).condicion ?? ""] ?? (r as OrderRow).condicion },
     { key: "origen", label: "Origen", kind: "text", value: r => SUPPLY_LABEL[(r as OrderRow).abastecimiento ?? ""] ?? null },
-    { key: "facturacion", label: "Facturación", kind: "text", value: r => SIMPLE_STATE_LABEL[orderBillingState(r as OrderRow, entregaByUnitId?.get(r.id)?.estado, confirmedBillingUnitIds?.has(r.id))] },
+    { key: "facturacion", label: "Facturación", kind: "text", value: r => billingStateLabel(orderBillingState(r as OrderRow, entregaByUnitId?.get(r.id)?.estado, confirmedBillingUnitIds?.has(r.id)), billingLookupStatus) },
     { key: "entrega", label: "Entrega", kind: "text", value: r => { const o = r as OrderRow; const u = entregaByUnitId?.get(o.id); const s = entregaStateFromUnit(u?.estado, u?.chasis, o.marca, estadoByOperacionId?.get(o.operacion_id), stockChasisSet, o.es_historico); return s ? ENTREGA_LABEL[s] : null; } },
     { key: "valor", label: "Valor", kind: "number", align: "right", value: r => (r as OrderRow).valor_venta == null ? null : Number((r as OrderRow).valor_venta) },
   ];
   const list = useSectionTable({ rows, columns, initialSort: { key: "fecha", direction: "desc" },
     title: importsView ? "Importaciones" : "Operaciones", fileName: importsView ? "importaciones.xlsx" : "operaciones.xlsx",
-    disabled: operationsQuery.isLoading || operationsQuery.isError });
+    disabled: operationsQuery.isLoading || operationsQuery.isError || (!importsView && confirmedBillingQuery.isError) });
   return <main className={pageShell}>
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
@@ -1102,6 +1127,10 @@ export default function MaquinariaOperaciones() {
         ? <Button size="sm" aria-label="Nueva importación" className="max-sm:w-11 max-sm:px-0" onClick={() => { setEditingImport(null); setImportFormOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nueva importación</span></Button>
         : <Button size="sm" aria-label="Nuevo pedido" className="max-sm:w-11 max-sm:px-0" onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo pedido</span></Button>}
     />
+    {!importsView && confirmedBillingQuery.isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2.5 text-red-800">
+      <div className="flex min-w-0 items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><div><div className="text-[12px] font-semibold">Facturación no disponible</div><div className="text-[11px]">No se pudieron confirmar las ventas por chasis. Los estados quedan sin clasificar y la exportación se bloquea para no informar pendientes incorrectos.</div></div></div>
+      <Button type="button" size="sm" variant="outline" className="h-8 border-red-300 bg-white text-[11px]" onClick={() => confirmedBillingQuery.refetch()}>Reintentar</Button>
+    </div>}
     {importsView ? (
       <KpiStrip mobilePrimary={[0, 3]} className="sm:grid-cols-2 xl:grid-cols-5">
         <KpiItem label="Unidades de importación" value={importTotals.total} icon={<Ship />} tone="info" />
@@ -1113,12 +1142,12 @@ export default function MaquinariaOperaciones() {
     ) : (
       <KpiStrip mobilePrimary={[1, 2]} className="sm:grid-cols-2 xl:grid-cols-4">
         <KpiItem label="Líneas de pedido" value={orderTotals.total} icon={<FileCheck2 />} tone="info" />
-        <KpiItem label="Líneas pendientes" value={orderTotals.pendientes} icon={<FileText />} tone="warning" />
-        <KpiItem label="Líneas facturadas" value={orderTotals.facturados} icon={<PackageCheck />} tone="positive" />
+        <KpiItem label="Líneas pendientes" value={billingLookupStatus === "ready" ? orderTotals.pendientes : "—"} icon={<FileText />} tone="warning" />
+        <KpiItem label="Líneas facturadas" value={billingLookupStatus === "ready" ? orderTotals.facturados : "—"} icon={<PackageCheck />} tone="positive" />
         <KpiItem
           label="Valor de pedidos"
           value={formatMoneyTotals(orderTotals.valorPedidos)}
-          detail={`Pendiente: ${formatMoneyTotals(orderTotals.valorPendiente)}`}
+          detail={billingLookupStatus === "ready" ? `Pendiente: ${formatMoneyTotals(orderTotals.valorPendiente)}` : "Pendiente: no disponible"}
         />
       </KpiStrip>
     )}
@@ -1193,13 +1222,13 @@ export default function MaquinariaOperaciones() {
         <div className="overflow-hidden">
           {operationsQuery.isLoading ? <div className="p-8 text-center text-[13px] text-muted-foreground">Cargando…</div> :
             importsView ? <ImportsTable rows={list.ordered as ImportRow[]} sort={list.sort} heading={list.heading} onSelect={setSelectedImport} /> :
-              <OrdersTable rows={list.ordered as OrderRow[]} sort={list.sort} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} confirmedBillingUnitIds={confirmedBillingUnitIds} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
+              <OrdersTable rows={list.ordered as OrderRow[]} sort={list.sort} heading={list.heading} onSelect={(row) => setSelected(row.operacion_id)} entregaByUnitId={entregaByUnitId} confirmedBillingUnitIds={confirmedBillingUnitIds} billingLookupStatus={billingLookupStatus} estadoByOperacionId={estadoByOperacionId} stockChasisSet={stockChasisSet} />}
         </div>
         {!rows.length && !operationsQuery.isLoading && <div className="p-10 text-center text-[12px] text-muted-foreground">No hay {importsView ? "importaciones" : "líneas"} con estos filtros.</div>}
       </>}
     </Panel>
     <NewOperationDrawer operationId={editingOperationId} open={newOpen} onOpenChange={(open) => { setNewOpen(open); if (!open) setEditingOperationId(null); }} onSaved={() => queryClient.invalidateQueries({ queryKey: ["machine-operations"] })} />
-    <OperationDrawer operationId={selected} onOpenChange={(open) => !open && setSelected(null)} onEdit={(id) => { setSelected(null); setEditingOperationId(id); setNewOpen(true); }} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-confirmed-billing"] }); queryClient.invalidateQueries({ queryKey: ["machine-operation-confirmed-billing"] }); }} />
+    <OperationDrawer operationId={selected} billingSnapshot={billingSnapshot} onOpenChange={(open) => !open && setSelected(null)} onEdit={(id) => { setSelected(null); setEditingOperationId(id); setNewOpen(true); }} onChanged={() => { queryClient.invalidateQueries({ queryKey: ["machine-operations"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-entrega"] }); queryClient.invalidateQueries({ queryKey: ["machine-operations-confirmed-billing"] }); queryClient.invalidateQueries({ queryKey: ["machine-operation-confirmed-billing"] }); }} />
     <ImportFormDrawer
       open={importFormOpen}
       row={editingImport}
@@ -1221,9 +1250,9 @@ export default function MaquinariaOperaciones() {
   </main>;
 }
 
-export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, confirmedBillingUnitIds, estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; confirmedBillingUnitIds?: Set<string>; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
+export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, confirmedBillingUnitIds, billingLookupStatus = "ready", estadoByOperacionId, stockChasisSet }: { rows: OrderRow[]; heading: (key: string) => React.ReactNode; sort?: SalesSort; onSelect: (row: OrderRow) => void; entregaByUnitId?: Map<string, { estado: string; chasis: string | null }>; confirmedBillingUnitIds?: Set<string>; billingLookupStatus?: BillingLookupStatus; estadoByOperacionId?: Map<string, string>; stockChasisSet?: Set<string> }) {
   const [mobileState, setMobileState] = useState("facturacion");
-  const billing=(row:OrderRow)=>orderBillingState(row,entregaByUnitId?.get(row.id)?.estado,confirmedBillingUnitIds?.has(row.id));
+  const billing=(row:OrderRow)=>orderBillingState(row,entregaByUnitId?.get(row.id)?.estado,billingLookupStatus==="ready"?(confirmedBillingUnitIds?.has(row.id)??false):undefined);
   const delivery=(row:OrderRow)=>{const unit=entregaByUnitId?.get(row.id);return entregaStateFromUnit(unit?.estado,unit?.chasis,row.marca,estadoByOperacionId?.get(row.operacion_id),stockChasisSet,row.es_historico);};
   const schema: {key:string;label:string;width:string;hiddenBelow?:"md"|"lg"}[]=[
     {key:"np",label:"NP",width:"md:w-[9%] lg:w-[8%]",hiddenBelow:"md"},
@@ -1245,19 +1274,19 @@ export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, co
     if(key==="marca")return visibleMachineBrand(row.marca);
     if(key==="condicion")return CONDITION_LABEL[row.condicion??""]??row.condicion??"—";
     if(key==="origen")return SUPPLY_LABEL[row.abastecimiento??""]??"Sin definir";
-    if(key==="facturacion")return SIMPLE_STATE_LABEL[billing(row)];
+    if(key==="facturacion")return billingStateLabel(billing(row),billingLookupStatus);
     if(key==="entrega"){const state=delivery(row);return state?ENTREGA_LABEL[state]:"—";}
     return formatMoney(row.valor_venta,row.moneda_valor||"USD");
   };
   const columns:CompactListColumn<OrderRow>[]=schema.map(column=>({...column,kind:column.key==="valor"?"number":"text",align:column.key==="valor"?"right":"left",value:r=>value(column.key,r),className:column.key==="np"?"font-mono font-medium":undefined,render:r=>{
     const text=value(column.key,r);
     const deliveryState=delivery(r);
-    const style=column.key==="marca"?brandClass(r.marca):column.key==="condicion"?conditionClass(r.condicion):column.key==="origen"?supplyClass(r.abastecimiento):column.key==="facturacion"?simpleStateClass(billing(r)):column.key==="entrega"&&deliveryState?entregaClass(deliveryState):"";
+    const style=column.key==="marca"?brandClass(r.marca):column.key==="condicion"?conditionClass(r.condicion):column.key==="origen"?supplyClass(r.abastecimiento):column.key==="facturacion"?billingStateClass(billing(r),billingLookupStatus):column.key==="entrega"&&deliveryState?entregaClass(deliveryState):"";
     return ["marca","condicion","origen","facturacion","entrega"].includes(column.key)&&text!=="—"?<Badge variant="outline" style={column.key==="marca"?machineBrandStyle(r.marca):undefined} className={cn("max-w-full whitespace-nowrap px-1.5 text-[10px]",style)}>{text}</Badge>:text;
   }}));
   return <><div className="hidden items-center justify-between gap-2 px-2 py-1 sm:flex md:hidden"><span className="text-[12px] font-medium">Líneas de pedido</span><select aria-label="Estado visible" value={mobileState} onChange={event=>setMobileState(event.target.value)} className="h-11 min-w-0 rounded-md border bg-background px-2 text-base"><option value="facturacion">Facturación</option><option value="entrega">Entrega</option></select></div>
     <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Operaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
-    mobileColumns={[{ key: "modelo", label: "Pedido", kind: "text", width: "w-auto", value: r => r.modelo, render: r => <MobileRecord primary={r.modelo || r.producto || "Sin modelo"} secondary={<>{formatNpCode(r.np_numero)} · {r.cliente_nombre || "Sin cliente"}</>} context={<><span aria-label={`Facturación: ${value("facturacion", r)}`} className={cn("rounded border px-1.5 py-0.5 text-[10px]", simpleStateClass(billing(r)))}>{value("facturacion", r)}</span><span aria-label={`Entrega: ${value("entrega", r)}`}>{value("entrega", r)}</span></>} /> }]}
+    mobileColumns={[{ key: "modelo", label: "Pedido", kind: "text", width: "w-auto", value: r => r.modelo, render: r => <MobileRecord primary={r.modelo || r.producto || "Sin modelo"} secondary={<>{formatNpCode(r.np_numero)} · {r.cliente_nombre || "Sin cliente"}</>} context={<><span aria-label={`Facturación: ${value("facturacion", r)}`} className={cn("rounded border px-1.5 py-0.5 text-[10px]", billingStateClass(billing(r),billingLookupStatus))}>{value("facturacion", r)}</span><span aria-label={`Entrega: ${value("entrega", r)}`}>{value("entrega", r)}</span></>} /> }]}
     actions={{width:"w-11 sm:w-[14%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-11 w-11 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring md:h-7 md:w-7" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} /></>;
 }
 
@@ -2081,7 +2110,7 @@ function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; unit
   </div>;
 }
 
-function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { operationId: string | null; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
+function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, onChanged }: { operationId: string | null; billingSnapshot?: BillingSnapshot; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const modelCatalog = useMachineCatalog(!!operationId);
   const { isAdmin, isSuperAdmin, roles } = useAuth();
   const canEditChasis = isAdmin || roles.includes("jefatura");
@@ -2149,11 +2178,20 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     }) };
   }, [detailQuery.data, modelCatalog.data]);
   const detailUnitIds = useMemo(() => (detail?.units ?? []).map((unit: any) => unit.id).filter(Boolean), [detail?.units]);
+  const reusesListBilling = Boolean(detailUnitIds.length && billingSnapshot
+    && detailUnitIds.every((unitId: string) => billingSnapshot.coveredUnitIds.has(unitId)));
   const detailConfirmedBillingQuery = useQuery({
     queryKey: ["machine-operation-confirmed-billing", operationId, detailUnitIds],
-    enabled: Boolean(operationId && detailUnitIds.length),
+    enabled: Boolean(operationId && detailUnitIds.length && !reusesListBilling),
     queryFn: () => fetchConfirmedBillingUnitIds(detailUnitIds),
+    retry: false,
   });
+  const detailConfirmedBillingUnitIds = reusesListBilling
+    ? billingSnapshot!.confirmedUnitIds
+    : detailConfirmedBillingQuery.data;
+  const detailBillingStatus: BillingLookupStatus = reusesListBilling || detailConfirmedBillingQuery.isSuccess
+    ? "ready"
+    : detailConfirmedBillingQuery.isError ? "error" : "loading";
   const simpleState = detail ? simpleOrderState(detail.estado) : "PENDIENTE";
   useEffect(() => {
     setActiveTab("resumen");
@@ -2222,7 +2260,7 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
   const unitBillingCount = detail?.units.filter((unit: any) => orderBillingState(
     { ...detail, es_historico: isConcludedHistorical },
     unit.estado,
-    detailConfirmedBillingQuery.data?.has(unit.id),
+    detailBillingStatus === "ready" ? (detailConfirmedBillingUnitIds?.has(unit.id) ?? false) : undefined,
   ) === "COMPLETADO").length ?? 0;
   const totalUnits = Number(detail?.unidades ?? 0);
   const billingComplete = totalUnits > 0 && unitBillingCount >= totalUnits;
@@ -2236,8 +2274,15 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
     const lineUnits = detail.units.filter((unit: any) => unit.linea_id === line.id);
     return line.valor_acordado_unitario == null && !lineUnits.every((unit: any) => unit.valor_facturado != null);
   }).length ?? 0;
+  const billingUnavailable = Boolean(detail?.units.some((unit: any) => {
+    const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
+    return orderBillingState({ ...detail, ...line, es_historico: isConcludedHistorical }, unit.estado,
+      detailBillingStatus === "ready" ? (detailConfirmedBillingUnitIds?.has(unit.id) ?? false) : undefined) === null;
+  }));
   const nextAction = simpleState === "CANCELADA"
     ? { title: "Pedido cancelado", detail: "No requiere ninguna acción." }
+    : billingUnavailable
+      ? { title: "Facturación no disponible", detail: "No se pudo confirmar la venta por chasis. El pedido no se marca como pendiente ni facturado hasta recuperar la consulta." }
     : simpleState === "COMPLETADO" && deliveryComplete
       ? { title: "Proceso completo", detail: "La facturación y la entrega ya están confirmadas." }
       : simpleState === "COMPLETADO"
@@ -2315,7 +2360,9 @@ function OperationDrawer({ operationId, onOpenChange, onEdit, onChanged }: { ope
               <AlertTriangle className={cn("mt-0.5 h-4 w-4 shrink-0", nextActionResolved ? "text-emerald-700" : "text-amber-700")} />
               <div className="min-w-0"><div className="text-[11px] font-semibold">{nextAction.title}</div><div className="mt-0.5 text-[10px] text-muted-foreground">{nextAction.detail}</div></div>
             </div>
-            {missingOriginCount > 0 && !isConcludedHistorical && canEditChasis && <Button size="sm" className="h-8 shrink-0 px-3 text-[11px]" onClick={() => setActiveTab("trazabilidad")}>Asignar origen</Button>}
+            {detailBillingStatus === "error"
+              ? <Button size="sm" variant="outline" className="h-8 shrink-0 px-3 text-[11px]" onClick={() => detailConfirmedBillingQuery.refetch()}>Reintentar</Button>
+              : missingOriginCount > 0 && !isConcludedHistorical && canEditChasis && <Button size="sm" className="h-8 shrink-0 px-3 text-[11px]" onClick={() => setActiveTab("trazabilidad")}>Asignar origen</Button>}
           </div>
           <DetailSection card icon={<FileCheck2 className="h-3.5 w-3.5" />} title="Información general">
             <KeyValueGrid className={cn(detail.lines.length > 1 ? "sm:grid-cols-4" : "sm:grid-cols-3")}>

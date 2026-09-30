@@ -79,6 +79,28 @@ describe("Parque and imports compact lists",()=>{
     expect(cells[7]).toHaveClass("hidden");expect(cells[8]).not.toHaveClass("hidden");
     fireEvent.click(screen.getByRole("button",{name:"Ver NP NP0101"}));expect(select).toHaveBeenCalledExactlyOnceWith(row);expect(table.querySelectorAll("td br,td .flex-col")).toHaveLength(0);
   });
+  it("keeps machine billing unavailable on RPC failure and retries only on demand",async()=>{
+    const row={id:"U1",operacion_id:"OP1",np_numero:"000101",np_fecha:"2026-09-17",cliente_nombre:"CLIENTE CON NOMBRE MUY LARGO",comercial:null,marca:"CLAAS",producto:"COSECHADORAS",modelo:machine.modelo_tipo,cantidad:1,condicion:"NUEVA",abastecimiento:"STOCK",estado_fuente:"FACTURADA",estado_operacion:"FACTURADA",chasis:machine.serie,estado_disponibilidad:"DISPONIBLE",disponibilidad_detalle:null,estado_importacion_fuente:null,eta:null,ata:null,proveedor:null,factura_venta:"FACT 5106",factura_fecha:"2026-09-22",costo_producto:null,valor_venta:111234.56,moneda_valor:"USD",observaciones:null,actualizado_en:"2026-09-18",es_historico:false};
+    mocks.tables.maquinaria_pedidos_lineas_estado_actual=[row];
+    mocks.tables.maquinaria_unidades_operacion=[{id:"U1",estado:"FACTURADA",chasis:machine.serie}];
+    mocks.tables.maquinaria_operaciones=[{id:"OP1",estado:"FACTURADA"}];
+    mocks.rpc.mockResolvedValue({data:null,error:{code:"57014",message:"canceling statement due to statement timeout"}});
+    setup(<MaquinariaOperaciones/>,"/parque-operaciones");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Facturación no disponible");
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    const table=screen.getByRole("table",{name:"Operaciones de máquinas"});
+    expect(within(table).getAllByRole("row")[1]).toHaveTextContent("No disponible");
+    expect(within(table).getAllByRole("row")[1]).not.toHaveTextContent("Pendiente");
+    fireEvent.keyDown(screen.getByRole("button",{name:"Acciones de la sección"}),{key:"Enter"});
+    expect(await screen.findByRole("menuitem",{name:"Exportar Operaciones"})).toHaveAttribute("data-disabled");
+    fireEvent.keyDown(screen.getByRole("menuitem",{name:"Exportar Operaciones"}),{key:"Escape"});
+    mocks.rpc.mockResolvedValue({data:[{unidad_id:"U1"}],error:null});
+    fireEvent.click(screen.getByRole("button",{name:"Reintentar"}));
+    await waitFor(()=>expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("No disponible")).not.toBeInTheDocument();
+    expect(within(table).getAllByRole("row")).toHaveLength(1); // El filtro Pendientes vuelve a excluir la unidad facturada.
+  });
   it("stock keeps centered fractions, full hover and duplicate warnings",async()=>{
     setup(<StockMaquinasTab/>);await screen.findAllByRole("button",{name:`Detalle ${machine.modelo_tipo}`});
     const table=screen.getByRole("table",{name:"Stock de máquinas"});expect(table).toHaveClass("table-fixed");

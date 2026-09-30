@@ -188,6 +188,7 @@ describe("reported production regressions", () => {
 
   it("confirms each ordered machine only from a sale with the same chassis", () => {
     const sql = read("supabase/migrations/20260923170000_confirm_machine_order_billing_by_chassis.sql");
+    const optimizedSql = read("supabase/migrations/20260930120000_optimize_machine_order_confirmed_billing.sql");
     const ui = read("src/pages/MaquinariaOperaciones.tsx");
     expect(sql).toContain("maquinaria_unidad_tiene_venta_confirmada");
     expect(sql).toContain("maquinaria_unidades_facturadas_confirmadas");
@@ -197,6 +198,12 @@ describe("reported production regressions", () => {
     expect(sql).toContain("maquinaria_vinculos_factura_invalidos");
     expect(ui).toContain("hasConfirmedChassisSale");
     expect(ui).toContain("confirmedBillingUnitIds?.has(row.id)");
+    expect(optimizedSql).toContain("ventas_candidatas AS MATERIALIZED");
+    expect(optimizedSql).not.toMatch(/\b(?:UPDATE|DELETE|INSERT|TRUNCATE)\b/i);
+    expect(optimizedSql).not.toContain("maquinaria_vinculos_factura_invalidos");
+    expect(ui).toContain('retry: false');
+    expect(ui).toContain("Facturación no disponible");
+    expect(ui).toContain("reusesListBilling");
   });
 
   it("does not suggest a transfer for duplicate rows of the same customer", () => {
