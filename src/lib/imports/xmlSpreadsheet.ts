@@ -8,6 +8,20 @@ export interface SpreadsheetXmlWorkbook {
   sheets: SpreadsheetXmlSheet[];
 }
 
+export function decodeXmlBytes(input: ArrayBuffer | Uint8Array) {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const prefix = new TextDecoder("ascii").decode(bytes.slice(0, 256));
+  const declared = prefix.match(/<\?xml[^>]*encoding=["']([^"']+)["']/i)?.[1]?.toLowerCase();
+  const encoding = declared === "iso-8859-1" || declared === "latin1" || declared === "windows-1252"
+    ? "windows-1252"
+    : "utf-8";
+  return new TextDecoder(encoding).decode(bytes);
+}
+
+export async function readXmlFileText(file: Blob) {
+  return decodeXmlBytes(await file.arrayBuffer());
+}
+
 const XML_NS = "urn:schemas-microsoft-com:office:spreadsheet";
 
 function localNameOf(node: Node | null) {
@@ -68,7 +82,81 @@ function makeUniqueHeaders(headers: string[]) {
   });
 }
 
+function decodeXmlEntities(value: string) {
+  const cdata = value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+  return cdata
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, decimal: string) => String.fromCodePoint(Number.parseInt(decimal, 10)))
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&amp;/gi, "&");
+}
+
+function xmlAttribute(attributes: string, name: string) {
+  const match = attributes.match(new RegExp(`(?:^|\\s)(?:[\\w.-]+:)?${name}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i"));
+  return match ? decodeXmlEntities(match[2]) : null;
+}
+
+function fastCellText(cellBody: string) {
+  const data = cellBody.match(/<(?:[\w.-]+:)?Data\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Data\s*>/i);
+  if (!data) return "";
+  return decodeXmlEntities(data[1].replace(/<[^>]*>/g, "")).trim();
+}
+
+function fastMaterializeRow(rowBody: string) {
+  const values: string[] = [];
+  let cursor = 0;
+  const cells = rowBody.matchAll(/<(?:[\w.-]+:)?Cell\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[\w.-]+:)?Cell\s*>)/gi);
+  for (const cell of cells) {
+    const indexAttr = xmlAttribute(cell[1], "Index");
+    if (indexAttr) {
+      const requestedIndex = Math.max(Number(indexAttr) - 1, 0);
+      while (cursor < requestedIndex) {
+        values.push("");
+        cursor += 1;
+      }
+    }
+    values.push(fastCellText(cell[2] ?? ""));
+    cursor += 1;
+  }
+  return values;
+}
+
+function parseSpreadsheetXmlFast(xmlText: string): SpreadsheetXmlWorkbook | null {
+  const worksheets = [...xmlText.matchAll(/<(?:[\w.-]+:)?Worksheet\b([^>]*)>([\s\S]*?)<\/(?:[\w.-]+:)?Worksheet\s*>/gi)];
+  if (!worksheets.length) return null;
+
+  return {
+    sheets: worksheets.map((worksheet) => {
+      const table = worksheet[2].match(/<(?:[\w.-]+:)?Table\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Table\s*>/i);
+      const rowValues = table
+        ? [...table[1].matchAll(/<(?:[\w.-]+:)?Row\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?Row\s*>/gi)]
+            .map((row) => fastMaterializeRow(row[1]))
+        : [];
+      const headers = makeUniqueHeaders(rowValues[0]?.map((header) => String(header || "").trim()) ?? []);
+      const dataRows = rowValues.slice(1).filter((row) => row.some((item) => String(item || "").trim() !== ""));
+      return {
+        name: xmlAttribute(worksheet[1], "Name") || "Hoja 1",
+        headers,
+        rows: dataRows.map<Record<string, unknown>>((row) => {
+          const record: Record<string, unknown> = {};
+          const maxLength = Math.max(headers.length, row.length);
+          for (let index = 0; index < maxLength; index += 1) {
+            record[headers[index] || `col_${index + 1}`] = row[index] ?? "";
+          }
+          return record;
+        }),
+      };
+    }),
+  };
+}
+
 export function parseSpreadsheetXml(xmlText: string): SpreadsheetXmlWorkbook {
+  const fastWorkbook = parseSpreadsheetXmlFast(xmlText);
+  if (fastWorkbook) return fastWorkbook;
+
   const parser = new DOMParser();
   const documentNode = parser.parseFromString(xmlText, "application/xml");
   const parserError = documentNode.getElementsByTagName("parsererror")[0];

@@ -17,25 +17,54 @@ import { FolderOpen, FileUp, Import, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   mapCanonicalPedidoCompraToRow,
+  mapCanonicalImportDispatchToRow,
+  mapCanonicalKardexToRow,
   mapCanonicalMachineStockToRow,
   mapCanonicalProductToRow,
   mapCanonicalSolicitudCompraToRow,
+  mapCanonicalSalesOrderToRow,
+  mapCanonicalSyntheticKardexToRow,
+  mapCanonicalPurchaseInvoiceToRow,
+  mapCanonicalSupplierToRow,
+  mapCanonicalBranchTransferToRow,
   mapCanonicalStockToRow,
   mapClienteSheet,
+  mapImportDispatchSheet,
+  mapKardexSheet,
   mapMachineRegistrySheet,
   mapPedidoCompraSheet,
   mapMachineStockSheet,
   mapProductosSheet,
   mapSolicitudCompraSheet,
+  mapSalesOrderSheet,
+  mapSyntheticKardexSheet,
+  mapPurchaseInvoiceSheet,
+  mapSupplierSheet,
+  mapBranchTransferSheet,
   mapStockSheet,
   parseSpreadsheetXml,
+  readXmlFileText,
   prepareNewSystemImportBundle,
   reconcileCanonicalClientes,
+  mergeKardexRows,
+  mergeImportDispatchRows,
+  mergeSalesOrderRows,
+  mergeSyntheticKardexRows,
+  mergePurchaseInvoiceRows,
+  mergeSupplierRows,
+  mergeBranchTransferRows,
   reconcileMachineStockChassis,
   persistNewSystemBundle,
   actualizarVentasRepuestosPeriodo,
   type CanonicalClienteRow,
+  type CanonicalImportDispatchRow,
+  type CanonicalKardexRow,
   type CanonicalPedidoCompraRow,
+  type CanonicalSalesOrderRow,
+  type CanonicalSyntheticKardexRow,
+  type CanonicalPurchaseInvoiceRow,
+  type CanonicalSupplierRow,
+  type CanonicalBranchTransferRow,
   type CanonicalMachineStockRow,
   type CanonicalMachineRegistryRow,
   type MachineStockChassisReconciliation,
@@ -45,6 +74,12 @@ import {
   type ClienteInsert,
   type ClienteActualizacionImport,
   type ClienteExistenteImport,
+  type KardexDiagnostics,
+  type ImportDispatchDiagnostics,
+  type SalesOrderDiagnostics,
+  type SyntheticKardexDiagnostics,
+  type PurchaseInvoiceDiagnostics,
+  syntheticValueDiffersFromBalance,
   TOTVS_FILE_KIND_LABELS,
   detectTotvsFileKind,
   type TotvsFileKind,
@@ -70,9 +105,89 @@ interface Preview {
   clientesTodos: CanonicalClienteRow[];
   clientesNuevos: ClienteInsert[];
   clientesActualizados: ClienteActualizacionImport[];
+  kardex: CanonicalKardexRow[];
+  kardexDiagnostics: KardexDiagnostics | null;
+  kardexDuplicatesSkipped: number;
+  dispatchRows: CanonicalImportDispatchRow[];
+  dispatchDiagnostics: ImportDispatchDiagnostics | null;
+  dispatchDuplicatesSkipped: number;
+  salesOrders: CanonicalSalesOrderRow[];
+  salesOrderDiagnostics: SalesOrderDiagnostics | null;
+  salesOrderDuplicatesSkipped: number;
+  syntheticKardex: CanonicalSyntheticKardexRow[];
+  syntheticKardexDiagnostics: SyntheticKardexDiagnostics | null;
+  syntheticKardexDuplicatesSkipped: number;
+  purchaseInvoices: CanonicalPurchaseInvoiceRow[];
+  purchaseInvoiceDiagnostics: PurchaseInvoiceDiagnostics | null;
+  purchaseInvoiceDuplicatesSkipped: number;
+  suppliers: CanonicalSupplierRow[];
+  supplierDuplicatesSkipped: number;
+  branchTransfers: CanonicalBranchTransferRow[];
+  branchTransferDuplicatesSkipped: number;
   bundleFiles: { facturacion: { fileName: string; xmlText: string }; ordenesServicio: { fileName: string; xmlText: string }; productos: { fileName: string; xmlText: string } } | null;
   faltaParaTrio: string[];
 }
+
+type KardexRpcResult = {
+  insertadas?: number;
+  actualizadas?: number;
+  sin_cambios?: number;
+};
+
+type KardexRpcClient = {
+  rpc: (
+    name: "totvs_importar_kardex_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalKardexToRow>[] },
+  ) => Promise<{ data: KardexRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
+
+type OperationalRpcResult = {
+  insertadas?: number;
+  actualizadas?: number;
+  sin_cambios?: number;
+};
+
+type ImportDispatchRpcClient = {
+  rpc: (
+    name: "totvs_importar_despacho_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalImportDispatchToRow>[] },
+  ) => Promise<{ data: OperationalRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
+
+type SalesOrderRpcClient = {
+  rpc: (
+    name: "totvs_importar_pedidos_venta_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalSalesOrderToRow>[] },
+  ) => Promise<{ data: OperationalRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
+
+type SyntheticKardexRpcClient = {
+  rpc: (
+    name: "totvs_importar_kardex_sintetico_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalSyntheticKardexToRow>[] },
+  ) => Promise<{ data: OperationalRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
+
+type PurchaseInvoiceRpcClient = {
+  rpc: (
+    name: "totvs_importar_facturas_compra_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalPurchaseInvoiceToRow>[] },
+  ) => Promise<{ data: OperationalRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
+
+type SupplierRpcClient = {
+  rpc: (
+    name: "totvs_importar_proveedores_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalSupplierToRow>[] },
+  ) => Promise<{ data: OperationalRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
+
+type BranchTransferRpcClient = {
+  rpc: (
+    name: "totvs_importar_transferencias_transito_lote_v1",
+    params: { p_carga_id: string; p_filas: ReturnType<typeof mapCanonicalBranchTransferToRow>[] },
+  ) => Promise<{ data: OperationalRpcResult | null; error: { code?: string; message?: string } | null }>;
+};
 
 export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const { user } = useAuth();
@@ -143,44 +258,131 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const machineRegistryRows: CanonicalMachineRegistryRow[] = [];
       const pedidos: CanonicalPedidoCompraRow[] = [];
       const solicitudes: CanonicalSolicitudCompraRow[] = [];
+      const kardexUnmerged: CanonicalKardexRow[] = [];
+      const dispatchUnmerged: CanonicalImportDispatchRow[] = [];
+      const salesOrdersUnmerged: CanonicalSalesOrderRow[] = [];
+      const syntheticKardexUnmerged: CanonicalSyntheticKardexRow[] = [];
+      const purchaseInvoicesUnmerged: CanonicalPurchaseInvoiceRow[] = [];
+      const suppliersUnmerged: CanonicalSupplierRow[] = [];
+      const branchTransfersUnmerged: CanonicalBranchTransferRow[] = [];
       let clientesTodos: CanonicalClienteRow[] = [];
       let osTexto: { fileName: string; xmlText: string } | null = null;
       let facturacionTexto: { fileName: string; xmlText: string } | null = null;
       let productosTexto: { fileName: string; xmlText: string } | null = null;
 
       for (const { file, kind } of usableFiles) {
-        const xmlText = await file.text();
+        try {
+          const xmlText = await readXmlFileText(file);
 
-        if (kind === "os") {
-          osTexto = { fileName: file.name, xmlText };
-          continue;
-        }
-        if (kind === "facturacion") {
-          facturacionTexto = { fileName: file.name, xmlText };
-          continue;
-        }
+          if (kind === "os") {
+            osTexto = { fileName: file.name, xmlText };
+            continue;
+          }
+          if (kind === "facturacion") {
+            facturacionTexto = { fileName: file.name, xmlText };
+            continue;
+          }
 
-        const workbook = parseSpreadsheetXml(xmlText);
-        const sheet = workbook.sheets[0];
-        if (!sheet) continue;
+          const workbook = parseSpreadsheetXml(xmlText);
+          const sheet = workbook.sheets[0];
+          if (!sheet) throw new Error("no contiene una hoja legible");
 
-        if (kind === "productos") {
-          productosTexto = { fileName: file.name, xmlText };
-          productos.push(...mapProductosSheet(file.name, sheet).rows);
-        } else if (kind === "stock") {
-          stock.push(...mapStockSheet(file.name, sheet).rows);
-        } else if (kind === "stock_maquinas") {
-          stockMaquinas.push(...mapMachineStockSheet(file.name, sheet).rows);
-        } else if (kind === "maquinarias") {
-          machineRegistryRows.push(...mapMachineRegistrySheet(file.name, sheet).rows);
-        } else if (kind === "pedidos") {
-          pedidos.push(...mapPedidoCompraSheet(file.name, sheet).rows);
-        } else if (kind === "solicitudes") {
-          solicitudes.push(...mapSolicitudCompraSheet(file.name, sheet).rows);
-        } else if (kind === "clientes") {
-          clientesTodos = mapClienteSheet(file.name, sheet).rows;
+          if (kind === "productos") {
+            productosTexto = { fileName: file.name, xmlText };
+            productos.push(...mapProductosSheet(file.name, sheet).rows);
+          } else if (kind === "stock") {
+            stock.push(...mapStockSheet(file.name, sheet).rows);
+          } else if (kind === "stock_maquinas") {
+            stockMaquinas.push(...mapMachineStockSheet(file.name, sheet).rows);
+          } else if (kind === "maquinarias") {
+            machineRegistryRows.push(...mapMachineRegistrySheet(file.name, sheet).rows);
+          } else if (kind === "pedidos") {
+            pedidos.push(...mapPedidoCompraSheet(file.name, sheet).rows);
+          } else if (kind === "solicitudes") {
+            solicitudes.push(...mapSolicitudCompraSheet(file.name, sheet).rows);
+          } else if (kind === "clientes") {
+            clientesTodos = mapClienteSheet(file.name, sheet).rows;
+          } else if (kind === "kardex") {
+            kardexUnmerged.push(...mapKardexSheet(file.name, sheet).rows);
+          } else if (kind === "despacho") {
+            dispatchUnmerged.push(...mapImportDispatchSheet(file.name, sheet).rows);
+          } else if (kind === "pedidos_venta") {
+            salesOrdersUnmerged.push(...mapSalesOrderSheet(file.name, sheet).rows);
+          } else if (kind === "kardex_sintetico") {
+            syntheticKardexUnmerged.push(...mapSyntheticKardexSheet(file.name, sheet).rows);
+          } else if (kind === "facturas_compra") {
+            purchaseInvoicesUnmerged.push(...mapPurchaseInvoiceSheet(file.name, sheet).rows);
+          } else if (kind === "proveedores") {
+            suppliersUnmerged.push(...mapSupplierSheet(file.name, sheet).rows);
+          } else if (kind === "transferencias_transito") {
+            branchTransfersUnmerged.push(...mapBranchTransferSheet(file.name, sheet).rows);
+          }
+        } catch (error) {
+          throw new Error(`${file.name}: ${(error as Error).message}`);
         }
       }
+
+      const kardexMerged = mergeKardexRows(kardexUnmerged);
+      const kardexDates = kardexMerged.rows.map((row) => row.movementDate).sort();
+      const kardexDiagnostics: KardexDiagnostics | null = kardexMerged.rows.length ? {
+        rows: kardexMerged.rows.length,
+        from: kardexDates[0] ?? null,
+        to: kardexDates[kardexDates.length - 1] ?? null,
+        branches: new Set(kardexMerged.rows.map((row) => row.branch)).size,
+        warehouses: new Set(kardexMerged.rows.map((row) => row.warehouse)).size,
+        currencyCodes: [...new Set(kardexMerged.rows.map((row) => row.currencyCode))].sort(),
+        duplicateKeys: 0,
+      } : null;
+      const dispatchMerged = mergeImportDispatchRows(dispatchUnmerged);
+      const dispatchDates = dispatchMerged.rows.map((row) => row.processDate).sort();
+      const dispatchDiagnostics: ImportDispatchDiagnostics | null = dispatchMerged.rows.length ? {
+        rows: dispatchMerged.rows.length,
+        from: dispatchDates[0] ?? null,
+        to: dispatchDates[dispatchDates.length - 1] ?? null,
+        branches: new Set(dispatchMerged.rows.map((row) => row.branch)).size,
+        processes: new Set(dispatchMerged.rows.map((row) => `${row.branch}|${row.processNumber}`)).size,
+        quantity: dispatchMerged.rows.reduce((sum, row) => sum + row.quantity, 0),
+        duplicateKeys: 0,
+      } : null;
+      const salesOrdersMerged = mergeSalesOrderRows(salesOrdersUnmerged);
+      const salesOrderDates = salesOrdersMerged.rows.map((row) => row.emissionDate).sort();
+      const pendingSalesOrderRows = salesOrdersMerged.rows.filter((row) => row.pendingQuantity !== 0);
+      const salesOrderDiagnostics: SalesOrderDiagnostics | null = salesOrdersMerged.rows.length ? {
+        rows: salesOrdersMerged.rows.length,
+        from: salesOrderDates[0] ?? null,
+        to: salesOrderDates[salesOrderDates.length - 1] ?? null,
+        branches: new Set(salesOrdersMerged.rows.map((row) => row.branch)).size,
+        ordersByBranch: new Set(salesOrdersMerged.rows.map((row) => `${row.branch}|${row.orderNumber}`)).size,
+        pendingRows: pendingSalesOrderRows.length,
+        pendingQuantity: Number(pendingSalesOrderRows.reduce((sum, row) => sum + row.pendingQuantity, 0).toFixed(6)),
+        duplicateKeys: 0,
+      } : null;
+      const syntheticKardexMerged = mergeSyntheticKardexRows(syntheticKardexUnmerged);
+      const syntheticKardexDiagnostics: SyntheticKardexDiagnostics | null = syntheticKardexMerged.rows.length ? {
+        rows: syntheticKardexMerged.rows.length,
+        branches: new Set(syntheticKardexMerged.rows.map((row) => row.branch)).size,
+        warehouses: new Set(syntheticKardexMerged.rows.map((row) => row.warehouse)).size,
+        products: new Set(syntheticKardexMerged.rows.map((row) => row.productCode)).size,
+        chassisRows: syntheticKardexMerged.rows.filter((row) => row.chassis).length,
+        positiveBalances: syntheticKardexMerged.rows.filter((row) => row.balance > 0).length,
+        negativeBalances: syntheticKardexMerged.rows.filter((row) => row.balance < 0).length,
+        zeroBalances: syntheticKardexMerged.rows.filter((row) => row.balance === 0).length,
+        valueFormulaMismatches: syntheticKardexMerged.rows.filter(syntheticValueDiffersFromBalance).length,
+        valuationDate: null,
+      } : null;
+      const purchaseInvoicesMerged = mergePurchaseInvoiceRows(purchaseInvoicesUnmerged);
+      const purchaseDates = purchaseInvoicesMerged.rows.map((row) => row.emissionDate).sort();
+      const purchaseInvoiceDiagnostics: PurchaseInvoiceDiagnostics | null = purchaseInvoicesMerged.rows.length ? {
+        rows: purchaseInvoicesMerged.rows.length,
+        from: purchaseDates[0] ?? null,
+        to: purchaseDates[purchaseDates.length - 1] ?? null,
+        suppliers: new Set(purchaseInvoicesMerged.rows.map((row) => `${row.supplierCode}|${row.supplierStore}`)).size,
+        documents: new Set(purchaseInvoicesMerged.rows.map((row) => `${row.branch}|${row.series}|${row.documentNumber}`)).size,
+        sourceCurrencies: [...new Set(purchaseInvoicesMerged.rows.map((row) => row.sourceCurrency))].sort(),
+        documentKinds: [...new Set(purchaseInvoicesMerged.rows.map((row) => row.documentKind))].sort(),
+      } : null;
+      const suppliersMerged = mergeSupplierRows(suppliersUnmerged);
+      const branchTransfersMerged = mergeBranchTransferRows(branchTransfersUnmerged);
 
       // El trio OS+Facturacion+Productos va junto (se cruzan entre si) o no
       // va: si falta alguno, se avisa y no se arma el bundle todavia.
@@ -236,6 +438,25 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         clientesTodos,
         clientesNuevos,
         clientesActualizados,
+        kardex: kardexMerged.rows,
+        kardexDiagnostics,
+        kardexDuplicatesSkipped: kardexMerged.duplicatesSkipped,
+        dispatchRows: dispatchMerged.rows,
+        dispatchDiagnostics,
+        dispatchDuplicatesSkipped: dispatchMerged.duplicatesSkipped,
+        salesOrders: salesOrdersMerged.rows,
+        salesOrderDiagnostics,
+        salesOrderDuplicatesSkipped: salesOrdersMerged.duplicatesSkipped,
+        syntheticKardex: syntheticKardexMerged.rows,
+        syntheticKardexDiagnostics,
+        syntheticKardexDuplicatesSkipped: syntheticKardexMerged.duplicatesSkipped,
+        purchaseInvoices: purchaseInvoicesMerged.rows,
+        purchaseInvoiceDiagnostics,
+        purchaseInvoiceDuplicatesSkipped: purchaseInvoicesMerged.duplicatesSkipped,
+        suppliers: suppliersMerged.rows,
+        supplierDuplicatesSkipped: suppliersMerged.duplicatesSkipped,
+        branchTransfers: branchTransfersMerged.rows,
+        branchTransferDuplicatesSkipped: branchTransfersMerged.duplicatesSkipped,
         bundleFiles,
         faltaParaTrio,
       });
@@ -250,6 +471,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         pedidos.length ? `${pedidos.length} líneas de pedido` : null,
         solicitudes.length ? `${solicitudes.length} líneas de solicitud` : null,
         clientesTodos.length ? `${clientesNuevos.length} clientes nuevos y ${clientesActualizados.length} actualizados` : null,
+        kardexMerged.rows.length ? `${kardexMerged.rows.length} movimientos de Kardex` : null,
+        dispatchMerged.rows.length ? `${dispatchMerged.rows.length} l\u00edneas de despacho` : null,
+        salesOrdersMerged.rows.length ? `${salesOrdersMerged.rows.length} l\u00edneas de pedidos de venta` : null,
+        syntheticKardexMerged.rows.length ? `${syntheticKardexMerged.rows.length} posiciones valorizadas de Kardex` : null,
+        purchaseInvoicesMerged.rows.length ? `${purchaseInvoicesMerged.rows.length} líneas de facturas de compra` : null,
+        suppliersMerged.rows.length ? `${suppliersMerged.rows.length} proveedores` : null,
+        branchTransfersMerged.rows.length ? `${branchTransfersMerged.rows.length} transferencias en tránsito` : null,
       ].filter(Boolean);
       toast.success(partes.length > 0 ? `Leído: ${partes.join(", ")}.` : "Nada para importar todavía.");
     } catch (e) {
@@ -272,6 +500,27 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let facturacionDesde: string | null = null;
       let facturacionHasta: string | null = null;
       let historialRepuestosError: string | null = null;
+      let kardexInsertadas = 0;
+      let kardexActualizadas = 0;
+      let kardexSinCambios = 0;
+      let dispatchInsertadas = 0;
+      let dispatchActualizadas = 0;
+      let dispatchSinCambios = 0;
+      let salesOrdersInsertadas = 0;
+      let salesOrdersActualizadas = 0;
+      let salesOrdersSinCambios = 0;
+      let syntheticKardexInsertadas = 0;
+      let syntheticKardexActualizadas = 0;
+      let syntheticKardexSinCambios = 0;
+      let purchaseInvoicesInsertadas = 0;
+      let purchaseInvoicesActualizadas = 0;
+      let purchaseInvoicesSinCambios = 0;
+      let suppliersInsertados = 0;
+      let suppliersActualizados = 0;
+      let suppliersSinCambios = 0;
+      let branchTransfersInsertadas = 0;
+      let branchTransfersActualizadas = 0;
+      let branchTransfersSinCambios = 0;
 
       // El maestro se aplica antes que facturacion/OS: asi las lineas del
       // mismo lote ya resuelven contra el nombre y RUC corregidos.
@@ -331,6 +580,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const machineStockRows = preview.stockMaquinas.map(mapCanonicalMachineStockToRow);
       const pedidoRows = preview.pedidos.map(mapCanonicalPedidoCompraToRow).filter((r): r is NonNullable<typeof r> => r !== null);
       const solicitudRows = preview.solicitudes.map(mapCanonicalSolicitudCompraToRow).filter((r): r is NonNullable<typeof r> => r !== null);
+      const kardexRows = preview.kardex.map(mapCanonicalKardexToRow);
+      const dispatchRows = preview.dispatchRows.map(mapCanonicalImportDispatchToRow);
+      const salesOrderRows = preview.salesOrders.map(mapCanonicalSalesOrderToRow);
+      const syntheticKardexRows = preview.syntheticKardex.map(mapCanonicalSyntheticKardexToRow);
+      const purchaseInvoiceRows = preview.purchaseInvoices.map(mapCanonicalPurchaseInvoiceToRow);
+      const supplierRows = preview.suppliers.map(mapCanonicalSupplierToRow);
+      const branchTransferRows = preview.branchTransfers.map(mapCanonicalBranchTransferToRow);
 
       for (let i = 0; i < productoRows.length; i += 500) {
         const chunk = productoRows.slice(i, i + 500);
@@ -380,6 +636,256 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         if (error) throw error;
       }
 
+      if (kardexRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < kardexRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as KardexRpcClient).rpc("totvs_importar_kardex_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: kardexRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") {
+              throw new Error("Falta aplicar la migraci\u00f3n local de Kardex antes de confirmar esta fuente.");
+            }
+            if (error.code === "23505") {
+              throw new Error("El Kardex contiene claves TABLA + RECNO ya cargadas con otra versi\u00f3n. No se sobrescribi\u00f3 ning\u00fan movimiento; revis\u00e1 la fuente y su trazabilidad.");
+            }
+            throw error;
+          }
+          kardexInsertadas += Number(data?.insertadas ?? 0);
+          kardexActualizadas += Number(data?.actualizadas ?? 0);
+          kardexSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id,
+          tipo: "parque",
+          total_filas: kardexRows.length,
+          insertados: kardexInsertadas + kardexActualizadas,
+          duplicados: kardexSinCambios + preview.kardexDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "kardex").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_kardex_analitico",
+            filas_insertadas: kardexInsertadas,
+            filas_actualizadas: kardexActualizadas,
+            filas_sin_cambios: kardexSinCambios,
+            duplicados_entre_archivos: preview.kardexDuplicatesSkipped,
+            fecha_desde: preview.kardexDiagnostics?.from,
+            fecha_hasta: preview.kardexDiagnostics?.to,
+            codigos_moneda: preview.kardexDiagnostics?.currencyCodes,
+            clave: "TABLA+RECNO",
+          },
+        } as never);
+      }
+
+      if (dispatchRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < dispatchRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as ImportDispatchRpcClient).rpc("totvs_importar_despacho_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: dispatchRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") {
+              throw new Error("Falta aplicar la migraci\u00f3n local de Importaciones - Despacho antes de confirmar esta fuente.");
+            }
+            throw error;
+          }
+          dispatchInsertadas += Number(data?.insertadas ?? 0);
+          dispatchActualizadas += Number(data?.actualizadas ?? 0);
+          dispatchSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id,
+          tipo: "repuestos",
+          total_filas: dispatchRows.length,
+          insertados: dispatchInsertadas + dispatchActualizadas,
+          duplicados: dispatchSinCambios + preview.dispatchDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "despacho").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_importaciones_despacho",
+            filas_insertadas: dispatchInsertadas,
+            filas_actualizadas: dispatchActualizadas,
+            filas_sin_cambios: dispatchSinCambios,
+            duplicados_entre_archivos: preview.dispatchDuplicatesSkipped,
+            fecha_desde: preview.dispatchDiagnostics?.from,
+            fecha_hasta: preview.dispatchDiagnostics?.to,
+            procesos: preview.dispatchDiagnostics?.processes,
+            cobertura_parcial: true,
+            clave: "Sucursal+Proceso+ItemProceso+Documento+ItemDocumento+Producto",
+          },
+        } as never);
+      }
+
+      if (salesOrderRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < salesOrderRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as SalesOrderRpcClient).rpc("totvs_importar_pedidos_venta_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: salesOrderRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") {
+              throw new Error("Falta aplicar la migraci\u00f3n local de Pedidos de Venta antes de confirmar esta fuente.");
+            }
+            throw error;
+          }
+          salesOrdersInsertadas += Number(data?.insertadas ?? 0);
+          salesOrdersActualizadas += Number(data?.actualizadas ?? 0);
+          salesOrdersSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id,
+          tipo: "repuestos",
+          total_filas: salesOrderRows.length,
+          insertados: salesOrdersInsertadas + salesOrdersActualizadas,
+          duplicados: salesOrdersSinCambios + preview.salesOrderDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "pedidos_venta").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_pedidos_venta",
+            filas_insertadas: salesOrdersInsertadas,
+            filas_actualizadas: salesOrdersActualizadas,
+            filas_sin_cambios: salesOrdersSinCambios,
+            duplicados_entre_archivos: preview.salesOrderDuplicatesSkipped,
+            fecha_desde: preview.salesOrderDiagnostics?.from,
+            fecha_hasta: preview.salesOrderDiagnostics?.to,
+            lineas_pendientes: preview.salesOrderDiagnostics?.pendingRows,
+            cantidad_pendiente: preview.salesOrderDiagnostics?.pendingQuantity,
+            cobertura_parcial: true,
+            clave: "FILIAL+NroPedido+Item",
+          },
+        } as never);
+      }
+
+      if (syntheticKardexRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < syntheticKardexRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as SyntheticKardexRpcClient).rpc("totvs_importar_kardex_sintetico_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: syntheticKardexRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") {
+              throw new Error("Falta aplicar la migraci\u00f3n local de Kardex sint\u00e9tico antes de confirmar esta fuente.");
+            }
+            throw error;
+          }
+          syntheticKardexInsertadas += Number(data?.insertadas ?? 0);
+          syntheticKardexActualizadas += Number(data?.actualizadas ?? 0);
+          syntheticKardexSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id,
+          tipo: "repuestos",
+          total_filas: syntheticKardexRows.length,
+          insertados: syntheticKardexInsertadas + syntheticKardexActualizadas,
+          duplicados: syntheticKardexSinCambios + preview.syntheticKardexDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "kardex_sintetico").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_kardex_sintetico",
+            filas_insertadas: syntheticKardexInsertadas,
+            filas_actualizadas: syntheticKardexActualizadas,
+            filas_sin_cambios: syntheticKardexSinCambios,
+            duplicados_entre_archivos: preview.syntheticKardexDuplicatesSkipped,
+            fecha_valorizacion_fuente: null,
+            ejes_costo: ["PPP1/VALOR_1", "PPP2/VALOR_2", "PPP3/VALOR_3"],
+            moneda_ejes_confirmada: false,
+            clave: "SUCURSAL+CODIGO+DEPOSITO+Chasis",
+          },
+        } as never);
+      }
+
+      if (purchaseInvoiceRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < purchaseInvoiceRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as PurchaseInvoiceRpcClient).rpc("totvs_importar_facturas_compra_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: purchaseInvoiceRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") throw new Error("Falta aplicar la migración local de Facturas de Compra antes de confirmar esta fuente.");
+            throw error;
+          }
+          purchaseInvoicesInsertadas += Number(data?.insertadas ?? 0);
+          purchaseInvoicesActualizadas += Number(data?.actualizadas ?? 0);
+          purchaseInvoicesSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id, tipo: "repuestos", total_filas: purchaseInvoiceRows.length,
+          insertados: purchaseInvoicesInsertadas + purchaseInvoicesActualizadas,
+          duplicados: purchaseInvoicesSinCambios + preview.purchaseInvoiceDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "facturas_compra").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_facturas_compra", filas_insertadas: purchaseInvoicesInsertadas,
+            filas_actualizadas: purchaseInvoicesActualizadas, filas_sin_cambios: purchaseInvoicesSinCambios,
+            fecha_desde: preview.purchaseInvoiceDiagnostics?.from, fecha_hasta: preview.purchaseInvoiceDiagnostics?.to,
+            monedas_fuente: preview.purchaseInvoiceDiagnostics?.sourceCurrencies,
+            especies: preview.purchaseInvoiceDiagnostics?.documentKinds,
+            clave: "FILIAL+PROVEEDOR+LOJA+SERIE+DOCUMENTO+ITEM",
+            sin_conversion_monetaria: true,
+          },
+        } as never);
+      }
+
+      if (supplierRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < supplierRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as SupplierRpcClient).rpc("totvs_importar_proveedores_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: supplierRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") throw new Error("Falta aplicar la migración local del Maestro de Proveedores antes de confirmar esta fuente.");
+            throw error;
+          }
+          suppliersInsertados += Number(data?.insertadas ?? 0);
+          suppliersActualizados += Number(data?.actualizadas ?? 0);
+          suppliersSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id, tipo: "repuestos", total_filas: supplierRows.length,
+          insertados: suppliersInsertados + suppliersActualizados,
+          duplicados: suppliersSinCambios + preview.supplierDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "proveedores").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_maestro_proveedores", filas_insertadas: suppliersInsertados,
+            filas_actualizadas: suppliersActualizados, filas_sin_cambios: suppliersSinCambios,
+            clave: "Codigo+Tienda",
+            banderas_retencion_sin_reinterpretar: true,
+          },
+        } as never);
+      }
+
+      if (branchTransferRows.length > 0) {
+        const cargaId = crypto.randomUUID();
+        for (let i = 0; i < branchTransferRows.length; i += 500) {
+          const { data, error } = await (supabase as unknown as BranchTransferRpcClient).rpc("totvs_importar_transferencias_transito_lote_v1", {
+            p_carga_id: cargaId,
+            p_filas: branchTransferRows.slice(i, i + 500),
+          });
+          if (error) {
+            if (error.code === "PGRST202" || error.code === "42883") throw new Error("Falta aplicar la migración local de Transferencias en Tránsito antes de confirmar esta fuente.");
+            throw error;
+          }
+          branchTransfersInsertadas += Number(data?.insertadas ?? 0);
+          branchTransfersActualizadas += Number(data?.actualizadas ?? 0);
+          branchTransfersSinCambios += Number(data?.sin_cambios ?? 0);
+        }
+        const { error: finalizeError } = await (supabase as unknown as { rpc: (name: "totvs_finalizar_transferencias_transito_v1", params: { p_carga_id: string }) => Promise<{ error: { code?: string; message?: string } | null }> }).rpc("totvs_finalizar_transferencias_transito_v1", { p_carga_id: cargaId });
+        if (finalizeError) throw finalizeError;
+        await supabase.from("importaciones").insert({
+          usuario_id: user.id, tipo: "repuestos", total_filas: branchTransferRows.length,
+          insertados: branchTransfersInsertadas + branchTransfersActualizadas,
+          duplicados: branchTransfersSinCambios + preview.branchTransferDuplicatesSkipped,
+          archivo_nombre: usableFiles.filter((d) => d.kind === "transferencias_transito").map((d) => d.file.name).join(", "),
+          metadata: {
+            fuente: "totvs_transferencias_transito", filas_insertadas: branchTransfersInsertadas,
+            filas_actualizadas: branchTransfersActualizadas, filas_sin_cambios: branchTransfersSinCambios,
+            clave: "ORIGEN+DESTINO+SerieDocto+NumDoc+Item", foto_vigente: true,
+          },
+        } as never);
+      }
+
       const totalOtros = productoRows.length + stockRows.length + pedidoRows.length + solicitudRows.length
         + preview.clientesNuevos.length + preview.clientesActualizados.length;
       if (totalOtros > 0) {
@@ -390,7 +896,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           insertados: totalOtros,
           duplicados: 0,
           archivo_nombre: usableFiles
-            .filter((d) => d.kind !== "os" && d.kind !== "facturacion" && d.kind !== "stock_maquinas")
+            .filter((d) => !["os", "facturacion", "stock_maquinas", "kardex", "kardex_sintetico", "despacho", "pedidos_venta", "facturas_compra", "proveedores", "transferencias_transito"].includes(d.kind))
             .map((d) => d.file.name)
             .join(", "),
         } as any);
@@ -428,6 +934,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         solicitudRows.length ? `${solicitudRows.length} líneas de solicitud` : null,
         preview.clientesNuevos.length ? `${preview.clientesNuevos.length} clientes nuevos` : null,
         preview.clientesActualizados.length ? `${preview.clientesActualizados.length} clientes actualizados` : null,
+        kardexRows.length ? `${kardexRows.length} movimientos de Kardex (${kardexInsertadas} nuevos, ${kardexActualizadas} actualizados, ${kardexSinCambios} sin cambios)` : null,
+        dispatchRows.length ? `${dispatchRows.length} l\u00edneas de despacho (${dispatchInsertadas} nuevas, ${dispatchActualizadas} actualizadas, ${dispatchSinCambios} sin cambios)` : null,
+        salesOrderRows.length ? `${salesOrderRows.length} l\u00edneas de pedidos de venta (${salesOrdersInsertadas} nuevas, ${salesOrdersActualizadas} actualizadas, ${salesOrdersSinCambios} sin cambios)` : null,
+        syntheticKardexRows.length ? `${syntheticKardexRows.length} posiciones valorizadas (${syntheticKardexInsertadas} nuevas, ${syntheticKardexActualizadas} actualizadas, ${syntheticKardexSinCambios} sin cambios)` : null,
+        purchaseInvoiceRows.length ? `${purchaseInvoiceRows.length} líneas de compra (${purchaseInvoicesInsertadas} nuevas, ${purchaseInvoicesActualizadas} actualizadas, ${purchaseInvoicesSinCambios} sin cambios)` : null,
+        supplierRows.length ? `${supplierRows.length} proveedores (${suppliersInsertados} nuevos, ${suppliersActualizados} actualizados, ${suppliersSinCambios} sin cambios)` : null,
+        branchTransferRows.length ? `${branchTransferRows.length} transferencias en tránsito (${branchTransfersInsertadas} nuevas, ${branchTransfersActualizadas} actualizadas, ${branchTransfersSinCambios} sin cambios)` : null,
       ].filter(Boolean);
       toast.success(`Importado: ${partes.join(", ")}.`);
       if (ordenesServicioBloqueadas) {
@@ -457,7 +970,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Elegí la carpeta completa de exports (o los archivos sueltos) — se detecta automáticamente cada tipo de
             reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, el reporte
-            general de maquinarias como respaldo de chasis, pedidos, solicitudes y clientes.
+            general de maquinarias como respaldo de chasis, pedidos y solicitudes de compra, pedidos de venta,
+            importaciones-despacho, clientes, proveedores, facturas de compra, transferencias entre sucursales en tr\u00e1nsito,
+            Kardex anal\u00edtico y Kardex sint\u00e9tico valorizado. Los archivos de respaldo con sufijo _original se ignoran.
           </p>
         </div>
 
@@ -575,6 +1090,25 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                   {preview.clientesNuevos.length} nuevos · {preview.clientesActualizados.length} actualizados
                 </Badge>
               )}
+              {preview.kardexDiagnostics && (
+                <Badge variant="secondary">
+                  {preview.kardexDiagnostics.rows} movimientos de Kardex
+                </Badge>
+              )}
+              {preview.dispatchDiagnostics && (
+                <Badge variant="secondary">{preview.dispatchDiagnostics.rows} l\u00edneas de despacho</Badge>
+              )}
+              {preview.salesOrderDiagnostics && (
+                <Badge variant="secondary">{preview.salesOrderDiagnostics.rows} l\u00edneas de pedidos de venta</Badge>
+              )}
+              {preview.syntheticKardexDiagnostics && (
+                <Badge variant="secondary">{preview.syntheticKardexDiagnostics.rows} posiciones valorizadas</Badge>
+              )}
+              {preview.purchaseInvoiceDiagnostics && (
+                <Badge variant="secondary">{preview.purchaseInvoiceDiagnostics.rows} l\u00edneas de facturas de compra</Badge>
+              )}
+              {preview.suppliers.length > 0 && <Badge variant="secondary">{preview.suppliers.length} proveedores</Badge>}
+              {preview.branchTransfers.length > 0 && <Badge variant="secondary">{preview.branchTransfers.length} transferencias en tr\u00e1nsito</Badge>}
             </div>
             {preview.machineStockChassis.unresolvedPlaceholders > 0 && (
               <p className="text-[11px] text-amber-700">
@@ -584,6 +1118,50 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             {(preview.machineStockChassis.validConflicts > 0 || preview.machineStockChassis.ambiguousProductCodes > 0) && (
               <p className="text-[11px] text-amber-700">
                 No se reemplazaron {preview.machineStockChassis.validConflicts} chasis válidos en conflicto ni {preview.machineStockChassis.ambiguousProductCodes} códigos ambiguos; revisalos antes de confirmar.
+              </p>
+            )}
+            {preview.kardexDiagnostics && (
+              <p className="text-[11px] text-muted-foreground">
+                Kardex: {preview.kardexDiagnostics.from} a {preview.kardexDiagnostics.to}, {preview.kardexDiagnostics.branches} filiales, {preview.kardexDiagnostics.warehouses} dep\u00f3sitos. C\u00f3digos de moneda conservados sin reinterpretar: {preview.kardexDiagnostics.currencyCodes.join(", ") || "ninguno"}.
+                {preview.kardexDuplicatesSkipped ? ` ${preview.kardexDuplicatesSkipped} filas id\u00e9nticas solapadas entre archivos se omitir\u00e1n.` : ""}
+              </p>
+            )}
+            {preview.dispatchDiagnostics && (
+              <p className="text-[11px] text-muted-foreground">
+                Importaciones - Despacho: cobertura observada {preview.dispatchDiagnostics.from} a {preview.dispatchDiagnostics.to}, {preview.dispatchDiagnostics.processes} procesos y {preview.dispatchDiagnostics.quantity.toLocaleString("es-PY")} unidades agregadas. Es un reporte agregado de productos/repuestos; no se interpreta como importaci\u00f3n de m\u00e1quinas ni se infieren chasis.
+                {preview.dispatchDuplicatesSkipped ? ` ${preview.dispatchDuplicatesSkipped} filas id\u00e9nticas solapadas se omitir\u00e1n.` : ""}
+              </p>
+            )}
+            {preview.salesOrderDiagnostics && (
+              <p className="text-[11px] text-muted-foreground">
+                Pedidos de venta: cobertura observada {preview.salesOrderDiagnostics.from} a {preview.salesOrderDiagnostics.to}, {preview.salesOrderDiagnostics.branches} filiales, {preview.salesOrderDiagnostics.ordersByBranch} pedidos por filial y {preview.salesOrderDiagnostics.pendingRows} l\u00edneas pendientes ({preview.salesOrderDiagnostics.pendingQuantity.toLocaleString("es-PY")} unidades). Moneda y tratamiento impositivo se conservan como texto fuente, sin reinterpretarlos.
+                {preview.salesOrderDuplicatesSkipped ? ` ${preview.salesOrderDuplicatesSkipped} filas id\u00e9nticas solapadas se omitir\u00e1n.` : ""}
+              </p>
+            )}
+            {preview.syntheticKardexDiagnostics && (
+              <p className="text-[11px] text-muted-foreground">
+                Kardex sint\u00e9tico: {preview.syntheticKardexDiagnostics.products} productos, {preview.syntheticKardexDiagnostics.warehouses} dep\u00f3sitos y {preview.syntheticKardexDiagnostics.chassisRows} filas con chasis. Se conservan SALDO, PPP1/2/3 y VALOR_1/2/3 exactamente como llegan. El archivo no declara fecha de valorizaci\u00f3n ni moneda de cada eje; {preview.syntheticKardexDiagnostics.valueFormulaMismatches} filas no cumplen VALOR_1 = SALDO \u00d7 PPP1 y no se recalculan.
+                {preview.syntheticKardexDuplicatesSkipped ? ` ${preview.syntheticKardexDuplicatesSkipped} filas id\u00e9nticas solapadas se omitir\u00e1n.` : ""}
+              </p>
+            )}
+            {preview.purchaseInvoiceDiagnostics && (
+              <p className="text-[11px] text-muted-foreground">
+                Compras: cobertura observada {preview.purchaseInvoiceDiagnostics.from} a {preview.purchaseInvoiceDiagnostics.to}, {preview.purchaseInvoiceDiagnostics.documents} documentos y {preview.purchaseInvoiceDiagnostics.suppliers} proveedores. Se conservan MONORI, Gs, USD y TIPCAM de la fuente sin convertir ni escoger una moneda contable.
+              </p>
+            )}
+            {preview.suppliers.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                Proveedores: actualizaci\u00f3n incremental por Codigo + Tienda. Las dos columnas hom\u00f3nimas Ag. Ret.IVA? se preservan como banderas 1 y 2 sin atribuirles un significado no documentado.
+              </p>
+            )}
+            {preview.branchTransfers.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                Transferencias en tr\u00e1nsito: la selecci\u00f3n se trata como foto vigente; filas de fotos anteriores quedan en historial pero dejan de marcarse vigentes al finalizar una carga completa.
+              </p>
+            )}
+            {(preview.dispatchDiagnostics || preview.salesOrderDiagnostics || preview.kardexDiagnostics || preview.syntheticKardexDiagnostics || preview.purchaseInvoiceDiagnostics || preview.branchTransfers.length > 0) && (
+              <p className="text-[11px] text-amber-700">
+                La cobertura corresponde solamente a las fechas presentes en los archivos seleccionados; no representa un acumulado anual ni reemplaza historia anterior fuera de ese rango.
               </p>
             )}
             <p className="text-[11px] text-muted-foreground">
