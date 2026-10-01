@@ -971,8 +971,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             Elegí la carpeta completa de exports (o los archivos sueltos) — se detecta automáticamente cada tipo de
             reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, el reporte
             general de maquinarias como respaldo de chasis, pedidos y solicitudes de compra, pedidos de venta,
-            importaciones-despacho, clientes, proveedores, facturas de compra, transferencias entre sucursales en tr\u00e1nsito,
-            Kardex anal\u00edtico y Kardex sint\u00e9tico valorizado. Los archivos de respaldo con sufijo _original se ignoran.
+            importaciones-despacho, clientes, proveedores, facturas de compra, transferencias entre sucursales en tránsito,
+            Kardex analítico y Kardex sintético valorizado. Los archivos de respaldo con sufijo _original se ignoran.
           </p>
         </div>
 
@@ -1096,19 +1096,19 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                 </Badge>
               )}
               {preview.dispatchDiagnostics && (
-                <Badge variant="secondary">{preview.dispatchDiagnostics.rows} l\u00edneas de despacho</Badge>
+                <Badge variant="secondary">{preview.dispatchDiagnostics.rows} líneas de despacho</Badge>
               )}
               {preview.salesOrderDiagnostics && (
-                <Badge variant="secondary">{preview.salesOrderDiagnostics.rows} l\u00edneas de pedidos de venta</Badge>
+                <Badge variant="secondary">{preview.salesOrderDiagnostics.rows} líneas de pedidos de venta</Badge>
               )}
               {preview.syntheticKardexDiagnostics && (
                 <Badge variant="secondary">{preview.syntheticKardexDiagnostics.rows} posiciones valorizadas</Badge>
               )}
               {preview.purchaseInvoiceDiagnostics && (
-                <Badge variant="secondary">{preview.purchaseInvoiceDiagnostics.rows} l\u00edneas de facturas de compra</Badge>
+                <Badge variant="secondary">{preview.purchaseInvoiceDiagnostics.rows} líneas de facturas de compra</Badge>
               )}
               {preview.suppliers.length > 0 && <Badge variant="secondary">{preview.suppliers.length} proveedores</Badge>}
-              {preview.branchTransfers.length > 0 && <Badge variant="secondary">{preview.branchTransfers.length} transferencias en tr\u00e1nsito</Badge>}
+              {preview.branchTransfers.length > 0 && <Badge variant="secondary">{preview.branchTransfers.length} transferencias en tránsito</Badge>}
             </div>
             {preview.machineStockChassis.unresolvedPlaceholders > 0 && (
               <p className="text-[11px] text-amber-700">
@@ -1122,25 +1122,25 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             )}
             {preview.kardexDiagnostics && (
               <p className="text-[11px] text-muted-foreground">
-                Kardex: {preview.kardexDiagnostics.from} a {preview.kardexDiagnostics.to}, {preview.kardexDiagnostics.branches} filiales, {preview.kardexDiagnostics.warehouses} dep\u00f3sitos. C\u00f3digos de moneda conservados sin reinterpretar: {preview.kardexDiagnostics.currencyCodes.join(", ") || "ninguno"}.
+                Kardex: {preview.kardexDiagnostics.from} a {preview.kardexDiagnostics.to}, {preview.kardexDiagnostics.branches} filiales, {preview.kardexDiagnostics.warehouses} depósitos. Códigos de moneda conservados sin reinterpretar: {preview.kardexDiagnostics.currencyCodes.join(", ") || "ninguno"}.
                 {preview.kardexDuplicatesSkipped ? ` ${preview.kardexDuplicatesSkipped} filas id\u00e9nticas solapadas entre archivos se omitir\u00e1n.` : ""}
               </p>
             )}
             {preview.dispatchDiagnostics && (
               <p className="text-[11px] text-muted-foreground">
-                Importaciones - Despacho: cobertura observada {preview.dispatchDiagnostics.from} a {preview.dispatchDiagnostics.to}, {preview.dispatchDiagnostics.processes} procesos y {preview.dispatchDiagnostics.quantity.toLocaleString("es-PY")} unidades agregadas. Es un reporte agregado de productos/repuestos; no se interpreta como importaci\u00f3n de m\u00e1quinas ni se infieren chasis.
+                Importaciones - Despacho: cobertura observada {preview.dispatchDiagnostics.from} a {preview.dispatchDiagnostics.to}, {preview.dispatchDiagnostics.processes} procesos y {preview.dispatchDiagnostics.quantity.toLocaleString("es-PY")} unidades agregadas. Es un reporte agregado de productos/repuestos; no se interpreta como importación de máquinas ni se infieren chasis.
                 {preview.dispatchDuplicatesSkipped ? ` ${preview.dispatchDuplicatesSkipped} filas id\u00e9nticas solapadas se omitir\u00e1n.` : ""}
               </p>
             )}
             {preview.salesOrderDiagnostics && (
               <p className="text-[11px] text-muted-foreground">
-                Pedidos de venta: cobertura observada {preview.salesOrderDiagnostics.from} a {preview.salesOrderDiagnostics.to}, {preview.salesOrderDiagnostics.branches} filiales, {preview.salesOrderDiagnostics.ordersByBranch} pedidos por filial y {preview.salesOrderDiagnostics.pendingRows} l\u00edneas pendientes ({preview.salesOrderDiagnostics.pendingQuantity.toLocaleString("es-PY")} unidades). Moneda y tratamiento impositivo se conservan como texto fuente, sin reinterpretarlos.
+                Pedidos de venta: cobertura observada {preview.salesOrderDiagnostics.from} a {preview.salesOrderDiagnostics.to}, {preview.salesOrderDiagnostics.branches} filiales, {preview.salesOrderDiagnostics.ordersByBranch} pedidos por filial y {preview.salesOrderDiagnostics.pendingRows} líneas pendientes ({preview.salesOrderDiagnostics.pendingQuantity.toLocaleString("es-PY")} unidades). Moneda y tratamiento impositivo se conservan como texto fuente, sin reinterpretarlos.
                 {preview.salesOrderDuplicatesSkipped ? ` ${preview.salesOrderDuplicatesSkipped} filas id\u00e9nticas solapadas se omitir\u00e1n.` : ""}
               </p>
             )}
             {preview.syntheticKardexDiagnostics && (
               <p className="text-[11px] text-muted-foreground">
-                Kardex sint\u00e9tico: {preview.syntheticKardexDiagnostics.products} productos, {preview.syntheticKardexDiagnostics.warehouses} dep\u00f3sitos y {preview.syntheticKardexDiagnostics.chassisRows} filas con chasis. Se conservan SALDO, PPP1/2/3 y VALOR_1/2/3 exactamente como llegan. El archivo no declara fecha de valorizaci\u00f3n ni moneda de cada eje; {preview.syntheticKardexDiagnostics.valueFormulaMismatches} filas no cumplen VALOR_1 = SALDO \u00d7 PPP1 y no se recalculan.
+                Kardex sintético: {preview.syntheticKardexDiagnostics.products} productos, {preview.syntheticKardexDiagnostics.warehouses} depósitos y {preview.syntheticKardexDiagnostics.chassisRows} filas con chasis. Se conservan SALDO, PPP1/2/3 y VALOR_1/2/3 exactamente como llegan. El archivo no declara fecha de valorización ni moneda de cada eje; {preview.syntheticKardexDiagnostics.valueFormulaMismatches} filas no cumplen VALOR_1 = SALDO × PPP1 y no se recalculan.
                 {preview.syntheticKardexDuplicatesSkipped ? ` ${preview.syntheticKardexDuplicatesSkipped} filas id\u00e9nticas solapadas se omitir\u00e1n.` : ""}
               </p>
             )}
@@ -1151,12 +1151,12 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             )}
             {preview.suppliers.length > 0 && (
               <p className="text-[11px] text-muted-foreground">
-                Proveedores: actualizaci\u00f3n incremental por Codigo + Tienda. Las dos columnas hom\u00f3nimas Ag. Ret.IVA? se preservan como banderas 1 y 2 sin atribuirles un significado no documentado.
+                Proveedores: actualización incremental por Codigo + Tienda. Las dos columnas homónimas Ag. Ret.IVA? se preservan como banderas 1 y 2 sin atribuirles un significado no documentado.
               </p>
             )}
             {preview.branchTransfers.length > 0 && (
               <p className="text-[11px] text-muted-foreground">
-                Transferencias en tr\u00e1nsito: la selecci\u00f3n se trata como foto vigente; filas de fotos anteriores quedan en historial pero dejan de marcarse vigentes al finalizar una carga completa.
+                Transferencias en tránsito: la selección se trata como foto vigente; filas de fotos anteriores quedan en historial pero dejan de marcarse vigentes al finalizar una carga completa.
               </p>
             )}
             {(preview.dispatchDiagnostics || preview.salesOrderDiagnostics || preview.kardexDiagnostics || preview.syntheticKardexDiagnostics || preview.purchaseInvoiceDiagnostics || preview.branchTransfers.length > 0) && (
