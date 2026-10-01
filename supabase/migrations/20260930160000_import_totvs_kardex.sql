@@ -95,6 +95,7 @@ BEGIN
     RAISE EXCEPTION 'Cada lote de Kardex debe contener entre 1 y 500 filas' USING ERRCODE='22023';
   END IF;
 
+  DROP TABLE IF EXISTS pg_temp.kardex_lote;
   CREATE TEMP TABLE kardex_lote ON COMMIT DROP AS
   SELECT *
   FROM jsonb_to_recordset(p_filas) AS x(

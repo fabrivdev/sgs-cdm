@@ -78,6 +78,7 @@ BEGIN
   IF p_carga_id IS NULL OR p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' THEN RAISE EXCEPTION 'Carga o filas de compras inválidas' USING ERRCODE='22023'; END IF;
   v_total := jsonb_array_length(p_filas);
   IF v_total < 1 OR v_total > 500 THEN RAISE EXCEPTION 'Cada lote de compras debe contener entre 1 y 500 filas' USING ERRCODE='22023'; END IF;
+  DROP TABLE IF EXISTS pg_temp.facturas_compra_lote;
   CREATE TEMP TABLE facturas_compra_lote ON COMMIT DROP AS SELECT * FROM jsonb_to_recordset(p_filas) AS x(
     filial text, fecha_emision date, fecha_digitacion date, proveedor_codigo text, proveedor_tienda text,
     proveedor_nombre text, moneda_origen text, especie text, modalidad text, documento_electronico text,
@@ -135,6 +136,7 @@ BEGIN
   IF auth.uid() IS NULL OR NOT public.has_section_access(auth.uid(), 'admin.importaciones') THEN RAISE EXCEPTION 'Sin permiso para importar datos de TOTVS' USING ERRCODE='42501'; END IF;
   IF p_carga_id IS NULL OR p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' THEN RAISE EXCEPTION 'Carga o proveedores inválidos' USING ERRCODE='22023'; END IF;
   v_total := jsonb_array_length(p_filas); IF v_total < 1 OR v_total > 500 THEN RAISE EXCEPTION 'Cada lote de proveedores debe contener entre 1 y 500 filas' USING ERRCODE='22023'; END IF;
+  DROP TABLE IF EXISTS pg_temp.proveedores_lote;
   CREATE TEMP TABLE proveedores_lote ON COMMIT DROP AS SELECT * FROM jsonb_to_recordset(p_filas) AS x(
     codigo text, tienda text, razon_social text, ruc text, nombre_fantasia text, direccion text, departamento text,
     municipio text, email text, telefono text, pais text, retencion_bandera_1 text, retencion_bandera_2 text, estado text,
@@ -169,6 +171,7 @@ BEGIN
   IF auth.uid() IS NULL OR NOT public.has_section_access(auth.uid(), 'admin.importaciones') THEN RAISE EXCEPTION 'Sin permiso para importar datos de TOTVS' USING ERRCODE='42501'; END IF;
   IF p_carga_id IS NULL OR p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' THEN RAISE EXCEPTION 'Carga o transferencias inválidas' USING ERRCODE='22023'; END IF;
   v_total := jsonb_array_length(p_filas); IF v_total < 1 OR v_total > 500 THEN RAISE EXCEPTION 'Cada lote de transferencias debe contener entre 1 y 500 filas' USING ERRCODE='22023'; END IF;
+  DROP TABLE IF EXISTS pg_temp.transferencias_lote;
   CREATE TEMP TABLE transferencias_lote ON COMMIT DROP AS SELECT * FROM jsonb_to_recordset(p_filas) AS x(
     origen text, destino text, fecha_emision date, serie_documento text, numero_documento text, item text,
     producto_codigo text, producto_descripcion text, cantidad numeric, observacion text,

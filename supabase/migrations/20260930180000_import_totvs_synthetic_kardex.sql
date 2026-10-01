@@ -67,6 +67,7 @@ BEGIN
     RAISE EXCEPTION 'Cada lote de Kardex sint\u00e9tico debe contener entre 1 y 500 filas' USING ERRCODE='22023';
   END IF;
 
+  DROP TABLE IF EXISTS pg_temp.kardex_sintetico_lote;
   CREATE TEMP TABLE kardex_sintetico_lote ON COMMIT DROP AS
   SELECT * FROM jsonb_to_recordset(p_filas) AS x(
     sucursal text, producto_codigo text, producto_descripcion text, deposito text, chasis text,

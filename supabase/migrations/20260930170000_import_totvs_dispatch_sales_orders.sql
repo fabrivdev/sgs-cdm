@@ -136,6 +136,7 @@ BEGIN
     RAISE EXCEPTION 'Cada lote de despacho debe contener entre 1 y 500 filas' USING ERRCODE='22023';
   END IF;
 
+  DROP TABLE IF EXISTS pg_temp.despacho_lote;
   CREATE TEMP TABLE despacho_lote ON COMMIT DROP AS
   SELECT * FROM jsonb_to_recordset(p_filas) AS x(
     sucursal text, proceso text, fecha_proceso date, despachante text, fecha_finalizacion date,
@@ -229,6 +230,7 @@ BEGIN
     RAISE EXCEPTION 'Cada lote de pedidos de venta debe contener entre 1 y 500 filas' USING ERRCODE='22023';
   END IF;
 
+  DROP TABLE IF EXISTS pg_temp.pedidos_venta_lote;
   CREATE TEMP TABLE pedidos_venta_lote ON COMMIT DROP AS
   SELECT * FROM jsonb_to_recordset(p_filas) AS x(
     filial text, fecha_emision date, cliente_codigo text, cliente_nombre text, vendedor text,
