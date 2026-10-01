@@ -37,6 +37,8 @@ describe("reported production regressions", () => {
     const ui = read("src/pages/MaquinariaOperaciones.tsx");
     expect(ui).toContain("extractSupplierInvoice(file)");
     expect(ui).toContain("machineSupplierInvoicePatch(extraction)");
+    expect(ui).toContain("machineSupplierInvoiceExtractionStatus(supplierExtraction)");
+    expect(ui).toContain('revisado_por: supplierExtraction ? null : auth.user.id');
     expect(ui).toContain('rpc("maquinaria_actualizar_unidad_importacion"');
     expect(ui).toContain('arrival === "PLANIFICADO" || arrival === "EN_TRANSITO"');
     expect(ui).toContain("canEdit && canRegisterArrival");

@@ -48,7 +48,7 @@ import { IMPORT_SITUATION_LABELS, importSituationState, importSituationLabel, is
 import { matchesOperationFilters, normalizeOperationModel, operationModelOptions } from "@/lib/machineOperationFilters";
 import { shortPersonName } from "@/lib/personName";
 import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
-import { extractMachineSupplierInvoice, machineSupplierInvoicePatch, type MachineSupplierInvoiceExtraction } from "@/lib/machineSupplierInvoice";
+import { extractMachineSupplierInvoice, machineSupplierInvoiceExtractionStatus, machineSupplierInvoicePatch, type MachineSupplierInvoiceExtraction } from "@/lib/machineSupplierInvoice";
 import { parseLocalizedNonNegativeAmount } from "@/lib/localizedAmount";
 
 const db = supabase as any;
@@ -557,6 +557,7 @@ function providerInvoiceExtraction(data: Record<string, unknown>, fileName: stri
     factura_fecha: safeExtractedDate(data.factura_fecha) || fallback.factura_fecha,
     moneda: (["USD", "EUR", "PYG"].includes(currency) ? currency : fallback.moneda) as MachineSupplierInvoiceExtraction["moneda"],
     valor_facturado: Number.isFinite(amount) && amount >= 0 ? amount : fallback.valor_facturado,
+    valor_facturado_estado: Number.isFinite(amount) && amount >= 0 ? "confiable" : fallback.valor_facturado_estado,
     chasis: Array.isArray(data.chasis) ? data.chasis.map(safeExtractedText).filter(Boolean) : [],
   };
 }
@@ -695,11 +696,15 @@ async function uploadImportDocument(file: File, importLineId: string, type: "OC"
   const { error: storageError } = await supabase.storage.from("maquinaria-documentos").upload(path, file, { contentType: file.type });
   if (storageError) throw storageError;
   const savedAt = new Date().toISOString();
+  const supplierExtraction = type === "FACTURA_IMPORTACION" ? extracted as Partial<MachineSupplierInvoiceExtraction> : null;
   const payload = {
     operacion_id: operationId || null, importacion_linea_id: importLineId, tipo: type,
     archivo_nombre: file.name, storage_path: path, mime_type: file.type,
-    tamano_bytes: file.size, estado_extraccion: "REVISADO", datos_extraidos: extracted,
-    revisado_por: auth.user.id, revisado_en: savedAt,
+    tamano_bytes: file.size,
+    estado_extraccion: supplierExtraction ? machineSupplierInvoiceExtractionStatus(supplierExtraction) : "REVISADO",
+    datos_extraidos: extracted,
+    revisado_por: supplierExtraction ? null : auth.user.id,
+    revisado_en: supplierExtraction ? null : savedAt,
     creado_en: savedAt, actualizado_en: savedAt,
   };
   const current = existing?.[0];
@@ -1656,8 +1661,10 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
         if (error) toast.warning(`La factura se adjuntó, pero sus datos no pudieron guardarse: ${error.message}`);
         else {
           setForm(current => ({ ...current, ...patch }));
-          const complete = Object.keys(patch).length === 4;
-          toast.success(complete ? "Factura adjuntada y datos completados" : "Factura adjuntada; revisá los datos faltantes");
+          const amountNeedsReview = extraction?.valor_facturado_estado !== "confiable";
+          const complete = Object.keys(patch).length === 4 && !amountNeedsReview;
+          if (amountNeedsReview) toast.warning("Factura adjuntada; el importe es ambiguo o no se identificó y quedó pendiente de revisión.");
+          else toast.success(complete ? "Factura adjuntada y datos extraídos automáticamente; revisalos" : "Factura adjuntada; revisá los datos faltantes");
           autoSaved = true;
         }
       } else {
