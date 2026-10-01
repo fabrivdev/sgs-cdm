@@ -19,6 +19,10 @@ import {
   persistCommissionTimeEntries,
   type NewSystemImportBundle,
 } from "@/lib/imports";
+import {
+  billingSourceRepairPatch,
+  planBillingStableReimport,
+} from "@/lib/imports/billingLineStableReimport";
 
 export interface PersistNewSystemBundleArgs {
   bundle: NewSystemImportBundle;
@@ -51,6 +55,55 @@ const missingServiceOrderReconciliation = (error: any) =>
   error?.code === "PGRST202"
   || error?.code === "42883"
   || /ordenes_servicio_(reconciliar_snapshot|importadas_archivo)/.test(String(error?.message ?? ""));
+
+type BillingLineConflictIdentity = {
+  origen_sistema: string | null;
+  codigo_interno_factura: string | null;
+  factura: string | null;
+  cod_mercaderia: string | null;
+  codigo_fabricante: string | null;
+  observacion: string | null;
+  total_venta: number | null;
+  fecha_factura: string | null;
+};
+
+const billingLineConflictKey = (row: BillingLineConflictIdentity) => [
+  row.origen_sistema,
+  row.codigo_interno_factura,
+  row.factura,
+  row.cod_mercaderia,
+  row.codigo_fabricante,
+  row.observacion,
+  row.total_venta,
+].map((value) => value == null ? "" : String(value)).join("|");
+
+export function prepareBillingLineReimport<T extends BillingLineConflictIdentity>(rows: T[]) {
+  const datedByIdentity = new Map<string, BillingLineConflictIdentity>();
+  for (const row of rows) {
+    if (!row.fecha_factura) continue;
+    datedByIdentity.set(billingLineConflictKey(row), {
+      origen_sistema: row.origen_sistema,
+      codigo_interno_factura: row.codigo_interno_factura,
+      factura: row.factura,
+      cod_mercaderia: row.cod_mercaderia,
+      codigo_fabricante: row.codigo_fabricante,
+      observacion: row.observacion,
+      total_venta: row.total_venta,
+      fecha_factura: row.fecha_factura,
+    });
+  }
+  return { insertAll: rows, repairDates: Array.from(datedByIdentity.values()) };
+}
+
+export const BILLING_LINE_INSERT_OPTIONS = {
+  onConflict: "origen_sistema,linea_hash",
+  ignoreDuplicates: true,
+} as const;
+
+export const BILLING_LINE_REPAIR_DATE_OPTIONS = {
+  onConflict: "origen_sistema,linea_hash",
+  ignoreDuplicates: false,
+} as const;
 
 export async function actualizarVentasRepuestosPeriodo(desde: string | null, hasta: string | null) {
   if (!desde || !hasta) return { actualizado: false, error: null as string | null };
@@ -287,15 +340,54 @@ export async function persistNewSystemBundle({
     if (error) throw error;
   }
 
-  for (let i = 0; i < facturacionLineas.length; i += 500) {
-    const chunk = facturacionLineas.slice(i, i + 500).map((row) => ({
+  const documentosFacturacion = Array.from(new Set(
+    facturacionLineas.map((row) => row.codigo_interno_factura).filter((value): value is string => Boolean(value)),
+  ));
+  const origenesFacturacion = Array.from(new Set(
+    facturacionLineas.map((row) => row.origen_sistema).filter((value): value is string => Boolean(value)),
+  ));
+  const lineasExistentes: any[] = [];
+  for (let i = 0; i < documentosFacturacion.length; i += 100) {
+    const documentos = documentosFacturacion.slice(i, i + 100);
+    lineasExistentes.push(...await cargarTodo<any>(supabase
+      .from("facturacion_lineas_importadas" as any)
+      .select("id,origen_sistema,codigo_interno_factura,factura,sucursal,cod_mercaderia,entidad_nombre,mercaderia,observacion,cantidad,valor_unitario,total_venta,moneda,codigo_fabricante,fecha_factura,raw_data")
+      .in("origen_sistema", origenesFacturacion)
+      .in("codigo_interno_factura", documentos)));
+  }
+  const planFacturacion = planBillingStableReimport(lineasExistentes, facturacionLineas);
+  for (const repair of planFacturacion.update) {
+    const { error } = await (supabase.from("facturacion_lineas_importadas" as any)
+      .update(billingSourceRepairPatch(repair.row) as any)
+      .eq("id", repair.id) as any);
+    if (error) throw error;
+  }
+
+  const { insertAll: facturacionParaInsertar, repairDates: fechasParaReparar } =
+    prepareBillingLineReimport(planFacturacion.insert);
+
+  // Primero conserva la insercion completa e idempotente. Despues envia solo
+  // las columnas que componen la identidad y fecha_factura: el conflicto ya
+  // insertado se actualiza sin pisar clasificaciones, raw_data o metadata.
+  for (let i = 0; i < facturacionParaInsertar.length; i += 500) {
+    const chunk = facturacionParaInsertar.slice(i, i + 500).map((row) => ({
       ...row,
       importacion_id: factImp.id,
     }));
-    const { error } = await (supabase.from("facturacion_lineas_importadas" as any).upsert(chunk as any, {
-      onConflict: "origen_sistema,linea_hash",
-      ignoreDuplicates: true,
-    }) as any);
+    const { error } = await (supabase.from("facturacion_lineas_importadas" as any)
+      .upsert(chunk as any, BILLING_LINE_INSERT_OPTIONS) as any);
+    if (error) {
+      if (isMissingBillingLinesTableError(error)) {
+        throw new Error("Falta aplicar la migración de facturación detallada antes de importar XML del nuevo sistema.");
+      }
+      throw error;
+    }
+  }
+
+  for (let i = 0; i < fechasParaReparar.length; i += 500) {
+    const chunk = fechasParaReparar.slice(i, i + 500);
+    const { error } = await (supabase.from("facturacion_lineas_importadas" as any)
+      .upsert(chunk as any, BILLING_LINE_REPAIR_DATE_OPTIONS) as any);
     if (error) {
       if (isMissingBillingLinesTableError(error)) {
         throw new Error("Falta aplicar la migración de facturación detallada antes de importar XML del nuevo sistema.");
