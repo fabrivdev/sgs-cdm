@@ -102,6 +102,20 @@ describe("Importaciones: detalle compacto", () => {
     expect(screen.getByText(/El registro antiguo indica recepción pero no tiene fecha/)).toBeInTheDocument();
     expect(screen.getByText("Monedas diferentes: no comparable")).toBeInTheDocument();
   });
+  it("muestra el mismo OC neto preservado en pedido y comparación", () => {
+    setup({
+      precio_oc: 329725.38,
+      valor_oc_general: 383401.6,
+      datos_fuente: { precio_oc: 383401.6 },
+      precio_teorico_oc: 341227.4,
+      descuentos: 11,
+      valor_factura_proveedor: 329725.38,
+      factura_proveedor_moneda: "USD",
+    });
+    expect(screen.getAllByText(/329\.725,38/)).toHaveLength(3);
+    expect(screen.queryByText(/293\.455,59/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^\$\s*0,00$/)).toBeInTheDocument();
+  });
   it("solo habilita costo con stock confirmado y omite seguimiento vacío", () => {
     setup({ ata: "2026-05-23", chasis: "TEST-CHASIS", costo_stock_habilitado: true, stock_fisico_confirmado: true, estado_disponibilidad: "RESERVADO" });
     expect(screen.getAllByText("Completado", { exact: true })).toHaveLength(1);

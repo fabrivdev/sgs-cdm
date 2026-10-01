@@ -1735,6 +1735,9 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
     sourceNetValue: row.precio_teorico_oc,
     discountPercentage: row.descuentos,
     manualOverride: row.valor_oc_manual,
+    orderValueScope: row.alcance_valor_oc,
+    unitCount: row.cantidad_lote,
+    unitNumber: row.numero_unidad,
   });
   const difference = importInvoiceDifference(displayedOrderValue, row.moneda_oc, row.valor_factura_proveedor, row.factura_proveedor_moneda);
   const saleInvoiced = isImportSaleInvoiced(row);

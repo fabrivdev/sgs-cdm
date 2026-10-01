@@ -16,6 +16,9 @@ export function importNetOrderValue({
   sourceNetValue,
   discountPercentage,
   manualOverride,
+  orderValueScope,
+  unitCount,
+  unitNumber,
 }: {
   unitGrossValue: number | null | undefined;
   generalGrossValue?: number | null;
@@ -23,6 +26,9 @@ export function importNetOrderValue({
   sourceNetValue?: number | null;
   discountPercentage?: number | null;
   manualOverride?: boolean;
+  orderValueScope?: string | null;
+  unitCount?: number | null;
+  unitNumber?: number | null;
 }): number | null {
   const unitGross = Number(unitGrossValue);
   if (unitGrossValue == null || !Number.isFinite(unitGross)) return null;
@@ -31,14 +37,27 @@ export function importNetOrderValue({
   const generalGross = Number(generalGrossValue);
   const sourceGross = Number(sourceGrossValue);
   const sourceNet = Number(sourceNetValue);
-  if (
-    generalGrossValue != null && sourceGrossValue != null && sourceNetValue != null
+  const quantity = Math.max(1, Math.trunc(Number(unitCount) || 1));
+  if (generalGrossValue != null && Number.isFinite(generalGross) && generalGross >= 0) {
+    const number = Math.min(quantity, Math.max(1, Math.trunc(Number(unitNumber) || 1)));
+    const base = Math.trunc((generalGross / quantity) * 100) / 100;
+    const expectedUnitGross = orderValueScope === "TOTAL"
+      ? (number === quantity ? generalGross - base * (quantity - 1) : base)
+      : generalGross;
+    if (Math.abs(unitGross - expectedUnitGross) >= 0.005) return Math.round(unitGross * 100) / 100;
+  }
+
+  const hasComparableSourceGross = generalGrossValue != null && sourceGrossValue != null
     && Number.isFinite(generalGross) && generalGross > 0
-    && Number.isFinite(sourceGross) && sourceGross > 0
+    && Number.isFinite(sourceGross) && sourceGross > 0;
+  const usesOriginalGeneralValue = hasComparableSourceGross && Math.abs(generalGross - sourceGross) < 0.005;
+  if (hasComparableSourceGross && !usesOriginalGeneralValue) return Math.round(unitGross * 100) / 100;
+
+  if (
+    quantity === 1 && usesOriginalGeneralValue && sourceNetValue != null
     && Number.isFinite(sourceNet) && sourceNet >= 0
-    && Math.abs(generalGross - sourceGross) < 0.005
   ) {
-    return Math.round((unitGross * sourceNet / generalGross) * 100) / 100;
+    return Math.round(sourceNet * 100) / 100;
   }
 
   const discount = Number(discountPercentage);

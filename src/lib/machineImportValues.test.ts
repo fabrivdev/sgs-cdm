@@ -34,18 +34,44 @@ describe("Importaciones: OC, factura y costo separados", () => {
     expect(importNetOrderValue({ unitGrossValue: 200 })).toBe(200);
   });
   it("prorratea el neto en valores OC totales y conserva overrides manuales", () => {
-    const source = { generalGrossValue: 300, sourceGrossValue: 300, sourceNetValue: 282, discountPercentage: 6 };
+    const source = { generalGrossValue: 300, sourceGrossValue: 300, sourceNetValue: 282, discountPercentage: 6, orderValueScope: "TOTAL", unitCount: 3, unitNumber: 1 };
     expect(importNetOrderValue({ unitGrossValue: 100, ...source })).toBe(94);
     expect(importNetOrderValue({ unitGrossValue: 120, ...source, manualOverride: true })).toBe(120);
   });
-  it("no reutiliza un neto histórico después de editar el valor OC general", () => {
+  it("no interpreta como unitario el neto total de un lote CLAAS", () => {
     expect(importNetOrderValue({
-      unitGrossValue: 250,
-      generalGrossValue: 250,
-      sourceGrossValue: 200,
-      sourceNetValue: 188,
-      discountPercentage: 6,
-    })).toBe(235);
+      unitGrossValue: 215976,
+      generalGrossValue: 215976,
+      sourceGrossValue: 215976,
+      sourceNetValue: 1727808,
+      orderValueScope: "UNITARIO",
+      unitCount: 8,
+      unitNumber: 1,
+    })).toBe(215976);
+  });
+  it("conserva importes literales sin descuento", () => {
+    expect(importNetOrderValue({ unitGrossValue: 43150, unitCount: 1 })).toBe(43150);
+  });
+  it("no descuenta otra vez un valor OC general editado", () => {
+    expect(importNetOrderValue({
+      unitGrossValue: 329725.38,
+      generalGrossValue: 329725.38,
+      sourceGrossValue: 383401.6,
+      sourceNetValue: 341227.4,
+      discountPercentage: 11,
+    })).toBe(329725.38);
+  });
+  it("conserva una unidad que ya contiene el neto aunque la fuente histórica esté desfasada", () => {
+    expect(importNetOrderValue({
+      unitGrossValue: 329725.38,
+      generalGrossValue: 383401.6,
+      sourceGrossValue: 383401.6,
+      sourceNetValue: 341227.4,
+      discountPercentage: 11,
+      orderValueScope: "UNITARIO",
+      unitCount: 1,
+      unitNumber: 1,
+    })).toBe(329725.38);
   });
   it("no toma el costo definitivo como valor facturado del proveedor", () => {
     expect(importUnitForm({ costo_final: 999 }).valor_factura_proveedor).toBe("");
