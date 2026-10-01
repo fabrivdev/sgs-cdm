@@ -33,8 +33,38 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
+const currentMonth = () => fireEvent.change(document.querySelectorAll<HTMLInputElement>('input[type="date"]')[0], { target: { value: "2026-09-01" } });
 const technicianStatus = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Estado de técnicos" })).getByRole("button", { name }));
 describe("orders workspace", () => {
+  it("defaults to July through today, keeps manual dates, and resets the whole filter set", async () => {
+    mocks.width = 1280;
+    setup();
+    const quickPeriod = screen.getByRole("combobox", { name: "Período rápido" });
+    const dates = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25");
+    expect(dates[0]).toHaveValue("2026-07-01");
+    expect(dates[1]).toHaveValue("2026-09-25");
+    expect(quickPeriod).toHaveValue("");
+    expect((screen.getByRole("option", { name: "Personalizado" }) as HTMLOptionElement).selected).toBe(true);
+
+    fireEvent.change(dates[0], { target: { value: "2026-08-03" } });
+    expect(dates[0]).toHaveValue("2026-08-03");
+    expect(quickPeriod).toHaveValue("");
+
+    fireEvent.change(quickPeriod, { target: { value: "current-month" } });
+    expect(dates[0]).toHaveValue("2026-09-01");
+    expect(dates[1]).toHaveValue("2026-09-25");
+    expect(quickPeriod).toHaveValue("current-month");
+
+    const search = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    fireEvent.change(search, { target: { value: "demo" } });
+    await waitFor(() => expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ busqueda: "demo" })));
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Limpiar (1)" }));
+    expect(dates[0]).toHaveValue("2026-07-01");
+    expect(dates[1]).toHaveValue("2026-09-25");
+    expect(quickPeriod).toHaveValue("");
+  });
   it.each([390, 1280])("keeps its view tabs inside the page header at %i px", width => {
     mocks.width = width;
     setup();
@@ -113,7 +143,7 @@ describe("orders workspace", () => {
     workLogs = [demoWorkLog([demoWorkEntry({ fecha_inicio: "2026-08-15", fecha_fin: "2026-08-15" }),
       demoWorkEntry({ id: "SEPT", hora_fin: "11:00" })], "01-00000099")];
     workLogs[0].order_data.fecha_cierre_os = "2026-10-01";
-    setup(); tab("Productividad");
+    setup(); currentMonth(); tab("Productividad");
     expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("3");
     expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("3%");
     fireEvent.click(screen.getByRole("button", { name: /TECNICO UNO.*OS/ }));
@@ -132,7 +162,7 @@ describe("orders workspace", () => {
     const table = within(screen.getByRole("dialog")).getByRole("table", { name: "Jornadas trabajadas" });
     expect(table).toHaveTextContent("15/08/2026"); expect(table).toHaveTextContent("10/09/2026");
     expect(table).toHaveTextContent("08:00"); expect(table).toHaveTextContent("12:00");
-    expect(mocks.work).toHaveBeenLastCalledWith("2026-09-01", "2026-09-25", true, "01-00000001");
+    expect(mocks.work).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25", true, "01-00000001");
   });
   it("keeps operational views usable while work is loading or fails and never substitutes closure hours", () => {
     workState.isPending = true; const rendered = setup();
@@ -179,7 +209,7 @@ describe("orders workspace", () => {
   it("exports partial numeric values with their status and clears the alert after filtering", async () => {
     workLogs[0].entries[0].hora_inicio = null;
     workLogs[0].entries.push(demoWorkEntry({ id: "VALID", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11" }));
-    setup(); tab("Productividad"); technicianStatus("Todos");
+    setup(); currentMonth(); tab("Productividad"); technicianStatus("Todos");
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Productividad por técnico" }));
     await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
@@ -196,7 +226,7 @@ describe("orders workspace", () => {
     expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("1");
   });
   it("alerts automatically when refreshed work introduces an incident without removing valid productivity", () => {
-    const rendered = setup(); tab("Productividad");
+    const rendered = setup(); currentMonth(); tab("Productividad");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     const productivityCard = () => screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item");
     const before = productivityCard()!.textContent!.trim();
@@ -213,7 +243,7 @@ describe("orders workspace", () => {
   it("keeps partial period exports numeric and excludes conflicts from technician detail", async () => {
     workLogs[0].entries.push(demoWorkEntry({ id: "BAD", hora_inicio: "09:00", hora_fin: "11:00" }),
       demoWorkEntry({ id: "VALID", fecha_inicio: "2026-09-11", fecha_fin: "2026-09-11", hora_fin: "12:00" }));
-    setup(); tab("Productividad"); technicianStatus("Todos");
+    setup(); currentMonth(); tab("Productividad"); technicianStatus("Todos");
     expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("5");
     fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Horas por período" }));
@@ -325,7 +355,7 @@ describe("orders workspace", () => {
     mocks.width = width;
     response.data.data.ordenesServicio[0].servicios_cantidad = 150;
     workLogs[0].entries = Array.from({ length: 15 }, (_, i) => demoWorkEntry({ id: String(i), fecha_inicio: `2026-09-${String(i + 1).padStart(2, "0")}`, fecha_fin: `2026-09-${String(i + 1).padStart(2, "0")}` }));
-    setup(); tab("Productividad");
+    setup(); currentMonth(); tab("Productividad");
     const meter = screen.getByRole("meter", { name: "Meta de TECNICO UNO" });
     expect(meter).toHaveAttribute("aria-valuenow", "150"); // 120 × 25/30 = 100 h target
     expect(meter).toHaveAttribute("aria-valuetext", "150 de 100 horas; 150% de meta");
@@ -354,7 +384,7 @@ describe("orders workspace", () => {
     response.data.data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", responsable: "TECNICO SIN FICHA", servicios_cantidad: 7 }));
     workLogs[1].entries[0].hora_fin = "18:00";
     workLogs.push(demoWorkLog([demoWorkEntry({ id: "UNKNOWN", tecnico_profile_id: null, tecnico_nombre: "TECNICO SIN FICHA", hora_fin: "15:00" })], "01-00000003"));
-    setup(); tab("Productividad");
+    setup(); currentMonth(); tab("Productividad");
     let table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(table.getAllByRole("row")).toHaveLength(2);
     expect(table.getByText("TECNICO UNO")).toBeVisible();
@@ -576,7 +606,7 @@ describe("orders workspace", () => {
   });
   it("uses complete week columns for a month and day columns for a selected week", () => {
     mocks.width = 1280;
-    setup(); tab("Cumplimiento");
+    setup(); currentMonth(); tab("Cumplimiento");
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "semana" }));
     expect(screen.getByText("Sem 36 · 26")).toBeVisible();
     expect(screen.getByText("Sem 39 · 26")).toBeVisible();
@@ -603,7 +633,7 @@ describe("orders workspace", () => {
     mocks.width = 1280;
     response.data.data.jornadas[2].fecha = "2026-09-25";
     response.data.data.jornadas.push({ ...response.data.data.jornadas[0], id: "J4", estado: "Cancelada", horas_trabajadas: 0 });
-    setup(); tab("Cumplimiento");
+    setup(); currentMonth(); tab("Cumplimiento");
     const completion = () => screen.getAllByRole("meter", { name: "Trabajos cumplidos" }).find(meter => meter.getAttribute("aria-valuetext") === "1 de 2 trabajos cumplidos");
     expect(screen.getByText("Sem 37 · 26", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
     expect(completion()?.closest(".dashboard-matrix-cell")).toHaveTextContent("1/2");

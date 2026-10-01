@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, startOfMonth } from "date-fns";
 import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target, Percent, CalendarDays } from "lucide-react";
 import { PageHeader, PageShell, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,6 +27,7 @@ import { useWorkLog } from "@/features/service-orders/useWorkLog";
 import { workedProductivity } from "@/features/service-orders/workedProductivity";
 import { productivityPeriod } from "@/features/service-orders/productivityPeriod";
 import { operationsDate } from "@/features/service-orders/format";
+import { defaultServiceOrdersPeriod } from "@/features/service-orders/defaultPeriod";
 import { LEGACY_IMPORT_CUTOFF, NEW_SYSTEM_START } from "@/lib/imports/cutoff";
 import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
 import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
@@ -52,7 +52,7 @@ export function OrdersWorkspace() {
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
-  const defaults = useMemo<OperationsFilters>(() => ({ dateFrom: format(startOfMonth(today), "yyyy-MM-dd"), dateTo: format(today, "yyyy-MM-dd"), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
+  const defaults = useMemo<OperationsFilters>(() => ({ ...defaultServiceOrdersPeriod(today), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
   const valid = validOperationsRange(filters.dateFrom, filters.dateTo);
