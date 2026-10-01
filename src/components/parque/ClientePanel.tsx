@@ -57,6 +57,13 @@ import { SubgrupoMaquinaSelect } from "./SubgrupoMaquinaSelect";
 import { MarcaMaquinaSelect } from "./MarcaMaquinaSelect";
 import { legacyMachineBrand, normalizeMachineBrand } from "@/lib/machineBrands";
 import { MarcaBadge } from "@/components/StatusBadges";
+import {
+  calculateClientBillingStats,
+  mergeClientBilling,
+  TOTVS_BILLING_START,
+  type ClientBillingEntry,
+  type TotvsBillingLine,
+} from "@/lib/clientBilling";
 
 const RESULTADOS = [
   "Contactado",
@@ -114,15 +121,7 @@ type Seguimiento = {
   observaciones: string | null;
   trabajo_id?: string | null;
 };
-type Factura = {
-  id: string;
-  fecha: string;
-  tipo: "Repuesto" | "Servicio";
-  total_venta: number;
-  grupo: string | null;
-  grupo_fx: string | null;
-  cod_factura: string;
-};
+type Factura = ClientBillingEntry;
 type TrabajoCliente = {
   id: string;
   cliente_id: string | null;
@@ -169,6 +168,43 @@ const initials = (s: string) =>
     .join("")
     .toUpperCase();
 
+const BILLING_PAGE_SIZE = 1000;
+
+async function fetchLegacyClientBilling(clientId: string) {
+  const rows: Factura[] = [];
+  for (let from = 0; ; from += BILLING_PAGE_SIZE) {
+    const result = await supabase
+      .from("facturacion")
+      .select("id, fecha, tipo, total_venta, grupo, grupo_fx, cod_factura")
+      .eq("cliente_id", clientId)
+      .eq("excluido_de_reportes", false)
+      .lt("fecha", TOTVS_BILLING_START)
+      .order("id", { ascending: true })
+      .range(from, from + BILLING_PAGE_SIZE - 1);
+    if (result.error) return { data: [] as Factura[], error: result.error };
+    const page = (result.data ?? []) as Factura[];
+    rows.push(...page);
+    if (page.length < BILLING_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
+async function fetchTotvsClientBilling(clientId: string) {
+  const rows: TotvsBillingLine[] = [];
+  for (let from = 0; ; from += BILLING_PAGE_SIZE) {
+    const result = await supabase
+      .from("facturacion_lineas_importadas")
+      .select("id, fecha_factura, factura, codigo_interno_factura, grupo_normalizado, subgrupo_original, total_venta")
+      .eq("cliente_id", clientId)
+      .gte("fecha_factura", `${TOTVS_BILLING_START}T00:00:00Z`)
+      .order("id", { ascending: true })
+      .range(from, from + BILLING_PAGE_SIZE - 1);
+    if (result.error) return { data: [] as TotvsBillingLine[], error: result.error };
+    const page = (result.data ?? []) as TotvsBillingLine[];
+    rows.push(...page);
+    if (page.length < BILLING_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
 export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrearServicio }: Props) {
   const { user, can } = useAuth();
   const canManagePark = can("parque:gestionar");
@@ -185,6 +221,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   }), [rawMaquinas, modelCatalog.data]);
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
   const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [facturacionError, setFacturacionError] = useState("");
   const [trabajos, setTrabajos] = useState<TrabajoCliente[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
@@ -208,7 +245,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
   const cargar = async (id: string) => {
     setLoading(true);
-    const [c, ct, m, s, f, t, p] = await Promise.all([
+    setFacturacionError("");
+    const [c, ct, m, s, fLegacy, fTotvs, t, p] = await Promise.all([
       supabase
         .from("clientes")
         .select("id, nombre, ruc, region, direccion, localidad, correo_principal, telefono, sucursal")
@@ -217,7 +255,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       supabase.from("contactos_cliente").select("*").eq("cliente_id", id).order("es_principal", { ascending: false }),
       supabase.from("parque_maquinas").select("*").eq("cliente_id", id),
       supabase.from("seguimiento_comercial").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
-      supabase.from("facturacion").select("*").eq("cliente_id", id).eq("excluido_de_reportes", false).order("fecha", { ascending: false }),
+      fetchLegacyClientBilling(id),
+      fetchTotvsClientBilling(id),
       supabase
         .from("trabajos")
         .select("id, cliente_id, codigo, os_numero, creado_en, estado_general, descripcion_problema")
@@ -229,9 +268,15 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
     setContactos((ct.data ?? []) as Contacto[]);
     setMaquinas((m.data ?? []) as Maquina[]);
     setSeguimientos((s.data ?? []) as Seguimiento[]);
-    setFacturas(
-      ((f.data ?? []) as Factura[]).map((x) => ({ ...x, total_venta: Number(x.total_venta) })),
-    );
+    if (fLegacy.error || fTotvs.error) {
+      setFacturas([]);
+      setFacturacionError("No se pudo cargar la facturación completa del cliente.");
+    } else {
+      setFacturas(mergeClientBilling(
+        (fLegacy.data ?? []) as Factura[],
+        (fTotvs.data ?? []) as TotvsBillingLine[],
+      ));
+    }
     setTrabajos((t.data ?? []) as TrabajoCliente[]);
     setProfiles(
       Object.fromEntries(((p.data ?? []) as { id: string; nombre: string }[]).map((u) => [u.id, u.nombre])),
@@ -507,39 +552,11 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
 
   // ===== Facturación stats =====
   const factStats = useMemo(() => {
-    const hoy = new Date();
-    const inicioAño = new Date(hoy.getFullYear(), 0, 1);
-    const inicioPrev = new Date(hoy.getFullYear() - 1, 0, 1);
-    const finPrev = new Date(hoy.getFullYear(), 0, 1);
-    const calc = (tipo: "Repuesto" | "Servicio") => {
-  let ytd = 0, prev = 0;
-  const lista: Factura[] = [];
-
-  for (const f of facturas) {
-    if (f.tipo !== tipo) continue;
-
-    const grupoFx = (f.grupo_fx ?? "").trim().toUpperCase();
-
-    if (
-      tipo === "Servicio" &&
-      grupoFx !== "MANO DE OBRA" &&
-      grupoFx !== "KILOMETRAJE"
-    ) {
-      continue;
-    }
-
-    const d = new Date(f.fecha);
-
-    if (d >= inicioAño) ytd += f.total_venta;
-    else if (d >= inicioPrev && d < finPrev) prev += f.total_venta;
-
-    lista.push(f);
-  }
-
-  const varPct = prev > 0 ? Math.round(((ytd - prev) / prev) * 100) : ytd > 0 ? 100 : null;
-  return { ytd, prev, varPct, lista: lista.slice(0, 10) };
-};
-    return { Repuesto: calc("Repuesto"), Servicio: calc("Servicio") };
+    const currentYear = new Date().getFullYear();
+    return {
+      Repuesto: calculateClientBillingStats(facturas, "Repuesto", currentYear),
+      Servicio: calculateClientBillingStats(facturas, "Servicio", currentYear),
+    };
   }, [facturas]);
 
   if (!cliente && !loading) {
@@ -842,7 +859,11 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
           <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
             <Receipt className="h-4 w-4 text-primary" /> Facturación
           </div>
-          <Tabs defaultValue="Repuesto">
+          {facturacionError ? (
+            <div role="alert" className="rounded-md border border-destructive/30 p-3 text-[12px] text-destructive">
+              {facturacionError} No se muestran resultados parciales.
+            </div>
+          ) : <Tabs defaultValue="Repuesto">
             <TabsList className="w-full">
               <TabsTrigger value="Repuesto" className="flex-1">Repuestos</TabsTrigger>
               <TabsTrigger value="Servicio" className="flex-1">Servicios</TabsTrigger>
@@ -893,7 +914,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
                 </TabsContent>
               );
             })}
-          </Tabs>
+          </Tabs>}
         </section>
       </SheetContent>
     </Sheet>
