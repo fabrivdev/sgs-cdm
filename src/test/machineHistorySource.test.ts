@@ -17,6 +17,7 @@ describe("machine history source provenance", () => {
 
   it("requires a single OS candidate and branch agreement for repeated numbers", () => {
     expect(migration).toContain("count(*) OVER (PARTITION BY f.id) AS coincidencias_numero");
+    expect(migration).toContain("p_coincidencias_numero bigint");
     expect(migration).toContain("ventas_historial_vinculo_os_publicable(");
     expect(migration).toContain("HAVING count(*)=1");
     expect(migration).toContain("c.chasis_clave,p_chasis");

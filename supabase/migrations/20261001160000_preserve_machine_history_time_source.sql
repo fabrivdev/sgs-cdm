@@ -17,7 +17,7 @@ AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION public.ventas_historial_vinculo_os_publicable(
-  p_coincidencias_numero integer,
+  p_coincidencias_numero bigint,
   p_factura_sucursal text,
   p_os_sucursal text,
   p_os_chasis text,
@@ -40,7 +40,7 @@ $$;
 
 REVOKE ALL ON FUNCTION public.ventas_historial_tipo_tiempo_procedencia(text)
   FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION public.ventas_historial_vinculo_os_publicable(integer,text,text,text,text)
+REVOKE ALL ON FUNCTION public.ventas_historial_vinculo_os_publicable(bigint,text,text,text,text)
   FROM PUBLIC,anon,authenticated;
 
 -- Read-only history correction. It does not rewrite imported orders, time
