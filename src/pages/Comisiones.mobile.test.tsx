@@ -20,7 +20,7 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem("sig:comisiones:date-range", JSON.stringify({ from: "2026-09-01", to: "2026-09-30" }));
   mocks.rpc.mockReset().mockResolvedValue({ data: [{ id: "tech" }], error: null });
-  mocks.rows = [{ id: "journey", os_numero: "000012345", cliente_nombre: "Cliente de prueba con nombre extenso", nro_chasis: "DEMO-0001", sucursal: "Santa Rita", estado_os: "Cerrada", fecha_cierre: "2026-09-23", fecha_inicio: "2026-09-23", fecha_fin: "2026-09-23", hora_inicio: "08:00", hora_fin: "12:30", tecnico_nombre: "Técnico de prueba", tecnico_profile_id: "tech", rol_tecnico: "PRINCIPAL", tipo_tiempo: "Cliente", tipo_tiempo_importado: "Cliente", horas_reportadas: 4.5, horas_calculadas: 4.5, horas_validas: 4.5, estado_validacion: "VALIDA", motivos_validacion: [] }];
+  mocks.rows = [{ id: "journey", vigente: true, actualizado_en: "2026-09-23T13:00:00Z", os_numero: "000012345", cliente_nombre: "Cliente de prueba con nombre extenso", nro_chasis: "DEMO-0001", sucursal: "Santa Rita", estado_os: "Cerrada", fecha_cierre: "2026-09-23", fecha_inicio: "2026-09-23", fecha_fin: "2026-09-23", hora_inicio: "08:00", hora_fin: "12:30", tecnico_nombre: "Técnico de prueba", tecnico_profile_id: "tech", rol_tecnico: "PRINCIPAL", tipo_tiempo: "Cliente", tipo_tiempo_importado: "Cliente", horas_reportadas: 4.5, horas_calculadas: 4.5, horas_validas: 4.5, estado_validacion: "VALIDA", motivos_validacion: [] }];
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); });
 

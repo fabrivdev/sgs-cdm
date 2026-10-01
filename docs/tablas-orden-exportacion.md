@@ -38,6 +38,12 @@ Primera revisión de encabezados (18/09): Clientes del parque retira Sucursal y 
 
 Las matrices cronológicas, calendarios, gráficas/rankings y previsualizaciones de importación NO se convierten en listados genéricos: preservar calendario, secuencia, límites visuales y número de línea de origen. Las tablas de impresión no incorporan botones interactivos. Componentes antiguos sin consumidor activo no acreditan cobertura productiva. Esta revisión no es una certificación universal de cada formulario o gráfica de la app.
 
+### Detalle histórico de pagos de Comisiones
+
+La vista Pagos ofrece `Detalle histórico pagado` bajo el mismo permiso de exportación y las mismas políticas RLS de Comisiones. No agrega RPC, rol ni escritura. Incluye solamente liquidaciones con estado `PAGADA` y `pagado_en`, conserva `comisiones_liquidacion_detalle.horas_pagadas` como snapshot histórico y concilia el total de la liquidación contra la suma de sus detalles.
+
+La tabla de detalle no guarda una copia histórica del técnico, OS ni de las otras horas. Por eso esas columnas se rotulan como estado actual de `comisiones_jornadas`, separadas de `Horas pagadas (snapshot)`. Una jornada no vigente sigue apareciendo para no perder evidencia; liquidaciones sin detalle, jornadas no disponibles y diferencias de conciliación se exportan como evidencia incompleta, nunca se ocultan ni se convierten en cero sano. La descarga no calcula horas económicas, reparto entre técnicos, deuda ni importes de factura, y no cambia validaciones, liquidaciones o pagos.
+
 ## SQL manual, en este orden
 
 1. `supabase/migrations/20260918200000_parts_sales_global_sort_and_export.sql`: helper natural y `ventas_repuestos_listado_v3`. Conserva las CTE/reglas de la versión vigente, agrega claves/direcciones permitidas y exportación completa sin alterar `v2`.

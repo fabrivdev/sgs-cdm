@@ -21,6 +21,10 @@ import {
   totalUniqueCommissionOrderHours,
   uniqueCommissionBlockHours,
 } from "@/lib/commissionMetrics";
+import {
+  buildPaidCommissionAuditRows,
+  type PaidCommissionDetail,
+} from "@/lib/commissionPaidAuditExport";
 import { PageHeader, PageShell, KpiItem, KpiStrip, Panel, SectionHeader } from "@/components/layout/AppPrimitives";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeletonRows } from "@/components/LoadingSkeletons";
@@ -46,6 +50,7 @@ type CommissionTimeType = "Cliente" | "Garantia" | "Interno" | "Desconocido";
 
 interface CommissionRow {
   id: string;
+  vigente: boolean;
   sucursal: string | null;
   os_numero: string;
   cliente_nombre: string | null;
@@ -70,6 +75,7 @@ interface CommissionRow {
   horas_validas: number | null;
   estado_validacion: "VALIDA" | "REVISAR" | "INVALIDA";
   motivos_validacion: string[];
+  actualizado_en: string;
 }
 
 interface Settlement {
@@ -79,6 +85,7 @@ interface Settlement {
   estado: string;
   total_horas: number;
   observacion: string | null;
+  creado_en: string;
   pagado_en: string | null;
 }
 
@@ -288,6 +295,8 @@ export default function Comisiones() {
   const [from, setFrom] = useState(initialDateRange.from);
   const [to, setTo] = useState(initialDateRange.to);
   const [rows, setRows] = useState<CommissionRow[]>([]);
+  const [auditJourneys, setAuditJourneys] = useState<CommissionRow[]>([]);
+  const [paymentDetails, setPaymentDetails] = useState<PaidCommissionDetail[]>([]);
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [activeTechnicianIds, setActiveTechnicianIds] = useState<Set<string>>(new Set());
@@ -311,16 +320,21 @@ export default function Comisiones() {
       const [journeys, detailResult, settlementResult, technicianResult] = await Promise.all([
         cargarTodo<CommissionRow>(
           (supabase.from("comisiones_jornadas" as any) as any)
-            .select("id,sucursal,os_numero,cliente_nombre,nro_chasis,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,tipo_tiempo_importado,tipo_tiempo_ajustado,tipo_tiempo_ajustado_por,tipo_tiempo_ajustado_en,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion")
-            .eq("vigente", true)
+            .select("id,vigente,sucursal,os_numero,cliente_nombre,nro_chasis,estado_os,fecha_cierre,fecha_inicio,hora_inicio,fecha_fin,hora_fin,tecnico_codigo,tecnico_nombre,tecnico_profile_id,rol_tecnico,tipo_tiempo,tipo_tiempo_importado,tipo_tiempo_ajustado,tipo_tiempo_ajustado_por,tipo_tiempo_ajustado_en,horas_reportadas,horas_calculadas,horas_validas,estado_validacion,motivos_validacion,actualizado_en")
             .order("fecha_inicio", { ascending: false }),
         ),
-        cargarTodo<{ jornada_id: string }>((supabase.from("comisiones_liquidacion_detalle" as any) as any).select("jornada_id")),
-        cargarTodo<Settlement>((supabase.from("comisiones_liquidaciones" as any) as any).select("id,periodo_desde,periodo_hasta,estado,total_horas,observacion,pagado_en").order("pagado_en", { ascending: false })),
+        cargarTodo<PaidCommissionDetail>((supabase.from("comisiones_liquidacion_detalle" as any) as any)
+          .select("id,liquidacion_id,jornada_id,horas_pagadas,creado_en")
+          .order("creado_en", { ascending: true })),
+        cargarTodo<Settlement>((supabase.from("comisiones_liquidaciones" as any) as any)
+          .select("id,periodo_desde,periodo_hasta,estado,total_horas,observacion,creado_en,pagado_en")
+          .order("pagado_en", { ascending: false })),
         (supabase.rpc as any)("servicios_listar_tecnicos_activos"),
       ]);
       if (technicianResult.error) throw technicianResult.error;
-      setRows(journeys);
+      setRows(journeys.filter((row) => row.vigente));
+      setAuditJourneys(journeys);
+      setPaymentDetails(detailResult);
       setPaidIds(new Set(detailResult.map((row) => row.jornada_id)));
       setSettlements(settlementResult);
       setActiveTechnicianIds(new Set((technicianResult.data ?? []).map((row: { id: string }) => row.id)));
@@ -421,6 +435,10 @@ export default function Comisiones() {
   ];
   const settlementTable = useSectionTable({ rows: settlements, columns: settlementColumns, title: "Liquidaciones", fileName: "comisiones-liquidaciones.xlsx", initialSort: { key: "periodo", direction: "desc" } });
   const orderedSettlements = settlementTable.ordered;
+  const paidAuditRows = useMemo(
+    () => buildPaidCommissionAuditRows(settlements, paymentDetails, auditJourneys),
+    [auditJourneys, paymentDetails, settlements],
+  );
   const closedAll = useMemo(() => eligibleRows.filter((row) => isClosed(row) && row.fecha_cierre && row.fecha_cierre >= from && row.fecha_cierre <= to), [eligibleRows, from, to]);
   const openAll = useMemo(() => eligibleRows.filter((row) => !isClosed(row) && (!row.fecha_inicio || row.fecha_inicio <= to)), [eligibleRows, to]);
   const totalClosed = totalUniqueCommissionOrderHours(closedAll);
@@ -540,19 +558,28 @@ export default function Comisiones() {
   useEffect(() => setOrderPage(1), [from, to, searchFilter, view, osStateFilters, technicianFilters]);
   const exportOptions = useMemo<TableExportOption[]>(() => {
     if (view === "liquidaciones") {
-      return [{
-        label: "Liquidaciones registradas",
-        filename: `comisiones-liquidaciones-${from}-a-${to}`,
-        sheetName: "Liquidaciones",
-        rows: orderedSettlements.map((row) => ({
-          "Período desde": row.periodo_desde,
-          "Período hasta": row.periodo_hasta,
-          Estado: row.estado,
-          "Fecha de pago": row.pagado_en ?? "",
-          Observación: row.observacion ?? "",
-          Horas: Number(row.total_horas),
-        })),
-      }];
+      return [
+        {
+          label: "Liquidaciones registradas",
+          filename: `comisiones-liquidaciones-${from}-a-${to}`,
+          sheetName: "Liquidaciones",
+          rows: orderedSettlements.map((row) => ({
+            "Período desde": row.periodo_desde,
+            "Período hasta": row.periodo_hasta,
+            Estado: row.estado,
+            "Fecha de pago": row.pagado_en ?? "",
+            Observación: row.observacion ?? "",
+            Horas: Number(row.total_horas),
+          })),
+        },
+        {
+          label: "Detalle histórico pagado",
+          filename: "comisiones-detalle-historico-pagado",
+          sheetName: "Detalle pagado",
+          rows: paidAuditRows,
+          rowCount: paidAuditRows.length,
+        },
+      ];
     }
 
     const orderRows = detailOrders.map((order) => ({
@@ -603,7 +630,7 @@ export default function Comisiones() {
         rows: orderRows,
       },
     ];
-  }, [detailOrders, from, orderedSettlements, summaryRows, to, view]);
+  }, [detailOrders, from, orderedSettlements, paidAuditRows, summaryRows, to, view]);
   const selectableIdSet = useMemo(() => new Set(selectableIds), [selectableIds]);
   const activeFilterCount = Number(Boolean(searchFilter.trim()))
     + Number(technicianFilters.length > 0)
