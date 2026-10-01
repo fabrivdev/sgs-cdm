@@ -131,6 +131,28 @@ describe("complete machine history", () => {
     expect(within(table).queryByText("$ 0,00")).not.toBeInTheDocument();
   });
 
+  it("keeps an explicitly classified legacy order and does not infer a billed unclassified order", async () => {
+    const explicit = { ...row, os_numero: "LEGACY-EXPLICIT", tipo_tiempo: "Garantia", raw_data: {}, servicios_cantidad: 2, servicios_valor: 20 };
+    const unclassified = { ...row, os_numero: "LEGACY-MISSING", tipo_tiempo: null, raw_data: {}, servicios_cantidad: 3, servicios_valor: 30, factura: "001-001-9" };
+    rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [explicit, unclassified] } : args.p_vista === "maquina" ? { data: null } : { data: [] }));
+    renderSheet();
+    const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
+    expect(within(rowContaining(table, "Garantía")!).getAllByRole("cell")[2]).toHaveTextContent("LEGACY-EXPLICIT");
+    const missingRow = rowContaining(table, "LEGACY-MISSING");
+    expect(missingRow).toBeDefined();
+    expect(within(missingRow!).getAllByRole("cell")[1].textContent).toBe("");
+    expect(within(table).queryByText("Por confirmar")).not.toBeInTheDocument();
+  });
+
+  it("shows Por confirmar only when the source explicitly marks a pending review", async () => {
+    const pending = { ...row, os_numero: "REVIEW-1", tipo_tiempo: "Por confirmar", raw_data: {}, servicios_cantidad: 1, servicios_valor: 10 };
+    rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [pending] } : args.p_vista === "maquina" ? { data: null } : { data: [] }));
+    renderSheet();
+    const table = await screen.findByRole("table", { name: "Historial completo de la máquina" });
+    expect(rowContaining(table, "Por confirmar")).toBeDefined();
+    expect(within(table).queryByText("No informado en origen")).not.toBeInTheDocument();
+  });
+
   it("adds kilometraje and terceros only from real source values", async () => {
     const completeRow = { ...row, km_cantidad: 12.5, kilometro_valor: -1.25, terceros_valor: 20, raw_data: { ...row.raw_data, source_product_code: "MA01" } };
     rpc.mockImplementation((_name, args) => Promise.resolve(!args ? { data: [] } : args.p_vista === "os" ? { data: [completeRow] } : args.p_vista === "maquina" ? { data: null } : { data: [] }));

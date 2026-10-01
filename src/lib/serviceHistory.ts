@@ -11,7 +11,9 @@ export function serviceTypes(row: Order): string[] {
     if (text.includes('garant')) types.add('Garantia');
     if (text.includes('intern')) types.add('Interno');
   }
-  return types.size ? [...types] : ['No informado'];
+  if (types.size) return [...types];
+  const hasPendingReview = values.some(value => /confirm|pendient|revis/i.test(String(value ?? '')));
+  return [hasPendingReview ? 'Por confirmar' : ''];
 }
 
 export function serviceOwner(row: { raw_data: Record<string, unknown> | null; cliente_nombre: string | null }) {

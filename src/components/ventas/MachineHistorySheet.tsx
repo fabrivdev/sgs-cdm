@@ -15,7 +15,7 @@ import { displayImportedTechnicianName, importedServiceOrderParticipants, matchT
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { canonicalClientName } from "@/lib/clientIdentity";
 
-type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null; servicios_valor: number | null; repuesto_valor: number | null; kilometro_valor: number | null; terceros_valor: number | null };
+type Row = { os_numero: string; fecha_abierta_os: string | null; fecha_cierre_os: string | null; tipo_tiempo: string | null; tipo_tiempo_procedencia?: "origen_explicito" | "no_informado_origen" | "revision_pendiente"; servicios_cantidad: number | null; km_cantidad: number | null; responsable: string | null; situacion_os: string | null; factura: string | null; raw_data: Record<string, unknown> | null; servicios_valor: number | null; repuesto_valor: number | null; kilometro_valor: number | null; terceros_valor: number | null };
 type Part = { id: string; fecha_factura: string; factura: string; cod_mercaderia: string; codigo_fabricante: string; mercaderia: string; observacion: string; cantidad: number; total_venta: number; grupo_normalizado: string; subgrupo_original: string; raw_data: Record<string, unknown> };
 type Machine = { modelo_tipo: string; clientes: { nombre: string | null } | null; fuente_propietario?: string };
 type EntryKind = "Servicio" | "Kilometraje" | "Terceros" | "Repuesto";
@@ -39,7 +39,8 @@ type HistoryEntry = {
 const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 2 });
 const money = (value: number) => `$ ${new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: string | null) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
-const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value === "No informado" ? "Por confirmar" : value;
+const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value === "No informado" ? "" : value;
+const unresolvedTimeType = (value: string) => !value || ["No informado", "No informado en origen"].includes(value);
 const canonicalInvoice = (value: string | null | undefined) => String(value ?? "")
   .split(/[;,]/)
   .map(invoice => invoice.replace(/[-\s]/g, ""))
@@ -57,11 +58,11 @@ function laborByType(row: Row): Record<string, LaborTotal> {
   const totals = row.raw_data?.totales_por_tipo as Record<string, { horas?: number; valor_servicio?: number; kilometros?: number; valor_kilometraje?: number }> | undefined;
   const result: Record<string, LaborTotal> = {};
   const rowType = serviceTypes({ tipo_tiempo: row.tipo_tiempo, raw_data: null });
-  const correctedType = rowType.length === 1 && rowType[0] !== "No informado" ? rowType[0] : null;
+  const correctedType = rowType.length === 1 && !unresolvedTimeType(rowType[0]) ? rowType[0] : null;
   if (totals && Object.keys(totals).length) {
     for (const [key, value] of Object.entries(totals)) {
       const sourceType = serviceTypes({ tipo_tiempo: key, raw_data: null })[0];
-      const normalized = sourceType === "No informado" && correctedType ? correctedType : sourceType;
+      const normalized = unresolvedTimeType(sourceType) && correctedType ? correctedType : sourceType;
       const previous = result[normalized] ?? { quantity: 0, amount: null, kmQuantity: 0, kmAmount: null };
       const hasAmount = value.valor_servicio !== undefined && value.valor_servicio !== null;
       const hasKmAmount = value.valor_kilometraje !== undefined && value.valor_kilometraje !== null;
@@ -254,7 +255,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
 
   const columns: SalesColumn<HistoryEntry>[] = [
     { key: "fecha", label: "Fecha", kind: "date", value: row => row.date?.slice(0, 10) },
-    { key: "tipo", label: "Tipo", kind: "text", value: row => row.kind === "Repuesto" ? row.kind : row.timeType || row.kind },
+    { key: "tipo", label: "Tipo", kind: "text", value: row => row.kind === "Repuesto" ? row.kind : row.timeType },
     { key: "os", label: "OS", kind: "text", value: row => row.os },
     { key: "estado", label: "Estado", kind: "text", value: row => row.state },
     { key: "tecnicos", label: "Técnicos", kind: "text", value: row => row.technicians },
@@ -292,14 +293,15 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
       className: ["os", "codigo", "factura"].includes(column.key) ? "font-mono" : undefined,
       render: row => {
         if (column.key === "fecha") return date(row.date);
-        if (column.key === "descripcion") return <CompactListInfo label={row.description || "—"} fields={[
-          ["Ítem", row.kind], ["OS", row.os || "—"], ["Estado", row.state || "—"], ["Técnicos", row.technicians || "—"],
-          ["Tiempo", row.timeType || "—"], ["Código", row.code || "—"], ["Cód. fabr.", row.manufacturerCode || "—"],
+        if (column.key === "descripcion") return <CompactListInfo label={row.description || "-"} fields={[
+          ["Ítem", row.kind], ["OS", row.os || "-"], ["Estado", row.state || "-"], ["Técnicos", row.technicians || "-"],
+          ["Tiempo", row.timeType], ["Código", row.code || "-"], ["Cód. fabr.", row.manufacturerCode || "-"],
           ["Factura", row.invoice || "—"], ["Cierre", date(row.closeDate)],
         ]} />;
         if (column.key === "cantidad") return row.quantity == null ? "—" : decimal.format(row.quantity);
         if (column.key === "facturado") return row.amount == null ? "—" : money(row.amount);
-        return String(column.value(row) || "—");
+        if (column.key === "tipo" && !column.value(row)) return "";
+        return String(column.value(row) || "-");
       },
     };
   });

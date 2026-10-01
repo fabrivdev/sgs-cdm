@@ -7,6 +7,10 @@ describe('service history identity and classification', () => {
   it('recovers types from operational breakdown', () => {
     expect(serviceTypes({ tipo_tiempo: 'Mixto', raw_data: { totales_por_tipo: { Interno: {}, Garantia: {} } } })).toEqual(['Interno', 'Garantia']);
   });
+  it('distinguishes a missing source value from an explicit pending review', () => {
+    expect(serviceTypes({ tipo_tiempo: null, raw_data: null })).toEqual(['']);
+    expect(serviceTypes({ tipo_tiempo: 'Por confirmar', raw_data: null })).toEqual(['Por confirmar']);
+  });
   it('does not call the billed recipient the owner', () => {
     expect(serviceOwner({ cliente_nombre: 'Facturado', raw_data: { CLIFAC: '123' } })).toBe('Propietario no informado');
     expect(serviceOwner({ cliente_nombre: 'Facturado', raw_data: { Nombre: 'Dueño', CLIFAC: '123' } })).toBe('Dueño');
