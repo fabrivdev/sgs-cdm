@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Administración consulta tablas nuevas antes de regenerar database.types. */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { MODULOS, MODULO_LABELS, ROLES, ROLE_LABELS, SUCURSALES, nivelLabel, type AssignableRole, type Modulo, type Role, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { ChevronDown, Database, Eye, EyeOff, KeyRound, Save, Settings2, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
+import { Activity, ChevronDown, Database, Eye, EyeOff, KeyRound, Save, Settings2, ShieldAlert, Trash2, UserPlus, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +40,9 @@ import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetT
 import { Switch } from "@/components/ui/switch";
 import { createAdminPerson } from "@/lib/admin-create-person";
 import { useQueryClient } from "@tanstack/react-query";
+import { presenceSnapshot, type PresenceState, type UserPresenceRow } from "@/lib/userPresence";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface Profile {
   id: string;
@@ -70,6 +73,18 @@ interface UserSectionAccess {
   user_id: string;
   seccion_id: string;
 }
+
+const PRESENCE_LABELS: Record<PresenceState, string> = {
+  active: "Activo ahora",
+  inactive: "Inactivo",
+  disconnected: "Desconectado",
+};
+
+const PRESENCE_DOT: Record<PresenceState, string> = {
+  active: "bg-emerald-500",
+  inactive: "bg-amber-500",
+  disconnected: "bg-muted-foreground/35",
+};
 
 const normalizeAdminSearch = (value: string) => value
   .normalize("NFD")
@@ -127,6 +142,10 @@ export default function Admin() {
   const [sectionUser, setSectionUser] = useState<Profile | null>(null);
   const [sectionBusy, setSectionBusy] = useState<string | null>(null);
   const [emails, setEmails] = useState<Record<string, string>>({});
+  const [presenceRows, setPresenceRows] = useState<UserPresenceRow[]>([]);
+  const [presenceAvailable, setPresenceAvailable] = useState(true);
+  const [presenceNow, setPresenceNow] = useState(Date.now());
+  const presenceSchemaMissingRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -193,6 +212,11 @@ export default function Admin() {
   }, [emails]);
 
   const permissionOwnerId = (profile: Profile) => profile.auth_user_id || profile.id;
+  const presenceByUser = useMemo(
+    () => new Map(presenceRows.map((row) => [row.user_id, row])),
+    [presenceRows],
+  );
+  const presenceForProfile = (profile: Profile) => presenceSnapshot(presenceByUser.get(permissionOwnerId(profile)), presenceNow);
   const rolesForProfile = (profile: Profile) => Array.from(new Set([
     ...(rolesByUser[permissionOwnerId(profile)] ?? []),
     ...(rolesByUser[profile.id] ?? []),
@@ -233,6 +257,7 @@ export default function Admin() {
       role ? ROLE_LABELS[role] : "",
       ...modulesForProfile(profile).map((module) => MODULO_LABELS[module]),
       profile.activo ? "Activo" : "Inactivo",
+      PRESENCE_LABELS[presenceForProfile(profile).state],
     ].join(" ")).includes(normalizedTableSearch);
   };
   const profileColumns: SalesColumn<Profile>[] = [
@@ -241,6 +266,7 @@ export default function Admin() {
     { key: "sucursal", label: "Sucursal", kind: "text", value: p => p.sucursal },
     { key: "nivel", label: "Nivel", kind: "text", value: p => nivelLabel(primaryRoleForProfile(p), modulesForProfile(p)) },
     { key: "areas", label: "Áreas", kind: "text", value: p => modulesForProfile(p).map(m => MODULO_LABELS[m]).join(", ") },
+    { key: "uso", label: "Uso app", kind: "text", value: p => PRESENCE_LABELS[presenceForProfile(p).state] },
     { key: "perfil", label: "Perfil", kind: "text", value: p => p.activo ? "Activo" : "Inactivo" },
   ];
   const equipoTable = useSectionTable({ rows: profiles.filter(profileMatchesSearch), columns: profileColumns,
@@ -249,13 +275,17 @@ export default function Admin() {
     profileColumns[0], { ...profileColumns[1], label: "Email" }, profileColumns[3],
     { ...profileColumns[4], label: "Módulos" },
     { key: "secciones", label: "Secciones", kind: "text", value: p => sectionsForProfile(p).map(id => sections.find(s => s.id === id)?.nombre ?? id).join(", ") },
-    profileColumns[2], { ...profileColumns[5], label: "Estado" },
+    profileColumns[2], { ...profileColumns[6], label: "Estado" },
   ];
   const accessTable = useSectionTable({ rows: profilesConAcceso.filter(profileMatchesSearch), columns: accessColumns,
     title: "Accesos al sistema", fileName: "administracion-accesos.xlsx", initialSort: { key: "persona", direction: "asc" } });
   const filteredProfiles = equipoTable.ordered;
   const filteredProfilesConAcceso = accessTable.ordered;
   const filteredProfilesSinAcceso = profilesSinAcceso.filter(profileMatchesSearch);
+  const presenceCounts = profilesConAcceso.reduce<Record<PresenceState, number>>((counts, profile) => {
+    counts[presenceForProfile(profile).state] += 1;
+    return counts;
+  }, { active: 0, inactive: 0, disconnected: 0 });
 
   const exportOptions: TableExportOption[] = [
     {
@@ -269,6 +299,7 @@ export default function Admin() {
         Nivel: nivelLabel(primaryRoleForProfile(profile), modulesForProfile(profile)),
         Módulos: modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(", "),
         Secciones: sectionsForProfile(profile).map((id) => sections.find((section) => section.id === id)?.nombre ?? id).join(", "),
+        "Uso app": PRESENCE_LABELS[presenceForProfile(profile).state],
         Estado: profile.activo ? "Activo" : "Inactivo",
       })),
     },
@@ -346,10 +377,38 @@ export default function Admin() {
     setTableLoading(false);
   };
 
+  const loadPresence = useCallback(async () => {
+    if (document.visibilityState !== "visible" || presenceSchemaMissingRef.current) return;
+    const { data, error } = await supabase
+      .from("user_presence")
+      .select("user_id, last_activity_at, last_heartbeat_at, disconnected_at")
+      .order("last_activity_at", { ascending: false });
+    setPresenceNow(Date.now());
+    if (error) {
+      if (/user_presence|schema cache|does not exist/i.test(error.message ?? "")) {
+        presenceSchemaMissingRef.current = true;
+      }
+      setPresenceAvailable(false);
+      return;
+    }
+    setPresenceAvailable(true);
+    setPresenceRows((data ?? []) as UserPresenceRow[]);
+  }, []);
+
   useEffect(() => {
     load();
+    void loadPresence();
     void reloadProductivityGoal();
-  }, []);
+    const refreshId = window.setInterval(() => void loadPresence(), 60_000);
+    const clockId = window.setInterval(() => setPresenceNow(Date.now()), 30_000);
+    const handleVisibility = () => void loadPresence();
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(refreshId);
+      window.clearInterval(clockId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [loadPresence]);
 
   async function reloadProductivityGoal() {
     setGoalLoading(true);
@@ -643,6 +702,32 @@ export default function Admin() {
             </Card>
           )}
 
+          <Card className="p-3 sm:p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-[13px] font-semibold">
+                  <Activity className="h-4 w-4" />
+                  Uso de la app
+                </div>
+                <p className="mt-1 text-[12px] text-muted-foreground">
+                  Actividad real, no solo sesion iniciada. Activo vence a los 90 s; inactivo pasa a desconectado a los 10 min.
+                </p>
+              </div>
+              {presenceAvailable ? (
+                <div className="flex flex-wrap gap-2 text-[12px]">
+                  {(["active", "inactive", "disconnected"] as PresenceState[]).map((state) => (
+                    <Badge key={state} variant="outline" className="gap-1.5">
+                      <span className={cn("h-2 w-2 rounded-full", PRESENCE_DOT[state])} />
+                      {PRESENCE_LABELS[state]}: {presenceCounts[state]}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <Badge variant="outline" className="text-muted-foreground">Pendiente de habilitar en base de datos</Badge>
+              )}
+            </div>
+          </Card>
+
           <Card className="hidden overflow-hidden md:block">
             <Table containerClassName={scrollTableClass(filteredProfiles.length)}>
               <TableHeader className="sticky top-0 z-10 bg-card">
@@ -652,6 +737,7 @@ export default function Admin() {
                   <TableHead>{equipoTable.heading("sucursal")}</TableHead>
                   <TableHead>{equipoTable.heading("nivel")}</TableHead>
                   <TableHead>{equipoTable.heading("areas")}</TableHead>
+                  <TableHead>{equipoTable.heading("uso")}</TableHead>
                   <TableHead>{equipoTable.heading("perfil")}</TableHead>
                   <TableHead className="w-[120px]"><span className="sr-only">Acciones</span></TableHead>
                 </TableRow>
@@ -671,6 +757,24 @@ export default function Admin() {
                       {modulesForProfile(profile).length
                         ? modulesForProfile(profile).map((module) => MODULO_LABELS[module]).join(" · ")
                         : "Sin áreas"}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const snapshot = presenceForProfile(profile);
+                        return (
+                          <div className="min-w-[128px] text-[12px]">
+                            <span className="inline-flex items-center gap-2">
+                              <span className={cn("h-2 w-2 rounded-full", PRESENCE_DOT[snapshot.state])} />
+                              {PRESENCE_LABELS[snapshot.state]}
+                            </span>
+                            {snapshot.lastActivityAt && (
+                              <div className="mt-0.5 text-[11px] text-muted-foreground">
+                                Hace {formatDistanceToNow(snapshot.lastActivityAt, { locale: es })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-2 text-[12px]">
@@ -696,7 +800,10 @@ export default function Admin() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium max-sm:whitespace-normal max-sm:break-words max-sm:text-[13px] max-sm:leading-5" title={profile.nombre}>{profile.nombre}</div>
                   </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">{profile.activo ? "Activo" : "Inactivo"}</span>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn("h-2 w-2 rounded-full", PRESENCE_DOT[presenceForProfile(profile).state])} />
+                    {PRESENCE_LABELS[presenceForProfile(profile).state]}
+                  </span>
                   <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Ver ficha de ${profile.nombre}`} onClick={() => setSectionUser(profile)}>
                     <Eye className="h-4 w-4" />
                   </Button>

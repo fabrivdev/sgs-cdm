@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Role, Sucursal } from "@/lib/constants";
 import { firstAccessibleRoute, roleHasCapability, sectionsFromLegacyModules, type Capability, type SectionKey } from "@/lib/permissions";
+import { markUserDisconnected, startUserPresence } from "@/lib/userPresence";
 
 interface Profile {
   id: string;
@@ -220,6 +221,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [loadUserData, user]);
 
+  useEffect(() => {
+    if (!user) return;
+    return startUserPresence(user.id);
+  }, [user]);
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error };
@@ -238,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user) await markUserDisconnected(user.id);
     await supabase.auth.signOut();
     clearUserData();
   };

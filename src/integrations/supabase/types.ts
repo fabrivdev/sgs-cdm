@@ -3299,6 +3299,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_presence: {
+        Row: {
+          disconnected_at: string | null
+          last_activity_at: string
+          last_heartbeat_at: string
+          user_id: string
+        }
+        Insert: {
+          disconnected_at?: string | null
+          last_activity_at?: string
+          last_heartbeat_at?: string
+          user_id: string
+        }
+        Update: {
+          disconnected_at?: string | null
+          last_activity_at?: string
+          last_heartbeat_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       programaciones: {
         Row: {
           accion_programada: string | null
@@ -6417,6 +6438,7 @@ export type Database = {
       }
     }
     Functions: {
+      disconnect_user_presence: { Args: never; Returns: undefined }
       admin_actualizar_acceso_seccion: {
         Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
         Returns: undefined
@@ -6582,6 +6604,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      touch_user_presence: {
+        Args: { p_last_activity_at?: string }
+        Returns: undefined
       }
       has_section_access: {
         Args: { _seccion_id: string; _user_id: string }
