@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount } from "./machineImportValues";
+import { importHasMultipleUnits, importInvoiceDifference, importNetOrderValue, importUnitForm, importUnitPatch, validImportAmount } from "./machineImportValues";
 
 describe("Importaciones: OC, factura y costo separados", () => {
   it("solo presenta opciones generales/individuales cuando hay varias unidades", () => {
@@ -18,6 +18,34 @@ describe("Importaciones: OC, factura y costo separados", () => {
     expect(importInvoiceDifference(null, "USD", 100, "USD")).toBeNull();
     expect(importInvoiceDifference(100, "EUR", 100, "USD")).toBeNull();
     expect(importInvoiceDifference(100, undefined, 100, "USD")).toBeNull();
+  });
+  it("muestra el neto de origen sin recalcularlo desde un bruto ya redondeado", () => {
+    expect(importNetOrderValue({
+      unitGrossValue: 218636.3,
+      generalGrossValue: 218636.3,
+      sourceGrossValue: 218636.3,
+      sourceNetValue: 205518.1,
+      discountPercentage: 6,
+    })).toBe(205518.1);
+  });
+  it("aplica el descuento cuando no existe un neto de origen", () => {
+    expect(importNetOrderValue({ unitGrossValue: 200, discountPercentage: 6 })).toBe(188);
+    expect(importNetOrderValue({ unitGrossValue: 218636.267307, discountPercentage: 6 })).toBe(205518.09);
+    expect(importNetOrderValue({ unitGrossValue: 200 })).toBe(200);
+  });
+  it("prorratea el neto en valores OC totales y conserva overrides manuales", () => {
+    const source = { generalGrossValue: 300, sourceGrossValue: 300, sourceNetValue: 282, discountPercentage: 6 };
+    expect(importNetOrderValue({ unitGrossValue: 100, ...source })).toBe(94);
+    expect(importNetOrderValue({ unitGrossValue: 120, ...source, manualOverride: true })).toBe(120);
+  });
+  it("no reutiliza un neto histórico después de editar el valor OC general", () => {
+    expect(importNetOrderValue({
+      unitGrossValue: 250,
+      generalGrossValue: 250,
+      sourceGrossValue: 200,
+      sourceNetValue: 188,
+      discountPercentage: 6,
+    })).toBe(235);
   });
   it("no toma el costo definitivo como valor facturado del proveedor", () => {
     expect(importUnitForm({ costo_final: 999 }).valor_factura_proveedor).toBe("");

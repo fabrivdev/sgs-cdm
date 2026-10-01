@@ -9,6 +9,46 @@ export function importInvoiceDifference(
   return Math.round((Number(invoiceValue) - Number(orderValue)) * 100) / 100;
 }
 
+export function importNetOrderValue({
+  unitGrossValue,
+  generalGrossValue,
+  sourceGrossValue,
+  sourceNetValue,
+  discountPercentage,
+  manualOverride,
+}: {
+  unitGrossValue: number | null | undefined;
+  generalGrossValue?: number | null;
+  sourceGrossValue?: number | string | null;
+  sourceNetValue?: number | null;
+  discountPercentage?: number | null;
+  manualOverride?: boolean;
+}): number | null {
+  const unitGross = Number(unitGrossValue);
+  if (unitGrossValue == null || !Number.isFinite(unitGross)) return null;
+  if (manualOverride) return Math.round(unitGross * 100) / 100;
+
+  const generalGross = Number(generalGrossValue);
+  const sourceGross = Number(sourceGrossValue);
+  const sourceNet = Number(sourceNetValue);
+  if (
+    generalGrossValue != null && sourceGrossValue != null && sourceNetValue != null
+    && Number.isFinite(generalGross) && generalGross > 0
+    && Number.isFinite(sourceGross) && sourceGross > 0
+    && Number.isFinite(sourceNet) && sourceNet >= 0
+    && Math.abs(generalGross - sourceGross) < 0.005
+  ) {
+    return Math.round((unitGross * sourceNet / generalGross) * 100) / 100;
+  }
+
+  const discount = Number(discountPercentage);
+  if (discountPercentage != null && Number.isFinite(discount) && discount >= 0 && discount <= 100) {
+    return Math.round((unitGross * (1 - discount / 100)) * 100) / 100;
+  }
+
+  return Math.round(unitGross * 100) / 100;
+}
+
 export function validImportAmount(value: string): boolean {
   return value.trim() === "" || (Number.isFinite(Number(value)) && Number(value) >= 0);
 }

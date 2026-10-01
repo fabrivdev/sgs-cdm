@@ -47,7 +47,7 @@ import { legacyMachineBrand, machineBrandClass as brandClass, machineBrandStyle,
 import { IMPORT_SITUATION_LABELS, importSituationState, importSituationLabel, isImportSaleInvoiced, importArrivalState as arrivalState, type ImportArrivalState as ArrivalState } from "@/lib/machineImportStatus";
 import { matchesOperationFilters, normalizeOperationModel, operationModelOptions } from "@/lib/machineOperationFilters";
 import { shortPersonName } from "@/lib/personName";
-import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
+import { formatImportMoney, importHasMultipleUnits, importInvoiceDifference, importNetOrderValue, importUnitForm, importUnitPatch, validImportAmount, type ImportUnitForm, type ImportUnitSection } from "@/lib/machineImportValues";
 import { extractMachineSupplierInvoice, machineSupplierInvoiceExtractionStatus, machineSupplierInvoicePatch, type MachineSupplierInvoiceExtraction } from "@/lib/machineSupplierInvoice";
 import { parseLocalizedNonNegativeAmount } from "@/lib/localizedAmount";
 
@@ -246,7 +246,9 @@ type OrderRow = {
 };
 type ImportRow = {
   llave_interna_general?: string | null; eta_general?: string | null; estado_general?: string | null;
+  datos_fuente?: { precio_oc?: number | string | null } | null;
   valor_oc_general?: number | null; alcance_valor_oc?: string; moneda_oc_general?: string;
+  descuentos?: number | null; precio_teorico_oc?: number | null;
   moneda_oc?: string; valor_oc_manual?: boolean; eta_manual?: boolean;
   valor_factura_proveedor?: number | null; costo_stock_moneda?: string; costo_stock_habilitado?: boolean; stock_fisico_confirmado?: boolean;
   parque_confirmado?: boolean; chasis_ambiguo?: boolean;
@@ -1726,7 +1728,15 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   const ocDocument = (ocDocuments[0] ?? null) as StoredMachineDocument | null;
   const supplierDocument = (supplierDocuments[0] ?? null) as StoredMachineDocument | null;
   const hasSupplierInvoiceData = Boolean(row.invoice_supplier || row.factura_proveedor_fecha || row.valor_factura_proveedor != null);
-  const difference = importInvoiceDifference(row.precio_oc, row.moneda_oc, row.valor_factura_proveedor, row.factura_proveedor_moneda);
+  const displayedOrderValue = importNetOrderValue({
+    unitGrossValue: row.precio_oc,
+    generalGrossValue: row.valor_oc_general,
+    sourceGrossValue: row.datos_fuente?.precio_oc,
+    sourceNetValue: row.precio_teorico_oc,
+    discountPercentage: row.descuentos,
+    manualOverride: row.valor_oc_manual,
+  });
+  const difference = importInvoiceDifference(displayedOrderValue, row.moneda_oc, row.valor_factura_proveedor, row.factura_proveedor_moneda);
   const saleInvoiced = isImportSaleInvoiced(row);
   const deleteImportUnit = async () => {
     setDeleting(true);
@@ -1769,7 +1779,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
               <KeyValueItem label="OC" value={row.oc} empty="—" mono />
               <KeyValueItem label="Fecha pedido" value={formatDate(row.fecha_pedido)} empty="—" />
               <KeyValueItem label="Embarque est." value={formatDate(row.eta)} empty="—" />
-              <KeyValueItem label="Valor OC" value={row.precio_oc != null ? formatImportMoney(row.precio_oc, row.moneda_oc ?? "USD") : null} empty="Sin cargar" />
+              <KeyValueItem label="Valor OC" value={displayedOrderValue != null ? formatImportMoney(displayedOrderValue, row.moneda_oc ?? "USD") : null} empty="Sin cargar" />
               {multipleUnits && <KeyValueItem label="Previsión" value={row.eta_manual || row.valor_oc_manual ? "Individual" : "General"} />}
             </KeyValueGrid>}
             {multipleUnits && (row.eta_manual || row.valor_oc_manual) && canEdit && !editingImportData && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
@@ -1779,9 +1789,9 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
           </DetailSection>
           <DetailSection card icon={<FileText className="h-3.5 w-3.5" />} title="OC vs factura" help="Factura del proveedor menos valor OC de esta unidad. Comparar en la misma moneda y base impositiva. No incluye ni reemplaza el costo de stock.">
             <KeyValueGrid>
-              <KeyValueItem label="Valor OC" value={row.precio_oc == null ? null : formatImportMoney(row.precio_oc, row.moneda_oc ?? "USD")} empty="Sin cargar" />
+              <KeyValueItem label="Valor OC" value={displayedOrderValue == null ? null : formatImportMoney(displayedOrderValue, row.moneda_oc ?? "USD")} empty="Sin cargar" />
               <KeyValueItem label="Factura proveedor" value={row.valor_factura_proveedor == null ? null : formatImportMoney(row.valor_factura_proveedor, row.factura_proveedor_moneda ?? "USD")} empty="Sin cargar" />
-              <KeyValueItem label="Diferencia" value={difference == null ? null : formatImportMoney(difference, row.moneda_oc ?? "USD")} empty={row.precio_oc != null && row.valor_factura_proveedor != null ? "Monedas diferentes: no comparable" : "Faltan importes"} />
+              <KeyValueItem label="Diferencia" value={difference == null ? null : formatImportMoney(difference, row.moneda_oc ?? "USD")} empty={displayedOrderValue != null && row.valor_factura_proveedor != null ? "Monedas diferentes: no comparable" : "Faltan importes"} />
             </KeyValueGrid>
           </DetailSection>
           <DetailSection card icon={<PackageCheck className="h-3.5 w-3.5" />} title="Costo de stock" help="Se habilita al identificar esta máquina en el stock físico. El importe de la factura del proveedor no se toma como costo definitivo. Una referencia histórica no acredita costo de stock." action={canEdit && row.costo_stock_habilitado && !editingStockCost ? <Button aria-label="Editar costo de stock" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => { closeEditors(); setEditingStockCost(true); }}><Pencil className="mr-1.5 h-3 w-3" />Editar</Button> : undefined}>
