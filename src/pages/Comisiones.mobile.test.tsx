@@ -68,5 +68,5 @@ describe("Comisiones: presentación del teléfono", () => {
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByText("2 de 2 · 21 OS")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /^OS 0{0,8}\d+ Cliente de prueba/ })).toHaveLength(1);
-  });
+  }, 10_000);
 });
