@@ -1,4 +1,16 @@
-# Design QA — ajuste específico del Planificador móvil
+# Design QA - scroll vertical de tablas largas en móvil
+
+01/10/2026, base `e6846b719c916230538628979ae65f152cd126a7`. `TableScroll` deja de imponer `max-height` y scroll vertical propio bajo 768 px cuando una lista supera 20 filas. Conserva `overflow-x-auto`; desde `md` mantiene el límite de 480 px, `overflow-y-auto`, gutter estable y encabezados sticky existentes. No cambia filas, consultas, paginación, filtros, orden, selección, acciones ni exportaciones.
+
+Regresiones focalizadas: 49 pruebas correctas en cuatro archivos, incluyendo helper en la frontera 20/21 y `CompactListTable` con 21 filas; ninguna fila se elimina y las clases verticales quedan prefijadas con `md`. TypeScript pasa al usar la librería ES2021 ya requerida por `replaceAll`. ESLint focalizado termina con cero errores y la advertencia preexistente de Fast Refresh de `TableScroll`; el lint global continúa fallando por 217 errores y 44 advertencias ajenos a este cambio.
+
+Navegador local aislado con el componente real y 50 filas ficticias: a 320/390/430 px el contenedor mide respectivamente 2236/2236 px de alto, no tiene `max-height` y la página crece hasta 2392/2442/2425 px. El ancho mínimo ficticio de 480 px queda dentro del contenedor horizontal (294/364/404 px visibles) y el documento no desborda su ancho. A 768/1024/1366 px el contenedor mide 480/1959 px, conserva `max-height: 480px` y scroll vertical interno; el documento cabe en el viewport. Capturas fuera de Git: `C:/Users/Usuario/Documents/Codex/2026-09-30/task-8/output/mobile-page-scroll/table-scroll-{320,390,430,768,1024,1366}.png`.
+
+El build completo pasa con la configuración local ignorada que omite únicamente el plugin SWC y usa la transformación TSX de Vite/Esbuild. El comando oficial `npm run build` no puede cargar el binding nativo de SWC en este Windows; es un bloqueo de herramienta anterior a compilar la aplicación, no un error del cambio. No se usaron datos reales, sesión autenticada ni `sgs10`; no acredita publicación o producción.
+
+---
+
+# Design QA - ajuste específico del Planificador móvil
 
 25/09/2026, base `79555bb55534a437f176e2d7c4b9405e44c57966`. Sólo cambia Planificador bajo 640 px: agenda plana, fecha lateral, cliente prioritario, descripción secundaria de dos líneas, referencia/estado/continuidad y navegación de semana compacta. Sin horas ni total al pie en teléfono por indicación del usuario. Escritorio/tablet, detalle, fuentes y exportación conservan horas y comportamiento; las otras secciones aprobadas no cambian.
 

@@ -3,9 +3,16 @@ import { salesHeader, scrollTableClass } from "./TableScroll";
 import { salesColumnClass } from "./salesTableFormat";
 
 describe("sales column alignment", () => {
-  it("caps the viewport after twenty rows without truncating the dataset", () => {
+  it("uses page scrolling on mobile and caps the viewport from md after twenty rows", () => {
     expect(scrollTableClass(20)).toBeUndefined();
-    expect(scrollTableClass(21)).toContain("md:max-h-[480px]");
+    const classes = scrollTableClass(21)?.split(" ") ?? [];
+    expect(classes).toContain("overflow-x-auto");
+    expect(classes).toContain("md:max-h-[480px]");
+    expect(classes).toContain("md:overflow-y-auto");
+    expect(classes).toContain("md:[scrollbar-gutter:stable]");
+    expect(classes).not.toContain("max-h-[56vh]");
+    expect(classes).not.toContain("overflow-y-auto");
+    expect(classes).not.toContain("[scrollbar-gutter:stable]");
   });
   it.each(["Marca", "Condición", "Cliente facturado", "Vendedor", "Descripción", "Factura", "Chasis", "Código", "Última venta"])("left-aligns text: %s", label => {
     expect(salesColumnClass(label)).toBe("text-left");

@@ -2,6 +2,12 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Scroll de tablas largas en móvil - 01/10/2026
+
+`src/components/ventas/TableScroll.tsx` conserva el umbral de 20 filas y la altura máxima de 480 px desde `md` (768 px), pero elimina la limitación vertical interna bajo ese ancho. En teléfonos las tablas largas crecen con el contenido y el usuario desplaza la página; se conserva `overflow-x-auto` para cualquier ancho horizontal necesario. La regla alcanza `CompactListTable`, tablas de Ventas, Stock, Sugerencias, Compras y otros consumidores compartidos sin cambiar sus filas.
+
+No se modifica paginación de servidor o local, carga incremental, filtros, selección, orden, acciones, detalles, exportaciones, permisos ni consultas. Tampoco se agrega virtualización: el código ya renderizaba todas las filas recibidas, por lo que este ajuste cambia el contenedor, no la cantidad de nodos. Cuarenta y nueve pruebas focalizadas cubren 20/21 filas y consumidores compartidos. Navegador local con 50 filas ficticias comprueba scroll de página en 320/390/430 px, overflow horizontal contenido y límite interno de 480 px conservado en 768/1024/1366 px. Esta implementación es local y no acredita commit remoto, despliegue ni producción autenticada.
+
 ## Ubicación y desbordamiento de pestañas — 29/09/2026
 
 `src/components/ui/tabs.tsx` oculta el desbordamiento nativo de la lista: el scroll automático producía flechas verticales junto a pestañas que ya cabían, como en Comisiones. El disparador de escritorio mide 32 px dentro de una lista de 36 px para dejar sitio al subrayado; en teléfono conserva un mínimo táctil de 44 px. Las secciones principales Órdenes (`src/pages/OrdenesServicio.tsx`), Administración (`src/pages/Admin.tsx`) y Compras (`src/pages/RepuestosCompras.tsx`) pasan sus pestañas a `PageHeader`, como ya hacen Comisiones y Dashboard. Desde 640 px se ubican a la derecha del título cuando caben; el encabezado puede envolverlas en anchos intermedios sin recortar el título. Bajo 640 px siguen visibles debajo del título, con acciones principales en la primera fila. No mover las pestañas internas de fichas o paneles al encabezado de página. Se conservan selección, permisos y contenido; sólo cambia la presentación. Pruebas locales de estructura y navegación, no comprobación del despliegue ni de todos los navegadores.
