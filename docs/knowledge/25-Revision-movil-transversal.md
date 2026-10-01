@@ -2,6 +2,12 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Apertura directa de detalles en Parque y Planificador - 01/10/2026
+
+En `src/components/parque/ParqueTab.tsx`, el nombre del cliente abre directamente el `ClientePanel` existente; en `src/pages/Planificador.tsx`, la descripción de la jornada abre directamente `ServicioDetalleDialog`. Se retiró únicamente el popover informativo intermedio y sus botones “Ver cliente”/“Ver jornada”. El clic de la fila conserva el mismo destino, los objetivos principales siguen siendo botones nativos accesibles por teclado y detienen la propagación para evitar una doble apertura. El enlace telefónico, orden, filtros, selección, exportación, identidad de cliente/jornada, permisos y agenda móvil no cambian. Estos listados no implementan arrastre, por lo que no se agregó un gesto alternativo ni lógica de drag/drop.
+
+Validación local: 32 pruebas focalizadas de Parque y listas de Servicios en 320/390/639/640/768/1280 px, incluidas apertura directa, cierre y reapertura, acciones secundarias, filtros y exportaciones; build de producción correcto. El typecheck requiere conservar el override ES2021 ya documentado por el uso previo de `String.replaceAll` en `src/lib/localizedAmount.ts`. No se consultaron datos productivos, no se modificaron consultas ni se agregó SQL. El clon no contiene `00-Inicio.md`, `mapa-negocio.json` ni `obsidian-sync.local`, por lo que esta nota no acredita sincronización con Obsidian.
+
 ## Scroll de tablas largas en móvil - 01/10/2026
 
 `src/components/ventas/TableScroll.tsx` conserva el umbral de 20 filas y la altura máxima de 480 px desde `md` (768 px), pero elimina la limitación vertical interna bajo ese ancho. En teléfonos las tablas largas crecen con el contenido y el usuario desplaza la página; se conserva `overflow-x-auto` para cualquier ancho horizontal necesario. La regla alcanza `CompactListTable`, tablas de Ventas, Stock, Sugerencias, Compras y otros consumidores compartidos sin cambiar sus filas.

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Planificador from "@/pages/Planificador";
@@ -59,7 +59,7 @@ describe("compact operational services lists",()=>{
   it.each([640, 768])("keeps the original table and hour total at %i px", async width => {
     viewport.width = width;
     plan();
-    await screen.findAllByRole("button", {name: `Detalle ${service.trabajo_descripcion}`});
+    await screen.findAllByRole("button", {name: `Abrir jornada ${service.trabajo_descripcion}`});
     expect(screen.getByRole("table", {name:"Jornadas del Planificador"})).toBeInTheDocument();
     expect(screen.getByText(/Total horas/)).toBeInTheDocument();
     expect(screen.queryByRole("list", {name:"Jornadas del Planificador"})).not.toBeInTheDocument();
@@ -95,22 +95,23 @@ describe("compact operational services lists",()=>{
     mocks.errorTable = ""; fireEvent.click(screen.getByRole("button", {name:"Reintentar"}));
     await screen.findByRole("list", {name:"Jornadas del Planificador"});
   });
-  it("keeps same-day journeys separate, numeric hours and continuity under demand",async()=>{
-    plan();await screen.findAllByRole("button",{name:`Detalle ${service.trabajo_descripcion}`});
+  it("keeps same-day journeys separate and opens their existing detail directly",async()=>{
+    plan();await screen.findAllByRole("button",{name:`Abrir jornada ${service.trabajo_descripcion}`});
     const table=screen.getByRole("table",{name:"Jornadas del Planificador"});expect(table).toHaveClass("table-fixed");expect(within(table).getAllByRole("row")).toHaveLength(3);expect(within(table).getByRole("img",{name:"Jornada 1/2"})).toBeInTheDocument();expect(within(table).getByRole("img",{name:"Jornada 2/2"})).toBeInTheDocument();
     const cells=within(within(table).getAllByRole("row")[1]).getAllByRole("cell");expect(cells[7]).toHaveTextContent("2,5");expect(cells[7]).toHaveClass("text-center");expect(cells[0]).not.toHaveTextContent("Viernes");expect(table.querySelectorAll("td br, td .flex-col")).toHaveLength(0);
-    fireEvent.click(screen.getAllByRole("button",{name:`Detalle ${service.trabajo_descripcion}`})[0]);
-    const info=await screen.findByRole("dialog",{name:`Detalle ${service.trabajo_descripcion}`});expect(info).toHaveTextContent("1/2");expect(info).toHaveTextContent(order.os_numero);
-    fireEvent.click(screen.getByRole("button",{name:"Ver jornada"}));expect(mocks.detail.mock.calls.at(-1)?.[0]).toMatchObject({servicio:{id:"S1",jornada_id:"J1",auxiliares:[],horas_trabajadas:2.5}});expect(mocks.update).not.toHaveBeenCalled();
+    const target=screen.getAllByRole("button",{name:`Abrir jornada ${service.trabajo_descripcion}`})[0];expect(target.tagName).toBe("BUTTON");const rendersBeforeOpen=mocks.detail.mock.calls.length;
+    fireEvent.click(target);expect(mocks.detail.mock.calls.at(-1)?.[0]).toMatchObject({servicio:{id:"S1",jornada_id:"J1",auxiliares:[],horas_trabajadas:2.5}});expect(mocks.detail).toHaveBeenCalledTimes(rendersBeforeOpen+1);expect(screen.queryByRole("dialog",{name:`Detalle ${service.trabajo_descripcion}`})).not.toBeInTheDocument();
+    const detailProps=mocks.detail.mock.calls.at(-1)?.[0] as {onOpenChange:(open:boolean)=>void};act(()=>detailProps.onOpenChange(false));const rendersAfterClose=mocks.detail.mock.calls.length;
+    fireEvent.click(screen.getAllByRole("button",{name:`Abrir jornada ${service.trabajo_descripcion}`})[0]);expect(mocks.detail).toHaveBeenCalledTimes(rendersAfterClose+1);expect(mocks.detail.mock.calls.at(-1)?.[0]).toMatchObject({servicio:{id:"S1",jornada_id:"J1"}});expect(mocks.update).not.toHaveBeenCalled();
   });
   it("sorts original hours and exports the complete journeys, original identities and zero",async()=>{
-    plan();await screen.findAllByRole("button",{name:`Detalle ${service.trabajo_descripcion}`});
+    plan();await screen.findAllByRole("button",{name:`Abrir jornada ${service.trabajo_descripcion}`});
     const sort=screen.getByRole("button",{name:/Ordenar Horas:/});fireEvent.click(sort);fireEvent.click(sort);expect(sort.closest("th")).toHaveAttribute("aria-sort","descending");
     await exportRows("Exportar Planificador");const rows=mocks.json.mock.calls[0][0];expect(rows).toHaveLength(2);expect(rows[0]).toMatchObject({"ID Jornada":"J1","OS Nº":order.os_numero,Horas:2.5,Auxiliares:""});expect(rows[1]).toMatchObject({"ID Jornada":"J2",Horas:0});expect(mocks.update).not.toHaveBeenCalled();
   });
   it("blocks stale exports after a required read fails and allows retry",async()=>{
     mocks.errorTable="servicio_jornadas";plan();await screen.findByRole("alert");fireEvent.keyDown(screen.getByRole("button",{name:"Acciones de la sección"}),{key:"Enter"});expect(await screen.findByRole("menuitem",{name:"Exportar Planificador"})).toHaveAttribute("data-disabled");
-    fireEvent.keyDown(screen.getByRole("menuitem",{name:"Exportar Planificador"}),{key:"Escape"});mocks.errorTable="";fireEvent.click(screen.getByRole("button",{name:"Reintentar"}));await screen.findAllByRole("button",{name:`Detalle ${service.trabajo_descripcion}`});
+    fireEvent.keyDown(screen.getByRole("menuitem",{name:"Exportar Planificador"}),{key:"Escape"});mocks.errorTable="";fireEvent.click(screen.getByRole("button",{name:"Reintentar"}));await screen.findAllByRole("button",{name:`Abrir jornada ${service.trabajo_descripcion}`});
   });
   it("OS keeps negative amounts, missing money and separate states without stacking",async()=>{
     orders();await screen.findByRole("button",{name:`Detalle ${order.os_numero}`});const table=screen.getByRole("table",{name:"OS vinculadas"});const cells=within(within(table).getAllByRole("row")[1]).getAllByRole("cell");
@@ -125,6 +126,6 @@ describe("compact operational services lists",()=>{
     mocks.errorTable="ordenes_servicio_importadas";orders();expect(await screen.findByRole("alert")).toHaveTextContent("No se pudieron cargar");expect(screen.queryByText(/No hay OS vinculadas/)).not.toBeInTheDocument();
   });
   it("does not grant export permission when unifying the planner",async()=>{
-    mocks.can.mockReturnValue(false);plan();await screen.findAllByRole("button",{name:`Detalle ${service.trabajo_descripcion}`});expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
+    mocks.can.mockReturnValue(false);plan();await screen.findAllByRole("button",{name:`Abrir jornada ${service.trabajo_descripcion}`});expect(screen.queryByRole("button",{name:"Acciones de la sección"})).not.toBeInTheDocument();
   });
 });

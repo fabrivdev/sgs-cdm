@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
+import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
@@ -818,14 +818,9 @@ export function ParqueTab({
               if(key==="marcas")return `CLAAS: ${r.cantClaas} · HORSCH: ${r.cantHorsch} · Orden por participación CLAAS`;
               return String(column.value(r)??"—");
             },render:(r:Row)=>{
-              if(key==="cliente")return <CompactListInfo label={r.cliente.nombre} fields={[
-                ["Sucursal",r.sucursales.join(", ")||"—"],["Teléfono",r.contactoPrincipal?.telefono??"—"],["Máquinas",String(r.cantTotal)],
-                ["Antig. (años)",String(r.antiguedadProm??"—")],["CLAAS",String(r.cantClaas)],["HORSCH",String(r.cantHorsch)],
-                ["Días rep.",String(r.diasUltRepuesto??"—")],["Días serv.",String(r.diasUltServicio??"—")],
-                ["Repuestos",r.tieneRepEnRango?"Sí":"No"],["Servicios",r.tieneSrvEnRango?"Sí":"No"],
-                ["Facturación",factLoading?"Cargando…":factError??`$ ${fmtMoney(r.factYTD)}`],["Fact. LY",factLoading?"Cargando…":factError??`$ ${fmtMoney(r.factPrev)}`],
-                ["Variación",factLoading?"Cargando…":factError??(r.varPct==null?"—":`${r.varPct}%`)]
-              ]}>{onOpenCliente&&<Button size="sm" variant="outline" onClick={event=>{event.stopPropagation();onOpenCliente(r.cliente.id);}}>Ver cliente</Button>}</CompactListInfo>;
+              if(key==="cliente")return onOpenCliente ? <button type="button" title={r.cliente.nombre} aria-label={`Abrir cliente ${r.cliente.nombre}`}
+                className="block min-h-11 max-w-full truncate rounded-sm text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-sm:whitespace-normal max-sm:break-words md:min-h-0"
+                onClick={event=>{event.stopPropagation();onOpenCliente(r.cliente.id);}}>{r.cliente.nombre}</button> : r.cliente.nombre;
               if(key==="telefono")return r.contactoPrincipal?.telefono?<a href={`tel:${r.contactoPrincipal.telefono}`} onClick={event=>event.stopPropagation()} className="inline-flex max-w-full items-center gap-1 hover:text-primary"><Phone className="h-3 w-3 shrink-0" /><span className="truncate">{r.contactoPrincipal.telefono}</span></a>:"—";
               if(key==="antiguedadProm")return r.antiguedadProm!=null?<Badge className={cn("max-w-full whitespace-nowrap px-1.5 tabular-nums",antiguedadColor(r.antiguedadProm))}>{r.antiguedadProm}</Badge>:"—";
               if(key==="marcas")return r.cantTotal?<span className="inline-flex max-w-full gap-1 tabular-nums"><span className="text-marca-claas">{Math.round(r.cantClaas/r.cantTotal*100)}%</span><span>/</span><span className="text-marca-horsch">{Math.round(r.cantHorsch/r.cantTotal*100)}%</span></span>:"—";

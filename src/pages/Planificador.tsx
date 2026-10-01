@@ -8,7 +8,7 @@ import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
 import { Button } from "@/components/ui/button";
-import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
+import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { PlannerMobileAgenda } from "@/components/calendar/PlannerMobileAgenda";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
@@ -694,16 +694,9 @@ export default function Planificador() {
             if (column.key === "resultado") return <EstadoBadge estado={s.estado} className="max-w-full whitespace-nowrap px-1.5 text-[10px]" />;
             if (column.key === "sucursal") return SUCURSAL_ABBR[s.sucursal] ?? s.sucursal;
             if (column.key === "horas") return s.horas_trabajadas == null ? "—" : s.horas_trabajadas.toLocaleString("es-PY", { maximumFractionDigits: 6 });
-            if (column.key === "trabajo") return <CompactListInfo label={s.trabajo_descripcion || "—"} fields={[
-              ...columns.map(c => [c.label, String(c.value(s) ?? "—")] as const),
-              ["Referencia", refByServicio.get(s.id)?.ref || "—"],
-              ["OS", refByServicio.get(s.id)?.os || "—"],
-              ["Continuidad", continuity ? `${continuity.orden}/${continuity.total}` : "—"],
-              ["Día", s.dia_semana], ["Semana", String(s.semana)],
-              ["Tipo", s.tipo_trabajo],
-              ["Auxiliares", s.auxiliares.map(id => profById[id]?.nombre ?? id).join(", ") || "—"],
-              ["Observaciones", s.observaciones || "—"],
-            ]}><Button size="sm" variant="outline" onClick={() => openDetalle(s)}>Ver jornada</Button></CompactListInfo>;
+            if (column.key === "trabajo") return <button type="button" title={s.trabajo_descripcion || "—"} aria-label={`Abrir jornada ${s.trabajo_descripcion || "sin descripción"}`}
+              className="block min-h-11 max-w-full truncate rounded-sm text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-sm:whitespace-normal max-sm:break-words md:min-h-0"
+              onClick={event => { event.stopPropagation(); openDetalle(s); }}>{s.trabajo_descripcion || "—"}</button>;
             return String(column.value(s) ?? "—");
           }};
         })} id={s => `${s.id}-${s.jornada_id ?? s.fecha_programada}`} label="Jornadas del Planificador"
