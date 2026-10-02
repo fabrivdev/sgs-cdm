@@ -86,6 +86,9 @@ export function prepareNewSystemImportBundle(input: NewSystemImportBundleInput):
       productGroup: row.productGroup,
       description: row.productName,
       billingTimeType: row.timeType,
+      billingProductBrand: /[A-Za-z0-9]/.test(String(row.raw.MARCA ?? ""))
+        ? row.productBrand
+        : null,
       serviceOrders: osLookup,
       products: productLookup,
     }),

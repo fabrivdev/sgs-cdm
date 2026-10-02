@@ -399,10 +399,17 @@ export interface CanonicalBillingCrosswalk {
   billingRowId: string;
   matchedBy: "document" | "invoice" | "product_code" | "manufacturer_code" | "none";
   serviceOrderNumber: string | null;
+  serviceOrderEvidence: "complete" | "missing" | "conflict";
+  knownServiceOrders: string[];
   trabajoId: string | null;
   inferredTimeType: CanonicalTimeType;
+  timeTypeEvidence: "complete" | "partial" | "missing" | "conflict";
+  knownTimeTypes: CanonicalTimeType[];
+  hasUnknownTimeType: boolean;
   inferredLineType: CanonicalBillingType;
   productBrand: string | null;
+  productBrandEvidence: "service_order" | "product" | "billing" | "inferred" | "missing";
+  knownProductBrands: string[];
   productGroup: string | null;
   productFamily: string | null;
 }

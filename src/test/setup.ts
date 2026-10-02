@@ -7,10 +7,11 @@ class TestIntersectionObserver {
   disconnect() {}
   takeRecords() { return []; }
 }
-Object.defineProperty(window, "IntersectionObserver", { writable: true, value: TestIntersectionObserver });
 Object.defineProperty(globalThis, "IntersectionObserver", { writable: true, value: TestIntersectionObserver });
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "IntersectionObserver", { writable: true, value: TestIntersectionObserver });
 
-Object.defineProperty(window, "matchMedia", {
+  Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
     matches: false,
@@ -23,3 +24,4 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+}

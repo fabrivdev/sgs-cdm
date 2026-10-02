@@ -181,7 +181,9 @@ export function mapFacturaVentasSheet(
       exchangeRate: number(row, ["TIPCAM"]) || null,
       paymentCondition: text(row, ["CNDPAG"]),
       lineType: inferCanonicalBillingType(productGroup, productName, productCode),
-      timeType: "Cliente",
+      // Facturacion no aporta evidencia del tipo de tiempo. Solo el cruce
+      // inequivoco con la linea de OS puede clasificarlo.
+      timeType: "Desconocido",
       productGroup,
       productFamily: null,
       productBrand:

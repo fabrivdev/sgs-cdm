@@ -1,4 +1,4 @@
-type BillingSourceLine = {
+export type BillingSourceLine = {
   id?: string;
   origen_sistema: string | null;
   codigo_interno_factura: string | null;
@@ -6,6 +6,7 @@ type BillingSourceLine = {
   sucursal: string | null;
   cod_mercaderia: string | null;
   entidad_nombre: string | null;
+  vendedor?: string | null;
   mercaderia: string | null;
   observacion: string | null;
   cantidad: number | null;
@@ -15,91 +16,108 @@ type BillingSourceLine = {
   codigo_fabricante: string | null;
   fecha_factura: string | null;
   raw_data: Record<string, unknown> | null;
+  subgrupo_original?: string | null;
+  grupo_normalizado?: string | null;
+  marca_normalizada?: string | null;
+  tipo_facturacion?: string | null;
+  tipo_tiempo?: string | null;
 };
 
 const stable = (value: unknown) => String(value ?? "").trim().toUpperCase();
+const numberValue = (value: unknown) => value == null ? null : Number(value);
+const canonicalOrigin = (value: unknown) => {
+  const origin = stable(value);
+  return origin === "NEW_XML_FACTURACION_DIRECTA" || origin === "NEW_XML_FACTURACION_OS"
+    ? "NEW_XML_FACTURACION"
+    : origin;
+};
+const canonicalBranch = (value: unknown) => {
+  const branch = stable(value);
+  return branch === "04" || branch === "04 - SAN JUAN BAUTISTA" || branch === "SAN JUAN BAUTISTA"
+    ? "MISIONES"
+    : branch;
+};
 
+/**
+ * Clave declarada por el origen TOTVS. DOCUMENTO ya contiene el numero fiscal
+ * completo que entrega el archivo; no se inventan empresa o serie separadas.
+ * El tipo canonico distingue factura de nota de credito aun si comparten numero.
+ */
 export function billingSourceLineKey(row: BillingSourceLine): string | null {
-  const item = stable(row.raw_data?.ITEM);
+  // directa/os es una clasificacion enriquecida por el crosswalk, no una
+  // coordenada de la linea fuente. Ambas variantes pertenecen al mismo XML.
+  const origin = canonicalOrigin(row.origen_sistema);
+  const branch = canonicalBranch(row.sucursal);
   const document = stable(row.codigo_interno_factura || row.factura);
-  const origin = stable(row.origen_sistema);
-  const branch = stable(row.sucursal || row.raw_data?.FILIAL || row.raw_data?.LOJA);
-  if (!origin || !document || !branch || !item) return null;
-  return [origin, branch, document, item].join("|");
+  const item = stable(row.raw_data?.ITEM);
+  const documentKind = stable(row.raw_data?.canonical_document_kind);
+  if (!origin || !branch || !document || !item || !documentKind) return null;
+  return [origin, branch, documentKind, document, item].join("|");
 }
 
-const same = (left: unknown, right: unknown) => stable(left) === stable(right);
-const sameNumber = (left: unknown, right: unknown) => {
-  if (left == null || right == null) return left == null && right == null;
-  return Number(left) === Number(right);
-};
+const commercialSnapshot = (row: BillingSourceLine) => ({
+  origen_sistema: canonicalOrigin(row.origen_sistema),
+  sucursal: canonicalBranch(row.sucursal),
+  documento: stable(row.codigo_interno_factura || row.factura),
+  factura: stable(row.factura),
+  item: stable(row.raw_data?.ITEM),
+  especie: stable(row.raw_data?.canonical_document_kind),
+  vendedor: stable(row.vendedor),
+  cod_mercaderia: stable(row.cod_mercaderia),
+  codigo_fabricante: stable(row.codigo_fabricante),
+  entidad_nombre: stable(row.entidad_nombre),
+  mercaderia: stable(row.mercaderia),
+  observacion: stable(row.observacion),
+  cantidad: numberValue(row.cantidad),
+  valor_unitario: numberValue(row.valor_unitario),
+  total_venta: numberValue(row.total_venta),
+  moneda: stable(row.moneda),
+  fecha_factura: row.fecha_factura ?? null,
+  linked_service_order: stable(row.raw_data?.linked_service_order),
+  subgrupo_original: stable(row.subgrupo_original),
+  grupo_normalizado: stable(row.grupo_normalizado),
+  marca_normalizada: stable(row.marca_normalizada),
+  tipo_facturacion: stable(row.tipo_facturacion),
+  tipo_tiempo: stable(row.tipo_tiempo),
+});
 
 export function sameAuditedCommercialLine(left: BillingSourceLine, right: BillingSourceLine) {
-  return same(left.codigo_interno_factura || left.factura, right.codigo_interno_factura || right.factura)
-    && same(left.sucursal || left.raw_data?.FILIAL || left.raw_data?.LOJA, right.sucursal || right.raw_data?.FILIAL || right.raw_data?.LOJA)
-    && same(left.raw_data?.ITEM, right.raw_data?.ITEM)
-    && same(left.cod_mercaderia, right.cod_mercaderia)
-    && same(left.entidad_nombre, right.entidad_nombre)
-    && same(left.mercaderia, right.mercaderia)
-    && same(left.observacion, right.observacion)
-    && sameNumber(left.cantidad, right.cantidad)
-    && sameNumber(left.valor_unitario, right.valor_unitario)
-    && sameNumber(left.total_venta, right.total_venta);
+  return JSON.stringify(commercialSnapshot(left)) === JSON.stringify(commercialSnapshot(right));
 }
 
-const sameCurrentHashInputs = (left: BillingSourceLine, right: BillingSourceLine) =>
-  same(left.origen_sistema, right.origen_sistema)
-  && same(left.codigo_interno_factura, right.codigo_interno_factura)
-  && same(left.factura, right.factura)
-  && same(left.cod_mercaderia, right.cod_mercaderia)
-  && same(left.codigo_fabricante, right.codigo_fabricante)
-  && same(left.observacion, right.observacion)
-  && sameNumber(left.total_venta, right.total_venta);
-
-export type BillingStablePlan<T extends BillingSourceLine> = {
-  insert: T[];
-  update: Array<{ id: string; row: T }>;
+export type ValidatedBillingSourceBatch<T extends BillingSourceLine> = {
+  rows: T[];
+  collapsedExactDuplicates: number;
 };
 
-export function planBillingStableReimport<T extends BillingSourceLine>(
-  existing: BillingSourceLine[],
+/** Valida y colapsa el lote completo antes de que el importador escriba nada. */
+export function validateBillingSourceBatch<T extends BillingSourceLine>(
   incoming: T[],
-): BillingStablePlan<T> {
-  const byKey = new Map<string, BillingSourceLine[]>();
-  for (const row of existing) {
-    const key = billingSourceLineKey(row);
-    if (!key) continue;
-    byKey.set(key, [...(byKey.get(key) ?? []), row]);
-  }
+): ValidatedBillingSourceBatch<T> {
+  const byKey = new Map<string, T>();
+  let collapsedExactDuplicates = 0;
 
-  const plan: BillingStablePlan<T> = { insert: [], update: [] };
   for (const row of incoming) {
+    const origin = stable(row.origen_sistema);
+    if (origin !== "NEW_XML_FACTURACION_DIRECTA" && origin !== "NEW_XML_FACTURACION_OS") {
+      throw new Error(`Origen de facturacion TOTVS no permitido: ${origin || "VACIO"}. No se escribio ningun dato.`);
+    }
     const key = billingSourceLineKey(row);
-    const candidates = key ? byKey.get(key) ?? [] : [];
-    if (!key || candidates.length === 0) {
-      plan.insert.push(row);
+    if (!key) {
+      throw new Error(
+        "Linea TOTVS sin identidad fuente completa (origen, sucursal, DOCUMENTO, ITEM y tipo de documento). No se escribio ningun dato.",
+      );
+    }
+    const current = byKey.get(key);
+    if (!current) {
+      byKey.set(key, row);
       continue;
     }
-
-    const exact = candidates.filter((candidate) => sameCurrentHashInputs(candidate, row));
-    if (exact.length === 1) {
-      // El upsert actual ya reconoce este hash. Mantenerlo en insert evita
-      // reescribir manualmente clasificaciones o metadatos del registro.
-      plan.insert.push(row);
-      continue;
+    if (!sameAuditedCommercialLine(current, row)) {
+      throw new Error(`Conflicto dentro del XML para la identidad ${key}. No se escribio ningun dato.`);
     }
-    if (candidates.length !== 1 || !candidates[0].id || !sameAuditedCommercialLine(candidates[0], row)) {
-      throw new Error(`Conflicto de identidad estable en facturacion: ${key}. Requiere auditoria antes de importar.`);
-    }
-    plan.update.push({ id: candidates[0].id, row });
+    collapsedExactDuplicates += 1;
   }
-  return plan;
-}
 
-export function billingSourceRepairPatch(row: BillingSourceLine) {
-  return {
-    fecha_factura: row.fecha_factura,
-    codigo_fabricante: row.codigo_fabricante,
-    moneda: row.moneda,
-  };
+  return { rows: [...byKey.values()], collapsedExactDuplicates };
 }

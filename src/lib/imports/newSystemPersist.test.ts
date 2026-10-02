@@ -1,50 +1,27 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-  BILLING_LINE_INSERT_OPTIONS,
-  BILLING_LINE_REPAIR_DATE_OPTIONS,
-  prepareBillingLineReimport,
-} from "./newSystemPersist";
 
-const line = {
-  origen_sistema: "new_xml_facturacion_os",
-  codigo_interno_factura: "0010010004812",
-  factura: "0010010004812",
-  cod_mercaderia: "REPIN002906",
-  codigo_fabricante: "1503220",
-  observacion: "REPUESTO",
-  total_venta: 25,
-  fecha_factura: null as string | null,
-};
+const source = readFileSync("src/lib/imports/newSystemPersist.ts", "utf8");
 
-describe("reimportacion de lineas de facturacion", () => {
-  it("separa la misma identidad fechada para actualizar un NULL previo", () => {
-    const dated = { ...line, fecha_factura: "2026-07-20" };
+describe("persistencia de facturacion del sistema nuevo", () => {
+  it("prevalida antes del RPC y persiste OS solo despues de facturacion", () => {
+    const prevalidation = source.indexOf("validateBillingSourceBatch(facturacionLineasSinValidar)");
+    const billingRpc = source.indexOf('"facturacion_importar_totvs_lote_v1"');
+    const serviceOrderImport = source.indexOf("...bundle.importaciones.ordenesServicio");
 
-    const result = prepareBillingLineReimport([line, dated]);
-
-    expect(result.insertAll).toEqual([line, dated]);
-    expect(result.repairDates).toEqual([dated]);
-    expect(BILLING_LINE_INSERT_OPTIONS.ignoreDuplicates).toBe(true);
-    expect(BILLING_LINE_REPAIR_DATE_OPTIONS).toEqual({
-      onConflict: "origen_sistema,linea_hash",
-      ignoreDuplicates: false,
-    });
+    expect(prevalidation).toBeGreaterThan(0);
+    expect(billingRpc).toBeGreaterThan(prevalidation);
+    expect(serviceOrderImport).toBeGreaterThan(billingRpc);
   });
 
-  it("deduplica identidades fechadas dentro del mismo lote", () => {
-    const first = { ...line, fecha_factura: "2026-07-20", marker: "first" };
-    const last = { ...line, fecha_factura: "2026-07-20", marker: "last" };
-
-    expect(prepareBillingLineReimport([first, last]).repairDates).toEqual([{
-      ...line,
-      fecha_factura: "2026-07-20",
-    }]);
+  it("no ejecuta borrado directo ni upsert tolerante de lineas detalladas", () => {
+    expect(source).not.toContain("BILLING_LINE_INSERT_OPTIONS");
+    expect(source).not.toContain("ignoreDuplicates: true");
+    expect(source).not.toMatch(/facturacion_lineas_importadas[\s\S]{0,180}\.delete\(\)/);
   });
 
-  it("no convierte una linea sin fecha en una actualizacion destructiva", () => {
-    expect(prepareBillingLineReimport([line])).toEqual({
-      insertAll: [line],
-      repairDates: [],
-    });
+  it("distingue un fallo posterior de OS de un rollback de facturacion", () => {
+    expect(source).toContain("La facturacion quedo confirmada, pero fallo la etapa posterior");
+    expect(source).toContain("la facturacion reutilizara sus UUID");
   });
 });

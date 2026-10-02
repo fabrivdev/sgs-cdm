@@ -1,64 +1,95 @@
 import { describe, expect, it } from "vitest";
-import { billingSourceLineKey, planBillingStableReimport } from "./billingLineStableReimport";
+import {
+  billingSourceLineKey,
+  sameAuditedCommercialLine,
+  validateBillingSourceBatch,
+} from "./billingLineStableReimport";
 
 const line = (overrides: Record<string, unknown> = {}) => ({
-  id: "old-1",
   origen_sistema: "new_xml_facturacion_os",
-  codigo_interno_factura: "0010010004812",
-  factura: "0010010004812",
-  sucursal: "SANTA RITA",
-  cod_mercaderia: "REPIN002906",
-  entidad_nombre: "CLIENTE",
-  mercaderia: "REPUESTO",
-  observacion: "REPUESTO",
+  codigo_interno_factura: "SYN-DOC-001",
+  factura: "SYN-DOC-001",
+  sucursal: "SYNTHETIC BRANCH",
+  cod_mercaderia: "SYN-PROD-001",
+  entidad_nombre: "SYNTHETIC ENTITY",
+  mercaderia: "SYNTHETIC ITEM",
+  observacion: "SYNTHETIC ITEM",
   cantidad: 2,
   valor_unitario: 43.82,
   total_venta: 87.64,
-  moneda: null,
-  codigo_fabricante: null,
-  fecha_factura: null,
-  raw_data: { ITEM: "01", FILIAL: "SANTA RITA" },
+  moneda: "GS",
+  codigo_fabricante: "SYN-MFG-001",
+  fecha_factura: "2026-08-01",
+  raw_data: {
+    ITEM: "01",
+    FILIAL: "SYNTHETIC BRANCH",
+    ESPECIE: "NF",
+    canonical_document_kind: "Factura",
+    linked_service_order: null,
+  },
   ...overrides,
 });
 
-describe("identidad estable de lineas TOTVS", () => {
-  it("no depende de fecha, fabricante ni orden fisico del archivo", () => {
+describe("prevalidacion de lineas TOTVS", () => {
+  it("usa solo identidad declarada disponible y distingue tipo de documento", () => {
     expect(billingSourceLineKey(line())).toBe(
-      billingSourceLineKey(line({ fecha_factura: "2026-07-20", codigo_fabricante: "1503220" })),
+      "NEW_XML_FACTURACION|SYNTHETIC BRANCH|FACTURA|SYN-DOC-001|01",
     );
+    expect(billingSourceLineKey(line({
+      raw_data: { ...line().raw_data, canonical_document_kind: "NotaCredito" },
+    }))).not.toBe(billingSourceLineKey(line()));
   });
 
-  it("conserva dos lineas legitimas del mismo producto con distinto ITEM", () => {
-    expect(billingSourceLineKey(line())).not.toBe(
-      billingSourceLineKey(line({ id: "old-2", raw_data: { ITEM: "02", FILIAL: "SANTA RITA" } })),
-    );
+  it("no cambia la identidad cuando el crosswalk reclasifica directa como OS", () => {
+    expect(billingSourceLineKey(line({ origen_sistema: "new_xml_facturacion_directa" })))
+      .toBe(billingSourceLineKey(line({ origen_sistema: "new_xml_facturacion_os" })));
   });
 
-  it("actualiza una unica copia incompleta cuando lo comercial coincide", () => {
-    const enriched = line({ id: undefined, fecha_factura: "2026-07-20", moneda: "USD", codigo_fabricante: "1503220" });
-    expect(planBillingStableReimport([line()], [enriched])).toEqual({
-      insert: [],
-      update: [{ id: "old-1", row: enriched }],
+  it("usa Misiones como identidad canonica del alias 04 San Juan Bautista", () => {
+    expect(billingSourceLineKey(line({ sucursal: "04 - San Juan Bautista" })))
+      .toBe(billingSourceLineKey(line({ sucursal: "Misiones" })));
+  });
+
+  it("rechaza cualquier origen fuera del allowlist del importador", () => {
+    expect(() => validateBillingSourceBatch([
+      line({ origen_sistema: "new_xml_facturacion_otro" }),
+    ])).toThrow(/Origen de facturacion TOTVS no permitido/);
+  });
+
+  it("preserva lineas legitimas con ITEM distinto", () => {
+    const second = line({ raw_data: { ...line().raw_data, ITEM: "02" } });
+    expect(validateBillingSourceBatch([line(), second]).rows).toHaveLength(2);
+  });
+
+  it("colapsa una repeticion exacta sin perder una linea legitima", () => {
+    expect(validateBillingSourceBatch([line(), line()])).toEqual({
+      rows: [line()],
+      collapsedExactDuplicates: 1,
     });
   });
 
-  it("mantiene el upsert normal cuando ya existe el hash enriquecido", () => {
-    const enriched = line({ id: undefined, fecha_factura: "2026-07-20", moneda: "USD", codigo_fabricante: "1503220" });
-    const existing = line({ id: "new-1", fecha_factura: "2026-07-20", moneda: "USD", codigo_fabricante: "1503220" });
-    expect(planBillingStableReimport([existing], [enriched])).toEqual({ insert: [enriched], update: [] });
-  });
-
-  it("aborta ante varias copias sin una coincidencia exacta", () => {
-    const incoming = line({ id: undefined, codigo_fabricante: "NUEVO" });
-    expect(() => planBillingStableReimport([
+  it("aborta antes de persistir si el mismo ITEM cambia cantidad o importe", () => {
+    expect(() => validateBillingSourceBatch([
       line(),
-      line({ id: "old-2", codigo_fabricante: "OTRO" }),
-    ], [incoming])).toThrow(/Requiere auditoria/);
+      line({ cantidad: 3, total_venta: 131.46 }),
+    ])).toThrow(/Conflicto dentro del XML/);
   });
 
-  it("aborta si cantidad o importe cambiaron en una supuesta unica linea", () => {
-    expect(() => planBillingStableReimport([line()], [
-      line({ id: undefined, cantidad: 3, total_venta: 131.46, codigo_fabricante: "1503220" }),
-    ])).toThrow(/Requiere auditoria/);
+  it.each([
+    { sucursal: null },
+    { codigo_interno_factura: null, factura: null },
+    { raw_data: { ...line().raw_data, ITEM: null } },
+    { raw_data: { ...line().raw_data, canonical_document_kind: null } },
+  ])("aborta si falta un componente fuente obligatorio: %o", (missing) => {
+    expect(() => validateBillingSourceBatch([line(missing)])).toThrow(/sin identidad fuente completa/);
+  });
+
+  it("compara los valores comerciales y el vinculo OS", () => {
+    expect(sameAuditedCommercialLine(line(), line())).toBe(true);
+    expect(sameAuditedCommercialLine(line(), line({ moneda: "USD" }))).toBe(false);
+    expect(sameAuditedCommercialLine(line(), line({ vendedor: "OTRO" }))).toBe(false);
+    expect(sameAuditedCommercialLine(line(), line({
+      raw_data: { ...line().raw_data, linked_service_order: "SYN-OS-001" },
+    }))).toBe(false);
   });
 });

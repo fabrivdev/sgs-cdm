@@ -19,10 +19,10 @@ import {
   persistCommissionTimeEntries,
   type NewSystemImportBundle,
 } from "@/lib/imports";
-import {
-  billingSourceRepairPatch,
-  planBillingStableReimport,
-} from "@/lib/imports/billingLineStableReimport";
+import { validateBillingSourceBatch } from "@/lib/imports/billingLineStableReimport";
+import { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
+
+export { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
 
 export interface PersistNewSystemBundleArgs {
   bundle: NewSystemImportBundle;
@@ -46,6 +46,55 @@ export interface PersistNewSystemBundleResult {
   historialRepuestosError: string | null;
 }
 
+export function prepareBillingPersistenceRows(bundle: NewSystemImportBundle) {
+  const crosswalkByRowId = new Map(bundle.billingCrosswalk.map((row) => [row.billingRowId, row]));
+  return bundle.facturacion.rows.map((row) => {
+    const crosswalk = crosswalkByRowId.get(row.rowId);
+    const canonicalTimeType = crosswalk?.inferredTimeType ?? row.timeType;
+    return {
+      origen_sistema: crosswalk?.matchedBy === "none" ? "new_xml_facturacion_directa" : "new_xml_facturacion_os",
+      codigo_interno_factura: row.documentNumber ?? row.invoiceLongNumber,
+      factura: row.invoiceShortNumber ?? row.invoiceLongNumber,
+      entidad_nombre: row.clientName,
+      vendedor: row.seller ?? null,
+      fecha_factura: row.emissionDate,
+      sucursal: matchSucursalFromRegion(row.branch) ?? matchSucursal(row.branch),
+      subgrupo_original: crosswalk?.productGroup ?? row.productGroup,
+      grupo_normalizado: crosswalk?.inferredLineType ?? row.lineType,
+      marca_normalizada: (crosswalk?.productBrand as any) ?? "OTROS",
+      tipo_facturacion: crosswalk?.inferredLineType === "Repuestos" ? "Repuesto" : "Servicio",
+      tipo_tiempo: persistedBillingTimeType(canonicalTimeType),
+      observacion: row.productName,
+      cod_mercaderia: row.productCode,
+      codigo_fabricante: row.manufacturerCode,
+      mercaderia: row.productName,
+      cantidad: Number((row.quantity || 0).toFixed(4)),
+      valor_unitario: Number((row.unitValueWithIva || row.unitValueBase || 0).toFixed(2)),
+      total_venta: Number((row.totalValueWithIva || row.totalValueBase || 0).toFixed(2)),
+      moneda: row.currency,
+      raw_data: {
+        ...row.raw,
+        linked_service_order: crosswalk?.serviceOrderNumber ?? null,
+        linked_service_order_evidence: crosswalk?.serviceOrderEvidence ?? "missing",
+        linked_service_order_known_values: crosswalk?.knownServiceOrders ?? [],
+        canonical_line_type: crosswalk?.inferredLineType ?? row.lineType,
+        canonical_time_type: canonicalTimeType,
+        canonical_time_type_evidence: crosswalk?.timeTypeEvidence ?? "missing",
+        canonical_time_type_known_values: crosswalk?.knownTimeTypes ?? [],
+        canonical_time_type_has_unknown: crosswalk?.hasUnknownTimeType ?? true,
+        product_brand: crosswalk?.productBrandEvidence === "missing"
+          ? null
+          : crosswalk?.productBrand ?? null,
+        product_brand_evidence: crosswalk?.productBrandEvidence ?? "missing",
+        product_brand_known_values: crosswalk?.knownProductBrands ?? [],
+        product_group: crosswalk?.productGroup ?? null,
+        product_family: crosswalk?.productFamily ?? null,
+        import_cutoff_mode: `legacy<=2026-06-30 / new>=${NEW_SYSTEM_START}`,
+      },
+    };
+  });
+}
+
 const missingPartsHistoryRefresh = (error: any) =>
   error?.code === "PGRST202"
   || error?.code === "42883"
@@ -56,54 +105,15 @@ const missingServiceOrderReconciliation = (error: any) =>
   || error?.code === "42883"
   || /ordenes_servicio_(reconciliar_snapshot|importadas_archivo)/.test(String(error?.message ?? ""));
 
-type BillingLineConflictIdentity = {
-  origen_sistema: string | null;
-  codigo_interno_factura: string | null;
-  factura: string | null;
-  cod_mercaderia: string | null;
-  codigo_fabricante: string | null;
-  observacion: string | null;
-  total_venta: number | null;
-  fecha_factura: string | null;
+const postBillingStageError = (stage: string, error: unknown) => {
+  const detail = error instanceof Error
+    ? error.message
+    : String((error as { message?: unknown } | null)?.message ?? error ?? "Error desconocido");
+  return new Error(
+    `La facturacion quedo confirmada, pero fallo la etapa posterior ${stage}. `
+    + `Es seguro reintentar el mismo paquete: la facturacion reutilizara sus UUID. Detalle: ${detail}`,
+  );
 };
-
-const billingLineConflictKey = (row: BillingLineConflictIdentity) => [
-  row.origen_sistema,
-  row.codigo_interno_factura,
-  row.factura,
-  row.cod_mercaderia,
-  row.codigo_fabricante,
-  row.observacion,
-  row.total_venta,
-].map((value) => value == null ? "" : String(value)).join("|");
-
-export function prepareBillingLineReimport<T extends BillingLineConflictIdentity>(rows: T[]) {
-  const datedByIdentity = new Map<string, BillingLineConflictIdentity>();
-  for (const row of rows) {
-    if (!row.fecha_factura) continue;
-    datedByIdentity.set(billingLineConflictKey(row), {
-      origen_sistema: row.origen_sistema,
-      codigo_interno_factura: row.codigo_interno_factura,
-      factura: row.factura,
-      cod_mercaderia: row.cod_mercaderia,
-      codigo_fabricante: row.codigo_fabricante,
-      observacion: row.observacion,
-      total_venta: row.total_venta,
-      fecha_factura: row.fecha_factura,
-    });
-  }
-  return { insertAll: rows, repairDates: Array.from(datedByIdentity.values()) };
-}
-
-export const BILLING_LINE_INSERT_OPTIONS = {
-  onConflict: "origen_sistema,linea_hash",
-  ignoreDuplicates: true,
-} as const;
-
-export const BILLING_LINE_REPAIR_DATE_OPTIONS = {
-  onConflict: "origen_sistema,linea_hash",
-  ignoreDuplicates: false,
-} as const;
 
 export async function actualizarVentasRepuestosPeriodo(desde: string | null, hasta: string | null) {
   if (!desde || !hasta) return { actualizado: false, error: null as string | null };
@@ -225,41 +235,12 @@ export async function persistNewSystemBundle({
   }
   const facturacionResumen = Array.from(facturacionResumenByKey.values());
 
-  const facturacionLineas = bundle.facturacion.rows.map((row) => {
-    const crosswalk = factCrosswalkByRowId.get(row.rowId);
-    return {
-      origen_sistema: crosswalk?.matchedBy === "none" ? "new_xml_facturacion_directa" : "new_xml_facturacion_os",
-      codigo_interno_factura: row.documentNumber ?? row.invoiceLongNumber,
-      factura: row.invoiceShortNumber ?? row.invoiceLongNumber,
-      entidad_nombre: row.clientName,
-      vendedor: row.seller ?? null,
-      fecha_factura: row.emissionDate,
-      sucursal: matchSucursalFromRegion(row.branch) ?? matchSucursal(row.branch),
-      subgrupo_original: crosswalk?.productGroup ?? row.productGroup,
-      grupo_normalizado: crosswalk?.inferredLineType ?? row.lineType,
-      marca_normalizada: (crosswalk?.productBrand as any) ?? "OTROS",
-      tipo_facturacion: crosswalk?.inferredLineType === "Repuestos" ? "Repuesto" : "Servicio",
-      tipo_tiempo: crosswalk?.inferredTimeType ?? row.timeType,
-      observacion: row.productName,
-      cod_mercaderia: row.productCode,
-      codigo_fabricante: row.manufacturerCode,
-      mercaderia: row.productName,
-      cantidad: Number((row.quantity || 0).toFixed(4)),
-      valor_unitario: Number((row.unitValueWithIva || row.unitValueBase || 0).toFixed(2)),
-      total_venta: Number((row.totalValueWithIva || row.totalValueBase || 0).toFixed(2)),
-      moneda: row.currency,
-      raw_data: {
-        ...row.raw,
-        linked_service_order: crosswalk?.serviceOrderNumber ?? null,
-        canonical_line_type: crosswalk?.inferredLineType ?? row.lineType,
-        canonical_time_type: crosswalk?.inferredTimeType ?? row.timeType,
-        product_brand: crosswalk?.productBrand ?? null,
-        product_group: crosswalk?.productGroup ?? null,
-        product_family: crosswalk?.productFamily ?? null,
-        import_cutoff_mode: `legacy<=2026-06-30 / new>=${NEW_SYSTEM_START}`,
-      },
-    };
-  });
+  const facturacionLineasSinValidar = prepareBillingPersistenceRows(bundle);
+
+  // Esta validacion ocurre antes del primer INSERT/UPDATE/DELETE del flujo.
+  // El RPC repite las mismas invariantes bajo transaccion para cerrar carreras.
+  const facturacionValidada = validateBillingSourceBatch(facturacionLineasSinValidar);
+  const facturacionLineas = facturacionValidada.rows;
 
   const osInvoiceDateByNumber = new Map<string, string>();
   for (const crosswalk of bundle.billingCrosswalk) {
@@ -278,21 +259,33 @@ export async function persistNewSystemBundle({
     fecha_emision_factura: row.fecha_emision_factura ?? osInvoiceDateByNumber.get(row.os_numero) ?? null,
   }));
 
-  const { data: factImp, error: factImpError } = await supabase
-    .from("importaciones")
-    .insert({
+  const billingWindow = bundle.diagnostics.replacement.facturacion;
+  const billingDates = facturacionLineas.map((row) => row.fecha_factura).filter((value): value is string => Boolean(value));
+  const facturacionDesde = billingWindow.from ?? (billingDates.length ? [...billingDates].sort()[0] : null);
+  const facturacionHasta = billingWindow.to ?? (billingDates.length ? [...billingDates].sort().at(-1)! : null);
+  const osNumeros = Array.from(new Set(ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean)));
+
+  const { error: facturacionError } = await (supabase.rpc as any)("facturacion_importar_totvs_lote_v1", {
+    p_importacion: {
       ...bundle.importaciones.facturacion,
-      insertados: 0,
-      duplicados: 0,
-      usuario_id: userId,
       metadata: {
         ...(bundle.importaciones.facturacion.metadata as Record<string, unknown>),
         archivos_relacionados: fileNames,
-      } as any,
-    } as any)
-    .select("id")
-    .single();
-  if (factImpError) throw factImpError;
+        duplicados_exactos_colapsados: facturacionValidada.collapsedExactDuplicates,
+      },
+    },
+    p_resumen: facturacionResumen,
+    p_lineas: facturacionLineas,
+    p_desde: facturacionDesde,
+    p_hasta: facturacionHasta,
+    p_reemplazar_resumen: billingWindow.shouldReplace,
+  });
+  if (facturacionError) {
+    if (isMissingBillingLinesTableError(facturacionError) || facturacionError.code === "PGRST202") {
+      throw new Error("Falta aplicar la migracion transaccional de facturacion TOTVS antes de importar el XML.");
+    }
+    throw facturacionError;
+  }
 
   const { data: osImp, error: osImpError } = await supabase
     .from("importaciones")
@@ -308,93 +301,7 @@ export async function persistNewSystemBundle({
     } as any)
     .select("id")
     .single();
-  if (osImpError) throw osImpError;
-
-  const billingWindow = bundle.diagnostics.replacement.facturacion;
-  const billingDates = facturacionLineas.map((row) => row.fecha_factura).filter((value): value is string => Boolean(value));
-  const facturacionDesde = billingWindow.from ?? (billingDates.length ? [...billingDates].sort()[0] : null);
-  const facturacionHasta = billingWindow.to ?? (billingDates.length ? [...billingDates].sort().at(-1)! : null);
-  if (billingWindow.shouldReplace && billingWindow.from && billingWindow.to) {
-    const { error: deleteFactSummaryError } = await supabase
-      .from("facturacion")
-      .delete()
-      .gte("fecha", billingWindow.from)
-      .lte("fecha", billingWindow.to);
-    if (deleteFactSummaryError) throw deleteFactSummaryError;
-
-    const { error: deleteFactLinesError } = await (supabase
-      .from("facturacion_lineas_importadas" as any)
-      .delete()
-      .gte("fecha_factura", billingWindow.from)
-      .lte("fecha_factura", billingWindow.to) as any);
-    if (deleteFactLinesError) throw deleteFactLinesError;
-  }
-
-  const osNumeros = Array.from(new Set(ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean)));
-
-  for (let i = 0; i < facturacionResumen.length; i += 500) {
-    const chunk = facturacionResumen.slice(i, i + 500);
-    const { error } = await supabase.from("facturacion").upsert(chunk as any, {
-      onConflict: "cod_factura,tipo,fecha,cod_entidad,entidad_nombre,sucursal,grupo,grupo_fx,moneda",
-    });
-    if (error) throw error;
-  }
-
-  const documentosFacturacion = Array.from(new Set(
-    facturacionLineas.map((row) => row.codigo_interno_factura).filter((value): value is string => Boolean(value)),
-  ));
-  const origenesFacturacion = Array.from(new Set(
-    facturacionLineas.map((row) => row.origen_sistema).filter((value): value is string => Boolean(value)),
-  ));
-  const lineasExistentes: any[] = [];
-  for (let i = 0; i < documentosFacturacion.length; i += 100) {
-    const documentos = documentosFacturacion.slice(i, i + 100);
-    lineasExistentes.push(...await cargarTodo<any>(supabase
-      .from("facturacion_lineas_importadas" as any)
-      .select("id,origen_sistema,codigo_interno_factura,factura,sucursal,cod_mercaderia,entidad_nombre,mercaderia,observacion,cantidad,valor_unitario,total_venta,moneda,codigo_fabricante,fecha_factura,raw_data")
-      .in("origen_sistema", origenesFacturacion)
-      .in("codigo_interno_factura", documentos)));
-  }
-  const planFacturacion = planBillingStableReimport(lineasExistentes, facturacionLineas);
-  for (const repair of planFacturacion.update) {
-    const { error } = await (supabase.from("facturacion_lineas_importadas" as any)
-      .update(billingSourceRepairPatch(repair.row) as any)
-      .eq("id", repair.id) as any);
-    if (error) throw error;
-  }
-
-  const { insertAll: facturacionParaInsertar, repairDates: fechasParaReparar } =
-    prepareBillingLineReimport(planFacturacion.insert);
-
-  // Primero conserva la insercion completa e idempotente. Despues envia solo
-  // las columnas que componen la identidad y fecha_factura: el conflicto ya
-  // insertado se actualiza sin pisar clasificaciones, raw_data o metadata.
-  for (let i = 0; i < facturacionParaInsertar.length; i += 500) {
-    const chunk = facturacionParaInsertar.slice(i, i + 500).map((row) => ({
-      ...row,
-      importacion_id: factImp.id,
-    }));
-    const { error } = await (supabase.from("facturacion_lineas_importadas" as any)
-      .upsert(chunk as any, BILLING_LINE_INSERT_OPTIONS) as any);
-    if (error) {
-      if (isMissingBillingLinesTableError(error)) {
-        throw new Error("Falta aplicar la migración de facturación detallada antes de importar XML del nuevo sistema.");
-      }
-      throw error;
-    }
-  }
-
-  for (let i = 0; i < fechasParaReparar.length; i += 500) {
-    const chunk = fechasParaReparar.slice(i, i + 500);
-    const { error } = await (supabase.from("facturacion_lineas_importadas" as any)
-      .upsert(chunk as any, BILLING_LINE_REPAIR_DATE_OPTIONS) as any);
-    if (error) {
-      if (isMissingBillingLinesTableError(error)) {
-        throw new Error("Falta aplicar la migración de facturación detallada antes de importar XML del nuevo sistema.");
-      }
-      throw error;
-    }
-  }
+  if (osImpError) throw postBillingStageError("registro de ordenes de servicio", osImpError);
 
   for (let i = 0; i < ordenesServicioPayload.length; i += 500) {
     const chunk = ordenesServicioPayload.slice(i, i + 500).map((row) => ({
@@ -406,9 +313,12 @@ export async function persistNewSystemBundle({
     }) as any);
     if (error) {
       if (isMissingOsImportTableError(error)) {
-        throw new Error("Falta aplicar la migración de órdenes de servicio antes de importar XML del nuevo sistema.");
+        throw postBillingStageError(
+          "persistencia de ordenes de servicio",
+          new Error("Falta aplicar la migracion de ordenes de servicio."),
+        );
       }
-      throw error;
+      throw postBillingStageError("persistencia de ordenes de servicio", error);
     }
   }
 
@@ -416,11 +326,15 @@ export async function persistNewSystemBundle({
   // clientes, productos, facturacion ni el resumen de la OS. Hasta que la
   // migracion se aplique, esta extension es opcional y no bloquea el flujo
   // historico del importador.
-  await persistCommissionTimeEntries({
-    rows: bundle.ordenesServicio.rows,
-    importId: osImp.id,
-    strict: false,
-  });
+  try {
+    await persistCommissionTimeEntries({
+      rows: bundle.ordenesServicio.rows,
+      importId: osImp.id,
+      strict: false,
+    });
+  } catch (error) {
+    throw postBillingStageError("detalle de comisiones", error);
+  }
 
   let ordenesServicioArchivadas = 0;
   let ordenesServicioBloqueadas = 0;
@@ -434,11 +348,12 @@ export async function persistNewSystemBundle({
     });
     if (error) {
       if (missingServiceOrderReconciliation(error)) {
-        throw new Error(
-          "Falta aplicar la migración de reconciliación de órdenes de servicio antes de volver a importar el XML.",
+        throw postBillingStageError(
+          "reconciliacion de ordenes de servicio",
+          new Error("Falta aplicar la migracion de reconciliacion de ordenes de servicio."),
         );
       }
-      throw error;
+      throw postBillingStageError("reconciliacion de ordenes de servicio", error);
     }
 
     const reconciliation = (data ?? {}) as Record<string, unknown>;
@@ -447,15 +362,6 @@ export async function persistNewSystemBundle({
     ordenesServicioBloqueadas = Number(reconciliation.bloqueadas ?? 0);
   }
 
-  const { error: updateFactImpError } = await supabase
-    .from("importaciones")
-    .update({
-      insertados: facturacionLineas.length,
-      duplicados: 0,
-    } as any)
-    .eq("id", factImp.id);
-  if (updateFactImpError) throw updateFactImpError;
-
   const { error: updateOsImpError } = await supabase
     .from("importaciones")
     .update({
@@ -463,7 +369,7 @@ export async function persistNewSystemBundle({
       duplicados: 0,
     } as any)
     .eq("id", osImp.id);
-  if (updateOsImpError) throw updateOsImpError;
+  if (updateOsImpError) throw postBillingStageError("cierre del registro de ordenes de servicio", updateOsImpError);
 
   const { error: refreshParkError } = await (supabase.rpc as any)("refrescar_parque_ultima_actividad");
   if (refreshParkError) {

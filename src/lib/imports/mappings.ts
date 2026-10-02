@@ -136,14 +136,18 @@ export function buildProductLookup(rows: CanonicalProductRow[]) {
 }
 
 export function buildServiceOrderLookup(rows: CanonicalServiceOrderRow[]) {
-  const byDocument = new Map<string, CanonicalServiceOrderRow>();
-  const byInvoice = new Map<string, CanonicalServiceOrderRow>();
+  const byDocument = new Map<string, CanonicalServiceOrderRow[]>();
+  const byInvoice = new Map<string, CanonicalServiceOrderRow[]>();
+
+  const append = (lookup: Map<string, CanonicalServiceOrderRow[]>, key: string, row: CanonicalServiceOrderRow) => {
+    lookup.set(key, [...(lookup.get(key) ?? []), row]);
+  };
 
   for (const row of rows) {
     const document = normalizeStableKey(row.documentNumber);
     const invoice = normalizeStableKey(row.invoiceNumber);
-    if (document) byDocument.set(document, row);
-    if (invoice) byInvoice.set(invoice, row);
+    if (document) append(byDocument, document, row);
+    if (invoice) append(byInvoice, invoice, row);
   }
 
   return { byDocument, byInvoice };
@@ -158,6 +162,7 @@ export function crosswalkBillingRow(args: {
   productGroup?: unknown;
   description?: unknown;
   billingTimeType?: CanonicalTimeType;
+  billingProductBrand?: string | null;
   serviceOrders: ReturnType<typeof buildServiceOrderLookup>;
   products: ReturnType<typeof buildProductLookup>;
 }): CanonicalBillingCrosswalk {
@@ -170,6 +175,7 @@ export function crosswalkBillingRow(args: {
     productGroup,
     description,
     billingTimeType,
+    billingProductBrand,
     serviceOrders,
     products,
   } = args;
@@ -179,16 +185,59 @@ export function crosswalkBillingRow(args: {
   const productCodeKey = normalizeStableKey(productCode);
   const manufacturerCodeKey = normalizeStableKey(manufacturerCode);
 
-  const serviceOrder =
+  const serviceOrderCandidates =
     (documentKey ? serviceOrders.byDocument.get(documentKey) : null) ??
     (invoiceKey ? serviceOrders.byInvoice.get(invoiceKey) : null) ??
-    null;
+    [];
 
   const product =
     (productCodeKey ? products.byInternalCode.get(productCodeKey) : null) ??
     (manufacturerCodeKey ? products.byManufacturerCode.get(manufacturerCodeKey) : null) ??
     null;
   const rowLineType = inferCanonicalBillingType(productGroup, description, productCode);
+  const sameProduct = serviceOrderCandidates.filter((candidate) =>
+    Boolean(productCodeKey) && normalizeStableKey(candidate.productCode) === productCodeKey,
+  );
+  const sameManufacturer = serviceOrderCandidates.filter((candidate) =>
+    Boolean(manufacturerCodeKey) && normalizeStableKey(candidate.manufacturerCode) === manufacturerCodeKey,
+  );
+  const sameLineType = serviceOrderCandidates.filter((candidate) =>
+    inferCanonicalServiceOrderLineType({
+      group: candidate.group,
+      productCode: candidate.productCode,
+      manufacturerCode: candidate.manufacturerCode,
+      description: candidate.productName,
+    }) === rowLineType,
+  );
+  const lineEvidence = sameProduct.length
+    ? sameProduct
+    : sameManufacturer.length
+      ? sameManufacturer
+      : sameLineType.length
+        ? sameLineType
+        : rowLineType === "Otros" && serviceOrderCandidates.length === 1
+          ? serviceOrderCandidates
+          : [];
+  const uniqueValues = (values: Array<string | null | undefined>) =>
+    Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+  const serviceOrderNumbers = uniqueValues(serviceOrderCandidates.map((candidate) => candidate.serviceOrderNumber));
+  const serviceOrderEvidence: CanonicalBillingCrosswalk["serviceOrderEvidence"] = !serviceOrderNumbers.length
+    ? "missing"
+    : serviceOrderNumbers.length === 1
+      ? "complete"
+      : "conflict";
+  const lineTimeTypes = uniqueValues(
+    lineEvidence.map((candidate) => candidate.timeType).filter((value) => value !== "Desconocido"),
+  ) as CanonicalTimeType[];
+  const hasUnknownTimeType = lineEvidence.some((candidate) => candidate.timeType === "Desconocido");
+  const timeTypeEvidence: CanonicalBillingCrosswalk["timeTypeEvidence"] = !lineEvidence.length
+    ? "missing"
+    : lineTimeTypes.length > 1
+      ? "conflict"
+      : hasUnknownTimeType
+        ? "partial"
+        : "complete";
+  const lineBrands = uniqueValues(lineEvidence.map((candidate) => candidate.brand));
   const productLineType = product
     ? inferCanonicalBillingType(product.group, product.description, product.internalCode)
     : null;
@@ -199,7 +248,27 @@ export function crosswalkBillingRow(args: {
       ? rowLineType
       : productLineType ?? rowLineType;
 
-  const matchedBy: CanonicalBillingCrosswalk["matchedBy"] = serviceOrder
+  const serviceOrderBrand = lineBrands.length === 1
+    && (inferredLineType === "Servicio" || inferredLineType === "Kilometraje")
+    ? lineBrands[0]
+    : null;
+  const inferredBrand = inferProductBrand(productGroup, manufacturerCode, description);
+  const evidencedInferredBrand = inferredBrand === "OTROS" ? null : inferredBrand;
+  const productBrand = serviceOrderBrand
+    ?? product?.brand
+    ?? billingProductBrand
+    ?? inferredBrand;
+  const productBrandEvidence: CanonicalBillingCrosswalk["productBrandEvidence"] = serviceOrderBrand
+    ? "service_order"
+    : product?.brand
+      ? "product"
+      : billingProductBrand
+        ? "billing"
+        : evidencedInferredBrand
+          ? "inferred"
+          : "missing";
+
+  const matchedBy: CanonicalBillingCrosswalk["matchedBy"] = serviceOrderCandidates.length
     ? documentKey && serviceOrders.byDocument.has(documentKey)
       ? "document"
       : "invoice"
@@ -212,17 +281,20 @@ export function crosswalkBillingRow(args: {
   return {
     billingRowId,
     matchedBy,
-    serviceOrderNumber: serviceOrder?.serviceOrderNumber ?? null,
+    serviceOrderNumber: serviceOrderNumbers.length === 1 ? serviceOrderNumbers[0] : null,
+    serviceOrderEvidence,
+    knownServiceOrders: serviceOrderNumbers,
     trabajoId: null,
-    inferredTimeType:
-      serviceOrder?.timeType ?? billingTimeType ?? inferCanonicalTimeType(productGroup ?? description),
+    inferredTimeType: lineTimeTypes.length === 1
+      ? lineTimeTypes[0]
+      : billingTimeType ?? "Desconocido",
+    timeTypeEvidence,
+    knownTimeTypes: lineTimeTypes,
+    hasUnknownTimeType,
     inferredLineType,
-    productBrand:
-      (serviceOrder && (inferredLineType === "Servicio" || inferredLineType === "Kilometraje")
-        ? serviceOrder.brand
-        : null) ??
-      product?.brand ??
-      inferProductBrand(productGroup, manufacturerCode, description),
+    productBrand,
+    productBrandEvidence,
+    knownProductBrands: productBrandEvidence === "missing" ? [] : [productBrand],
     productGroup: product?.group ?? (normalizeText(productGroup) || null),
     productFamily: product?.family ?? null,
   };

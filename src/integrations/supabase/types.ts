@@ -874,7 +874,7 @@ export type Database = {
           tipo_facturacion:
             | Database["public"]["Enums"]["tipo_facturacion"]
             | null
-          tipo_tiempo: string
+          tipo_tiempo: string | null
           total_venta: number
           valor_unitario: number | null
           vendedor: string | null
@@ -905,7 +905,7 @@ export type Database = {
           tipo_facturacion?:
             | Database["public"]["Enums"]["tipo_facturacion"]
             | null
-          tipo_tiempo?: string
+          tipo_tiempo?: string | null
           total_venta?: number
           valor_unitario?: number | null
           vendedor?: string | null
@@ -936,7 +936,7 @@ export type Database = {
           tipo_facturacion?:
             | Database["public"]["Enums"]["tipo_facturacion"]
             | null
-          tipo_tiempo?: string
+          tipo_tiempo?: string | null
           total_venta?: number
           valor_unitario?: number | null
           vendedor?: string | null

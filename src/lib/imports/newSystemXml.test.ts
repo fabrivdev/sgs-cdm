@@ -574,20 +574,116 @@ describe("importacion XML de ordenes de servicio", () => {
   it("clasifica cada factura por su documento aunque la OS sea mixta", () => {
     const rows = mapOrdenesServicioSheet("ordenes.xml", sheet).rows;
     const lookup = buildServiceOrderLookup(rows);
-    const classify = (documentNumber: string) =>
+    const classify = (documentNumber: string, withLaborEvidence = true) =>
       crosswalkBillingRow({
         billingRowId: documentNumber,
         documentNumber,
+        productCode: withLaborEvidence ? "MA01" : undefined,
+        productGroup: withLaborEvidence ? "SERVICIOS" : undefined,
+        description: withLaborEvidence ? "SERVICIO DE MANO DE OBRA" : undefined,
         serviceOrders: lookup,
         products: { byInternalCode: new Map(), byManufacturerCode: new Map() },
       }).inferredTimeType;
 
     expect(classify("0010010004798")).toBe("Cliente");
-    expect(classify("0010010004797")).toBe("Garantia");
     expect(classify("0010000000013")).toBe("Interno");
   });
 
-  it("prioriza la marca de la OS para Servicio y conserva la del producto para Repuestos", () => {
+  it("clasifica tipo de tiempo con evidencia de linea en una OS multiclase", () => {
+    const mixed = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes",
+      headers: [],
+      rows: [
+        {
+          Sucursal: "01", "NRO OS": "SYN-OS-MIXED", DOCUMENTO: "SYN-DOC-MIXED",
+          ITEM: "01", CODIGO: "MA01", PRODUCTO: "SERVICIO DE MANO DE OBRA",
+          GRUPO: "SERVICIOS", TIPTEM: "GS - GARANTIA SERVICIOS", MARCA: "CLAAS",
+        },
+        {
+          Sucursal: "01", "NRO OS": "SYN-OS-MIXED", DOCUMENTO: "SYN-DOC-MIXED",
+          ITEM: "02", CODIGO: "KM01", PRODUCTO: "KILOMETRAJE",
+          GRUPO: "SERVICIOS", TIPTEM: "CS - CLIENTE SERVICIOS", MARCA: "CLAAS",
+        },
+        {
+          Sucursal: "01", "NRO OS": "SYN-OS-MIXED", DOCUMENTO: "SYN-DOC-MIXED",
+          ITEM: "03", CODIGO: "MA01", PRODUCTO: "SERVICIO DE MANO DE OBRA",
+          GRUPO: "SERVICIOS", TIPTEM: "", MARCA: "CLAAS",
+        },
+      ],
+    }).rows;
+    const serviceOrders = buildServiceOrderLookup(mixed);
+    const products = { byInternalCode: new Map(), byManufacturerCode: new Map() };
+
+    const warrantyLabor = crosswalkBillingRow({
+      billingRowId: "labor",
+      documentNumber: "SYN-DOC-MIXED",
+      productCode: "MA01",
+      productGroup: "SERVICIOS",
+      description: "SERVICIO DE MANO DE OBRA",
+      serviceOrders,
+      products,
+    });
+    const clientKilometres = crosswalkBillingRow({
+      billingRowId: "km",
+      documentNumber: "SYN-DOC-MIXED",
+      productCode: "KM01",
+      productGroup: "SERVICIOS",
+      description: "KILOMETRAJE",
+      serviceOrders,
+      products,
+    });
+
+    expect(warrantyLabor.inferredTimeType).toBe("Garantia");
+    expect(warrantyLabor.timeTypeEvidence).toBe("partial");
+    expect(warrantyLabor.knownTimeTypes).toEqual(["Garantia"]);
+    expect(warrantyLabor.hasUnknownTimeType).toBe(true);
+    expect(clientKilometres.inferredTimeType).toBe("Cliente");
+    expect(clientKilometres.timeTypeEvidence).toBe("complete");
+    expect(warrantyLabor.serviceOrderNumber).toBe("01-SYN-OS-MIXED");
+  });
+
+  it("no inventa Cliente ni borra la marca cuando falta evidencia de OS", () => {
+    const result = crosswalkBillingRow({
+      billingRowId: "sin-os",
+      documentNumber: "SIN-COINCIDENCIA",
+      productCode: "MA01",
+      productGroup: "SERVICIOS",
+      description: "SERVICIO DE MANO DE OBRA",
+      billingTimeType: "Desconocido",
+      billingProductBrand: "HORSCH",
+      serviceOrders: buildServiceOrderLookup([]),
+      products: { byInternalCode: new Map(), byManufacturerCode: new Map() },
+    });
+
+    expect(result.inferredTimeType).toBe("Desconocido");
+    expect(result.timeTypeEvidence).toBe("missing");
+    expect(result.knownTimeTypes).toEqual([]);
+    expect(result.hasUnknownTimeType).toBe(false);
+    expect(result.serviceOrderNumber).toBeNull();
+    expect(result.serviceOrderEvidence).toBe("missing");
+    expect(result.knownServiceOrders).toEqual([]);
+    expect(result.productBrand).toBe("HORSCH");
+    expect(result.productBrandEvidence).toBe("billing");
+    expect(result.knownProductBrands).toEqual(["HORSCH"]);
+  });
+
+  it("distingue el fallback OTROS de evidencia explicita de marca", () => {
+    const result = crosswalkBillingRow({
+      billingRowId: "sin-marca",
+      documentNumber: "SIN-MARCA",
+      productCode: "SRV000006",
+      productGroup: "SERVICIOS",
+      description: "SERVICIO DE MANO DE OBRA",
+      serviceOrders: buildServiceOrderLookup([]),
+      products: { byInternalCode: new Map(), byManufacturerCode: new Map() },
+    });
+
+    expect(result.productBrand).toBe("OTROS");
+    expect(result.productBrandEvidence).toBe("missing");
+    expect(result.knownProductBrands).toEqual([]);
+  });
+
+  it("usa marca de OS solo con evidencia de linea y conserva la del producto en las demas", () => {
     const serviceOrders = buildServiceOrderLookup(mapOrdenesServicioSheet("ordenes.xml", sheet).rows);
     const products = buildProductLookup([
       {
@@ -660,13 +756,39 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(service.inferredLineType).toBe("Servicio");
     expect(service.productBrand).toBe("HORSCH");
     expect(kilometre.inferredLineType).toBe("Kilometraje");
-    expect(kilometre.productBrand).toBe("HORSCH");
+    expect(kilometre.productBrand).toBe("CLAAS");
     expect(sparePart.inferredLineType).toBe("Repuestos");
     expect(sparePart.productBrand).toBe("CLAAS");
   });
 });
 
 describe("importacion XML de facturacion", () => {
+  it("normaliza la filial 04 San Juan Bautista a la sucursal Misiones", () => {
+    const result = mapFacturaVentasSheet("facturas.xml", {
+      name: "Facturas",
+      headers: [],
+      rows: [{
+        FILIAL: "04 - San Juan Bautista",
+        LOJA: "01",
+        EMISION: "20261001",
+        ESPECIE: "NF",
+        DOCUMENTO: "SYN-DOC-BRANCH",
+        ITEM: "01",
+        CLIENTE: "SYN-ENTITY-001",
+        NOMBRE: "SYNTHETIC ENTITY",
+        CODIGO: "SYN-PROD-001",
+        PRODUCTO: "SYNTHETIC ITEM",
+        CANTIDAD: "1",
+        TOTALGS: "100",
+        VUNITGS: "100",
+      }],
+    });
+
+    expect(result.rows[0].branch).toBe("Misiones");
+    expect(result.rows[0].timeType).toBe("Desconocido");
+    expect(result.rows[0].raw.FILIAL).toBe("04 - San Juan Bautista");
+  });
+
   it("conserva el chasis y los datos finales de una venta de maquinaria", () => {
     const result = mapFacturaVentasSheet("facturas.xml", {
       name: "Facturas",

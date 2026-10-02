@@ -132,6 +132,13 @@ export function mapCanonicalBillingToFactLine(
       canonical_line_type: row.lineType,
       canonical_time_type: row.timeType,
       linked_service_order: crosswalk?.serviceOrderNumber ?? row.linkedServiceOrder,
+      linked_service_order_evidence: crosswalk?.serviceOrderEvidence ?? "missing",
+      linked_service_order_known_values: crosswalk?.knownServiceOrders ?? [],
+      product_brand: crosswalk?.productBrandEvidence === "missing"
+        ? null
+        : crosswalk?.productBrand ?? row.productBrand,
+      product_brand_evidence: crosswalk?.productBrandEvidence ?? "missing",
+      product_brand_known_values: crosswalk?.knownProductBrands ?? [],
       linked_trabajo: crosswalk?.trabajoId ?? row.linkedTrabajo,
       import_era: resolveImportEra(row.emissionDate),
       is_direct_sale: row.isDirectSale,
