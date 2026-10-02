@@ -2,16 +2,27 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync("src/lib/imports/newSystemPersist.ts", "utf8");
+const importerUi = readFileSync("src/components/parque/ImportarTotvsTab.tsx", "utf8");
 
 describe("persistencia de facturacion del sistema nuevo", () => {
   it("prevalida antes del RPC y persiste OS solo despues de facturacion", () => {
     const prevalidation = source.indexOf("validateBillingSourceBatch(facturacionLineasSinValidar)");
-    const billingRpc = source.indexOf('"facturacion_importar_totvs_lote_v1"');
+    const billingRpc = source.indexOf('"facturacion_validar_totvs_lote_v1"');
     const serviceOrderImport = source.indexOf("...bundle.importaciones.ordenesServicio");
 
     expect(prevalidation).toBeGreaterThan(0);
     expect(billingRpc).toBeGreaterThan(prevalidation);
     expect(serviceOrderImport).toBeGreaterThan(billingRpc);
+  });
+
+  it("ejecuta el preflight transaccional antes de escribir clientes", () => {
+    const preflight = importerUi.indexOf('mode: "validate"');
+    const firstClientWrite = importerUi.indexOf('supabase.from("clientes").insert');
+    const actualPersistence = importerUi.indexOf("const resultado = await persistNewSystemBundle");
+
+    expect(preflight).toBeGreaterThan(0);
+    expect(firstClientWrite).toBeGreaterThan(preflight);
+    expect(actualPersistence).toBeGreaterThan(firstClientWrite);
   });
 
   it("no ejecuta borrado directo ni upsert tolerante de lineas detalladas", () => {

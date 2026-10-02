@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildServiceOrderLookup, crosswalkBillingRow } from "./mappings";
+import { buildProductLookup, buildServiceOrderLookup, crosswalkBillingRow } from "./mappings";
 import { mapOrdenesServicioSheet } from "./newSystemXml";
 
 const emptyProducts = {
@@ -61,5 +61,34 @@ describe("evidencia sintetica del crosswalk de facturacion", () => {
     expect(result.serviceOrderEvidence).toBe("missing");
     expect(result.productBrand).toBe("HORSCH");
     expect(result.productBrandEvidence).toBe("billing");
+  });
+
+  it("no convierte el fallback OTROS del maestro en evidencia de marca", () => {
+    const products = buildProductLookup([{
+      rowId: "product-other",
+      internalCode: "SRV000006",
+      manufacturerCode: null,
+      description: "SERVICIO SIN MARCA ESPECIFICA",
+      brand: "OTROS",
+      group: "SERVICIOS",
+      family: null,
+      unit: "HS",
+      isActive: true,
+      raw: {},
+    }]);
+    const result = crosswalkBillingRow({
+      billingRowId: "synthetic-other-product",
+      documentNumber: "SIN-OS",
+      productCode: "SRV000006",
+      productGroup: "SERVICIOS",
+      description: "SERVICIO SIN MARCA ESPECIFICA",
+      billingTimeType: "Desconocido",
+      serviceOrders: buildServiceOrderLookup([]),
+      products,
+    });
+
+    expect(result.productBrand).toBe("OTROS");
+    expect(result.productBrandEvidence).toBe("missing");
+    expect(result.knownProductBrands).toEqual([]);
   });
 });

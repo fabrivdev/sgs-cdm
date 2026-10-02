@@ -27,6 +27,7 @@ export { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
 export interface PersistNewSystemBundleArgs {
   bundle: NewSystemImportBundle;
   userId: string;
+  mode?: "validate" | "persist";
   fileNames: {
     facturacion: string | null;
     ordenesServicio: string | null;
@@ -133,6 +134,7 @@ export async function actualizarVentasRepuestosPeriodo(desde: string | null, has
 export async function persistNewSystemBundle({
   bundle,
   userId,
+  mode = "persist",
   fileNames,
 }: PersistNewSystemBundleArgs): Promise<PersistNewSystemBundleResult> {
   const osWindow = bundle.diagnostics.replacement.ordenesServicio;
@@ -265,7 +267,10 @@ export async function persistNewSystemBundle({
   const facturacionHasta = billingWindow.to ?? (billingDates.length ? [...billingDates].sort().at(-1)! : null);
   const osNumeros = Array.from(new Set(ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean)));
 
-  const { error: facturacionError } = await (supabase.rpc as any)("facturacion_importar_totvs_lote_v1", {
+  const billingRpc = mode === "validate"
+    ? "facturacion_validar_totvs_lote_v1"
+    : "facturacion_importar_totvs_lote_v1";
+  const { error: facturacionError } = await (supabase.rpc as any)(billingRpc, {
     p_importacion: {
       ...bundle.importaciones.facturacion,
       metadata: {
@@ -285,6 +290,20 @@ export async function persistNewSystemBundle({
       throw new Error("Falta aplicar la migracion transaccional de facturacion TOTVS antes de importar el XML.");
     }
     throw facturacionError;
+  }
+
+  if (mode === "validate") {
+    return {
+      facturacionLineas: facturacionLineas.length,
+      ordenesServicio: ordenesServicioPayload.length,
+      ordenesServicioArchivadas: 0,
+      ordenesServicioBloqueadas: 0,
+      jornadasDesactivadas: 0,
+      facturacionDesde,
+      facturacionHasta,
+      historialRepuestosActualizado: false,
+      historialRepuestosError: null,
+    };
   }
 
   const { data: osImp, error: osImpError } = await supabase

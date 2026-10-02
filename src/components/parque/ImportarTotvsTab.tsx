@@ -522,6 +522,32 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let branchTransfersActualizadas = 0;
       let branchTransfersSinCambios = 0;
 
+      const newSystemBundle = preview.bundleFiles
+        ? prepareNewSystemImportBundle({
+          facturacion: preview.bundleFiles.facturacion,
+          ordenesServicio: preview.bundleFiles.ordenesServicio,
+          productos: preview.bundleFiles.productos,
+          usuarioId: user.id,
+        })
+        : null;
+
+      // El mismo RPC que persiste el lote se ejecuta en una subtransaccion
+      // descartada antes de tocar clientes. Esto evita escrituras del maestro
+      // ante errores deterministas del paquete, sin prometer atomicidad global
+      // entre las llamadas HTTP posteriores.
+      if (newSystemBundle && preview.bundleFiles) {
+        await persistNewSystemBundle({
+          bundle: newSystemBundle,
+          userId: user.id,
+          mode: "validate",
+          fileNames: {
+            facturacion: preview.bundleFiles.facturacion.fileName,
+            ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
+            productos: preview.bundleFiles.productos.fileName,
+          },
+        });
+      }
+
       // El maestro se aplica antes que facturacion/OS: asi las lineas del
       // mismo lote ya resuelven contra el nombre y RUC corregidos.
       for (let i = 0; i < preview.clientesNuevos.length; i += 500) {
@@ -550,15 +576,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         if (error) throw error;
       }
 
-      if (preview.bundleFiles) {
-        const bundle = prepareNewSystemImportBundle({
-          facturacion: preview.bundleFiles.facturacion,
-          ordenesServicio: preview.bundleFiles.ordenesServicio,
-          productos: preview.bundleFiles.productos,
-          usuarioId: user.id,
-        });
+      if (preview.bundleFiles && newSystemBundle) {
         const resultado = await persistNewSystemBundle({
-          bundle,
+          bundle: newSystemBundle,
           userId: user.id,
           fileNames: {
             facturacion: preview.bundleFiles.facturacion.fileName,

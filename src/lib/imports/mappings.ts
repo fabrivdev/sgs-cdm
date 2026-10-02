@@ -253,14 +253,17 @@ export function crosswalkBillingRow(args: {
     ? lineBrands[0]
     : null;
   const inferredBrand = inferProductBrand(productGroup, manufacturerCode, description);
+  const evidencedProductBrand = product?.brand && product.brand !== "OTROS"
+    ? product.brand
+    : null;
   const evidencedInferredBrand = inferredBrand === "OTROS" ? null : inferredBrand;
   const productBrand = serviceOrderBrand
-    ?? product?.brand
+    ?? evidencedProductBrand
     ?? billingProductBrand
     ?? inferredBrand;
   const productBrandEvidence: CanonicalBillingCrosswalk["productBrandEvidence"] = serviceOrderBrand
     ? "service_order"
-    : product?.brand
+    : evidencedProductBrand
       ? "product"
       : billingProductBrand
         ? "billing"

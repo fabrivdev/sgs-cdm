@@ -6,6 +6,10 @@ const migration = readFileSync(
   "utf8",
 );
 const importer = readFileSync("src/lib/imports/newSystemPersist.ts", "utf8");
+const calendarDateMigration = readFileSync(
+  "supabase/migrations/20261002210000_fix_totvs_calendar_dates_and_preflight.sql",
+  "utf8",
+);
 
 describe("importacion transaccional de facturacion TOTVS", () => {
   it("mantiene el RPC en una transaccion y no borra lineas detalladas", () => {
@@ -80,5 +84,20 @@ describe("importacion transaccional de facturacion TOTVS", () => {
     expect(migration).not.toMatch(
       /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+public\.facturacion_dedupe_repair_pairs/i,
     );
+  });
+
+  it("fija UTC para todo el contrato calendario y valida huellas antes de cambiarlo", () => {
+    const fingerprintPrecondition = calendarDateMigration.indexOf(
+      "p.linea_fingerprint IS DISTINCT FROM",
+    );
+    const timezoneChange = calendarDateMigration.indexOf(
+      "ALTER FUNCTION public.facturacion_importar_totvs_lote_v1",
+    );
+
+    expect(fingerprintPrecondition).toBeGreaterThan(0);
+    expect(timezoneChange).toBeGreaterThan(fingerprintPrecondition);
+    expect(calendarDateMigration).toContain("SET TimeZone TO 'UTC'");
+    expect(calendarDateMigration).toContain("facturacion_validar_totvs_lote_v1");
+    expect(calendarDateMigration).toContain("__TOTVS_VALIDACION_ROLLBACK__");
   });
 });
