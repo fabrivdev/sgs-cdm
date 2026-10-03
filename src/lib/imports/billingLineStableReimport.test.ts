@@ -92,4 +92,18 @@ describe("prevalidacion de lineas TOTVS", () => {
       raw_data: { ...line().raw_data, linked_service_order: "SYN-OS-001" },
     }))).toBe(false);
   });
+
+  it("rechaza duplicados con distinta evidencia aunque coincida la clasificacion", () => {
+    const first = line({ tipo_tiempo: null, raw_data: {
+      ...line().raw_data, canonical_time_type_evidence: "missing",
+      canonical_time_type_known_values: [], canonical_time_type_has_unknown: false,
+    } });
+    const other = { ...first, raw_data: {
+      ...first.raw_data, canonical_time_type_evidence: "partial",
+      canonical_time_type_known_values: ["Cliente"], canonical_time_type_has_unknown: true,
+    } };
+    expect(() => validateBillingSourceBatch([first, other])).toThrow(/Conflicto dentro del XML/);
+    expect(() => validateBillingSourceBatch([other, first])).toThrow(/Conflicto dentro del XML/);
+    expect(validateBillingSourceBatch([first, first]).collapsedExactDuplicates).toBe(1);
+  });
 });

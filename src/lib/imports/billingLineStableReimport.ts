@@ -79,6 +79,18 @@ const commercialSnapshot = (row: BillingSourceLine) => ({
   marca_normalizada: stable(row.marca_normalizada),
   tipo_facturacion: stable(row.tipo_facturacion),
   tipo_tiempo: stable(row.tipo_tiempo),
+  // Dos lineas con valores iguales pero evidencia distinta no son duplicados
+  // intercambiables: elegir una podria esconder una contradiccion de OS.
+  evidence: {
+    linked_service_order_evidence: row.raw_data?.linked_service_order_evidence ?? null,
+    linked_service_order_known_values: row.raw_data?.linked_service_order_known_values ?? null,
+    canonical_time_type_evidence: row.raw_data?.canonical_time_type_evidence ?? null,
+    canonical_time_type_known_values: row.raw_data?.canonical_time_type_known_values ?? null,
+    canonical_time_type_has_unknown: row.raw_data?.canonical_time_type_has_unknown ?? null,
+    product_brand: row.raw_data?.product_brand ?? null,
+    product_brand_evidence: row.raw_data?.product_brand_evidence ?? null,
+    product_brand_known_values: row.raw_data?.product_brand_known_values ?? null,
+  },
 });
 
 export function sameAuditedCommercialLine(left: BillingSourceLine, right: BillingSourceLine) {

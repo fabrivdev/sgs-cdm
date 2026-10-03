@@ -25,3 +25,32 @@ Estas tablas quedan preparadas como fuentes para un futuro panel gerencial macro
 ## Validación pendiente para rentabilidad
 
 Antes de alimentar margen o resultado económico se necesita un Kardex comparable del período 2026-07-01 a 2026-08-25, con todas las filiales, depósitos, productos, tablas y movimientos, conservando TABLA/RECNO y los ejes de costo. También se debe confirmar la semántica de `MONEDA=0/2`, `_D_2`, `_D_3`, `T_C=0` y si los reprocesos de costo/fecha reescriben históricos manteniendo RECNO.
+
+## Reimportacion y ausencia de evidencia (2026-10-03)
+
+La regla de destinatario del importador anterior no se traslada a TOTVS. Sin
+vinculo real con OS, el tipo de tiempo queda NULL; la ausencia de una OS en un
+XML nuevo no prueba que un vinculo persistido haya dejado de existir.
+
+La migracion `20261003001500` propuesta conserva UUID y pares reparados. Admite
+completar vendedores vacios, limpiar el antiguo default Cliente sin OS
+ni metadata de evidencia, incorporar un vinculo previamente ausente cuando
+el XML aporta evidencia completa y univoca (con tiempo/marca comprobados),
+y retener un vinculo/clasificacion existente cuando
+la entrada declara evidencia ausente. Cambios explicitos contradictorios de
+OS, tipo, marca, vendedor conocido, cantidades o importes siguen bloqueando.
+Las preservaciones auditadas conservan sus verificaciones de huella, timestamp
+y par; no usan el respaldo general. La limpieza actualiza tambien
+`raw_data.canonical_time_type` para evitar que consumidores recuperen el viejo
+default. Los cambios de vendedor/tipo quedan en una auditoria transaccional.
+
+Los duplicados del lote deben coincidir tambien en su metadata de evidencia,
+tanto antes de enviarse desde el frontend como dentro del RPC. Repetir un
+paquete sin novedades no debe actualizar filas cuyo campo y entrada siguen
+ambos vacios. La validacion descrita es local; aplicar codigo no ejecuta SQL y
+no acredita triggers ni vistas productivas que no se hayan reproducido.
+
+La migracion guarda la definicion previa del RPC antes de reemplazarla. La
+auditoria de importacion conserva valores anteriores de todas las columnas
+modificadas, raw_data anterior y huellas antes/despues. Revertir el codigo no
+revierte datos importados; una reversión de datos requiere controles propios.
