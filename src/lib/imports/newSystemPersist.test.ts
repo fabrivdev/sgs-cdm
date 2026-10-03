@@ -36,3 +36,18 @@ describe("persistencia de facturacion del sistema nuevo", () => {
     expect(source).toContain("la facturacion reutilizara sus UUID");
   });
 });
+
+describe("contadores de exclusiones confirmadas", () => {
+  it("usa las lineas aceptadas y excluidas devueltas por el RPC", () => {
+    expect(source).toContain("data: facturacionData");
+    expect(source).toContain("facturacionResultado.excluidas_confirmadas");
+    expect(source).toContain("facturacionResultado.lineas_activas");
+    expect(source).toContain("facturacionLineas: facturacionAceptadas");
+  });
+  it("cuenta las OS que devuelve el upsert, conservando sus triggers", () => {
+    expect(source).toContain('}).select("os_numero")');
+    expect(source).toContain("insertados: ordenesServicioPersistidas");
+    expect(source).toContain("ordenesServicio: ordenesServicioPersistidas");
+    expect(source).not.toContain("insertados: ordenesServicioPayload.length");
+  });
+});

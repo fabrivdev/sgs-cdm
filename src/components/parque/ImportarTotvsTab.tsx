@@ -494,6 +494,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     setBusy(true);
     try {
       let facturacionLineas = 0;
+      let facturacionExcluidas = 0;
+      let ordenesServicioOmitidas = 0;
       let ordenesServicio = 0;
       let ordenesServicioArchivadas = 0;
       let ordenesServicioBloqueadas = 0;
@@ -587,6 +589,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           },
         });
         facturacionLineas = resultado.facturacionLineas;
+        facturacionExcluidas = resultado.facturacionExcluidas;
+        ordenesServicioOmitidas = resultado.ordenesServicioOmitidas;
         ordenesServicio = resultado.ordenesServicio;
         ordenesServicioArchivadas = resultado.ordenesServicioArchivadas;
         ordenesServicioBloqueadas = resultado.ordenesServicioBloqueadas;
@@ -963,6 +967,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         branchTransferRows.length ? `${branchTransferRows.length} transferencias en tránsito (${branchTransfersInsertadas} nuevas, ${branchTransfersActualizadas} actualizadas, ${branchTransfersSinCambios} sin cambios)` : null,
       ].filter(Boolean);
       toast.success(`Importado: ${partes.join(", ")}.`);
+      if (facturacionExcluidas || ordenesServicioOmitidas) {
+        toast.info(`${facturacionExcluidas} líneas excluidas por anulación confirmada; ${ordenesServicioOmitidas} OS omitidas por las reglas vigentes.`);
+      }
       if (ordenesServicioBloqueadas) {
         toast.warning(
           `${ordenesServicioBloqueadas} OS ausentes conservaron su estado porque tienen factura, trabajo o comisión liquidada.`,

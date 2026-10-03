@@ -695,6 +695,9 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
             : ""
         }.`,
       );
+      if (resultado.facturacionExcluidas || resultado.ordenesServicioOmitidas) {
+        toast.info(`${resultado.facturacionExcluidas} líneas excluidas por anulación confirmada; ${resultado.ordenesServicioOmitidas} OS omitidas por las reglas vigentes.`);
+      }
       if (resultado.ordenesServicioBloqueadas) {
         toast.warning(
           `${resultado.ordenesServicioBloqueadas} OS ausentes conservaron su estado porque tienen factura, trabajo o comisión liquidada.`,

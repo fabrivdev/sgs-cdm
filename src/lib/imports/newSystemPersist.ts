@@ -37,6 +37,8 @@ export interface PersistNewSystemBundleArgs {
 
 export interface PersistNewSystemBundleResult {
   facturacionLineas: number;
+  facturacionExcluidas: number;
+  ordenesServicioOmitidas: number;
   ordenesServicio: number;
   ordenesServicioArchivadas: number;
   ordenesServicioBloqueadas: number;
@@ -270,7 +272,7 @@ export async function persistNewSystemBundle({
   const billingRpc = mode === "validate"
     ? "facturacion_validar_totvs_lote_v1"
     : "facturacion_importar_totvs_lote_v1";
-  const { error: facturacionError } = await (supabase.rpc as any)(billingRpc, {
+  const { data: facturacionData, error: facturacionError } = await (supabase.rpc as any)(billingRpc, {
     p_importacion: {
       ...bundle.importaciones.facturacion,
       metadata: {
@@ -292,9 +294,15 @@ export async function persistNewSystemBundle({
     throw facturacionError;
   }
 
+  const facturacionResultado = (facturacionData ?? {}) as Record<string, unknown>;
+  const facturacionExcluidas = Number(facturacionResultado.excluidas_confirmadas ?? 0);
+  const facturacionAceptadas = Number(facturacionResultado.lineas_activas ?? facturacionLineas.length - facturacionExcluidas);
+
   if (mode === "validate") {
     return {
-      facturacionLineas: facturacionLineas.length,
+      facturacionLineas: facturacionAceptadas,
+      facturacionExcluidas,
+      ordenesServicioOmitidas: 0,
       ordenesServicio: ordenesServicioPayload.length,
       ordenesServicioArchivadas: 0,
       ordenesServicioBloqueadas: 0,
@@ -322,14 +330,15 @@ export async function persistNewSystemBundle({
     .single();
   if (osImpError) throw postBillingStageError("registro de ordenes de servicio", osImpError);
 
+  let ordenesServicioPersistidas = 0;
   for (let i = 0; i < ordenesServicioPayload.length; i += 500) {
     const chunk = ordenesServicioPayload.slice(i, i + 500).map((row) => ({
       ...row,
       actualizado_en: new Date().toISOString(),
     }));
-    const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
+    const { data: osPersistidas, error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
       onConflict: "os_numero",
-    }) as any);
+    }).select("os_numero") as any);
     if (error) {
       if (isMissingOsImportTableError(error)) {
         throw postBillingStageError(
@@ -339,7 +348,9 @@ export async function persistNewSystemBundle({
       }
       throw postBillingStageError("persistencia de ordenes de servicio", error);
     }
+    ordenesServicioPersistidas += Array.isArray(osPersistidas) ? osPersistidas.length : 0;
   }
+  const ordenesServicioOmitidas = ordenesServicioPayload.length - ordenesServicioPersistidas;
 
   // El mismo XML alimenta el detalle de comisiones sin volver a importar
   // clientes, productos, facturacion ni el resumen de la OS. Hasta que la
@@ -384,7 +395,7 @@ export async function persistNewSystemBundle({
   const { error: updateOsImpError } = await supabase
     .from("importaciones")
     .update({
-      insertados: ordenesServicioPayload.length,
+      insertados: ordenesServicioPersistidas,
       duplicados: 0,
     } as any)
     .eq("id", osImp.id);
@@ -398,8 +409,10 @@ export async function persistNewSystemBundle({
   const historialRepuestos = await actualizarVentasRepuestosPeriodo(facturacionDesde, facturacionHasta);
 
   return {
-    facturacionLineas: facturacionLineas.length,
-    ordenesServicio: ordenesServicioPayload.length,
+    facturacionLineas: facturacionAceptadas,
+    facturacionExcluidas,
+    ordenesServicioOmitidas,
+    ordenesServicio: ordenesServicioPersistidas,
     ordenesServicioArchivadas,
     ordenesServicioBloqueadas,
     jornadasDesactivadas,
